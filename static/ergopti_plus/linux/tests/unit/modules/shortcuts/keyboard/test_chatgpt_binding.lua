@@ -25,7 +25,7 @@ local function with_binding(body, options)
 				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 				run = function(command) seen.commands[#seen.commands + 1] = command; return true end,
 			}
-			package.loaded["adapters.evdev_reader"] = {
+			package.loaded["platform.input.evdev_reader"] = {
 				open = function() error("shortcut ownership must not acquire evdev") end,
 				close = function() error("shortcut ownership must not close evdev") end,
 			}

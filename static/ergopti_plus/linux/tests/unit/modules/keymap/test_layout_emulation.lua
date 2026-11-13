@@ -194,7 +194,7 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		package.loaded["adapters.keyboard_layout"] = saved.layout
 		package.loaded["modules.keymap.layout_emulation"] = nil
 		if not ok then error(problem, 0) end
-		local Codes = require("infra.evdev_codes")
+		local Codes = require("platform.input.evdev_codes")
 		helpers.assert_eq(chords, {
 			{ modifiers = { Codes.KEY_LEFTCTRL }, keys = { 44 } },
 			{ modifiers = { Codes.KEY_LEFTCTRL, Codes.KEY_LEFTSHIFT }, keys = { 44 } },

@@ -114,9 +114,9 @@ helpers.describe("modules.shortcuts.manager", function()
   -- restored at the end of the block. The real lock is proven by
   -- test_keyboard_hook_caps_word_lock and the session's endings by
   -- test_caps_word_auto_off.
-  local prior_hook = package.loaded["adapters.keyboard_hook"]
+  local prior_hook = package.loaded["platform.input.keyboard_hook"]
   local hook = require("tests.support.caps_word_lock_hook_fake").new()
-  package.loaded["adapters.keyboard_hook"] = hook
+  package.loaded["platform.input.keyboard_hook"] = hook
   M.init({})
 
   helpers.it("is_caps_word_active returns false initially", function()
@@ -149,7 +149,7 @@ helpers.describe("modules.shortcuts.manager", function()
 
   -- Not an `it`: a --only filter skips cases, and the fake would then stay in
   -- package.loaded for every later module (the diagnostics bridge reads the hook).
-  package.loaded["adapters.keyboard_hook"] = prior_hook
+  package.loaded["platform.input.keyboard_hook"] = prior_hook
 
   -- ==========================================================================
   -- 4. Enable / disable / toggle

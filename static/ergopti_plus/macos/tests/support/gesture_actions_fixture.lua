@@ -50,10 +50,10 @@ local OWNERS = {
 	"_generated.gesture_emit_actions",
 	"core.fs.adapters.file_system",
 	"adapters.clipboard",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.fs.adapters.json_codec",
-	"adapters.key_state",
-	"adapters.synthetic_input",
+	"platform.input.key_state",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"keyboard.engine.desktop_navigation",
 	"infra.config_paths",
@@ -143,8 +143,8 @@ local function fresh_actions(options)
 		"modules.shortcuts.actions.system_pixel",
 		"core.fs.adapters.file_system",
 		"adapters.clipboard",
-		"adapters.key_state",
-		"adapters.synthetic_input",
+		"platform.input.key_state",
+		"platform.input.synthetic_input",
 		"core.lifecycle.engine.shutdown.termination_coordinator",
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",
@@ -610,7 +610,7 @@ local function fresh_actions(options)
 		end,
 		read_file = function() return nil end,
 	}
-	package.loaded["adapters.key_state"] = setmetatable({}, {
+	package.loaded["platform.input.key_state"] = setmetatable({}, {
 		__index = function() return function() return false end end,
 	})
 	local function finish_transaction(tx, status)
@@ -622,7 +622,7 @@ local function fresh_actions(options)
 		tx.completed, tx.status = true, tx.cancelled and "cancelled" or status
 		for _, callback in ipairs(tx.complete) do callback(tx, tx.status) end
 	end
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		begin = function(owner, effect, publication)
 			return { owner = owner, effect = effect, publication = publication, complete = {}, dispatched = {} }
 		end,
@@ -920,7 +920,7 @@ local function with_feature_lifecycles(actions, calls, body)
 		"modules.shortcuts.bindings",
 		"modules.shortcuts.script_control",
 		"modules.shortcuts.keyboard_shortcuts",
-		"adapters.hotkey_registrar",
+		"platform.input.hotkey_registrar",
 		"core.lifecycle.engine.startup_transaction",
 		"modules.gestures",
 		"modules.gestures.engine",
@@ -958,7 +958,7 @@ local function with_feature_lifecycles(actions, calls, body)
 		start = function() feature.keyboard_started = true; return true end,
 		stop = function() feature.keyboard_started = false; return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		set_delivery_guard = function() return true end,
 	}
 	package.loaded["core.lifecycle.engine.startup_transaction"] = {

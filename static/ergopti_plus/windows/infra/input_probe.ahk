@@ -35,7 +35,7 @@
 #Requires AutoHotkey v2.0
 
 #Include ../core/events/boot_clock.ahk
-#Include ../adapters/input_probe_native.ahk
+#Include ../platform/input/probe_native.ahk
 
 
 

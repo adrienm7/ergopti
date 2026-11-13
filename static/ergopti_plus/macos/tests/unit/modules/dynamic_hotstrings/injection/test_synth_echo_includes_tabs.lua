@@ -48,7 +48,7 @@ end
 --- @return table captured Transaction output and inject_dynamic arguments.
 local function drive_real_expansion()
 	local PI = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
-	local SyntheticInput = require("adapters.synthetic_input")
+	local SyntheticInput = require("platform.input.synthetic_input")
 
 	local captured = {}
 	local interceptor

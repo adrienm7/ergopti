@@ -44,10 +44,10 @@
 ---    rule in tap_hold.lone_tap); 0 keeps the strict threshold.
 --- ==============================================================================
 
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local OneShotShift = require("tap_hold.engine.one_shot_shift_core")
 local LoneTap = require("tap_hold.engine.lone_tap")
-local InputEvent = require("infra.input_event")
+local InputEvent = require("platform.input.event")
 
 local M = {}
 -- Only the installed wrapper supplies the hook-backed port. Pure engine users

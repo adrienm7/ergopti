@@ -64,7 +64,7 @@ end
 --- Captures the provider's family at input, before any mutable metric counters.
 --- @return string Physical keyboard family.
 function M.capture_layout()
-	local Hook = require("adapters.keyboard_hook")
+	local Hook = require("platform.input.keyboard_hook")
 	assert(type(Hook.get_layout) == "function", "Metrics capture has no physical family provider")
 	return physical_family(Hook.get_layout())
 end

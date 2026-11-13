@@ -104,7 +104,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.utils"] = api()
 		package.loaded["adapters.event_provenance"] = api()
 		local epoch = {}
-		package.loaded["adapters.synthetic_input"] = api({
+		package.loaded["platform.input.synthetic_input"] = api({
 			current_action_epoch = function() return epoch end,
 		})
 		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
@@ -117,7 +117,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 				return false
 			end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			ESCAPE = 53,
 			BACKSPACE = 51,
 			RETURN = 36,
@@ -175,7 +175,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
 		package.loaded["adapters.event_provenance"] = api()
-		package.loaded["adapters.synthetic_input"] = api({
+		package.loaded["platform.input.synthetic_input"] = api({
 			current_action_epoch = function() return {} end,
 		})
 		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
@@ -188,7 +188,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 				return false
 			end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			ESCAPE = 53,
 			BACKSPACE = 51,
 			RETURN = 36,
@@ -216,7 +216,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		local logs = logger_capture()
 		package.loaded["modules.keymap.utils"] = { emit_text = function() error("must not emit") end }
 		package.loaded["modules.keystats"] = {}
-		package.loaded["adapters.synthetic_input"] = api()
+		package.loaded["platform.input.synthetic_input"] = api()
 
 		local rules = require("modules.dynamic_hotstrings.rules_engine")
 		local interceptor
@@ -269,7 +269,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		}
 		package.loaded["modules.keystats"] = {}
 
-		local synthetic = require("adapters.synthetic_input")
+		local synthetic = require("platform.input.synthetic_input")
 		local rules = require("modules.dynamic_hotstrings.rules_engine")
 		local interceptor
 		local fake_keymap = {
@@ -315,7 +315,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local hs_stub = reset_driver_modules()
 		local logs = logger_capture()
 		package.loaded["modules.keystats"] = {}
-		package.loaded["adapters.synthetic_input"] = api()
+		package.loaded["platform.input.synthetic_input"] = api()
 
 		local personal = require("modules.dynamic_hotstrings.personal_info")
 		local interceptor
@@ -363,7 +363,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		logger_capture()
 		package.loaded["modules.keystats"] = {}
 
-		local synthetic = require("adapters.synthetic_input")
+		local synthetic = require("platform.input.synthetic_input")
 		local personal = require("modules.dynamic_hotstrings.personal_info")
 		local interceptor
 		local fake_keymap = {

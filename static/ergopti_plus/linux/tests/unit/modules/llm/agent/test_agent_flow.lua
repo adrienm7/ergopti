@@ -163,7 +163,7 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			world.handlers.llm_agent_selection("tap_3")
 			world.wait_for(1)
 			world.respond(1, ANSWER)
-			local EvdevCodes = require("infra.evdev_codes")
+			local EvdevCodes = require("platform.input.evdev_codes")
 			helpers.assert_eq(world.engine.handle_shortcut({ code = EvdevCodes.KEY_DOWN, mods = {} }), true)
 			helpers.assert_eq(world.engine.handle_shortcut({ code = EvdevCodes.KEY_TAB, mods = {} }), true)
 			helpers.assert_eq(#world.runs, 1)
@@ -412,10 +412,10 @@ end)
 
 helpers.describe("AI agent: native missing-model modal ownership", function()
 	local function native_case(effect, refuse_regrab)
-		local Hook = helpers.load_module("adapters.keyboard_hook")
-		local Reader = require("adapters.evdev_reader")
-		local saved_hook, saved_grab = package.loaded["adapters.keyboard_hook"], Reader.grab
-		package.loaded["adapters.keyboard_hook"] = Hook
+		local Hook = helpers.load_module("platform.input.keyboard_hook")
+		local Reader = require("platform.input.evdev_reader")
+		local saved_hook, saved_grab = package.loaded["platform.input.keyboard_hook"], Reader.grab
+		package.loaded["platform.input.keyboard_hook"] = Hook
 		local observed, caught, world_active, desyncs = nil, nil, nil, 0
 		if refuse_regrab then Reader.grab = function() return false end end
 		Hook._test_drive({ { type = 1, code = 30, value = 1 } }, {
@@ -440,7 +440,7 @@ helpers.describe("AI agent: native missing-model modal ownership", function()
 			end,
 			onEmitRaw = function() return true end,
 		}, true)
-		Reader.grab, package.loaded["adapters.keyboard_hook"] = saved_grab, saved_hook
+		Reader.grab, package.loaded["platform.input.keyboard_hook"] = saved_grab, saved_hook
 		helpers.assert_eq(caught, nil, "assertions inside the real runtime guard must be collected, never swallowed")
 		helpers.assert_true(observed ~= nil, "the actual decoded reader event starts the scenario")
 		observed.desyncs = desyncs

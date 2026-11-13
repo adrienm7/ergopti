@@ -278,7 +278,7 @@ local function load_fixture(options)
 	local control
 	if options.real_script_control == true then
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -288,7 +288,7 @@ local function load_fixture(options)
 		}
 		package.loaded["adapters.event_provenance"] = {}
 		local admission_fence = nil
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,
 			acquire_admission_fence = function()
 				if admission_fence ~= nil then return nil end
@@ -305,7 +305,7 @@ local function load_fixture(options)
 				return callback() == true
 			end,
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}

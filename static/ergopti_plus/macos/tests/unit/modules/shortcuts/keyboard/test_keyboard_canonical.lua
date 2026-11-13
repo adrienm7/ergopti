@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local function with_subject(source, body)
-	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "adapters.hotkey_registrar", "infra.preferences",
+	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "platform.input.hotkey_registrar", "infra.preferences",
 		"core.fs.engine.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -29,7 +29,7 @@ local function with_subject(source, body)
 				control.content, control.writes = candidate, control.writes + 1; return true
 			end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(chord, callback)
 				if control.refuse_bind then return nil end
 				local handle = { chord = chord, callback = callback, enabled = true }

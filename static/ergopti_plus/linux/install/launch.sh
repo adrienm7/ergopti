@@ -80,7 +80,7 @@ for arg in "$@"; do
 			if [ -n "$diagnostic" ]; then printf '%s\n' "$diagnostic" >&2; fi
 			if [ "$status" -ne 0 ]; then
 				# EX_UNAVAILABLE plus a `missing-program NAME` line: no window exists
-				# yet, so the daemon (infra/input_access.lua) tells the user, in
+				# yet, so the daemon (platform/input/access.lua) tells the user, in
 				# their language, which program to install.
 				last_line="${diagnostic##*$'\n'}"
 				if [ "$status" -eq 69 ] && [[ "$last_line" =~ ^missing-program\ ([A-Za-z0-9._+-]+)$ ]]; then

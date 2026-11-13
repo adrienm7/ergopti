@@ -16,7 +16,7 @@ local Toml = require("core.text.engine.toml_codec")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Outdated = require("settings.engine.migration.outdated")
 local Logger = require("core.logger.engine.shim")
-local InputEvent = require("infra.input_event")
+local InputEvent = require("platform.input.event")
 
 local LOG = "platform.remap.nav_layer"
 
@@ -150,7 +150,7 @@ end
 --- @param registry table Canonical physical-key registry.
 --- @return table layer Evdev input codes mapped to native chord sequences.
 --- The layer-table code of a source: its evdev key or button code, or for a
---- wheel direction the code infra/input_event.lua reserves for it above KEY_MAX.
+--- wheel direction the code platform/input/event.lua reserves for it above KEY_MAX.
 local function source_code(registry, name)
 	local entry = registry.keys[name]
 	if type(entry) == "table" and entry.kind == "wheel" then

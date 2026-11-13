@@ -15,7 +15,7 @@ local lifecycle_dispatches = { script_reload = 0, script_quit = 0 }
 
 package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
 	F15_KARABINER_ESCAPE = 0x6C,
@@ -62,8 +62,8 @@ package.loaded["ui.wpm.wpm_widget"] = {
 package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 
-package.loaded["adapters.synthetic_input"] = nil
-local SyntheticInput = helpers.load_with_stubs("adapters.synthetic_input")
+package.loaded["platform.input.synthetic_input"] = nil
+local SyntheticInput = helpers.load_with_stubs("platform.input.synthetic_input")
 SyntheticInput.when_idle = function(callback)
 	callback()
 	return true

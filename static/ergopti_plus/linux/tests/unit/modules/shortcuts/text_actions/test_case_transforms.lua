@@ -18,7 +18,7 @@ local function with_manager(selected, body)
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",
-		hook = "adapters.keyboard_hook",
+		hook = "platform.input.keyboard_hook",
 	}
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end

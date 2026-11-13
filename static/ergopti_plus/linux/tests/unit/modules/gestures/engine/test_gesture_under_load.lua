@@ -35,7 +35,7 @@
 local helpers = require("tests.helpers")
 
 local Decoder = helpers.load_module("modules.gestures.mt_decoder")
-local Reader  = helpers.load_module("adapters.evdev_reader")
+local Reader  = helpers.load_module("platform.input.evdev_reader")
 
 local BTN_TOUCH = 0x14a
 local TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }

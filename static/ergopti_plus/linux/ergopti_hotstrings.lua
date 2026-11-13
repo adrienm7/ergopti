@@ -273,8 +273,8 @@ local tooltip_preview = RuntimeGuard.optional_require("core.ui.ui.tooltip.previe
 local llm_overlay = RuntimeGuard.optional_require("core.ui.ui.tooltip.llm")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keystats         = require("modules.keystats.keystats")
-local keyboard_hook     = require("adapters.keyboard_hook")
-local InputEvent        = require("infra.input_event")
+local keyboard_hook     = require("platform.input.keyboard_hook")
+local InputEvent        = require("platform.input.event")
 local Monotonic         = require("core.logger.engine.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
@@ -948,7 +948,7 @@ local function main()
 	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 	local PreviewSettings = require("modules.hotstrings.preview_settings")
 	local ExpansionDelay = require("modules.hotstrings.expansion_delay")
-	local InputCaptureGate = require("infra.input_capture_gate")
+	local InputCaptureGate = require("platform.input.capture_gate")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
 	-- every keystroke, and a bucket for a common tail character holds hundreds of
@@ -1145,7 +1145,7 @@ local function main()
 	if not device then
 		device = dev_finder.find_keyboard()
 	end
-	local InputAccess = require("infra.input_access")
+	local InputAccess = require("platform.input.access")
 	-- The launcher could not set up the input groups because a program is
 	-- missing: say which one before the device error that follows from it.
 	local missing_program = InputAccess.missing_program()
@@ -2221,7 +2221,7 @@ local function main()
 			local admission = physical_privacy_admission
 			physical_privacy_admission = nil
 			local admitted
-			if admission and admission.code == require("infra.evdev_codes").KEY_BACKSPACE then
+			if admission and admission.code == require("platform.input.evdev_codes").KEY_BACKSPACE then
 				admitted = admission.allowed
 			else
 				admitted = not secure_focus_guard.blocks_text()
@@ -2631,7 +2631,7 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
+		require("platform.input.access").report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil },
 			"/dev/uinput cannot be opened for writing (uinput group or module missing)")
 		error("Fast output unavailable; refusing input capture", 0)

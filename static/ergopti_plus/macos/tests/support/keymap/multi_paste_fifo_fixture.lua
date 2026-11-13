@@ -11,8 +11,8 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 local M = {}
 local OWNED = {
 	"adapters.clipboard", "adapters.event_provenance", "adapters.python_interpreter",
-	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
-	"adapters.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
+	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "platform.input.synthetic_input",
+	"platform.input.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "hs.application", "hs.canvas",
 	"hs.dialog", "hs.distributednotifications", "hs.eventtap",
@@ -83,7 +83,7 @@ function M.with_world(options, scenario)
 			f.key_observer = observe
 			package.loaded["modules.keystats"] = {}
 			local utils = require("modules.keymap.utils")
-			local sender = require("adapters.text_sender")
+			local sender = require("platform.input.text_sender")
 			helpers.assert_eq(sender.terminalInputTarget() ~= nil, options.terminal == true)
 			local expander = require("modules.keymap.expander")
 			local scheduler = require("core.events.timer_scheduler")

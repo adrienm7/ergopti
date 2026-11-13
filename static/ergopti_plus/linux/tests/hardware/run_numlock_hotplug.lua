@@ -13,9 +13,9 @@
 --- ==============================================================================
 
 require('core.lifecycle.engine.compat.utf8').install()
-local Hook=require('adapters.keyboard_hook')
-local Names=require('infra.device_names')
-local Reader=require('adapters.evdev_reader')
+local Hook=require('platform.input.keyboard_hook')
+local Names=require('platform.input.device_names')
+local Reader=require('platform.input.evdev_reader')
 local Finder=require('modules.hotstrings.device_finder')
 local Layout=require('adapters.keyboard_layout')
 local Clock=require('core.logger.engine.monotonic')
@@ -95,7 +95,7 @@ local ok,failure=xpcall(function()
 	Sink=assert(loadfile('adapters/xkb_capture.lua'))();assert(Sink.load(text));sink_chars={}
 	Capture=require('adapters.xkb_capture')
 	Finder.find_devices=function() return selected,{} end
-	Hook=require('adapters.keyboard_hook')
+	Hook=require('platform.input.keyboard_hook')
 	Hook.start({intercept=true,requireOutputBroker=true,outputBroker=assert(Injector.output_broker()),
 		onCaptureReacquired=function() return Layout.publish_current_capture() end,onEmitRaw=Injector.emit_key,onChar=function(char) chars[#chars+1]=char end})
 	assert(Hook.isRunning());assert(Layout.publish_current_capture())

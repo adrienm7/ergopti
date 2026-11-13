@@ -1727,7 +1727,7 @@ local function capture_window(binding)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local FileSystem = require("core.fs.adapters.file_system")
-	local Keyboard = require("adapters.keyboard_hook")
+	local Keyboard = require("platform.input.keyboard_hook")
 	local physical = Keyboard.physical_source_receipt()
 	if type(physical) ~= "table" or physical.ready ~= true then return nil end
 	if section == "tap_hold" then
@@ -2398,7 +2398,7 @@ function M.start_reading()
 	if _reading then return true end
 
 	local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
-	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+	local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
 	local ok_decoder, Decoder = pcall(require, "modules.gestures.mt_decoder")
 	if not (ok_finder and ok_reader and ok_decoder) then
 		Logger.error(LOG, "Gesture reading needs touchpad_finder, evdev_reader and mt_decoder — one is missing.")
@@ -2459,7 +2459,7 @@ function M.pump()
 	if _is_paused() then M.release_clicks() end
 	if not _reading or not _decoder or _reader_stop_error then return 0 end
 
-	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+	local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
 	if not ok_reader then return 0 end
 
 	local drained, status = Reader.drain(function(event)
@@ -2507,7 +2507,7 @@ local function stop_reading(preserve_clicks)
 	if not _scope_native and not admit_mutation() then return false end
 	local clicks_retired = preserve_clicks == true or M.release_clicks()
 	if _reading then
-		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+		local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
 		local called, acknowledged, detail = false, nil, "reader close is unavailable"
 		if ok_reader and type(Reader) == "table" and type(Reader.close) == "function" then
 			called, acknowledged, detail = pcall(Reader.close, Reader.TOUCHPAD)

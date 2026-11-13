@@ -1,5 +1,5 @@
 ﻿; platform/remap/nav_layer_table.ahk
-; Requires: platform/remap/layers_loader.ahk, adapters/hotkey_registrar.ahk (modifier symbols),
+; Requires: platform/remap/layers_loader.ahk, platform/input/hotkey_registrar.ahk (modifier symbols),
 ;           infra/nav_layer_helpers.ahk (ActionLayer, repeat count)
 
 ; ==============================================================================
@@ -44,7 +44,7 @@ global NAV_LAYER_CRITERION_LAYER := "layer"
 global NAV_LAYER_ALTGR_CODE := "AltRight"
 global NAV_LAYER_ALTGR_LABELS := ["~SC01D & ~SC138", "*SC138"]
 ; Layer-vocabulary modifier -> the chord notation's name, whose AutoHotkey
-; symbol adapters/hotkey_registrar.ahk owns (HOTKEY_MOD_PREFIXES).
+; symbol platform/input/hotkey_registrar.ahk owns (HOTKEY_MOD_PREFIXES).
 global NAV_LAYER_MODIFIER_CHORD_NAMES := Map("ctrl", "ctrl", "alt", "alt", "shift", "shift", "meta", "cmd")
 ; The driver-native handlers a call:<handler> resolution may name on Windows;
 ; must cover [call_handlers].windows in _shared/layouts/data/layer_actions.toml.

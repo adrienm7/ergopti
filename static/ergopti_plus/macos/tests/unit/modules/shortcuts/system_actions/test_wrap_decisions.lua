@@ -16,7 +16,7 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 
 	helpers.it("wraps an AltGr-typed symbol when a selection exists (alt must not block)", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()
@@ -26,7 +26,7 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 
 	helpers.it("passes the symbol through when no selection is readable", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()
@@ -38,7 +38,7 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 
 	helpers.it("never treats Cmd/Ctrl combos as wrap input", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()
@@ -49,7 +49,7 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 
 	helpers.it("passes through characters that are not configured wrap symbols", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()
@@ -59,7 +59,7 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 
 	helpers.it("passes through empty / nil characters without crashing", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()
@@ -70,7 +70,7 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 
 	helpers.it("wraps a plain (no-modifier) wrap symbol with a selection", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()

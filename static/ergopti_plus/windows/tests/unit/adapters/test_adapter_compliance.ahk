@@ -548,7 +548,7 @@ Test("ADAPTER_* maps: all declared Func() references resolve to non-null", _Adap
 ; ====================================================
 
 ; The boot-time keyboard-layout DllCall probes were extracted from the entry
-; into adapters/key_state.ahk. These Windows-only helpers are not part of the
+; into platform/input/key_state.ahk. These Windows-only helpers are not part of the
 ; cross-platform KeyState port (isDown/isUp), so they are smoke-tested directly:
 ; each must be callable without throwing and return the documented type, so a
 ; future rename/deletion breaks here instead of silently at boot on an exotic

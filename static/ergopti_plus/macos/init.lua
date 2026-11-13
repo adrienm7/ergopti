@@ -179,7 +179,7 @@ local TimerScheduler     = require("core.events.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
 end
-local SyntheticInput     = require("adapters.synthetic_input")
+local SyntheticInput     = require("platform.input.synthetic_input")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local AccessibilityWait       = require("infra.accessibility_wait")
 local LOG                = "init"
@@ -1234,7 +1234,7 @@ end
 -- The native map is immutable for this VM; every key event supplies its own
 -- model identifier. Behind Karabiner that model does not decide the ISO pair:
 -- the virtual keyboard form the bridge deploys does (registered below).
-require("adapters.keyboard_geometry").initialize()
+require("platform.input.keyboard_geometry").initialize()
 local file_system        = require("core.fs.adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
@@ -1249,7 +1249,7 @@ if not ok_karabiner then
 	karabiner = nil
 else
 	local bridge = karabiner
-	require("adapters.keyboard_geometry").set_virtual_form_source(function()
+	require("platform.input.keyboard_geometry").set_virtual_form_source(function()
 		return bridge.virtual_keyboard_form()
 	end)
 end

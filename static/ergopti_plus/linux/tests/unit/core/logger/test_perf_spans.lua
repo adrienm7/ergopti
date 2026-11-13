@@ -161,7 +161,7 @@ helpers.describe("timing spans: the daemon's own paths", function()
 
 	helpers.it("records a forwarded press's age from its kernel stamp", function()
 		local perf = fixture(20)
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
 		local luv = require("luv")
 		local seconds, microseconds = luv.gettimeofday()
 		local stamp = seconds * 1000000 + microseconds - 1500

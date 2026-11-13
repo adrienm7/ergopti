@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Adds only the transaction and clock boundaries used by queued Search.
 local function search_transaction_ports(hs_stub)
 	package.loaded["adapters.clipboard"] = nil
-	local input = package.loaded["adapters.synthetic_input"]
+	local input = package.loaded["platform.input.synthetic_input"]
 	local function complete(tx, status)
 		if tx.status then return false end
 		tx.status, tx.sealed = status, true
@@ -83,7 +83,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 0.2 end,
 		}
-		package.loaded["adapters.synthetic_input"] = setmetatable({
+		package.loaded["platform.input.synthetic_input"] = setmetatable({
 			emit_key_stroke = function() copies = copies + 1; return true end,
 		}, { __index = function() return function() return true end end })
 
@@ -142,7 +142,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
 		local copies = 0
-		package.loaded["adapters.synthetic_input"] = setmetatable({
+		package.loaded["platform.input.synthetic_input"] = setmetatable({
 			emit_key_stroke = function() copies = copies + 1; return true end,
 			defer_after_callback = function() return false end,
 		}, { __index = function() return function() return true end end })
@@ -188,7 +188,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		end
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
-		package.loaded["adapters.synthetic_input"] = setmetatable({
+		package.loaded["platform.input.synthetic_input"] = setmetatable({
 			emit_key_stroke = function() return false end,
 		}, { __index = function() return function() return true end end })
 

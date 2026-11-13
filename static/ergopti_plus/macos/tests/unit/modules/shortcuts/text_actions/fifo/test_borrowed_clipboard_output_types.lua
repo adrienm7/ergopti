@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 
 local STUBS = {
-	"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
+	"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
 	"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 	"infra.clipboard_borrowers", "modules.keymap.utils",
@@ -57,7 +57,7 @@ helpers.describe("Borrowed clipboard output is typed (clipboard-borrowed-output-
 	helpers.it("(clipboard-borrowed-output-types) TextSender types instead of snapshotting a borrow", function()
 		with_board(function(board)
 			borrow_elsewhere()
-			local sender = require("adapters.text_sender")
+			local sender = require("platform.input.text_sender")
 			helpers.assert_true(sender.send(LONG_TEXT, { mode = "clipboard" }), "the output is still delivered")
 			helpers.assert_eq(board.reads, 0, "the borrowed payload is never snapshotted")
 			helpers.assert_eq(board.writes, 0, "the borrowed payload is never replaced")
@@ -68,7 +68,7 @@ helpers.describe("Borrowed clipboard output is typed (clipboard-borrowed-output-
 
 	helpers.it("(clipboard-borrowed-output-types) TextSender still pastes when nobody borrows", function()
 		with_board(function(board)
-			local sender = require("adapters.text_sender")
+			local sender = require("platform.input.text_sender")
 			helpers.assert_true(sender.send(LONG_TEXT, { mode = "clipboard" }))
 			helpers.assert_eq(board.reads > 0, true, "the user's clipboard is snapshotted")
 			helpers.assert_eq(board.writes > 0, true, "the payload is published for Cmd+V")

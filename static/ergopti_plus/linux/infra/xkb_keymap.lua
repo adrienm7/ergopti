@@ -22,7 +22,7 @@
 --- WHAT IT DELIBERATELY DOES NOT DO:
 --- It does not resolve keysyms to characters. A keysym name is an X11 protocol
 --- constant, a character is Unicode, and the mapping between them belongs to
---- libxkbcommon — see infra/keysym.lua. Keeping the two apart is what lets this
+--- libxkbcommon — see platform/input/keysym.lua. Keeping the two apart is what lets this
 --- half be a pure function over text, testable from a fixture with no display
 --- server anywhere.
 ---

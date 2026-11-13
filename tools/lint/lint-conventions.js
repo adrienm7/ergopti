@@ -737,6 +737,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/process/adapters'),
@@ -746,6 +747,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/timing/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/text/engine'),
@@ -782,6 +784,7 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/process/adapters'),
@@ -791,6 +794,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/ui/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/timing/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/text/engine'),
@@ -805,6 +809,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/process/adapters'),
@@ -813,6 +818,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/platform/input'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/ui/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/timing/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/text/engine'),

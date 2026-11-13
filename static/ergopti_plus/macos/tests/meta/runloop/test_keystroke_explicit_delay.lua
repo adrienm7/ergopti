@@ -17,7 +17,7 @@
 --- length lets macOS disable the tap outright (kCGEventTapDisabledByTimeout) and
 --- kills the shortcut permanently.
 ---
---- The driver already knew this: adapters/text_sender.lua's eraseChars/pressKey
+--- The driver already knew this: platform/input/text_sender.lua's eraseChars/pressKey
 --- both coerce the delay to 0, gestures/actions.lua's postKeyStroke() helper
 --- passes 0, and layouts/engine/utils.lua's paste path passes 0. The invariant was simply
 --- applied per-site, and 49 sibling sites across gestures/actions.lua,

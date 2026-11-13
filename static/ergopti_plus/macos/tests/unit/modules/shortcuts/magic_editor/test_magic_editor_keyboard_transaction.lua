@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local MODULES = {
-	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
+	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
 	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
@@ -36,7 +36,7 @@ local function with_subject(assignments, scenario)
 			is_assignable = function(action) return type(action) == "string" end,
 			execute_single = function(action) observed.actions[#observed.actions + 1] = action; return true end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function() observed.binds = observed.binds + 1; return "ordinary-handle" end,
 			unbind = function() return true end,
 			setEnabled = function() return true end,

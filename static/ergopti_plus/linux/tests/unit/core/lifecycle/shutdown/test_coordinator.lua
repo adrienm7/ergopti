@@ -999,12 +999,12 @@ end)
 
 helpers.describe("shutdown coordinator: final native output acknowledgement", function()
 	local function with_output(mode, check)
-		local names = { "adapters.uinput_writer", "adapters.modifier_broker", "modules.hotstrings.injector" }
+		local names = { "platform.input.uinput_writer", "platform.input.modifier_broker", "modules.hotstrings.injector" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, why = pcall(function()
-			local writer = require("adapters.uinput_writer")
-			local broker = require("adapters.modifier_broker")
+			local writer = require("platform.input.uinput_writer")
+			local broker = require("platform.input.modifier_broker")
 			local injector = require("modules.hotstrings.injector")
 			local calls = { destroy = 0, close = 0, success = 0, writes = 0 }
 			writer._set_backend({
@@ -1605,9 +1605,9 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		for _, name in ipairs({ "infra.version", "modules.hotstrings.engine", "modules.hotstrings.hotstrings_config",
 			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
 			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
-			"modules.hotstrings.device_finder", "infra.input_event", "core.logger.engine.monotonic", "infra.manifest_reader",
+			"modules.hotstrings.device_finder", "platform.input.event", "core.logger.engine.monotonic", "infra.manifest_reader",
 			"infra.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
-			"modules.keystats.focus_guard", "infra.input_capture_gate", "core.logger.engine.boot_profiler", "infra.diagnostic_snapshot" }) do
+			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "infra.diagnostic_snapshot" }) do
 			modules[name] = {}
 		end
 		modules["core.lifecycle.engine.shutdown.session_lock"] = { protect = function() return true end }
@@ -1625,7 +1625,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["modules.keystats.keystats"] = { stop = function() return true end }
 		modules["modules.llm.agent_learning"] = { flush = noop }
 		modules["core.events.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
-		modules["adapters.keyboard_hook"] = {
+		modules["platform.input.keyboard_hook"] = {
 			isRunning = function() return state.running end,
 			stop = function() state.running = false; state.hooks = state.hooks + 1; record("hook.stop") end,
 			emergency_stop = function() error("ordinary quit must not borrow emergency cleanup") end,

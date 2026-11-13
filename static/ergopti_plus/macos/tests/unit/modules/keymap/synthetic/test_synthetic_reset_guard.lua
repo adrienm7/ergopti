@@ -145,7 +145,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 			"the class is recorded on both phases of the one pair builder")
 		local caller = read_unit("local function scratch_typing")
 		helpers.assert_eq(count_literal(caller,
-			'pcall(require("adapters.synthetic_input").emit_selftest_key_stroke, {}, keys[index])'), 1,
+			'pcall(require("platform.input.synthetic_input").emit_selftest_key_stroke, {}, keys[index])'), 1,
 			"the field run's scratch typing is the only selftest caller")
 	end)
 

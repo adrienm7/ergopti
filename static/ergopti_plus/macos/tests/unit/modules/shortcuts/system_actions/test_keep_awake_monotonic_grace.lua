@@ -25,11 +25,11 @@ local OWNED_MODULES = {
 	"core.text.engine.utils",
 	"core.timing.engine.timings",
 	"core.i18n.engine.i18n",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.keymap.control_sentinels",
-	"adapters.key_state",
-	"adapters.keyboard_geometry",
-	"adapters.synthetic_input",
+	"platform.input.key_state",
+	"platform.input.keyboard_geometry",
+	"platform.input.synthetic_input",
 	"adapters.event_provenance",
 	"core.events.clock",
 	"core.events.timer_scheduler",
@@ -116,7 +116,7 @@ local function with_awake(callback)
 				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.keycodes"] = { F18_WAKE_OS = 79 }
+			package.loaded["platform.input.keycodes"] = { F18_WAKE_OS = 79 }
 			local stored = {}
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key) return stored[key] end,
@@ -128,8 +128,8 @@ local function with_awake(callback)
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 				"modules.gestures", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
-				"core.text.engine.utils", "modules.keymap.control_sentinels", "adapters.key_state",
-				"adapters.keyboard_geometry", "modules.keystats.log_manager",
+				"core.text.engine.utils", "modules.keymap.control_sentinels", "platform.input.key_state",
+				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
 			local System = require("modules.shortcuts.actions.system")
 			local Scheduler = require("core.events.timer_scheduler")

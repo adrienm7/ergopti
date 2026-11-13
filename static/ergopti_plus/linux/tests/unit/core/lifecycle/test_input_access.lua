@@ -26,7 +26,7 @@ end
 helpers.describe("input_access: telling the user", function()
 
 	helpers.it("prints an absolute quoted repair command (input-access-repair-path)", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local lines = {}
 		Access.report({
 			i18n = { init = function() end, get = function(key)
@@ -39,7 +39,7 @@ helpers.describe("input_access: telling the user", function()
 	end)
 
 	helpers.it("notifies with the translated title and body", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local sent = {}
 		local fake_i18n = {
 			init = function() end,
@@ -56,7 +56,7 @@ helpers.describe("input_access: telling the user", function()
 	end)
 
 	helpers.it("(input-access-no-device) names no input group when no keyboard exists", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local sent = {}
 		local status = Access.report({
 			i18n = { init = function() end, get = function(key) return "<" .. key .. ">" end },
@@ -99,7 +99,7 @@ helpers.describe("input_access: telling the user", function()
 	end)
 
 	helpers.it("still explains itself on the console when there is no notifier", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local lines = {}
 		Access.report({ print = function(line) lines[#lines + 1] = line end }, "detail")
 		helpers.assert_true(#lines >= 2, "the console gets both the cause and the fix")
@@ -158,7 +158,7 @@ helpers.describe("input_access: a tray launch stays visible", function()
 		-- The AppImage catalogue launches the app without the input group and
 		-- fails it when no window or tray icon appears; exiting after the
 		-- notification left nothing on screen.
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local tray = fake_tray("appindicator")
 		local actions = fake_actions()
 		local naps = 0
@@ -183,7 +183,7 @@ helpers.describe("input_access: a tray launch stays visible", function()
 		-- The catalogue screenshots the first named window. With only an icon it
 		-- left-clicked it (the menu popped), then right-clicked the same spot,
 		-- which closed the grabbed menu: its screenshot showed the bare icon.
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local tray = fake_tray("appindicator")
 		Access.report({
 			i18n = fake_i18n, tray = tray, actions = fake_actions(), print = function() end,
@@ -196,7 +196,7 @@ helpers.describe("input_access: a tray launch stays visible", function()
 	end)
 
 	helpers.it("publishes a real menu, not a name and a way out", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local tray = fake_tray("appindicator")
 		local actions = fake_actions()
 		local clicked = false
@@ -223,7 +223,7 @@ helpers.describe("input_access: a tray launch stays visible", function()
 	end)
 
 	helpers.it("returns at once when no tray backend can show an icon", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local tray = fake_tray(nil)
 		local status = Access.report({ tray = tray, print = function() end,
 			sleep_ms = function() error("must not wait without an icon") end }, "denied")
@@ -237,7 +237,7 @@ end)
 helpers.describe("input_access: only a denied node means re-login", function()
 
 	helpers.it("recognises EACCES and nothing else", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local denied = function() return false, "EACCES" end
 		local absent = function() return false, "ENOENT" end
 		helpers.assert_eq(Access.is_denied("/dev/input/event3", denied), true)
@@ -252,7 +252,7 @@ end)
 helpers.describe("input_access: the service does not loop on it", function()
 
 	helpers.it("declares the exit status in RestartPreventExitStatus", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local unit = read("ergopti-hotstrings.service")
 		local declared = unit:match("\nRestartPreventExitStatus=(%d+)")
 		helpers.assert_eq(tonumber(declared), Access.EXIT_ACCESS,
@@ -276,7 +276,7 @@ end)
 helpers.describe("input_access: a program the permission setup needs is missing", function()
 
 	helpers.it("reads the program the launcher reported, and nothing else", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local function with(value) return function(name) return name == Access.MISSING_PROGRAM_ENV and value or nil end end
 		helpers.assert_eq(Access.missing_program(with("getent")), "getent")
 		helpers.assert_eq(Access.missing_program(with(nil)), nil)
@@ -285,7 +285,7 @@ helpers.describe("input_access: a program the permission setup needs is missing"
 	end)
 
 	helpers.it("tells the user which program is missing, in their language (missing-program-localized)", function()
-		local Access = helpers.load_module("infra.input_access")
+		local Access = helpers.load_module("platform.input.access")
 		local sent, lines = {}, {}
 		local status = Access.report({
 			i18n = { init = function() end, get = function(key)
@@ -328,9 +328,9 @@ helpers.describe("input-access-fifo-probe", function()
 	if not native_ok or not ffi_ok then return end
 	ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
 	local probes = {
-		{ name = "startup denial", body = 'require("infra.input_access").is_denied(path)' },
-		{ name = "keyboard availability", body = 'local reader = require("adapters.evdev_reader"); reader._set_backend({}); reader.is_available(path)' },
-		{ name = "uinput availability", body = 'local writer = require("adapters.uinput_writer"); writer._set_backend({}); writer._set_path_for_test(path); writer.is_available()' },
+		{ name = "startup denial", body = 'require("platform.input.access").is_denied(path)' },
+		{ name = "keyboard availability", body = 'local reader = require("platform.input.evdev_reader"); reader._set_backend({}); reader.is_available(path)' },
+		{ name = "uinput availability", body = 'local writer = require("platform.input.uinput_writer"); writer._set_backend({}); writer._set_path_for_test(path); writer.is_available()' },
 	}
 	for _, probe in ipairs(probes) do
 		helpers.it("(input-access-fifo-probe) " .. probe.name .. " never waits for a FIFO writer", function()
@@ -363,7 +363,7 @@ end)
 
 helpers.describe("input-access-probe-receipts", function()
 	helpers.it("(input-access-probe-receipts) rejects invalid paths before any native operation", function()
-		local probe = require("infra.device_access")
+		local probe = require("platform.input.device_access")
 		local calls = 0
 		local native = { fs_open = function() calls = calls + 1 end }
 		for _, path in ipairs({ "", "/dev/null\0/other", false, {} }) do
@@ -375,7 +375,7 @@ helpers.describe("input-access-probe-receipts", function()
 	end)
 
 	helpers.it("(input-access-probe-receipts) preserves native refusal and requires the exact close receipt", function()
-		local probe = require("infra.device_access")
+		local probe = require("platform.input.device_access")
 		local descriptor, closed = {}, nil
 		local native = {
 			constants = { O_RDONLY = 0, O_NONBLOCK = 2048 },
@@ -405,7 +405,7 @@ helpers.describe("input-access-probe-receipts", function()
 		local native = require("luv")
 		local path = os.tmpname()
 		assert(native.fs_chmod(path, 0))
-		local Access = require("infra.input_access")
+		local Access = require("platform.input.access")
 		local denied = Access.is_denied(path)
 		assert(native.fs_chmod(path, 384))
 		local readable = Access.is_denied(path)

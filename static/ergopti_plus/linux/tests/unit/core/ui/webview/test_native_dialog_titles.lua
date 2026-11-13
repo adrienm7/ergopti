@@ -18,7 +18,7 @@ local DIALOG = require("core.ui.ui.native_dialog").command()
 local function scenario(body)
 	local names = { "core.ui.ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
-		"core.fs.adapters.storage", "core.events.loop", "adapters.keyboard_hook",
+		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -275,7 +275,7 @@ h.describe("programmable source problems open no dialog", function()
 					h.assert_eq(key, "hotstrings.dynamic.user_code.time_activation_seconds")
 					return 0.5
 				end }
-				package.loaded["adapters.keyboard_hook"] = { while_released = function()
+				package.loaded["platform.input.keyboard_hook"] = { while_released = function()
 					error("a source problem never releases the keyboard for a dialog")
 				end }
 				shell.run = function(command)

@@ -60,7 +60,7 @@ end
 --- Opens a recorded native channel with literal retirement acknowledgement.
 --- @return table writer, table recorder, table capability
 local function owned_channel()
-	local writer = helpers.load_module("adapters.uinput_writer")
+	local writer = helpers.load_module("platform.input.uinput_writer")
 	local recorded = recorder()
 	recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
 	writer._set_backend(recorded.backend)

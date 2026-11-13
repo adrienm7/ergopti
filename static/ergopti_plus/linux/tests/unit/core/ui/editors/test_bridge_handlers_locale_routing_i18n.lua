@@ -788,7 +788,7 @@ helpers.describe("ui.bridge_handlers", function()
         "the dispatch path must enforce the same preference type as set_pref()")
     end)
     helpers.it("'window_focus' owns the input gate at the trusted page epoch", function()
-      local gate_mod = helpers.load_module("infra.input_capture_gate")
+      local gate_mod = helpers.load_module("platform.input.capture_gate")
       local resets = 0
       local s2 = build_mock_state()
       s2.input_capture_gate = gate_mod.new({

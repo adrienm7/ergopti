@@ -515,7 +515,7 @@ const RULES = [
 			[
 				'static/ergopti_plus/linux/adapters/xkb_capture.lua',
 				'static/ergopti_plus/linux/adapters/xkb_source_probe.lua',
-				'static/ergopti_plus/linux/adapters/keyboard_hook.lua',
+				'static/ergopti_plus/linux/platform/input/keyboard_hook.lua',
 				'static/ergopti_plus/linux/modules/hotstrings/device_finder.lua',
 				'static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua',
 				'static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua',

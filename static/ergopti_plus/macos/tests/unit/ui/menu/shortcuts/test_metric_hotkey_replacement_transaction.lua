@@ -132,7 +132,7 @@ local function load_fixture(legacy)
 	package.loaded["keyboard.engine.chord"] = {
 		format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord, callback)
 			if bind_refused then return nil end
 			next_handle = next_handle + 1

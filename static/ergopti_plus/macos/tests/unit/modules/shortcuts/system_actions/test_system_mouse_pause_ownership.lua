@@ -40,7 +40,7 @@ local function fresh_mouse_owner()
 		"core.events.timer_scheduler",
 		"core.process.adapters.shell_runner",
 		"adapters.mouse_control",
-		"adapters.synthetic_input",
+		"platform.input.synthetic_input",
 		"core.logger.engine.logger",
 		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
@@ -364,7 +364,7 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function()
 			if type(fixture.boundary_hook) == "function" then
 				fixture.boundary_hook("emoji")

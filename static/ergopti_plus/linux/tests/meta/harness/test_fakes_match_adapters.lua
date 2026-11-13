@@ -35,8 +35,8 @@ local Fakes = helpers.load_module("tests.fakes")
 -- underscore) are excluded: they are seams for the real adapter's own tests and
 -- carry no contract for a caller.
 local PAIRS = {
-	{ adapter = "adapters.uinput_writer",   make = function() return Fakes.uinput_writer() end },
-	{ adapter = "adapters.evdev_reader",    make = function() return Fakes.evdev_reader() end },
+	{ adapter = "platform.input.uinput_writer",   make = function() return Fakes.uinput_writer() end },
+	{ adapter = "platform.input.evdev_reader",    make = function() return Fakes.evdev_reader() end },
 	{ adapter = "core.process.adapters.shell_runner",    make = function() return Fakes.shell_runner() end },
 	{ adapter = "core.fs.adapters.storage",         make = function() return Fakes.storage() end },
 	{ adapter = "adapters.clipboard",       make = function() return Fakes.clipboard() end },

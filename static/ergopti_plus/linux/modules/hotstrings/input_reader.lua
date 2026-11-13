@@ -13,8 +13,8 @@
 --- second copy of shift handling, a second copy of the control-key list, and a
 --- third copy of the struct layout — all hardcoded to a 24-byte struct with the
 --- type field at offset 17, which is the 64-bit shape and only that. Reading the
---- descriptor now belongs to adapters/evdev_reader.lua and the struct to
---- infra/input_event.lua, where the size is measured rather than assumed.
+--- descriptor now belongs to platform/input/evdev_reader.lua and the struct to
+--- platform/input/event.lua, where the size is measured rather than assumed.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source for layout data: the keycode maps live in
@@ -46,8 +46,8 @@ local LOG = "modules.hotstrings.input_reader"
 -- =========================================
 -- =========================================
 
--- Deliberately none. The struct layout lives in infra/input_event.lua and the
--- key identities in infra/evdev_codes.lua; both were duplicated here, and a
+-- Deliberately none. The struct layout lives in platform/input/event.lua and the
+-- key identities in platform/input/evdev_codes.lua; both were duplicated here, and a
 -- constant that exists in two files is a constant that will eventually differ
 -- in two files.
 

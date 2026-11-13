@@ -121,7 +121,7 @@ package.loaded["core.i18n.engine.i18n"] = {
 }
 
 -- Stub lib.keycodes.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 

@@ -150,7 +150,7 @@ local function run_case(family, change, route)
 					local compiled
 					if loadstring then compiled = assert(loadstring(body)); setfenv(compiled, environment)
 					else compiled = assert(load(body, "original Main handle_char", "t", environment)) end
-					callback = require("infra.input_capture_gate").new().guard(compiled())
+					callback = require("platform.input.capture_gate").new().guard(compiled())
 					local codes = family == "date" and { 32, 20, 43 } or { 30, 25, 43 }
 					for index, code in ipairs(codes) do
 						session.edge("a", code, 1, 1000 + index * 10)

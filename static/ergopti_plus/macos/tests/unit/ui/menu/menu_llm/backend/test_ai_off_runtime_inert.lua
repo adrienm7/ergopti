@@ -282,7 +282,7 @@ local ORCHESTRATOR_MODULES = {
 	"core.logger.engine.logger",
 	"modules.llm",
 	"keyboard.engine.chord",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"ui.menu.shortcut_utils",
 	"ui.menu.menu_llm.trigger_orchestrator",
 }
@@ -305,7 +305,7 @@ local function with_orchestrator(body)
 		}
 		local bindings = {}
 		local next_token = 0
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(chord)
 				next_token = next_token + 1
 				local handle = "hotkey#" .. next_token

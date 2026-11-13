@@ -14,7 +14,7 @@ local with_fixture = fixture.with_fixture
 helpers.describe("shortcuts.actions.system", function()
 	helpers.it("toggle_awake creates an event watcher with the correct events", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()

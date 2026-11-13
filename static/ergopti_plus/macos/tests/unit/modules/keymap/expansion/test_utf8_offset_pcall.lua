@@ -413,7 +413,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.keystats",
 			"modules.hotstrings.hotstrings_config",
 			"core.text.engine.utils",
-			"infra.keycodes",
+			"platform.input.keycodes",
 			"core.logger.engine.perf",
 			"infra.hotpath_profiler",
 			"core.ui.ui.tooltip",
@@ -421,7 +421,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		for _, mod in ipairs(to_clear) do package.loaded[mod] = nil end
 
 		-- Stub every dependency that is not under test.
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			ESCAPE            = 53,
 			RETURN            = 36,
 			BACKSPACE         = 51,

@@ -21,7 +21,7 @@ local function load_gate(options)
 	package.loaded["hs"] = hs_stub
 
 	for _, name in ipairs({
-		"core.events.timer_scheduler", "adapters.synthetic_input", "adapters.event_provenance",
+		"core.events.timer_scheduler", "platform.input.synthetic_input", "adapters.event_provenance",
 		"modules.keymap.terminator_replay",
 	}) do
 		package.loaded[name] = nil
@@ -58,12 +58,12 @@ local function load_gate(options)
 		end
 		return event
 	end
-	local SyntheticInput = require("adapters.synthetic_input")
+	local SyntheticInput = require("platform.input.synthetic_input")
 	local timers = {}
 	local awake_time = 0
 	local timer_calls = 0
 	local fail_send = false
-	package.loaded["adapters.text_sender"] = {
+	package.loaded["platform.input.text_sender"] = {
 		pressKey = function(key, _mods, delay)
 			if fail_send then return false end
 			return SyntheticInput.emit_key_stroke({}, key, delay or 0)
@@ -962,8 +962,8 @@ helpers.describe("terminator replay: malformed requests fail closed", function()
 end)
 
 
-package.loaded["adapters.text_sender"] = nil
+package.loaded["platform.input.text_sender"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
-package.loaded["adapters.synthetic_input"] = nil
+package.loaded["platform.input.synthetic_input"] = nil
 package.loaded["adapters.event_provenance"] = nil
 package.loaded["modules.keymap.terminator_replay"] = nil

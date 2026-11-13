@@ -10,7 +10,7 @@ local METHODS = {
 }
 
 local function with_facade(callback, configure)
-	local names = { "modules.gestures.native_app_switcher", "adapters.synthetic_input",
+	local names = { "modules.gestures.native_app_switcher", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "platform.focus.window_manager" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -47,7 +47,7 @@ local function with_facade(callback, configure)
 	f.input, f.scheduler, f.windows = input, scheduler, windows
 	f.publication = { current = function() return f.source end, cached = function() return f.source end }
 	if configure then configure(f) end
-	package.loaded["adapters.synthetic_input"] = input
+	package.loaded["platform.input.synthetic_input"] = input
 	package.loaded["core.events.timer_scheduler"] = f.scheduler
 	package.loaded["platform.focus.window_manager"] = windows
 	local ok, failure = xpcall(function()

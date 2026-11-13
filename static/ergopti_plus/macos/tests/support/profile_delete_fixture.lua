@@ -14,7 +14,7 @@ local json = require("core.text.engine.json")
 
 local MODULES = {
 	"diagnostics.engine.operation_reporter",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.events.timer_scheduler",
 	-- The real timer scheduler describes callback failures through this pure owner.
 	"diagnostics.engine.reports.error_description",
@@ -235,10 +235,10 @@ local function with_trigger_fixture(options, body)
 		local set_profiles_calls = {}
 
 		if options.real_registrar then
-			package.loaded["adapters.hotkey_registrar"] = nil
+			package.loaded["platform.input.hotkey_registrar"] = nil
 			package.loaded["keyboard.engine.chord"] = nil
 		else
-			package.loaded["adapters.hotkey_registrar"] = backend.registrar
+			package.loaded["platform.input.hotkey_registrar"] = backend.registrar
 			package.loaded["keyboard.engine.chord"] = {
 				format = function(mods, key)
 					if type(mods) ~= "table" or type(key) ~= "string" then return nil, "invalid" end

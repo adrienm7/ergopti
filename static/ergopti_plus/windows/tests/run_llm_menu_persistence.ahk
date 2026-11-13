@@ -28,7 +28,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../_generated/locale_table.ahk
 #Include ../core/i18n/engine/i18n.ahk
 #Include ../infra/chord.ahk
-#Include ../adapters/hotkey_registrar.ahk
+#Include ../platform/input/hotkey_registrar.ahk
 #Include ../infra/hotpath_profiler.ahk
 #Include ../core/text/engine/toml/helpers.ahk
 #Include ../core/text/engine/toml/loader.ahk

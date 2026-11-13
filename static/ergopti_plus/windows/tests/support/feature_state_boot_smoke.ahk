@@ -45,7 +45,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\redact.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk
-#Include ..\..\adapters\key_state.ahk
+#Include ..\..\platform\input\key_state.ahk
 #Include ..\..\core\text\engine\toml\helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
 ; The getter consumes the actual configuration-owner binding policy.

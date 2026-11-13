@@ -37,7 +37,7 @@ local function load_fixture()
 		now = function() return 0 end,
 		log_if_slow = function() end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		RETURN = 36,
 		ENTER = 76,
 		TAB = 48,
@@ -101,7 +101,7 @@ local function load_fixture()
 	-- The tooltip captures both adapters at require time. A leaked instance from a
 	-- prior test would own different timer/property stubs and turn these callbacks
 	-- into fixture accidents instead of production behavior.
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["core.ui.ui.tooltip.llm"] = nil
 	local TooltipLLM = require("core.ui.ui.tooltip.llm")
@@ -116,7 +116,7 @@ local function load_fixture()
 		hs.timer.doAfter = previous_do_after
 		package.loaded["core.ui.ui.tooltip.llm"] = nil
 		package.loaded["adapters.event_provenance"] = nil
-		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["platform.input.synthetic_input"] = nil
 		restore_context()
 		restore_context = function() end
 	end
@@ -175,7 +175,7 @@ helpers.describe("tooltip_llm: stale action-epoch callbacks are inert", function
 			helpers.assert_true(consume,
 				"a successfully queued acceptance still owns the physical Tab")
 
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			helpers.assert_eq(synthetic.stats().pending_post_callback_actions, 1,
 				"the throwing callback must remain queued until after the HID callback")
 			local drain_ok, drain_err = pcall(hs.timer.__fire_all)
@@ -196,7 +196,7 @@ helpers.describe("tooltip_llm: stale action-epoch callbacks are inert", function
 			local key_watcher = find_watcher(watchers, hs.eventtap.event.types.keyDown)
 			helpers.assert_not_nil(key_watcher)
 
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			local tx = synthetic.begin("test.tooltip.replacement", "replacement")
 			local batch = synthetic.begin_callback(tx)
 			helpers.assert_true(synthetic.keyStroke(batch, {}, "tab"))
@@ -241,7 +241,7 @@ helpers.describe("tooltip_llm: stale action-epoch callbacks are inert", function
 			local open_tab = event(48, {}, "\t")
 			helpers.assert_eq(key_watcher.callback(open_tab), true,
 				"positive control: an open-epoch Tab must be accepted")
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			helpers.assert_eq(synthetic.stats().pending_post_callback_actions, 1,
 				"acceptance must be queued outside the HID callback")
 			hs.timer.__fire_all()

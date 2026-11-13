@@ -132,7 +132,7 @@ elseif CLOCK ~= "system" then
 	error("ERGOPTI_E2E_CLOCK must be system or seconds, not " .. CLOCK)
 end
 
-local Codes = require("infra.evdev_codes")
+local Codes = require("platform.input.evdev_codes")
 
 --- @param text string
 --- @return table UTF-8 characters.
@@ -166,7 +166,7 @@ local scripted_writer, injected_refusal = nil, false
 local callbacks = {}
 local queued_during_output = false
 local ai_characters = {}
-package.preload["adapters.uinput_writer"] = function()
+package.preload["platform.input.uinput_writer"] = function()
 	-- Actual Writer transactions over controlled byte ports, never native input.
 	scripted_writer = require("tests.fakes").uinput_writer({
 		on_emit = function(code, value)
@@ -194,7 +194,7 @@ package.preload["adapters.uinput_writer"] = function()
 	return scripted_writer
 end
 
-local hook = require("adapters.keyboard_hook")
+local hook = require("platform.input.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
 	if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then
@@ -403,7 +403,7 @@ if MAGIC_REPEAT ~= "none" then
 		repeat_controller = make_actions(options)
 		return repeat_controller
 	end
-	local Gate = require("infra.input_capture_gate")
+	local Gate = require("platform.input.capture_gate")
 	local make_gate = Gate.new
 	Gate.new = function(options)
 		repeat_gate = make_gate(options)

@@ -76,7 +76,7 @@ local function load_fixture()
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
-			or name == "adapters.synthetic_input"
+			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
 		) then
 			package.loaded[name] = nil
@@ -119,7 +119,7 @@ local function load_fixture()
 	Utils.is_ignored_window = function() return false, 1 end
 	Utils.is_secure_field = function() return false, 1 end
 	local hs_stub = require("hs")
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local keydown_tap, keyup_tap = nil, nil
 	for _, tap in ipairs(taps) do
 		if #tap.types == 1 and tap.types[1] == hs_stub.eventtap.event.types.keyDown then
@@ -412,15 +412,15 @@ end)
 --- @return table events { down, up }
 local function selftest_events(fixture, key)
 	local captured = nil
-	local saved_owner = package.loaded["adapters.synthetic_input_loopback_owner"]
-	package.loaded["adapters.synthetic_input_loopback_owner"] = {
+	local saved_owner = package.loaded["platform.input.synthetic_input_loopback_owner"]
+	package.loaded["platform.input.synthetic_input_loopback_owner"] = {
 		new = function(_scheduler, events)
 			captured = events
 			return { start = function() return true end, cancel = function() return false end }
 		end,
 	}
 	local ok, err = pcall(fixture.synthetic.emit_selftest_key_stroke, {}, key)
-	package.loaded["adapters.synthetic_input_loopback_owner"] = saved_owner
+	package.loaded["platform.input.synthetic_input_loopback_owner"] = saved_owner
 	helpers.assert_true(ok and err == true, "the selftest pair must be accepted: " .. tostring(err))
 	helpers.assert_not_nil(captured)
 	return captured

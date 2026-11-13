@@ -14,17 +14,17 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codes = require("infra.evdev_codes")
+local Codes = require("platform.input.evdev_codes")
 
 local KEY_W, KEY_X = 17, 45
 
 --- Runs body with the real writer, broker and injector on a recording backend.
 --- @param body function body(deps, rows, injector)
 local function with_output(body)
-	local Input = require("infra.input_event")
+	local Input = require("platform.input.event")
 	local rows = {}
-	local saved_hook = package.loaded["adapters.keyboard_hook"]
-	package.loaded["adapters.keyboard_hook"] = {
+	local saved_hook = package.loaded["platform.input.keyboard_hook"]
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
 		held_shortcut_modifier_codes = function() return {} end,
 		held_forwarded_keys = function() return {} end,
@@ -33,7 +33,7 @@ local function with_output(body)
 	}
 	local path = os.tmpname()
 	assert(assert(io.open(path, "wb")):close())
-	local writer = helpers.load_module("adapters.uinput_writer")
+	local writer = helpers.load_module("platform.input.uinput_writer")
 	writer._set_path_for_test(path)
 	writer._set_backend({ open = function() return 7 end, ioctl = function() return true end,
 		close = function() return true end, write = function(_, bytes)
@@ -60,7 +60,7 @@ local function with_output(body)
 	writer._reset_backend()
 	writer._set_path_for_test(nil)
 	os.remove(path)
-	package.loaded["adapters.keyboard_hook"] = saved_hook
+	package.loaded["platform.input.keyboard_hook"] = saved_hook
 	if not ok then error(err, 0) end
 end
 

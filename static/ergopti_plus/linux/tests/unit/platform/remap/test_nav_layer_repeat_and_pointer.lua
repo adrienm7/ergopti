@@ -81,7 +81,7 @@ helpers.describe("navigation layer repeat count (layer-repeat-count-linux)", fun
 	end)
 
 	helpers.it("(layer-repeat-count-linux) a counted wheel notch sends its last chord the count times", function()
-		local Input = require("infra.input_event")
+		local Input = require("platform.input.event")
 		local spec = layer()
 		spec[Input.wheel_layer_code("vertical", 1)] = { chords = { chord({}, ARROW_UP) }, counted = true }
 		local instance = engine(spec)

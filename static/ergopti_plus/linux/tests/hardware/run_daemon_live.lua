@@ -31,11 +31,11 @@
 --- the grab. Exit 0 = both verified; 1 = a failure; 2 = no environment.
 --- ==============================================================================
 
-local EvdevCodes = require("infra.evdev_codes")
-local EvdevReader = require("adapters.evdev_reader")
+local EvdevCodes = require("platform.input.evdev_codes")
+local EvdevReader = require("platform.input.evdev_reader")
 
 local TEST_KEYBOARD = "Ergopti E2E Keyboard"
-local DAEMON_OUTPUT = require("infra.device_names").VIRTUAL_KEYBOARD
+local DAEMON_OUTPUT = require("platform.input.device_names").VIRTUAL_KEYBOARD
 
 -- US evdev codes of the keys this harness types and decodes (Xvfb's default
 -- keymap is US, so the decode below is exact rather than assumed).

@@ -51,7 +51,7 @@ function M.uinput_writer(opts)
 	-- Only its syscall port is controlled: no device, kernel ACK or origin exists.
 	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	local driver = assert(source:match("^(.*)/tests/fakes/init.lua$"))
-	local fake = assert(loadfile(driver .. "/adapters/uinput_writer.lua"))()
+	local fake = assert(loadfile(driver .. "/platform/input/uinput_writer.lua"))()
 	fake.events, fake.opened, fake.closed, fake.test = {}, false, false, {}
 	local pending
 	local function uint(bytes, at, count)

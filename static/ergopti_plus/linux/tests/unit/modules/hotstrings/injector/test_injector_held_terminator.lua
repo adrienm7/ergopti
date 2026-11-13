@@ -34,7 +34,7 @@ local KEY_A = 30
 helpers.describe("keyboard_hook: the forwarded keys still held", function()
 
 	helpers.it("reports the terminator while its key-down is being handled", function()
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = helpers.load_module("platform.input.keyboard_hook")
 		local seen = {}
 		kh._test_drive({
 			{ type = EV_KEY, code = KEY_LEFTSHIFT, value = 1 },
@@ -64,8 +64,8 @@ end)
 --- @param held table evdev keycodes the hook reports as forwarded and held.
 --- @return table injector, table channel
 local function load(held, shortcut_modifiers)
-	local real_hook = package.loaded["adapters.keyboard_hook"]
-	package.loaded["adapters.keyboard_hook"] = {
+	local real_hook = package.loaded["platform.input.keyboard_hook"]
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
 		held_shortcut_modifier_codes = function() return shortcut_modifiers or {} end,
 		held_forwarded_keys = function() return held end,
@@ -84,7 +84,7 @@ local function load(held, shortcut_modifiers)
 	injector._set_uinput(channel)
 	injector._set_nanosleep_for_test(function() end)
 	return injector, channel, function()
-		package.loaded["adapters.keyboard_hook"] = real_hook
+		package.loaded["platform.input.keyboard_hook"] = real_hook
 		package.loaded["modules.hotstrings.injector"] = nil
 	end
 end

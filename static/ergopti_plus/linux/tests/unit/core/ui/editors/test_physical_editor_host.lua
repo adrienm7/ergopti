@@ -21,7 +21,7 @@ end)
 
 helpers.describe("Physical editor position capture host epoch composition", function()
 	helpers.it("uses genuine thin-host session guards through explicitly controlled native ports", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "adapters.keyboard_hook",
+		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, callback, native_token, guard, cancel_refused, writes, sends = nil, 0, nil, nil, nil, false, 0, 0
@@ -41,7 +41,7 @@ helpers.describe("Physical editor position capture host epoch composition", func
 			editor_source_current = function(exact) return rawequal(exact, receipt) end,
 			edit = function() writes = writes + 1; return true end }
 		local called, detail = pcall(function()
-			package.loaded["core.ui.ui.webview_manager"], package.loaded["adapters.keyboard_hook"] = manager, hook
+			package.loaded["core.ui.ui.webview_manager"], package.loaded["platform.input.keyboard_hook"] = manager, hook
 			package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function() end, get_action_label = function(action) return action end }
@@ -99,7 +99,7 @@ end)
 
 helpers.describe("Physical editor exact native-closed debt retry", function()
 	helpers.it("(physical-editor-close-debt) settles only the observed closed epoch before admitting a successor", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "adapters.keyboard_hook",
+		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, serial, callback, token = nil, 0, 0, nil, nil
@@ -125,7 +125,7 @@ helpers.describe("Physical editor exact native-closed debt retry", function()
 			editor_source_current = function(exact) return rawequal(exact, receipt) end,
 			edit = function() error("Controlled observation retirement must never publish") end }
 		local checked, failure = pcall(function()
-			package.loaded["core.ui.ui.webview_manager"], package.loaded["adapters.keyboard_hook"] = manager, hook
+			package.loaded["core.ui.ui.webview_manager"], package.loaded["platform.input.keyboard_hook"] = manager, hook
 			package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function() end, get_action_label = function(action) return action end }
@@ -180,7 +180,7 @@ end)
 
 helpers.describe("Physical editor premature close notice refusal", function()
 	helpers.it("(physical-editor-close-notice) premature same-epoch notice cannot settle cancellation retry without native ACK", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "adapters.keyboard_hook",
+		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, serial, callback, token = nil, 0, 0, nil, nil
@@ -206,7 +206,7 @@ helpers.describe("Physical editor premature close notice refusal", function()
 			editor_source_current = function(exact) return rawequal(exact, receipt) end,
 			edit = function() error("Controlled observation retirement must never publish") end }
 		local checked, failure = pcall(function()
-			package.loaded["core.ui.ui.webview_manager"], package.loaded["adapters.keyboard_hook"] = manager, hook
+			package.loaded["core.ui.ui.webview_manager"], package.loaded["platform.input.keyboard_hook"] = manager, hook
 			package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function() end, get_action_label = function(action) return action end }
@@ -248,7 +248,7 @@ end)
 helpers.describe("Physical editor pure constructor reservation rollback", function()
 	for _, mode in ipairs({ "throw", "nil", "false" }) do
 		helpers.it("(physical-editor-constructor) refuses before native acquisition and releases only the pure reservation: " .. mode, function()
-			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "adapters.keyboard_hook",
+			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 				"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 			local host, epoch, serial, options, failing = nil, 0, 0, nil, true
@@ -273,7 +273,7 @@ helpers.describe("Physical editor pure constructor reservation rollback", functi
 						local old = epoch; epoch = 0; host.on_window_closed(old); return true
 					end,
 					eval_js = function() return true end }
-				package.loaded["adapters.keyboard_hook"] = { position_capture_available = function() return true end,
+				package.loaded["platform.input.keyboard_hook"] = { position_capture_available = function() return true end,
 					capture_position = function() captures = captures + 1; return {} end,
 					cancel_position = function() cancellations = cancellations + 1; return true end }
 				package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
@@ -324,7 +324,7 @@ end)
 
 helpers.describe("Physical editor returned Window retirement acknowledgement", function()
 	helpers.it("(physical-editor-window-ack) retains false nil and throw retirement debt after acknowledged native close", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "adapters.keyboard_hook",
+		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"modules.gestures.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local checked, failure = pcall(function()
@@ -344,7 +344,7 @@ helpers.describe("Physical editor returned Window retirement acknowledgement", f
 						local old = epoch; epoch = 0; host.on_window_closed(old); return true
 					end,
 					eval_js = function() return true end }
-				package.loaded["adapters.keyboard_hook"] = { position_capture_available = function() return false end }
+				package.loaded["platform.input.keyboard_hook"] = { position_capture_available = function() return false end }
 				package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
 					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
@@ -403,7 +403,7 @@ end)
 
 helpers.it("physical editor refuses a FIFO key registry without blocking", function()
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "modules.gestures.manager", "adapters.keyboard_hook" }
+	local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "modules.gestures.manager", "platform.input.keyboard_hook" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local original_shared = Paths.shared
 	local source = assert(original_shared("layouts/data/keycodes/physical_keys.json"))
@@ -414,7 +414,7 @@ helpers.it("physical editor refuses a FIFO key registry without blocking", funct
 	package.loaded["core.ui.ui.webview_manager"] = { native_available = function() return true end,
 		show = function() shows = shows + 1; return false end }
 	package.loaded["modules.gestures.manager"] = {}
-	package.loaded["adapters.keyboard_hook"] = {}
+	package.loaded["platform.input.keyboard_hook"] = {}
 	package.loaded["ui.physical_shortcuts.bridge"] = nil
 	local host = require("ui.physical_shortcuts.bridge")
 	Paths.shared = function(relative)

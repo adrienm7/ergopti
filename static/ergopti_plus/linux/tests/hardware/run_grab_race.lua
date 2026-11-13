@@ -38,10 +38,10 @@
 --- Exit 0 = every assertion held. 1 = a failure. 2 = this machine cannot host it.
 --- ==============================================================================
 
-local InputEvent   = require("infra.input_event")
-local EvdevCodes   = require("infra.evdev_codes")
-local UinputWriter = require("adapters.uinput_writer")
-local EvdevReader  = require("adapters.evdev_reader")
+local InputEvent   = require("platform.input.event")
+local EvdevCodes   = require("platform.input.evdev_codes")
+local UinputWriter = require("platform.input.uinput_writer")
+local EvdevReader  = require("platform.input.evdev_reader")
 
 -- How long to wait for udev to publish a node the kernel just created. Bounded so
 -- a broken environment fails with a message instead of hanging a CI job.
@@ -57,7 +57,7 @@ local READ_TIMEOUT_MS = 500
 -- always registers the production one — so this is looked up rather than chosen.
 -- device_finder excludes it as synthetic, which is correct for the daemon and
 -- irrelevant here: the node is found by name, not through the finder.
-local TEST_DEVICE_NAME = require("infra.device_names").VIRTUAL_KEYBOARD
+local TEST_DEVICE_NAME = require("platform.input.device_names").VIRTUAL_KEYBOARD
 
 -- Letter keycodes. NOT in infra/evdev_codes: that module carries the modifiers
 -- and control keys the engine reasons about, and adding the whole US keyboard to

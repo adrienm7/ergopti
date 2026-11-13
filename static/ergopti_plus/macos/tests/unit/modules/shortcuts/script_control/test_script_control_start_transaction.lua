@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 --- Installs the non-native dependencies used by script control.
 local function install_dependency_stubs()
 	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 0x6A,
 		F14_KARABINER_BACKSPACE = 0x6B,
 		F15_KARABINER_ESCAPE = 0x6C,
@@ -38,13 +38,13 @@ local function install_dependency_stubs()
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "hardware", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_, callback)
 			callback()
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "none" end,
 	}

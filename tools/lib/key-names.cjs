@@ -7,7 +7,7 @@
  * Reads `_shared/layouts/data/keycodes/key_names.json`, the one table naming a key or
  * modifier in visible text, for the generators and gates written in Node. The
  * drivers read its projections (_shared/platform/input/keycodes/key_names.lua and
- * windows/infra/key_names.ahk); this is the same rule.
+ * windows/platform/input/key_names.ahk); this is the same rule.
  * ==============================================================================
  */
 

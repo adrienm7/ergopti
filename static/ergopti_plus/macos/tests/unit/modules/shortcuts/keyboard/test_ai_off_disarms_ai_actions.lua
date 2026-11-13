@@ -85,7 +85,7 @@ end)
 --- Loads the real owner with an AI slot and a plain one over a recording registrar.
 local function load_keyboard()
 	local enabled, order = {}, {}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord)
 			local handle = "handle:" .. chord
 			enabled[handle] = true

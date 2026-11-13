@@ -41,18 +41,14 @@ graph TD
         LINUX_clipboard_owner_worker["ClipboardOwnerWorker.lua"]
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
-        LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
-        LINUX_keyboard_hook["KeyboardHook.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
-        LINUX_modifier_broker["ModifierBroker.lua"]
         LINUX_notifier["Notifier.lua"]
         LINUX_screen_capture["ScreenCapture.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
-        LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
         LINUX_wayland_selection_counter["WaylandSelectionCounter.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
@@ -77,14 +73,10 @@ graph TD
         MACOS_field_probe_ports["FieldProbePorts.lua"]
         MACOS_field_run_ports["FieldRunPorts.lua"]
         MACOS_foreign_ledger_snapshot["ForeignLedgerSnapshot.lua"]
-        MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_input_source_selector["InputSourceSelector.lua"]
         MACOS_installed_physical_source["InstalledPhysicalSource.lua"]
         MACOS_karabiner_coexistence["KarabinerCoexistence.lua"]
-        MACOS_key_state["KeyState.lua"]
-        MACOS_keyboard_geometry["KeyboardGeometry.lua"]
-        MACOS_keyboard_hook["KeyboardHook.lua"]
         MACOS_keyboard_layout_files["KeyboardLayoutFiles.lua"]
         MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
         MACOS_managed_ollama_bootstrap["ManagedOllamaBootstrap.lua"]
@@ -92,7 +84,6 @@ graph TD
         MACOS_managed_ollama_hint["ManagedOllamaHint.lua"]
         MACOS_managed_ollama_pull["ManagedOllamaPull.lua"]
         MACOS_metadata_command_stats["MetadataCommandStats.lua"]
-        MACOS_modifier_injector["ModifierInjector.lua"]
         MACOS_mouse_control["MouseControl.lua"]
         MACOS_native_bootstrap_pty["NativeBootstrapPty.lua"]
         MACOS_native_python_probe["NativePythonProbe.lua"]
@@ -111,14 +102,11 @@ graph TD
         MACOS_runtime_capture_port["RuntimeCapturePort.lua"]
         MACOS_runtime_owner_ports["RuntimeOwnerPorts.lua"]
         MACOS_screen_capture["ScreenCapture.lua"]
-        MACOS_synthetic_input["SyntheticInput.lua"]
-        MACOS_synthetic_input_loopback_owner["SyntheticInputLoopbackOwner.lua"]
         MACOS_system_info["SystemInfo.lua"]
         MACOS_system_switcher_input["SystemSwitcherInput.lua"]
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
-        MACOS_text_sender["TextSender.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
         MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
@@ -132,10 +120,6 @@ graph TD
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
-        WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
-        WINDOWS_input_probe_native["InputProbeNative.ahk"]
-        WINDOWS_key_state["KeyState.ahk"]
-        WINDOWS_keyboard_hook["KeyboardHook.ahk"]
         WINDOWS_keyboard_layout_install["KeyboardLayoutInstall.ahk"]
         WINDOWS_keyboard_layout_switch["KeyboardLayoutSwitch.ahk"]
         WINDOWS_llm_automation["LlmAutomation.ahk"]
@@ -151,7 +135,6 @@ graph TD
         WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_system_locale["SystemLocale.ahk"]
         WINDOWS_system_time_zone["SystemTimeZone.ahk"]
-        WINDOWS_text_sender["TextSender.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
         WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
@@ -169,30 +152,21 @@ graph TD
 
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
-    P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_Notifier -->|implements| LINUX_notifier
     P_TrayMenu -->|implements| LINUX_tray_menu
 
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
-    P_HotkeyRegistrar -->|implements| MACOS_hotkey_registrar
-    P_KeyState -->|implements| MACOS_key_state
-    P_KeyboardHook -->|implements| MACOS_keyboard_hook
     P_MouseControl -->|implements| MACOS_mouse_control
     P_Notifier -->|implements| MACOS_notifier
-    P_TextSender -->|implements| MACOS_text_sender
     P_TrayMenu -->|implements| MACOS_tray_menu
 
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
-    P_HotkeyRegistrar -->|implements| WINDOWS_hotkey_registrar
-    P_KeyState -->|implements| WINDOWS_key_state
-    P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
     P_MouseControl -->|implements| WINDOWS_mouse_control
     P_Notifier -->|implements| WINDOWS_notifier
-    P_TextSender -->|implements| WINDOWS_text_sender
     P_TrayMenu -->|implements| WINDOWS_tray_menu
 
     %% Key domain relationships

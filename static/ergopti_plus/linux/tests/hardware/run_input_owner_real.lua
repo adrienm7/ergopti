@@ -47,14 +47,14 @@ if arg and arg[1] == "--classifier" then return { frames_match = frames_match } 
 
 -- Cold Hook construction pins the genuine first Reader authority before any
 -- backend or fixture callback. Transport observation below grants no authority.
-local Hook = require("adapters.keyboard_hook")
+local Hook = require("platform.input.keyboard_hook")
 local ffi = require("ffi")
-local Input = require("infra.input_event")
-local Names = require("infra.device_names")
+local Input = require("platform.input.event")
+local Names = require("platform.input.device_names")
 local Finder = require("modules.hotstrings.device_finder")
-local Reader = require("adapters.evdev_reader")
-local Writer = require("adapters.uinput_writer")
-local Broker = require("adapters.modifier_broker")
+local Reader = require("platform.input.evdev_reader")
+local Writer = require("platform.input.uinput_writer")
+local Broker = require("platform.input.modifier_broker")
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
 local Monotonic = require("core.logger.engine.monotonic")
@@ -434,7 +434,7 @@ end
 
 --- Runs genuine kernel scenarios with separately handwritten wire oracles.
 local function run()
-	assert(rawequal(package.loaded["adapters.keyboard_hook"], Hook), "original cold Hook construction must remain loaded")
+	assert(rawequal(package.loaded["platform.input.keyboard_hook"], Hook), "original cold Hook construction must remain loaded")
 	local template = ffi.new("char[?]", #"/tmp/ergopti-input-owner-XXXXXX" + 1, "/tmp/ergopti-input-owner-XXXXXX")
 	local created = ffi.C.mkdtemp(template); assert(created ~= nil, "exclusive private fixture namespace")
 	namespace = ffi.string(created); config_path = namespace .. "/config.toml"

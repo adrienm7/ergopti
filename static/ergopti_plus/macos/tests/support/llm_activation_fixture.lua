@@ -44,11 +44,11 @@ local OWNED_MODULES = {
 	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"infra.keycodes",
+	"platform.input.synthetic_input",
+	"platform.input.keycodes",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"modules.llm.warmup_controller",
 	"modules.llm.api_ollama",
 	"modules.llm.api_remote",
@@ -580,7 +580,7 @@ local function build_fixture(backend, save_results, options)
 			mark = function() return true end,
 			is_synthetic = function() return false end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,
 			acquire_admission_fence = function()
 				if admission_fence ~= nil then return nil end
@@ -594,7 +594,7 @@ local function build_fixture(backend, save_results, options)
 			end,
 			defer_after_callback = function(_, callback) return callback() end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -609,7 +609,7 @@ local function build_fixture(backend, save_results, options)
 			SG_NAMES = {},
 			AX_NAMES = {},
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}

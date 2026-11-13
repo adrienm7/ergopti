@@ -25,7 +25,7 @@ local function with_position_capture(options, body)
 		sym_utf8 = function(code) return code == 30 and "a" or nil end,
 		key_utf8 = function(_, code) return code == 30 and "a" or nil end,
 		compose_feed = function() end, compose_status = function() return "nothing" end,
-		compose_reset = function() end, modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end }
+		compose_reset = function() end, modifier_role = function(code) return require("platform.input.evdev_codes").MODIFIER_OF[code] end }
 	backend.source_group = function()
 		local epoch = state.epoch
 		return 0, epoch, function() return state.epoch == epoch end

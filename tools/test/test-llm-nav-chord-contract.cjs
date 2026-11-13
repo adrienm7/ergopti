@@ -200,7 +200,7 @@ const luaTable = (source, name) =>
 
 // 3. Linux.
 {
-	const codes = read('linux/infra/evdev_codes.lua');
+	const codes = read('linux/platform/input/evdev_codes.lua');
 	const named = new Map();
 	for (const entry of codes.matchAll(/^M\.(KEY_[A-Z]+)\s*=\s*(\d+)/gm)) {
 		named.set(entry[1], Number(entry[2]));
@@ -231,7 +231,7 @@ const luaTable = (source, name) =>
 		'Linux handle_shortcut must step by both tables'
 	);
 	check(
-		/shift_side = M\.held_shift_side\(\),/.test(read('linux/adapters/keyboard_hook.lua')),
+		/shift_side = M\.held_shift_side\(\),/.test(read('linux/platform/input/keyboard_hook.lua')),
 		'the Linux keyboard hook must name the Shift side in every consume detail'
 	);
 }

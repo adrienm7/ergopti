@@ -42,13 +42,13 @@ local SCAN_PREDICATES = {
 local function probe(source, claim)
 	local target = "modules.dynamic_hotstrings.personal_info"
 	return helpers.with_stub_scope({ target, "core.logger.engine.logger", "modules.keystats", "ui.personal_info_editor",
-		"adapters.synthetic_input", "core.fs.adapters.file_system", "infra.personal_info_fields" }, function()
+		"platform.input.synthetic_input", "core.fs.adapters.file_system", "infra.personal_info_fields" }, function()
 		local record = { errors = {}, queries = {}, attempts = 0, scans = 0 }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) record.errors[#record.errors + 1] = string.format(format, ...) end
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.keystats"], package.loaded["ui.personal_info_editor"] = {}, {}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			emit_key_stroke = function() return true end, emit_key_strokes = function() return true end,
 		}
 		local interceptor

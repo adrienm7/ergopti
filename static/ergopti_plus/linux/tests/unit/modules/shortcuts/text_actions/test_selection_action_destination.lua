@@ -40,7 +40,7 @@ end
 local function with_action(session, action, change, body)
 	local names = {
 		"core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
-		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
+		"platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.uinput_writer",
 		"core.events.loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
 		"platform.focus.window_info", "core.logger.engine.shim",
@@ -94,9 +94,9 @@ local function with_action(session, action, change, body)
 			package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function(_, fallback)
 				retire("layout"); return fallback
 			end }
-			package.loaded["adapters.keyboard_hook"] = {}
-			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
-			package.loaded["adapters.uinput_writer"] = {
+			package.loaded["platform.input.keyboard_hook"] = {}
+			package.loaded["platform.input.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["platform.input.uinput_writer"] = {
 				is_open = function() return true end,
 				emit = function(code, value)
 					world.events[#world.events + 1] = { code, value }
@@ -125,7 +125,7 @@ local function with_action(session, action, change, body)
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 				package.loaded["adapters.clipboard"] = nil
 				injector = helpers.load_module("modules.hotstrings.injector")
-				injector._set_uinput(package.loaded["adapters.uinput_writer"])
+				injector._set_uinput(package.loaded["platform.input.uinput_writer"])
 				injector._set_nanosleep_for_test(function() end)
 			end
 			for _, name in ipairs({ "adapters.clipboard", "modules.shortcuts.manager",
@@ -242,8 +242,8 @@ end)
 --- @param change string Controlled destination retirement or native refusal.
 --- @return table world Independently recorded output and handler result.
 local function observe_compound_action(action, change)
-	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_hook",
-		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
+	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
+		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
 		"platform.focus.window_info" }
@@ -268,8 +268,8 @@ local function observe_compound_action(action, change)
 				UNKNOWN = "unknown", kind = function() return "x11" end,
 				is_x11 = function() return true end, is_wayland = function() return false end,
 			}
-			package.loaded["adapters.keyboard_hook"] = {}
-			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["platform.input.keyboard_hook"] = {}
+			package.loaded["platform.input.modifier_broker"] = { for_channel = function() return nil end }
 			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
 			package.loaded["platform.focus.window_info"] = { focused_app_id = function()
 				retire("metrics"); return "owned-editor"
@@ -294,7 +294,7 @@ local function observe_compound_action(action, change)
 					return true
 				end,
 			}
-			package.loaded["adapters.uinput_writer"] = writer
+			package.loaded["platform.input.uinput_writer"] = writer
 			local Layout = helpers.load_module("adapters.keyboard_layout")
 			Layout._set_table_for_test({ ["("] = { keycode = 10, level = 2, mods = {"shift"} },
 				[")"] = { keycode = 11, level = 2, mods = {"shift"} } })
@@ -374,8 +374,8 @@ end)
 --- @param change string The desktop boundary which retires the original field.
 --- @return table observations Independent output, clipboard and owner receipts.
 local function observe_configured_insertion(session, action, route, change)
-	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_hook",
-		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
+	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
+		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -419,8 +419,8 @@ local function observe_configured_insertion(session, action, route, change)
 				is_x11 = function() return session == "x11" end,
 				is_wayland = function() return session == "wayland" end,
 			}
-			package.loaded["adapters.keyboard_hook"] = {}
-			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["platform.input.keyboard_hook"] = {}
+			package.loaded["platform.input.modifier_broker"] = { for_channel = function() return nil end }
 			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
 			local writer = {
 				is_open = function() return true end,
@@ -439,7 +439,7 @@ local function observe_configured_insertion(session, action, route, change)
 					return true
 				end,
 			}
-			package.loaded["adapters.uinput_writer"] = writer
+			package.loaded["platform.input.uinput_writer"] = writer
 			local layout = helpers.load_module("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 			package.loaded["adapters.clipboard"] = nil

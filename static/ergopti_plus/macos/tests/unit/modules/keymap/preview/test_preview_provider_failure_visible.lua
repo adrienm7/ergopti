@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- Runs the provider-failure scenario with isolated process-global modules.
 local function run_scenario()
 	local dependency_names = {
-		"adapters.synthetic_input",
+		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"core.logger.engine.logger",
 		"infra.manifest_reader",
@@ -50,7 +50,7 @@ local function run_scenario()
 		effects.errors[#effects.errors + 1] = string.format(format_string, ...)
 	end
 
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
 	package.loaded["core.events.timer_scheduler"] = {

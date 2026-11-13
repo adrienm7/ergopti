@@ -88,7 +88,7 @@ local function with_case(spec, body)
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
 			package.loaded["core.process.adapters.shell_runner"] = { has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end }
 			local gestures = require("modules.gestures.manager")
@@ -179,7 +179,7 @@ local function with_configuration_picker(body)
 		end
 		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
-		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad" }
+		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad" }
 		package.loaded["core.process.adapters.program_providers"] = {}
 		local gestures = require("modules.gestures.manager")
 		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })

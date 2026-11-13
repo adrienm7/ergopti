@@ -72,7 +72,7 @@ local function with_stack(scenario)
 		tap.fn(physical_event("z"))
 		helpers.assert_eq(observed.physical, 2, "the native fixture must reach the real keymap buffer")
 		scenario({ keymap = km, rules = rules, observed = observed, tap = tap,
-			synthetic = require("adapters.synthetic_input") })
+			synthetic = require("platform.input.synthetic_input") })
 	end, debug.traceback)
 	if rules then pcall(rules.stop) end
 	if km then pcall(km.stop, true) end

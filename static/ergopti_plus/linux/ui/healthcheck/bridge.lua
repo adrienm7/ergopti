@@ -281,7 +281,7 @@ local function collect_input(state)
 	local input = {}
 	-- The pause belongs to the script actions, which the daemon hands over
 	if type(state.is_paused) == "function" then input.paused = state.is_paused() == true end
-	local Hook = require("adapters.keyboard_hook")
+	local Hook = require("platform.input.keyboard_hook")
 	local held = Hook.held_modifiers()
 	for _, name in ipairs({ "shift", "ctrl", "alt", "altgr", "meta" }) do input[name] = held[name] == true end
 	local caps_lock, caps_err = Hook.caps_lock_on()
@@ -430,7 +430,7 @@ local function collect_permissions(ids)
 	end
 	local readers = {
 		input_devices = function() return event and device_access(event) or "unknown" end,
-		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
+		uinput        = function() return device_writable(require("platform.input.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
 	for _, id in ipairs(ids) do

@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function clear_mouse_stack()
 	for _, name in ipairs({
 		"adapters.event_provenance",
-		"adapters.synthetic_input",
+		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"modules.gestures.actions",
 		"modules.gestures.actions_click",
@@ -47,7 +47,7 @@ local function load_lookup_fixture()
 	return {
 		actions = actions,
 		posted = posted,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 		new_mouse_event = new_mouse_event,
 		event_types = eventtap.event.types,
@@ -86,7 +86,7 @@ local function load_click_fixture(options)
 			attempts[#attempts + 1] = self
 			if options.fence_on_first_type == event_type and not fenced_once then
 				fenced_once = true
-				options.fence_token = require("adapters.synthetic_input")
+				options.fence_token = require("platform.input.synthetic_input")
 					.acquire_admission_fence("test.mouse-post")
 			end
 			if options.fail_first_type == event_type and not failed_once then
@@ -115,7 +115,7 @@ local function load_click_fixture(options)
 		taps = eventtap.__taps,
 		eventtap = eventtap,
 		timer = require("tests.stubs.hs").timer,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 		event_types = eventtap.event.types,
 		options = options,

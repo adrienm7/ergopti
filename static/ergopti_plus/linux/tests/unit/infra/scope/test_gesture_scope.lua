@@ -11,9 +11,9 @@ local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
 		local manager_name = "modules.gestures.manager"
 		local original_manager = package.loaded[manager_name]
-		local original_reader = package.loaded["adapters.evdev_reader"]
+		local original_reader = package.loaded["platform.input.evdev_reader"]
 		package.loaded[manager_name] = nil
-		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
+		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
 		local backup = path .. ".scope-backup"
 		local controls = { backups = {} }
 		local ok, err = pcall(function()
@@ -46,7 +46,7 @@ local function with_scope(body)
 			body(owner, gestures, controls, path, backup)
 		end)
 		package.loaded[manager_name] = original_manager
-		package.loaded["adapters.evdev_reader"] = original_reader
+		package.loaded["platform.input.evdev_reader"] = original_reader
 		os.remove(backup)
 		os.remove(backup .. ".tmp")
 		for _, created in ipairs(controls.backups) do os.remove(created) os.remove(created .. ".tmp") end
@@ -57,7 +57,7 @@ end
 helpers.describe("Linux gesture scope transaction", function()
 	helpers.it("gesture-master-close: refused native stop preserves file and retains its inverse", function()
 		with_scope(function(_, gestures, _, path)
-			require("adapters.evdev_reader").close = function() return false end
+			require("platform.input.evdev_reader").close = function() return false end
 			helpers.assert_eq(gestures.set_enabled(false), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 			helpers.assert_true(gestures.is_enabled())

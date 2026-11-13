@@ -161,7 +161,7 @@ Test("feature-state startup: actual compiled tap declarations publish before con
 TestFeatureStateBootTapBindingSourceWiring() {
 	Source := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
 	State := FileRead(A_ScriptDir . "\..\infra\feature_state.ahk", "UTF-8")
-	KeyStatePos := InStr(Source, "#Include adapters/key_state.ahk")
+	KeyStatePos := InStr(Source, "#Include platform/input/key_state.ahk")
 	StatePos := InStr(Source, "#Include infra/feature_state.ahk")
 	ApplyPos := InStr(Source, "_BootConfigApplied := ApplyBootConfigToml(")
 	GesturePos := InStr(Source, "#Include modules/gestures/init.ahk")

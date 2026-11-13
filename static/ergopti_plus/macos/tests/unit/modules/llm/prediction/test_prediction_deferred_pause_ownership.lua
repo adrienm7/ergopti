@@ -166,7 +166,7 @@ local function load_fixture()
 		get = function(key) return key end,
 		t = function(key) return key end,
 	}
-	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 	package.loaded["core.ui.ui.tooltip"] = {
 		get_current_index = function() return nil end,
 		hide = function() return true end,

@@ -512,7 +512,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.keyboard_geometry",
+		id       = "platform.input.keyboard_geometry",
 		contract = { "initialize", "event_type", "form", "native_code", "physical_code" },
 		wired    = true,
 	},
@@ -562,7 +562,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.hotkey_registrar",
+		id       = "platform.input.hotkey_registrar",
 		contract = { "bind", "unbind", "setEnabled" },
 		wired    = true,
 	},
@@ -582,12 +582,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.key_state",
+		id       = "platform.input.key_state",
 		contract = { "isDown", "isUp" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.keyboard_hook",
+		id       = "platform.input.keyboard_hook",
 		contract = { "start", "stop" },
 		wired    = true,
 	},
@@ -597,7 +597,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.modifier_injector",
+		id       = "platform.input.modifier_injector",
 		contract = { "arm", "disarm", "is_armed" },
 		wired    = true,
 	},
@@ -652,7 +652,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.synthetic_input",
+		id       = "platform.input.synthetic_input",
 		contract = {
 			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
 			"current_action_epoch", "register_action_listener", "enter_callback",
@@ -661,7 +661,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.synthetic_input_loopback_owner",
+		id       = "platform.input.synthetic_input_loopback_owner",
 		contract = { "new" },
 		wired    = true,
 	},
@@ -696,7 +696,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.text_sender",
+		id       = "platform.input.text_sender",
 		contract = { "send" },
 		wired    = true,
 	},

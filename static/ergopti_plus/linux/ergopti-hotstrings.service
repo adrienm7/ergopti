@@ -38,7 +38,7 @@ ExecStart=%h/.local/bin/ergopti-hotstrings --tray
 Restart=on-failure
 RestartSec=3s
 # 78 (EX_CONFIG) is the daemon saying the session cannot read the keyboard or
-# write /dev/uinput (infra/input_access.lua). The graphical launcher requests
+# write /dev/uinput (platform/input/access.lua). The graphical launcher requests
 # missing permissions and refreshes its groups before starting the daemon;
 # retrying a refused setup would repeat the prompt every three seconds.
 RestartPreventExitStatus=78

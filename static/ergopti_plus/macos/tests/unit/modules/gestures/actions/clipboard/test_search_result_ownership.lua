@@ -41,7 +41,7 @@ local function it(name, scenario)
 					return text
 				end
 				calls.hs.pasteboard = native
-				local synthetic = package.loaded["adapters.synthetic_input"]
+				local synthetic = package.loaded["platform.input.synthetic_input"]
 				local emit = synthetic.emit_key_stroke
 				synthetic.emit_key_stroke = function(mods, key, ...)
 					local accepted = emit(mods, key, ...)

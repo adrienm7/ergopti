@@ -16,14 +16,14 @@
 ---    acquires native chords for explicitly assigned catalogue slots.
 --- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
 ---    and rebuilt after any assignment change + reload. The OS call itself lives
----    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
+---    in platform/input/hotkey_registrar.lua, so this module never names hs.hotkey.
 --- ==============================================================================
 
 local M = {}
 
 local JsonCodec   = require("core.fs.adapters.json_codec")
 local Chord       = require("keyboard.engine.chord")
-local Registrar   = require("adapters.hotkey_registrar")
+local Registrar   = require("platform.input.hotkey_registrar")
 local FileSystem  = require("core.fs.adapters.file_system")
 local Paths       = require("core.fs.engine.paths")
 local Logger      = require("core.logger.engine.logger")

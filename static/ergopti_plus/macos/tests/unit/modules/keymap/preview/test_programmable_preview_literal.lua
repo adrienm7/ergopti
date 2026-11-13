@@ -72,14 +72,14 @@ end
 local function render_provider_row(provider_result)
 	local text
 	helpers.with_stub_scope({
-		"adapters.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
+		"platform.input.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"infra.manifest_reader", "modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander", "modules.keystats", "modules.llm",
 		"modules.llm.prediction_engine", "core.ui.ui.tooltip", "modules.keymap.llm_bridge",
 	}, function()
 		local scheduled = {}
 		local action_epoch = {}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			current_action_epoch = function() return action_epoch end,
 		}
 		package.loaded["core.events.timer_scheduler"] = {

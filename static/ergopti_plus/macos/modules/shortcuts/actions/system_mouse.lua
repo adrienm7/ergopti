@@ -25,7 +25,7 @@ local notifications  = require("core.ui.engine.notifications")
 local i18n           = require("core.i18n.engine.i18n")
 local MouseControl   = require("adapters.mouse_control")
 local ShellRunner    = require("core.process.adapters.shell_runner")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local PythonInterpreter = require("adapters.python_interpreter")
 

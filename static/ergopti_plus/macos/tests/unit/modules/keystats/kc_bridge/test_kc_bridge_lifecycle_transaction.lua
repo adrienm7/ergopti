@@ -203,8 +203,8 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 			"adapters.input_source_broker", "modules.keystats.log_manager",
 			"modules.keystats.context_tracker", "metrics.engine.metrics",
 			"modules.keystats.watchers", "core.process.adapters.lifecycle",
-			"adapters.keyboard_hook", "adapters.event_provenance",
-			"adapters.synthetic_input",
+			"platform.input.keyboard_hook", "adapters.event_provenance",
+			"platform.input.synthetic_input",
 		}) do package.loaded[name] = {} end
 
 		local loaded, err = pcall(require, "modules.keystats.init")

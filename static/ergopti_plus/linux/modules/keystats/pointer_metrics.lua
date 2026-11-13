@@ -31,8 +31,8 @@
 
 local M = {}
 
-local EvdevCodes = require("infra.evdev_codes")
-local InputEvent = require("infra.input_event")
+local EvdevCodes = require("platform.input.evdev_codes")
+local InputEvent = require("platform.input.event")
 local Logger = require("core.logger.engine.shim")
 local TapDetector = require("modules.gestures.tap_detector")
 

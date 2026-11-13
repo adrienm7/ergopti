@@ -786,7 +786,7 @@ function M.init(opts)
 	end
 	-- Keystats imports Manager before Hook. Select the loaded receiver at init,
 	-- before callbacks; its private frame controller alone proves native rights.
-	_native_hook = package.loaded["adapters.keyboard_hook"]
+	_native_hook = package.loaded["platform.input.keyboard_hook"]
 	Logger.start(LOG, "Initialising tap-holds…")
 	_hook = opts.keyboard_hook
 	_dry_run = opts.dry_run == true

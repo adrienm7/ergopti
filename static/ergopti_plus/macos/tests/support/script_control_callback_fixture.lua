@@ -31,10 +31,10 @@ local M = {}
 --- @param callback function Receives the constructed subject and observations.
 function M.with_sentinel(callback)
 	local names = {
-		"core.logger.engine.logger", "core.ui.engine.notifications", "infra.keycodes", "core.i18n.engine.i18n",
+		"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n",
 		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
-		"adapters.event_provenance", "adapters.synthetic_input",
-		"core.events.timer_scheduler", "adapters.key_state",
+		"adapters.event_provenance", "platform.input.synthetic_input",
+		"core.events.timer_scheduler", "platform.input.key_state",
 		"modules.shortcuts.script_control",
 	}
 	return helpers.with_stub_scope(names, function()
@@ -44,7 +44,7 @@ function M.with_sentinel(callback)
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.ui.engine.notifications"] = {notify = function() end}
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 0x6A,
 			F14_KARABINER_BACKSPACE = 0x6B,
 			F15_KARABINER_ESCAPE = 0x6C,
@@ -66,7 +66,7 @@ function M.with_sentinel(callback)
 			STATUS_UNREADABLE = "unreadable",
 			classify_with_fence = function() return nil, "hardware", nil end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			defer_after_callback = function(_, callback)
 				deferred[#deferred + 1] = callback
 				return true
@@ -76,7 +76,7 @@ function M.with_sentinel(callback)
 			every = function(_, callback) return {callback = callback}, true end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "none" end,
 		}
@@ -123,7 +123,7 @@ end
 function M.with_configurable(callback)
 	local names = {
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
-		"adapters.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
+		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
 		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
@@ -141,7 +141,7 @@ function M.with_configurable(callback)
 			read_with_status = function() return '[shortcuts.keyboard]\nprimary_a = "throwing_action"\n', "ok" end,
 			write = function() error("callback dispatch must not publish preferences") end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(_, callback)
 				bound_callback = callback
 				return "callback-hotkey"

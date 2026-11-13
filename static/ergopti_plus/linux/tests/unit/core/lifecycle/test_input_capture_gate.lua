@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local InputCaptureGate = helpers.load_module("infra.input_capture_gate")
+local InputCaptureGate = helpers.load_module("platform.input.capture_gate")
 
 helpers.describe("input capture gate: guarded input", function()
 		helpers.it("runs no character, physical-key, or control side effect while owned", function()

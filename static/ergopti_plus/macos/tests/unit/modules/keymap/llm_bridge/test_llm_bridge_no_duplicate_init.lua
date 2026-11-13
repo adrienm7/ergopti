@@ -33,7 +33,7 @@ local STUB_MODULES = {
 	"modules.keymap.utils",
 	"core.text.engine.utils",
 	"modules.llm",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.keystats",
 	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
@@ -87,7 +87,7 @@ package.loaded["modules.llm"] = {
 }
 
 -- lib.keycodes: only the constants accessed at load time matter.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	ESCAPE             = 53,
 	RETURN             = 36,
 	F16_LLM_CHAIN_SIGNAL = 106,

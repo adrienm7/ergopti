@@ -39,11 +39,11 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.llm.api_mlx",
@@ -75,7 +75,7 @@ local function exercise_committed_backend_pause()
 		local admission_fence = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -84,11 +84,11 @@ local function exercise_committed_backend_pause()
 			ESCAPE = 53,
 		}
 		package.loaded["adapters.event_provenance"] = {}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback)
 				idle_callback = callback
 				return true

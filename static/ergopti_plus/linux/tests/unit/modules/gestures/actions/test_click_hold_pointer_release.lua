@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local InputEvent = require("infra.input_event")
+local InputEvent = require("platform.input.event")
 
 --- Compiles Main's on_click with a recording gestures manager.
 --- @param released table Counter { count }.

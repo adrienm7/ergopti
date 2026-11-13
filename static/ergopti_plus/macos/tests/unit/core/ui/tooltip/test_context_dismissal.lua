@@ -12,8 +12,8 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"adapters.event_provenance",
-	"adapters.key_state",
-	"adapters.synthetic_input",
+	"platform.input.key_state",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"core.ui.ui.tooltip.config",
 	"core.ui.ui.tooltip.renderer",

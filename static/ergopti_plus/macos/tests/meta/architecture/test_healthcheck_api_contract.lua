@@ -40,7 +40,7 @@ local CONTRACT = {
 	{ mod = "platform.remap.ke_paths",          constants = { "CLI" } },
 	{ mod = "core.fs.adapters.file_system",             fns = { "exists" } },
 	{ mod = "modules.shortcuts.script_control", fns = { "is_paused" } },
-	{ mod = "adapters.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
+	{ mod = "platform.input.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
 	{ mod = "platform.remap.lease_controller",  fns = { "status" } },
 	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",
 		"get_active_profile" } },
@@ -63,7 +63,7 @@ local CONTRACT = {
 -- The adapters that capture the hs global when they load: reloaded inside
 -- the fixture so they read its answers
 local HS_READERS = {
-	"adapters.key_state", "adapters.accessibility_permission", "adapters.screen_capture", "adapters.system_info",
+	"platform.input.key_state", "adapters.accessibility_permission", "adapters.screen_capture", "adapters.system_info",
 }
 
 --- Answers the Hammerspoon queries the collectors make, as a Mac would.

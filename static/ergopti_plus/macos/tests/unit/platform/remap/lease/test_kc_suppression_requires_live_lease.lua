@@ -151,7 +151,7 @@ local function load_remap(initially_enabled, options)
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		unbind = function(handle)
 			ctx.unbind_attempts[handle] = (ctx.unbind_attempts[handle] or 0) + 1
 			if options.fail_cycle_unbind_once and handle == "cycle"

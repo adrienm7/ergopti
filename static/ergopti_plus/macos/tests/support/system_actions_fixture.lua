@@ -30,12 +30,12 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-		"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
-		"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
-		"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
+		"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
+		"adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
+		"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
 		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
 		"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
-		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
+		"modules.keymap.terminator_replay", "platform.input.text_sender", "adapters.clipboard",
 	}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.gestures"] = {}
@@ -107,11 +107,11 @@ end
 local function load_capslock_fixture(toggle_impl)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.synthetic_input"] = nil
+	package.loaded["platform.input.key_state"] = {
 		toggle_capslock = toggle_impl,
 	}
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 
 	local logs = { debug = {}, error = {} }
 	local logger = helpers.make_logger_stub()
@@ -127,7 +127,7 @@ local function load_capslock_fixture(toggle_impl)
 	package.loaded["core.logger.engine.logger"] = logger
 
 	local raw_key_attempts = 0
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function()
 			raw_key_attempts = raw_key_attempts + 1
 			return true
@@ -168,10 +168,10 @@ end
 -- updating an upvalue after the function returns cannot be seen by the caller).
 -- window_override: optional `window` stub table (defaults to a window with id=42).
 local function make_sys_screenshot_spies(window_override)
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
@@ -329,7 +329,7 @@ local SyntheticInputStack = require("tests.support.synthetic_input_stack")
 local function load_h01_system(options)
 	options = options or {}
 	refresh_native_consumers()
-	package.loaded["adapters.key_state"] = nil
+	package.loaded["platform.input.key_state"] = nil
 	package.loaded["core.ui.engine.notifications"] = nil
 	local previous_logger = package.loaded["core.logger.engine.logger"]
 	package.loaded["modules.shortcuts.actions.system"] = nil

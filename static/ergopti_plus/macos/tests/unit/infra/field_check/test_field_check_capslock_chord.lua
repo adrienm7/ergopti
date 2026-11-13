@@ -77,7 +77,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 
 	helpers.it("the slot's native callback counts each delivery, and only the Caps Lock slot's", function()
 		local callbacks, executed = {}, 0
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(chord, callback) callbacks[chord] = callback; return "handle:" .. chord end,
 			bind_capslock_chord = function(chord, callback) callbacks[chord] = callback; return "caps:" .. chord end,
 			unbind = function() return true end,
@@ -114,7 +114,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		helpers.assert_true(executed >= 1, "the slot's action still runs")
 		subject.stop()
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-		package.loaded["adapters.hotkey_registrar"] = nil
+		package.loaded["platform.input.hotkey_registrar"] = nil
 		package.loaded["core.fs.adapters.file_system"] = nil
 		package.loaded["core.fs.engine.paths"] = nil
 		package.loaded["modules.gestures.actions"] = nil

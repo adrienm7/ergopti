@@ -24,7 +24,7 @@ local function type_events(events, space_tap_hold)
 	local engine = require("modules.hotstrings.engine").new()
 	assert(engine:load_mappings({ { auto_expand = false, trigger = "qzx", replacement = "final" } }),
 		"the fixture mapping must publish")
-	local kh = helpers.load_module("adapters.keyboard_hook")
+	local kh = helpers.load_module("platform.input.keyboard_hook")
 	if space_tap_hold then
 		local TapHoldEngine = require("platform.remap.tap_hold_engine")
 		kh.set_remapper(TapHoldEngine.new({

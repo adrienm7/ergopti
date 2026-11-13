@@ -4,7 +4,7 @@
 ; MODULE: Adapter Callback-Swallow Logging Guard
 ; DESCRIPTION:
 ; Regression guard for the 6 bare `try Callback(...)` sites across
-; adapters/text_sender.ahk and core/network/adapters/http_client.ahk that swallowed a
+; platform/input/text_sender.ahk and core/network/adapters/http_client.ahk that swallowed a
 ; throwing completion callback with zero log trace, unlike sibling adapters
 ; (core/process/adapters/shell_runner.ahk's on_done wrapper, core/events/timer_scheduler.ahk's
 ; _OneShot/_Repeating wrappers), which both log via LoggerError.
@@ -30,7 +30,7 @@
 
 _MetaTextSenderCallbackHelperLogs() {
 	Body := _DriverFuncBody("_TextSenderInvokeCallback")
-	Assert(Body != "", "_TextSenderInvokeCallback must exist in adapters/text_sender.ahk")
+	Assert(Body != "", "_TextSenderInvokeCallback must exist in platform/input/text_sender.ahk")
 	Assert(InStr(Body, "catch"),
 		"_TextSenderInvokeCallback must catch a throwing Callback instead of letting it propagate")
 	Assert(InStr(Body, "LoggerError"),

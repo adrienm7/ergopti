@@ -21,8 +21,8 @@ local MODULE_NAMES = {
 	"tests.stubs.hs",
 	"core.logger.engine.logger",
 	"core.events.timer_scheduler",
-	"adapters.keyboard_geometry",
-	"adapters.synthetic_input",
+	"platform.input.keyboard_geometry",
+	"platform.input.synthetic_input",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"core.logger.engine.boot_profiler",
@@ -243,7 +243,7 @@ local function run_isolated(options, assertions)
 				-- The wall clock the reload duration is measured with
 				now = function() return 1000 end,
 			},
-			["adapters.synthetic_input"] = {
+			["platform.input.synthetic_input"] = {
 				when_idle = function(callback)
 					callback()
 					return true

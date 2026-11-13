@@ -116,7 +116,7 @@ local function scenario(action, phase, body)
 		package.loaded["core.ui.engine.display_server"] = {
 			is_x11 = function() return true end, is_wayland = function() return false end, kind = function() return "x11" end,
 		}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}

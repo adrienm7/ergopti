@@ -19,7 +19,7 @@
 
 local M = {}
 
-local InputEvent = require("infra.input_event")
+local InputEvent = require("platform.input.event")
 
 --- Builds an independent tracker.
 --- @return table tracker `observe(slot, code, value)`, `lift(slot)`, `reset()`.

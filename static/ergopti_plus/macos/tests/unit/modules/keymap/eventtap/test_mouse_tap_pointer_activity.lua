@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local function load_keymap()
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")
-			or name == "adapters.synthetic_input" or name == "adapters.event_provenance") then
+			or name == "platform.input.synthetic_input" or name == "adapters.event_provenance") then
 			package.loaded[name] = nil
 		end
 	end

@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local InputEvent = require("infra.input_event")
+local InputEvent = require("platform.input.event")
 local AbsoluteMotion = require("infra.absolute_motion")
 
 helpers.describe("absolute pointer motion tracker", function()

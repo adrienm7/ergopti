@@ -51,7 +51,7 @@ local function with_scope(body, source, chord_j_identity)
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,
 			}
-			package.loaded["adapters.evdev_reader"] = {
+			package.loaded["platform.input.evdev_reader"] = {
 				TOUCHPAD = "touchpad", close = function() controls.device_calls = controls.device_calls + 1; return false end,
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}

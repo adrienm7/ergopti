@@ -21,7 +21,7 @@ local KEYCODE_C = 8
 
 local RESET_MODULES = {
 	"modules.keystats.physical_accounting_mode",
-	"adapters.event_provenance", "adapters.synthetic_input",
+	"adapters.event_provenance", "platform.input.synthetic_input",
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",
@@ -49,7 +49,7 @@ require("tests.lua.layouts.magic_key_source_contract")(helpers, Shared, {
 --- @return table keymap
 --- @return table tap The keyDown tap, whose callback is the production one.
 local function load_keymap()
-	package.loaded["adapters.keyboard_geometry"] = nil
+	package.loaded["platform.input.keyboard_geometry"] = nil
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")) then
@@ -74,7 +74,7 @@ local function load_keymap()
 		return tap
 	end
 	local keymap = helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
-	require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
+	require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 	return keymap, taps[1]
 end
 
@@ -127,8 +127,8 @@ end)
 -- left of Z in the driver's own Karabiner setup.
 helpers.describe("magic key source: the two keys ISO boards swap", function()
 	helpers.it("(magic-key-source) Backquote and IntlBackslash keep distinct physical positions", function()
-		helpers.with_fresh_modules({ "modules.keymap.magic_key_source", "adapters.keyboard_geometry" }, function()
-			require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
+		helpers.with_fresh_modules({ "modules.keymap.magic_key_source", "platform.input.keyboard_geometry" }, function()
+			require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 			local Source = require("modules.keymap.magic_key_source")
 			local on = function() return true end
 			for _, code in ipairs({ "Backquote", "IntlBackslash" }) do

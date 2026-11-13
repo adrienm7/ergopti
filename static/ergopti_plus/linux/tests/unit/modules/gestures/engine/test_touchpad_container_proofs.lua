@@ -40,7 +40,7 @@ local helpers = require("tests.helpers")
 
 local Record = helpers.load_module("tests.support.touchpad_record")
 
-local MANAGER, READER, FINDER = "modules.gestures.manager", "adapters.evdev_reader", "modules.gestures.touchpad_finder"
+local MANAGER, READER, FINDER = "modules.gestures.manager", "platform.input.evdev_reader", "modules.gestures.touchpad_finder"
 local EMITTER, LOGGER = "modules.gestures.combo_emitter", "core.logger.engine.shim"
 
 --- Reads and decodes a trace of tests/fixtures.
@@ -88,7 +88,7 @@ local function replay(name, setup)
 		}, { __index = real_finder })
 		-- The kernel: the trace's events as the binary records read(2) returns.
 		local reader = helpers.load_module(READER)
-		local codec = require("infra.input_event")
+		local codec = require("platform.input.event")
 		local pending, cursor = {}, 1
 		for _, event in ipairs(trace.events) do
 			pending[#pending + 1] = codec.encode(event.type, event.code, event.value, codec.native_size(), event.timestamp_us)

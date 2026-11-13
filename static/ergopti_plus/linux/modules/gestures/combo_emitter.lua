@@ -40,14 +40,14 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local LOG = "gestures.combo_emitter"
 
 -- The issuer owns its source factory before later calls can replace cache
 -- entries or observation exports. Such a replacement cannot mint authority.
-local trusted_writer_ok, trusted_writer = pcall(require, "adapters.uinput_writer")
-local trusted_broker_ok, trusted_broker = pcall(require, "adapters.modifier_broker")
+local trusted_writer_ok, trusted_writer = pcall(require, "platform.input.uinput_writer")
+local trusted_broker_ok, trusted_broker = pcall(require, "platform.input.modifier_broker")
 local trusted_for_channel = trusted_broker_ok and type(trusted_broker) == "table"
 	and rawget(trusted_broker, "for_channel") or nil
 local trusted_writer_ports = {}
@@ -67,8 +67,8 @@ end
 
 local function witness_current(receipt)
 	if getmetatable(receipt.writer) ~= nil or getmetatable(receipt.broker) ~= nil
-		or not rawequal(package.loaded["adapters.uinput_writer"], receipt.writer)
-		or not rawequal(package.loaded["adapters.modifier_broker"], receipt.broker)
+		or not rawequal(package.loaded["platform.input.uinput_writer"], receipt.writer)
+		or not rawequal(package.loaded["platform.input.modifier_broker"], receipt.broker)
 		or not rawequal(rawget(receipt.broker, "for_channel"), receipt.for_channel) then return false end
 	for name, port in pairs(receipt.ports) do
 		if not rawequal(rawget(receipt.writer, name), port) then return false end
@@ -271,7 +271,7 @@ end
 --- @return table Set of evdev keycodes.
 local function held_modifier_codes()
 	local held = {}
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook) ~= "table" then return held end
 	for _, accessor in ipairs({ "held_text_modifier_codes", "held_shortcut_modifier_codes" }) do
 		if type(hook[accessor]) == "function" then
@@ -333,14 +333,14 @@ function M.press_codes(mods, keys, label, publication)
 	end
 	local name = label or (table.concat(mods, "+") .. "|" .. table.concat(keys, "+"))
 
-	local ok_writer, Writer = pcall(require, "adapters.uinput_writer")
+	local ok_writer, Writer = pcall(require, "platform.input.uinput_writer")
 	if not ok_writer or type(Writer) ~= "table" or type(Writer.emit) ~= "function" then
 		Logger.error(LOG, "No uinput writer — '%s' cannot be emitted.", name)
 		return false, outcome("refused")
 	end
 	local writer_ports = {}
 	for name, port in pairs(Writer) do if type(port) == "function" then writer_ports[name] = port end end
-	local Broker = require("adapters.modifier_broker")
+	local Broker = require("platform.input.modifier_broker")
 	if type(Writer.is_open) == "function" and not Writer.is_open() then
 		-- Loud rather than opened here: the daemon owns that device's lifetime,
 		-- and a module that opened it on demand would race the one that closes it.
@@ -367,7 +367,7 @@ function M.press_codes(mods, keys, label, publication)
 	end
 	local function settle()
 		if not reservation or reservation.finish() then return true end
-		local Hook = require("adapters.keyboard_hook")
+		local Hook = require("platform.input.keyboard_hook")
 		if type(Hook.emergency_stop) == "function" then Hook.emergency_stop("gesture output custody unresolved") end
 		return false
 	end

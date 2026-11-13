@@ -23,7 +23,7 @@ WebViewHost`, WebView only: no native fallback), the configuration scope
   `physical_editor_menu.lua`).
 
 Key position capture is `KHCapturePosition` / `KHCancelPosition` /
-`KHPositionCaptureAvailable` in `adapters/keyboard_hook.ahk`: one key-down of
+`KHPositionCaptureAvailable` in `platform/input/keyboard_hook.ahk`: one key-down of
 the shared InputHook, physically down, hands `native_code` (`SCnnn`) and the
 physically held `mods`; AltGr is refused, nothing is suppressed.
 

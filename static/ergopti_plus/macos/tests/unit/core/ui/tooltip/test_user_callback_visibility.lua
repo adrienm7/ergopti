@@ -57,7 +57,7 @@ local function load_tooltip(faults)
 	Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 
 	package.loaded["adapters.event_provenance"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 
 	local renderer
 	renderer = {
@@ -104,7 +104,7 @@ local function load_tooltip(faults)
 	-- modules while preserving the live fixture's dependency graph
 	package.loaded["core.logger.engine.logger"] = real_logger
 	package.loaded["adapters.event_provenance"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 
 	return {
 		errors = errors,

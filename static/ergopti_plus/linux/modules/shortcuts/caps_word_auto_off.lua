@@ -34,8 +34,8 @@ local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local Policy = require("keyboard.engine.caps_word_auto_off")
-local EvdevCodes = require("infra.evdev_codes")
-local InputEvent = require("infra.input_event")
+local EvdevCodes = require("platform.input.evdev_codes")
+local InputEvent = require("platform.input.event")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.caps_word_auto_off"

@@ -196,7 +196,7 @@ local function build_world(selection)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["adapters.synthetic_input"] = make_synthetic(world)
+	package.loaded["platform.input.synthetic_input"] = make_synthetic(world)
 	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return world.focus end,
 		getFocused = function()

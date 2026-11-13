@@ -15,7 +15,7 @@ local MODULES = {
 	"modules.gestures.manager",
 	"modules.gestures.touchpad_finder",
 	"modules.gestures.mt_decoder",
-	"adapters.evdev_reader",
+	"platform.input.evdev_reader",
 	"core.logger.engine.shim",
 }
 
@@ -45,7 +45,7 @@ local function with_manager(open_fails, init_opts, body, no_touchpad)
 	end
 
 	package.loaded["core.logger.engine.shim"] = logger
-	package.loaded["adapters.evdev_reader"] = reader
+	package.loaded["platform.input.evdev_reader"] = reader
 	package.loaded["modules.gestures.touchpad_finder"] = {
 		read_resolution = function() return nil end,
 		read_axes = function() return nil end,

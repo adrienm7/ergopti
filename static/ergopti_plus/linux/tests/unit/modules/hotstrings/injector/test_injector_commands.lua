@@ -26,7 +26,7 @@
 --- ==============================================================================
 
 -- The cases replace these entries; the module end puts them back.
-local restore_loaded = require("tests.helpers").keep_loaded({ "adapters.keyboard_hook" })
+local restore_loaded = require("tests.helpers").keep_loaded({ "platform.input.keyboard_hook" })
 local helpers = require("tests.helpers")
 
 --- A recording uinput channel.
@@ -80,7 +80,7 @@ local function with_recorder(chars, held)
 
 	-- The injector requires this lazily and asks it what the user is holding.
 	-- Declaring the answer is what makes these cases independent of run order.
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return held or {} end,
 	}
 
@@ -126,7 +126,7 @@ helpers.describe("injector: the erase phase", function()
 
 	helpers.it("takes the Backspace keycode from the shared constants", function()
 		local injector, events = with_recorder("")
-		local codes = helpers.load_module("infra.evdev_codes")
+		local codes = helpers.load_module("platform.input.evdev_codes")
 		injector.inject(1, "")
 		helpers.assert_eq(events[1], codes.KEY_BACKSPACE .. ":1",
 			"one number in one place; a second literal 14 in the injector is how the "
@@ -177,7 +177,7 @@ helpers.describe("injector: the type phase", function()
 		injector._set_uinput(channel)
 
 		injector.inject(0, "Ab")
-		local codes = helpers.load_module("infra.evdev_codes")
+		local codes = helpers.load_module("platform.input.evdev_codes")
 		helpers.assert_eq(table.concat(events, " "), string.format(
 			"%d:1 30:1 30:0 %d:0 48:1 48:0", codes.KEY_LEFTSHIFT, codes.KEY_LEFTSHIFT),
 			"Shift is released before the next character; a modifier left held turns "

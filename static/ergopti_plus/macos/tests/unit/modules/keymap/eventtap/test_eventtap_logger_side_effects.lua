@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
 	"core.logger.engine.logger", "core.logger.adapters.log_transport", "adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.fs.engine.paths", "core.timing.engine.timings",
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
 	"core.ui.ui.tooltip", "modules.hotstrings.hotstrings_config", "core.ui.adapters.tooltip_renderer",
@@ -262,7 +262,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 
 		local keymap = require("modules.keymap.init")
 		helpers.assert_type(keymap, "table")
-		local synthetic_input = require("adapters.synthetic_input")
+		local synthetic_input = require("platform.input.synthetic_input")
 		local original_enter_callback = synthetic_input.enter_callback
 		synthetic_input.enter_callback = function()
 			error("causal interceptor failure")

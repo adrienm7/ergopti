@@ -38,7 +38,7 @@ local function with_wrap(options, body)
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
 		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
+			"modules.hotstrings.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
 			"modules.gestures.user_actions", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -96,7 +96,7 @@ local function with_wrap(options, body)
 		}
 		package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end,
 			is_x11 = function() return true end, kind = function() return "x11" end }
-		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
+		package.loaded["platform.input.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
 			emergency_stop = function() state.stops = state.stops + 1 end }
 		local ok, err = pcall(function()

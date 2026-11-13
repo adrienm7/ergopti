@@ -16,7 +16,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 -- Stub modules required at top-level by script_control.lua so that load_with_stubs
 -- can fully execute the module and expose pause_all/resume_all etc on the returned table.
 package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
 	F15_KARABINER_ESCAPE = 0x6C,
@@ -70,13 +70,13 @@ package.loaded["platform.remap.onboarding"] = { stop = function() return true en
 
 -- Force a fresh adapters.key_state so it captures THIS file's hs stub (the F-CRIT-1
 -- sentinel guard delegates the live right-AltGr query to that adapter).
-package.loaded["adapters.key_state"] = nil
+package.loaded["platform.input.key_state"] = nil
 
 -- These broad API tests are not serializer timing tests. Complete the newly
 -- required input-idle fence synchronously while retaining the real adapter's
 -- classification/defer paths used by the sentinel cases below.
-package.loaded["adapters.synthetic_input"] = nil
-local SyntheticInput = helpers.load_with_stubs("adapters.synthetic_input")
+package.loaded["platform.input.synthetic_input"] = nil
+local SyntheticInput = helpers.load_with_stubs("platform.input.synthetic_input")
 SyntheticInput.when_idle = function(callback)
 	callback()
 	return true

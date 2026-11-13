@@ -32,7 +32,7 @@
 
 local Decoder = require("modules.gestures.mt_decoder")
 local Finder = require("modules.gestures.touchpad_finder")
-local Reader = require("adapters.evdev_reader")
+local Reader = require("platform.input.evdev_reader")
 local Record = require("tests.support.touchpad_record")
 
 local UINPUT_PATH = "/dev/uinput"

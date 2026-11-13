@@ -24,7 +24,7 @@ local function session(user_text)
 	-- The switch and the timings the scenario spells go to config.toml beside it.
 	local config_text = require("tests.support.tap_hold_fixture").config(user_text)
 	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
-	local Hook = helpers.load_module("adapters.keyboard_hook")
+	local Hook = helpers.load_module("platform.input.keyboard_hook")
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local Writer = helpers.load_module("platform.remap.tap_hold_writer")
 	local dir = os.tmpname()

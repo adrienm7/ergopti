@@ -25,15 +25,15 @@ local function load_keymap_with_results(results)
 	local stubs = {
 		["core.text.engine.utils"] = {},
 		["adapters.event_provenance"] = {},
-		["adapters.synthetic_input"] = {
+		["platform.input.synthetic_input"] = {
 			current_action_epoch = function() return 0 end,
 		},
 		["modules.keymap.utils"] = {},
-		["adapters.text_sender"] = {},
+		["platform.input.text_sender"] = {},
 		["modules.llm.app_filter"] = {},
 		-- The real timing registry, read when the keymap loads, logs its path walk.
 		["core.logger.engine.logger"] = helpers.make_logger_stub(),
-		["infra.keycodes"] = {},
+		["platform.input.keycodes"] = {},
 		["infra.manifest_reader"] = {
 			default_for = function() return true end,
 		},

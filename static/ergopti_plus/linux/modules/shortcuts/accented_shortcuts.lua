@@ -30,7 +30,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
 local ConfigOutdated = require("settings.engine.migration.outdated")
@@ -212,7 +212,7 @@ function M.on_key(detail, options)
 	if options.emulating() == true then return false end
 	local ports = {
 		base_symbol = options.base_symbol or require("adapters.keyboard_layout").base_symbol,
-		number_row_mode = options.number_row_mode or require("adapters.keyboard_hook").number_row_mode,
+		number_row_mode = options.number_row_mode or require("platform.input.keyboard_hook").number_row_mode,
 		settings = options.settings or M.settings,
 	}
 	local press = options.press

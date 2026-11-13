@@ -11,7 +11,7 @@
 local M = {}
 
 local Policy = require("shortcuts.engine.magic_editor_core")
-local Registrar = require("adapters.hotkey_registrar")
+local Registrar = require("platform.input.hotkey_registrar")
 local Broker = require("adapters.input_source_broker")
 local Probe = require("adapters.keyboard_source_probe")
 local original_source_id = rawget(Probe, "current_source_id")
@@ -21,7 +21,7 @@ local JsonCodec = require("core.fs.adapters.json_codec")
 local Paths = require("core.fs.engine.paths")
 local Manifest = require("infra.manifest_reader")
 local MagicKeySource = require("modules.keymap.magic_key_source")
-local Geometry = require("adapters.keyboard_geometry")
+local Geometry = require("platform.input.keyboard_geometry")
 local Logger = require("core.logger.engine.logger")
 
 local LOG = "shortcuts.engine.magic_editor_core"

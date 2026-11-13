@@ -1509,7 +1509,7 @@ function M.read_input_state(expected, groups) return read(expected, groups, true
 --- Writer supplies only its original opaque kernel issuer; no profile boolean.
 
 function M.capture_receiving_source(kernel)
-	local Writer = require("adapters.uinput_writer")
+	local Writer = require("platform.input.uinput_writer")
 	local kernel_ports = Writer.kernel_source_ports
 	if type(kernel_ports) ~= "function" then return nil end
 	local writer = kernel_ports(kernel)
@@ -1534,7 +1534,7 @@ function M.capture_receiving_source(kernel)
 	for _, name in ipairs({ "owner_current", "acquire_path", "current", "retire", "closed", "close" }) do writer_ports[name] = writer[name] end
 	local function current()
 		if retired or unresolved or M.capture_receiving_source ~= original_receiving_capture
-			or package.loaded["adapters.uinput_writer"] ~= Writer or Writer.kernel_source_ports ~= kernel_ports
+			or package.loaded["platform.input.uinput_writer"] ~= Writer or Writer.kernel_source_ports ~= kernel_ports
 			or kernel_ports(kernel) ~= writer or native.x11.XInternAtom ~= intern_atom
 			or _native ~= native or _connection ~= connection or connection.retired
 			or connection.lifetime ~= lifetime or connection.receiving_revision ~= revision

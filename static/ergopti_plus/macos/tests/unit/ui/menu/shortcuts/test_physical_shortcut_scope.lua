@@ -90,7 +90,7 @@ helpers.describe('Mac actual physical scope edits',function()
  for _, mode in ipairs({'action_conflict','none_conflict','publication_conflict'}) do
   helpers.it('(physical-preflight) refuses '..mode..' before opening delivery',function()
    Fixture.run(function(f)
-    local registrar=require('adapters.hotkey_registrar')
+    local registrar=require('platform.input.hotkey_registrar')
     local conflict=mode=='action_conflict' or mode=='none_conflict'
     registrar.has_physical_conflict=function() return conflict end
     local updates=mode=='none_conflict' and {{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}} or rows
@@ -300,7 +300,7 @@ helpers.describe("Mac scope None and deletion preserve original collision admiss
 		helpers.it("(physical-nav-scope-regression) absent Navigation owner retains " .. mode, function()
 			Fixture.run(function(f)
 				local original_remap = package.loaded["platform.remap"]
-				local registrar = require("adapters.hotkey_registrar")
+				local registrar = require("platform.input.hotkey_registrar")
 				local original_conflict, calls = registrar.has_physical_conflict, 0
 				local claim = {}
 				helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)

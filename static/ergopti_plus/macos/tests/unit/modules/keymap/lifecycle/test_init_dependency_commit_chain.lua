@@ -178,8 +178,8 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["modules.keymap.utils"] = {},
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["modules.keymap.state"] = {},
-			["adapters.text_sender"] = {},
-			["adapters.synthetic_input"] = {},
+			["platform.input.text_sender"] = {},
+			["platform.input.synthetic_input"] = {},
 			["core.ui.adapters.tooltip_renderer"] = {},
 			["modules.keymap.terminator_replay"] = {
 				init = function()
@@ -204,13 +204,13 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 		with_stubbed_module("modules.keymap.llm_bridge", {
 			["modules.keymap.utils"] = {},
 			["adapters.event_provenance"] = {},
-			["adapters.synthetic_input"] = {
+			["platform.input.synthetic_input"] = {
 				current_action_epoch = function() return 0 end,
 			},
 			["core.text.engine.utils"] = {},
 			["modules.llm"] = { DEFAULT_STATE = {} },
 			["core.logger.engine.logger"] = LOGGER_STUB,
-			["infra.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
+			["platform.input.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
 			["modules.keystats"] = {},
 			["core.ui.ui.tooltip"] = {
 				set_runtime_guard = function() tooltip_guard_calls = tooltip_guard_calls + 1 end,
@@ -244,9 +244,9 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 	helpers.it("TerminatorReplay refuses a different state", function()
 		with_stubbed_module("modules.keymap.terminator_replay", {
 			["core.logger.engine.logger"] = LOGGER_STUB,
-			["adapters.text_sender"] = {},
+			["platform.input.text_sender"] = {},
 			["core.events.timer_scheduler"] = {},
-			["adapters.synthetic_input"] = {},
+			["platform.input.synthetic_input"] = {},
 		}, function(replay)
 			local state1 = {}
 			local state2 = {}
@@ -347,7 +347,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),
 		["core.i18n.engine.i18n"] = {},
-		["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },
+		["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },
 		["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = noop,
 			set_enter_validates = noop,

@@ -332,6 +332,7 @@ try {
 		const installer = path.join(ROOT, 'static/ergopti_plus/linux/install.sh');
 		const cases = [
 			'linux/infra',
+			'linux/platform/input',
 			'linux/core/ui/engine',
 			'linux/core/timing/engine',
 			'linux/core/text/engine',
@@ -340,7 +341,7 @@ try {
 			'linux/core/lifecycle/engine',
 			'linux/core/i18n/engine',
 			'linux/core/fs/engine',
-			'linux/adapters/keyboard_hook.lua',
+			'linux/platform/input/keyboard_hook.lua',
 			'_shared',
 			'_shared',
 			'linux/static/layouts/registry',

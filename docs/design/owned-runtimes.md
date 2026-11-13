@@ -176,7 +176,7 @@ Flatpak builds list the host packages instead
 `tools/build/build-linux-deb.sh:177`; `tools/build/build-linux-rpm.sh:190`).
 Text injection no longer uses ydotool: the daemon writes to `/dev/uinput`
 directly (`linux/ergopti_hotstrings.lua:2168`); the only remaining mention of
-ydotool is a device-name filter (`linux/infra/device_names.lua:54`).
+ydotool is a device-name filter (`linux/platform/input/device_names.lua:54`).
 
 <!-- BEGIN GENERATED linux: tools/codegen/codegen-owned-runtimes.cjs; do not edit -->
 

@@ -211,18 +211,18 @@ function M.run(options)
 			return false
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
 		to_name = function() return "f16" end,
 	}
 
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local km_utils = require("modules.keymap.utils")
 	local terminal_target = options.terminal and { id = "terminal-app" } or nil
 	if terminal_target then
-		local text_sender = require("adapters.text_sender")
+		local text_sender = require("platform.input.text_sender")
 		text_sender.terminalInputTarget = function() return terminal_target end
 	end
 	-- Keep the fixture about dispatch, not overlap policy.

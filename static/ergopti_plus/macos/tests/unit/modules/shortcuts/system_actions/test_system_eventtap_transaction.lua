@@ -34,7 +34,7 @@ end
 local function load_fixture(plans, timer_plans)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_contract = require("tests.stubs.hs")
@@ -119,7 +119,7 @@ local function load_fixture(plans, timer_plans)
 		STATUS_FOREIGN = "foreign",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return {} end,
 		emit_key_stroke = function() return true end,
 		seal = function() return true end,

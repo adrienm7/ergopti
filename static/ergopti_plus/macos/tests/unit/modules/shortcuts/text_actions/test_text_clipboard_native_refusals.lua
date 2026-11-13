@@ -17,7 +17,7 @@ local function load_fixture(options)
 	Destination.install()
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
+		"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
@@ -97,7 +97,7 @@ local function load_fixture(options)
 		tx.native_down_attempted = true
 		return synthetic.emit_key_stroke(modifiers, key, 0, tx)
 	end
-	package.loaded["adapters.synthetic_input"] = synthetic
+	package.loaded["platform.input.synthetic_input"] = synthetic
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local timer_calls = 0
 	local clock_ns = 0

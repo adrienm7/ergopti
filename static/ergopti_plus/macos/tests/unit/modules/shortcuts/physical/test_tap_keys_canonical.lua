@@ -6,7 +6,7 @@ local Codec = require("core.text.engine.toml_codec")
 
 local function with_fixture(source, body)
 	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.preferences",
-		"infra.config_paths", "core.fs.engine.paths", "modules.shortcuts.tap_keys", "adapters.keyboard_geometry" }
+		"infra.config_paths", "core.fs.engine.paths", "modules.shortcuts.tap_keys", "platform.input.keyboard_geometry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0 }
@@ -35,8 +35,8 @@ local function with_fixture(source, body)
 		package.loaded["infra.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
 		local preferences = require("infra.preferences")
 		preferences.load("config")
-		package.loaded["adapters.keyboard_geometry"] = nil
-		require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
+		package.loaded["platform.input.keyboard_geometry"] = nil
+		require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 		local taps = require("modules.shortcuts.tap_keys")
 		local assignable = function(action) return action == "send_text" or action == "screen_capture" end
 		body(taps, preferences, control, assignable)

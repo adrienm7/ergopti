@@ -28,7 +28,7 @@ local function load_fixture()
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
-			or name == "adapters.synthetic_input"
+			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
 			or name == "core.events.clock"
 			or name == "adapters.unicode_carrier"
@@ -74,7 +74,7 @@ local function load_fixture()
 	helpers.assert_not_nil(up_tap, "the keymap keyUp tap must exist")
 	return {
 		down = down_tap.callback, up = up_tap.callback, hs = hs_stub,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 	}
 end
 

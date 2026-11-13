@@ -27,7 +27,7 @@ local M = {}
 local hs              = hs
 local Logger          = require("core.logger.engine.logger")
 local i18n            = require("core.i18n.engine.i18n")
-local Keycodes        = require("infra.keycodes")
+local Keycodes        = require("platform.input.keycodes")
 local Notifications   = require("core.ui.engine.notifications")
 local Timings         = require("core.timing.engine.timings")
 local Timer           = require("core.events.timer_scheduler")
@@ -36,7 +36,7 @@ local Shared          = require("layouts.engine.layers.magic_key_source")
 local ManifestMenu    = require("infra.manifest_menu")
 local PhaseStats      = require("infra.phase_stats")
 local Source          = require("modules.keymap.magic_key_source")
-local Geometry        = require("adapters.keyboard_geometry")
+local Geometry        = require("platform.input.keyboard_geometry")
 
 local LOG = "menu.magic_key_source"
 

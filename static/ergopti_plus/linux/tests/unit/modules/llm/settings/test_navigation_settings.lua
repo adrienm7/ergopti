@@ -83,7 +83,7 @@ end)
 
 helpers.describe("keyboard hook validation consumption", function()
 	helpers.it("suppresses the accepted digit down, repeat, and release only in intercept mode", function()
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
 		local emitted = {}
 		local chars = {}
 		local consumed = 0

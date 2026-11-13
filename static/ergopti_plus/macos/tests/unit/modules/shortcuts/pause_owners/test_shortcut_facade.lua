@@ -79,7 +79,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			start = function() return true end,
 			stop = function() return true end,
 		}, { __index = function() return function() return true end end })
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			set_delivery_guard = function(guard)
 				helpers.assert_true(guard())
 				return true
@@ -221,7 +221,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			destroy = noop,
 		}
 		package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function() return {} end,
 			setEnabled = function() return true end,
 			unbind = function() return true end,

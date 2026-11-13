@@ -33,7 +33,7 @@ package.loaded["infra.config_paths"] = {
 }
 
 -- Stub lib.keycodes with the minimal surface used by generator.lua.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	to_name              = function(code) return "key_" .. tostring(code) end,
 	F13_KARABINER_RETURN   = 105,
 	F14_KARABINER_BACKSPACE = 107,

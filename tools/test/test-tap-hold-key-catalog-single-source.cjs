@@ -371,7 +371,7 @@ const linuxMenu = stripLineComments(
 );
 
 const linuxHook = stripLineComments(
-	read(path.join(SP, 'linux/adapters/keyboard_hook.lua')),
+	read(path.join(SP, 'linux/platform/input/keyboard_hook.lua')),
 	'.lua'
 );
 const linuxDaemon = stripLineComments(read(path.join(SP, 'linux/ergopti_hotstrings.lua')), '.lua');
@@ -460,16 +460,16 @@ function savedLinuxOneShotClosure(sources) {
 		'retire_buffered_input',
 		'refresh_capture'
 	];
-	const capture = '_native_hook = package.loaded["adapters.keyboard_hook"]';
+	const capture = '_native_hook = package.loaded["platform.input.keyboard_hook"]';
 	const managerAt = daemon.indexOf('require("modules.keystats.keystats")');
-	const hookAt = daemon.indexOf('require("adapters.keyboard_hook")');
+	const hookAt = daemon.indexOf('require("platform.input.keyboard_hook")');
 	return (
 		assignment?.trim().replace(/\s+/g, ' ') ===
 			'return (action ~= "one_shot_shift" or _hook == _native_hook) and _tap_action_set()[action] == true' &&
 		bodies.init.includes(capture) &&
 		bodies.init.indexOf(capture) < bodies.init.indexOf('Logger.start(') &&
 		bodies.init.indexOf(capture) < bodies.init.indexOf('_load(true)') &&
-		manager.split('package.loaded["adapters.keyboard_hook"]').length === 2 &&
+		manager.split('package.loaded["platform.input.keyboard_hook"]').length === 2 &&
 		manager.includes('local _native_hook = nil') &&
 		managerAt >= 0 &&
 		hookAt > managerAt &&
@@ -672,7 +672,7 @@ for (const [index, token] of [
 for (const [index, token] of [
 	[0, '_hook == _native_hook'],
 	[0, '_tap_action_set()[action] == true'],
-	[0, '_native_hook = package.loaded["adapters.keyboard_hook"]'],
+	[0, '_native_hook = package.loaded["platform.input.keyboard_hook"]'],
 	[0, 'if action == "one_shot_shift" then return action end'],
 	[0, 'function M.init(opts)'],
 	[4, 'origin_view.origin == "native-evdev" and _remapper_input_owner'],

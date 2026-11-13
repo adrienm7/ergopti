@@ -110,7 +110,7 @@ local function with_remap(files, run)
 		"core.fs.adapters.file_system",
 		"core.fs.adapters.json_codec",
 		"infra.config_paths",
-		"infra.keycodes",
+		"platform.input.keycodes",
 		"core.logger.engine.logger",
 		"core.text.engine.toml.codec",
 		"platform.remap.config",
@@ -123,7 +123,7 @@ local function with_remap(files, run)
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/tmp/ergopti_test" end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			to_name                 = function(code) return "key_" .. tostring(code) end,
 			F13_KARABINER_RETURN    = 105,
 			F14_KARABINER_BACKSPACE = 107,

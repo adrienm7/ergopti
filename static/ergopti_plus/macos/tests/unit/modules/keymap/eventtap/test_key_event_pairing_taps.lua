@@ -25,7 +25,7 @@ local function load_fixture()
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
 			or name:match("^core%.ui%.ui%.tooltip")
-			or name == "adapters.synthetic_input"
+			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
 			or name == "core.events.clock"
 			or name == "core.logger.engine.key_event_health"
@@ -147,7 +147,7 @@ helpers.describe("keymap taps feed the key pairing counters (key-event-pairing)"
 
 	helpers.it("never counts Ergopti's own tagged output as typing", function()
 		local fixture = load_fixture()
-		local synthetic = require("adapters.synthetic_input")
+		local synthetic = require("platform.input.synthetic_input")
 		local tx = synthetic.begin("test.key-pairing", "replacement")
 		local batch = synthetic.begin_callback(tx)
 		synthetic.keyStroke(batch, {}, "a")

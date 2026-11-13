@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "infra.manifest_reader",
 	"core.fs.adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
-	"adapters.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
-	"adapters.keyboard_geometry", "shortcuts.engine.magic_editor_core",
+	"platform.input.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
+	"platform.input.keyboard_geometry", "shortcuts.engine.magic_editor_core",
 }
 
 local function with_fixture(callback)
@@ -22,7 +22,7 @@ local function with_fixture(callback)
 		local native = dofile("tests/stubs/hs.lua")
 		native.keycodes.map = { a = 0, c = 8, b = 11, j = 38 }
 		_G.hs, package.loaded.hs = native, native
-		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(native.eventtap.event.properties)
+		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(native.eventtap.event.properties)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "physical-registry.json" end }
 		package.loaded["infra.manifest_reader"] = {
@@ -68,7 +68,7 @@ local function with_fixture(callback)
 			state.projections[#state.projections + 1] = options
 			return policy.resolve(options)
 		end }, { __index = policy })
-		local registrar = require("adapters.hotkey_registrar")
+		local registrar = require("platform.input.hotkey_registrar")
 		local subject = require("modules.shortcuts.magic_editor")
 		local spec = {
 			configuration_generation = 1,

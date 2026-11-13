@@ -1,0 +1,639 @@
+--- tests/unit/platform/input/synthetic_input/test_clipboard_selection_transaction.lua
+
+--- ==============================================================================
+--- MODULE: Clipboard Selection Transaction
+--- DESCRIPTION:
+--- Proves that selection transforms use the session clipboard backend, emit copy
+--- and paste through uinput, and restore the user's clipboard on every exit.
+--- The read-only probe (the tone actions read the selection, then replace it
+--- once the model answers) copies the same way and pastes nothing.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
+
+--- Runs one isolated clipboard transaction against a simulated desktop session.
+--- @param kind string "x11" or "wayland"
+--- @param selection string|nil Text published by Ctrl+C; nil means no selection.
+--- @param body function
+local function with_session(kind, selection, body)
+	local names = {
+		clipboard = "adapters.clipboard",
+		shell = "core.process.adapters.shell_runner",
+		display = "core.ui.engine.display_server",
+	}
+	local previous = {}
+	for key, name in pairs(names) do previous[key] = package.loaded[name] end
+
+	local shell = { current = "saved", writes = {}, reads = {}, pending = nil }
+	function shell.has_command() return true end
+	function shell.exec() return shell.current end
+	function shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY, nil end
+		shell.reads[#shell.reads + 1] = command
+		return true, shell.current, nil
+	end
+	function shell.with_exact_stdin(command, text)
+		shell.pending = { command = command, text = text }
+		return command
+	end
+	function shell.run()
+		shell.writes[#shell.writes + 1] = shell.pending
+		shell.current = shell.pending.text
+		shell.pending = nil
+		return true
+	end
+
+	package.loaded[names.shell] = shell
+	package.loaded[names.display] = {
+		UNKNOWN = "unknown",
+		is_wayland = function() return kind == "wayland" end,
+		is_x11 = function() return kind == "x11" end,
+		kind = function() return kind end,
+	}
+	package.loaded[names.clipboard] = nil
+
+	local combos = {}
+	local function emit(combo)
+		combos[#combos + 1] = combo
+		if combo == "ctrl+c" and selection ~= nil then shell.current = selection end
+		return true
+	end
+	local sleeps = {}
+	local function sleep_ms(ms)
+		sleeps[#sleeps + 1] = ms
+		return true
+	end
+
+	local ok, err = pcall(function()
+		body(require(names.clipboard), shell, combos, sleeps, emit, sleep_ms)
+	end)
+	for key, name in pairs(names) do package.loaded[name] = previous[key] end
+	helpers.assert_true(ok, "selection transaction probe must not throw: " .. tostring(err))
+end
+
+helpers.describe("clipboard selection transaction", function()
+	helpers.it("transforms and restores through the X11 backend", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, sleeps, emit, sleep_ms)
+			local ok = clipboard.transform_selection(string.upper, emit, sleep_ms)
+
+			helpers.assert_true(ok, "the complete transform must succeed")
+			helpers.assert_eq(combos, { "ctrl+c", "ctrl+v" }, "copy and paste must use uinput combos")
+			helpers.assert_eq(#sleeps, 3, "copy, paste, and restore must each settle")
+			helpers.assert_eq(shell.writes[2].text, "SELECTED", "the replacement must be staged")
+			helpers.assert_eq(shell.writes[3].text, "saved", "the original clipboard must be restored")
+			helpers.assert_true(shell.reads[1]:find("xclip", 1, true) ~= nil,
+				"an X11 session must use its selected clipboard backend")
+		end)
+	end)
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps a new clipboard copy made while the replacement settles (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, _, _, emit)
+				local waits = 0
+				local ok = clipboard.transform_selection(string.upper, emit, function()
+					waits = waits + 1
+					if waits == 3 then shell.current = "new user copy" end
+					return true
+				end)
+				helpers.assert_true(ok)
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("does not paste an external copy made before the paste chord (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, combos, _, emit)
+				local waits = 0
+				local ok = clipboard.transform_selection(string.upper, emit, function()
+					waits = waits + 1
+					if waits == 2 then shell.current = "new user copy" end
+					return true
+				end)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(combos, { "ctrl+c" })
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+		helpers.it("keeps an external copy when the transformation fails (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+				local ok = clipboard.transform_selection(function()
+					shell.current = "new user copy"
+					error("transform refused")
+				end, emit, sleep_ms)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(combos, { "ctrl+c" })
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("does not overwrite a copy made during a successful transform", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+			local ok = clipboard.transform_selection(function()
+				shell.current = "new user copy"
+				return "SELECTED"
+			end, emit, sleep_ms)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(combos, { "ctrl+c" })
+			helpers.assert_eq(shell.current, "new user copy")
+		end)
+	end)
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("does not restore over an unreadable external copy on transform failure (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+				local read = shell.exec_checked
+				local unreadable = false
+				shell.exec_checked = function(command)
+					if unreadable then return false, "", "reader failed" end
+					return read(command)
+				end
+				local ok, reason = clipboard.transform_selection(function()
+					shell.current, unreadable = "external copy", true
+					error("transform failed")
+				end, emit, sleep_ms)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(reason, "clipboard_ownership_unknown")
+				helpers.assert_eq(combos, { "ctrl+c" })
+				helpers.assert_eq(shell.current, "external copy")
+			end)
+		end)
+	end
+
+	helpers.it("does not restore over an unreadable copy after the paste", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, _, emit)
+			local read, unreadable, waits = shell.exec_checked, false, 0
+			shell.exec_checked = function(command)
+				if unreadable then return false, "", "reader failed" end
+				return read(command)
+			end
+			local ok, reason = clipboard.transform_selection(string.upper, emit, function()
+				waits = waits + 1
+				if waits == 3 then shell.current, unreadable = "external copy", true end
+				return true
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(reason, "clipboard_ownership_unknown")
+			helpers.assert_eq(combos, { "ctrl+c", "ctrl+v" })
+			helpers.assert_eq(shell.current, "external copy")
+		end)
+	end)
+
+	helpers.it("does not paste when the replacement cannot be read back", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, _, emit)
+			local original_read, waits, refuse = shell.exec_checked, 0, false
+			shell.exec_checked = function(command)
+				if refuse then refuse = false; return false, "", "unreadable" end
+				return original_read(command)
+			end
+			local ok = clipboard.transform_selection(string.upper, emit, function()
+				waits = waits + 1
+				if waits == 2 then refuse = true end
+				return true
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(combos, { "ctrl+c" })
+			helpers.assert_eq(shell.current, "saved")
+		end)
+	end)
+
+	helpers.it("uses wl-clipboard under Wayland", function()
+		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local ok = clipboard.transform_selection(string.upper, emit, sleep_ms)
+
+			helpers.assert_true(ok, "the Wayland transform must succeed")
+			helpers.assert_true(shell.reads[1]:find("wl-paste", 1, true) ~= nil,
+				"Wayland reads must not fall back to an X11 tool")
+			helpers.assert_eq(shell.writes[1].command, "timeout 1 wl-copy",
+				"Wayland writes must stay on the selected backend")
+		end)
+	end)
+
+	helpers.it("detects no selection without pasting the sentinel", function()
+		with_session("x11", nil, function(clipboard, shell, combos, _, emit, sleep_ms)
+			local ok, reason = clipboard.transform_selection(string.upper, emit, sleep_ms)
+
+			helpers.assert_true(not ok, "an unchanged probe means there was no selection")
+			helpers.assert_eq(reason, "no_selection")
+			helpers.assert_eq(combos, { "ctrl+c" }, "no replacement must be pasted")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved",
+				"the probe must never remain in the user's clipboard")
+		end)
+	end)
+
+	helpers.it("keeps an external copy when transform selection settling fails", function()
+		with_session("x11", nil, function(clipboard, shell, combos, _, emit)
+			local ok = clipboard.transform_selection(string.upper, emit, function()
+				shell.current = "new user copy"
+				return false
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(combos, { "ctrl+c" })
+			helpers.assert_eq(shell.current, "new user copy")
+		end)
+	end)
+
+	helpers.it("preserves an unidentified copy after a timing failure", function()
+		with_session("x11", "selected", function(clipboard, shell, _, _, emit)
+			local ok, reason = clipboard.transform_selection(string.upper, emit, function() return false end)
+
+			helpers.assert_true(not ok, "an uncompleted wait must abort the transaction")
+			helpers.assert_eq(reason, "copy_settle_failed")
+			helpers.assert_eq(shell.current, "selected",
+				"a changed clipboard may belong to another application")
+		end)
+	end)
+
+	helpers.it("reads the selection without pasting and restores the clipboard", function()
+		with_session("x11", "merci pour ton aide", function(clipboard, shell, combos, _, emit, sleep_ms)
+			local ok, text, reason = clipboard.read_selection(emit, sleep_ms)
+
+			helpers.assert_true(ok, "a published selection is read: " .. tostring(reason))
+			helpers.assert_eq(text, "merci pour ton aide")
+			helpers.assert_eq(combos, { "ctrl+c" }, "the read copies and pastes nothing")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the clipboard is put back")
+		end)
+	end)
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps another copy made after reading the selection (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+				local original, reads = shell.exec_checked, 0
+				shell.exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return original(command) end
+					reads = reads + 1
+					local ok, text, reason = original(command)
+					if reads == 2 then shell.current = "new user copy" end
+					return ok, text, reason
+				end
+				local ok, text = clipboard.read_selection(emit, sleep_ms)
+				helpers.assert_true(ok)
+				helpers.assert_eq(text, "selected")
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("does not restore a selection when the ownership check is unreadable", function()
+		with_session("x11", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local original, reads = shell.exec_checked, 0
+			shell.exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return original(command) end
+				reads = reads + 1
+				if reads == 3 then return false, "", "reader failed" end
+				return original(command)
+			end
+			local ok, _, reason = clipboard.read_selection(emit, sleep_ms)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(reason, "clipboard_ownership_unknown")
+			helpers.assert_eq(shell.current, "selected")
+		end)
+	end)
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps a copy made while the copy wait fails (" .. kind .. ")", function()
+			with_session(kind, nil, function(clipboard, shell, _, _, emit)
+				local ok = clipboard.read_selection(emit, function()
+					shell.current = "new user copy"
+					return false
+				end)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("reports no selection from the read probe and restores the clipboard", function()
+		with_session("wayland", nil, function(clipboard, shell, _, _, emit, sleep_ms)
+			local ok, text, reason = clipboard.read_selection(emit, sleep_ms)
+
+			helpers.assert_true(not ok, "an unchanged probe means there was no selection")
+			helpers.assert_eq(text, "")
+			helpers.assert_eq(reason, "no_selection")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved",
+				"the probe must never remain in the user's clipboard")
+		end)
+	end)
+end)
+
+--- Makes the simulated session answer a text/uri-list read only when the
+--- clipboard holds one, as wl-paste refuses a target nobody offers. xclip does
+--- not: it answers every target with its text (the next describe's last case).
+--- @param shell table The simulated shell of with_session.
+local function offer_uri_list_only_for_files(shell)
+	local read = shell.exec_checked
+	function shell.exec_checked(command)
+		if command:find("text/uri-list", 1, true) and not shell.current:find("^file:") then
+			shell.reads[#shell.reads + 1] = command
+			return false, "", "target text/uri-list not available"
+		end
+		return read(command)
+	end
+end
+
+helpers.describe("clipboard file-selection probe (text/uri-list)", function()
+	for _, case in ipairs({
+		{ kind = "x11", needle = "xclip -selection clipboard -t text/uri-list -o" },
+		{ kind = "wayland", needle = "wl-paste --no-newline --type text/uri-list" },
+	}) do
+		helpers.it("reads the copied files as text/uri-list and restores the clipboard (" .. case.kind .. ")", function()
+			with_session(case.kind, "file:///home/ana/run.sh\r\n", function(clipboard, shell, combos, _, emit, sleep_ms)
+				offer_uri_list_only_for_files(shell)
+				local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
+
+				helpers.assert_true(ok, "the copied files are read: " .. tostring(reason))
+				helpers.assert_eq(uri_list, "file:///home/ana/run.sh\r\n")
+				helpers.assert_eq(combos, { "ctrl+c" }, "the probe copies and pastes nothing")
+				helpers.assert_true(shell.reads[#shell.reads]:find(case.needle, 1, true) ~= nil,
+					"the uri-list target is asked for: " .. shell.reads[#shell.reads])
+				helpers.assert_true(shell.writes[1].text:find("^__ERGOPTI_SELECTION_PROBE_") ~= nil,
+					"a sentinel replaces files copied earlier before the copy")
+				helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the clipboard is put back")
+			end)
+		end)
+	end
+
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps a copy made while the file selection wait fails (" .. kind .. ")", function()
+			with_session(kind, nil, function(clipboard, shell, _, _, emit)
+				local ok = clipboard.read_selection_uri_list(emit, function()
+					shell.current = "new user copy"
+					return false
+				end)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("preserves a copy made after reading the file selection", function()
+		with_session("x11", "file:///selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local original = shell.exec_checked
+			shell.exec_checked = function(command)
+				local ok, text, reason = original(command)
+				if command:find("text/uri-list", 1, true) then shell.current = "new user copy" end
+				return ok, text, reason
+			end
+			local ok = clipboard.read_selection_uri_list(emit, sleep_ms)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(shell.current, "new user copy")
+		end)
+	end)
+
+	helpers.it("reports no file selection when the copy published no uri-list", function()
+		with_session("x11", nil, function(clipboard, shell, _, _, emit, sleep_ms)
+			offer_uri_list_only_for_files(shell)
+			local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
+
+			helpers.assert_true(not ok, "nothing was copied")
+			helpers.assert_eq(uri_list, "")
+			helpers.assert_eq(reason, "no_file_selection")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the sentinel never remains")
+		end)
+	end)
+
+	-- Measured on xclip 0.13 under X11: `xclip -t text/uri-list -o` against
+	-- the sentinel xclip -in owns returns the sentinel, with status 0.
+	helpers.it("(linux-uri-list-xclip-sentinel) reads the sentinel back as no file selection", function()
+		with_session("x11", nil, function(clipboard, shell, _, _, emit, sleep_ms)
+			local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
+
+			helpers.assert_true(not ok, "the sentinel is not a file selection: " .. tostring(uri_list))
+			helpers.assert_eq(uri_list, "")
+			helpers.assert_eq(reason, "no_file_selection")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the sentinel never remains")
+		end)
+	end)
+end)
+
+--- Exercises the production asynchronous range owner with native ACK boundaries.
+--- @param body function
+local function with_native_selection(body)
+	local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "core.logger.engine.monotonic" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local world = { now = 0, focus = "atspi::1.2:/field", allowed = true, starts = 0,
+		emitted = 0, first = 0, last = 6, text = "ORIGIN" }
+	local adapter = { cached_snapshot = function()
+		return { native_bus_name = ":1.2", native_object_path = "/field", role = 61 }
+	end }
+	function adapter.start_selection_capture(_, options, callback)
+		world.starts = world.starts + 1
+		local operation, listeners, done = {}, {}, false
+		function operation:is_settled() return done end
+		function operation:on_settled(fn)
+			listeners[#listeners + 1] = fn
+			if done then fn() end
+			if world.fault == "register-throw" then error("accepted registration then threw") end
+			return world.fault ~= "register-refuse"
+		end
+		function operation:cancel() world.cancelled = true; return done end
+		world.deliver = function()
+			done = true
+			callback({ bus = ":1.2", path = "/field", role = 61,
+				first = options.span and options.span.first or world.first,
+				last = options.span and options.span.last or world.last,
+				text = options.span and "rewritten" or world.text })
+			for _, fn in ipairs(listeners) do fn() end
+		end
+		if world.inline then world.deliver() end
+		if world.fault == "start-throw" then error("accepted native operation then threw") end
+		if world.fault == "missing-cancel" then operation.cancel = nil end
+		if world.fault == "missing-settled" then operation.is_settled = nil end
+		if world.fault == "missing-registration" then operation.on_settled = nil end
+		return operation
+	end
+	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return world.now end }
+	package.loaded["platform.focus.atspi_focus"], package.loaded["adapters.selection_transaction"] = adapter, nil
+	local owner = require("adapters.selection_transaction").new({
+		focus_id = function()
+			if world.during_focus then local fn = world.during_focus; world.during_focus = nil; fn() end
+			return world.focus
+		end,
+		privacy_guard = function() return world.blocked == true end,
+		capture_text_owner = function(expected_focus)
+			local function current() return world.focus == expected_focus and not world.blocked end
+			return { current = current, cached = current }
+		end,
+	})
+	local function authorized() return world.allowed end
+	local function construct()
+		local known_cleanup = false
+		return {
+			prepare = function() return true end,
+			payload = function()
+				world.emitted = world.emitted + 1
+				local result = world.ack or { ok = true, cleanup_ok = true }
+				known_cleanup = type(result) == "table" and result.cleanup_ok == true
+				if type(result) == "table" and result.cleanup_ok ~= nil then
+					result.native_cleanup_ok, result.payload_written = known_cleanup, result.ok == true
+				end
+				return result
+			end,
+			reselect = function() return { ok = true, cleanup_ok = true, native_cleanup_ok = true } end,
+			close = function() return known_cleanup end,
+		}
+	end
+	function world.read()
+		local delivered, success, text, receipt = false
+		helpers.assert_true(owner.read(world.focus, authorized, function(ok, value, _, token)
+			delivered, success, text, receipt = true, ok, value, token
+		end))
+		helpers.assert_true(not delivered, "dispatch cannot invent native completion")
+		helpers.assert_true(not owner.is_settled())
+		world.deliver()
+		helpers.assert_true(delivered and success)
+		helpers.assert_eq(text, "ORIGIN")
+		helpers.assert_true(owner.is_settled())
+		return receipt
+	end
+	function world.replace(receipt)
+		local delivered, committed = false
+		owner.replace_staged(receipt, "rewritten", authorized, construct, function(ok) delivered, committed = true, ok end)
+		for _ = 1, 2 do if not delivered then world.deliver() end end
+		helpers.assert_true(delivered)
+		return committed
+	end
+	local ok, err = pcall(body, owner, world, authorized, construct)
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	helpers.assert_true(ok, tostring(err))
+end
+
+helpers.describe("asynchronous native selected-range transactions", function()
+	helpers.it("ai-pass2-span commits the original range only once after the physical ACK", function()
+		with_native_selection(function(_, world)
+			local receipt = world.read()
+			helpers.assert_true(world.replace(receipt))
+			helpers.assert_true(not world.replace(receipt))
+			helpers.assert_eq(world.emitted, 1)
+			helpers.assert_eq(world.starts, 3)
+		end)
+	end)
+	for _, changed in ipairs({ "offset", "text", "focus", "privacy", "authorization" }) do
+		helpers.it("ai-pass2-span refuses changed " .. changed .. " before any physical edit", function()
+			with_native_selection(function(_, world)
+				local receipt = world.read()
+				if changed == "offset" then world.first, world.last = 14, 20
+				elseif changed == "text" then world.text = "SECOND"
+				elseif changed == "focus" then world.focus = "atspi::1.2:/other"
+				elseif changed == "privacy" then world.blocked = true
+				else world.allowed = false end
+				helpers.assert_true(not world.replace(receipt))
+				helpers.assert_eq(world.emitted, 0)
+			end)
+		end)
+	end
+	for index, ack in ipairs({ { ok = false }, {}, true }) do
+		helpers.it("ai-pass2-span rejects an absent or refused physical success receipt " .. index, function()
+			with_native_selection(function(_, world)
+				local receipt = world.read()
+				world.ack = ack
+				helpers.assert_true(not world.replace(receipt))
+				helpers.assert_true(not world.replace(receipt))
+				helpers.assert_eq(world.emitted, 1)
+			end)
+		end)
+	end
+	for _, action in ipairs({ "cancel", "stop", "timeout", "authorization", "privacy", "focus" }) do
+		helpers.it("ai-pass2-span retains " .. action .. " cleanup until actual native ACK", function()
+			with_native_selection(function(owner, world, authorized)
+				local delivered, success = false
+				helpers.assert_true(owner.read(world.focus, authorized, function(ok) delivered, success = true, ok end))
+				if action == "cancel" then helpers.assert_true(not owner.cancel())
+				elseif action == "stop" then helpers.assert_true(not owner.stop())
+				elseif action == "timeout" then world.now = 1001
+				elseif action == "privacy" then world.blocked = true
+				elseif action == "focus" then world.focus = "atspi::1.2:/other"
+				else world.allowed = false end
+				helpers.assert_true(not delivered)
+				helpers.assert_true(not owner.is_settled())
+				helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+				helpers.assert_eq(world.starts, 1)
+				world.deliver()
+				helpers.assert_true(delivered and not success)
+				helpers.assert_true(owner.is_settled())
+				if action == "stop" then
+					helpers.assert_true(owner.stop())
+					helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+				end
+			end)
+		end)
+	end
+	for _, fault in ipairs({ "start-throw", "missing-cancel", "missing-settled", "missing-registration", "register-throw", "register-refuse" }) do
+		helpers.it("ai-pass2-span retains inconclusive acquired ownership after " .. fault, function()
+			with_native_selection(function(owner, world, authorized)
+				world.fault = fault
+				local callbacks = 0
+				helpers.assert_true(not owner.read(world.focus, authorized, function() callbacks = callbacks + 1 end))
+				helpers.assert_true(not owner.is_settled())
+				helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+				helpers.assert_true(not owner.stop())
+				world.deliver()
+				helpers.assert_eq(callbacks, 0, "late completion cannot invent missing native lifetime authority")
+				helpers.assert_true(not owner.is_settled())
+				helpers.assert_true(not owner.stop())
+				helpers.assert_eq(world.starts, 1)
+			end)
+		end)
+	end
+	helpers.it("ai-pass2-span handles inline native settlement after subscription ACK", function()
+		with_native_selection(function(owner, world, authorized)
+			world.inline = true
+			local completed = false
+			helpers.assert_true(owner.read(world.focus, authorized, function(ok) completed = ok end))
+			helpers.assert_true(completed and owner.is_settled())
+		end)
+	end)
+	helpers.it("ai-pass2-span fences reentry before native dispatch and cannot pump libuv", function()
+		with_native_selection(function(owner, world, authorized)
+			world.during_focus = function()
+				helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+			end
+			world.read()
+			helpers.assert_eq(world.starts, 1)
+		end)
+	end)
+end)
+
+-- ADD-2 (decided by the maintainer on 2026-11-11): a Wayland clipboard that
+-- held nothing is cleared after the borrow, as macOS clears its pasteboard,
+-- instead of being left to Ergopti as an owned empty entry.
+helpers.describe("clipboard borrow of an empty Wayland clipboard (clipboard-unowned-empty)", function()
+	helpers.it("clears the clipboard instead of writing an empty string back (clipboard-unowned-empty)", function()
+		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local empty, clears = true, 0
+			local listing_owner = shell.exec_checked
+			function shell.exec_checked(command)
+				if command:find("Nothing is copied", 1, true) then return empty end
+				if command:find("wl-copy --clear", 1, true) then
+					clears, empty = clears + 1, true
+					return true
+				end
+				if empty and command:find("wl-paste --no-newline 2>/dev/null", 1, true) then
+					shell.reads[#shell.reads + 1] = command
+					return false, "", "exit 1"
+				end
+				return listing_owner(command)
+			end
+			local real_run = shell.run
+			function shell.run()
+				empty = false
+				return real_run()
+			end
+			local real_emit = emit
+			local function copy(combo)
+				if combo == "ctrl+c" then empty = false end
+				return real_emit(combo)
+			end
+			local ok, selected = clipboard.read_selection(copy, sleep_ms)
+			helpers.assert_true(ok, "an empty clipboard must still be borrowed")
+			helpers.assert_eq(selected, "selected")
+			helpers.assert_eq(clears, 1, "the empty clipboard must be given back empty")
+			for _, write in ipairs(shell.writes) do
+				helpers.assert_true(write.text ~= "", "an owned empty string was written back")
+			end
+		end)
+	end)
+end)

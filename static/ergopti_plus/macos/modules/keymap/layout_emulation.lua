@@ -451,7 +451,7 @@ end
 --- @return boolean ok M.reload's answer.
 function M.start(ports)
 	local Registry = require("modules.keymap.layout_registry")
-	local Geometry = require("adapters.keyboard_geometry")
+	local Geometry = require("platform.input.keyboard_geometry")
 	M.init({
 		read_config = function()
 			local content, status, detail = require("core.text.engine.toml_codec.writer").read_classified(
@@ -488,7 +488,7 @@ function M.start(ports)
 		now_ms = function() return math.floor(hs.timer.absoluteTime() / 1000000) end,
 		-- After the callback and before any later physical key, in order.
 		post = function(outputs)
-			local SyntheticInput = require("adapters.synthetic_input")
+			local SyntheticInput = require("platform.input.synthetic_input")
 			return SyntheticInput.defer_consumed_input_action("layout source emulation", function()
 				for _, output in ipairs(outputs) do
 					if output.type == "text" then

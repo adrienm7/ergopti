@@ -12,7 +12,7 @@ local h, symbols, rows =
 -- No connected/native/physical claim; original native forty facts remain above.
 do
  local function genuine_row_owner_builder()
-  local name = 'adapters.keyboard_hook'
+  local name = 'platform.input.keyboard_hook'
   local previous = package.loaded[name]
   local called, result = pcall(function()
    local Hook = h.load_module(name)
@@ -68,7 +68,7 @@ do
  end
 
  local function with_original_reader_symbols(body)
-  local names = { 'ffi', 'adapters.evdev_reader', 'infra.input_event' }
+  local names = { 'ffi', 'platform.input.evdev_reader', 'platform.input.event' }
   local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
   local queues, descriptors, serial = {}, {}, 100
   local allowed = { ['/dev/input/event3'] = true, ['/dev/input/event4'] = true }
@@ -112,8 +112,8 @@ do
   }
   local Reader
   local called, result = xpcall(function()
-   local Input = h.load_module('infra.input_event')
-   Reader = h.load_module('adapters.evdev_reader')
+   local Input = h.load_module('platform.input.event')
+   Reader = h.load_module('platform.input.evdev_reader')
    local function push_bytes(path, bytes)
     assert(allowed[path] and type(bytes) == 'string' and #bytes == 24)
     local queue = assert(queues[path], 'source must be opened by the original Reader')

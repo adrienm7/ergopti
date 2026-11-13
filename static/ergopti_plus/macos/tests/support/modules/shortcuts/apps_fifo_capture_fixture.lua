@@ -5,7 +5,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 require("core.logger.engine.logger")
 local M = {}
 local OWNED = {
-	"modules.shortcuts.actions.apps", "adapters.synthetic_input", "adapters.event_provenance",
+	"modules.shortcuts.actions.apps", "platform.input.synthetic_input", "adapters.event_provenance",
 	"core.events.timer_scheduler", "core.fs.adapters.storage", "adapters.clipboard", "core.logger.engine.logger", "core.logger.engine.shim", "tests.stubs.hs", "hs",
 	"platform.focus.window_info", "platform.focus.window_manager", "adapters.app_launcher", "core.process.adapters.shell_runner",
 	"core.ui.engine.notifications", "core.i18n.engine.i18n", "core.text.engine.utils",

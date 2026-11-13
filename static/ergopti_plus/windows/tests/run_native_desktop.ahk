@@ -58,8 +58,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../core/process/adapters/lifecycle.ahk
 #Include ../core/process/adapters/shell_runner.ahk
-#Include ../adapters/key_state.ahk
-#Include ../adapters/text_sender.ahk
+#Include ../platform/input/key_state.ahk
+#Include ../platform/input/text_sender.ahk
 #Include ../ui/console_window.ahk
 #Include ../infra/key_combinations.ahk
 #Include ../core/text/engine/toml/helpers.ahk

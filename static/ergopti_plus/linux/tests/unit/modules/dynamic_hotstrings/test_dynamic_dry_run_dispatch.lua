@@ -133,7 +133,7 @@ local function exercise(kind, dry_run, options)
 				engine:load_mappings(dynamic.prefix_mappings())
 				local scripts = require("modules.shortcuts.script_actions").new({ reset = function() engine:reset() end,
 					reload = function() error("unexpected reload") end, quit = function() error("unexpected quit") end })
-				local gate = require("infra.input_capture_gate").new()
+				local gate = require("platform.input.capture_gate").new()
 				local native = require("infra.user_hotstring_runtime").new({ engine = engine, injector = injector,
 					magic = require("modules.hotstrings.magic_key"), detector = detector, focus_guard = guard,
 					capture_gate = gate, dynamic = dynamic, paused = scripts.is_paused,

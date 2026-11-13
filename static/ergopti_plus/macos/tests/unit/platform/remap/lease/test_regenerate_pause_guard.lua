@@ -130,7 +130,7 @@ local function load_karabiner(paused)
 		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
+	package.loaded["platform.input.hotkey_registrar"] = { unbind = function() return true end }
 	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function() return true end,

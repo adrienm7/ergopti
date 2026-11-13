@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local function with_geometry(callback)
-	helpers.with_stub_scope({ "adapters.keyboard_geometry", "modules.shortcuts.tap_keys",
+	helpers.with_stub_scope({ "platform.input.keyboard_geometry", "modules.shortcuts.tap_keys",
 		"modules.keymap.magic_key_source" }, function()
 		local getenv = os.getenv
 		os.getenv = function(key)
@@ -23,7 +23,7 @@ local function with_geometry(callback)
 				{ first = 43, last = 32767, form = "unknown" },
 			} })
 		end
-		local geometry = require("adapters.keyboard_geometry")
+		local geometry = require("platform.input.keyboard_geometry")
 		local called, initialized = pcall(geometry.initialize)
 		os.getenv = getenv
 		helpers.assert_true(called and initialized, tostring(initialized))

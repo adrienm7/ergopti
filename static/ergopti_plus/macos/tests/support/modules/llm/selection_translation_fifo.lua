@@ -25,12 +25,12 @@ function M.build(configure, options)
 			hs[key] = value
 		end
 	end
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.fs.adapters.storage"] = nil
 	if configure then configure(world, quartz) end
-	world.synthetic = require("adapters.synthetic_input")
+	world.synthetic = require("platform.input.synthetic_input")
 	world.quartz = quartz
 	world.native_destination.utils.prewarm_ignored_win_watchers({}, {})
 	assert(world.native_destination.utils.capture_text_destination(), "native tracker must retain its classified receipt")

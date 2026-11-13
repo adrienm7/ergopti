@@ -53,7 +53,7 @@ local Monotonic = require("core.logger.engine.monotonic")
 local i18n = require("core.i18n.engine.i18n")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local Json = require("core.text.engine.json")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -4477,7 +4477,7 @@ end
 	end
 
 	local function collision_roles_current()
-		if not rawequal(package.loaded["infra.evdev_codes"], EvdevCodes) or EvdevCodes.KEY_TAB ~= collision_tab
+		if not rawequal(package.loaded["platform.input.evdev_codes"], EvdevCodes) or EvdevCodes.KEY_TAB ~= collision_tab
 			or not rawequal(EvdevCodes.DIGIT_ROW_SLOT, collision_digit_table)
 			or getmetatable(collision_digit_table) ~= nil then return false end
 		for code, slot in pairs(collision_digit_table) do if collision_digits[code] ~= slot then return false end end

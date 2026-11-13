@@ -70,7 +70,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 	helpers.it("replays Space and punctuation after the replacement (lnx-001)", function()
 		local saved_layout = package.loaded["adapters.keyboard_layout"]
 		local saved_injector = package.loaded["modules.hotstrings.injector"]
-		local codes = require("infra.evdev_codes")
+		local codes = require("platform.input.evdev_codes")
 		local rendered, active_terminator
 		local keycodes = { t = 1001, h = 1002, e = 1003, terminator = 1004 }
 		local chars = { [1001] = "t", [1002] = "h", [1003] = "e" }
@@ -114,7 +114,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 	helpers.it("replays Enter and Tab as control keystrokes after text (lnx-002)", function()
 		local saved_layout = package.loaded["adapters.keyboard_layout"]
 		local saved_injector = package.loaded["modules.hotstrings.injector"]
-		local codes = require("infra.evdev_codes")
+		local codes = require("platform.input.evdev_codes")
 		local emitted = {}
 		local channel = {
 			is_open = function() return true end,
@@ -152,7 +152,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 	end)
 
 	helpers.it("the daemon owns the output stream, which is what makes the above safe", function()
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
 		helpers.assert_type(hook.get_mode, "function",
 			"get_mode() is how a caller learns whether the daemon owns the output stream")
 

@@ -21,7 +21,7 @@ local MODULES = {
 	"core.fs.adapters.storage",
 	"infra.preferences",
 	"infra.config_paths",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
@@ -42,7 +42,7 @@ local function with_subject(store, scenario)
 	for _, name in ipairs(MODULES) do prior[name] = package.loaded[name] end
 
 	local observed = { bound = {} }
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord)
 			observed.bound[#observed.bound + 1] = chord
 			return { id = #observed.bound }

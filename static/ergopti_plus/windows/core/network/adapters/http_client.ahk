@@ -1658,7 +1658,7 @@ HTTPPost(Url, Headers, Body, Callback) {
 	; letting a timer/hotkey fire a nested HTTPPost). MyGeneration lets the
 	; cleanup below detect that case and avoid clobbering the newer request's
 	; HTTPCancel()/HTTPIsActive() visibility — mirrors the generation-counter
-	; guard adapters/text_sender.ahk uses for its clipboard-restore race.
+	; guard platform/input/text_sender.ahk uses for its clipboard-restore race.
 	_HTTP_REQUEST_GENERATION += 1
 	MyGeneration := _HTTP_REQUEST_GENERATION
 	try {

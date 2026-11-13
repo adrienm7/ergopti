@@ -72,7 +72,7 @@ end
 helpers.with_fresh_modules({
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"core.logger.engine.logger",
 	"core.text.engine.toml.codec",
 	"platform.remap.config",
@@ -80,13 +80,13 @@ helpers.with_fresh_modules({
 	"modules.keymap.layout_registry",
 	"core.text.engine.toml_codec",
 	"modules.keymap.control_sentinels",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 }, function()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		to_name                 = function(code) return "key_" .. tostring(code) end,
 		F13_KARABINER_RETURN    = 105,
 		F14_KARABINER_BACKSPACE = 107,
@@ -124,7 +124,7 @@ helpers.with_fresh_modules({
 	-- The application receives only events not consumed by the actual keymap
 	-- owner. Its diagnostic scheduler is inert unless a real listener fails.
 	local diagnostics = {}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(reason, callback)
 			diagnostics[#diagnostics + 1] = { reason = reason, callback = callback }
 			return true

@@ -210,7 +210,7 @@ local function load_remap(options)
 		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		unbind = function(handle)
 			calls.unbound[#calls.unbound + 1] = handle
 			return true

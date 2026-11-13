@@ -81,10 +81,10 @@ end
 --- @param events table
 --- @return table fired The actions that ran, as {slot, action}.
 local function pump_gesture(slot, events)
-	local previous_reader, previous_manager = package.loaded["adapters.evdev_reader"], package.loaded["modules.gestures.manager"]
+	local previous_reader, previous_manager = package.loaded["platform.input.evdev_reader"], package.loaded["modules.gestures.manager"]
 	local ok, result = xpcall(function()
 		local reader = Fakes.evdev_reader({ events = events })
-		package.loaded["adapters.evdev_reader"] = reader
+		package.loaded["platform.input.evdev_reader"] = reader
 		local M = helpers.load_module("modules.gestures.manager")
 		M.init({ enabled = false, persist = false })
 		M.set_action(slot, "enter")
@@ -103,7 +103,7 @@ local function pump_gesture(slot, events)
 		M.pump()
 		return fired
 	end, debug.traceback)
-	package.loaded["adapters.evdev_reader"], package.loaded["modules.gestures.manager"] = previous_reader, previous_manager
+	package.loaded["platform.input.evdev_reader"], package.loaded["modules.gestures.manager"] = previous_reader, previous_manager
 	if not ok then error(result, 0) end
 	return result
 end
@@ -158,7 +158,7 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 
 	helpers.it("stops reading when the drain reports fatal", function()
 		local reader = Fakes.evdev_reader({ events = {}, drain_status = "fatal", drain_reason = "ENODEV" })
-		package.loaded["adapters.evdev_reader"] = reader
+		package.loaded["platform.input.evdev_reader"] = reader
 
 		local M = helpers.load_module("modules.gestures.manager")
 		M.init({ enabled = false, persist = false })
@@ -175,7 +175,7 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 			helpers.assert_eq(M.pump(), 0, "a stopped reader costs one call per tick, nothing else")
 		end, debug.traceback)
 
-		package.loaded["adapters.evdev_reader"] = nil
+		package.loaded["platform.input.evdev_reader"] = nil
 		if not ok then error(failure, 0) end
 	end)
 
@@ -184,7 +184,7 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 		-- and keeps the module: the same module runs every tap-hold and shortcut
 		-- action, which must not die with the touchpad.
 		local reader = Fakes.evdev_reader({ events = gesture_events(3, 0, -600) })
-		package.loaded["adapters.evdev_reader"] = reader
+		package.loaded["platform.input.evdev_reader"] = reader
 
 		local M = helpers.load_module("modules.gestures.manager")
 		local ran = 0
@@ -204,13 +204,13 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 			helpers.assert_eq(ran, 1, "the action catalogue still runs its actions")
 		end, debug.traceback)
 
-		package.loaded["adapters.evdev_reader"] = nil
+		package.loaded["platform.input.evdev_reader"] = nil
 		if not ok then error(failure, 0) end
 	end)
 
 	helpers.it("keeps reading when the drain reports only an empty queue", function()
 		local reader = Fakes.evdev_reader({ events = {} })
-		package.loaded["adapters.evdev_reader"] = reader
+		package.loaded["platform.input.evdev_reader"] = reader
 
 		local M = helpers.load_module("modules.gestures.manager")
 		M.init({ enabled = false, persist = false })
@@ -224,7 +224,7 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 				"an empty queue is a quiet tick, not a dead descriptor")
 		end, debug.traceback)
 
-		package.loaded["adapters.evdev_reader"] = nil
+		package.loaded["platform.input.evdev_reader"] = nil
 		if not ok then error(failure, 0) end
 	end)
 

@@ -58,7 +58,7 @@ end
 -- 1b/ Idle event loop as the daemon runs it: sleeping on the input descriptors.
 -- A FIFO stands in for the keyboard so the real poll(2) path is measured.
 do
-	local reader = require("adapters.evdev_reader")
+	local reader = require("platform.input.evdev_reader")
 	local path = os.tmpname()
 	os.remove(path)
 	-- A tree without the input wait (an older checkout) skips this section.
@@ -106,7 +106,7 @@ do
 		per_key = per_key + 2
 	end
 	local function run(with_engine)
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = helpers.load_module("platform.input.keyboard_hook")
 		if with_engine then
 			kh.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, one_shot_timeout_ms = 2000 }), function() end)
 		end

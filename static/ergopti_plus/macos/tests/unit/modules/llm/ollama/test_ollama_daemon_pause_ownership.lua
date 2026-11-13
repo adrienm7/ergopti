@@ -227,12 +227,12 @@ local function load_fixture()
 		execute_single = function() return true end,
 	}
 	package.loaded["adapters.event_provenance"] = {}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
 	local admission = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback) callback(); return true end,
 		acquire_admission_fence = function()
 			if admission ~= nil then return nil end

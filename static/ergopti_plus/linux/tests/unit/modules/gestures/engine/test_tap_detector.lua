@@ -98,8 +98,8 @@ helpers.describe("tap detector: libinput's tap rules on a recorded trace", funct
 
 	helpers.it("(tap-click) the same trace through the binary evdev reader gives the same taps", function()
 		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
-		local reader = helpers.load_module("adapters.evdev_reader")
-		local codec = require("infra.input_event")
+		local reader = helpers.load_module("platform.input.evdev_reader")
+		local codec = require("platform.input.event")
 		local text = fixture("tap_click_record_synaptics.yml")
 		local trace = assert(Record.decode(text))
 		local pending, cursor = {}, 1

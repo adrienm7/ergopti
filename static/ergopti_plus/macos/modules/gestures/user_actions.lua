@@ -34,7 +34,7 @@ local text_utils = require("core.text.engine.utils")
 local AuxOwner = require("modules.gestures.actions_aux_owner")
 local FileSystem = require("core.fs.adapters.file_system")
 local Clipboard = require("adapters.clipboard")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local Unicode = require("core.lifecycle.engine.compat.utf8")
 local Parameter = require("shortcuts.engine.user_action_parameter")
 

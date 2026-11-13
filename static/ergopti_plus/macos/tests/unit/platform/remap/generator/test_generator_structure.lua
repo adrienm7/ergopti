@@ -384,7 +384,7 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			helpers.assert_true(not tostring(condition.name):find("ke_held_", 1, true),
 				"the sticky key's rule must not depend on another key being held: " .. tostring(condition.name))
 		end
-		local Keycodes = require("infra.keycodes")
+		local Keycodes = require("platform.input.keycodes")
 		helpers.assert_true(type(manipulator.to_if_alone) == "table"
 			and type(manipulator.to_if_alone[1]) == "table"
 			and manipulator.to_if_alone[1].key_code == Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED),

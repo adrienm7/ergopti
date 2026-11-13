@@ -19,7 +19,7 @@
 ---    application; the magic key is injected in its place and then handed to
 ---    the character path, so the buffer, the metrics and a ★-triggered
 ---    expansion see exactly what the application shows — the order a
----    re-emitted key follows (adapters/keyboard_hook.lua).
+---    re-emitted key follows (platform/input/keyboard_hook.lua).
 --- 3. Fail safe. A paused driver, the replace section off, a modifier held or
 ---    an injection that did not happen lets the key through untouched, so it is
 ---    typed exactly once, as its own character.
@@ -42,9 +42,9 @@ local Manifest    = require("infra.manifest_reader")
 local Paths       = require("core.fs.engine.paths")
 local FileSystem  = require("core.fs.adapters.file_system")
 local Json        = require("core.text.engine.json")
-local EvdevCodes  = require("infra.evdev_codes")
+local EvdevCodes  = require("platform.input.evdev_codes")
 local Timings     = require("core.timing.engine.timings")
-local InputEvent  = require("infra.input_event")
+local InputEvent  = require("platform.input.event")
 local Shared      = require("layouts.engine.layers.magic_key_source")
 local ConfigKeys = require("settings.engine.keys")
 

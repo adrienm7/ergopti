@@ -124,7 +124,7 @@ end
 --- editor transaction, rather than the fixture, decide which handle is current.
 --- @param body function Callback receiving editor and registrar fixture.
 local function with_editor_registrar(body)
-	local saved_registrar = package.loaded["adapters.hotkey_registrar"]
+	local saved_registrar = package.loaded["platform.input.hotkey_registrar"]
 	local saved_editor = package.loaded["ui.hotstring_editor"]
 	local calls = { bind = 0, unbind = 0, enable = 0, order = {} }
 	local handles = {}
@@ -164,7 +164,7 @@ local function with_editor_registrar(body)
 		return true
 	end
 
-	package.loaded["adapters.hotkey_registrar"] = registrar
+	package.loaded["platform.input.hotkey_registrar"] = registrar
 	package.loaded["ui.hotstring_editor"] = nil
 	local ok, err = xpcall(function()
 		local Editor = helpers.load_with_stubs("ui.hotstring_editor")
@@ -175,7 +175,7 @@ local function with_editor_registrar(body)
 			refuse_unbind = function(handle) refuse_unbind[handle] = true end,
 		})
 	end, debug.traceback)
-	package.loaded["adapters.hotkey_registrar"] = saved_registrar
+	package.loaded["platform.input.hotkey_registrar"] = saved_registrar
 	package.loaded["ui.hotstring_editor"] = saved_editor
 	if not ok then error(err, 0) end
 end

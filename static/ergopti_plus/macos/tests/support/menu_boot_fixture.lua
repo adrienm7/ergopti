@@ -200,7 +200,7 @@ function M.boot(opts)
 		end,
 		destroy = noop,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,

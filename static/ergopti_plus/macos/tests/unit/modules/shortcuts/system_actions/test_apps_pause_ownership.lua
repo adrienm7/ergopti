@@ -29,7 +29,7 @@ local function fresh_apps()
 		"adapters.app_launcher",
 		"platform.focus.window_info",
 		"platform.focus.window_manager",
-		"adapters.synthetic_input",
+		"platform.input.synthetic_input",
 		"adapters.clipboard",
 		"core.logger.engine.logger",
 		"core.ui.engine.notifications",
@@ -268,7 +268,7 @@ local function fresh_apps()
 		for _, callback in ipairs(tx.completed) do callback(tx, status) end
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
 		on_complete = function(tx, callback)
 			if tx.status then callback(tx, tx.status)

@@ -15,7 +15,7 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps", "platform.focus.window_info",
-		"adapters.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "core.logger.engine.logger",
+		"platform.input.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
@@ -38,7 +38,7 @@ local function load_fixture(options)
 		for _, callback in ipairs(tx.completed) do callback(tx, status) end
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
 		on_complete = function(tx, callback)
 			if tx.status then callback(tx, tx.status)

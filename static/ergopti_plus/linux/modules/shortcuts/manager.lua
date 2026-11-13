@@ -46,7 +46,7 @@ local Clipboard = require("adapters.clipboard")
 local EventLoop = require("core.events.loop")
 local ComboEmitter = require("modules.gestures.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local Monotonic = require("core.logger.engine.monotonic")
 local CapsWordPolicy = require("keyboard.engine.caps_word_auto_off")
 local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
@@ -474,7 +474,7 @@ local function end_caps_word(reason)
 	if not _caps_word_active then return end
 	clear_caps_word(reason)
 	-- The hook logs an unlock it could not emit; the session is over either way.
-	require("adapters.keyboard_hook").release_caps_word_lock()
+	require("platform.input.keyboard_hook").release_caps_word_lock()
 end
 
 --- Queues the idle check of one session on the daemon loop: it ends the
@@ -514,7 +514,7 @@ local function start_caps_word()
 	-- level types. The hook ends the hold itself when the user presses
 	-- CapsLock, when it stops and before a dialog takes the keyboard.
 	local session = _caps_word_session + 1
-	local locked, refusal = require("adapters.keyboard_hook").lock_caps_for_word(press_caps_lock, function(reason)
+	local locked, refusal = require("platform.input.keyboard_hook").lock_caps_for_word(press_caps_lock, function(reason)
 		if session == _caps_word_session and _caps_word_active then clear_caps_word(reason) end
 	end)
 	if not locked then
@@ -747,7 +747,7 @@ end
 --- @return boolean armed
 function M.arm_one_shot_shift()
 	record("one_shot_shift")
-	local armed, refusal = require("adapters.keyboard_hook").arm_action_one_shot()
+	local armed, refusal = require("platform.input.keyboard_hook").arm_action_one_shot()
 	if not armed then Logger.warn(LOG, "One-shot Shift not armed: %s.", tostring(refusal)) end
 	return armed == true
 end

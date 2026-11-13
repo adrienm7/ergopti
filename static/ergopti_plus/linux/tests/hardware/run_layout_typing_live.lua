@@ -11,8 +11,8 @@
 --- production wiring (M.start), the shared emulation engine, the registry's
 --- shipped .keylayout files, adapters/keyboard_layout.lua and
 --- adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
---- modules/hotstrings/injector.lua, adapters/modifier_broker.lua,
---- adapters/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
+--- modules/hotstrings/injector.lua, platform/input/modifier_broker.lua,
+--- platform/input/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
 --- modules/gestures/combo_emitter.lua, and modules/keymap/layout_registry.lua
 --- with the real Python installer for the Bépo user-tree install.
 ---
@@ -239,7 +239,7 @@ local function held_codes(roles)
 	table.sort(codes)
 	return codes
 end
-package.loaded["adapters.keyboard_hook"] = {
+package.loaded["platform.input.keyboard_hook"] = {
 	held_text_modifier_codes = function() return held_codes({ shift = true, altgr = true }) end,
 	held_shortcut_modifier_codes = function() return held_codes({ ctrl = true }) end,
 	held_forwarded_keys = function() return {} end,
@@ -253,7 +253,7 @@ package.loaded["adapters.keyboard_hook"] = {
 }
 
 local Backend = require("tests.hardware.lib.xtest_uinput_backend")
-local Writer = require("adapters.uinput_writer")
+local Writer = require("platform.input.uinput_writer")
 local wire = Backend.new()
 Writer._set_backend(wire)
 local fake_node = SCRATCH .. "/uinput"
@@ -270,7 +270,7 @@ local Emulation = require("modules.keymap.layout_emulation")
 local Accented = require("modules.shortcuts.accented_shortcuts")
 local ComboEmitter = require("modules.gestures.combo_emitter")
 local NumberRow = require("infra.number_row_preferences")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 assert(Injector.open_fast_channel(), "the injector's channel did not open on the XTest backend")
 
@@ -302,7 +302,7 @@ local function refresh_layout()
 	error("the server keymap did not resolve: " .. tostring(reason))
 end
 
--- One output owner per physical key, as adapters/keyboard_hook.lua keeps them.
+-- One output owner per physical key, as platform/input/keyboard_hook.lua keeps them.
 local _owners = {}
 
 --- Puts back one physical event as the grab's pass-through does

@@ -24,7 +24,7 @@ local helpers = require("tests.helpers")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("core.text.engine.json")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 -- The Left arrow's kernel code (input-event-codes.h KEY_LEFT)
 local KEY_LEFT = 105

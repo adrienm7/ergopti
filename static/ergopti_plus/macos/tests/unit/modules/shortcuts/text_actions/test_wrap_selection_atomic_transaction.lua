@@ -37,7 +37,7 @@ local function load_fixture(options)
 		destination = package.loaded["modules.keymap.utils"],
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["core.logger.engine.logger"],
-		synthetic = package.loaded["adapters.synthetic_input"],
+		synthetic = package.loaded["platform.input.synthetic_input"],
 		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		text = package.loaded["modules.shortcuts.actions.text"],
 	}
@@ -120,7 +120,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic
+	package.loaded["platform.input.synthetic_input"] = synthetic
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
@@ -227,7 +227,7 @@ local function load_fixture(options)
 			package.loaded["modules.keymap.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["core.logger.engine.logger"] = saved.logger
-			package.loaded["adapters.synthetic_input"] = saved.synthetic
+			package.loaded["platform.input.synthetic_input"] = saved.synthetic
 			package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 			package.loaded["hs"] = saved.hs_module
 			_G.hs = saved.hs_global

@@ -105,7 +105,7 @@ local function scenario(options, body)
 		})
 		package.loaded["core.ui.engine.display_server"] = { is_x11 = function() return true end,
 			is_wayland = function() return false end, kind = function() return "x11" end }
-		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
+		package.loaded["platform.input.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
 			-- The fixture's evdev A=30 and space=57 belong to this physical provider.
 			get_layout = function() return "qwerty" end,
@@ -142,7 +142,7 @@ local function scenario(options, body)
 		settings.arrow_resets_word = options.arrow_resets_word ~= false
 		if options.shortcut_resets_word ~= nil then settings.shortcut_resets_word = options.shortcut_resets_word end
 		assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
-		local gate = require("infra.input_capture_gate").new()
+		local gate = require("platform.input.capture_gate").new()
 		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
 		local environment = setmetatable({ engine = matcher, engine_mod = require("modules.hotstrings.engine"),
 			TapHold = { observe_copy_activity = function() end },
@@ -151,7 +151,7 @@ local function scenario(options, body)
 				is_caps_word_active = function() return false end } or nil,
 			script_actions = require("modules.shortcuts.script_actions").new({ reset = function() end,
 				reload = function() end, quit = function() end }),
-			keystats = policy, WordReset = WordReset, InputEvent = require("infra.input_event"),
+			keystats = policy, WordReset = WordReset, InputEvent = require("platform.input.event"),
 			Monotonic = { now_ms = function() return 1000 + scheduler.now * 1000 end }, _cached_app_id = "owned-editor",
 			terminators_mod = { is_terminator = function() return false end },
 			-- Main sizes the expansion delay from the physically held modifiers.
@@ -200,8 +200,8 @@ local function scenario(options, body)
 			return false
 		end
 		function state.shortcut(vector)
-			local original_hook = package.loaded["adapters.keyboard_hook"]
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local original_hook = package.loaded["platform.input.keyboard_hook"]
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local events, modifiers, raw_held = {}, {}, {}
 			for _, pair in ipairs({ { "ctrl", 29 }, { "shift", 42 }, { "alt", 56 }, { "meta", 125 }, { "altgr", 100 } }) do
 				if vector.mods[pair[1]] then modifiers[#modifiers + 1] = pair[2] end
@@ -238,7 +238,7 @@ local function scenario(options, body)
 					callbacks.control(name, detail)
 				end,
 			}, true)
-			package.loaded["adapters.keyboard_hook"] = original_hook
+			package.loaded["platform.input.keyboard_hook"] = original_hook
 			if not driven then error(problem, 0) end
 			helpers.assert_true(forwarded, "the actual Hook must forward the unbound editing chord")
 			helpers.assert_eq(raw_held, {}, "all physical forwarded modifiers and keys must be released")
@@ -653,7 +653,7 @@ do
 				if name:match("^modules%.llm%.") or name:match("^modules%.keystats%.")
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
-			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
+			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
 				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
 				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
@@ -692,7 +692,7 @@ do
 			  if not ok then io.stderr:write("MAIN_SETUP_FAILURE " .. tostring(result) .. "\n") end
 			  return ok, result
 			end })
-			put("infra.input_access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
+			put("platform.input.access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
 			put("core.lifecycle.engine.shutdown.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
 			put("core.lifecycle.engine.reload.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
@@ -776,7 +776,7 @@ do
 			end
 			put("modules.hotstrings.engine", main_engine)
 			local prediction = require("modules.llm.prediction_engine"); fixture_prediction = prediction
-			local hook = require("adapters.keyboard_hook")
+			local hook = require("platform.input.keyboard_hook")
 			hook.start = function(options) state.callbacks = options; coroutine.yield("actual Hook.start callback capture"); return true end
 			hook.isRunning, hook.get_mode = yes, function() return "intercept" end
 			local optional = { ["modules.llm.prediction_engine"] = prediction, ["core.ui.ui.tooltip.llm"] = overlay,

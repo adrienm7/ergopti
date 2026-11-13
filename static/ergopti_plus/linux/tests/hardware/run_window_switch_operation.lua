@@ -74,7 +74,7 @@ if mode == "binding" or mode == "canonical" or mode == "physical" or mode == "di
 	-- still belong to the real manager and the actual canonical file.
 	local original_new = Switch.new
 	Switch.new = function(capture) return original_new(capture, ports) end
-	package.loaded["adapters.keyboard_hook"] = { physical_source_receipt = function()
+	package.loaded["platform.input.keyboard_hook"] = { physical_source_receipt = function()
 		return { generation = physical_generation, ready = true }
 	end }
 	local global_combos = 0

@@ -669,8 +669,8 @@ helpers.describe("private chosen-ID remaining native consumer assignments", func
 		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
 			native_query_fixture(native)
 			package.loaded["modules.shortcuts.tap_keys"] = nil
-			package.loaded["adapters.keyboard_geometry"] = nil
-			local geometry = require("adapters.keyboard_geometry")
+			package.loaded["platform.input.keyboard_geometry"] = nil
+			local geometry = require("platform.input.keyboard_geometry")
 			require("tests.support.keyboard_geometry").initialize(geometry)
 			local tap = require("modules.shortcuts.tap_keys")
 			helpers.assert_eq(tap.set_action("number_row_left", "run_program", function() return true end), true)

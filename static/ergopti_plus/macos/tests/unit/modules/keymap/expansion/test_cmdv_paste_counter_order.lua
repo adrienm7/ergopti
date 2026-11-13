@@ -105,7 +105,7 @@ local function load_fixture()
 	helpers.assert_not_nil(callback, "the production keyDown callback must exist")
 	return {
 		keymap = keymap,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		hs = hs_stub,
 		handle = callback,
 	}

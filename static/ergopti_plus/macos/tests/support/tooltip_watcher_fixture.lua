@@ -114,8 +114,8 @@ local function with_fixture(callback)
 		"core.ui.ui.tooltip",
 		"modules.keymap.control_sentinels",
 		"adapters.event_provenance",
-		"adapters.key_state",
-		"adapters.synthetic_input",
+		"platform.input.key_state",
+		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"core.fs.adapters.storage",
 		"infra.hotpath_profiler",
@@ -143,8 +143,8 @@ local function with_fixture(callback)
 				-- different timer table and pass without ever draining the real queue.
 				package.loaded["modules.keymap.control_sentinels"] = nil
 				package.loaded["adapters.event_provenance"] = nil
-				package.loaded["adapters.key_state"] = nil
-				package.loaded["adapters.synthetic_input"] = nil
+				package.loaded["platform.input.key_state"] = nil
+				package.loaded["platform.input.synthetic_input"] = nil
 				package.loaded["core.events.timer_scheduler"] = nil
 				package.loaded["core.fs.adapters.storage"] = nil
 				package.loaded["infra.hotpath_profiler"] = nil

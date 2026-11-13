@@ -43,7 +43,7 @@ local Logger = require("core.logger.engine.shim")
 local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("core.ui.engine.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
-local Keysym = require("infra.keysym")
+local Keysym = require("platform.input.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
 local inverse_republish = XkbCapture.inverse_republish
@@ -51,7 +51,7 @@ local inverse_retarget = XkbCapture.inverse_retarget
 local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 local LOG = "adapters.keyboard_layout"

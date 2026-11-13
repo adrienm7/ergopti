@@ -100,7 +100,7 @@ function windowsKeys() {
  * @returns {string[]}
  */
 function linuxKeys() {
-	const codes = read('linux/infra/evdev_codes.lua');
+	const codes = read('linux/platform/input/evdev_codes.lua');
 	const table = codes.match(/M\.CONTROL_NAME_OF = \{([\s\S]*?)\n\}/);
 	if (!table) throw new Error('CONTROL_NAME_OF is missing from the Linux evdev codes');
 	const names = [...table[1].matchAll(/= "([a-z0-9_]+)"/g)].map((m) => m[1]);

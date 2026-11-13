@@ -16,7 +16,7 @@ local fixture = require("tests.support.text_owner_fixture")
 local function injection(boundary, body)
 	fixture.with(function(guard, state)
 		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
-			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "core.logger.engine.shim" }
+			"adapters.keyboard_layout", "modules.hotstrings.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local rows, writes, commands, held, stopped = {}, {}, {}, {}, 0
@@ -69,7 +69,7 @@ local function injection(boundary, body)
 			is_wayland = function() return false end, is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() stopped = stopped + 1 end,
 		}

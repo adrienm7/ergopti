@@ -39,8 +39,8 @@ local original_receiving_rows = nil
 local receiving_native_backends = setmetatable({}, { __mode = "k" })
 
 local Logger = require("core.logger.engine.shim")
-local Keysym = require("infra.keysym")
-local EvdevCodes = require("infra.evdev_codes")
+local Keysym = require("platform.input.keysym")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local LOG = "adapters.xkb_capture"
 

@@ -36,13 +36,13 @@ end
 --- the keymap tap that claims it does.
 local function enter_layer()
 	require("modules.keymap.control_sentinels").claim_key(
-		require("infra.keycodes").F20_LAYER_NAV_ENTERED, true, {})
+		require("platform.input.keycodes").F20_LAYER_NAV_ENTERED, true, {})
 end
 
 --- Publishes the sentinel Karabiner taps on leaving the navigation layer.
 local function exit_layer()
 	require("modules.keymap.control_sentinels").claim_key(
-		require("infra.keycodes").F19_LAYER_NAV_EXITED, true, {})
+		require("platform.input.keycodes").F19_LAYER_NAV_EXITED, true, {})
 end
 
 helpers.describe("shortcuts.actions.system: exact provenance and ordered fences (HS-H-01)", function()

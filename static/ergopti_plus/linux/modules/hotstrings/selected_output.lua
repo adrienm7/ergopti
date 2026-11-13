@@ -10,7 +10,7 @@ local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local Layout = require("adapters.keyboard_layout")
 local Clipboard = require("adapters.clipboard")
-local Broker = require("adapters.modifier_broker")
+local Broker = require("platform.input.modifier_broker")
 
 --- Constructs a reversible selected-output owner without desktop I/O.
 --- @param text string Private replacement bytes.

@@ -182,7 +182,7 @@ local function start_real_keystats()
 	-- The production engine owns the raw event tap through KeyboardHook. Capture
 	-- its onEvent callback at that boundary rather than relying on the retired
 	-- direct hs.eventtap.new() ownership in keystats/init.lua.
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(opts) captured_handle_key = opts and opts.onEvent; return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
@@ -194,7 +194,7 @@ local function start_real_keystats()
 	package.loaded["modules.keystats.log_manager"] = nil
 	package.loaded["core.fs.adapters.ledger_append"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
 	-- KC file draining and hardware sensor collection are independent of the
@@ -318,7 +318,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		package.loaded["core.fs.adapters.file_system"], false)
 	local km = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
 	package.loaded["core.fs.adapters.file_system"] = saved_file_system
-	local synthetic_input = require("adapters.synthetic_input")
+	local synthetic_input = require("platform.input.synthetic_input")
 	local is_paused = false
 	local script_control = { is_paused = function() return is_paused end }
 	helpers.assert_eq(km.start(script_control), true,

@@ -6,7 +6,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.logger",
 	"modules.llm",
 	"keyboard.engine.chord",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"ui.menu.shortcut_utils",
 	"ui.menu.menu_llm.trigger_orchestrator",
 }
@@ -41,7 +41,7 @@ local function with_fixture(body)
 			end,
 		}
 		package.loaded["keyboard.engine.chord"] = {}
-		package.loaded["adapters.hotkey_registrar"] = {}
+		package.loaded["platform.input.hotkey_registrar"] = {}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = nil
 

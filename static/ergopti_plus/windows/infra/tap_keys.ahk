@@ -167,7 +167,7 @@ TapKeyFire(Id, WaitFn := "") {
 ; ======================================
 ; ======================================
 
-; The OS calls a label needs, all in adapters/key_state.ahk; reading a dead key
+; The OS calls a label needs, all in platform/input/key_state.ahk; reading a dead key
 ; there leaves the keyboard state alone, so a label cannot arm it for the user's
 ; next keystroke. The unit suite passes a fake layout instead.
 global _TapKeyOsProbe := {

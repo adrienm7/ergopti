@@ -277,7 +277,7 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			end, debug.traceback)
 			hs.eventtap.checkKeyboardModifiers = original_check
 			hs.eventtap.event.rawFlagMasks = original_masks
-			package.loaded["adapters.key_state"] = nil
+			package.loaded["platform.input.key_state"] = nil
 			if not ok then error(err, 0) end
 		end)
 	end)

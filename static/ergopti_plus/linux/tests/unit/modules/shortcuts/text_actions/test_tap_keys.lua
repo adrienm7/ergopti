@@ -364,14 +364,14 @@ helpers.describe('deferred tap during a pause cycle', function()
     local ScriptActions = require('modules.shortcuts.script_actions')
     local Loop = require('core.events.loop')
     local controller = ScriptActions.new({reset=function() end,reload=function() end,quit=function() end})
-    local old_reader = package.loaded['adapters.evdev_reader']
+    local old_reader = package.loaded['platform.input.evdev_reader']
     Manager.init({enabled=false,persist=false,is_paused=controller.is_paused,action_handlers=controller.handlers})
     Manager._test_begin_reading({feed=function() return {fingers=3,direction='up'} end})
     assert(Manager.enable())
     assert(Manager.set_action('swipe_3_up','script_pause_toggle'))
     local TapKeys, log = fresh({['shortcuts.tap_keys.number_row_left']='screen_capture'})
     TapKeys.init({is_active=function() return not controller.is_paused() end,defer=Loop.defer,pause_epoch=controller.pause_epoch})
-    package.loaded['adapters.evdev_reader'] = {TOUCHPAD='touchpad', close=function() return true end, drain=function(callback) callback({}); callback({}); return 2 end}
+    package.loaded['platform.input.evdev_reader'] = {TOUCHPAD='touchpad', close=function() return true end, drain=function(callback) callback({}); callback({}); return 2 end}
     local ok, err = pcall(function()
       assert(TapKeys.on_key({code=41,mods={}}))
       assert(Manager.pump() == 2)
@@ -383,7 +383,7 @@ helpers.describe('deferred tap during a pause cycle', function()
       helpers.assert_eq(log.executed, {'screen_capture@tap_key__number_row_left'}, 'new presses after resume still run')
     end)
     Manager.disable()
-    package.loaded['adapters.evdev_reader'] = old_reader
+    package.loaded['platform.input.evdev_reader'] = old_reader
     log.restore()
     package.loaded['modules.gestures.manager'] = previous_manager
     if not ok then error(err,0) end

@@ -31,14 +31,14 @@ local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("core.ui.engine.notifications")
 local EventProvenance = require("adapters.event_provenance")
-local KeyState      = require("adapters.key_state")
+local KeyState      = require("platform.input.key_state")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
-local KeyboardGeometry = require("adapters.keyboard_geometry")
+local KeyboardGeometry = require("platform.input.keyboard_geometry")
 local Logger        = require("core.logger.engine.logger")
 local text_utils = require("core.text.engine.utils")
 local Timings       = require("core.timing.engine.timings")
 local i18n          = require("core.i18n.engine.i18n")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 
@@ -66,7 +66,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- ====================================
 -- ====================================
 
-local Keycodes               = require("infra.keycodes")
+local Keycodes               = require("platform.input.keycodes")
 local ControlSentinels       = require("modules.keymap.control_sentinels")
 local ConfigKeys = require("settings.engine.keys")
 

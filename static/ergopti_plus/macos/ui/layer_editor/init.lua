@@ -51,7 +51,7 @@ local TomlCodec   = require("core.text.engine.toml_codec")
 local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
-local Keycodes    = require("infra.keycodes")
+local Keycodes    = require("platform.input.keycodes")
 local NavLayer    = require("platform.remap.nav_layer")
 
 local LOG = "layer_editor"

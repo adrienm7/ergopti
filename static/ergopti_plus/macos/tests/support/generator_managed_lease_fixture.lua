@@ -209,7 +209,7 @@ end
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system",
-		"infra.config_paths", "infra.keycodes",
+		"infra.config_paths", "platform.input.keycodes",
 	}, function()
 		local fixture = {}
 		fixture.file_data = {}
@@ -282,7 +282,7 @@ local function with_fixture(callback)
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/tmp/ergopti_generator_lease" end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			to_name = function(code) return "key_" .. tostring(code) end,
 			F13_KARABINER_RETURN = 105,
 			F14_KARABINER_BACKSPACE = 107,

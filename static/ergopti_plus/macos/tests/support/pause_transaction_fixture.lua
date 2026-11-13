@@ -12,11 +12,11 @@ local OWNERS = {
 	"modules.shortcuts.script_control",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"adapters.key_state",
-	"adapters.synthetic_input",
+	"platform.input.key_state",
+	"platform.input.synthetic_input",
 	"modules.llm.warmup_controller",
 	"modules.llm.api_mlx",
 	"modules.llm.api_ollama",
@@ -140,7 +140,7 @@ local function load_context(options)
 			}
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 0x6A,
 		F14_KARABINER_BACKSPACE = 0x6B,
 		F15_KARABINER_ESCAPE = 0x6C,
@@ -155,7 +155,7 @@ local function load_context(options)
 		SG_NAMES = { "none", "script_pause_toggle" },
 		AX_NAMES = {},
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
@@ -194,7 +194,7 @@ local function load_context(options)
 		resync_context = record("keystats_resync"),
 		log_shortcut = function() end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback)
 			ctx.calls.input_drain = (ctx.calls.input_drain or 0) + 1
 			ctx.input_idle_callbacks[#ctx.input_idle_callbacks + 1] = callback

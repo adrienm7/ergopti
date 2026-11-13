@@ -69,7 +69,7 @@ local function drive_rotation(rollover_results, paused, ticks, split_results)
 	}
 	watchers.init(state, function() return paused end)
 
-	local synthetic_input = require("adapters.synthetic_input")
+	local synthetic_input = require("platform.input.synthetic_input")
 	local provenance = require("adapters.event_provenance")
 	local tagged = provenance_fixture.tagged_key(
 		synthetic_input, "test.midnight", "replacement", "m")

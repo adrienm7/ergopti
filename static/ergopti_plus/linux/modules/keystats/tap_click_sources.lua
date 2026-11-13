@@ -17,7 +17,7 @@
 
 local M = {}
 
-local Reader = require("adapters.evdev_reader")
+local Reader = require("platform.input.evdev_reader")
 local Finder = require("modules.gestures.touchpad_finder")
 local TapDetector = require("modules.gestures.tap_detector")
 local Setting = require("adapters.tap_to_click_setting")

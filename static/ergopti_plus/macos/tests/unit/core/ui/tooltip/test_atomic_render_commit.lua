@@ -228,7 +228,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[1])
 			local accepts = 0
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			local logger = require("core.logger.engine.logger")
 			helpers.admit_logger_privacy(logger)
 			local previous_error = logger.error
@@ -269,7 +269,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 	helpers.it("(tooltip-watcher-reuse) stale hotstring dismissal cannot hide a replacement", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[2])
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			helpers.assert_eq(context.tooltip.show("visible A", false, true), true)
 			local key_watcher = context.created[CASES[2].watcher_count]
 			helpers.assert_eq(key_watcher.fn(hardware_key_event(0, {}, "a")), false,
@@ -291,7 +291,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[1])
 			local accepts = 0
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			context.tooltip.set_accept_callback(function() accepts = accepts + 1; return true end)
 			helpers.assert_eq(context.tooltip.show_predictions({ "visible" }, 1, true), true)
 			local key_watcher = context.created[CASES[1].watcher_count]
@@ -309,7 +309,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 	helpers.it("(HS-059) refused Tab scheduling preserves the selected fallback row", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[1])
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			local original_defer = synthetic.defer_consumed_input_action
 			local accepted = {}
 			local ok, err = xpcall(function()
@@ -347,7 +347,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			.. " ahead of a physical click", function()
 			with_fixture(function(fixture)
 				local context = fixture.load_tooltip(CASES[1])
-				local synthetic = require("adapters.synthetic_input")
+				local synthetic = require("platform.input.synthetic_input")
 				local runtime_open = true
 				local accepts = 0
 				local replay_posts = 0
@@ -414,7 +414,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 	helpers.it("(HS-049) passes through a shortcut beyond the live prediction pool", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[1])
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			local accepts = 0
 			context.tooltip.set_accept_callback(function()
 				accepts = accepts + 1
@@ -439,7 +439,7 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			.. " rejects an old CG callback delivered during a new watcher epoch", function()
 			with_fixture(function(fixture)
 				local context = fixture.load_tooltip(spec)
-				local synthetic = require("adapters.synthetic_input")
+				local synthetic = require("platform.input.synthetic_input")
 				helpers.assert_eq(spec.render(context.tooltip), true)
 				local old_key_callback = context.created[spec.watcher_count].fn
 				if spec.label == "LLM" then

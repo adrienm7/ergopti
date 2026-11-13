@@ -61,7 +61,7 @@ local function load_utils()
 
 	package.loaded["modules.keymap.utils"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_transaction = function() return current end,
 		begin = function()
 			debt_sequence = debt_sequence + 1
@@ -405,4 +405,4 @@ helpers.describe("emit_tokens reports its ordering fence to the caller", functio
 	end)
 end)
 
-package.loaded["adapters.synthetic_input"] = nil
+package.loaded["platform.input.synthetic_input"] = nil

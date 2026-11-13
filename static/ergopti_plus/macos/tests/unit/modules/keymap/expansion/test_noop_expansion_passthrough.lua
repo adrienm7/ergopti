@@ -91,7 +91,7 @@ local function load_fixture(buffer)
 	}
 	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() end }
 
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local expander = require("modules.keymap.expander")
 	local state = make_state(buffer)
 	expander.init(state, make_registry(), make_llm())

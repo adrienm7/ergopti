@@ -17,7 +17,7 @@ local function load_real_sticky_pause_owner()
 		if type(name) == "string" and (name:match("^modules%.gestures%.actions")
 			or name == "modules.gestures.sticky_modifiers"
 			or name == "modules.gestures"
-			or name == "adapters.modifier_injector"
+			or name == "platform.input.modifier_injector"
 			or name == "core.events.timer_scheduler") then
 			package.loaded[name] = nil
 		end
@@ -65,7 +65,7 @@ local function load_real_sticky_pause_owner()
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		defer_after_callback = function(_label, callback)
 			deferred[#deferred + 1] = callback
 			return true
@@ -73,7 +73,7 @@ local function load_real_sticky_pause_owner()
 	}, { __index = function() return function() return true end end })
 
 	local TimerScheduler = require("core.events.timer_scheduler")
-	local Injector = require("adapters.modifier_injector")
+	local Injector = require("platform.input.modifier_injector")
 	local Sticky = require("modules.gestures.sticky_modifiers")
 
 	local function permissive(overrides)
@@ -89,7 +89,7 @@ local function load_real_sticky_pause_owner()
 		escape_gsub_replacement = function(value) return value end,
 	})
 	package.loaded["core.fs.adapters.file_system"] = permissive({ read = function() return nil end })
-	package.loaded["adapters.key_state"] = permissive({
+	package.loaded["platform.input.key_state"] = permissive({
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	})

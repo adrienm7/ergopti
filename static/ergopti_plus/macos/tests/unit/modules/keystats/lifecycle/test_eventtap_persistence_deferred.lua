@@ -35,8 +35,8 @@ local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
 	"adapters.event_provenance", "core.fs.adapters.file_system",
-	"adapters.input_source_broker", "adapters.keyboard_hook",
-	"core.process.adapters.lifecycle", "adapters.synthetic_input",
+	"adapters.input_source_broker", "platform.input.keyboard_hook",
+	"core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "infra.config_paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
 	"core.logger.engine.logger", "infra.manifest_reader", "core.timing.engine.timings",
@@ -212,7 +212,7 @@ local function load_fixture(options)
 		start = function() return true end,
 		stop = function() return true end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(config)
 			handle_key = config and config.onEvent
 			hook_event_types = config and config.eventTypes
@@ -225,7 +225,7 @@ local function load_fixture(options)
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		STATUS_FOREIGN = "foreign",
 		current_action_epoch = function() return "epoch-1", 0 end,
 		claim_physical_fence = function() return nil end,

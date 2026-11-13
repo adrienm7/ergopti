@@ -772,7 +772,7 @@ local function with_daemon_wrap(body, options)
 			require = require, package = { loaded = {} },
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
-			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
+			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("platform.input.capture_gate"),
 			keystats = { cancel_hold_intervals = noop, set_private_window = noop,
 				discard_roi = function() state.roi_discards = state.roi_discards + 1 end,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,

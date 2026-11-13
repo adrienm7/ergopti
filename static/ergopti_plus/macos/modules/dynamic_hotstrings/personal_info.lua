@@ -15,7 +15,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("core.logger.engine.logger")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local Terminators = require("layouts.engine.layers.terminators")
 local LOG      = "personal_info"
 

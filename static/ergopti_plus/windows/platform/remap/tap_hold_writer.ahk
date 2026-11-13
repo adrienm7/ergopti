@@ -30,7 +30,7 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\..\infra\key_names.ahk
+#Include %A_LineFile%\..\..\input\key_names.ahk
 #Include ../../core/ui/adapters/native_number.ahk
 
 ; ===========================
@@ -56,7 +56,7 @@ global _TH_KeyDefs := _TH_BuildKeyDefs()
 ; Reads this driver's column of the shared key catalogue. An entry that names
 ; no hand is a broken catalogue: it is logged as an ERROR and left out, so the
 ; tray never shows a guessed hand. Its name is the shared key name table's
-; (infra/key_names.ahk), which throws on a key it does not name.
+; (platform/input/key_names.ahk), which throws on a key it does not name.
 ; @returns {Array} One Map per Windows key, in catalogue order.
 _TH_BuildKeyDefs() {
 	global _SharedDir

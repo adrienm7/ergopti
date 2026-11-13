@@ -63,7 +63,7 @@ local function with_fixture(seal_result, body)
 	package.loaded["core.timing.engine.timings"] = previous_timings
 	if not loaded_ok then error(expander_or_err, 0) end
 	local expander = expander_or_err
-	local text_sender = require("adapters.text_sender")
+	local text_sender = require("platform.input.text_sender")
 	local terminator_replay = require("modules.keymap.terminator_replay")
 	local target = { id = "terminal-app" }
 
@@ -183,7 +183,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 
 	helpers.it("acquires terminator replay before committing a paced terminal replacement", function()
 		local expander, synthetic = SyntheticStack.load("modules.keymap.expander")
-		local text_sender = require("adapters.text_sender")
+		local text_sender = require("platform.input.text_sender")
 		local timer_scheduler = require("core.events.timer_scheduler")
 		local terminator_replay = require("modules.keymap.terminator_replay")
 		local target = { id = "terminal-app" }
@@ -339,7 +339,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 			eventtap = event_hs.eventtap,
 		})
 		package.loaded["modules.keystats"] = previous_keystats
-		local text_sender = require("adapters.text_sender")
+		local text_sender = require("platform.input.text_sender")
 		local replay = require("modules.keymap.terminator_replay")
 		local original_target = text_sender.terminalInputTarget
 		local original_prepare = synthetic.prepare_collected_paced

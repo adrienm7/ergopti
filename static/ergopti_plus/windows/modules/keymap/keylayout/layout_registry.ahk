@@ -562,7 +562,7 @@ LayoutRegistry_ActiveLayoutExtension(SelectedId, ErgoptiBase, ErgoptiId, ReadIns
 
 /**
  * The scan code of the key that types a character on the OS layout, probed with
- * no modifier through ToUnicodeEx (adapters/key_state.ahk). VkKeyScanExW is not
+ * no modifier through ToUnicodeEx (platform/input/key_state.ahk). VkKeyScanExW is not
  * used: it fails on layouts such as bépo where the character sits behind a
  * driver-level remapping the API cannot see.
  * @param {Integer} Hkl - Keyboard layout handle, 0 when none could be read.
