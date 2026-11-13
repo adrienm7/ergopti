@@ -45,10 +45,10 @@ local helpers, Sandbox, Codec, load_over_config, drop_config, chord =
 --- @param body function
 --- @return any The body's result.
 local function with_marked_translations(body)
-	local saved = package.loaded["infra.i18n"]
-	package.loaded["infra.i18n"] = { get = function(key) return "<" .. key .. ">" end }
+	local saved = package.loaded["core.i18n.engine.i18n"]
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return "<" .. key .. ">" end }
 	local ok, result = pcall(body)
-	package.loaded["infra.i18n"] = saved
+	package.loaded["core.i18n.engine.i18n"] = saved
 	if not ok then error(result, 0) end
 	return result
 end
@@ -595,7 +595,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		with_editor(nil, function(shortcuts, config, state)
 			local changed = 0
 			local builder = helpers.load_module("ui.menu.builder")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local function contextual(items)
 				for _, row in ipairs(items or {}) do
 					if row.title == i18n.get("menu.shortcuts.group_contextual") then return row end

@@ -103,7 +103,7 @@ for (const name of names) {
 	assert.notDeepEqual(corrupted, expected, 'the pixel comparison detects a changed asset');
 }
 const driver = fs.readFileSync(
-	path.join(root, 'static/ergopti_plus/windows/infra/i18n.ahk'),
+	path.join(root, 'static/ergopti_plus/windows/core/i18n/engine/i18n.ahk'),
 	'utf8'
 );
 const iconBody = /\nI18nFlagIconPath\([^\n]*\) \{([\s\S]*?)\n\}/.exec(driver)?.[1];

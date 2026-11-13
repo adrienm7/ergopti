@@ -19,7 +19,7 @@ local ParentSource = require("menu.engine.frames.parent_source")
 local PhaseStats = require("infra.phase_stats")
 local Paths      = require("core.fs.engine.paths")
 local LOG        = "builder"
-local i18n       = require("infra.i18n")
+local i18n       = require("core.i18n.engine.i18n")
 local COMMAND    = require("settings.engine.keys").COMMAND
 -- The single reader of menu_manifest.json. See load_manifest below for why this
 -- module no longer has one of its own.

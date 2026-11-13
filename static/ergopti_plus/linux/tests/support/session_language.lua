@@ -4,7 +4,7 @@
 --- MODULE: Pinned Session Language (Linux tests)
 --- DESCRIPTION:
 --- A first run's interface language follows the session (LC_ALL, then
---- LC_MESSAGES, then LANG), as on Windows and macOS (infra/i18n.lua). The suite
+--- LC_MESSAGES, then LANG), as on Windows and macOS (core/i18n/engine/i18n.lua). The suite
 --- was written against the French catalogue, so the runner pins the language
 --- the test process reads to French, whatever the developer's or the CI
 --- runner's session says. Only this Lua process sees the pin: children keep the

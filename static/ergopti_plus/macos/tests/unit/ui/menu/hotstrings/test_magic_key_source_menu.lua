@@ -192,7 +192,7 @@ helpers.describe("magic key source menu: capturing a key", function()
 			helpers.assert_eq(Menu.capture(ctx), false, "one capture at a time")
 			local tap = world.taps[1]
 			helpers.assert_true(tap.running)
-			helpers.assert_eq(world.notices[1].body, require("infra.i18n").get("dialog.magic_key_source.prompt"),
+			helpers.assert_eq(world.notices[1].body, require("core.i18n.engine.i18n").get("dialog.magic_key_source.prompt"),
 				"the user is asked for a key")
 			helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), true, "the answering key never reaches an app")
 			helpers.assert_eq(tap.callback(key_down(KEYCODE_SPACE)), false, "every later key passes through")
@@ -232,7 +232,7 @@ helpers.describe("magic key source menu: capturing a key", function()
 			run_deferred(world)
 			helpers.assert_eq(#ctx.applied, 0)
 			helpers.assert_eq(world.notices[#world.notices].body,
-				require("infra.i18n").get("dialog.magic_key_source.not_a_candidate"))
+				require("core.i18n.engine.i18n").get("dialog.magic_key_source.not_a_candidate"))
 			helpers.assert_eq(world.notices[#world.notices].kind, "warning")
 		end)
 	end)
@@ -251,7 +251,7 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 			helpers.assert_eq(ctx.saves, 0)
 			helpers.assert_eq(ctx.applied, {})
 			helpers.assert_eq(ctx.state.magic_key_source, "auto")
-			local reason = require("infra.i18n").get(require("layouts.engine.layers.magic_key_source").TAP_CONFLICT_REASON)
+			local reason = require("core.i18n.engine.i18n").get(require("layouts.engine.layers.magic_key_source").TAP_CONFLICT_REASON)
 			helpers.assert_eq(world.notices[1].body, reason)
 			local row = nil
 			for _, candidate in ipairs(Menu.rows(ctx)[1].items) do
@@ -273,11 +273,11 @@ end)
 
 helpers.describe("magic key source: the actual declared native menu", function()
 	helpers.it("(magic-key-source) cold English and warm French use the real native renderer and retain capture and choice callbacks", function()
-		helpers.with_stub_scope({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
+		helpers.with_stub_scope({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
 			with_menu(function(_, world)
-				package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
-				local translations = require("infra.i18n")
-				local locale = require("infra.locale")
+				package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"] = nil, nil
+				local translations = require("core.i18n.engine.i18n")
+				local locale = require("core.i18n.engine.locale")
 				package.loaded["infra.manifest_menu"], package.loaded["ui.menu.magic_key_source_menu"] = nil, nil
 				local Menu = require("ui.menu.magic_key_source_menu")
 				local Source = require("modules.keymap.magic_key_source")

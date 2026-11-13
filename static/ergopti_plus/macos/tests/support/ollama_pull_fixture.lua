@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"core.fs.engine.dir",
 	"infra.notifications",
@@ -51,7 +51,7 @@ local function with_fixture(options, callback)
 	local terminate_mode = options.terminate_mode or "self"
 
 	local noop = function() end
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.logger"] = {
 		debug = noop,
 		start = noop,

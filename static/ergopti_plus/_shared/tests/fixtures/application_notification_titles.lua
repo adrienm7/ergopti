@@ -27,14 +27,14 @@ local M = {}
 --- @param bypass boolean|nil Causal control routes through the original generic port.
 function M.run(assert_eq, driver, compose, expected, bypass)
 	local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
-		"core.ui.engine.window_titles", "adapters.shell_runner", "infra.i18n", "infra.logger", "core.logger.engine.shim" }
+		"core.ui.engine.window_titles", "adapters.shell_runner", "core.i18n.engine.i18n", "infra.logger", "core.logger.engine.shim" }
 	local previous, previous_hs = {}, _G.hs
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local commands, notes, native_mode = {}, {}, "accept"
 	local native_callback
 	local logger = { info = function() end, warn = function() end, error = function() end }
 	package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		return key == "common.warning" and "Warning" or "Error"
 	end }
 	package.loaded["core.ui.engine.window_titles"] = { compose = compose }

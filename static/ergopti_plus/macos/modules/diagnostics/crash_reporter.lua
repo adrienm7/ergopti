@@ -38,7 +38,7 @@ local M = {}
 local Logger = require("infra.logger")
 local CrashReport = require("diagnostics.engine.reports.crash_report")
 local NativePath = require("core.fs.engine.native_path")
-local i18n   = require("infra.i18n")
+local i18n   = require("core.i18n.engine.i18n")
 
 local LOG = "crash_reporter"
 

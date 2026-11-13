@@ -92,7 +92,7 @@ local function load_subject()
 		end,
 		has_pending_screenshot_action = function() return false end,
 	}
-	package.loaded["infra.i18n"] = {get = function(key) return key end}
+	package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts.bindings"] = nil
 

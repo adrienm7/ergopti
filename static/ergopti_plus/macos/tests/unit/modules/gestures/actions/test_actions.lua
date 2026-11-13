@@ -177,7 +177,7 @@ helpers.describe("gestures.actions: get_label", function()
 
 	-- An id from another OS has no conventional key: a probe, not a raw key shown.
 	helpers.it("probes the conventional keys of an undeclared id (i18n-miss-warned)", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local saved, asked = i18n.get, {}
 		i18n.get = function(key) asked[#asked + 1] = key; return saved(key) end
 		local ok, err = pcall(Actions.get_label, "totally_not_a_real_id")
@@ -189,7 +189,7 @@ helpers.describe("gestures.actions: get_label", function()
 	-- 2026-11-03: the chords read the catalogue's English names (« Shift »,
 	-- « Enter ») in every locale; each key is now named in the user's language.
 	helpers.it("names shared modifier chords in the user's language", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 		local french = assert(require("core.fs.adapters.json_codec").decode(assert(file:read("*a"))))
 		file:close()
@@ -217,7 +217,7 @@ helpers.describe("gestures.actions: get_label", function()
 		-- Headings are built from locale keys; test_action_catalogue_parity.lua
 		-- renders them in two real locales. Here: the H1 comes from its key and
 		-- every chord block opens under a level-2 group heading.
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_true(contains(Actions.SG_NAMES,
 			"#" .. i18n.get("sg_actions.sg_order.header.modifier_chords")))
 		local groups = 0

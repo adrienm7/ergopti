@@ -295,7 +295,7 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,

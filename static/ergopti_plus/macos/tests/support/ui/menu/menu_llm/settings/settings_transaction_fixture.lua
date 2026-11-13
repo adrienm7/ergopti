@@ -38,7 +38,7 @@ local MODULES = {
 	"modules.llm.ollama_deps_checker",
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.dialog_util",
 	"ui.menu.shortcut_utils",
 	"infra.app_picker",
@@ -317,7 +317,7 @@ local function with_fixture(options, callback)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 		return options.translate and options.translate(key) or require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
 	end
-	package.loaded["infra.i18n"] = {get = fixture_caption, section = fixture_caption}
+	package.loaded["core.i18n.engine.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function()

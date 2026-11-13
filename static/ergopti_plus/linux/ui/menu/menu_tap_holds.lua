@@ -38,7 +38,7 @@ end
 local function _tap_hold_action_label(action, gestures)
 	if type(action) ~= "string" or action == "" then return i18n_safe("tap_hold.tap.none") end
 	-- Probed: an action the gestures manager labels has no sg_actions key.
-	local ok_i18n, I18n = pcall(require, "infra.i18n")
+	local ok_i18n, I18n = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n and type(I18n.has) == "function" and I18n.has("sg_actions." .. action) then
 		return i18n_safe("sg_actions." .. action)
 	end

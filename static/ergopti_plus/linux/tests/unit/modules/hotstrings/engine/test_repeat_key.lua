@@ -226,7 +226,7 @@ helpers.describe("repeat key menu persistence", function()
 					is_group_enabled = function() return true end, is_section_enabled = function() return true end } })
 				local function find(items)
 					for _, row in ipairs(items or {}) do
-						if row.title == require("infra.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
+						if row.title == require("core.i18n.engine.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
 						local nested = find(row.menu); if nested then return nested end
 					end
 				end
@@ -342,7 +342,7 @@ helpers.describe("repeat key menu persistence", function()
 				is_section_enabled = function() return true end } })
 			local function find(items)
 				for _, row in ipairs(items or {}) do
-					if row.title == require("infra.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
+					if row.title == require("core.i18n.engine.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
 					local nested = find(row.menu); if nested then return nested end
 				end
 			end
@@ -384,7 +384,7 @@ helpers.describe("repeat key menu persistence", function()
 					on_menu_changed = function() changes = changes + 1 end })
 				local function find(items)
 					for _, row in ipairs(items or {}) do
-						if row.title == require("infra.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
+						if row.title == require("core.i18n.engine.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
 						local nested = find(row.menu); if nested then return nested end
 					end
 				end

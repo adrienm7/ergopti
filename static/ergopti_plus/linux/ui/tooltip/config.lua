@@ -190,7 +190,7 @@ function M.llm_line()
 	-- by the shared key name table in the active language (« Ctrl+Maj+3 »).
 	local shortcut_spec = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
 		require_key("llm_ui", "shortcut_joiner_linux"), function(name)
-			return KeyNames.label(name, "linux", require("infra.i18n").get)
+			return KeyNames.label(name, "linux", require("core.i18n.engine.i18n").get)
 		end)
 	if not shortcut_spec then
 		error("[llm_ui].shortcut_modifier_order and shortcut_joiner_linux must declare the shortcut column")

@@ -66,7 +66,7 @@ end
 --- The unit under the number, in the user's language.
 --- @return string
 function M.unit_label()
-	return require("infra.i18n").get("menu.metrics.wpm_unit")
+	return require("core.i18n.engine.i18n").get("menu.metrics.wpm_unit")
 end
 
 

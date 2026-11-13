@@ -47,8 +47,8 @@ local DEFAULT_DEPS = {
 	exepath = function() return require("luv").exepath() end,
 	driver_root = function() return require("core.fs.engine.paths").driver_root() end,
 	locales_dir = function() return require("core.fs.engine.paths").shared("core/i18n/data/locales") end,
-	locale = function() return require("infra.i18n").get_locale() end,
-	text = function(key) return require("infra.i18n").get(key) end,
+	locale = function() return require("core.i18n.engine.i18n").get_locale() end,
+	text = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	getenv = os.getenv,
 	data_home = function() return require("infra.config_paths").data_home() end,
 	-- `environment` overrides the daemon's own variables of the same name.

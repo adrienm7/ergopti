@@ -16,9 +16,9 @@ local CAPTIONS = {
 }
 
 local function english_captions()
-	return helpers.with_fresh_modules({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "core.fs.engine.paths" }, function()
-		local native = require("infra.i18n")
-		local locale = require("infra.locale")
+	return helpers.with_fresh_modules({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths" }, function()
+		local native = require("core.i18n.engine.i18n")
+		local locale = require("core.i18n.engine.locale")
 		local paths = require("core.fs.engine.paths")
 		local fh = assert(io.open(paths.shared("core/i18n/data/locales/en.json"), "r"), "actual English caption file unavailable")
 		local raw = fh:read("*a")

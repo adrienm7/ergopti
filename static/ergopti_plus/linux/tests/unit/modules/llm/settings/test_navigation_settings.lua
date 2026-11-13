@@ -116,7 +116,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
 		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder", "core.fs.adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "infra.i18n" }
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder", "core.fs.adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "core.i18n.engine.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
 			local notices, changed, refused_publications = 0, 0, 0
@@ -129,11 +129,11 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					enabled = function() return false end,
 					command_available = function() return true end,
 				}
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				if type(variant) == "table" and type(variant.translate) == "function" then
 					local localized = {}; for key, value in pairs(i18n) do localized[key] = value end
 					localized.get = variant.translate
-					package.loaded["infra.i18n"], i18n = localized, localized
+					package.loaded["core.i18n.engine.i18n"], i18n = localized, localized
 				end
 				local native_menu = assert(require("menu.engine.renderer").new({
 					platform = "linux", manifest_path = function() return helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json" end,

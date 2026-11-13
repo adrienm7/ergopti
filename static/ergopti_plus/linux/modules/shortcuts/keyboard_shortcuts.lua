@@ -94,7 +94,7 @@ local MOD_LABELS = {
 --- @param name string "ctrl", "shift", "alt", "meta", "space"…
 --- @return string
 local function key_name(name)
-	return KeyNames.label(name, "linux", require("infra.i18n").get)
+	return KeyNames.label(name, "linux", require("core.i18n.engine.i18n").get)
 end
 
 -- The slot suffix of a key the hook reports by the character it types.
@@ -128,7 +128,7 @@ M.SLOT_GROUPS = {
 --- @param group table An entry of M.SLOT_GROUPS.
 --- @return string
 function M.get_group_label(group)
-	local translate = require("infra.i18n").get
+	local translate = require("core.i18n.engine.i18n").get
 	if group.add_key == nil then return translate(group.group_key) end
 	local modifiers = KeyNames.modifiers_label(SlotRoles.family_modifiers("linux", group.prefix), "linux", translate)
 	return KeyNames.fill(group.group_key, modifiers, translate)
@@ -298,7 +298,7 @@ end
 function M.get_slot_label(slot_id, reason)
 	if slot_id == MagicEditor.SLOT_ID then
 		local label = key_name("meta") .. " + " .. require("modules.hotstrings.magic_key").get()
-		if reason then label = label .. " (" .. require("infra.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
+		if reason then label = label .. " (" .. require("core.i18n.engine.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
 		return label
 	end
 	local physical = M.physical_slot_descriptor(slot_id)
@@ -307,7 +307,7 @@ function M.get_slot_label(slot_id, reason)
 		for _, name in ipairs(PhysicalSlots.modifiers()) do
 			if physical.mods[name] then parts[#parts + 1] = key_name(name) end
 		end
-		parts[#parts + 1] = KeyNames.physical_label(physical.code, "linux", require("infra.i18n").get)
+		parts[#parts + 1] = KeyNames.physical_label(physical.code, "linux", require("core.i18n.engine.i18n").get)
 		return table.concat(parts, " + ")
 	end
 	local mods, suffix = split_slot(slot_id)

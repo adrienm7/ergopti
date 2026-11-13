@@ -80,7 +80,7 @@ local function load_real_model_switch_owner(options)
 		set_llm_display_model_name = function() return true end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 	package.loaded["infra.notifications"] = { notify = function() return true end }
 	package.loaded["ui.menu.menu_llm.profile_label"] = {

@@ -198,7 +198,7 @@ helpers.describe("Linux global scope: the Configuration row", function()
 		}
 		package.loaded["ui.menu.builder"] = nil
 		local items = require("ui.menu.builder").build(ctx)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, item in ipairs(items) do
 			if item.title == i18n.get("menu.configuration.title") then
 				for _, row in ipairs(item.menu or {}) do
@@ -315,7 +315,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 					if command:find("dialog_host.lua", 1, true) then asked = asked + 1; return 1 end
 					return execute(command)
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local items = require("ui.menu.builder").build({ _version = "test", on_quit = function() end,
 					is_paused = function() return false end, tap_holds = Manager })
 				local rows

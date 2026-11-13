@@ -92,7 +92,7 @@ end)
 local function expected_prompt(world, source)
 	return Agent.system2_prompt(world.config, {
 		source = source, app = world.window.app, window = world.window.title, now = "2026-09-29T14:05",
-		weekday = "Tuesday", timezone = "Europe/Paris", language = require("infra.i18n").get_locale(),
+		weekday = "Tuesday", timezone = "Europe/Paris", language = require("core.i18n.engine.i18n").get_locale(),
 		tools = world.tools,
 	})
 end

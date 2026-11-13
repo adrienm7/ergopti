@@ -14,7 +14,7 @@ local script_prefix = require("modules.shortcuts.script_control").BINDING_PREFIX
 local names = {
 	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
-	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
+	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
 	"core.fs.engine.paths", "menu.engine.renderer",
 }
@@ -55,7 +55,7 @@ helpers.describe("configured shortcut row labels", function()
 				}
 				package.loaded["modules.shortcuts.bindings"] = {}
 				package.loaded["modules.shortcuts.actions.text"] = {}
-				package.loaded["infra.i18n"] = {
+				package.loaded["core.i18n.engine.i18n"] = {
 					get = function(key)
 						return key:find("right_opt", 1, true) and "%s"
 							or helpers.I18N_PLACEHOLDER_FORMATS[key] or key
@@ -126,7 +126,7 @@ helpers.describe("real script-action catalogue projection", function()
 			end
 			local expected = read("tests/corpus/menus/script_action_original_catalogue_projection.json").locales[language].rows
 			local dictionary = read("core/i18n/data/locales/" .. language .. ".json")
-			local translator = package.loaded["infra.i18n"]
+			local translator = package.loaded["core.i18n.engine.i18n"]
 			translator.get = function(key) return dictionary[key] or key end
 			translator.format = function(key, ...)
 				local result, args = translator.get(key), table.pack(...)

@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-local ExtensionTranslator = require("infra.i18n")
+local ExtensionTranslator = require("core.i18n.engine.i18n")
 local shipped = require("core.text.engine.toml_codec.codec").decode(require("tests.support.source_file").read(
 	helpers.driver_root() .. "../../layouts/registry/ergopti/manifest.toml")).extension
 
@@ -37,7 +37,7 @@ end
 helpers.describe("Hotstrings menu: extension submenus", function()
 	helpers.it("renders the shipped Ergopti+ name in the actual tray tree", CaptionFixture.scoped(function()
 		helpers.load_with_stubs("ui.menu.builder")
-		CaptionFixture.install(require("infra.i18n"))
+		CaptionFixture.install(require("core.i18n.engine.i18n"))
 		package.loaded["ui.menu.builder"] = nil
 		local Builder = require("ui.menu.builder")
 		local Hotstrings = require("ui.menu.menu_hotstrings")
@@ -52,7 +52,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 		}
 		local actions = setmetatable({}, { __index = function() return function() end end })
 		local tree = Builder.generate(ctx, { hotstrings = Hotstrings }, actions)
-		local expected = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
+		local expected = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
 				if type(row.title) == "string" and row.title:sub(1, #expected) == expected then return row end
@@ -143,7 +143,7 @@ local function with_extension_frame(body, paused)
 	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu", "ui.menu.builder",
 		"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }, function()
 		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.i18n"] = translator
+		package.loaded["core.i18n.engine.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
@@ -227,7 +227,7 @@ helpers.describe("complete installed extension shared frames (macOS)", function(
 		end)
 	end)
 	helpers.it("(shared-extension-frame) restores genuine owners after a raised native-provider scenario", function()
-		local names = { "infra.i18n", "infra.manifest_menu", "core.fs.engine.paths", "ui.menu.builder",
+		local names = { "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.paths", "ui.menu.builder",
 			"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local previous_hs = rawget(_G, "hs")

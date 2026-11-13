@@ -342,13 +342,13 @@ end
 --- The locale string the prompts receive for {language}.
 --- @return string
 local function language()
-	return require("infra.i18n").get_locale()
+	return require("core.i18n.engine.i18n").get_locale()
 end
 
 --- @param key string
 --- @return string
 local function notice(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 --- The candidate texts on offer.

@@ -33,7 +33,7 @@ local function with_editor(scenario)
 				records.errors[#records.errors + 1] = string.format(message, ...)
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, callback)
 			records.deferred[#records.deferred + 1] = callback

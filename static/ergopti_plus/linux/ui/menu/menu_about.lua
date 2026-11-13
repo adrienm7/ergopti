@@ -20,7 +20,7 @@ local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local separator_modules = package.loaded
 local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
-local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")
+local uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")
 local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
 
 local _fill = require("ui.menu.menu_dialogs")._fill
@@ -39,7 +39,7 @@ local function uninstall_caption_facade_current()
 		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
 		and type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory
 		and type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil
-		and rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n
+		and rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n
 		and type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get
 end
 

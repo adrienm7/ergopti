@@ -25,7 +25,7 @@ local function build_cmd_rows(bindings, state_shortcuts)
 		"ui.menu.menu_shortcuts", "infra.deferred_work", "core.fs.engine.dir",
 		"infra.dialog_util", "modules.shortcuts", "ui.menu.menu_utils",
 		"infra.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
-		"infra.manifest_reader", "infra.i18n",
+		"infra.manifest_reader", "core.i18n.engine.i18n",
 	}, function()
 		local text = package.loaded["modules.shortcuts.actions.text"]
 		text.WRAP_GROUPS = {}
@@ -36,7 +36,7 @@ local function build_cmd_rows(bindings, state_shortcuts)
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			decorate_section = function(value) return value end,
 			section = function(value) return value end,

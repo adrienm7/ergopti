@@ -17,7 +17,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 -- Stub lib.i18n: profiles.lua calls i18n.get() at module load time to
 -- decorate each built-in profile with its label. The real lib.i18n depends
 -- on hs.settings and locale JSON files that are unavailable in unit tests.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get        = function(key) return key end,
 	get_locale = function() return "fr" end,
 }

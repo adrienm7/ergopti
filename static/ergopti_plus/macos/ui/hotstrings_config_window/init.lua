@@ -35,7 +35,7 @@ local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
 local NumberPolicy      = require("core.text.engine.number_policy")
 local TomlReader        = require("infra.toml.reader")
 local FileSystem        = require("core.fs.adapters.file_system")
-local i18n              = require("infra.i18n")
+local i18n              = require("core.i18n.engine.i18n")
 local Paths            = require("core.fs.engine.paths")
 local PersonalFiles    = require("hotstrings.engine.catalogue.personal_files")
 

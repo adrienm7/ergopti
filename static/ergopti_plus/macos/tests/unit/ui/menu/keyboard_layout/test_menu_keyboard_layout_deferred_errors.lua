@@ -13,7 +13,7 @@ local OWNERS = {
 	"core.events.timer_scheduler", "infra.deferred_work", "infra.logger",
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
 	"ui.menu.menu_keyboard_layout", "infra.manifest_menu",
-	"infra.notifications", "infra.i18n",
+	"infra.notifications", "core.i18n.engine.i18n",
 }
 
 --- Exercises one real rendered action through both retained continuations.
@@ -54,7 +54,7 @@ local function exercise_failure(site)
 		local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 		local labels = assert(Json.decode(assert(file:read("*a"))))
 		assert(file:close())
-		require("infra.i18n").get = function(key) return labels[key] or key end
+		require("core.i18n.engine.i18n").get = function(key) return labels[key] or key end
 		local renderer = require("infra.manifest_menu")
 		package.loaded["infra.manifest_menu"] = {
 			template_rows = renderer.template_rows,

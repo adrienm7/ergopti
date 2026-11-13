@@ -150,9 +150,9 @@ for _, rel in ipairs(REQUIRED_SHARED_FILES) do
 	end
 end
 
-local ok_i18n, i18n = pcall(require, "infra.i18n")
+local ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 if not ok_i18n then
-	fail("infra.i18n could not be loaded: %s", tostring(i18n))
+	fail("core.i18n.engine.i18n could not be loaded: %s", tostring(i18n))
 else
 	local ok_list, locales = pcall(i18n.list_locales)
 	if not ok_list or type(locales) ~= "table" then

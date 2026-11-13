@@ -104,14 +104,14 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 			local template = strings["dialog.gestures.param_title"]
 			local first = assert(template:find("{1}", 1, true))
 			local expected = template:sub(1, first - 1) .. label .. template:sub(first + 3)
-			helpers.with_stub_scope({ "ui.menu.shortcut_utils", "infra.dialog_util", "infra.i18n", "core.ui.engine.window_titles" }, function()
+			helpers.with_stub_scope({ "ui.menu.shortcut_utils", "infra.dialog_util", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }, function()
 				local scripts = {}
 				helpers.load_with_stubs("infra.dialog_util", { osascript = { applescript = function(script)
 					scripts[#scripts + 1] = script
 					return true, nil, ""
 				end } })
 				local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
-				package.loaded["infra.i18n"].get = function(key) return strings[key] or key end
+				package.loaded["core.i18n.engine.i18n"].get = function(key) return strings[key] or key end
 				local stored = {}
 				local owner = facade(stored)
 				owner.get_action_label = function() return label end

@@ -769,7 +769,7 @@ local function perform(session, action, state, context)
 		return { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
+				require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
 	end
 	if action.action == "day_log" then
 		-- Opt-in: ticking collects and redacts today's log; unticking drops it
@@ -914,7 +914,7 @@ function M.open()
 		Logger.error(LOG, "The open diagnostics window could not be replaced.")
 		return false
 	end
-	return manager.show("healthcheck", require("infra.i18n").get_locale())
+	return manager.show("healthcheck", require("core.i18n.engine.i18n").get_locale())
 end
 
 return M

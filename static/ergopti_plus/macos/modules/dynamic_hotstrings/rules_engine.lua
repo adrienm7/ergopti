@@ -32,7 +32,7 @@ local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local LOG    = "dynamic_hotstrings.rules"
 
-local ok_locale, locale = pcall(require, "infra.locale")
+local ok_locale, locale = pcall(require, "core.i18n.engine.locale")
 if not ok_locale then locale = nil end
 
 

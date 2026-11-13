@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PersonalTranslator = require("infra.i18n")
+local PersonalTranslator = require("core.i18n.engine.i18n")
 local SectionBackups = require("tests.support.section_settings_backups")
 
 --- Owns one genuine renderer and the native context supplied by the tray.
@@ -35,9 +35,9 @@ local function with_personal_frame(body, options)
 			return previous_getenv(name)
 		end
 		local paths = require("infra.config_paths"); assert(paths.init(scratch .. "/") == true)
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }

@@ -998,7 +998,7 @@ M.RULE_FAMILIES = RULE_FAMILIES
 --- @return string
 local function _family_label(family)
 	local key = family.i18n
-	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	local ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 	local label = ok_i18n and i18n and i18n.get(key) or key
 
 	-- The published date field names the same engine value the rule inserts.

@@ -15,7 +15,7 @@ local with_delivery = fixture.with_delivery
 --- Makes the fixture's i18n locale-aware: get() returns "<locale>:<key>".
 --- @return table i18n The patched stub.
 local function locale_aware_i18n()
-	local i18n = package.loaded["infra.i18n"]
+	local i18n = package.loaded["core.i18n.engine.i18n"]
 	local current = "en"
 	i18n.get_locale = function() return current end
 	i18n.set_locale_no_reload = function(code) current = code; return true end

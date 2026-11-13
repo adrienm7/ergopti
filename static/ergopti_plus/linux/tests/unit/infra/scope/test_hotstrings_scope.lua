@@ -422,7 +422,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					local action
 					for _, item in ipairs(menu) do
 						for _, row in ipairs(item.menu or {}) do
-							if action == nil and row.title == require("infra.i18n").get(key) then action = row.fn end
+							if action == nil and row.title == require("core.i18n.engine.i18n").get(key) then action = row.fn end
 						end
 					end
 					helpers.assert_eq(type(action), "function", "the hotstrings row is registered")
@@ -451,7 +451,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					if command:find("dialog_host.lua' --question", 1, true) then return 0 end
 					return execute(command)
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local menu = require("ui.menu.builder").build({ config = c.Config, paused = false,
 					is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 					tooltip_preview = c.preview_port })

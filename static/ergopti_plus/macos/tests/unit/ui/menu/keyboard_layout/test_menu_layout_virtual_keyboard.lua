@@ -20,7 +20,7 @@ local ROW = "menu.layout.virtual_keyboard"
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
 	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-	local ManifestMenu = LayoutFixture.install(require("infra.i18n"))
+	local ManifestMenu = LayoutFixture.install(require("core.i18n.engine.i18n"))
 	local item = layout.build(ctx)
 	local row = ManifestMenu.render_rows({ item }, "top_level")[1]
 	helpers.assert_true(type(row) == "table" and type(row.menu) == "table", "the layout submenu must render")
