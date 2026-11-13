@@ -47,9 +47,9 @@ editor modules with their native stubs.
 
 ## Left
 
-- The macOS prompt editor's refused save: no user notice was found on the
-  prompt editor or profile edit path (`profiles_manager.lua`
-  `replace_profile`); Windows notifies through `_LLM_Menu_ProfileNotifyFailure`
-  and Linux through `notify_save_refused`. To trace through `deps.save_prefs`
-  before changing it.
+- Done 2026-11-13 (worker H): the macOS prompt editor tells a refused or
+  raising save with `prompt_editor.save_failed`, as deferred work after the
+  page's callback, and stays open, as Windows (`_LLM_Menu_ProfileNotifyFailure`)
+  and Linux (`notify_save_refused`) do. Regression
+  `(prompt-editor-save-failure)` in `test_prompt_editor_native_boundaries`.
 - The layer editor page behaviour, `ui/tooltip` and `ui/wpm`.

@@ -51,3 +51,11 @@ plus the Lua menu suites; no tray was rendered natively.
 - The Windows rebuild triggers for the asynchronous user hotstring load, the
   agent and the updater were read but their Lua counterparts not traced end to
   end; native tray rendering and receiving are unqualified.
+- Traced 2026-11-13 (worker H), agent and updater: the Linux and macOS
+  updaters rebuild the tray when a release is announced (both `on_available`
+  callbacks). An agent mode switched by the `llm_agent_auto_toggle` binding
+  left the Linux tray's agent rows stale, where Windows rebuilds after the
+  commit (`LLM_Agent_RefreshTray`) and macOS refreshes through
+  `apply_setting_transaction`: fixed, the engine's `on_agent_mode_change`
+  observer rebuilds the tray (regression in `test_agent_auto`,
+  agent-mode-tray-redraw). Left: the user hotstring load.
