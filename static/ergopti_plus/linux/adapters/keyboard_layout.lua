@@ -52,6 +52,7 @@ local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
+local Timings = require("infra.timings")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 local LOG = "adapters.keyboard_layout"
@@ -70,7 +71,12 @@ local LOG = "adapters.keyboard_layout"
 --     Every LTS distribution shipped such a libxkbcommon when this was written
 --     (Ubuntu 24.04: 1.6), and without these two fallbacks the daemon refused
 --     the keyboard and exited on their default Wayland session.
-local WAYLAND_DUMP = "xkbcli dump-keymap-wayland 2>/dev/null"
+-- Bounded: the dump waits for a wl_keyboard keymap event, which a seat with no
+-- keyboard never sends, and an unbounded wait hung the daemon's start-up
+-- (libxkbcommon 1.13, sway headless). `timeout` takes whole seconds everywhere,
+-- BusyBox included.
+local WAYLAND_DUMP = string.format("timeout %d xkbcli dump-keymap-wayland 2>/dev/null",
+	math.ceil(Timings.ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000))
 local X11_DUMP     = "xkbcli dump-keymap-x11 2>/dev/null"
 local X11_FALLBACK = "xkbcomp -xkb \"$DISPLAY\" - 2>/dev/null"
 -- The log name of the in-process X11 dump (adapters/xkb_source_probe.dump_keymap).
