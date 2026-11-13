@@ -315,7 +315,7 @@ LegacyFolderParseAssignment(Line) {
 ; folder went; "new" by default). The comparison ignores case, as Windows paths
 ; do, and the result keeps the separator style of the value.
 ; @param Value {String} Current value, decoded.
-; @param Rule {Map} "old" (Array), "new" and an optional "under".
+; @param Rule {Map} "old" (Array), "new" and the optional "under" and "renamed".
 ; @returns {String}
 LegacyFolderRebased(Value, Rule) {
 		if (Value == "")
@@ -338,6 +338,13 @@ LegacyFolderRebased(Value, Rule) {
 						break
 				}
 		}
+		; A custom folder named like the old one becomes its parent's folder named
+		; after the application (renamed_folder of the Lua core).
+		if (New == "" && Rule.Has("renamed")) {
+				Folder := LegacyFolderRenamedFolder(Current, Rule["renamed"])
+				if (Folder != "")
+						New := Folder . Trailing
+		}
 		if (New == "")
 				return ""
 		; Keep the separator style of the value; the string spelling doubles a
@@ -345,6 +352,73 @@ LegacyFolderRebased(Value, Rule) {
 		if InStr(Value, "/")
 				New := StrReplace(New, "\", "/")
 		return New
+}
+
+; The folder a custom locator names in place of Renamed["from"]: the same
+; parent, with the folder named Renamed["to"]. Only a folder whose last name is
+; the old one is renamed, or its Renamed["to"] subfolder (the logger appends one
+; to a folder not named after the application); any other folder is kept.
+; Mirrors renamed_folder of _shared/settings/engine/migration/legacy_folder_migration_core.lua,
+; ignoring case as Windows paths do.
+; @param Folder {String} Normalized folder, without a trailing separator.
+; @param Renamed {Map} "from" and "to" folder names.
+; @returns {String} The new folder, or "" when the rule does not name it.
+LegacyFolderRenamedFolder(Folder, Renamed) {
+		SplitPath(Folder, &Leaf, &Parent)
+		if (Leaf = Renamed["to"])
+				SplitPath(Parent, &Leaf, &Parent)
+		if (Leaf != Renamed["from"] || Parent == "")
+				return ""
+		return Parent . "\" . Renamed["to"]
+}
+
+; The value of one paths.toml key, or "" when no line assigns it. Mirrors
+; paths_value of the Lua core.
+; @param Text {String} paths.toml content.
+; @param Key {String}
+; @returns {String}
+LegacyFolderPathsValue(Text, Key) {
+		for Line in StrSplit(Text, "`n") {
+				Parts := LegacyFolderParseAssignment(Line)
+				if (Parts is Map) && Parts["key"] == Key
+						return Parts["value"]
+		}
+		return ""
+}
+
+; The custom logs folder named like the old application folder that a
+; LogsDirPath names, or "" (custom_legacy_logs of the macOS migration). The old
+; default LocalAppData folder is not custom: it merges into the root.
+; @param Value {String} The LogsDirPath value.
+; @param LegacyLocal {String} The old LocalAppData folder.
+; @returns {String} The old-named folder, without a trailing separator.
+LegacyFolderCustomLegacyLogs(Value, LegacyLocal) {
+		Folder := LegacyFolderNormalize(Value)
+		if (Folder == "" || !LoggerIsAbsoluteFolder(Folder))
+				return ""
+		SplitPath(Folder, &Leaf, &Parent)
+		if (Leaf = AppDirsFolderName()) {
+				Folder := Parent
+				SplitPath(Folder, &Leaf)
+		}
+		if (Leaf != AppDirsMigrationWindowsLegacyLocalFolder() || Folder = LegacyFolderNormalize(LegacyLocal))
+				return ""
+		return Folder
+}
+
+; The merge of a custom old-named logs folder: the logger wrote into its
+; application-named subfolder, whose entries move to the renamed folder; the
+; entries of the custom folder itself are the user's and stay.
+; @param Custom {String} Folder from LegacyFolderCustomLegacyLogs.
+; @param Backup {String} The migration backup folder of the root.
+; @returns {Map} "from", "to" and "backup" folders.
+LegacyFolderCustomLogsStep(Custom, Backup) {
+		SplitPath(Custom, , &Parent)
+		; The backup keeps the custom folder's path below it, its drive colon and
+		; share prefix dropped.
+		Below := RegExReplace(RegExReplace(Custom, "^\\+", ""), "^([A-Za-z]):", "$1")
+		return Map("from", Custom . "\" . AppDirsFolderName(), "to", Parent . "\" . AppDirsFolderName(),
+				"backup", Backup . "\custom-logs\" . Below . "\" . AppDirsFolderName())
 }
 
 ; Rewrites the paths.toml lines whose value is an old default folder or a
@@ -464,7 +538,10 @@ LegacyFolderSettleRewrites(Rules, Report) {
 								continue
 						if (Kind == "moved" || Kind == "backed_up") {
 								; A folder chosen below the old one is where its ancestor went.
-								Settled.Push(Map("key", Rule["key"], "old", Rule["old"], "new", Rule["new"], "under", Row["to"]))
+								Moved := Map("key", Rule["key"], "old", Rule["old"], "new", Rule["new"], "under", Row["to"])
+								if Rule.Has("renamed")
+										Moved["renamed"] := Rule["renamed"]
+								Settled.Push(Moved)
 								continue
 						}
 				}
@@ -550,6 +627,20 @@ LegacyFolderMigrationRun(PathsFile) {
 				Map("key", AppDirsLogsOverrideKey(), "old", [LegacyLocal . "\logs"], "new", RTrim(LoggerDefaultLogsDir(), "\"),
 						"source", LegacyLocal . "\logs")
 		]
+		; A custom logs folder named like the old application folder is renamed
+		; after the new one, as on macOS and Linux (the shared « renamed » rule).
+		Custom := ""
+		if FileExist(PathsFile) {
+				try Custom := LegacyFolderCustomLegacyLogs(
+						LegacyFolderPathsValue(FSReadStrict(PathsFile), AppDirsLogsOverrideKey()), LegacyLocal)
+		}
+		if (Custom != "") {
+				Step := LegacyFolderCustomLogsStep(Custom, Backup)
+				LegacyFolderMergeEntries(Step["from"], Step["to"], Step["backup"], Report)
+				Rules.Push(Map("key", AppDirsLogsOverrideKey(), "old", [],
+						"renamed", Map("from", AppDirsMigrationWindowsLegacyLocalFolder(), "to", AppDirsFolderName()),
+						"source", Step["from"]))
+		}
 		LegacyFolderPublishPathsFile(PathsFile, Rules, Report)
 		LegacyFolderLogReport(Report)
 		return Report
