@@ -1068,5 +1068,38 @@
 				}
 			}
 		]
+	},
+	{
+		"id": "sticky_altgr",
+		"short_label": "Sticky AltGr",
+		"label": "📌 Sticky AltGr — one-shot, annulé après délai",
+		"holdable": false,
+		"category": "sticky_modifiers",
+		"karabiner_to": [
+			{
+				"sticky_modifier": {
+					"left_option": "toggle"
+				}
+			}
+		]
+	},
+	{
+		"id": "sticky_altgr_shift",
+		"short_label": "Sticky AltGr+Shift",
+		"label": "📌 Sticky AltGr+Shift — one-shot, annulé après délai",
+		"holdable": false,
+		"category": "sticky_combinations",
+		"karabiner_to": [
+			{
+				"sticky_modifier": {
+					"left_option": "toggle"
+				}
+			},
+			{
+				"sticky_modifier": {
+					"left_shift": "toggle"
+				}
+			}
+		]
 	}
 ]

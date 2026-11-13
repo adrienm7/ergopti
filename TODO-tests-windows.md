@@ -158,3 +158,7 @@ Account and tester actions (maintainer, from the PC):
       shift states 8, 9, 16 and 17 with F12 on `VK_KANA` and Caps Lock on `VK_OEM_FJ_ROYA`. Check that MSKLC's
       `kbdutool` builds it, and that with the DLL installed F12+B types « ka » and Caps Lock+A types ←. The
       repository KLC reader reads it back (`tools/test/test-layout-source-compiler.cjs`); MSKLC itself was not run.
+- [ ] One-shot modifiers (worker A, 2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the
+      one-shot Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level
+      on the Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold
+      AltGr types one AltGr character after a tap.

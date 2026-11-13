@@ -14,7 +14,9 @@
 ; @param {String} ActionId A sticky_* action id other than sticky_shift.
 ; @returns {Array} TextPressKey's modifier names.
 StickyModifierNames(ActionId) {
-	static Names := Map("cmd", "Win", "option", "Alt", "ctrl", "Ctrl", "shift", "Shift")
+	; altgr is the layout's AltGr level: TextPressKey sends it as the layout's
+	; own AltGr key, Kana on a Kana-style layout (KS_AltGrSendKey).
+	static Names := Map("cmd", "Win", "option", "Alt", "ctrl", "Ctrl", "shift", "Shift", "altgr", "AltGr")
 	if (ActionId == "sticky_hyper")
 		return ["Ctrl", "Alt", "Shift", "Win"]
 	Held := []
@@ -84,7 +86,11 @@ StickyModifier(ActionId) {
 			return false
 		; Preserve an original hold still down; only restore an endpoint modifier
 		; that was released before replay. TextPressKey retains its normal ABI.
-		if Restore
+		; sticky_altgr already holds AltGr: only a released endpoint AltGr is added.
+		HoldsAltGr := false
+		for Name in Held
+			HoldsAltGr := HoldsAltGr || (Name == "AltGr")
+		if Restore && !HoldsAltGr
 			Held.Push("AltGr")
 	}
 	Seen := Map()

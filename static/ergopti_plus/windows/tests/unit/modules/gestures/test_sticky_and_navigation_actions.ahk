@@ -4,7 +4,8 @@
 ; MODULE: Sticky and Navigation Actions
 ; DESCRIPTION:
 ; The catalogue rows Windows gained: Home, End, Page Up and Down, Alt+Escape and
-; the fourteen sticky combinations. Catalogue checks stay pure; native capture
+; the sixteen sticky combinations, AltGr and AltGr+Shift included (every one-shot
+; on every OS, decision of 2026-11-13). Catalogue checks stay pure; native capture
 ; probes confine synthetic keyboard delivery to a child-owned verified Edit.
 ; ==============================================================================
 
@@ -24,8 +25,8 @@ _SNA_Sticky() {
 		"sticky_option_shift", "Alt+Shift", "sticky_option_ctrl", "Alt+Ctrl", "sticky_ctrl_shift", "Ctrl+Shift",
 		"sticky_cmd_option_shift", "Win+Alt+Shift", "sticky_cmd_option_ctrl", "Win+Alt+Ctrl",
 		"sticky_cmd_shift_ctrl", "Win+Shift+Ctrl", "sticky_option_shift_ctrl", "Alt+Shift+Ctrl",
-		"sticky_hyper", "Ctrl+Alt+Shift+Win")
-	AssertEqual(14, Expected.Count)
+		"sticky_hyper", "Ctrl+Alt+Shift+Win", "sticky_altgr", "AltGr", "sticky_altgr_shift", "AltGr+Shift")
+	AssertEqual(16, Expected.Count)
 	for Id, Names in Expected {
 		AssertEqual(Names, _SNA_Names(Id), Id . " holds its modifiers")
 		AssertTrue(GESTURE_ACTIONS.Has(Id), Id . " has a handler")
