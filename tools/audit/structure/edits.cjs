@@ -192,6 +192,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: 'native_number.ahk\n\n\n\n\n\n; ===========================\n; ======'
 	},
 	{
+		// The neutral category's expected tail names the bundled hotstrings
+		// root by its last folder; S01 makes that root hotstrings/data/catalogue.
+		// No file has the tail, so no path rule can follow it.
+		file: 'static/ergopti_plus/windows/tests/unit/modules/hotstrings/catalogue/test_hotstring_language_packs.ahk',
+		moves: '_shared/modules/hotstrings/_index.toml',
+		from: 'AssertTrue(SubStr(Neutral, -StrLen("\\hotstrings\\autocorrection.toml")) == "\\hotstrings\\autocorrection.toml",',
+		to: 'AssertTrue(SubStr(Neutral, -StrLen("\\catalogue\\autocorrection.toml")) == "\\catalogue\\autocorrection.toml",'
+	},
+	{
 		// The ledger's family contracts leave one folder for two, and lose the
 		// name prefixes that told them from their neighbours there.
 		file: 'tools/test/test-contract-vector-ledger.cjs',
