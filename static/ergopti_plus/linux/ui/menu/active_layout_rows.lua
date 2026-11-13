@@ -9,13 +9,13 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One owner of the desktop's layouts: the input source adapter the pause
----    switch already holds (GNOME gsettings, the KDE keyboard daemon or
----    setxkbmap). Each build draws its last reading and asks for a fresh one;
+---    switch already holds (the Ergopti GNOME Shell extension, the KDE keyboard
+---    daemon or setxkbmap). Each build draws its last reading and asks for a fresh one;
 ---    the tray is rebuilt only when the desktop's list or active layout changed.
 --- 2. A desktop with no supported backend shows the declared status line, and
 ---    an empty list the shared « Open Keyboard Settings… » row.
 --- 3. A refused switch is told: the tick would otherwise stay on the old
----    layout with no reason given.
+---    layout with no reason given. GNOME without the extension names it.
 --- ==============================================================================
 
 local M = {}

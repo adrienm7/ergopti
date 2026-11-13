@@ -18,6 +18,9 @@ gestures in the terminal): coverage table, verdicts and what no run can test in
       COSMIC (2026-11-13): the log says « Listening for cosmic-comp focus reports on zcosmic_toplevel_info_v1
       version 2 » on a current cosmic-comp (1 on an older one) and the focused application follows the window; the
       v1, v2 and v2-without-list paths are proved only against the LuaJIT protocol fake.
+      GNOME layout switch (2026-11-13): on a real GNOME session after `install.sh` and a new login, Layout > « Input
+      sources » switches the layout through the Ergopti extension and the `sources` setting keeps its order; with the
+      extension turned off the menu names it.
 
 No machine is available. First `bash tools/dev/collect-linux-field-report.sh` on a real desktop: the field run
 without a click (53c1766514), the report marks, and `driver_reload` (one daemon restart under a real user manager).
@@ -77,3 +80,8 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
       output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
       CapsWord parity follow-ups).
+      GTK 3 Compose through IBus (2026-11-13): on a KDE or Xfce session with IBus installed and no input method, after
+      installing a Compose layout from the layout manager and logging in again, a GTK 3 application (mousepad, gedit)
+      types a multi-character Compose output, Layout shows « every sequence, through IBus », and the layout stays the
+      system's; with fcitx5 running the row names the input method and `~/.config/environment.d/90-ergopti-ibus.conf`
+      is absent.

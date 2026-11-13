@@ -297,6 +297,10 @@ local function _build_layouts(ctx)
 			switch = ctx.pause_layout,
 		})
 	end
+	-- How far GTK 3 applications compose the installed layouts' sequences.
+	providers["compose_input_method"] = function()
+		return require("ui.menu.compose_input_method_row").rows({ t = i18n_safe })
+	end
 	-- Input sources: the desktop's layouts, the active one ticked; choosing one
 	-- switches the desktop (ui/menu/active_layout_rows.lua), as macOS does.
 	providers["active_layouts"] = function()
