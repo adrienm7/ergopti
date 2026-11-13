@@ -62,6 +62,23 @@ local function run_guard(failure)
 	return ok, reason, facts
 end
 
+--- The number of roots the guard enumerates, read from its own SOURCE_ROOTS
+--- table: a structure step that adds a feature folder to the guard grows the
+--- inventory, and this count follows it instead of pinning a stale total.
+--- @return integer
+local function source_root_count()
+	local file = assert(io.open(helpers.driver_root() .. "tests/meta/boot/test_lua_sources_compile.lua", "rb"))
+	local source = assert(file:read("*a"))
+	assert(file:close())
+	local block = assert(source:match("\nlocal SOURCE_ROOTS = {\n(.-)\n}"), "the guard declares SOURCE_ROOTS")
+	local count = 0
+	for line in block:gmatch("[^\n]+") do
+		if line:match("^%s*[^%s%-].-,%s*$") then count = count + 1 end
+	end
+	assert(count > 0, "SOURCE_ROOTS lists no root")
+	return count
+end
+
 helpers.describe("compile inventory completion", function()
 	for _, failure in ipairs({ "open", "exit", "iteration", "close", "empty" }) do
 		helpers.it("(compile-inventory-completion) rejects a subtree's " .. failure .. " failure", function()
@@ -76,8 +93,9 @@ helpers.describe("compile inventory completion", function()
 	helpers.it("(compile-inventory-completion) admits complete nonempty production subtrees", function()
 		local ok, reason, facts = run_guard(nil)
 		helpers.assert_true(ok, tostring(reason))
-		helpers.assert_eq(facts.commands, 8)
-		helpers.assert_eq(facts.closes, 8)
-		helpers.assert_eq(facts.parsed, 10)
+		local roots = source_root_count()
+		helpers.assert_eq(facts.commands, roots)
+		helpers.assert_eq(facts.closes, roots)
+		helpers.assert_eq(facts.parsed, roots + 2, "every enumerated source plus the two entrypoints")
 	end)
 end)
