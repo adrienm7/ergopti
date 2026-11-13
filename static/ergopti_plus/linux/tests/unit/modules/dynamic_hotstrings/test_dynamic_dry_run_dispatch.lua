@@ -52,7 +52,7 @@ local function exercise(kind, dry_run, options)
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	for name in pairs(previous) do
 		if h.is_driver_module(name) or name == "core.logger.engine.shim"
-			or name == "hotstrings.engine.dynamic.core" or name:match("^dynamic_hotstrings%.") then package.loaded[name] = nil end
+			or name == "hotstrings.engine.dynamic.core" then package.loaded[name] = nil end
 	end
 	local directory = os.tmpname()
 	assert(os.remove(directory))
