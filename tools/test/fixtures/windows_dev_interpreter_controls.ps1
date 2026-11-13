@@ -91,13 +91,16 @@ $nativeWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
 if (($Mode -eq 'entry') -ne $nativeWindows) { throw 'Entry mode must match the real operating system.' }
 $fixture = Join-Path $Scratch ('clone space ' + [char]0xe9)
 $developer = Join-Path $fixture 'tools\dev'
-$shared = Join-Path $fixture 'static\ergopti_plus\_shared\data'
+# The clone holds the shared identifiers where the checkout does; their folder
+# comes from their own path, so it follows wherever the shared tree keeps them.
+$identifiersRelative = 'static\ergopti_plus\_shared\data\identifiers.json'
+$cloneIdentifiers = Join-Path $fixture $identifiersRelative
 [void][IO.Directory]::CreateDirectory($developer)
-[void][IO.Directory]::CreateDirectory($shared)
-$identifiersPath = Join-Path (Split-Path (Split-Path $Launcher)) '..\static\ergopti_plus\_shared\data\identifiers.json'
+[void][IO.Directory]::CreateDirectory((Split-Path $cloneIdentifiers))
+$identifiersPath = Join-Path (Split-Path (Split-Path $Launcher)) ('..\' + $identifiersRelative)
 $identifiersPath = [IO.Path]::GetFullPath($identifiersPath)
-[IO.File]::Copy($identifiersPath, (Join-Path $shared 'identifiers.json'), $false)
-$identifiers = [IO.File]::ReadAllText((Join-Path $shared 'identifiers.json')) | ConvertFrom-Json
+[IO.File]::Copy($identifiersPath, $cloneIdentifiers, $false)
+$identifiers = [IO.File]::ReadAllText($cloneIdentifiers) | ConvertFrom-Json
 $driver = Join-Path $fixture 'static\ergopti_plus\windows'
 [void][IO.Directory]::CreateDirectory($driver)
 $entry = Join-Path $driver $identifiers.app.ahk
