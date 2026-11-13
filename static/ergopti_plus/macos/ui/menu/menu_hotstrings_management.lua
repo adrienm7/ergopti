@@ -17,14 +17,13 @@ local Logger            = require("infra.logger")
 local dialog            = require("infra.dialog_util")
 local notifications     = require("infra.notifications")
 local i18n              = require("infra.i18n")
+local ValueCheck        = require("settings.engine.value_check")
 local LabelValue = require("core.i18n.engine.label_value")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local Terminators     = require("layouts.engine.layers.terminators")
-local HotstringCore   = require("infra.hotstring_engine")
-local TextUtils = require("core.text.engine.utils_core")
 local LOG               = "menu_hotstrings"
 
 
@@ -447,6 +446,16 @@ function M.build_management(ctx)
 	exp_item = expander_parent[1]
 
 	local delay_menu = {}
+	-- Reads a typed delay through the shared value check: whole milliseconds in
+	-- the declared range; a refusal is notified with the text naming the range.
+	local function typed_delay(raw, key)
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if typed.ok then return typed.value end
+		Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
+		pcall(notifications.notify, i18n.get("dialog.value_check.title"),
+			ValueCheck.refusal_text(key, typed, i18n.get), "error")
+		return nil
+	end
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
@@ -476,13 +485,9 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
-				local val = tonumber(raw)
-				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
-					return
-				end
+				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY)
+				if new_sec == nil then return end
 
-				local new_sec = val / 1000
 				if is_base then
 					if type(ctx.commit_base_delay) ~= "function" or ctx.commit_base_delay(new_sec) ~= true then
 						return false
@@ -529,16 +534,12 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
-				local val = tonumber(raw)
-				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
-					return
-				end
+				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY)
+				if new_sec == nil then return end
 
 				-- Persist through hotstrings_config (same store + file the config
 				-- window writes to, so the two UIs never desync) then apply to the
 				-- running engine so the new delay takes effect without a restart.
-				local new_sec = val / 1000
 				if hotstrings_config.set_override(category, nil, "delay", new_sec) ~= true then
 					return false
 				end
@@ -700,14 +701,17 @@ function M.build_management(ctx)
 			type(current) == "number" and string.format("%g", current) or "",
 			ok_label, i18n.get("button.cancel"))
 		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
-		-- A decimal comma is how half the locales write 1,5 s.
-		local seconds = tonumber((TextUtils.trim(raw):gsub(",", ".")))
-		if not HotstringCore.valid_idle_reset_seconds(seconds) then
-			Logger.warn(LOG, "Invalid idle reset '%s' — ignored.", raw)
-			pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-				i18n.get("menu.hotstrings.idle_reset_invalid"), ok_label)
+		-- The shared value check accepts a decimal comma (how half the locales
+		-- write 1,5 s) and names the declared range in its refusal.
+		local key = ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if not typed.ok then
+			Logger.warn(LOG, "Invalid idle reset '%s' — ignored (%s).", raw, typed.reason)
+			pcall(dialog.block_alert, i18n.get("dialog.value_check.title"),
+				ValueCheck.refusal_text(key, typed, i18n.get), ok_label)
 			return false
 		end
+		local seconds = typed.value
 		return commit_word_reset(require("settings.engine.keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
 	end
 	-- The cascade's longest chain: a fixed choice, drawn by the renderer from its declaration.

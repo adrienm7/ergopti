@@ -32,7 +32,6 @@ local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
-local NumberPolicy      = require("core.text.engine.number_policy")
 local TomlReader        = require("infra.toml.reader")
 local FileSystem        = require("adapters.file_system")
 local i18n              = require("infra.i18n")
@@ -692,12 +691,15 @@ local function on_message(msg, owner)
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
 		return false
 	end
-	if action == "set_delay" and (not NumberPolicy.is_finite(body.ms) or body.ms < 0) then
+	-- The shared value schema's declarations, the same rule as the page itself.
+	local ValueCheck = require("settings.engine.value_check")
+	if action == "set_delay"
+		and not ValueCheck.check_whole_scaled(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY, body.ms, 0.001) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid delay.")
 		return false
 	end
-	if action == "set_priority" and (not NumberPolicy.is_finite(body.priority)
-		or body.priority < 0 or body.priority > 100) then
+	if action == "set_priority" and not ValueCheck.check_value(
+		ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY), body.priority).ok then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid priority.")
 		return false
 	end

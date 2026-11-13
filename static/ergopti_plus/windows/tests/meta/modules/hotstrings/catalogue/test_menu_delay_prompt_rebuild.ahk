@@ -56,6 +56,8 @@ _MDPN_Source() {
  NumberOwner := _DriverProductionFileForSymbol("NumberTryParseInputInteger", _DriverDir)
  AssertTrue(NumberOwner != "", "The canonical integer parser must have its genuine owner")
  Source .= "#Include " . NumberOwner . "`n"
+ ; The prompts read the shared value schema through the genuine value check.
+ Source .= "#Include " . _DriverDir . "\infra\value_check.ahk`n"
  for Symbol in ["_HS_PromptDefaultDelay", "_HS_PromptCategoryDelay", "_HS_PromptPersonalFileField"] {
   Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
   AssertTrue(Owner != "", "Every prompt must resolve its actual production owner")

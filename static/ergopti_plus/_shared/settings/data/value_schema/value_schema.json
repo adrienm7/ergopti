@@ -11,8 +11,14 @@
 			"entry_scale": 1000,
 			"entry_type": "integer",
 			"entry_unit": "ms",
-			"default_from": { "timing": "tap_hold.default_activation_ms", "scale": 0.001 },
-			"max_from": { "timing": "tap_hold.max_activation_ms", "scale": 0.001 }
+			"default_from": {
+				"timing": "tap_hold.default_activation_ms",
+				"scale": 0.001
+			},
+			"max_from": {
+				"timing": "tap_hold.max_activation_ms",
+				"scale": 0.001
+			}
 		},
 		"tap_hold.keys.*.time_activation_seconds": {
 			"file": "tap_hold.toml",
@@ -23,7 +29,10 @@
 			"entry_scale": 1000,
 			"entry_type": "integer",
 			"entry_unit": "ms",
-			"max_from": { "timing": "tap_hold.max_activation_ms", "scale": 0.001 }
+			"max_from": {
+				"timing": "tap_hold.max_activation_ms",
+				"scale": 0.001
+			}
 		},
 		"tap_holds.lone_modifier_tap_max_ms": {
 			"file": "config.toml",
@@ -31,8 +40,15 @@
 			"unit": "ms",
 			"min": 0,
 			"max": 10000,
-			"special": [{ "value": 0, "label_key": "value_check.special.off" }],
-			"default_from": { "manifest": "tap_holds.lone_modifier_tap_max_ms" }
+			"special": [
+				{
+					"value": 0,
+					"label_key": "value_check.special.off"
+				}
+			],
+			"default_from": {
+				"manifest": "tap_holds.lone_modifier_tap_max_ms"
+			}
 		},
 		"mod_combos.simultaneous_threshold_ms": {
 			"file": "config.toml",
@@ -40,7 +56,95 @@
 			"unit": "ms",
 			"min": 1,
 			"max": 1000,
-			"default_from": { "manifest": "mod_combos.simultaneous_threshold_ms" }
+			"default_from": {
+				"manifest": "mod_combos.simultaneous_threshold_ms"
+			}
+		},
+		"hotstrings.expansion_delay": {
+			"file": "config.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0,
+			"max": 3600,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms",
+			"special": [
+				{
+					"value": 0,
+					"label_key": "value_check.special.no_time_limit"
+				}
+			],
+			"default_from": {
+				"manifest": "hotstrings.expansion_delay"
+			}
+		},
+		"hotstrings.idle_reset_seconds": {
+			"file": "config.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0,
+			"max": 3600,
+			"special": [
+				{
+					"value": 0,
+					"label_key": "value_check.special.never"
+				}
+			],
+			"default_from": {
+				"manifest": "hotstrings.idle_reset_seconds"
+			}
+		},
+		"hotstrings.cascade_max_arrows": {
+			"file": "config.toml",
+			"type": "integer",
+			"min": 1,
+			"max": 10,
+			"default_from": {
+				"manifest": "hotstrings.cascade_max_arrows"
+			}
+		},
+		"hotstrings.dynamic.user_code.time_activation_seconds": {
+			"file": "config.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0,
+			"max": 3600,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms"
+		},
+		"hotstrings_config.*.delay": {
+			"file": "hotstrings_config.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0,
+			"max": 3600,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms"
+		},
+		"hotstrings_config.*.*.delay": {
+			"file": "hotstrings_config.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0,
+			"max": 3600,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms"
+		},
+		"hotstrings_config.*.priority": {
+			"file": "hotstrings_config.toml",
+			"type": "integer",
+			"min": 0,
+			"max": 100
+		},
+		"hotstrings_config.*.*.priority": {
+			"file": "hotstrings_config.toml",
+			"type": "integer",
+			"min": 0,
+			"max": 100
 		}
 	}
 }

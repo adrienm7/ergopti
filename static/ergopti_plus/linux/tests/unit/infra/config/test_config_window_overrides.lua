@@ -98,12 +98,21 @@ helpers.describe("config window: delay actions", function()
 		helpers.assert_eq(log.overrides[1].value, 0.2, "converted the same way at every rung")
 	end)
 
-	helpers.it("coerces the delay to a number", function()
-		local log = send({ action = "set_delay", category = "rolls", section = "", ms = "2500" })
-		helpers.assert_eq(log.overrides[1].value, 2.5,
-			"the window sends what a text field holds; a string here would be stored "
-				.. "and then compared against numbers for the rest of the session")
-	end)
+	-- The page reads the field through the shared value check and sends a number;
+	-- a string, a fraction of a millisecond or an out-of-range delay reaching the
+	-- bridge is refused at this boundary, never coerced (value-validation).
+	for _, ms in ipairs({ "2500", 2.5, -1, 3600001 }) do
+		helpers.it("refuses the delay " .. tostring(ms) .. " at the bridge (value-validation)", function()
+			local log = send({ action = "set_delay", category = "rolls", section = "", ms = ms })
+			helpers.assert_eq(#log.overrides, 0, "a refused delay writes nothing")
+		end)
+	end
+	for _, priority in ipairs({ "50", 101, -1, 2.5 }) do
+		helpers.it("refuses the priority " .. tostring(priority) .. " at the bridge (value-validation)", function()
+			local log = send({ action = "set_priority", category = "rolls", section = "", priority = priority })
+			helpers.assert_eq(#log.overrides, 0, "a refused priority writes nothing")
+		end)
+	end
 
 	helpers.it("refuses a payload carrying the old `value` field instead of writing nil", function()
 		-- The exact shape of the bug. Reading `payload.value` made tonumber(nil)

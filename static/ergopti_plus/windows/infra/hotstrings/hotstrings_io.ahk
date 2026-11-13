@@ -24,6 +24,7 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\value_check.ahk
 #Include common_autocorrection_migration.ahk
 
 ; ============================================================
@@ -358,15 +359,27 @@ _HotstringsOverrideProjectFields(Values, Target) {
 	}
 	if Values.Has("delay") {
 		Value := Values["delay"]
-		if Value is Number && TickTryDurationMsFromSeconds(Value, &Milliseconds)
+		Checked := ValueCheckValue(ValueCheckEntryFor("hotstrings_config.*.delay"), Value)
+		if Checked["ok"] && TickTryDurationMsFromSeconds(Value, &Milliseconds)
 			Target.LegacyDelay := Value
+		else
+			try LoggerWarn("HotstringsConfig",
+				"A hotstrings_config.toml delay '{1}' is refused ({2}, {3} to {4} s); it is ignored.",
+				IsObject(Value) ? Type(Value) : Value, Checked["ok"] ? "tick_domain" : Checked["reason"],
+				Checked.Get("min", ""), Checked.Get("max", ""))
 	}
 	if Values.Has("color") && Values["color"] is String
 		Target.Color := Values["color"]
 	if Values.Has("show_tooltip") && Values["show_tooltip"] is TOML_Bool
 		Target.ShowTooltip := Values["show_tooltip"].Value
-	if Values.Has("priority") && HotstringsTryPriority(Values["priority"], &Priority)
-		Target.Priority := Priority
+	if Values.Has("priority") {
+		if HotstringsTryPriority(Values["priority"], &Priority)
+			Target.Priority := Priority
+		else
+			try LoggerWarn("HotstringsConfig",
+				"A hotstrings_config.toml priority '{1}' is refused (not a whole number in the declared range); it is ignored.",
+				IsObject(Values["priority"]) ? Type(Values["priority"]) : Values["priority"])
+	}
 }
 
 _HotstringsOverrideProjectCategory(Result, CategoryName, Values) {

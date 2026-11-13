@@ -78,7 +78,7 @@
 			"required": ["enabled"],
 			"properties": {
 				"enabled": { "type": "boolean" },
-				"time_activation_seconds": { "type": "number", "minimum": 0 }
+				"time_activation_seconds": { "type": "number", "minimum": 0, "maximum": 3600 }
 			}
 		},
 
@@ -130,13 +130,13 @@
 				},
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
-				"idle_reset_seconds": { "type": "number", "minimum": 0 },
+				"idle_reset_seconds": { "type": "number", "minimum": 0, "maximum": 3600 },
 				"cascade_max_arrows": { "type": "integer", "minimum": 1, "maximum": 10 },
 				"click_resets_word": { "type": "boolean" },
 				"arrow_resets_word": { "type": "boolean" },
 				"shortcut_resets_word": { "type": "boolean" },
 				"tap_hold_resets_word": { "type": "boolean" },
-				"expansion_delay": { "type": "number", "minimum": 0 },
+				"expansion_delay": { "type": "number", "minimum": 0, "maximum": 3600 },
 				"preview_ai_enabled": { "type": "boolean" },
 				"preview_autocorrect_enabled": { "type": "boolean" },
 				"preview_colored_tooltips": { "type": "boolean" },
@@ -176,7 +176,7 @@
 							"required": ["enabled"],
 							"properties": {
 								"enabled": { "type": "boolean" },
-								"time_activation_seconds": { "type": "number", "minimum": 0 },
+								"time_activation_seconds": { "type": "number", "minimum": 0, "maximum": 3600 },
 								"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
 							}
 						}

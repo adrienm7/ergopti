@@ -12,7 +12,6 @@ local TableUtil = require("core.text.engine.table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
 local Logger = require("core.logger.engine.shim")
-local NumberPolicy = require("core.text.engine.number_policy")
 local Extensions = require("hotstrings.engine.extensions")
 local LOG = "bridge.hotstrings_config"
 
@@ -54,14 +53,6 @@ local function i18n_label(key)
 	local value = i18n.get(key)
 	return (type(value) == "string" and value ~= "") and value or key
 end
-
--- The collision-priority range the settings window offers. Mirrored from the
--- window's own `v >= 0 && v <= 100` guard, and re-checked here rather than
--- trusted: the page is the least trusted input the daemon has, and a priority
--- outside the tier range silently reorders every hotstring source against every
--- other with nothing on screen to say so.
-local PRIORITY_MIN = 0
-local PRIORITY_MAX = 100
 
 -- Delays cross this bridge in milliseconds and are stored in seconds. The window
 -- shows milliseconds because that is the unit a person means by "a bit longer";
@@ -426,10 +417,14 @@ function M.on_message(payload, state, context)
 		-- Milliseconds on the wire, seconds in the store: the cascade, the TOMLs
 		-- and the engine all speak seconds, and the conversion belongs at this
 		-- boundary rather than in the resolver.
-		local ms = (type(payload.ms) == "number" or type(payload.ms) == "string") and tonumber(payload.ms) or nil
-		if not NumberPolicy.is_finite(ms) or ms < 0 then
-			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
-				tostring(payload.ms), tostring(payload.category))
+		-- The shared value schema bounds it: whole milliseconds within the
+		-- declared range, the same rule as the page and the menu prompt.
+		local ValueCheck = require("settings.engine.value_check")
+		local ms = payload.ms
+		local admitted, reason = ValueCheck.check_whole_scaled(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY, ms, 1 / MS_PER_SEC)
+		if not admitted then
+			Logger.warn(LOG, "Refusing delay %s for '%s' (%s).", tostring(payload.ms), tostring(payload.category),
+				tostring(reason))
 			return push_state(state, context)
 		end
 		set_override(state, payload.category, section_of(payload), "delay", ms / MS_PER_SEC, context)
@@ -483,11 +478,12 @@ function M.on_message(payload, state, context)
 	-- daemon has, and a priority outside the tier range silently reorders every
 	-- source against every other.
 	if action == "set_priority" and payload.category then
-		local value = (type(payload.priority) == "number" or type(payload.priority) == "string")
-			and tonumber(payload.priority) or nil
-		if not NumberPolicy.is_finite(value) or value % 1 ~= 0 or value < PRIORITY_MIN or value > PRIORITY_MAX then
-			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
-				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
+		local ValueCheck = require("settings.engine.value_check")
+		local value = payload.priority
+		local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY), value)
+		if not checked.ok then
+			Logger.warn(LOG, "Refusing priority %s for '%s' (%s, %s-%s).", tostring(payload.priority),
+				tostring(payload.category), checked.reason, tostring(checked.min), tostring(checked.max))
 			return push_state(state, context)
 		end
 		set_override(state, payload.category, section_of(payload), "priority", value, context)

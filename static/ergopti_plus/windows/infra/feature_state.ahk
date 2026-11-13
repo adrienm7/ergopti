@@ -21,6 +21,7 @@
 #Include hotstrings/preview_switches.ahk
 ; The generated key vocabulary (a dedupe-safe include: menu_manifest.ahk names it too).
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\value_check.ahk
 
 global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
@@ -338,13 +339,14 @@ _FeatureStateIdleResetSeconds(Raw) {
 	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS)
 	if Raw == "_"
 		return Default
-	; HSE_ValidIdleResetSeconds's rule, restated because this reader also boots
-	; without the hotstring engine (tests/support/feature_state_boot_smoke.ahk).
-	; NaN compares unequal to itself; an infinity survives no subtraction.
-	if ((Raw is Integer) or (Raw is Float)) and Raw == Raw and Raw >= 0 and (Raw - Raw) == 0
+	; The shared value schema's declaration (a number of seconds within its
+	; range); the value check needs no hotstring engine, so this reader still
+	; boots without it (tests/support/feature_state_boot_smoke.ahk).
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Raw)
+	if Checked["ok"]
 		return Raw
-	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
-		Raw is Object ? Type(Raw) : String(Raw), Default)
+	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is refused ({2}, {3} to {4} s) — using {5} s.",
+		Raw is Object ? Type(Raw) : String(Raw), Checked["reason"], Checked["min"], Checked["max"], Default)
 	return Default
 }
 

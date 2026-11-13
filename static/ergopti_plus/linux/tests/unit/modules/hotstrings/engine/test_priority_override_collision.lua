@@ -177,10 +177,12 @@ helpers.describe("hotstring priority overrides", function()
 			helpers.assert_eq(winner(restarted_engine), "FIRST",
 				"clearing priority must restore the registration-order tiebreak")
 
-			helpers.assert_eq(restarted.set_override("first", nil, "priority", 100), true)
+			helpers.assert_eq(restarted.set_override("first", nil, "priority", 101), false,
+				"a priority past the declared 0-100 range is refused at the setter (value-validation)")
+			helpers.assert_eq(restarted.set_override("first", nil, "priority", 95), true)
 			local extension_category = require("hotstrings.engine.extensions").category_key("sample-pack", "second")
 			local category_values = { delay = 1.25, color = "#123456", show_tooltip = true, priority = 90 }
-			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 120 }
+			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 100 }
 			for _, category in ipairs({ "second", extension_category }) do
 				for field, value in pairs(category_values) do
 					helpers.assert_eq(restarted.set_override(category, nil, field, value), true)

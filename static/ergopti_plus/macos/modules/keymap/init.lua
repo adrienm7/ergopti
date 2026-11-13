@@ -487,9 +487,20 @@ function M.on_base_delay_change(observer)
 end
 
 --- Sets the baseline inter-key delay threshold used for all unmapped groups.
---- @param secs number The new threshold in seconds (clamped to ≥ 0).
+--- A value its shared value schema declaration refuses (a string, a negative
+--- delay, past the maximum) fails fast with a log line: it was clamped to 0,
+--- which means « no time limit », without a word.
+--- @param secs number The new threshold in seconds.
+--- @return boolean applied
 function M.set_base_delay(secs)
-	local v = math.max(0, tonumber(secs) or M.DEFAULT_STATE.expansion_delay)
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY), secs)
+	if not checked.ok then
+		Logger.error(LOG, "Base delay '%s' refused (%s, %s..%s s).", tostring(secs), checked.reason,
+			tostring(checked.min), tostring(checked.max))
+		return false
+	end
+	local v = secs
 	if LLMBridge.invalidate_hotstring_preview() ~= true then
 		Logger.error(LOG, "Base-delay change refused because the active hotstring preview could not be revoked.")
 		return false

@@ -65,12 +65,23 @@ function M.normalize_section(value)
 	return value:lower()
 end
 
---- Whether a value is a finite, non-negative activation delay in seconds. Zero
---- is intentional: the hotstring stays always active.
+--- Whether a value is an activation delay in seconds its shared value schema
+--- declaration admits (finite, from 0 to the declared maximum). Zero is
+--- intentional: the hotstring stays always active.
 --- @param value any
 --- @return boolean
 function M.is_delay(value)
-	return type(value) == "number" and value == value and value >= 0 and value < math.huge
+	local ValueCheck = require("settings.engine.value_check")
+	return ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY), value).ok
+end
+
+--- Whether a value is a collision priority its shared value schema declaration
+--- admits (a whole number from 0 to 100).
+--- @param value any
+--- @return boolean
+function M.is_priority(value)
+	local ValueCheck = require("settings.engine.value_check")
+	return ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY), value).ok
 end
 
 --- Whether a value is the stored offset of a delay override: the signed seconds
@@ -81,6 +92,15 @@ function M.is_delay_offset(value)
 	return type(value) == "number" and value == value and math.abs(value) < math.huge
 end
 
+--- Reports a stored leaf its shared value schema declaration refuses: it is
+--- ignored, never dropped silently.
+--- @param field string Leaf name.
+--- @param value any Stored value.
+local function refused(field, value)
+	require("core.logger.engine.shim").warn("hotstrings.overrides",
+		"A hotstring override %s '%s' is refused by its shared declaration; it is ignored.", field, tostring(value))
+end
+
 --- Reads the owned leaves of one override table.
 --- @param values table Decoded table of a category or a section.
 --- @return table entry Owned fields only.
@@ -89,13 +109,12 @@ local function override_fields(values)
 	if M.is_delay_offset(values.delay_offset) then entry.delay_offset = values.delay_offset end
 	if values.delay_unlimited == true then entry.delay_unlimited = true end
 	-- The absolute delay of earlier builds, held only until the boot migration turns it into an offset.
-	if M.is_delay(values.delay) then entry.legacy_delay = values.delay end
+	if M.is_delay(values.delay) then entry.legacy_delay = values.delay
+	elseif values.delay ~= nil then refused("delay", values.delay) end
 	if type(values.color) == "string" then entry.color = values.color end
 	if type(values.show_tooltip) == "boolean" then entry.show_tooltip = values.show_tooltip end
-	local priority = values.priority
-	if type(priority) == "number" and priority >= 0 and priority == math.floor(priority) and priority < math.huge then
-		entry.priority = priority
-	end
+	if M.is_priority(values.priority) then entry.priority = values.priority
+	elseif values.priority ~= nil then refused("priority", values.priority) end
 	return entry
 end
 

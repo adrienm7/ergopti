@@ -291,8 +291,11 @@ function checkConfigSchema(schema) {
 	for (const [name, entry] of Object.entries(schema.settings)) {
 		if (entry.file !== 'config.toml' || name.includes('*')) continue;
 		let node = config;
-		for (const segment of name.split('.'))
+		for (const segment of name.split('.')) {
 			node = node && node.properties && node.properties[segment];
+			// A section is often a reference into $defs.
+			if (node && node.$ref) node = config.$defs[node.$ref.replace('#/$defs/', '')];
+		}
 		if (!node) continue;
 		const where = `config.schema.json ${name}`;
 		if (entry.type === 'integer') check(node.type === 'integer', `${where}: type integer`);
@@ -345,16 +348,58 @@ function checkPorts() {
 			check(text.includes(item.wiring.needle), `${item.wiring.file} runs ${item.test}`);
 		}
 	}
-	const { render, renderLua, OUTPUT, LUA_OUTPUT } = require(GENERATOR);
+	const { render, renderLua, renderBrowser, OUTPUT, LUA_OUTPUT, BROWSER_OUTPUT } = require(
+		GENERATOR
+	);
 	for (const [file, content] of [
 		[OUTPUT, render()],
-		[LUA_OUTPUT, renderLua()]
+		[LUA_OUTPUT, renderLua()],
+		[BROWSER_OUTPUT, renderBrowser()]
 	]) {
 		check(
 			fs.readFileSync(file, 'utf8') === content,
 			`${path.relative(ROOT, file)} is stale: run npm run codegen:value-schema`
 		);
 	}
+}
+
+// The WebView pages load the generated classic copy: it must behave as the
+// canonical check, and every page field the schema covers must go through it.
+function checkBrowserCopy() {
+	const vm = require('vm');
+	const { BROWSER_OUTPUT } = require(GENERATOR);
+	const sandbox = { window: {} };
+	vm.runInNewContext(fs.readFileSync(BROWSER_OUTPUT, 'utf8'), sandbox);
+	const V = sandbox.window.ErgoptiValueCheck;
+	check(
+		V && typeof V.parseEntry === 'function',
+		'the browser copy exposes window.ErgoptiValueCheck'
+	);
+	const priority = V.entryFor(V.SCHEMA, V.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY);
+	const refused = V.parseEntry(priority, '101');
+	check(!refused.ok && refused.reason === 'above_maximum', 'the browser copy refuses priority 101');
+	const delay = V.entryFor(V.SCHEMA, V.KEY.HOTSTRINGS_CONFIG_ANY_DELAY);
+	check(V.parseEntry(delay, '375').value === 0.375, 'the browser copy reads a typed delay in ms');
+	const page = path.join(SP, '_shared', 'ui', 'hotstrings_config_window');
+	const html = fs.readFileSync(path.join(page, 'index.html'), 'utf8');
+	check(
+		html.indexOf('../value_check.js') > 0 &&
+			html.indexOf('../value_check.js') < html.indexOf('"script.js"'),
+		'the hotstrings settings window loads the value check before its script'
+	);
+	const script = fs.readFileSync(path.join(page, 'script.js'), 'utf8');
+	for (const key of [
+		'HOTSTRINGS_CONFIG_ANY_DELAY',
+		'HOTSTRINGS_CONFIG_ANY_ANY_DELAY',
+		'HOTSTRINGS_CONFIG_ANY_PRIORITY',
+		'HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY'
+	]) {
+		check(script.includes(`KEY.${key}`), `the hotstrings settings window checks ${key}`);
+	}
+	check(
+		script.includes('setCustomValidity'),
+		'a refused field shows its localized range on the field'
+	);
 }
 
 async function main() {
@@ -365,6 +410,7 @@ async function main() {
 	checkConfigSchema(schema);
 	checkLocales(schema, en);
 	checkPorts();
+	checkBrowserCopy();
 	if (failures.length) {
 		console.error(`value schema contract: ${failures.length} of ${checks} checks failed`);
 		for (const failure of failures) console.error(`  - ${failure}`);

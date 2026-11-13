@@ -18,6 +18,75 @@ ValueSchemaData() {
 	if IsObject(Data)
 		return Data
 	Data := Map("version", 1, "settings", Map(
+		"hotstrings.cascade_max_arrows", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"min", 1,
+			"max", 10,
+			"default_from", Map(
+				"manifest", "hotstrings.cascade_max_arrows")),
+		"hotstrings.dynamic.user_code.time_activation_seconds", Map(
+			"file", "config.toml",
+			"type", "decimal",
+			"unit", "s",
+			"min", 0,
+			"max", 3600,
+			"entry_scale", 1000,
+			"entry_type", "integer",
+			"entry_unit", "ms"),
+		"hotstrings.expansion_delay", Map(
+			"file", "config.toml",
+			"type", "decimal",
+			"unit", "s",
+			"min", 0,
+			"max", 3600,
+			"entry_scale", 1000,
+			"entry_type", "integer",
+			"entry_unit", "ms",
+			"special", [Map(
+				"value", 0,
+				"label_key", "value_check.special.no_time_limit")],
+			"default_from", Map(
+				"manifest", "hotstrings.expansion_delay")),
+		"hotstrings.idle_reset_seconds", Map(
+			"file", "config.toml",
+			"type", "decimal",
+			"unit", "s",
+			"min", 0,
+			"max", 3600,
+			"special", [Map(
+				"value", 0,
+				"label_key", "value_check.special.never")],
+			"default_from", Map(
+				"manifest", "hotstrings.idle_reset_seconds")),
+		"hotstrings_config.*.*.delay", Map(
+			"file", "hotstrings_config.toml",
+			"type", "decimal",
+			"unit", "s",
+			"min", 0,
+			"max", 3600,
+			"entry_scale", 1000,
+			"entry_type", "integer",
+			"entry_unit", "ms"),
+		"hotstrings_config.*.*.priority", Map(
+			"file", "hotstrings_config.toml",
+			"type", "integer",
+			"min", 0,
+			"max", 100),
+		"hotstrings_config.*.delay", Map(
+			"file", "hotstrings_config.toml",
+			"type", "decimal",
+			"unit", "s",
+			"min", 0,
+			"max", 3600,
+			"entry_scale", 1000,
+			"entry_type", "integer",
+			"entry_unit", "ms"),
+		"hotstrings_config.*.priority", Map(
+			"file", "hotstrings_config.toml",
+			"type", "integer",
+			"min", 0,
+			"max", 100),
 		"mod_combos.simultaneous_threshold_ms", Map(
 			"file", "config.toml",
 			"type", "integer",

@@ -309,8 +309,19 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	--   2. `hotstrings_config.resolve(category).delay` for TOML-backed keys —
 	--      this is the new authoritative source (TOML metadata + user override).
 	--   3. `keymap.DELAYS_DEFAULT[k]` — ultimate hardcoded fallback.
-	if type(state.expansion_delay) == "number" then
-		if keymap and type(keymap.set_base_delay) == "function" then try("hotstrings", "keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay) end
+	if state.expansion_delay ~= nil then
+		-- A stored base delay its shared value schema declaration refuses is
+		-- reported once and the engine keeps its default.
+		local ValueCheck = require("settings.engine.value_check")
+		local key = ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY
+		local checked = ValueCheck.check_value(ValueCheck.declaration(key), state.expansion_delay)
+		if not checked.ok then
+			require("settings.engine.migration.outdated").report(key, string.format(
+				"%s is refused (%s, %s..%s s); the default applies", tostring(state.expansion_delay),
+				checked.reason, tostring(checked.min), tostring(checked.max)))
+		elseif keymap and type(keymap.set_base_delay) == "function" then
+			try("hotstrings", "keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay)
+		end
 	end
 	if keymap and type(keymap.set_delay) == "function" then
 		local defs       = keymap.DELAYS_DEFAULT or {}

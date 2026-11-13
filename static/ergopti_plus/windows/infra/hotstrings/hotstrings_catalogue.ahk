@@ -24,6 +24,7 @@
 ; The generated config-key constants; #Include skips a file the entry script
 ; already loaded, so a unit harness that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\value_check.ahk
 ; The shared matcher between a runtime category and its manifest rows, which the
 ; delay a built-in section declares is read through.
 #Include %A_LineFile%\..\..\..\..\_shared\hotstrings\data\catalogue\scope_overrides.ahk
@@ -78,9 +79,23 @@ HotstringsResolveBumpGen() {
 ; user override of a category or section is an offset of.
 HotstringsBaseDelay() {
 		global Features, GLOBAL_DEFAULT_DELAY
-		if IsSet(Features) and (Features is Map) and Features.Has("hotstrings")
-				and (Features["hotstrings"] is Map) and Features["hotstrings"].Has(ConfigLeaf.EXPANSION_DELAY)
-				return Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY]
+		static Reported := Map()
+		if !(IsSet(Features) and (Features is Map) and Features.Has("hotstrings")
+				and (Features["hotstrings"] is Map) and Features["hotstrings"].Has(ConfigLeaf.EXPANSION_DELAY))
+				return GLOBAL_DEFAULT_DELAY
+		Stored := Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY]
+		; A stored value the shared value schema refuses (a negative delay once
+		; meant « no limit » here by accident) is reported once; the default applies.
+		Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY), Stored)
+		if Checked["ok"]
+				return Stored
+		Shown := IsObject(Stored) ? Type(Stored) : String(Stored)
+		if !Reported.Has(Shown) {
+				Reported[Shown] := true
+				try LoggerWarn("HotstringsConfig",
+						"[hotstrings] expansion_delay = '{1}' is refused ({2}, {3} to {4} s): the default {5} s applies.",
+						Shown, Checked["reason"], Checked["min"], Checked["max"], GLOBAL_DEFAULT_DELAY)
+		}
 		return GLOBAL_DEFAULT_DELAY
 }
 
@@ -291,9 +306,11 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 ; @returns {Integer} True once the leaf is durable and the overrides are rebased.
 HotstringsSetBaseDelay(Seconds) {
 		global Features, _HotstringsOverrides
-		if !(Seconds is Number) or !TickTryDurationMsFromSeconds(Seconds, &DelayMs) {
+		if !ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY), Seconds)["ok"]
+				or !TickTryDurationMsFromSeconds(Seconds, &DelayMs) {
 				try LoggerError("HotstringsConfig",
-						"SetBaseDelay: the base delay must fit the elapsed-tick domain, got '{1}'.", Seconds)
+						"SetBaseDelay: the base delay is refused by its shared declaration, got '{1}'.",
+						IsObject(Seconds) ? Type(Seconds) : Seconds)
 				return false
 		}
 		; Finish a pending default move first. Otherwise an older _global record
@@ -679,6 +696,13 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 				try LoggerError("HotstringsConfig",
 						"SetOverride: delay must fit the elapsed-tick domain, got '{1}'.",
 						Value)
+				return false
+		}
+		if (Field == "delay" and Value != ""
+				and !ValueCheckValue(ValueCheckEntryFor("hotstrings_config.*.delay"), Value)["ok"]) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: delay is refused by its shared declaration, got '{1}'.",
+						IsObject(Value) ? Type(Value) : Value)
 				return false
 		}
 		if (Field == "priority" and !HotstringsTryPriority(Value, &Priority)) {

@@ -41,6 +41,24 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || key;
 }
 
+// Reads a typed field through the shared value check (_shared/ui/value_check.js,
+// generated from the one schema the three drivers read). A refusal is shown on
+// the field itself with the localized text naming the accepted range, and
+// nothing is sent; an admitted value is returned in the typed unit.
+function checkedField(input, key) {
+	const V = window.ErgoptiValueCheck;
+	const entry = V.entryFor(V.SCHEMA, key);
+	const typed = V.parseEntry(entry, input.value);
+	if (!typed.ok) {
+		input.setCustomValidity(V.renderMessage(V.messageParts(entry, typed), _t));
+		input.reportValidity();
+		return null;
+	}
+	input.setCustomValidity('');
+	// The host takes the typed unit (ms for a delay): the text, already admitted.
+	return Number(input.value.trim().replace(',', '.'));
+}
+
 // Apply data-i18n-key / data-i18n-title-key inside a freshly cloned template
 // fragment (i18n.js cannot reach inside <template> nodes before cloning).
 function applyTemplateI18n(node) {
@@ -211,8 +229,14 @@ function bindDelay(field, cat, sec) {
 	field.classList.toggle('overridden', !!overridden);
 
 	input.addEventListener('change', () => {
-		const v = Number(input.value);
-		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0) {
+		if (input.value === '') return;
+		const v = checkedField(
+			input,
+			sec
+				? window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_ANY_DELAY
+				: window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY
+		);
+		if (v !== null) {
 			send({
 				action: 'set_delay',
 				category: cat.name,
@@ -268,8 +292,13 @@ function bindPriority(field, cat, sec) {
 			clearPriority();
 			return;
 		}
-		const v = Number(input.value);
-		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0 && v <= 100) {
+		const v = checkedField(
+			input,
+			sec
+				? window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY
+				: window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY
+		);
+		if (v !== null) {
 			send({
 				action: 'set_priority',
 				category: cat.name,

@@ -1159,7 +1159,13 @@ function M.set_override(category, section, field, value)
 		return false
 	end
 	if field == "delay" and not ConfigSchema.is_delay(value) then
-		Logger.error(LOG, "set_override(): delay must be a finite non-negative number.")
+		Logger.error(LOG, "set_override(): delay '%s' is refused by its shared declaration.", tostring(value))
+		return false
+	end
+	-- Checked here too, not only by the window: a priority past the tier range
+	-- silently reorders every source against every other.
+	if field == "priority" and value ~= nil and not Overrides.is_priority(value) then
+		Logger.error(LOG, "set_override(): priority '%s' is refused by its shared declaration.", tostring(value))
 		return false
 	end
 

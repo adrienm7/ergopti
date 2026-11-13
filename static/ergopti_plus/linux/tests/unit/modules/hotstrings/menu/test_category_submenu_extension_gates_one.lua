@@ -426,7 +426,8 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				helpers.assert_eq(read(c.path), c.original)
 				helpers.assert_eq(read(c.config_path), c.config_original)
 				helpers.assert_eq(#notices, 1)
-				helpers.assert_not_nil(notices[1]:find(require("infra.i18n").get("menu.hotstrings.delay_invalid_body"), 1, true))
+				-- The shared value schema's refusal names the accepted range in ms.
+				helpers.assert_not_nil(notices[1]:find("3600000", 1, true), notices[1])
 			end)
 		end)
 		for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
