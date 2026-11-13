@@ -2400,11 +2400,28 @@ function scanFile(file, text, ctx) {
 						return n && n.endsWith(tail) ? n.slice(0, n.length - tail.length) : null;
 					})
 				);
-				const head = heads.size === 1 ? [...heads][0] : null;
 				const images = new Set(fresh.map(([, n]) => `${r}|${n}`));
-				const alone =
-					head &&
-					[...targetNames].filter((k) => k.startsWith(`${r}|${head}`)).every((k) => images.has(k));
+				const holdsOnly = (q) =>
+					[...targetNames].filter((k) => k.startsWith(`${r}|${q}`)).every((k) => images.has(k));
+				// Every module keeps its tail under one new head; or, when a file is
+				// renamed on the way (tooltip_hotstring -> hotstring), the images'
+				// longest common prefix cut at a name boundary, if it holds only them.
+				let head = heads.size === 1 ? [...heads][0] : null;
+				if (!head && fresh.every(([, n]) => n)) {
+					const names = fresh.map(([, n]) => n);
+					let common = names.reduce((c, n) => {
+						let i = 0;
+						while (i < c.length && i < n.length && c[i] === n[i]) i++;
+						return c.slice(0, i);
+					});
+					const bounded = (q) =>
+						stem.endsWith('.')
+							? q.endsWith('.')
+							: names.every((n) => n === q || n[q.length] === '.');
+					while (common && !bounded(common)) common = common.slice(0, -1);
+					if (common && common.includes('.')) head = common;
+				}
+				const alone = head && holdsOnly(head);
 				if (alone) {
 					verdicts.push({ to: `${m[1]}^${head.replace(/\./g, '%.')}${m[1]}`, oldRepo });
 				} else {
