@@ -73,7 +73,7 @@ local PROGRESS_LOG_INTERVAL_ROWS = 500
 ---   logger  table    The driver's logger (error/warn/info/start/success).
 ---   log_tag string   Tag passed as the logger's first argument.
 ---   cipher  table    The driver's text_cipher (encrypt/decrypt).
----   backend table    available/count/fetch/apply/get_cursor/set_cursor.
+---   backend table    available/count/fetch/apply/get_cursor/set_cursor/clear_rich_text.
 --- @return table|nil The runner, or nil when a dependency is missing.
 function M.new(deps)
 	if type(deps) ~= "table"
@@ -202,6 +202,12 @@ function M.new(deps)
 		cursor      = read_cursor(wanted_mode)
 		if cursor == nil then return abort("the stored resume point is not an exact supported integer") end
 		total       = backend.count(owner)
+
+		-- The formatted copy has no decrypting reader, so an encrypt pass empties
+		-- it before anything else rather than leave typed text in clear.
+		if wanted_mode == Plan.MODE_ENCRYPT and backend.clear_rich_text(owner) ~= true then
+			return abort("the formatted copy of the typed text could not be cleared")
+		end
 
 		-- Boot resumes only durable intent. The daemon may stop before its first
 		-- periodic slice, so accepting a RAM-only pass would strand old rows.

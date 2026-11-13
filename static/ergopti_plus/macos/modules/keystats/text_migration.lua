@@ -91,6 +91,10 @@ function RealBackend.apply(device_id, updates)
 	return SqliteWriter.apply_typing_updates(device_id, updates)
 end
 
+function RealBackend.clear_rich_text(device_id)
+	return SqliteWriter.clear_rich_text(device_id)
+end
+
 function RealBackend.get_cursor()
 	return SqliteWriter.get_meta(Runner.CURSOR_META_KEY)
 end
