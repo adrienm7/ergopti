@@ -632,13 +632,15 @@ coordinator on 2026-11-11, to review by the maintainer.
 
 - [ ] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
       cost about 30 ms of sqlite3 processes.
-      2026-11-13 (worker D): `open_db` creates the metrics folder in process (luv) instead of a shell and `mkdir`;
-      `linux-session-bench.py`, HEAD against the change, twice 7 boots: keystats stage median 49 and 44 → 45 and 43 ms,
-      near the noise. The rest is one sqlite3 process per boot read or write (device schema, UTC columns, media schema,
-      registration, the two meta versions, the open walk); merging the reads would hand the public migration
-      functions a value read before the registration, which their tests drive one query at a time, so the remaining
-      cut stays the persistent sqlite3 child (a design for the maintainer). Bench note: the tray panel needs the
-      Python that has GObject (`/usr/bin/python3.12` on Ubuntu 24.04 when `python3` is a newer build).
+      2026-11-13 (worker D), measured and not changed: creating the metrics folder in process instead of a shell and
+      `mkdir` gave a keystats stage median of 49 and 44 → 45 and 43 ms (`linux-session-bench.py`, HEAD against the
+      change, twice 7 boots), near the noise, and broke the store's no-luv contract (`run_sqlite_private_no_luv.lua`:
+      the store opens through FFI or the shell alone), so it was reverted. The rest is one sqlite3 process per boot
+      read or write (device schema, UTC columns, media schema, registration, the two meta versions, the open walk);
+      merging the reads would hand the public migration functions a value read before the registration, which their
+      tests drive one query at a time, so the cut stays the persistent sqlite3 child (a design for the maintainer).
+      Bench note: its tray panel needs the Python that has GObject (`/usr/bin/python3.12` on Ubuntu 24.04 when
+      `python3` is a newer build); run the Lua suite as an unprivileged user, root passes every EACCES probe.
 
 ## CI acceptance
 
