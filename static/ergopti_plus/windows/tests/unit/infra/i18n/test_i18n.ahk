@@ -717,7 +717,8 @@ _I18nShape_Case(Mode) {
 		if Mode == "legacy-numeric-cache" {
 			; Historical v1 caches stringify invalid numeric JSON, losing its
 			; original type before the next boot can validate the source.
-			Tsv := Root . "\data\locales\de.tsv"
+			; The cache sits beside its source, as _I18nLoadLocaleMap places it.
+			Tsv := RegExReplace(Path, "\.json$", ".tsv")
 			AssertTrue(FSWriteCreateDurable(Tsv, "fixture.key`t7`n#!ergopti-i18n-cache-v1 count=1`n"))
 			FileSetTime("20000101000000", Path, "M")
 			FileSetTime("20000102000000", Tsv, "M")
@@ -745,7 +746,7 @@ _I18nShape_Case(Mode) {
 				AssertEqual("fixture.key`t7`n#!ergopti-i18n-cache-v1 count=1`n", FSReadUtf8Exact(Tsv),
 					"Refusing invalid source must not regenerate or bless its legacy cache")
 			else
-				AssertFalse(FSExists(Root . "\data\locales\de.tsv"), "An invalid JSON shape cannot be promoted into the self-healing fast cache")
+				AssertFalse(FSExists(RegExReplace(Path, "\.json$", ".tsv")), "An invalid JSON shape cannot be promoted into the self-healing fast cache")
 		}
 	} finally {
 		_SharedDir := Saved[1], _I18nLocale := Saved[2]

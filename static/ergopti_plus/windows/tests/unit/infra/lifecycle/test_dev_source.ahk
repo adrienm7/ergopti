@@ -64,9 +64,12 @@ Test("dev source: accepts only the clone the script runs from (windows-dev-mode)
 ; told otherwise, a .git folder ("file" makes it a linked worktree's .git file).
 _DST_Clone(GitKind := "dir") {
 	Root := A_Temp . "\ergopti_dev_clone_" . A_TickCount . "_" . Random(1, 1000000)
-	DirCreate(Root . "\static\ergopti_plus\_shared\data")
+	Identifiers := Root . "\static\ergopti_plus\_shared\data\identifiers.json"
+	; The identifiers' own folder, wherever the shared tree keeps them.
+	SplitPath(Identifiers, , &IdentifiersDir)
+	DirCreate(IdentifiersDir)
 	DirCreate(Root . "\static\ergopti_plus\windows")
-	FileAppend("{}", Root . "\static\ergopti_plus\_shared\data\identifiers.json", "UTF-8")
+	FileAppend("{}", Identifiers, "UTF-8")
 	if (GitKind == "dir")
 		DirCreate(Root . "\.git")
 	else if (GitKind == "file")
