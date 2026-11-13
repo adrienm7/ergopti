@@ -115,7 +115,7 @@ function M.is_driver_module(name)
 	if type(name) ~= "string" then return false end
 	if not _production_heads then
 		local root = (M.driver_root():gsub("[/\\]$", ""))
-		local paths, detail = require("test.runner_discovery").files(root, function(file)
+		local paths, detail = require("tests.lua.core.runner_discovery").files(root, function(file)
 			return file:match("%.lua$") ~= nil
 		end, { tests = true })
 		assert(paths, detail)
