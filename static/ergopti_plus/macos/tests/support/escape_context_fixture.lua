@@ -14,7 +14,7 @@ local STUBBED_MODULES = {
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
 	"modules.keymap.utils",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.llm",
 	"infra.keycodes",
 	"modules.keystats",
@@ -64,7 +64,7 @@ local function load_fixture(options, lifetime)
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
 	}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		is_letter_char = function() return false end,
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,

@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 --- @param body function Receives { config, path, load, read, errors }.
 local function with_file(source, body)
 	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
-		"core.text.engine.toml_codec", "infra.toml.codec" }, function()
+		"core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end

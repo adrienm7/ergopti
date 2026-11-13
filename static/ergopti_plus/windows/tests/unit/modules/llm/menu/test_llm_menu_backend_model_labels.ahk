@@ -324,7 +324,7 @@ _LBMD_Join(Items) {
 ; turned it into a second JsonStringLiteral definition, which AutoHotkey
 ; refuses at load ("This function declaration conflicts with an existing
 ; Func"), so the driver and the page harness could not start. One definition,
-; the shared encoder in infra/json.ahk.
+; the shared encoder in core/text/engine/json.ahk.
 _LBMD_OneJsonStringEncoder() {
 	Source := _DriverSourceNoComments()
 	Count := 0, Pos := 1
@@ -332,7 +332,7 @@ _LBMD_OneJsonStringEncoder() {
 		Count += 1
 		Pos += Match.Len
 	}
-	AssertEqual(1, Count, "the driver defines JsonStringLiteral exactly once (infra/json.ahk)")
+	AssertEqual(1, Count, "the driver defines JsonStringLiteral exactly once (core/text/engine/json.ahk)")
 	AssertContains(_DriverFuncBody("JsonStringLiteral"), "escapeHtml", "that one is the shared encoder")
 }
 Test("model-selector-single-json-encoder: the driver defines one JSON string encoder",

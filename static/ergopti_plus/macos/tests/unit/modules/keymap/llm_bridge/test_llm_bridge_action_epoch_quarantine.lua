@@ -46,7 +46,7 @@ local function load_fixture(reset_result)
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
 	}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		is_letter_char = function() return false end,
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,

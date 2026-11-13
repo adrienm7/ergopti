@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 --- Checks the actual child verdict and receipts from the injected corpus handle.
 --- @param mode string Corpus success or failure mode.

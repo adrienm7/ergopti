@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local Paths = require("core.fs.engine.paths")
-local TomlReader = require("infra.toml.reader")
+local TomlReader = require("core.text.engine.toml.reader")
 local Languages = require("hotstrings.engine.languages")
 local Extensions = require("hotstrings.engine.extensions")
 

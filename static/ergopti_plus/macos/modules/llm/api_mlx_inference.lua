@@ -24,7 +24,7 @@ local M = {}
 
 local Logger         = require("core.logger.engine.logger")
 local Ports          = require("ai.engine.request_plan.ports")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")   -- single source for DEFAULT_MAX_TOKENS

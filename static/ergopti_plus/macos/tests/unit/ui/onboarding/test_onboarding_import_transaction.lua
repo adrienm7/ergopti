@@ -73,7 +73,7 @@ helpers.describe("onboarding configuration import transaction", function()
 	for _, mode in ipairs({ "throw", "nil" }) do
 		helpers.it("(onboarding-import-transaction) decode " .. mode .. " cannot publish defaults", function()
 			fixture.with_delivery(function(_, state, pending, errors, evaluations)
-				package.loaded["infra.toml.codec"].decode = function()
+				package.loaded["core.text.engine.toml.codec"].decode = function()
 					if mode == "throw" then error("PRIVATE_NATIVE_DETAIL") end
 				end
 				fixture.dispatch("loadExistingConfig", state, pending)
@@ -156,7 +156,7 @@ helpers.describe("onboarding empty configuration folder", function()
 					if attributes and attributes.mode == "file" then attributes.size = #content_for(path) end
 					return attributes
 				end
-				package.loaded["infra.toml.codec"].decode = require("core.text.engine.toml_codec").decode
+				package.loaded["core.text.engine.toml.codec"].decode = require("core.text.engine.toml_codec").decode
 				package.loaded["platform.remap"].recommended_key_report = function(path)
 					remap_paths[#remap_paths + 1] = path
 					return { enabled = false, keys = {} }
@@ -202,7 +202,7 @@ helpers.describe("onboarding empty configuration folder", function()
 				if attributes and attributes.mode == "file" then attributes.size = #content end
 				return attributes
 			end
-			package.loaded["infra.toml.codec"].decode = require("core.text.engine.toml_codec").decode
+			package.loaded["core.text.engine.toml.codec"].decode = require("core.text.engine.toml_codec").decode
 			io.open = function(path, access)
 				helpers.assert_eq(access, "r")
 				reads[#reads + 1] = path
@@ -243,7 +243,7 @@ helpers.describe("onboarding retained configuration source", function()
 						end,
 					}
 				end
-				package.loaded["infra.toml.codec"].decode = function()
+				package.loaded["core.text.engine.toml.codec"].decode = function()
 					if phase == "decode" or phase == "decode_refusal" then replace_source() end
 					if phase == "decode_refusal" then error("PRIVATE_NATIVE_DETAIL") end
 					return {}

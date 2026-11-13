@@ -178,8 +178,8 @@ helpers.describe("apply_prediction: direct text uses one tagged callback batch",
 
 	helpers.it("does not leak a partial text_utils stub to later tests", function()
 		fixture.run({ text = "x", buffer = "" })
-		package.loaded["infra.text_utils"] = nil
-		local real_text_utils = helpers.load_with_stubs("infra.text_utils")
+		package.loaded["core.text.engine.utils"] = nil
+		local real_text_utils = helpers.load_with_stubs("core.text.engine.utils")
 
 		helpers.assert_type(real_text_utils, "table")
 		helpers.assert_type(real_text_utils.utf8_len, "function",

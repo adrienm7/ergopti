@@ -24,7 +24,7 @@ return function(run)
 			return original_getenv(key)
 		end
 		helpers.with_fresh_modules({ "infra.app_picker", "core.process.adapters.shell_runner",
-			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.text_utils", "infra.deferred_work" }, function()
+			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.text.engine.utils", "infra.deferred_work" }, function()
 			package.loaded["infra.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
 				if state.defer_synchronous then callback() end
@@ -60,7 +60,7 @@ return function(run)
 			end
 			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.text_utils"] = { escape_gsub_replacement = function(value) return value end }
+			package.loaded["core.text.engine.utils"] = { escape_gsub_replacement = function(value) return value end }
 			_G.hs = {
 				timer = { absoluteTime = function() return state.now * 1000000000 end },
 				application = { frontmostApplication = function() return nil end,

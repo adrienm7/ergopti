@@ -53,7 +53,7 @@ _RSH_GroupRules() {
 	AssertEqual("config-scope-global", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_config_scope_manifest.ahk"))
 	AssertEqual("config-scope-features", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_hotstrings_scope.ahk"))
 	AssertEqual("config-scope-features", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_personal_file_captions.ahk"))
-	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\toml\test_toml_writer_admission.ahk"))
+	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\text\toml\test_writer_admission.ahk"))
 	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_updater.ahk"))
 	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk"))
 	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\hotstrings\personal\test_user_hotstrings.ahk"))
@@ -64,7 +64,7 @@ _RSH_GroupRules() {
 	AssertEqual("ui", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_script_control_submenu.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\process\shell_runner\test_tree_owned.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\network\adapters\test_managed_remote_transport.ahk"))
-	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"))
+	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\text\test_utils.ahk"))
 	; No catch-all: a file no category declares is refused, never filed under core.
 	AssertThrows(() => _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))
 	AssertThrows(() => _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\new_area\test_x.ahk"))
@@ -121,7 +121,7 @@ Test("runner list: unknown names refuse an otherwise valid replay (runner-list-c
 
 
 _RSH_ListSelectionIntersections() {
-	Core := "C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"
+	Core := "C:\repo\static\ergopti_plus\windows\tests\unit\core\text\test_utils.ahk"
 	Ui := "C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_menu.ahk"
 	Rows := [{name: "alpha", file: Core, interactive: false},
 		{name: "beta", file: Ui, interactive: false},
@@ -180,7 +180,7 @@ Test("runner module: --reverse runs the selection backwards (runner-module)", _R
 
 _RSH_DefaultPlanOwner() {
 	global TEST_MODULE_GROUPS
-	File := "C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"
+	File := "C:\repo\static\ergopti_plus\windows\tests\unit\core\text\test_utils.ahk"
 	Rows := [{file: File, name: "first"}, {file: File, name: "second"}]
 	Expected := "core`t" . File . "`tfirst`ncore`t" . File . "`tsecond`n"
 	AssertEqual(Expected, _TestBuildPlan(Rows), "the default plan preserves canonical unit classification and order")

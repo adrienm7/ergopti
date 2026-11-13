@@ -34,7 +34,7 @@ local function fresh_apps()
 		"core.logger.engine.logger",
 		"infra.notifications",
 		"core.i18n.engine.i18n",
-		"infra.text_utils",
+		"core.text.engine.utils",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -299,7 +299,7 @@ local function fresh_apps()
 		end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		applescript_format = function(template, value)
 			return (template:gsub("%%s", value))
 		end,

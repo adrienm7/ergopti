@@ -27,7 +27,7 @@ OnExit(_PathsEarlyObserveExit)
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../_generated/app_dirs.ahk
 #Include ../../infra/app_folders.ahk
-#Include ../../infra/toml/toml_helpers.ahk
+#Include ../../core/text/engine/toml/helpers.ahk
 
 if IsSet(Features) || IsSet(_SharedDir) || IsSet(_ConfigDir) || IsSet(ConfigurationFile)
 	throw Error("The early-reader fixture unexpectedly owns late configuration state")

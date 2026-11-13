@@ -7,7 +7,7 @@
  * Regression guard ensuring the cross-driver symmetry renames stay in effect and
  * cannot silently regress. Checks three invariants:
  *
- * 1. text_utils — windows/infra/text_utils.ahk mirrors macos/infra/text_utils.lua
+ * 1. text_utils — windows/core/text/engine/utils.ahk mirrors macos/core/text/engine/utils.lua
  *    (old name string_utils.ahk must be absent).
  * 2. action_picker — both drivers use a ui/action_picker/init.{ahk,lua} folder
  *    layout (old flat ui/action_picker.ahk must be absent).
@@ -55,15 +55,15 @@ function exists(rel) {
 // =====================================================================
 
 check(
-	'windows/infra/text_utils.ahk exists',
-	exists('windows/infra/text_utils.ahk'),
+	'windows/core/text/engine/utils.ahk exists',
+	exists('windows/core/text/engine/utils.ahk'),
 	'Rename windows/infra/string_utils.ahk -> text_utils.ahk may have been reverted.'
 );
 
 check(
-	'macos/infra/text_utils.lua exists',
-	exists('macos/infra/text_utils.lua'),
-	'macos/infra/text_utils.lua is the macOS peer — must not be renamed or removed.'
+	'macos/core/text/engine/utils.lua exists',
+	exists('macos/core/text/engine/utils.lua'),
+	'macos/core/text/engine/utils.lua is the macOS peer — must not be renamed or removed.'
 );
 
 check(

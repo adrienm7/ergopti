@@ -135,7 +135,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		}
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-		package.loaded["infra.text_utils"] = {
+		package.loaded["core.text.engine.utils"] = {
 			escape_gsub_replacement = function(value) return value end,
 			shell_quote = function(value) return value end,
 		}

@@ -27,7 +27,7 @@ local function load_lifecycle()
 		notify = function() ctx.notifications = ctx.notifications + 1 end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 
 	local lifecycle = helpers.load_with_stubs("platform.remap.ke_lifecycle", {
 		settings = { get = function() return true end },

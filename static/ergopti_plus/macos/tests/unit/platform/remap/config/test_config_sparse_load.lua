@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger",
-	"infra.toml.codec", "core.text.engine.toml_codec" }
+	"core.text.engine.toml.codec", "core.text.engine.toml_codec" }
 
 --- Loads one remap configuration source through the real codec.
 --- @param source string The source in the Karabiner model layout; the file
@@ -102,7 +102,7 @@ helpers.describe("Remap configuration sparse loading", function()
 			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
 		local config_source = '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
 		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system",
-			"core.logger.engine.logger", "core.logger.engine.shim", "infra.toml.codec", "core.text.engine.toml_codec" }, function()
+			"core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -141,7 +141,7 @@ helpers.describe("Remap configuration sparse loading", function()
 				state.tap_hold_config.tab = { tap = "paste", hold = "none" }
 				helpers.assert_true(config.save_user_config(state, "karabiner.toml"), "the save is never refused")
 				helpers.assert_eq(errors, {})
-				local stored = require("infra.toml.codec").decode(written)
+				local stored = require("core.text.engine.toml.codec").decode(written)
 				helpers.assert_eq(stored.tap_hold.keys.tab.tap_action, "paste")
 				helpers.assert_eq(stored.tap_hold.keys.retired_key, "legacy", "a retired entry stays for the user to fix")
 				helpers.assert_nil(stored.mod_combos, "the combination stays in config.toml")
@@ -185,7 +185,7 @@ helpers.describe("Remap obsolete scalar leaves", function()
 	--- `f.original`), or the raw bytes when `raw` is set.
 	local function with_file(original, body, raw)
 		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system",
-			"core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
+			"core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end

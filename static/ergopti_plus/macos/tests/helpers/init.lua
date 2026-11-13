@@ -52,7 +52,7 @@ local function real_timings()
 		REAL_TIMINGS = require("core.timing.engine.timings_core").new({
 			logger = silent, log = "timings", loaded_level = "done",
 			shared_path = function(rel) return M.shared(rel) end,
-			parse = require("infra.toml.reader").parse,
+			parse = require("core.text.engine.toml.reader").parse,
 		})
 	end
 	return REAL_TIMINGS
@@ -431,14 +431,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- require-time get the stub instead of the full shared module, causing
 	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
 	-- core/text/engine/utils_core.lua is pure Lua with no hs deps, so reloading it is safe.
-	loaded["infra.text_utils"] = nil
+	loaded["core.text.engine.utils"] = nil
 
 	-- Clear any toml_codec stub installed at module level by test files that
 	-- treat it as a native C library (e.g. test_config.lua). The real codec is
 	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
-	loaded["infra.toml.codec"]   = nil
+	loaded["core.text.engine.toml.codec"]   = nil
 	loaded["core.text.engine.toml_codec"]       = nil
 	loaded["core.text.engine.toml_codec.codec"] = nil
 

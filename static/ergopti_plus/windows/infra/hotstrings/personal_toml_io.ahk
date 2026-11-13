@@ -18,7 +18,7 @@
 
 
 #Include personal_toml_preservation.ahk
-#Include ../source_text_codec.ahk
+#Include ../../core/text/engine/source_text_codec.ahk
 
 
 

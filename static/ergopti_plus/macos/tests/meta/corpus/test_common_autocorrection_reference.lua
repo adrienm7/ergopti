@@ -56,7 +56,7 @@ helpers.describe("common autocorrection historical reference", function()
 		helpers.with_stub_scope({
 			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
-			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 		}, function()
 			-- The registry is real; the override port represents an empty user file.
 			package.loaded["modules.hotstrings.hotstrings_config"] = {
@@ -172,7 +172,7 @@ helpers.describe("common autocorrection interleaved source order", function()
 			helpers.with_stub_scope({
 				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
-				"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+				"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 			}, function()
 				package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
 				local State = helpers.load_with_stubs("modules.keymap.state")
@@ -258,7 +258,7 @@ local function shipped_split_registry(only)
 			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
 			"modules.keymap.expander", "modules.keymap.terminator_replay",
-			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 		}, function()
 			-- The registry is real; the override port represents an empty user file.
 			package.loaded["modules.hotstrings.hotstrings_config"] = {

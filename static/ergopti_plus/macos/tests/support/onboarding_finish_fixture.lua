@@ -24,9 +24,9 @@ local MODULE_NAMES = {
 	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.fs.engine.paths",
-	"infra.text_utils",
-	"infra.toml.codec",
-	"infra.toml.writer",
+	"core.text.engine.utils",
+	"core.text.engine.toml.codec",
+	"core.text.engine.toml.writer",
 	"infra.config_paths",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"platform.remap",
@@ -168,8 +168,8 @@ function M.with_finish(opts, scenario)
 	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["core.fs.engine.paths"] = { shared = opts.canonical_files and helpers.shared
 		or function() return "/virtual/shared" end }
-	package.loaded["infra.text_utils"] = { applescript_format = string.format }
-	package.loaded["infra.toml.codec"] = { decode = function() return {} end }
+	package.loaded["core.text.engine.utils"] = { applescript_format = string.format }
+	package.loaded["core.text.engine.toml.codec"] = { decode = function() return {} end }
 	package.loaded["core.fs.adapters.file_system"] = opts.canonical_files or {
 		read_with_status = opts.read or function() return nil, "absent" end,
 	}
@@ -177,7 +177,7 @@ function M.with_finish(opts, scenario)
 	for name, method in pairs(opts.native_files or {}) do
 		package.loaded["core.fs.adapters.file_system"][name] = method
 	end
-	package.loaded["infra.toml.writer"] = {
+	package.loaded["core.text.engine.toml.writer"] = {
 		batch_write = function(path, rows, expected_source)
 			state.writes[#state.writes + 1] = { path = path, rows = rows }
 			if type(opts.native_writer) == "function" then return opts.native_writer(path, rows, expected_source) end
@@ -290,8 +290,8 @@ function M.with_finish(opts, scenario)
 				helpers.assert_eq(package.loaded["settings.engine.migration.file_inverse"], state.retained_inverse_module,
 					"the genuine inverse module remains cached from the prior helper cohort")
 			end
-			package.loaded["infra.toml.writer"] = nil
-			require("infra.toml.writer")
+			package.loaded["core.text.engine.toml.writer"] = nil
+			require("core.text.engine.toml.writer")
 		end
 		local onboarding = require("ui.onboarding")
 		if not opts.canonical_files then require("tests.support.onboarding_shared_data").install() end

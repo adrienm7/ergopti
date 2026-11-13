@@ -42,7 +42,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"infra.keycodes",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -112,7 +112,7 @@ local function with_fixture(callback)
 				notify = function() return true end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.text_utils"] = {
+			package.loaded["core.text.engine.utils"] = {
 				shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 			}
 			package.loaded["modules.llm.ollama_binary"] = {

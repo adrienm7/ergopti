@@ -69,7 +69,7 @@ local function load_menu_quit_action()
 	}
 	package.loaded["ui.hotstring_editor"] = {}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		shell_quote = function(value) return tostring(value) end,
 		escape_gsub_replacement = function(value) return tostring(value) end,
 	}

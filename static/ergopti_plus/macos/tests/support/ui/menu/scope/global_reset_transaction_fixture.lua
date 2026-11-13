@@ -21,7 +21,7 @@ local MODULE_KEYS = {
 	"core.logger.engine.logger",
 	"infra.notifications",
 	"ui.hotstring_editor",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"core.i18n.engine.i18n",
 	"infra.ui_restore",
 	"infra.preferences",
@@ -308,7 +308,7 @@ local function with_menu_fixture(options, callback)
 		end,
 	}
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}

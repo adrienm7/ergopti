@@ -31,8 +31,8 @@ local WebviewResult = require("adapters.webview_result")
 local NativePath = require("core.fs.engine.native_path")
 
 local i18n         = require("core.i18n.engine.i18n")
-local toml_writer  = require("infra.toml.writer")
-local toml_codec   = require("infra.toml.codec")
+local toml_writer  = require("core.text.engine.toml.writer")
+local toml_codec   = require("core.text.engine.toml.codec")
 local notifications = require("infra.notifications")
 local Paths        = require("core.fs.engine.paths")
 local Logger       = require("core.logger.engine.logger")
@@ -81,7 +81,7 @@ local function publication_owner()
 		_publication = require("onboarding.engine.publication").new({
 			files = FileSystem, write = native_write, current = function()
 				return rawequal(package.loaded["ui.onboarding"], M)
-					and rawequal(package.loaded["infra.toml.writer"], toml_writer)
+					and rawequal(package.loaded["core.text.engine.toml.writer"], toml_writer)
 					and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem)
 					and toml_writer.batch_write == native_write and FileSystem.read_with_status == native_read
 			end,

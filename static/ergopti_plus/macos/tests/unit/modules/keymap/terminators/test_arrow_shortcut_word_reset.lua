@@ -101,9 +101,9 @@ local function install_collaborators(effects)
 	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
 	-- Only the fixture's virtual file is answered here; every other TOML (the
 	-- shared timing constants, …) is still read by the real reader.
-	package.loaded["infra.toml.reader"] = nil
-	local RealReader = require("infra.toml.reader")
-	package.loaded["infra.toml.reader"] = setmetatable({
+	package.loaded["core.text.engine.toml.reader"] = nil
+	local RealReader = require("core.text.engine.toml.reader")
+	package.loaded["core.text.engine.toml.reader"] = setmetatable({
 		parse = function(path, ...)
 			if path == "/virtual/word_reset.toml" then return WORD_TOML, true end
 			return RealReader.parse(path, ...)
@@ -214,7 +214,7 @@ local function with_keymap(body)
 	pcall(Keymap.stop)
 	Utils.is_ignored_window, Utils.is_secure_field = original_ignored, original_secure
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name == "infra.toml.reader") then
+		if type(name) == "string" and (name:match("^modules%.keymap") or name == "core.text.engine.toml.reader") then
 			package.loaded[name] = nil
 		end
 	end

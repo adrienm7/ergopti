@@ -18,7 +18,7 @@ local MODULES = {
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.manifest_menu",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.keystats",
 	"ui.menu.menu_metrics",
 }
@@ -111,7 +111,7 @@ local function with_filter(filter, options, callback)
 		end,
 		resolve_disabled_when = function() return false end,
 	}
-	package.loaded["infra.text_utils"] = {}
+	package.loaded["core.text.engine.utils"] = {}
 	package.loaded["modules.keystats"] = keystats
 
 	local state = {

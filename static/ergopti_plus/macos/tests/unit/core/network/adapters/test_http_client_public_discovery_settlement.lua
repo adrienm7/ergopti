@@ -14,7 +14,7 @@ local OWNED_MODULES = {
 	"core.events.timer_scheduler", "core.logger.engine.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
 	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
-	"infra.timings", "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
+	"infra.timings", "core.text.engine.utils", "modules.llm.profiles", "modules.llm.parser",
 	"modules.llm.api_common", "ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto",
 	"modules.llm.progressive_reveal", "modules.llm.remote_response_classifier",
 	"ai.engine.api.remote_formats", "modules.keystats", "core.fs.adapters.file_system", "core.network.engine.http_header_policy",
@@ -64,7 +64,7 @@ local function isolated(scenario)
 		end
 		-- These owners are outside detection; their module state is explicitly
 		-- scoped and none substitutes the detector, shared sweep or HTTP adapter.
-		for _, name in ipairs({ "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
+		for _, name in ipairs({ "core.text.engine.utils", "modules.llm.profiles", "modules.llm.parser",
 			"ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto", "modules.llm.progressive_reveal",
 			"modules.llm.remote_response_classifier", "ai.engine.api.remote_formats", "modules.keystats" }) do
 			package.loaded[name] = {}

@@ -12,7 +12,7 @@ local Fixture = require("tests.support.keystats_provenance_fixture")
 local OWNERS = {
 	"core.events.clock",
 	"infra.timings",
-	"infra.toml.reader",
+	"core.text.engine.toml.reader",
 	"metrics.engine.metrics",
 	"modules.keystats.privacy_context",
 	"diagnostics.engine.reports.error_description",

@@ -99,7 +99,7 @@ helpers.describe("preview masking: the shared cross-driver vectors", function()
 	-- test's, not one an earlier file happened to warm.
 	local Fields = helpers.load_with_stubs("infra.personal_info_fields")
 	local Paths  = require("core.fs.engine.paths")
-	local Codec  = require("infra.toml.codec")
+	local Codec  = require("core.text.engine.toml.codec")
 	Fields._reset()
 
 	--- Reads the vector file through the same resolver the driver uses.

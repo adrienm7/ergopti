@@ -23,7 +23,7 @@ local function with_config_fixture(callback)
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
 			"core.fs.engine.paths",
-			"infra.toml.codec",
+			"core.text.engine.toml.codec",
 			"hs",
 			"tests.stubs.hs",
 		}, function()
@@ -82,7 +82,7 @@ local function with_config_fixture(callback)
 			package.loaded["core.fs.engine.paths"] = {
 				shared = function() return "/fixture/modifier-chords.json" end,
 			}
-			package.loaded["infra.toml.codec"] = {
+			package.loaded["core.text.engine.toml.codec"] = {
 				decode = function() return {} end,
 				encode = function() return "" end,
 			}

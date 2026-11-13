@@ -21,7 +21,7 @@
 local hs = hs
 local M  = {}
 
-local text_utils  = require("infra.text_utils")
+local text_utils  = require("core.text.engine.utils")
 local shared_utils = require("layouts.engine.utils")
 local Logger      = require("core.logger.engine.logger")
 local Timings     = require("infra.timings")

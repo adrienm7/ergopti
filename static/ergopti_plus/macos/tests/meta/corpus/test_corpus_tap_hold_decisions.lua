@@ -83,7 +83,7 @@ helpers.with_fresh_modules({
 	"infra.config_paths",
 	"infra.keycodes",
 	"core.logger.engine.logger",
-	"infra.toml.codec",
+	"core.text.engine.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
@@ -106,7 +106,7 @@ helpers.with_fresh_modules({
 	-- pure-Lua reader; the native TOML codec is absent from the headless runner.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 	package.loaded["core.text.engine.toml_codec"] = toml_stub
-	package.loaded["infra.toml.codec"] = toml_stub
+	package.loaded["core.text.engine.toml.codec"] = toml_stub
 	local file_cache = {}
 	local function read_once(path)
 		if file_cache[path] == nil then file_cache[path] = SourceFile.read(path) end

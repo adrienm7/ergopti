@@ -20,7 +20,7 @@ local M = {}
 
 local hs = hs
 
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 -- The shared matcher core. Only M.decide is used: the firing DECISION is shared,
 -- the buffer traversal is not — macOS slices a byte string, the core an array of
 -- codepoints, and neither has to convert for the other.
@@ -1539,7 +1539,7 @@ function M.try_expand(chars, is_ignored)
 
 	local char_len = 1  -- ASCII fallback; accurate enough for the E2E corpus
 	local ok_len, n = pcall(function()
-		local text_u = require("infra.text_utils")
+		local text_u = require("core.text.engine.utils")
 		return text_u.utf8_len(chars)
 	end)
 	if ok_len and type(n) == "number" and n > 0 then char_len = n end

@@ -15,7 +15,7 @@ local function with_sender(callback)
 		"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
 		"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
 		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
-		"infra.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
+		"core.text.engine.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
 		"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local f = Fixture.make({ deliver_trigger = false, absolute_time = 0 })

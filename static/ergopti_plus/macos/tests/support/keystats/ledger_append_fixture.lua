@@ -15,7 +15,7 @@ local OWNED = { "tests.support.file_system_transaction_fixture", "core.fs.adapte
 	"modules.keystats.export", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "core.events.timer_scheduler", "modules.keystats.timestamp", "lfs",
 	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "metrics.engine.capture.physical_release",
-	"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "diagnostics.engine.operation_reporter", "infra.toml.reader",
+	"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "diagnostics.engine.operation_reporter", "core.text.engine.toml.reader",
 	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8" }
 
 local function upvalue(fn, wanted)

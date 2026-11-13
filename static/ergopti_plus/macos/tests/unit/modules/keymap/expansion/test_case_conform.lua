@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 package.loaded["core.logger.engine.logger"] = nil
 local _      = helpers.load_with_stubs("core.logger.engine.logger")
 local State  = helpers.load_with_stubs("modules.keymap.state")
-local txt    = helpers.load_with_stubs("infra.text_utils")
+local txt    = helpers.load_with_stubs("core.text.engine.utils")
 
 local REGISTRY_OWNERSHIP = {
 	"modules.keymap.registry",
@@ -29,7 +29,7 @@ local REGISTRY_OWNERSHIP = {
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
 	"modules.keymap.utils",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"core.text.engine.utils_core",
 }
 
@@ -41,7 +41,7 @@ local ENGINE_OWNERSHIP = {
 	"modules.keymap.expander",
 	"modules.keymap.terminator_replay",
 	"modules.keymap.utils",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"core.text.engine.utils_core",
 	"ui.tooltip",
 	"modules.keystats",

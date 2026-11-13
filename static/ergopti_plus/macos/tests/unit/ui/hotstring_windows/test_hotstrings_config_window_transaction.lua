@@ -352,7 +352,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local content = read_fixture(path)
 		local _, color_count = content:gsub("color%s*=", "")
 		helpers.assert_eq(color_count, 1)
-		local decoded = require("infra.toml.codec").decode(content)
+		local decoded = require("core.text.engine.toml.codec").decode(content)
 		helpers.assert_type(decoded, "table")
 		helpers.assert_eq(decoded._meta.color, "#A1b2C3D4")
 		helpers.assert_eq(notifications, 2)
@@ -389,7 +389,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			"the continuation line must not create a duplicate owned field")
 		helpers.assert_contains(content, matrix_record,
 			"the unowned nested record must remain byte-identical")
-		local codec = require("infra.toml.codec")
+		local codec = require("core.text.engine.toml.codec")
 		local decode_ok, decoded = pcall(codec.decode, content)
 		helpers.assert_true(decode_ok and type(decoded) == "table",
 			"the UI must publish valid TOML after the real bridge action")
@@ -539,7 +539,7 @@ helpers.describe("hotstrings config window: incomplete TOML reads are withheld",
 			read_with_status = function() return nil, "absent", "not found" end,
 			write = function() return true end,
 		}
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function()
 				return {
 					meta = { delay = 0.99, sections = {} },
@@ -558,7 +558,7 @@ helpers.describe("hotstrings config window: incomplete TOML reads are withheld",
 		}
 
 		PersonalFixture.install_personal_binding("/personal/private.toml", SENTINEL)
-		package.loaded["infra.toml.reader"] = { parse = function()
+		package.loaded["core.text.engine.toml.reader"] = { parse = function()
 			return { meta = { delay = 0.99, sections = {} }, sections = {}, sections_order = {} }, false
 		end }
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window", {

@@ -5,7 +5,7 @@
 
 local helpers = require("tests.helpers")
 local prefs   = helpers.load_with_stubs("infra.preferences")
-local codec   = helpers.load_with_stubs("infra.toml.codec")
+local codec   = helpers.load_with_stubs("core.text.engine.toml.codec")
 local with_count_menu = require("tests.support.llm_count_menu_fixture")
 
 local function contract_path()

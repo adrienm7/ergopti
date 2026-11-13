@@ -41,7 +41,7 @@ const sourcePaths = Object.freeze([
 	'static/ergopti_plus/windows/infra/config_migrate.ahk',
 	'static/ergopti_plus/windows/infra/config_transition_runtime.ahk',
 	'static/ergopti_plus/windows/infra/config_write_lease.ahk',
-	'static/ergopti_plus/windows/infra/toml/toml_document.ahk',
+	'static/ergopti_plus/windows/core/text/engine/toml/document.ahk',
 	'static/ergopti_plus/windows/modules/updater.ahk',
 	'static/ergopti_plus/windows/modules/updater/changelog.ahk',
 	'static/ergopti_plus/windows/modules/updater/channels.ahk',

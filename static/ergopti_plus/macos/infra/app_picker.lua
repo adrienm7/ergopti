@@ -18,7 +18,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local DeferredWork = require("infra.deferred_work")
 local Logger = require("core.logger.engine.logger")
 local i18n   = require("core.i18n.engine.i18n")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 local LOG = "app_picker"
 

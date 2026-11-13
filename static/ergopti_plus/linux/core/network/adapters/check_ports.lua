@@ -66,7 +66,7 @@ local function native()
 			local ok, output = Shell.exec_checked("timeout " .. M.SETTINGS_TIMEOUT_SECONDS .. " " .. command)
 			if not ok then return nil end
 			if command == GNOME_MODE or command == GNOME_PAC then
-				local value, refusal = require("infra.gvariant_string").decode(output)
+				local value, refusal = require("core.text.engine.gvariant_string").decode(output)
 				if value == nil then error(refusal, 0) end
 				return value
 			end

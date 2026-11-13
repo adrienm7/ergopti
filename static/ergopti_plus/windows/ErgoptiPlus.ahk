@@ -453,7 +453,7 @@ if UIASW_IsWorkerInvocation()
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
-#Include infra/toml/toml_helpers.ahk
+#Include core/text/engine/toml/helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
 #Include infra/timings/timings_config.ahk
@@ -464,7 +464,7 @@ if UIASW_IsWorkerInvocation()
 ; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include infra/window_utils.ahk
 #Include core/network/engine/external_url_policy.ahk
-#Include infra/text_utils.ahk
+#Include core/text/engine/utils.ahk
 #Include infra/text_case.ahk
 #Include infra/wrap_pair.ahk
 #Include infra/open_target.ahk
@@ -495,9 +495,9 @@ if UIASW_IsWorkerInvocation()
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
-#Include infra/toml/toml_loader.ahk
+#Include core/text/engine/toml/loader.ahk
 #Include infra/hotstrings/extension_packs.ahk
-#Include infra/toml/toml_config_loader.ahk
+#Include core/text/engine/toml/config_loader.ahk
 BootProfile_Stamp("Hotstring and TOML state initialised")
 ; The config.toml schema migration the boot runs before any reader or writer.
 #Include infra/config_migrate.ahk
@@ -534,7 +534,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include ui/error_dialog/init.ahk
 #Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
-#Include infra/json.ahk
+#Include core/text/engine/json.ahk
 #Include infra/program_parameter.ahk
 #Include core/process/adapters/program_providers.ahk
 #Include infra/program_actions.ahk

@@ -141,7 +141,7 @@ local function install_personal_binding(path, content)
 		end,
 	}
 	local Reader = require("core.text.engine.toml_codec.reader")
-	package.loaded["infra.toml.reader"] = {
+	package.loaded["core.text.engine.toml.reader"] = {
 		parse = function(candidate)
 			if candidate == native_path then return Reader.parse_text(record.content) end
 			return nil, false

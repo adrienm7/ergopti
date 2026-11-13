@@ -61,7 +61,7 @@ local OWNERS = {
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
 	"ui.tooltip",
-	"infra.toml.reader",
+	"core.text.engine.toml.reader",
 	"core.text.engine.toml_codec.reader",
 	"core.text.engine.toml_codec.bom",
 	"core.text.engine.toml_codec.basic_string",

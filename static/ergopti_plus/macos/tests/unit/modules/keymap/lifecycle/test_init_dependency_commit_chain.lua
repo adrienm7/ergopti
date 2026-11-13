@@ -173,7 +173,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 	helpers.it("Expander refuses before publication when TerminatorReplay.init refuses", function()
 		local replay_calls = 0
 		with_stubbed_module("modules.keymap.expander", {
-			["infra.text_utils"] = {},
+			["core.text.engine.utils"] = {},
 			["infra.hotstring_engine"] = {},
 			["modules.keymap.utils"] = {},
 			["core.logger.engine.logger"] = LOGGER_STUB,
@@ -207,7 +207,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["adapters.synthetic_input"] = {
 				current_action_epoch = function() return 0 end,
 			},
-			["infra.text_utils"] = {},
+			["core.text.engine.utils"] = {},
 			["modules.llm"] = { DEFAULT_STATE = {} },
 			["core.logger.engine.logger"] = LOGGER_STUB,
 			["infra.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },

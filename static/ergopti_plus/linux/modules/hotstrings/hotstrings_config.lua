@@ -38,7 +38,7 @@ local Extensions = require("hotstrings.engine.extensions")
 local ConfigPaths = require("infra.config_paths")
 local Paths = require("core.fs.engine.paths")
 local RegularFile = require("core.fs.engine.regular_file_reader")
-local TomlReader = require("infra.toml.reader")
+local TomlReader = require("core.text.engine.toml.reader")
 local TomlCodec = require("core.text.engine.toml_codec")
 local Overrides = require("hotstrings.engine.overrides")
 local KeyPath = require("core.text.engine.toml_codec.key_path")
@@ -2644,7 +2644,7 @@ function M.get_category_order()
 	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths then
 		local ok_read, parsed = pcall(function()
-			return require("infra.toml.reader").parse(Paths.shared("hotstrings/data/catalogue/_index.toml"))
+			return require("core.text.engine.toml.reader").parse(Paths.shared("hotstrings/data/catalogue/_index.toml"))
 		end)
 		local menu = ok_read and type(parsed) == "table" and parsed.sections
 			and parsed.sections.menu or nil

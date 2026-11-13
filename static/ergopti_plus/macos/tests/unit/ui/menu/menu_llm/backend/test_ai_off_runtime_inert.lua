@@ -416,7 +416,7 @@ local OLLAMA_MODULES = {
 	"infra.notifications",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.llm.ollama_binary",
 	"core.lifecycle.engine.core.ollama_runtime_choice",
 	"modules.llm.ollama_server_command",
@@ -451,7 +451,7 @@ local function with_ollama_manager(enabled, body)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.text_utils"] = {}
+		package.loaded["core.text.engine.utils"] = {}
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return "/opt/homebrew/bin/ollama", nil, "homebrew" end,
 		}

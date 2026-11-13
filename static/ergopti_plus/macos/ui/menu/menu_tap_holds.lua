@@ -39,7 +39,7 @@ local LoneTap     = require("tap_hold.engine.lone_tap")
 local Manifest    = require("infra.manifest_reader")
 local LOG         = "menu.tap_holds"
 local i18n        = require("core.i18n.engine.i18n")
-local text_utils  = require("infra.text_utils")
+local text_utils  = require("core.text.engine.utils")
 local WindowTitles = require("core.ui.engine.window_titles")
 local ConfigKeys = require("settings.engine.keys")
 

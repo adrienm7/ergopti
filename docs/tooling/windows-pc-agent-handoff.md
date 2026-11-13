@@ -417,7 +417,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `windows/tests/fixtures/keylogger_fire_publication_owner_body.ahk`, the
   `#Include` in `test_keystats_journal_flush_retry.ahk` and
   `test_buffer_snapshot_publication_owner.ahk`, and the `[keylogger]` section
-  of `windows/tests/unit/infra/toml/test_toml_reader_publication.ahk`. Rename
+  of `windows/tests/unit/core/text/toml/test_reader_publication.ahk`. Rename
   to `keystats` unless `[keylogger]` there pins a real retired section a
   migration still reads; then say so in a comment. The macOS-only leftover is
   the compiled comment of `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt`

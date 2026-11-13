@@ -17,7 +17,7 @@ local PATH = "/user/packs/" .. SECRET .. ".toml"
 local OWNED_MODULES = {
 	"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 	"modules.keymap.terminators", "modules.keymap.state", "modules.keymap.utils",
-	"infra.toml.reader", "infra.timings", "modules.hotstrings.hotstrings_config",
+	"core.text.engine.toml.reader", "infra.timings", "modules.hotstrings.hotstrings_config",
 }
 
 helpers.describe("Registry: a group name is masked in the log", function()
@@ -30,7 +30,7 @@ helpers.describe("Registry: a group name is masked in the log", function()
 		local ok, failure = pcall(function()
 			helpers.with_fresh_modules(OWNED_MODULES, function()
 				package.loaded["core.logger.engine.logger"] = Logger
-				package.loaded["infra.toml.reader"] = {
+				package.loaded["core.text.engine.toml.reader"] = {
 					parse = function(path)
 						if path ~= PATH then return nil, false end
 						return { sections_order = { "main" }, sections = { main = { zqrule = { output = "X" } } },

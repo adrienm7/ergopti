@@ -22,7 +22,7 @@ end
 local function with_download_window(controls, callback)
 	helpers.with_fresh_modules({
 		"ui.download_window", "ui.ui_builder", "core.logger.engine.logger", "infra.deferred_work",
-		"core.fs.engine.paths", "core.i18n.engine.i18n", "infra.text_utils", "hs", "tests.stubs.hs",
+		"core.fs.engine.paths", "core.i18n.engine.i18n", "core.text.engine.utils", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
 		local state = { errors = 0, successes = 0, show_calls = 0 }
@@ -30,7 +30,7 @@ local function with_download_window(controls, callback)
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.text_utils"] = {
+		package.loaded["core.text.engine.utils"] = {
 			applescript_format = function(value) return value end,
 			shell_quote = function(value) return value end,
 		}
@@ -52,8 +52,8 @@ end
 local function with_onboarding(controls, callback)
 	helpers.with_fresh_modules({
 		"ui.onboarding", "ui.ui_builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
-		"infra.toml.writer", "infra.toml.codec", "infra.notifications", "core.fs.engine.paths",
-		"infra.deferred_work", "infra.text_utils", "infra.manifest_reader",
+		"core.text.engine.toml.writer", "core.text.engine.toml.codec", "infra.notifications", "core.fs.engine.paths",
+		"infra.deferred_work", "core.text.engine.utils", "infra.manifest_reader",
 		"infra.dialog_util", "ui.menu.menu_paths", "core.fs.adapters.file_system",
 		"core.fs.adapters.storage", "hs", "tests.stubs.hs",
 	}, function()
@@ -70,14 +70,14 @@ local function with_onboarding(controls, callback)
 		}
 		package.loaded["core.logger.engine.logger"] = logger_spy(state)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.toml.writer"] = {
+		package.loaded["core.text.engine.toml.writer"] = {
 			batch_write = function() error("invalid window-only answers cannot acquire publication") end,
 		}
-		package.loaded["infra.toml.codec"] = {}
+		package.loaded["core.text.engine.toml.codec"] = {}
 		package.loaded["infra.notifications"] = {}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end }
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
-		package.loaded["infra.text_utils"] = {}
+		package.loaded["core.text.engine.utils"] = {}
 		package.loaded["infra.manifest_reader"] = {}
 		package.loaded["core.fs.adapters.file_system"] = {}
 		package.loaded["core.fs.adapters.storage"] = {}

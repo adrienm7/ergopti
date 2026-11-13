@@ -17,7 +17,7 @@ local OWNERS = {
 	-- It also tells whether its own window is focused through this adapter.
 	"adapters.own_window",
 	"core.fs.adapters.file_system", "adapters.metadata_command_stats", "core.fs.adapters.write_lock_path", "core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths",
-	"core.i18n.engine.i18n", "core.fs.engine.dir", "infra.text_utils", "core.text.engine.utils_core",
+	"core.i18n.engine.i18n", "core.fs.engine.dir", "core.text.engine.utils", "core.text.engine.utils_core",
 	"hs.fs", "hs.json", "core.text.engine.json", "ui.ui_builder", "ui.metrics_typing",
 	"modules.keystats.log_manager", "modules.keystats.sqlite_reader",
 	-- The dashboard and the reader name the shared metric keys through this table.

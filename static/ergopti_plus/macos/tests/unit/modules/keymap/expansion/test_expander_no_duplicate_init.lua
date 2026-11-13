@@ -86,7 +86,7 @@ local function fresh_expander()
 	local to_wipe = {
 		"modules.keymap.expander",
 		"modules.keymap.terminator_replay",
-		"infra.text_utils",
+		"core.text.engine.utils",
 		"modules.keymap.utils",
 		"core.logger.engine.logger",
 		"modules.keystats",

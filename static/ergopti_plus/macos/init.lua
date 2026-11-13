@@ -544,7 +544,7 @@ do
 	local ok_cache, toml_cache = pcall(require, "core.fs.adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
 		toml_cache.init(TOML_CACHE_DIR)
-		local ok_reader, toml_reader = pcall(require, "infra.toml.reader")
+		local ok_reader, toml_reader = pcall(require, "core.text.engine.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
 		end

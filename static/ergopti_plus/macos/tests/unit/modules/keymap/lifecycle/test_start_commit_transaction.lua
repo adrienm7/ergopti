@@ -832,7 +832,7 @@ local INPUT_MODULES = {
 	"modules.keymap.magic_key_source", "core.events.clock",
 	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "infra.deferred_work",
 	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
-	"infra.hotstring_engine", "hotstrings.engine.matcher", "infra.text_utils", "core.text.engine.utils_core",
+	"infra.hotstring_engine", "hotstrings.engine.matcher", "core.text.engine.utils", "core.text.engine.utils_core",
 	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
 	"core.text.engine.unicode_case", "unicode_case.init", "core.text.engine.unicode_case.data", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.logger.engine.shim", "hotstrings.engine.catalogue.personal_files", "core.fs.engine.native_path", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",

@@ -579,7 +579,7 @@ local function do_expand(combo)
 		if _keymap and type(_keymap.inject_dynamic) == "function" then
 			local injected = _keymap.inject_dynamic(n_back, echoed, function()
 				local c = 0
-				local ok_tu, text_utils = pcall(require, "infra.text_utils")
+				local ok_tu, text_utils = pcall(require, "core.text.engine.utils")
 				for i, value in ipairs(parts) do
 					assert(SyntheticInput.emit_key_strokes(value),
 						"personal-info field could not be dispatched")

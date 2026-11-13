@@ -99,7 +99,7 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 			helpers.assert_eq(mod.common_autocorrection_admitted(), false)
 			helpers.with_stub_scope({
 				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage", "infra.toml.reader",
+				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage", "core.text.engine.toml.reader",
 			}, function()
 				local State = helpers.load_with_stubs("modules.keymap.state")
 				local Registry = helpers.load_with_stubs("modules.keymap.registry")

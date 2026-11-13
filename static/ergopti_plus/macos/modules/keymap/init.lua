@@ -18,7 +18,7 @@
 
 local hs         = hs
 local eventtap   = hs.eventtap
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local ComposedText = require("infra.composed_text")
 local LlmContext = require("modules.keymap.llm_context")
 local EventProvenance = require("adapters.event_provenance")

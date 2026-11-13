@@ -159,7 +159,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 			helpers.assert_true(window.show({ kind = "ollama_model", model = model }))
 			state.bridge({ body = { action = "terminal", session = window.session_id() } })
 			local command = [[ollama pull 'owner'\''s/model; $(printf EXPANDED) `printf EXPANDED`']]
-			local expected = require("infra.text_utils").applescript_format(
+			local expected = require("core.text.engine.utils").applescript_format(
 				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
 			helpers.assert_eq(state.applescript_calls, 1)
 			helpers.assert_eq(state.script, expected)
@@ -182,7 +182,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 				state.logger.today_log_path = function() return case.path end
 				helpers.assert_true(window.show({ kind = "mlx_install" }))
 				state.bridge({ body = { action = "terminal", session = window.session_id() } })
-				local expected = require("infra.text_utils").applescript_format(
+				local expected = require("core.text.engine.utils").applescript_format(
 					'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', case.command)
 				helpers.assert_eq(state.applescript_calls, 1)
 				helpers.assert_eq(state.script, expected,
@@ -199,7 +199,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 				kind = "mlx_model", model = "controlled-model", terminal_cmd = command,
 			}))
 			state.bridge({ body = { action = "terminal", session = window.session_id() } })
-			local expected = require("infra.text_utils").applescript_format(
+			local expected = require("core.text.engine.utils").applescript_format(
 				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
 			helpers.assert_eq(state.applescript_calls, 1)
 			helpers.assert_eq(state.script, expected,

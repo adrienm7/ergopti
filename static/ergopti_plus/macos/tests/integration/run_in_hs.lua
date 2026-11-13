@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local TARGETS = {
-	"infra.text_utils", "infra.toml.reader", "core.logger.engine.logger",
+	"core.text.engine.utils", "core.text.engine.toml.reader", "core.logger.engine.logger",
 	"infra.keycodes", "modules.keymap.layout", "core.logger.engine.perf",
 	"modules.keymap.terminators", "modules.keymap.utils",
 	"platform.remap.defaults", "platform.remap.config",

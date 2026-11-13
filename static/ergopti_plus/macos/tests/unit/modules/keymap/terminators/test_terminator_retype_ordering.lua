@@ -17,7 +17,7 @@ local OWNED = {
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "infra.capsword_output", "infra.deferred_work",
 	"infra.hotstring_engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
-	"infra.text_utils", "infra.timings", "core.text.engine.json",
+	"core.text.engine.utils", "infra.timings", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
 	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",

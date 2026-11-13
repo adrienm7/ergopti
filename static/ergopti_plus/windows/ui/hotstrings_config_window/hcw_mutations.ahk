@@ -16,7 +16,7 @@
 ; extension entries) or _HCW_PatchTomlMeta (for personal TOML files).
 ; ==============================================================================
 
-#Include ../../infra/number.ahk
+#Include ../../core/text/engine/number.ahk
 
 ; Override fields that are BAKED INTO EACH SPEC at registration time rather than
 ; derived at read time. Persisting one of these only bumps the resolve

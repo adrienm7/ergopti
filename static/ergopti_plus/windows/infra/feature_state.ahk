@@ -138,7 +138,7 @@ global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection(ConfigKey.S
 global KeyboardShortcutAssignments := Map()
 
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in
-; infra/toml/toml_helpers.ahk
+; core/text/engine/toml/helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
 ; Category-level gating state (master-toggle refactor).

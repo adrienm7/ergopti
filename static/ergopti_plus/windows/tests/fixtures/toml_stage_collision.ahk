@@ -8,7 +8,7 @@
 #Include ../../core/logger/engine/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../core/fs/adapters/file_system.ahk
-#Include ../../infra/toml/toml_helpers.ahk
+#Include ../../core/text/engine/toml/helpers.ahk
 
 _TBCS_Child() {
 	AssertEqual(2, A_Args.Length)

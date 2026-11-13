@@ -332,7 +332,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-ollama-a-b-order) prevents late absent A from prompting or pulling after B commits", function()
 		local modules = {
-			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.text.engine.utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 			"core.network.adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
@@ -357,7 +357,7 @@ helpers.describe("model manager generation fences", function()
 		}
 		with_fixture(modules, hs_fixture, function()
 			install_common_stubs()
-			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}
+			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return value end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama" end,
 			}
@@ -1020,7 +1020,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-ollama-pull-publication-yield) refuses a successor before UI and drops stale completion", function()
 		local modules = {
-			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.text.engine.utils",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"core.process.adapters.task_lifecycle", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_ollama", "modules.llm.network_env",
@@ -1053,7 +1053,7 @@ helpers.describe("model manager generation fences", function()
 			package.loaded["infra.notifications"] = {
 				notify = function() notifications = notifications + 1 end,
 			}
-			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}
+			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return value end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama" end,
 			}
