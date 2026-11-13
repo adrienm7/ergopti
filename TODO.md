@@ -67,6 +67,17 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       single and combined: Shift, Ctrl, Alt, AltGr, Kana, Win/Cmd, and chords such as Ctrl+Shift or Win+Ctrl; a key
       can tap one modifier's one-shot and hold that modifier (AltGr key: one-shot AltGr on tap, AltGr on hold).
       Shared defaults, tests per OS.
+- [ ] **One validation contract for every user-entered value (maintainer request 2026-11-13).** Every input box,
+      editor field and `config.toml`/TOML key on Windows, macOS and Linux declares its type (integer, decimal,
+      boolean, enum, string, path), minimum, maximum, whether decimals are allowed and any special value (such as
+      the one-shot `0` = no limit), in one shared schema per setting (single source, read by the three drivers and
+      the web pages). Check it at three places: (1) at entry, refusing with a localized message that names the
+      allowed range; (2) at load of the saved configuration, reporting and logging a bad stored value and keeping
+      the default, never silently; (3) at the consuming code's boundary, where the value reaches the engine (a
+      setter, a timer, a Karabiner/ydotool/AHK call), so a value altered after load (a string instead of a number,
+      NaN, out of range) fails fast with a log line instead of crashing. Start with an inventory of every prompt and
+      key per OS, then regression tests per OS that feed a wrong type, a boundary and an out-of-range value at each
+      of the three places.
 - [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
