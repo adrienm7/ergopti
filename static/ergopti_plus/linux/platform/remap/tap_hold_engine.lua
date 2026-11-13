@@ -64,6 +64,7 @@ function M:set_roll_origin_capture(capture, current)
 		or next(self.held) or next(self.key_refs) or next(self.layer_keys) or next(self.instant_down)
 		or next(self.native_keys) or next(self.passed_down) or next(self.physical_down) or next(self.one_shot_keys)
 		or next(self.one_shot_swallowed) or self.one_shot_until ~= nil
+		or self.sticky ~= nil or next(self.sticky_keys)
 		or roll_origins[self] and next(roll_origins[self]) then return false end
 	roll_origin_ports[self] = { capture = capture, current = current }
 	return true
@@ -278,6 +279,9 @@ function M.new(opts)
 		-- key took the Shift back, "rolled" for a key pressed then (several can overlap)
 		one_shot_keys = {},
 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
+		-- The armed sticky (one-shot) modifiers: { codes, until_ms, guard }, or nil.
+		sticky = nil,
+		sticky_keys = {},    -- code -> the modifier codes a sticky arm wrapped it in, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
@@ -613,6 +617,74 @@ local function input_arm_current(self, arm)
 	return ok and current == true and input_arms[self] == arm
 end
 
+-- The modifier keys a sticky (one-shot) modifier may hold, in the order they
+-- go down: the catalogue's sticky_* actions name them (cmd is Super, option
+-- is Alt, altgr is the layout's third level on Right Alt).
+M.STICKY_MODIFIER_CODES = {
+	ctrl = KEY_LEFTCTRL, shift = KEY_LEFTSHIFT, alt = KEY_LEFTALT,
+	super = EvdevCodes.KEY_LEFTMETA, altgr = EvdevCodes.KEY_RIGHTALT,
+}
+local STICKY_ORDER = { KEY_LEFTCTRL, KEY_LEFTALT, EvdevCodes.KEY_RIGHTALT, EvdevCodes.KEY_LEFTMETA, KEY_LEFTSHIFT }
+local STICKY_CODE = {}
+for _, code in ipairs(STICKY_ORDER) do STICKY_CODE[code] = true end
+
+--- Toggles sticky (one-shot) modifiers, each one independently, as macOS and
+--- Karabiner's sticky_modifier do: the next key that is not a modifier goes
+--- down with every modifier still armed, once. The arm lasts the one-shot
+--- timeout (0: no time limit), the same setting as the one-shot Shift.
+--- @param now_ms number The event clock of the arm.
+--- @param codes table Modifier key codes, from M.STICKY_MODIFIER_CODES.
+--- @param guard function|nil Input-owner currency, checked at arm and at spend.
+--- @return boolean published
+function M:arm_sticky(now_ms, codes, guard)
+	if type(now_ms) ~= "number" or now_ms ~= now_ms or math.abs(now_ms) == math.huge
+		or type(codes) ~= "table" or #codes == 0 then return false end
+	for _, code in ipairs(codes) do
+		if not STICKY_CODE[code] then return false end
+	end
+	if guard ~= nil then
+		if type(guard) ~= "function" then return false end
+		local ok, current = pcall(guard)
+		if not ok or current ~= true then return false end
+	end
+	local set = {}
+	for _, code in ipairs(self.sticky and self.sticky.codes or {}) do set[code] = true end
+	for _, code in ipairs(codes) do set[code] = (not set[code]) or nil end
+	local ordered = {}
+	for _, code in ipairs(STICKY_ORDER) do
+		if set[code] then ordered[#ordered + 1] = code end
+	end
+	if #ordered == 0 then
+		self.sticky = nil
+		return true
+	end
+	self.sticky = { codes = ordered, until_ms = OneShotTimeout.deadline(now_ms, self.one_shot_timeout_ms), guard = guard }
+	return true
+end
+
+--- The armed sticky modifier codes, in press order, or nil.
+--- @return table|nil codes A copy.
+function M:sticky_armed()
+	if not self.sticky then return nil end
+	local copy = {}
+	for index, code in ipairs(self.sticky.codes) do copy[index] = code end
+	return copy
+end
+
+--- Spends the sticky arm on a key going down that is not a modifier.
+--- @return table|nil codes The modifiers to wrap the key in, nil to leave it.
+local function take_sticky(self, code, now_ms)
+	local sticky = self.sticky
+	if not sticky or MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return nil end
+	self.sticky = nil
+	if now_ms > sticky.until_ms then return nil end
+	if sticky.guard then
+		local ok, current = pcall(sticky.guard)
+		if not ok or current ~= true then return nil end
+	end
+	return sticky.codes
+end
+
 --- Takes the one-shot Shift back from every key it still wraps. The Shift is
 --- that press's own, kept for its repeats only: a key struck before it is
 --- released is typed as it is, as on Windows, where the one-shot capture ends
@@ -742,6 +814,13 @@ end
 --- unshifted and left the Shift for the next letter.
 --- @return table|nil tap Text for the injector, as type_text returns it.
 local function type_tap(self, out, code, now_ms)
+	local sticky = take_sticky(self, code, now_ms)
+	if sticky then
+		for _, mod in ipairs(sticky) do press(self, out, mod) end
+		tap_key(self, out, code)
+		for index = #sticky, 1, -1 do release(self, out, sticky[index]) end
+		return nil
+	end
 	local verdict, text = take_one_shot(self, code, now_ms)
 	if verdict == "text" then return type_text(self, out, text) end
 	if verdict == "shift" then press(self, out, KEY_LEFTSHIFT) end
@@ -1269,6 +1348,28 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 		if spec then return press_layer_key(self, code, spec) end
 	end
 
+	-- A sticky modifier arm wraps the next key that is not a modifier.
+	local sticky_wrapped = self.sticky_keys[code]
+	if sticky_wrapped and value == UP then
+		self.sticky_keys[code] = nil
+		release(self, out, code)
+		for index = #sticky_wrapped, 1, -1 do release(self, out, sticky_wrapped[index]) end
+		return out
+	end
+	if sticky_wrapped and value == REPEAT then
+		hold_row(self, out, code, REPEAT)
+		return out
+	end
+	if value == DOWN and not sticky_wrapped and not self.one_shot_keys[code] then
+		local sticky = take_sticky(self, code, now_ms)
+		if sticky then
+			self.sticky_keys[code] = sticky
+			for _, mod in ipairs(sticky) do press(self, out, mod) end
+			press(self, out, code)
+			return out
+		end
+	end
+
 	-- The one-shot Shift wraps the next key.
 	local wrapped = self.one_shot_keys[code]
 	if wrapped and value == UP then
@@ -1661,6 +1762,7 @@ function M:release_all()
 	self.held, self.layer_keys, self.layer_depth, self.repeat_count = {}, {}, 0, 1
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	self.sticky, self.sticky_keys = nil, {}
 	self.key_order = {}
 	input_arms[self] = nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
@@ -1676,7 +1778,7 @@ end
 --- existing owners and native-under-modifier/instant precedence are unchanged.
 function M:combination_first_available(code)
 	if self.layer_depth > 0 or self.undecided or next(self.held) or self.held[code] or self.native_keys[code] or self.instant_down[code]
-		or self.layer_keys[code] or self.one_shot_until then return false end
+		or self.layer_keys[code] or self.one_shot_until or self.sticky then return false end
 	local config = self.by_code[code]
 	if config then
 		if config.instant or config.tap_at_down or (NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier) and modifier_held(self) then return false end

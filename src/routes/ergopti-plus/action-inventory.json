@@ -1910,170 +1910,86 @@
 	{
 		"path": "sg_actions.sticky_ctrl",
 		"labels": { "fr": "📌 {1} rémanent", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd",
 		"labels": { "fr": "📌 {1} rémanent", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_option",
 		"labels": { "fr": "📌 {1} rémanente", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd_shift",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd_option",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd_ctrl",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_option_shift",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_option_ctrl",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_ctrl_shift",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd_option_shift",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd_option_ctrl",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_cmd_shift_ctrl",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_option_shift_ctrl",
 		"labels": { "fr": "📌 {1} rémanents", "en": "📌 Sticky {1}" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.sticky_hyper",
 		"labels": { "fr": "📌 Hyper rémanent", "en": "📌 Sticky Hyper" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.open_console",

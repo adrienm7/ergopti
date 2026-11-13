@@ -786,6 +786,17 @@ function M.arm_one_shot(receipt, now_ms, guard)
 	return engine_input_ports.arm(input_receipts[receipt].issuer.base, now_ms, guard)
 end
 
+--- Arms sticky (one-shot) modifiers on the original issuer's tap-hold engine.
+--- @param receipt table Opaque issuer receipt.
+--- @param now_ms number Original event clock.
+--- @param codes table Modifier key codes (tap_hold_engine STICKY_MODIFIER_CODES).
+--- @param guard function Hook-owned source/currentness join.
+--- @return boolean published
+function M.arm_sticky(receipt, now_ms, codes, guard)
+	if not input_owner_current(receipt) or type(guard) ~= "function" then return false end
+	return Engine.arm_sticky(input_receipts[receipt].issuer.base, now_ms, codes, guard)
+end
+
 --- Observes cleanup state only for the retained original issuer epoch.
 --- @param receipt table Opaque issuer receipt.
 --- @return string|nil state
