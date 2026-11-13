@@ -988,6 +988,20 @@ function run() {
 			`a path concatenated onto a known constant follows its file: ${out}`
 		);
 	}
+	// RELAY_SOURCE + 'cmd/x/main.go' where RELAY_SOURCE's own folder moves with
+	// the step: the piece stays spelled from the constant's new place, never a
+	// refusal (S01 refused the Linux native artifacts list).
+	const relay = '_shared/go/native_http/cmd/ergopti-proxy-relay/main.go';
+	if (fs.existsSync(path.join(repo, P, relay)) && full.get(relay) !== relay) {
+		const js = 'tools/test/z.cjs';
+		const src =
+			"const RELAY_SOURCE = 'static/ergopti_plus/_shared/go/native_http/';\n" +
+			"const F = RELAY_SOURCE + 'cmd/ergopti-proxy-relay/main.go';\n";
+		const rows = Plan.scanFile(js, src, fullCtx);
+		assert.ok(!rows.some((r) => r.kind === 'dir-split'), 'a moving constant is no refusal');
+		const out = Apply.rewriteText(src, rows, moved, js);
+		assert.ok(out.includes("RELAY_SOURCE + 'cmd/ergopti-proxy-relay/main.go'"), out);
+	}
 	// Third-party code keeps its own paths; our scripts in a vendor folder move.
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/_shared/ui/vendor/fengari-web.js'));
 	assert.ok(Plan.neverRewritten('static/ergopti_plus/windows/vendor/WebView2.ahk'));
