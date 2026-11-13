@@ -363,8 +363,25 @@ local function validate_context(context)
 	return true, { install_root = root, parent = parent, wrapper = wrapper }
 end
 
+--- The shared root of a staged release, found by its build stamp. The staged
+--- tree is another version, so its layout is not this version's: a release
+--- built before a folder move keeps its locales elsewhere, and probing it with
+--- this version's locale path refused every such update. The stamp sits at the
+--- shared root in every layout (sibling in the tarball, child in packages).
+--- @param work_dir string The staged archive's root.
+--- @param ops table Installer operations (is_file).
+--- @return string|nil root The staged shared root, or nil when none is stamped.
+local function staged_shared_root(work_dir, ops)
+	for _, candidate in ipairs({ work_dir .. "/_shared", work_dir .. "/linux/_shared" }) do
+		if ops.is_file(candidate .. "/" .. Snapshot.BUILD_STAMP_FILE) then return candidate end
+	end
+	return nil
+end
+
+M._staged_shared_root = staged_shared_root
+
 local function validate_candidate(work_dir, expected_version, ops)
-	local shared_root = Paths.shared_root_from(work_dir .. "/linux", ops.is_file)
+	local shared_root = staged_shared_root(work_dir, ops)
 	local required_files = {
 		work_dir .. "/linux/ergopti_hotstrings.lua",
 		work_dir .. "/linux/infra/version.lua",
