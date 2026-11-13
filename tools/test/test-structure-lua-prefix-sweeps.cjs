@@ -124,6 +124,25 @@ function run() {
 		);
 	}
 
+	// A runtime prefix a listed edit already rewrites at its own step
+	// (edits.cjs) is that edit's: an earlier step that moves another module
+	// under the same prefix refuses nothing (S08 moved a ui module while the
+	// metrics flush bridge test's "ui." .. app .. ".bridge" waits for S30).
+	{
+		const listed = 'static/ergopti_plus/linux/tests/unit/ui/metrics/test_metrics_flush_bridge.lua';
+		const text = 'local B = H.load_module("ui." .. app .. ".bridge")\n';
+		const map = new Map([
+			['linux/ui/network_status.lua', 'linux/core/network/ui/status.lua'],
+			['linux/ui/metrics_apps/bridge.lua', 'linux/ui/metrics_apps/bridge.lua'],
+			[
+				'linux/tests/unit/ui/metrics/test_metrics_flush_bridge.lua',
+				'linux/tests/unit/ui/metrics/test_metrics_flush_bridge.lua'
+			]
+		]);
+		const rows = Plan.scanFile(listed, text, Plan.referenceContext(map));
+		assert.ok(!rows.some((r) => r.kind === 'lua-prefix-split'), JSON.stringify(rows));
+	}
+
 	console.log('Lua prefix sweeps: OK');
 }
 

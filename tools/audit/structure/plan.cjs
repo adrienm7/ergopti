@@ -2244,7 +2244,10 @@ function scanFile(file, text, ctx) {
 			const target = dir ? byRepoDir.get(abs) : byRepoPath.get(abs);
 			if (target === undefined || target === abs) continue;
 			if (target === SPLIT || target === PREFIX || !target) {
-				add('dir-split', m[0], '(split)', { oldRepo: abs });
+				// A scattered folder that keeps files keeps its name (as dir-kept);
+				// one the step empties names nothing and is refused.
+				if (!dir || splitHomes(abs, map)[0] !== abs.slice(PREFIX.length))
+					add('dir-split', m[0], '(split)', { oldRepo: abs });
 				continue;
 			}
 			const rel = path.posix.relative(base, target).replace(/\//g, '\\') + (dir ? '\\' : '');
@@ -2430,6 +2433,8 @@ function scanFile(file, text, ctx) {
 			/(?:\brequire\s*\(?\s*|package\.loaded\s*\[\s*|\.(?:load_with_stubs|load_module|fresh_module|load_module_with_dependency)\s*\(\s*)["']((?:[A-Za-z_][A-Za-z0-9_]*\.)+)["']\s*\.\./g
 		)) {
 			if (Rules.RUNTIME_EDITS.some((e) => PREFIX + e.file === file && e.prefix === m[1])) continue;
+			// A site a listed edit rewrites at its own step (edits.cjs) is that edit's.
+			if (Edits.FOLDER_EDITS.some((e) => e.file === file && e.from.includes(m[0]))) continue;
 			const site = Rules.RUNTIME_PREFIXES.find((r) => PREFIX + r.file === file && r.old === m[1]);
 			const under = [...byLuaName.keys()].filter((k) => k.split('|')[1].startsWith(m[1]));
 			if (under.length === 0) continue;
