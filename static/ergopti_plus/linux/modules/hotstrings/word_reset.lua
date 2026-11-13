@@ -43,7 +43,6 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
@@ -150,9 +149,15 @@ end
 local function resolve_settings(document, mark)
 	local section = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger)
 	local idle = section and section.idle_reset_seconds
-	if idle ~= nil and not Engine.valid_idle_reset_seconds(idle) then
-		ConfigOutdated.report(IDLE_PATH, "the value is not a non-negative number of seconds", Logger)
-		idle = nil
+	if idle ~= nil then
+		-- The engine's domain and the shared value schema's declared range.
+		local ValueCheck = require("settings.engine.value_check")
+		local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS), idle)
+		if not (checked.ok and Engine.valid_idle_reset_seconds(idle)) then
+			ConfigOutdated.report(IDLE_PATH, string.format("the value is refused (%s, %s..%s s)",
+				tostring(checked.reason), tostring(checked.min), tostring(checked.max)), Logger)
+			idle = nil
+		end
 	end
 	if idle == nil then idle = Manifest.default_for(IDLE_PATH)
 	elseif mark then mark(KEY.HOTSTRINGS, LEAF.IDLE_RESET_SECONDS) end
@@ -337,7 +342,9 @@ end
 --- @param seconds number Non-negative seconds; 0 disables the reset.
 --- @return boolean committed
 function M.set_idle_seconds(seconds)
-	if not Engine.valid_idle_reset_seconds(seconds) then
+	local ValueCheck = require("settings.engine.value_check")
+	if not Engine.valid_idle_reset_seconds(seconds)
+		or not ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS), seconds).ok then
 		Logger.warn(LOG, "Invalid idle delay '%s' refused.", tostring(seconds))
 		return false
 	end
@@ -408,17 +415,16 @@ function M.toggle_tap_hold_resets_word()
 	return M.set_tap_hold_resets_word(not M.tap_hold_resets_word())
 end
 
---- Parses a free entry typed in the menu prompt: a decimal point or comma,
---- surrounding blanks ignored.
+--- Parses a free entry typed in the menu prompt through the shared value
+--- check: a decimal point or comma, surrounding blanks ignored, within the
+--- declared range of hotstrings.idle_reset_seconds.
 --- @param text string|nil Raw prompt answer.
 --- @return number|nil seconds Valid value, or nil when the text is not one.
 function M.parse_seconds(text)
-	if type(text) ~= "string" then return nil end
-	local trimmed = TextUtils.trim(text):gsub(",", ".", 1)
-	if not trimmed:match("^%d+%.?%d*$") and not trimmed:match("^%.%d+$") then return nil end
-	local value = tonumber(trimmed)
-	if not Engine.valid_idle_reset_seconds(value) then return nil end
-	return value
+	local ValueCheck = require("settings.engine.value_check")
+	local typed = ValueCheck.parse_entry(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS), text)
+	if not typed.ok then return nil end
+	return typed.value
 end
 
 

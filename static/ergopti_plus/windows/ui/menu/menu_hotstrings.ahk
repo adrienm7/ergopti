@@ -13,6 +13,7 @@
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\infra\number.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 
 
@@ -279,12 +280,13 @@ _HS_PromptDefaultDelay() {
 	if (IB.Result != "OK") {
 		return
 	}
-	Val := Trim(IB.Value, " `t")
-	if !RegExMatch(Val, "^\d+$") || !NumberTryParseInputInteger(Val, &Ms) {
-		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+	; The shared value schema owns the accepted range and its localized refusal.
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY), IB.Value)
+	if !Typed["ok"] {
+		ValueCheckShowRefusal(ConfigKey.HOTSTRINGS_EXPANSION_DELAY, Typed, IB.Value)
 		return
 	}
-	return _HS_CommitBaseDelay(Ms / 1000)
+	return _HS_CommitBaseDelay(Typed["value"])
 }
 
 ; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
@@ -314,12 +316,12 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 	if (IB.Result != "OK") {
 		return
 	}
-	Val := Trim(IB.Value, " `t")
-	if !RegExMatch(Val, "^\d+$") || !NumberTryParseInputInteger(Val, &Ms) {
-		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor("hotstrings_config.*.delay"), IB.Value)
+	if !Typed["ok"] {
+		ValueCheckShowRefusal("hotstrings_config.*.delay", Typed, IB.Value)
 		return
 	}
-	return _HS_CommitDelayOverride(Cat, Ms / 1000)
+	return _HS_CommitDelayOverride(Cat, Typed["value"])
 }
 
 ; Persist the base expansion delay, then re-register the hotstrings live: their
@@ -1284,11 +1286,14 @@ _HS_PromptPersonalFileField(Owner, Section, Field) {
 		return
 	Value := Trim(Prompt.Value)
 	if Field == "delay" || Field == "priority" {
-		if !RegExMatch(Value, "^\d+$") || !NumberTryParseInputInteger(Value, &Parsed)
+		; The shared value schema owns the accepted range and its localized refusal.
+		Key := "hotstrings_config.*." . Field
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Key), Prompt.Value)
+		if !Typed["ok"] {
+			ValueCheckShowRefusal(Key, Typed, Prompt.Value)
 			return false
-		Value := Parsed
-		if Field == "delay"
-			Value /= 1000
+		}
+		Value := Typed["value"]
 	} else if !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")
 		return false
 	return Owner.Commit(Section, Field, Value)

@@ -6,6 +6,7 @@
 
 global _MDPN_World := {Answer: {Result: "OK", Value: ""}, Calls: [], Prompts: 0, Notices: 0}
 t(Key) => Key
+LoggerWarn(*) => 0
 Ui_InputBox(*) {
  global _MDPN_World
  _MDPN_World.Prompts += 1

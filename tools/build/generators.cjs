@@ -206,7 +206,8 @@ const GENERATORS = [
 		script: 'codegen/codegen-value-schema.cjs',
 		outputs: [
 			'static/ergopti_plus/windows/_generated/value_schema.ahk',
-			'static/ergopti_plus/_shared/settings/engine/value_schema_data.lua'
+			'static/ergopti_plus/_shared/settings/engine/value_schema_data.lua',
+			'static/ergopti_plus/_shared/ui/value_check.js'
 		]
 	},
 	{

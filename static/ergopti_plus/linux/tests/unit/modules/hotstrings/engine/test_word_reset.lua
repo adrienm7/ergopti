@@ -262,6 +262,20 @@ helpers.describe("word reset: the settings", function()
 		end)
 	end)
 
+	-- Past the shared value schema's maximum, or a string: reported once, default (value-validation).
+	for _, stored in ipairs({ "3601", '"3"', "1e300" }) do
+		helpers.it("word reset, reports an idle delay of " .. stored .. " outside its declaration (value-validation)", function()
+			with_settings("[hotstrings]\nidle_reset_seconds = " .. stored .. "\n", function(subject)
+				require("settings.engine.migration.outdated").reset_for_tests()
+				local reported = require("settings.engine.migration.outdated").collect_reports(function()
+					helpers.assert_eq(subject.idle_seconds(), 3)
+				end)
+				helpers.assert_eq(reported["hotstrings.idle_reset_seconds"], true)
+				helpers.assert_eq(subject.set_idle_seconds(3601), false, "the setter refuses past the maximum")
+			end)
+		end)
+	end
+
 	helpers.it("word reset, marks every leaf as read for the cleanup", function()
 		with_settings("[hotstrings]\nidle_reset_seconds = 2\nclick_resets_word = false\narrow_resets_word = false\n"
 			.. "shortcut_resets_word = false\ntap_hold_resets_word = false\n", function(_, _, path)

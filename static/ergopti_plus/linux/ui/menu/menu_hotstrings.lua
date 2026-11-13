@@ -539,23 +539,24 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- Asks for a delay in milliseconds and returns it in seconds.
 	--- @param title string Already-translated dialog title.
 	--- @param current_sec number
+	--- @param key string Declaration of the shared value schema.
 	--- @return number|nil Seconds, or nil when cancelled or refused.
-	local function prompt_delay(title, current_sec)
+	local function prompt_delay(title, current_sec, key)
 		local raw = prompt_text(
 			title,
 			i18n_safe("menu.hotstrings.delay_prompt"),
 			tostring(math.floor(current_sec * MS_PER_SEC + 0.5)))
 		if raw == nil then return nil end
-
-		local value = tonumber((raw:gsub("%s", "")))
-		-- Refused rather than clamped: a negative or fractional millisecond is a
-		-- typo, and silently rounding it would store a number the user never chose
-		-- and cannot see is different from what they typed.
-		if not require("core.text.engine.number_policy").is_finite(value) or value < 0 or value ~= math.floor(value) then
-			show_error(i18n_safe("menu.hotstrings.delay_invalid_body"))
+		-- Refused rather than clamped, by the shared value schema: a negative or
+		-- fractional millisecond is a typo, and the refusal names the accepted range.
+		local ValueCheck = require("settings.engine.value_check")
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if not typed.ok then
+			Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
+			show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 			return nil
 		end
-		return value / MS_PER_SEC
+		return typed.value
 	end
 
 	--- Contains the existing durable delay owner's receipt before repainting.
@@ -594,7 +595,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
-				local chosen = prompt_delay(title, current)
+				local chosen = prompt_delay(title, current,
+					require("settings.engine.value_check").KEY.HOTSTRINGS_EXPANSION_DELAY)
 				if chosen == nil then return end
 				return commit_delay(config.set_base_delay, chosen)
 			end,
@@ -626,7 +628,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
-				local chosen = prompt_delay(title, current)
+				local chosen = prompt_delay(title, current,
+					require("settings.engine.value_check").KEY.HOTSTRINGS_CONFIG_ANY_DELAY)
 				if chosen == nil then return end
 				return commit_delay(config.set_override, category, nil, "delay", chosen)
 			end,
@@ -1608,13 +1611,16 @@ local function _manifest_hotstring_rows(ctx, config)
 					i18n_safe("menu.hotstrings.idle_reset_prompt"),
 					string.format("%g", WordReset.idle_seconds()))
 				if answer == nil then return false end
-				local seconds = WordReset.parse_seconds(answer)
-				if seconds == nil then
-					Logger.warn(LOG, "Invalid idle delay '%s' — ignored.", tostring(answer))
-					show_error(i18n_safe("menu.hotstrings.idle_reset_invalid"),
-						i18n_safe("dialog.gestures.param_error_title"))
+				-- The shared value schema owns the accepted range and its refusal text.
+				local ValueCheck = require("settings.engine.value_check")
+				local key = ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS
+				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer)
+				if not typed.ok then
+					Logger.warn(LOG, "Invalid idle delay '%s' — ignored (%s).", tostring(answer), typed.reason)
+					show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 					return false
 				end
+				local seconds = typed.value
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
 			params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS] = function(arrows)

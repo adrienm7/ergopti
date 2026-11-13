@@ -137,3 +137,47 @@ _ValueCheckTest_GeneratedSchema() {
 	AssertEqual("ms", Delay["entry_unit"])
 }
 Test("Value check: the generated schema is complete", _ValueCheckTest_GeneratedSchema)
+
+; Regression: a stored negative or oversized base delay used to reach the engine,
+; where a value at or under 0 silently meant « no limit ».
+_ValueCheckTest_BaseDelayLoadAndSetter() {
+	global Features, GLOBAL_DEFAULT_DELAY
+	if !Features.Has("hotstrings")
+		Features["hotstrings"] := Map()
+	Section := Features["hotstrings"]
+	Leaf := ConfigLeaf.EXPANSION_DELAY
+	Had := Section.Has(Leaf), Saved := Had ? Section[Leaf] : ""
+	try {
+		for Bad in [-1, 3601, "0.5"] {
+			Section[Leaf] := Bad
+			AssertEqual(GLOBAL_DEFAULT_DELAY, HotstringsBaseDelay(), "a refused stored delay reads as the default")
+		}
+		Section[Leaf] := 0.5
+		AssertEqual(0.5, HotstringsBaseDelay(), "an admitted stored delay is kept")
+		Section[Leaf] := 0
+		AssertEqual(0, HotstringsBaseDelay(), "0 (no time limit) is a declared special value")
+		for Bad in [-1, 3601, "2"]
+			AssertFalse(HotstringsSetBaseDelay(Bad), "the setter refuses what the schema refuses")
+	} finally {
+		if Had
+			Section[Leaf] := Saved
+		else
+			Section.Delete(Leaf)
+	}
+}
+Test("Value check: the hotstring base delay is checked at load and at its setter", _ValueCheckTest_BaseDelayLoadAndSetter)
+
+; Regression: the base and category delay prompts and the personal-file fields
+; refused silently or without the range; the refusal now goes through the
+; presenter with the setting's declaration.
+_ValueCheckTest_HotstringPromptsShowRefusal() {
+	global _ValueCheckTest_Refusals
+	Before := _ValueCheckTest_Refusals.Length
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor("hotstrings.expansion_delay"), "3600001")
+	AssertFalse(Typed["ok"])
+	ValueCheckShowRefusal("hotstrings.expansion_delay", Typed, "3600001")
+	AssertEqual(Before + 1, _ValueCheckTest_Refusals.Length)
+	AssertEqual("above_maximum", _ValueCheckTest_Refusals[-1]["reason"])
+	AssertEqual(3600000, Typed["max"], "the range is given in the typed unit (ms)")
+}
+Test("Value check: a refused hotstring delay is shown with its range", _ValueCheckTest_HotstringPromptsShowRefusal)

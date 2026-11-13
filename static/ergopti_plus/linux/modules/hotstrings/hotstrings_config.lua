@@ -377,12 +377,19 @@ load_shared_defaults()
 --- The base expansion delay in seconds: what a hotstring waits when no rung
 --- of the cascade says otherwise, and what a delay override is an offset of.
 --- It is the user's `hotstrings.expansion_delay`, else the shared default. A
---- stored value the owner refuses is read as absent (and reported by the
---- configuration cleanup), never guessed.
+--- stored value its shared value schema declaration refuses is reported once
+--- and read as absent, never guessed.
 --- @return number
 local function base_delay()
 	local value = Preferences.get(BASE_DELAY_PATH)
-	if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
+	if value == nil then return GLOBAL_DEFAULT_DELAY end
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY), value)
+	if checked.ok then return value end
+	-- Reported once per process, never read silently as the default.
+	require("settings.engine.migration.outdated").report(BASE_DELAY_PATH, string.format(
+		"%s is refused (%s, %s..%s s); the default %s s applies", tostring(value), checked.reason,
+		tostring(checked.min), tostring(checked.max), tostring(GLOBAL_DEFAULT_DELAY)))
 	return GLOBAL_DEFAULT_DELAY
 end
 
@@ -818,8 +825,10 @@ end
 --- @return boolean
 function M.set_base_delay(seconds)
 	if seconds == nil then seconds = GLOBAL_DEFAULT_DELAY end
-	if type(seconds) ~= "number" or seconds ~= seconds or seconds < 0 or seconds == math.huge then
-		Logger.error(LOG, "set_base_delay(): %s is not a non-negative number.", tostring(seconds))
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY), seconds)
+	if not checked.ok then
+		Logger.error(LOG, "set_base_delay(): %s is refused (%s).", tostring(seconds), checked.reason)
 		return false
 	end
 	local stored, reason = Preferences.set(BASE_DELAY_PATH, seconds)
@@ -858,6 +867,17 @@ function M.set_override(category, section, field, value)
 	end
 	if field == "color" and value ~= nil and require("core.ui.engine.color_hex").parse(value) == nil then
 		Logger.error(LOG, "set_override(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
+		return false
+	end
+	-- The shared value schema's declarations, the same rule as the window and the
+	-- loader: a priority past the tier range silently reorders every source.
+	local Overrides = require("hotstrings.engine.overrides")
+	if field == "priority" and value ~= nil and not Overrides.is_priority(value) then
+		Logger.error(LOG, "set_override(): priority '%s' is refused by its shared declaration.", tostring(value))
+		return false
+	end
+	if field == "delay" and value ~= nil and not Overrides.is_delay(value) then
+		Logger.error(LOG, "set_override(): delay '%s' is refused by its shared declaration.", tostring(value))
 		return false
 	end
 

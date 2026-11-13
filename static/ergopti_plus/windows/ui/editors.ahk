@@ -14,6 +14,7 @@
 ; The generated key vocabulary the word-reset and cascade settings are named by
 ; (a dedupe-safe include: menu_init.ahk and menu_manifest.ahk name it too).
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\infra\value_check.ahk
 
 global _MagicKeyEditorInputHook := ""
 global _MagicKeyEditorStopDebt := false
@@ -689,8 +690,9 @@ _EditorCommitWordReset(Key, Value, Context, WriterFn, NotifyFn, RebuildFn) {
  * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
  */
 SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
-	if !HSE_ValidIdleResetSeconds(Seconds) {
-		try LoggerError("Editors", "Refused idle-reset delay: not a number of seconds, 0 or more.")
+	if !HSE_ValidIdleResetSeconds(Seconds)
+			|| !ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Seconds)["ok"] {
+		try LoggerError("Editors", "Refused idle-reset delay: not a number of seconds within its declared range.")
 		return false
 	}
 	return _EditorCommitWordReset(ConfigLeaf.IDLE_RESET_SECONDS, Seconds, "the idle-reset delay",
@@ -709,30 +711,6 @@ SetHotstringsCascadeMaxArrows(Arrows, WriterFn := 0, NotifyFn := 0, RebuildFn :=
 	}
 	return _EditorCommitWordReset(ConfigLeaf.CASCADE_MAX_ARROWS, Arrows, "the cascade arrow count",
 		WriterFn, NotifyFn, RebuildFn)
-}
-
-/**
- * Parses a typed idle delay: a decimal point or comma, surrounding blanks
- * allowed. Returns "" for anything that is no number of seconds, 0 or more.
- * @param {String} Raw The prompt's text.
- * @returns {Number|String}
- */
-ParseHotstringsIdleResetSeconds(Raw) {
-	if !(Raw is String)
-		return ""
-	Text := StrReplace(Trim(Raw, " `t"), ",", ".")
-	if (Text == "" || !RegExMatch(Text, "^\d+(\.\d+)?$|^\.\d+$"))
-		return ""
-	; Parse decimal text before AutoHotkey can wrap an overflowing integer.
-	; The setting accepts every finite nonnegative number, so values outside
-	; Int64 keep their floating-point representation instead of casting back.
-	if NumberTryParseSignedInteger(Text, &Value)
-		return Value
-	if !NumberTryParseFiniteFloat(Text, &Value)
-		return ""
-	if (Value < 0x7FFFFFFFFFFFFFFF && Value = Round(Value))
-		Value := Integer(Value)
-	return HSE_ValidIdleResetSeconds(Value) ? Value : ""
 }
 
 /**
@@ -756,15 +734,18 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
 		: Ui_InputBox(Prompt, Title, "w380 h150", Prefill)
 	if !(Answer is Object) || Answer.Result != "OK"
 		return false
-	Seconds := ParseHotstringsIdleResetSeconds(Answer.Value)
-	if (Seconds == "") {
-		try LoggerWarn("Editors", "Invalid idle-reset delay typed — ignored.")
-		if HasMethod(NotifyFn, "Call")
-			NotifyFn.Call(t("menu.hotstrings.idle_reset_invalid"), "Icon!")
-		else
-			Ui_MsgBox(t("menu.hotstrings.idle_reset_invalid"), t("dialog.gestures.param_error_title"), "Icon!")
+	; The shared value schema owns the accepted range and its localized refusal.
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Answer.Value)
+	if !Typed["ok"] {
+		if HasMethod(NotifyFn, "Call") {
+			try LoggerWarn("Editors", "Invalid idle-reset delay typed — ignored.")
+			NotifyFn.Call(ValueCheckRenderMessage(ValueCheckMessageParts(
+				ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Typed), (K) => t(K)), "Icon!")
+		} else
+			ValueCheckShowRefusal(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS, Typed, Answer.Value)
 		return false
 	}
+	Seconds := Typed["value"]
 	return SetHotstringsIdleResetSeconds(Seconds, WriterFn, NotifyFn, RebuildFn)
 }
 

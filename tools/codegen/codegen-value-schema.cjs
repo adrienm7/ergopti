@@ -7,7 +7,10 @@
  * Emits the declarations of _shared/settings/data/value_schema/value_schema.json
  * as the data the Windows value check (windows/infra/value_check.ahk) reads and
  * as the Lua table both Lua drivers require (_shared/settings/engine/
- * value_schema_data.lua), so no driver resolves a path to read the schema.
+ * value_schema_data.lua), so no driver resolves a path to read the schema,
+ * and as the classic script the shared WebView pages load (_shared/ui/
+ * value_check.js), the canonical check with the schema inlined: the pages are
+ * plain scripts, and the macOS host inlines every local <script src>.
  *
  * WHY THIS EXISTS:
  * A compiled AHK build has no JSON reader at include time, so it gets a
@@ -31,6 +34,8 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE = path.join(SP, '_shared', 'settings', 'data', 'value_schema', 'value_schema.json');
 const OUTPUT = path.join(SP, 'windows', '_generated', 'value_schema.ahk');
 const LUA_OUTPUT = path.join(SP, '_shared', 'settings', 'engine', 'value_schema_data.lua');
+const CHECK_SOURCE = path.join(SP, '_shared', 'settings', 'data', 'value_schema', 'value_check.js');
+const BROWSER_OUTPUT = path.join(SP, '_shared', 'ui', 'value_check.js');
 const RUN_HINT = 'npm run codegen:value-schema';
 
 // ==========================================
@@ -153,6 +158,46 @@ function renderLua() {
 }
 
 /**
+ * Renders the browser copy: the canonical check without its ES export, the
+ * schema and its key constants inlined, exposed as window.ErgoptiValueCheck.
+ * @return {string}
+ */
+function renderBrowser() {
+	const schema = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
+	const source = fs.readFileSync(CHECK_SOURCE, 'utf8');
+	const exportAt = source.lastIndexOf('export {');
+	if (exportAt < 0) throw new Error('value_check.js lost its export list');
+	const names = source
+		.slice(exportAt + 'export {'.length, source.indexOf('}', exportAt))
+		.split(',')
+		.map((name) => name.trim())
+		.filter(Boolean);
+	const body = source
+		.slice(0, exportAt)
+		.replace(/^\/\/ _shared\/settings\/data\/value_schema\/value_check\.js\n/, '')
+		.replace(/^'use strict';\n/m, '')
+		.trim();
+	return (
+		'// _shared/ui/value_check.js\n' +
+		'// AUTO-GENERATED from _shared/settings/data/value_schema/value_check.js and\n' +
+		'// value_schema.json. DO NOT EDIT BY HAND — run `' +
+		RUN_HINT +
+		'` to refresh.\n' +
+		'// The shared WebView pages load it as a classic script: window.ErgoptiValueCheck.\n\n' +
+		'(function () {\n' +
+		"\t'use strict';\n\n" +
+		body +
+		'\n\n\tconst SCHEMA = ' +
+		JSON.stringify(schema, null, '\t').replace(/\n/g, '\n\t') +
+		';\n\tconst KEY = ' +
+		JSON.stringify(keyConstants(schema), null, '\t').replace(/\n/g, '\n\t') +
+		';\n\n\twindow.ErgoptiValueCheck = Object.freeze({ ' +
+		names.join(', ') +
+		', SCHEMA, KEY });\n})();\n'
+	);
+}
+
+/**
  * Renders the generated AHK file from the schema on disk.
  * @return {string}
  */
@@ -196,7 +241,8 @@ function main() {
 	fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
 	for (const [file, content] of [
 		[OUTPUT, render()],
-		[LUA_OUTPUT, renderLua()]
+		[LUA_OUTPUT, renderLua()],
+		[BROWSER_OUTPUT, renderBrowser()]
 	]) {
 		fs.writeFileSync(file, content, 'utf8');
 		console.log(`  wrote ${path.relative(ROOT, file).split(path.sep).join('/')}`);
@@ -205,4 +251,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { render, renderLua, OUTPUT, LUA_OUTPUT };
+module.exports = { render, renderLua, renderBrowser, OUTPUT, LUA_OUTPUT, BROWSER_OUTPUT };

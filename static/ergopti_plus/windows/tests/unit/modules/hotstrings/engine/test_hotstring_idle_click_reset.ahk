@@ -45,13 +45,17 @@ _HICR_ValidValues() {
 }
 
 _HICR_PromptParsing() {
-	AssertEqual(3, ParseHotstringsIdleResetSeconds("3"))
-	AssertTrue(ParseHotstringsIdleResetSeconds("3") is Integer, "an integral entry stays an integer")
-	AssertEqual(4.5, ParseHotstringsIdleResetSeconds("4,5"), "a decimal comma is accepted")
-	AssertEqual(4.5, ParseHotstringsIdleResetSeconds(" 4.5 "))
-	AssertEqual(0, ParseHotstringsIdleResetSeconds("0"))
-	for Raw in ["-1", "abc", "", "1e3", "3s"]
-		AssertEqual("", ParseHotstringsIdleResetSeconds(Raw), "refused entry: " . Raw)
+	; The prompt reads the shared value schema declaration (0 to 3600 s, 0 = never).
+	Entry := ValueCheckEntryFor("hotstrings.idle_reset_seconds")
+	Parse := (Raw) => ValueCheckParseEntry(Entry, Raw)
+	AssertEqual(3, Parse("3")["value"])
+	AssertTrue(Parse("3")["value"] is Integer, "an integral entry stays an integer")
+	AssertEqual(4.5, Parse("4,5")["value"], "a decimal comma is accepted")
+	AssertEqual(4.5, Parse(" 4.5 ")["value"])
+	AssertEqual(0, Parse("0")["value"])
+	AssertEqual(3600, Parse("3600")["value"], "the declared maximum is accepted")
+	for Raw in ["-1", "abc", "", "1e3", "3s", "3601"]
+		AssertFalse(Parse(Raw)["ok"], "refused entry: " . Raw)
 }
 
 Test("hotstring idle reset: pure rule vectors", _HICR_IdleRuleVectors)
@@ -245,7 +249,7 @@ _HICR_PromptRefusesAndAccepts() {
 			(Message, *) => Notices.Push(Message), _HICR_Rebuild))
 		AssertEqual("3", Prefilled, "the prompt shows the delay in force")
 		AssertEqual(1, Notices.Length, "an invalid entry is explained")
-		AssertEqual(t("menu.hotstrings.idle_reset_invalid"), Notices[1])
+		AssertTrue(InStr(Notices[1], "3600") > 0, "the refusal names the accepted range: " . Notices[1])
 		AssertEqual(0, _HICR_Writes.Length)
 		AssertTrue(PromptHotstringsIdleResetSeconds(
 			(*) => ({ Result: "OK", Value: "7,5" }), _HICR_Writer, (*) => 0, _HICR_Rebuild))
@@ -296,7 +300,8 @@ _HICR_ChoiceRowFreeEntry() {
 _HICR_LoaderRejectsNegative() {
 	Body := _DriverFuncBody("_FeatureStateIdleResetSeconds")
 	Assert(Body != "", "_FeatureStateIdleResetSeconds must exist")
-	AssertTrue(InStr(Body, "Raw >= 0") > 0, "the loader admits only non-negative delays")
+	AssertTrue(InStr(Body, "ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Raw)") > 0,
+		"the loader admits only delays its shared value schema declaration admits")
 	AssertTrue(InStr(Body, "LoggerWarn(") > 0, "an outdated delay is reported")
 	AssertTrue(InStr(Body, 'ManifestDefaultFor("hotstrings.idle_reset_seconds")') > 0)
 	Reader := _DriverFuncBody("ReadScriptConfig")
@@ -315,25 +320,24 @@ Test("hotstring word reset: the free-entry prompt", (*) => _HICR_WithFixture(_HI
 Test("hotstring word reset: the choice row's free entry", _HICR_ChoiceRowFreeEntry)
 Test("hotstring word reset: the loader and the watcher wiring", _HICR_LoaderRejectsNegative)
 
-; The UI promises the engine's finite nonnegative seconds domain, not Int64.
-; Decimal input must be validated before AutoHotkey's wrapping integer cast.
-_HICR_WideDecimalPrompt(Raw, Expected) {
-	if Expected is Float
-		AssertTrue(HSE_ValidIdleResetSeconds(Expected), "The independent engine contract admits this finite delay")
-	Actual := ParseHotstringsIdleResetSeconds(Raw)
-	AssertEqual(Expected, Actual, "The actual menu parser must preserve the finite decimal magnitude, never wrap it to disabled/zero")
-	if Expected is Float
-		AssertTrue(Actual is Float, "A finite value outside Int64 must retain floating-point representation")
+; The prompt follows the shared value schema (0 to 3600 s): a wide or
+; overflowing decimal is refused with the accepted range, never wrapped to 0
+; (which would mean « never ») nor cast across Int64.
+_HICR_WideDecimalPrompt(Raw) {
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor("hotstrings.idle_reset_seconds"), Raw)
+	AssertFalse(Typed["ok"], "a value past the declared maximum is refused, never wrapped: " . Raw)
+	AssertTrue(Typed["reason"] == "above_maximum" || Typed["reason"] == "not_finite", "refusal reason " . Typed["reason"])
+	AssertEqual(3600, Typed["max"], "the refusal carries the declared maximum")
 }
 Test("hotstring idle reset: wide decimal integer cannot wrap to disabled (idle-delay-decimal-domain)",
-	_HICR_WideDecimalPrompt.Bind("18446744073709551616", 18446744073709551616.0))
+	_HICR_WideDecimalPrompt.Bind("18446744073709551616"))
 Test("hotstring idle reset: integral float cannot cross Int64 cast (idle-delay-decimal-domain)",
-	_HICR_WideDecimalPrompt.Bind("100000000000000000000.0", 1.0e20))
+	_HICR_WideDecimalPrompt.Bind("100000000000000000000.0"))
 _HICR_OverflowingDecimalPrompt() {
 	Raw := ""
 	loop 400
 		Raw .= "9"
-	_HICR_WideDecimalPrompt(Raw . ".0", "")
+	_HICR_WideDecimalPrompt(Raw . ".0")
 }
 Test("hotstring idle reset: overflowing decimal float refuses before Round (idle-delay-decimal-domain)",
 	_HICR_OverflowingDecimalPrompt)
@@ -343,8 +347,8 @@ _HICR_WideIntegerKeepsTheActualWord() {
  global HSE_IdleResetSeconds, _PrefixFocusedControlToken, HSE_Buffer
  SavedSeconds := HSE_IdleResetSeconds, SavedToken := _PrefixFocusedControlToken
  Raw := "4611686018427387904"
- Parsed := ParseHotstringsIdleResetSeconds(Raw)
- AssertTrue(Parsed is Integer && Parsed == 0x4000000000000000, "The actual prompt must preserve an exact native2^62 integer, not a JSON-rounded decimal")
+ Parsed := Integer(Raw)
+ AssertTrue(Parsed is Integer && Parsed == 0x4000000000000000, "The engine receives an exact native 2^62 integer, not a JSON-rounded decimal")
  Document := TOML_ParseDocument("[hotstrings]`nidle_reset_seconds = " . Raw . "`n")
  Seconds := Document["hotstrings"]["idle_reset_seconds"]
  AssertTrue(Seconds is Integer && Seconds == Parsed, "The real typed TOML and native prompt agree on the original integer")
