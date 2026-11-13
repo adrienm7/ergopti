@@ -729,6 +729,7 @@ helpers.describe("installer-native-exit-receipt", function()
 			helpers.assert_true(Shell.run("mkdir -p -- " .. Shell.quote(root .. "/AppDir/usr/lib/ergopti")))
 			Fixture.write(root .. "/AppDir/usr/lib/ergopti/network-runtime-env.sh", "runtime fixture\n")
 			Fixture.write(scripts .. "/write_build_stamp.sh", "#!/bin/bash\nexit 0\n")
+			Fixture.write(scripts .. "/add-linux-legacy-update-probes.sh", "#!/bin/bash\nexit 0\n")
 			Fixture.write(scripts .. "/stage-linux-private-runtime.sh", "#!/bin/bash\nmkdir -p -- \"$2\"\n")
 			local builder = helpers.driver_root() .. "/../../../tools/build/build-linux-bundle-archive.sh"
 			assert(uv.fs_copyfile(builder, scripts .. "/builder.sh"))
