@@ -63,8 +63,8 @@ def main():
             shared = install / "_shared" if layout == "sibling" else root / "_shared"
             (root / "infra").mkdir(parents=True)
             (root / "modules" / "updater").mkdir(parents=True)
-            (shared / "data" / "locales").mkdir(parents=True)
-            (shared).mkdir()
+            locales = pathlib.Path("core", "i18n", "data", "locales")
+            (shared / locales).mkdir(parents=True)
             (prefix / "bin").mkdir()
             source = root / "infra" / "paths.lua"
             manager = root / "modules" / "updater" / "manager.lua"
@@ -72,8 +72,8 @@ def main():
             shutil.copyfile(driver / "infra" / "paths.lua", source)
             shutil.copyfile(driver / "modules" / "updater" / "manager.lua", manager)
             shutil.copyfile(
-                shared_source / "data" / "locales" / "en.json",
-                shared / "data" / "locales" / "en.json",
+                shared_source / locales / "en.json",
+                shared / locales / "en.json",
             )
             wrapper.write_text("#!/bin/sh\n")
             expected_shared = str(root) + "/../_shared" if layout == "sibling" else str(shared)
