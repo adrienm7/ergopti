@@ -88,6 +88,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
 	},
 	{
+		// The locale resolver loaded as if installed (a package root, a relative
+		// checkout): S05 moves it to core/i18n/engine, and so do its layouts.
+		file: 'static/ergopti_plus/linux/tests/unit/infra/i18n/test_locale_path_layouts.lua',
+		moves: 'linux/infra/locale.lua',
+		from: '\t\t{ name = "a system package (/usr/lib/ergopti)", chunk = "/usr/lib/ergopti/infra/locale.lua" },\n\t\t{ name = "a relative checkout launch", chunk = "./infra/locale.lua" },',
+		to: '\t\t{ name = "a system package (/usr/lib/ergopti)", chunk = "/usr/lib/ergopti/core/i18n/engine/locale.lua" },\n\t\t{ name = "a relative checkout launch", chunk = "./core/i18n/engine/locale.lua" },'
+	},
+	{
 		// A line of the Linux menu root the parts check expects once, quoted as
 		// JavaScript: its module key follows S05's move of linux/infra/i18n.lua.
 		file: 'tools/test/test-linux-menu-parts.cjs',
