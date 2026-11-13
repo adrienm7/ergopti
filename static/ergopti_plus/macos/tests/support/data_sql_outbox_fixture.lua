@@ -20,7 +20,7 @@ local MODULE_KEYS = {
 	"modules.keystats.rotation",
 	"modules.keystats.sqlite_writer",
 	"infra.logger",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.timestamp",
 }
 

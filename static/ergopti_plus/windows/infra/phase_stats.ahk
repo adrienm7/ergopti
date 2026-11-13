@@ -24,7 +24,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../adapters/boot_clock.ahk
+#Include ../core/events/boot_clock.ahk
 
 
 

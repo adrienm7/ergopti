@@ -41,7 +41,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.mlx_repair_offer",
 	"modules.llm.mlx_bootstrap_diagnosis",
 	"modules.llm.backend_detector",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -544,7 +544,7 @@ local function build_fixture(backend, save_results, options)
 			return receipt
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, callback)
 			local handle = { timer = {}, callback = callback, observers = {} }
 			calls.resume_timers[#calls.resume_timers + 1] = handle

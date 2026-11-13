@@ -11,7 +11,7 @@ local M = {}
 local Interpreter = require("adapters.python_interpreter")
 local Locator = require("core.lifecycle.engine.core.managed_python_locator")
 local Probe = require("adapters.native_python_probe")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Budget = require("modules.llm.bootstrap_retry_generated")
 local hs = hs
 

@@ -83,7 +83,7 @@ helpers.describe("metrics native presentation", function()
 			helpers.it("stops after " .. boundary .. " " .. mode, function()
 				with_window("ui.metrics_apps", function(dashboard, state)
 					local pending, calls, errors = {}, {}, {}
-					package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+					package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 						local handle = { timer = {} }
 						pending[#pending + 1] = function() handle.timer = nil; callback() end
 						return handle, true

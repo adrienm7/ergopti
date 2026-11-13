@@ -362,7 +362,7 @@ helpers.describe('deferred tap during a pause cycle', function()
     local previous_manager = package.loaded['modules.gestures.manager']
     local Manager = helpers.load_module('modules.gestures.manager')
     local ScriptActions = require('modules.shortcuts.script_actions')
-    local Loop = require('adapters.event_loop')
+    local Loop = require('core.events.loop')
     local controller = ScriptActions.new({reset=function() end,reload=function() end,quit=function() end})
     local old_reader = package.loaded['adapters.evdev_reader']
     Manager.init({enabled=false,persist=false,is_paused=controller.is_paused,action_handlers=controller.handlers})

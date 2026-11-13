@@ -22,7 +22,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../infra/logger.ahk
 #Include ../core/crypto/crypto.ahk
 #Include ../adapters/file_system.ahk
-#Include ../adapters/timer_scheduler.ahk
+#Include ../core/events/timer_scheduler.ahk
 #Include ../infra/json.ahk
 #Include ../infra/locale.ahk
 #Include ../_generated/locale_table.ahk

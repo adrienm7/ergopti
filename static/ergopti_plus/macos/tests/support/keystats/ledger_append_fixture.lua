@@ -13,7 +13,7 @@ local M = {}
 local OWNED = { "tests.support.file_system_transaction_fixture", "adapters.file_system", "infra.fs_dir",
 	"infra.logger", "adapters.ledger_append", "infra.timings", "metrics.engine.metrics", "modules.keystats.aggregator",
 	"modules.keystats.export", "modules.keystats.log_manager", "modules.keystats.rotation",
-	"modules.keystats.sqlite_writer", "adapters.timer_scheduler", "modules.keystats.timestamp", "lfs",
+	"modules.keystats.sqlite_writer", "core.events.timer_scheduler", "modules.keystats.timestamp", "lfs",
 	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "metrics.engine.capture.physical_release",
 	"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "diagnostics.engine.operation_reporter", "infra.toml.reader",
 	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8" }

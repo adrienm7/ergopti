@@ -272,7 +272,7 @@ end
 --- @param environment table|nil Explicit child environment.
 local function exec_input(executable, args, input, timeout_s, callback, environment)
 	local ShellRunner = M._shell_runner or require("adapters.shell_runner")
-	local Timer = require("adapters.timer_scheduler")
+	local Timer = require("core.events.timer_scheduler")
 	local settled, timer = false, nil
 	local function settle(code, stdout, stderr)
 		if settled then return end
@@ -537,7 +537,7 @@ end
 --- @param text string The check's own text.
 --- @param callback function fn(answered, failure_token|nil, elapsed_ms).
 local function ollama_predict(model, text, callback)
-	local Timer = require("adapters.timer_scheduler")
+	local Timer = require("core.events.timer_scheduler")
 	local started, settled, timer = hs.timer.absoluteTime(), false, nil
 	local function settle(answered, token)
 		if settled then return end
@@ -675,7 +675,7 @@ end
 ---        (until_prediction) is polled for wait_seconds; effect_ms is the time
 ---        from the last key to the effect, nil when it never came.
 local function scratch_typing(keys, callback, options)
-	local Timer = require("adapters.timer_scheduler")
+	local Timer = require("core.events.timer_scheduler")
 	local OwnWindow = require("adapters.own_window")
 	local Selftest = require("infra.field_run_selftest")
 	options = options or {}

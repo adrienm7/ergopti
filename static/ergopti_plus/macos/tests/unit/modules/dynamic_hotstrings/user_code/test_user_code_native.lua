@@ -242,7 +242,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	end)
 	helpers.it("retains the exact queued transaction when native settlement observation refuses", function()
 		with_native(function(f)
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			local original, seen = Scheduler.onSettled, {}
 			Scheduler.onSettled = function(handle, callback)
 				seen[handle] = (seen[handle] or 0) + 1
@@ -342,7 +342,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("retains the exact clipboard timer after restoration until native stop acknowledges", function()
 		with_native(function(f)
 			f.hs.pasteboard.setContents("original clipboard")
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			local original, timer_stop, owned_handle = Scheduler.after, nil, nil
 			local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
 			Scheduler.after = function(delay, callback)

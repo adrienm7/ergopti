@@ -42,7 +42,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"infra.keycodes",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -106,7 +106,7 @@ local function exercise_committed_backend_pause()
 			end,
 			admission_open = function() return admission_fence == nil end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function() return { timer = nil }, true end,
 			cancel = function() return true end,
 		}

@@ -29,7 +29,7 @@ function Timer.cancel(timer)
  if settings.cancel_refused then return false end
  timers[timer]=nil;if timer.settled then timer.settled() end;return true
 end
-package.loaded['adapters.timer_scheduler']=Timer
+package.loaded['core.events.timer_scheduler']=Timer
 local Broker={}
 function Broker.subscribe(_,fn) source_callback=fn;if settings.subscribe_stop then settings.owner.stop() end;return not settings.subscribe_refused end
 function Broker.unsubscribe() if settings.unsubscribe_refused then return false end;source_callback=nil;return true end

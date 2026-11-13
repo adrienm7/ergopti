@@ -12,7 +12,7 @@ helpers.describe("text_sender completion callback visibility", function()
 			"adapters.text_sender",
 			"adapters.clipboard",
 			"adapters.synthetic_input",
-			"adapters.timer_scheduler",
+			"core.events.timer_scheduler",
 			"infra.logger",
 		}, function()
 			local errors = {}
@@ -30,7 +30,7 @@ helpers.describe("text_sender completion callback visibility", function()
 			end
 			package.loaded["infra.logger"] = logger
 			package.loaded["adapters.clipboard"] = {}
-			package.loaded["adapters.timer_scheduler"] = {}
+			package.loaded["core.events.timer_scheduler"] = {}
 			package.loaded["adapters.synthetic_input"] = {
 				emit_key_strokes = function(text) return text == "visible" end,
 			}

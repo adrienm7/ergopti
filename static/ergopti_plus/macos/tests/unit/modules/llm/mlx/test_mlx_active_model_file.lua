@@ -17,7 +17,7 @@ local MODULES = {
 	"adapters.http_client",
 	"adapters.json_codec",
 	"adapters.shell_runner",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.config_paths",
 	"infra.logger",
 	"infra.timings",
@@ -73,7 +73,7 @@ local function with_fixture(run)
 		decode = function() return {} end,
 	}
 	package.loaded["adapters.shell_runner"] = {}
-	package.loaded["adapters.timer_scheduler"] = {}
+	package.loaded["core.events.timer_scheduler"] = {}
 	package.loaded["infra.timings"] = { sec = function() return 1 end }
 	package.loaded["modules.llm.api_common"] = {
 		protected_call = function(callback, _, ...)

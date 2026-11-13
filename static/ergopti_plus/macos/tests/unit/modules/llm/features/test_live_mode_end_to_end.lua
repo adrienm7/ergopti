@@ -175,7 +175,7 @@ local function build_world()
 	local engine = require("modules.llm.prediction_engine")
 	world.engine = engine
 	-- The native timers are those of the stub the scheduler captured when it loaded
-	local scheduler_hs = get_upvalue(require("adapters.timer_scheduler").after, "hs")
+	local scheduler_hs = get_upvalue(require("core.events.timer_scheduler").after, "hs")
 	assert(type(scheduler_hs) == "table" and type(scheduler_hs.timer.__timers) == "table",
 		"the timer scheduler's native stub must be reachable")
 	world.timers = scheduler_hs.timer.__timers
@@ -655,8 +655,8 @@ local function with_live_boundary_owner(scenario)
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleaned, cleanup_detail = pcall(function()
 		if world then world.engine.stop_live_prompt("boundary fixture cleanup", true) end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true); helpers.assert_eq(scheduler.activeCount(), 0)
 		end
 		local bridge = package.loaded["modules.keystats.kc_bridge"]

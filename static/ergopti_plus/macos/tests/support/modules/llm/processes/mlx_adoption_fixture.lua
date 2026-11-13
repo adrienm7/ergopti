@@ -13,7 +13,7 @@ local OWNED = {
 	"infra.log_folders", "_generated.logger_sub_files", "adapters.log_transport",
 	"infra.launcher_environment", "infra.notifications", "infra.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
-	"adapters.task_lifecycle", "adapters.shell_runner", "adapters.timer_scheduler",
+	"adapters.task_lifecycle", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.json_codec", "modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -65,7 +65,7 @@ local function with_adoption(scenario)
 				get_port = function() return 3460 end, reset_endpoints = function() return true end,
 				set_model_hf_path = noop, set_active_server_pgid = noop, mark_load_failed = noop,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { timer = {} }, true end,
 				cancel = function(handle) handle.timer = nil; return true end,
 			}

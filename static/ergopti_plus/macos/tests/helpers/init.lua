@@ -343,7 +343,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["adapters.foreign_ledger_snapshot"] = nil
 	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
 		loaded["infra.paced_job"] = nil
-		loaded["adapters.timer_scheduler"] = nil
+		loaded["core.events.timer_scheduler"] = nil
 	end
 	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child

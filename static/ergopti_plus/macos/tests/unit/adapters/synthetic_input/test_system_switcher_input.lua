@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local eq = helpers.assert_eq
 local function with_input(body, setup)
 	local names = { "adapters.system_switcher_input", "adapters.system_switcher_sampler",
-		"adapters.timer_scheduler", "modules.gestures.native_app_switcher", "adapters.synthetic_input",
+		"core.events.timer_scheduler", "modules.gestures.native_app_switcher", "adapters.synthetic_input",
 		"adapters.window_manager", "adapters.storage", "infra.logger", "infra.timings",
 		"modules.gestures.native_app_switcher_action", "adapters.system_switcher_runtime" }
 	local saved, old_hs = {}, hs
@@ -153,7 +153,7 @@ local function with_input(body, setup)
 		return require("modules.gestures.native_app_switcher_action")
 	end
 	if setup then setup(f) end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	_G.hs = native
 	local ok, failure = xpcall(function()
 		f.owner = assert(require("adapters.system_switcher_input").new(

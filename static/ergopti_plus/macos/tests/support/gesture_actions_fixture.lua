@@ -54,7 +54,7 @@ local OWNERS = {
 	"adapters.json_codec",
 	"adapters.key_state",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"keyboard.engine.desktop_navigation",
 	"infra.config_paths",
 	"infra.i18n",
@@ -132,7 +132,7 @@ local function fresh_actions(options)
 	"adapters.system_switcher_runtime",
 
 		"infra.notifications",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"modules.gestures.actions_aux_owner",
 		"modules.gestures.actions_click",
 		"modules.gestures.sticky_modifiers",

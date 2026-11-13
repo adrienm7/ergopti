@@ -406,7 +406,7 @@ end
 --- @param fn function
 --- @return boolean armed
 local function schedule_access_slice(fn)
-	return require("adapters.timer_scheduler").after(0, fn).armed == true
+	return require("core.events.timer_scheduler").after(0, fn).armed == true
 end
 
 --- Exchanges an entry's stored key for an access token, once at a time;
@@ -1509,7 +1509,7 @@ function M.refresh_capabilities(entry)
 	local function finish(records)
 		ModelCapabilities.finish(_capabilities, provider_id, records, os.time())
 	end
-	local scheduled = require("adapters.event_loop").defer(function()
+	local scheduled = require("core.events.loop").defer(function()
 		Logger.info(LOG, "Capability listing of provider %s requested.", provider_id)
 		local dispatched = HttpClient.get(url, headers,
 			{ owner = CAPABILITY_OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms"), follow_redirects = false },

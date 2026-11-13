@@ -27,7 +27,7 @@ helpers.describe("wpm_menubar.start() is idempotent (no redundant timer restart)
 	-- touches hs.screen, so the menubar is safe to drive headless.
 	local function load_menubar()
 		package.loaded["modules.keystats"] = { get_live_stats = function() return {} end }
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local starts = { n = 0 }
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {
 			timer = {

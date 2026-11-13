@@ -29,7 +29,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
 			"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+			"adapters.http_client", "core.events.timer_scheduler", "adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 			"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
 			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
@@ -43,7 +43,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				return { cancel = function() return true end, isActive = function() return false end,
 					isSettled = function() return true end }
 			end }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() error("foreground startup must not acquire a launch timer") end,
 				cancel = function() return true end,
 			}
@@ -133,7 +133,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			local json = require("core.text.engine.json")
 			fixture.codec = package.loaded["adapters.json_codec"]
 			fixture.codec.encode, fixture.codec.decode = json.encode, json.decode
-			package.loaded["adapters.timer_scheduler"].now = function() return 1 end
+			package.loaded["core.events.timer_scheduler"].now = function() return 1 end
 			package.loaded["modules.llm.parser"].strip_thinking = require("ai.engine.api.parser_core").strip_thinking
 			package.loaded["modules.llm.api_common"].protected_call = function(fn, _, ...)
 				return package.loaded["infra.logger"].callback("fixture", "request callback", fn, ...)

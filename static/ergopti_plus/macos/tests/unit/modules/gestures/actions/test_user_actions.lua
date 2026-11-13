@@ -64,7 +64,7 @@ local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
 	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "infra.logger", "infra.i18n",
 	"infra.notifications", "modules.gestures.actions_aux_owner", "adapters.file_system", "adapters.clipboard",
-	"adapters.synthetic_input", "adapters.shell_runner", "adapters.timer_scheduler",
+	"adapters.synthetic_input", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
 }
 
@@ -146,7 +146,7 @@ local function with_world(body)
 			world.typed[#world.typed + 1] = text
 			return true
 		end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn)
 				if world.raise_timer then error("timer unavailable") end
 				local handle = { fn = fn }

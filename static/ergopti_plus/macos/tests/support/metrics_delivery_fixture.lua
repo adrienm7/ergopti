@@ -47,7 +47,7 @@ local function with_delivery(cached, callback)
 				-- the zero-delay turns it arms, so one call still stands for one
 				-- refresh. Delayed retries and the fresh load stay queued.
 				local delivering, slices = false, nil
-				package.loaded["adapters.timer_scheduler"].after = function(delay, fn)
+				package.loaded["core.events.timer_scheduler"].after = function(delay, fn)
 					local handle = { timer = {} }
 					local entry = function() handle.timer = nil; fn() end
 					if delivering and delay == 0 then

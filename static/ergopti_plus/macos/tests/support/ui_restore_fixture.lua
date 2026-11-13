@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local MODULE_NAMES = {
-	"adapters.storage", "adapters.timer_scheduler", "infra.logger", "infra.timings",
+	"adapters.storage", "core.events.timer_scheduler", "infra.logger", "infra.timings",
 	"infra.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }
@@ -86,7 +86,7 @@ function M.with_fixture(options, scenario)
 				handle.timer = nil
 				return true
 			end
-			package.loaded["adapters.timer_scheduler"] = scheduler
+			package.loaded["core.events.timer_scheduler"] = scheduler
 
 			local ui_restore = require("infra.ui_restore")
 			local result = table.pack(xpcall(function()

@@ -40,7 +40,7 @@ local M = {}
 
 local Logger         = require("infra.logger")
 local TextSender     = require("adapters.text_sender")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "keymap.terminator_replay"

@@ -15,7 +15,7 @@ local json = require("core.text.engine.json")
 local MODULES = {
 	"diagnostics.engine.operation_reporter",
 	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	-- The real timer scheduler describes callback failures through this pure owner.
 	"diagnostics.engine.reports.error_description",
 	-- The timer scheduler admits delays through this pure owner.

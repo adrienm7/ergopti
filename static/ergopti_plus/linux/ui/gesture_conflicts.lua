@@ -76,7 +76,7 @@ end
 function M.show(group)
 	local key = "gesture_conflict_dismissed." .. group.key
 	if Storage.get(key, false) == true then return true end
-	return require("adapters.event_loop").defer(function()
+	return require("core.events.loop").defer(function()
 		if Storage.get(key, false) == true then return end
 		local title = WindowTitles.compose(I18n.get("menu.gestures.conflict_title"))
 		local message = I18n.get("gesture.slots." .. group.slot) .. "\n" .. I18n.get("gestures.system.warning")

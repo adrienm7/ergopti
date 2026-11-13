@@ -30,7 +30,7 @@ local function run_window(module_name, scenario)
 		"adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
 		"ui.model_browser", "ui.changelog",
-		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
+		"ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"core.fs.engine.app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
