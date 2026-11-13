@@ -4,35 +4,38 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 07:45)
+## Where things stand (2026-11-13, 12:20)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
-  dev `520bb24c`, merged in `ee1aa96f`.
-- Steps landed on dev: none. The migration is not authorized to land yet.
+  dev `520bb24c`, merged in `ee1aa96f`. Tip: `b0b78a2b`.
+- Steps landed on dev: none. The coordinator lands each green block of steps
+  on dev; the first block is S01+S02.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
   the verdicts). Any other red on a proof is the steps'.
 - Proof 5 (S01+S02, run 43366970653): 13 red jobs, 7 of them the steps'.
   Fixed since: hotstrings tails (`9a4f62ce`, `b5e4b75a`), the PAC paths
-  fixture (`607b4f91`). Common Ai and network fails on
-  `test-managed-ollama-protocol` (CI only: locally it fails on clock controls
-  both before and after). Unexplained: Linux integration native, macOS
-  Launcher XCTest and Archive update controls (logs not read yet; try a long
-  tail of each job).
-- Locally all 38 steps apply (`/home/user/wt-seq`), with these later-step
-  fixes: driver discovery by `_generated` (`426d6432`), the tap-hold writer
-  anchor (`d8eee7ef`), constant concatenation (`9526c0ef`).
-- **Next:** a full S01–S38 proof is being built from the tip in
-  `/home/user/wt-proof` (log `scratchpad/full2-run.log`); push it to
-  `claude/ergopti-todo-structure-phase2-proof-6` and dispatch `ci.yml`
-  (`os_lanes=all`), then fix per step.
-- S02 (`core/crypto`) needed: derived pins found where S01 left them
-  (`a4d8fcd6`, `4c145c12`), the committed step numbers kept (`4e04dd96`), the
-  folder gain rule (`ffe92aff`, `1e98ba49`), one adapter path table
-  (`6b4e07ca`), the I1 records moved by the runner (`57869cd5`) and the banner
-  fixture read from the lint (`691e47a4`). Locally its JS and macOS Lua reds
-  are gone.
+  fixture (`607b4f91`), the Linux XI2 receiver (`d61082f5`), constant
+  concatenation when the constant's own folder moves (`1d783d68`).
+  Unexplained: Common Ai and network (`test-managed-ollama-protocol`, CI
+  only), macOS Launcher XCTest (green on dev), macOS Archive update controls.
+- Proof 6 (S01–S38, branch `…-proof-6` at `3270b5dd`, run 43396604286): 46
+  red jobs, from two causes:
+  - Windows: every AHK lane stops in `build_windows_nav_owner.ps1`, whose
+    manifest fingerprint covers the moved sources' paths. Now a derived pin
+    (`93ffa01c`).
+  - macOS and Linux Lua: files that reach their driver root by naming or
+    counting their folders (the menu manifest readers, the Karabiner lease
+    helper, the Linux webview manager). Listed edits (`b0b78a2b`). Chains of
+    `dir = NativePath.dirname(dir)` and nested `dirname(dirname(…))` were
+    already followed by the tooling.
+- Proof 7 (S01+S02 from `efb53e24`, `3c4cf6ad`): run 43413113897, built in `/home/user/wt-proof`
+  (log `scratchpad/proof7-run.log`), then pushed to `…-proof-7` and run with
+  `os_lanes=all`. If its only reds are the baseline's, S01+S02 is the first
+  block to send to the coordinator.
+- `/home/user/wt-seq` holds proof 6 with the four Lua edits applied by hand,
+  to run the macOS and Linux Lua suites locally (`scratchpad/p6fix-*.log`).
 
 ### S01 CI failures (run 43311674550) and their state
 
@@ -63,10 +66,10 @@ Open, to check on the next proof:
 
 ### Next actions, in order
 
-1. Push the new proof to `claude/ergopti-todo-structure-phase2-proof-3` and
-   dispatch `ci.yml` with `os_lanes=all`; fix what is red outside the dev
-   reds, in the tooling.
-2. Then S02's proof the same way, then S03 onwards.
+1. Proof 7 on CI; send the coordinator the S01–S02 range when only baseline
+   reds remain, else fix in the tooling and rebuild.
+2. Fix what the local Lua suites still find on the full chain, then build
+   proof 8 (S01–S38) from the tip and run it with `os_lanes=all`.
 
 ### Baseline: the reds dev already has
 
@@ -101,6 +104,12 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   narrow scanners too (the OS-purity lists, the platform-only convention).
 - The runner moves the I1 tree parity records (`57869cd5`) to the measured
   values at each step, named in the commit with the folder bounds.
+- The navigation owner manifest fingerprint is re-derived when a step moves
+  its sources (`93ffa01c`). Each Windows lane recompiles and tests the moved
+  sources, but byte identity with the tracked DLL is not rebuilt with the
+  pinned toolset (no MSVC here): the comments-only changes and `/Brepro`
+  without debug records argue it holds; a run of the builder with
+  `-UpdateTracked` on the pinned toolset would prove it.
 
 ## Next commands
 
