@@ -143,6 +143,10 @@ function rewriteText(text, rows, movedRepo, file) {
 	const swap = (from, to) => {
 		text = text.split(from).join(hold(to));
 	};
+	// A Go module path names the module, not its folder: imports resolve it
+	// against go.mod wherever the module lives, and respelling it would
+	// change every committed binary built from the module.
+	text = text.replace(Plan.GO_MODULE_PATH, (m) => hold(m));
 	for (const row of rows) {
 		// The root switch runs last, on what the path rewrites leave.
 		if (row.kind === 'shared-root') {

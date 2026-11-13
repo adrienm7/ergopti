@@ -141,6 +141,11 @@ function run() {
 			),
 			'assert.match(s, /_shared\\\\zz_probe_hs\\\\data\\\\a\\.json/);'
 		);
+		// A Go module path names the module, wherever its folder moves: the
+		// relay binary built from it stays the committed one.
+		const goImport =
+			'import "github.com/adrienm7/ergopti/static/ergopti_plus/_shared/zz_probe_mod/hotstrings"';
+		assert.equal(rewrite(`${P}_shared/zz_probe_mod/x.go`, goImport), goImport);
 		// A shell exclusion of a bare _shared path, unquoted.
 		assert.equal(
 			rewrite(
