@@ -279,7 +279,7 @@ _LSE_SendCase() {
 	AssertEqual("{RAlt up}", KeylayoutEmulation_SourceSend(Map("type", "modifier", "id", "alt_right", "down", false),
 		Scans)["keys"])
 	AssertThrows(() => KeylayoutEmulation_SourceSend(Map("type", "key", "key", "Mystery", "modifiers", []), Scans))
-	Held := KeylayoutEmulation_SourceHeld((Key, Mode) => (Key == "RShift" || Key == "RAlt" || (Key == "CapsLock" && Mode == "T")))
+	Held := KeylayoutEmulation_SourceHeld((Key) => (Key == "RShift" || Key == "RAlt"), () => true)
 	AssertEqual("alt_right caps_lock shift", _KLT_Join([Held.Has("alt_right") ? "alt_right" : "",
 		Held.Has("caps_lock") ? "caps_lock" : "", Held.Has("shift") ? "shift" : ""], " "))
 	AssertFalse(Held.Has("control"))

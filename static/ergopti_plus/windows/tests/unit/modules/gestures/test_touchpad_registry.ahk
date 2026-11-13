@@ -392,7 +392,7 @@ _TPR_WizardElevatesOnlyTheRestart() {
 	Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
 	Assert(Start != "", "the wizard launcher must exist")
 	ApplyAt := InStr(Start, "TouchpadRegistryApply(")
-	RunAt := InStr(Start, "Run(")
+	RunAt := InStr(Start, "GestureRestartRunElevated(")
 	AssertTrue(ApplyAt > 0 && RunAt > ApplyAt,
 		"the wizard writes the values in the resident process before elevating the restart")
 	AssertEqual(0, InStr(Start, "_Onboarding_BuildGesturePsScript"), "no elevated registry writer remains")
@@ -516,7 +516,7 @@ _TPR_RestartLaunchersSkipAnIsolatedProfile() {
 		Body := _DriverFuncBody(Launcher)
 		Assert(Body != "", Launcher . " must exist")
 		SkipAt := InStr(Body, "TouchpadRegistrySkipsDeviceRestart(OnDone)")
-		AssertTrue(SkipAt > 0 && SkipAt < InStr(Body, "Run("),
+		AssertTrue(SkipAt > 0 && SkipAt < InStr(Body, "GestureRestartRunElevated("),
 			Launcher . " asks the owner before it launches the elevated restart")
 	}
 }

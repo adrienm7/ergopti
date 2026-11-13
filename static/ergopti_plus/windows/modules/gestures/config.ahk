@@ -985,6 +985,15 @@ _GestureRestartAbortReservation(Epoch) {
 	}
 }
 
+; The one elevated launch of the touchpad restart worker, shared by the gesture
+; menu and the onboarding wizard: each elevation site adds to the antivirus
+; surface of the compiled exe (tools/ci/windows-exe-av-surface.json).
+; @param ScriptPath {String} The worker script _GestureRestartBuildPsScript wrote.
+; @param &Pid {Integer} Receives the worker's PID; a refused UAC prompt throws.
+GestureRestartRunElevated(ScriptPath, &Pid) {
+	Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
+}
+
 GestureRestartTouchpadDevice(OnDone := 0) {
 		global _GestureRestartJob
 		LoggerStart("gestures", "Restarting touchpad device to apply gesture config…")
@@ -1036,7 +1045,7 @@ GestureRestartTouchpadDevice(OnDone := 0) {
 				; A UAC-approved PnP restart can take tens of seconds. The child writes
 				; its own outcome, and the driver only polls it — no hook, timer, or
 				; tray callback waits on the worker.
-				Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &RestartPid)
+				GestureRestartRunElevated(ScriptPath, &RestartPid)
 		} catch as e {
 				FSDelete(ScriptPath)
 				_GestureRestartAbortReservation(Epoch)

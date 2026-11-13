@@ -22,6 +22,9 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+; Loaded with the script, so a missing hid.dll stops the start and the reader
+; only resolves its entry points: no runtime module load in the exe's strings.
+#DllLoad "hid.dll"
 
 global RAW_INPUT_WM_INPUT := 0x00FF
 global RAW_INPUT_WM_INPUT_DEVICE_CHANGE := 0x00FE
@@ -189,9 +192,9 @@ RawInput_HidValueCaps(Preparsed, Count, &Got) {
 class RawInputHidReader {
 	; @param Preparsed {Buffer} The device's preparsed descriptor.
 	__New(Preparsed) {
-		static Module := DllCall("Kernel32\LoadLibraryW", "Str", "hid.dll", "Ptr")
+		static Module := DllCall("Kernel32\GetModuleHandleW", "Str", "hid.dll", "Ptr")
 		if !Module
-			throw OSError(A_LastError, -1, "LoadLibraryW hid.dll")
+			throw OSError(A_LastError, -1, "GetModuleHandleW hid.dll")
 		this._get_value := DllCall("Kernel32\GetProcAddress", "Ptr", Module, "AStr", "HidP_GetUsageValue", "Ptr")
 		this._get_usages := DllCall("Kernel32\GetProcAddress", "Ptr", Module, "AStr", "HidP_GetUsages", "Ptr")
 		if !this._get_value || !this._get_usages

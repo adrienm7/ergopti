@@ -18,7 +18,7 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
     Assert(Body != "" && Poll != "" && Builder != "", "touchpad restart worker helpers must exist")
     Assert(InStr(Body, "RunWait(") = 0,
         "GestureRestartTouchpadDevice must never RunWait for an elevated PnP restart on the driver thread")
-	Assert(InStr(Body, "Run(") > 0 && InStr(Body, "&RestartPid") > 0,
+	Assert(InStr(Body, "GestureRestartRunElevated(") > 0 && InStr(Body, "&RestartPid") > 0,
 		"GestureRestartTouchpadDevice must launch the restart asynchronously and retain its PID for diagnostics")
 	Reserve := _DriverFuncBody("_GestureRestartReserve")
 	Assert(InStr(Body, "_GestureRestartReserve(") > 0
@@ -30,8 +30,14 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 	StartPidPos := InStr(Body, "ProcessExist(_GestureRestartJob")
 	Assert(StartReceiptPos > 0 && StartPidPos > StartReceiptPos,
 		"a second restart must consume the prior receipt before consulting its recyclable PID")
-    Assert(InStr(Body, "*RunAs powershell.exe") > 0,
-        "GestureRestartTouchpadDevice must preserve elevation for the PnP operation")
+	Launch := _DriverFuncBody("GestureRestartRunElevated")
+	Assert(InStr(Launch, "*RunAs powershell.exe") > 0,
+		"GestureRestartTouchpadDevice must preserve elevation for the PnP operation")
+	; One elevation site for both launchers: each *RunAs counts against the
+	; antivirus surface ceilings of the compiled exe.
+	for _, Launcher in ["GestureRestartTouchpadDevice", "_Onboarding_StartGestureAuto"]
+		Assert(InStr(_DriverFuncBody(Launcher), "RunAs") = 0,
+			Launcher . " must elevate through GestureRestartRunElevated, not a *RunAs of its own")
 	Assert(InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_GestureRestartReadResult") > 0,
 		"completion must wait across Suspend and consume only the worker-authored result")
 	ReceiptPos := InStr(Poll, "FileExist(_GestureRestartJob")
@@ -81,7 +87,7 @@ _GRN_ElevatedLaunchIsReservedBeforeRun() {
 			"a rejected duplicate must not acquire a second completion poller")
 		Body := _DriverFuncBody("GestureRestartTouchpadDevice")
 		Assert(InStr(Body, "_GestureRestartReserve(") > 0
-				&& InStr(Body, "_GestureRestartReserve(") < InStr(Body, "Run("),
+				&& InStr(Body, "_GestureRestartReserve(") < InStr(Body, "GestureRestartRunElevated("),
 			"GestureRestartTouchpadDevice must reserve before crossing the elevated Run seam")
 	} finally {
 		_GestureRestartJob := SavedJob
