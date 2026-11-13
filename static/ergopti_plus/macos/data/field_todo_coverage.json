@@ -776,6 +776,12 @@
 			"title": "Start at login from the developer app (ad hoc signed)",
 			"checks": [],
 			"not_testable": "Changes the user's own Login Items and needs a logout: in the developer app, tick About > Start at login, approve it in System Settings > General > Login Items if asked, log out and in, then untick it."
+		},
+		{
+			"id": "config_nfd_paths",
+			"title": "Configuration paths in NFD and NFC",
+			"checks": [],
+			"not_testable": "Needs APFS and a person: the configuration folder is created once composed (NFC) and once decomposed (NFD) by Finder, which no field run step does; the Lua path readers are unit-tested on Linux only."
 		}
 	]
 }
