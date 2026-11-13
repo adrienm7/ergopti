@@ -156,6 +156,7 @@
 		"test:structure-lua-prefix-sweeps": "node ./tools/test/test-structure-lua-prefix-sweeps.cjs",
 		"test:structure-scope-ancestor": "node ./tools/test/test-structure-scope-ancestor.cjs",
 		"test:structure-shared-driver-paths": "node ./tools/test/test-structure-shared-driver-paths.cjs",
+		"test:structure-folder-gain-lists": "node ./tools/test/test-structure-folder-gain-lists.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
