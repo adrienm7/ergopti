@@ -87,7 +87,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "d3fc86ee9e0f2e6169a93702357396bb63da0119e5d961ec41864a5a1ad3d9a4"
+					"sha256": "0306f9f2b63dcedb1381473f3f05d730e275ca3669aff6dc980226a8efdb1d43"
 				},
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
@@ -142,7 +142,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "d3fc86ee9e0f2e6169a93702357396bb63da0119e5d961ec41864a5a1ad3d9a4"
+					"sha256": "0306f9f2b63dcedb1381473f3f05d730e275ca3669aff6dc980226a8efdb1d43"
 				}
 			],
 			"linux": [
@@ -194,7 +194,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d3fc86ee9e0f2e6169a93702357396bb63da0119e5d961ec41864a5a1ad3d9a4"
+					"sha256": "0306f9f2b63dcedb1381473f3f05d730e275ca3669aff6dc980226a8efdb1d43"
 				}
 			],
 			"linux": [
@@ -249,7 +249,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d3fc86ee9e0f2e6169a93702357396bb63da0119e5d961ec41864a5a1ad3d9a4"
+					"sha256": "0306f9f2b63dcedb1381473f3f05d730e275ca3669aff6dc980226a8efdb1d43"
 				}
 			],
 			"linux": [
@@ -296,7 +296,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d3fc86ee9e0f2e6169a93702357396bb63da0119e5d961ec41864a5a1ad3d9a4"
+					"sha256": "0306f9f2b63dcedb1381473f3f05d730e275ca3669aff6dc980226a8efdb1d43"
 				}
 			],
 			"linux": [
@@ -348,7 +348,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "d3fc86ee9e0f2e6169a93702357396bb63da0119e5d961ec41864a5a1ad3d9a4"
+					"sha256": "0306f9f2b63dcedb1381473f3f05d730e275ca3669aff6dc980226a8efdb1d43"
 				}
 			],
 			"linux": [

@@ -12,6 +12,14 @@ const context = vm.createContext({
 	makeHostBridge: () => (value) => messages.push(value)
 });
 context.window = context;
+// The page reads the shared value contract that its HTML loads first.
+vm.runInContext(
+	fs.readFileSync(
+		path.join(__dirname, '../../static/ergopti_plus/_shared/ui/value_check.js'),
+		'utf8'
+	),
+	context
+);
 vm.runInContext(
 	fs.readFileSync(
 		path.join(__dirname, '../../static/ergopti_plus/_shared/ui/hotstrings_config_window/script.js'),
@@ -26,6 +34,8 @@ function field() {
 	const input = {
 		value: '',
 		placeholder: '',
+		setCustomValidity() {},
+		reportValidity() {},
 		addEventListener(_, fn) {
 			this.change = fn;
 		}

@@ -12,6 +12,14 @@ const context = vm.createContext({
 	makeHostBridge: () => (packet) => messages.push(packet)
 });
 context.window = context;
+// The page reads the shared value contract that its HTML loads first.
+vm.runInContext(
+	fs.readFileSync(
+		path.join(__dirname, '../../static/ergopti_plus/_shared/ui/value_check.js'),
+		'utf8'
+	),
+	context
+);
 vm.runInContext(
 	fs.readFileSync(
 		path.join(__dirname, '../../static/ergopti_plus/_shared/ui/hotstrings_config_window/script.js'),
@@ -25,6 +33,11 @@ assert.deepEqual(messages.splice(0), ['ready'], 'the page posts ready once on lo
 function field() {
 	const input = {
 		value: '',
+		refusal: '',
+		setCustomValidity(message) {
+			this.refusal = message;
+		},
+		reportValidity() {},
 		addEventListener(_, callback) {
 			this.change = callback;
 		}
@@ -49,23 +62,25 @@ for (const [method, key] of [
 ]) {
 	const f = field();
 	context[method](f, category, null);
-	f.input.value = '1e2';
+	f.input.value = '100';
 	f.input.change();
-	assert.equal(
-		messages.pop()[key],
-		100,
-		`${method}: scientific notation must preserve its actual numeric value`
-	);
+	assert.equal(messages.pop()[key], 100, `${method}: a whole number is sent as typed`);
+	assert.equal(f.input.refusal, '', `${method}: an admitted value clears the refusal`);
 	for (const invalid of method === 'bindDelay'
-		? ['', '2.5', '9007199254740992']
-		: ['2.5', '9007199254740992']) {
+		? ['', '1e2', '2.5', '9007199254740992']
+		: ['1e2', '2.5', '9007199254740992']) {
 		f.input.value = invalid;
+		f.input.refusal = '';
 		f.input.change();
 		assert.equal(
 			messages.length,
 			0,
 			`${method}: invalid integer ${invalid} must not be silently truncated`
 		);
+		// The empty delay is an unfinished edit, not a refusal (WVH-001).
+		if (invalid !== '') {
+			assert.notEqual(f.input.refusal, '', `${method}: ${invalid} must be refused with a message`);
+		}
 	}
 }
 for (const section of [null, { name: 'snippets', priority: 3, priority_default: 5 }]) {
