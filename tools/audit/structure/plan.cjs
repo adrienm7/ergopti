@@ -1395,6 +1395,13 @@ function referenceContext(map) {
 		if (name) {
 			const root = old.startsWith('_shared/') ? '_shared' : old.split('/')[0];
 			byLuaName.set(`${root}|${name}`, [old, target, luaModuleName(target, true)]);
+			// require("modules.keymap.init") names an init.lua with its stem; the
+			// new name keeps the stem only where the target is an init.lua too.
+			if (old.endsWith('/init.lua') && target) {
+				const fresh = luaModuleName(target, true);
+				const spelled = fresh && target.endsWith('/init.lua') ? `${fresh}.init` : fresh;
+				byLuaName.set(`${root}|${name}.init`, [old, target, spelled]);
+			}
 		}
 	}
 	// The module names the tree answers today, so a runtime edit can tell a
@@ -1405,6 +1412,7 @@ function referenceContext(map) {
 		if (!name) continue;
 		const root = old.startsWith('_shared/') ? '_shared' : old.split('/')[0];
 		presentNames.add(`${root}|${name}`);
+		if (old.endsWith('/init.lua')) presentNames.add(`${root}|${name}.init`);
 	}
 	const targetNames = new Set();
 	for (const t of map.values()) {
