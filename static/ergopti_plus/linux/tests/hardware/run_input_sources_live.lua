@@ -176,6 +176,30 @@ local function pick(id)
 		.. desktop_active() .. ", " .. id .. " types " .. signature_of[id] .. ")")
 end
 
+-- GNOME switches only through the Ergopti Shell extension: without it every
+-- choice is refused with the extension named and the desktop stays put.
+local GNOME_SOURCES = "[('xkb', 'us'), ('xkb', 'fr')]"
+if DESKTOP == "gnome" and os.getenv("ERGOPTI_LIVE_GNOME_EXTENSION") == "off" then
+	local before = desktop_active()
+	local other = signature_of[id_order[1]] == before and id_order[2] or id_order[1]
+	local errors
+	for index, choice in ipairs(switcher.choices()) do
+		if choice.id == other then
+			local rows_now
+			rows_now, errors = menu_rows()
+			rows_now[index].action()
+		end
+	end
+	settle(switcher)
+	check(errors ~= nil and errors[1] == "menu.layout.select_failed_gnome_extension",
+		"without the extension the menu names it: " .. tostring(errors and errors[1]))
+	check(desktop_active() == before, "the desktop keeps its layout (" .. desktop_active() .. ")")
+	check(capture("gsettings get org.gnome.desktop.input-sources sources") == GNOME_SOURCES,
+		"the user's sources list is untouched")
+	print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
+	os.exit(_failures == 0 and 0 or 1)
+end
+
 local start_active = desktop_active()
 local first = signature_of[id_order[1]] == start_active and id_order[2] or id_order[1]
 pick(first)
@@ -200,6 +224,11 @@ PauseSwitch.on_pause_change(false)
 settle(switcher)
 check(desktop_active() == signature_of[resume_id], "resuming selects " .. resume_id .. " (<AD01> types "
 	.. desktop_active() .. ")")
+
+if DESKTOP == "gnome" then
+	check(capture("gsettings get org.gnome.desktop.input-sources sources") == GNOME_SOURCES,
+		"every GNOME switch left the user's sources list as it was")
+end
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)

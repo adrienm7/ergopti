@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Layout ao pausar / retomar",
 	"menu.layout.pause_layout_unsupported_desktop": "Layout na pausa / retoma: indisponível neste ambiente de trabalho (apenas GNOME, KDE ou X11)",
 	"menu.layout.select_failed": "Não foi possível mudar o layout do teclado. Consulte os registos para mais detalhes.",
+	"menu.layout.select_failed_gnome_extension": "Não foi possível mudar o layout do teclado: no GNOME, o Ergopti muda-o através da sua extensão do GNOME Shell, que não está ativa. Termine a sessão e volte a entrar depois de instalar ou atualizar o Ergopti; a versão Flatpak não a pode instalar.",
 	"menu.layout.system_layout_install": "Transferir o instalador do layout de sistema Ergopti (não assinado, direitos de administrador)…",
 	"menu.layout.system_layout_update": "Transferir novamente o instalador do layout de sistema Ergopti para o atualizar…",
 	"menu.layout.system_layout_installed": "Layout de sistema Ergopti instalado",

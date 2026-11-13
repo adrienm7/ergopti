@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "暂停/恢复时的键盘布局",
 	"menu.layout.pause_layout_unsupported_desktop": "暂停 / 恢复时的布局：此桌面不可用（仅限 GNOME、KDE 或 X11）",
 	"menu.layout.select_failed": "无法切换键盘布局。详情请查看日志。",
+	"menu.layout.select_failed_gnome_extension": "无法切换键盘布局：在 GNOME 上，Ergopti 通过其 GNOME Shell 扩展切换布局，但该扩展未在运行。安装或更新 Ergopti 后请注销并重新登录；Flatpak 版本无法安装该扩展。",
 	"menu.layout.system_layout_install": "下载 Ergopti 系统布局安装程序(未签名,需管理员权限)…",
 	"menu.layout.system_layout_update": "重新下载 Ergopti 系统布局安装程序以更新…",
 	"menu.layout.system_layout_installed": "已安装 Ergopti 系统布局",

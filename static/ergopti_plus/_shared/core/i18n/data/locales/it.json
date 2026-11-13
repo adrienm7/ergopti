@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Layout in pausa / ripresa",
 	"menu.layout.pause_layout_unsupported_desktop": "Layout in pausa / ripresa: non disponibile su questo desktop (solo GNOME, KDE o X11)",
 	"menu.layout.select_failed": "Impossibile cambiare il layout di tastiera. Consulta i log per i dettagli.",
+	"menu.layout.select_failed_gnome_extension": "Impossibile cambiare il layout di tastiera: su GNOME, Ergopti lo cambia tramite la sua estensione di GNOME Shell, che non è attiva. Esci e rientra dopo aver installato o aggiornato Ergopti; la versione Flatpak non può installarla.",
 	"menu.layout.system_layout_install": "Scarica il programma di installazione del layout di sistema Ergopti (non firmato, diritti di amministratore)…",
 	"menu.layout.system_layout_update": "Scarica di nuovo il programma di installazione del layout di sistema Ergopti per aggiornarlo…",
 	"menu.layout.system_layout_installed": "Layout di sistema Ergopti installato",

@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Layout vid paus / fortsättning",
 	"menu.layout.pause_layout_unsupported_desktop": "Layout vid paus / återupptagning: inte tillgängligt på detta skrivbord (endast GNOME, KDE eller X11)",
 	"menu.layout.select_failed": "Det gick inte att byta tangentbordslayout. Se loggarna för detaljer.",
+	"menu.layout.select_failed_gnome_extension": "Det gick inte att byta tangentbordslayout: i GNOME byter Ergopti den via sitt GNOME Shell-tillägg, som inte körs. Logga ut och in igen efter att ha installerat eller uppdaterat Ergopti; Flatpak-versionen kan inte installera det.",
 	"menu.layout.system_layout_install": "Ladda ned installationsprogrammet för Ergopti-systemlayouten (osignerat, administratörsbehörighet)…",
 	"menu.layout.system_layout_update": "Ladda ned installationsprogrammet för Ergopti-systemlayouten igen för att uppdatera den…",
 	"menu.layout.system_layout_installed": "Ergopti-systemlayouten installerad",

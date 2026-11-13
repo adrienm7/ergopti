@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "פריסה בהשהיה / המשך",
 	"menu.layout.pause_layout_unsupported_desktop": "פריסה בהשהיה / חידוש: לא זמין בשולחן עבודה זה (GNOME, KDE או X11 בלבד)",
 	"menu.layout.select_failed": "לא ניתן להחליף את פריסת המקלדת. ראה את היומנים לפרטים.",
+	"menu.layout.select_failed_gnome_extension": "לא ניתן להחליף את פריסת המקלדת: ב-GNOME, ‏Ergopti מחליף אותה דרך הרחבת GNOME Shell שלו, שאינה פועלת. התנתק והתחבר מחדש לאחר התקנה או עדכון של Ergopti; גרסת Flatpak אינה יכולה להתקין אותה.",
 	"menu.layout.system_layout_install": "הורדת המתקין של פריסת המערכת Ergopti (לא חתום, הרשאות מנהל)…",
 	"menu.layout.system_layout_update": "הורדה חוזרת של המתקין של פריסת המערכת Ergopti כדי לעדכן אותה…",
 	"menu.layout.system_layout_installed": "פריסת המערכת Ergopti מותקנת",

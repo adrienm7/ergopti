@@ -97,8 +97,17 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       committed atomically by the info `done`), version 1 otherwise; unit tests plus the protocol fake in three modes
       (v1, v2, v2-without-list) in the compositor-focus CI step. Linux only: COSMIC is a Linux desktop. Real
       cosmic-comp check in TODO-tests-linux.md (`wayland_focus`).
-- [ ] **GNOME layout switch through the Ergopti GNOME Shell extension** (the one planned for focused-app identity),
-      instead of rewriting the `sources` list; keep a clear refusal when the extension is absent.
+- [x] **GNOME layout switch through the Ergopti GNOME Shell extension** (the one planned for focused-app identity),
+      instead of rewriting the `sources` list; keep a clear refusal when the extension is absent. Done 2026-11-13
+      (worker D): `focus@ergopti.fr` exports `org.ergopti.InputSource1.Activate(s) -> b` at `/org/ergopti/InputSource` on
+      the Shell's connection and activates the source as the Shell's switcher does (interactive, so the recent list
+      follows); `input_source_switch.lua` calls it through `gdbus` and never writes `sources`. Without the extension
+      (Flatpak, turned off, or an update before the next login) the switch is refused with `gnome_extension_missing`
+      and the menu says why (`menu.layout.select_failed_gnome_extension`, 21 locales). Proved on a headless GNOME
+      Shell 46 (`run_input_sources_live.sh gnome`: 16 checks, the sources list untouched; `gnome-no-extension`: 9
+      checks, the refusal named, the layout kept). Linux only: Windows and macOS switch through their own system
+      APIs. Decided by the agent on 2026-11-13, to review by the maintainer: the exported method admits any client of
+      the user's session bus, which can already write the same `gsettings`.
 - [ ] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
       keep the inlined single-character rules as the safety net, and state the remaining limit in the menu.
 - [ ] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
@@ -582,6 +591,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       login is unknown to it and the slot alone switches the session to its `us` fallback. apply-wayland now compares
       the registry's date with the shell's start, registers both slots and answers `needs_relogin` without touching
       the setting; after the next login every build alternates live. [Proof](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md).
+      2026-11-13: the daemon's runtime switch no longer writes `sources` (see « GNOME layout switch through the Ergopti
+      GNOME Shell extension » above); what is left here is the installer's activation of a newly installed layout.
 
 ### Linux performance (2026-11-11, branch `claude/ergopti-todo-linux-perf`)
 

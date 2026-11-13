@@ -2060,6 +2060,7 @@
 	"menu.layout.pause_layout_section": "Layout on pause / resume",
 	"menu.layout.pause_layout_unsupported_desktop": "Layout on pause / resume: not available on this desktop (GNOME, KDE or X11 only)",
 	"menu.layout.select_failed": "Could not switch the keyboard layout. Check the logs for details.",
+	"menu.layout.select_failed_gnome_extension": "Could not switch the keyboard layout: on GNOME, Ergopti switches it through its GNOME Shell extension, which is not running. Log out and back in after installing or updating Ergopti; the Flatpak version cannot install it.",
 	"menu.layout.system_layout_install": "Download the Ergopti system layout installer (unsigned, administrator rights)…",
 	"menu.layout.system_layout_update": "Download the Ergopti system layout installer again to update it…",
 	"menu.layout.system_layout_installed": "Ergopti system layout installed",

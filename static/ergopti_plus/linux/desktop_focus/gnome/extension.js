@@ -19,14 +19,21 @@
  *    titles to every same-user client; this adds no wider audience.)
  * 3. The daemon starting after the Shell still gets the current window: the
  *    name's appearance triggers one report.
- * 4. The daemon checks that the caller owns org.gnome.Shell; this extension
- *    exports nothing and answers nothing.
+ * 4. The daemon checks that the caller owns org.gnome.Shell.
+ * 5. Layout switch: GNOME Shell keeps its input sources in memory and ignores
+ *    runtime writes of `current` and `mru-sources`, so the daemon asks this
+ *    extension to activate one source the way the Shell's own switcher does
+ *    (interactive, so the Shell records it as the most recent). It is exported
+ *    on the Shell's own connection at INPUT_SOURCE_PATH and answers whether the
+ *    source was found; it can do no more than the user's gsettings writes,
+ *    which every client of the session can already make.
  * ==============================================================================
  */
 
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as Keyboard from 'resource:///org/gnome/shell/ui/status/keyboard.js';
 
 // Pinned by tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua
 // against adapters/compositor_focus.lua, which owns them.
@@ -36,6 +43,17 @@ const INTERFACE = 'org.ergopti.Focus1';
 // How long the shell waits for the worker to take one report; the worker's own
 // bus calls have their bound in adapters/compositor_focus.lua.
 const REPORT_TIMEOUT_MS = 1000;
+// Pinned by the same test against adapters/input_source_switch.lua, which calls them.
+const INPUT_SOURCE_PATH = '/org/ergopti/InputSource';
+const INPUT_SOURCE_INTERFACE = 'org.ergopti.InputSource1';
+const INPUT_SOURCE_XML = `<node>
+	<interface name="${INPUT_SOURCE_INTERFACE}">
+		<method name="Activate">
+			<arg type="s" direction="in" name="id"/>
+			<arg type="b" direction="out" name="switched"/>
+		</method>
+	</interface>
+</node>`;
 
 export default class ErgoptiFocusExtension extends Extension {
 	enable() {
@@ -56,9 +74,15 @@ export default class ErgoptiFocusExtension extends Extension {
 			}
 		);
 		this._track();
+		this._inputSources = Gio.DBusExportedObject.wrapJSObject(INPUT_SOURCE_XML, {
+			Activate: (id) => this._activateInputSource(id)
+		});
+		this._inputSources.export(Gio.DBus.session, INPUT_SOURCE_PATH);
 	}
 
 	disable() {
+		if (this._inputSources) this._inputSources.unexport();
+		this._inputSources = null;
 		if (this._watch) Gio.bus_unwatch_name(this._watch);
 		this._watch = 0;
 		if (this._focusSignal) global.display.disconnect(this._focusSignal);
@@ -67,6 +91,23 @@ export default class ErgoptiFocusExtension extends Extension {
 		// The daemon must not keep the last window as current once nothing reports.
 		this._send('Cleared', null);
 		this._owner = null;
+	}
+
+	/**
+	 * Activates the input source "<type>:<id>" (the daemon's id, "xkb:fr+ergopti").
+	 * @param {string} id
+	 * @returns {boolean} False when the Shell lists no such source.
+	 */
+	_activateInputSource(id) {
+		const sources = Keyboard.getInputSourceManager().inputSources;
+		for (const key of Object.keys(sources)) {
+			const source = sources[key];
+			if (`${source.type}:${source.id}` === id) {
+				source.activate(true);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	_untrackWindow() {
