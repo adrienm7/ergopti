@@ -20,8 +20,7 @@ local function run_case(family, change, route)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local previous_rules = saved.dynamic_hotstrings and saved.dynamic_hotstrings.get_rules()
 	for name in pairs(saved) do
-		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.") or name == "core.logger.engine.shim" or name == "hotstrings.engine.dynamic.core" then
+		if helpers.is_driver_module(name) or name == "core.logger.engine.shim" or name == "hotstrings.engine.dynamic.core" then
 			package.loaded[name] = nil
 		end
 	end

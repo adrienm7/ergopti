@@ -63,8 +63,7 @@ function M.with_world(config, body)
 	local world = { model_label = MODEL, clock = 1000, paused = false }
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
