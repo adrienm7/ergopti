@@ -91,7 +91,7 @@ end
 
 helpers.describe("every manifest setting survives config.toml load and save (preferences-manifest-round-trip)", function()
 	helpers.it("loads each value at its owner and saves it back unchanged", function()
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
 			local manifest = require("infra.manifest_reader")
 			local prefs_probe = helpers.load_with_stubs("infra.preferences")
 
@@ -117,7 +117,7 @@ helpers.describe("every manifest setting survives config.toml load and save (pre
 				"the shared script-control table must be part of the round trip")
 
 			local source = as_sections(cases)
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
 				write = function() error("unguarded publication") end,
 				write_if_unchanged = function(_, content)

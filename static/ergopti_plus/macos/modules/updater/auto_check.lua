@@ -43,9 +43,9 @@ local M = {}
 local pending_session_cleanup = nil
 
 local Logger    = require("infra.logger")
-local Paths     = require("infra.paths")
-local FileSystem = require("adapters.file_system")
-local JsonCodec = require("adapters.json_codec")
+local Paths     = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local Schedule  = require("updater.engine.schedule")
 local ListCache = require("updater.engine.list_cache")
 local Parser   = require("updater.engine.release_parser")
@@ -816,7 +816,7 @@ function M.start_session(opts)
 		on_available = opts.on_available,
 		config = config,
 		timer = require("core.events.timer_scheduler"),
-		storage = require("adapters.storage"),
+		storage = require("core.fs.adapters.storage"),
 		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		now = os.time,

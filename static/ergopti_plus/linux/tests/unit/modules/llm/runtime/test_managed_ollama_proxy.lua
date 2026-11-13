@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 local function it(name, body) helpers.it(name .. " (ollama-proxy)", body) end
 local function eq(actual, expected)
@@ -533,15 +533,15 @@ end)
 
 --- The real Linux policy binding over a stubbed storage holding `stored`.
 local function bound_policy(stored)
-	local saved = { storage = package.loaded["adapters.storage"], binding = package.loaded["infra.proxy_policy"] }
-	package.loaded["adapters.storage"] = { get = function(key, default)
+	local saved = { storage = package.loaded["core.fs.adapters.storage"], binding = package.loaded["infra.proxy_policy"] }
+	package.loaded["core.fs.adapters.storage"] = { get = function(key, default)
 		if key == "network.proxy_override" then return stored end
 		return default
 	end }
 	package.loaded["infra.proxy_policy"] = nil
 	local active = assert(require("infra.proxy_policy").load())
 	return active, function()
-		package.loaded["adapters.storage"], package.loaded["infra.proxy_policy"] = saved.storage, saved.binding
+		package.loaded["core.fs.adapters.storage"], package.loaded["infra.proxy_policy"] = saved.storage, saved.binding
 	end
 end
 

@@ -55,7 +55,7 @@ local function with_probes(async, body, absent)
 			world.cancelled_timers = world.cancelled_timers + 1
 		end,
 	}
-	local reader = require("infra.regular_file_reader")
+	local reader = require("core.fs.engine.regular_file_reader")
 	local real_read = reader.read_source
 	reader.read_source = function(path)
 		local content = world.proc and world.proc[path]

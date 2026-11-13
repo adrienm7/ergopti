@@ -7,7 +7,7 @@ return function(helpers, driver)
 		settings = settings or {}
 		local saved = {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
-		local names = { "adapters.storage", "infra.script_scope", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+		local names = { "core.fs.adapters.storage", "infra.script_scope", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 			"infra.script_settings", "infra.logger", "infra.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
 			"settings.engine.scope.script_scope_runtime", "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "settings.engine.scope.transaction", "ui.menu.scoped_preferences",
 			"ui.menu.preferences_transaction" }
@@ -33,7 +33,7 @@ return function(helpers, driver)
 				paths.config_home = function() return prefix end
 				write(prefix .. "/" .. linux_folder .. "/storage.json", settings.storage or
 					'{"locale":"en","script.log_level":"DEBUG","script.show_error_dialog":false,"foreign":[1,2]}')
-				store, files = require("adapters.storage"), require("adapters.file_system")
+				store, files = require("core.fs.adapters.storage"), require("core.fs.adapters.file_system")
 			else
 				cells = { ["ergopti.i18n_locale"] = "en", ["ergopti.log_level"] = "DEBUG",
 					["ergopti.script.show_error_dialog"] = false, ["ergopti.foreign"] = { 1, 2 } }
@@ -41,7 +41,7 @@ return function(helpers, driver)
 					set = function(key, value) cells[key] = value; return true end,
 					clear = function(key) cells[key] = nil; return true end,
 					getKeys = function() local keys = {}; for key in pairs(cells) do keys[#keys + 1] = key end; return keys end }
-				store = require("adapters.storage")
+				store = require("core.fs.adapters.storage")
 				files = { read_with_status = function(name) local bytes = read(name); return bytes, bytes and "ok" or "absent" end,
 					write = function(name, bytes) write(name, bytes); return true end,
 					write_if_unchanged = function(name, bytes, expected)
@@ -51,7 +51,7 @@ return function(helpers, driver)
 						write(name, bytes); return true
 					end,
 					delete = function(name) os.remove(name); return true end }
-				package.loaded["adapters.file_system"] = files
+				package.loaded["core.fs.adapters.file_system"] = files
 			end
 			local i18n, backend = require("infra.i18n"), require("infra.locale")
 			if driver == "macos" then i18n.set_locale_injector(backend.set_locale) end

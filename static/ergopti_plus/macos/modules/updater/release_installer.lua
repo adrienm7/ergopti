@@ -32,10 +32,10 @@ local M = {}
 
 local Identifiers = require("core.text.engine.identifiers")
 local Logger      = require("infra.logger")
-local Paths       = require("infra.paths")
+local Paths       = require("core.fs.engine.paths")
 local NativePath  = require("core.fs.engine.native_path")
-local FileSystem  = require("adapters.file_system")
-local JsonCodec   = require("adapters.json_codec")
+local FileSystem  = require("core.fs.adapters.file_system")
+local JsonCodec   = require("core.fs.adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
 local Archives    = require("updater.engine.release_assets")
 local ProxyPolicy = require("core.network.engine.proxy_policy_core")

@@ -37,7 +37,7 @@ end
 -- A terminal close-refusal vector owns a separate process: the exact refused
 -- descriptor remains live until process exit and never earns a shutdown ACK.
 if arg[2] == "close-refusal" then
-	Private = require("infra.private_sqlite_file")
+	Private = require("core.fs.engine.private_sqlite_file")
 	require("tests.support.metrics_preferences_fixture").with(function()
 		local writer = require("modules.keystats.sqlite_writer")
 		local collector = require("modules.keystats.keystats")
@@ -74,7 +74,7 @@ local ok, failure = xpcall(function()
 			local writer = require("modules.keystats.sqlite_writer")
 			assert(writer.is_available())
 			assert(uv.fs_stat(database).mode % 4096 == 384, "new SQLite database must be private under ambient umask")
-			Private = require("infra.private_sqlite_file")
+			Private = require("core.fs.engine.private_sqlite_file")
 			k.on_keydown(token, math.floor(require("infra.monotonic").now_ms()), "private-app")
 			Fixture.flush(k)
 			assert(writer.query_rows("SELECT text FROM events_typing;")[1] == token)

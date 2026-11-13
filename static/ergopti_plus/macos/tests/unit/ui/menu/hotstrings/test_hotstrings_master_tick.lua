@@ -42,7 +42,7 @@ local MENU_MODULES = {
 --- The generated wizard catalogue, read through the driver's path owner.
 --- @return string
 local function catalogue_text()
-	local path = require("infra.paths").shared(Answers.CATALOGUE_PATH)
+	local path = require("core.fs.engine.paths").shared(Answers.CATALOGUE_PATH)
 	local fh = assert(io.open(path, "r"), "the onboarding catalogue is missing: " .. tostring(path))
 	local text = fh:read("*a")
 	fh:close()
@@ -220,7 +220,7 @@ end
 --- @param scenario function Receives the fixture world.
 local function with_wizard(answer, scenario)
 	helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "infra.fs_dir",
+		"infra.preferences", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"ui.menu.menu_state", "ui.menu.builder", "ui.menu.menu_hotstrings", "ui.menu.keymap_lifecycle",
 		"infra.notifications", "infra.i18n", "infra.manifest_menu",
 	}, function()

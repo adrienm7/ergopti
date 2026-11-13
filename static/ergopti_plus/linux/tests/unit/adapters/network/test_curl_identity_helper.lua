@@ -11,7 +11,7 @@
 --- These are model receipts, not proof of a real child image or retirement.
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local helper = helpers.driver_root() .. "/platform/network/system_proxy_probe.lua"
 
 local function observe(config)

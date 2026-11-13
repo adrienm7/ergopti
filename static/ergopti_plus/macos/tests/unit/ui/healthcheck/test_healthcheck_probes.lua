@@ -19,7 +19,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
 	"infra.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "adapters.http_client",
-	"adapters.shell_runner", "adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
+	"adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
 --- Runs body with the real probes over recorded adapters.
@@ -111,7 +111,7 @@ local function with_probes(body)
 				}
 			end,
 		}
-		package.loaded["adapters.json_codec"] = { decode = function(text) return hs.json.decode(text) end }
+		package.loaded["core.fs.adapters.json_codec"] = { decode = function(text) return hs.json.decode(text) end }
 		package.loaded["modules.llm"] = {
 			get_runtime_llm_enabled = function() return world.llm_on end,
 			get_backend = function() return "ollama" end,
@@ -133,7 +133,7 @@ end
 --- @return table run, table answers
 local function start(Probes, paths, options)
 	options = options or {}
-	local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+	local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("core.fs.engine.paths").shared).schema
 	local answers = {}
 	local snapshot = {
 		detailed = options.detailed == true,
@@ -284,7 +284,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 			helpers.assert_eq(answer_of(answers, "github_api").result.state, "timeout")
 			helpers.assert_true(world.cancelled_requests >= 1, "a timed-out request must be stopped")
 			-- A probe the schema declares and nothing starts reads "checking…" forever
-			local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+			local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("core.fs.engine.paths").shared).schema
 			local declared = 0
 			for id, probe in pairs(schema.probes) do
 				if require("diagnostics.engine.healthcheck.snapshot").applies(probe, "macos") then

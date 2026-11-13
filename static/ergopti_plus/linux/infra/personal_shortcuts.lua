@@ -28,7 +28,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Shell = require("adapters.shell_runner")
 local NativePath = require("core.fs.engine.native_path")
 

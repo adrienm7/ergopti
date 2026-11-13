@@ -70,7 +70,7 @@ end
 --- @return string|nil root
 function M.root()
 	if _resolved == nil then
-		_resolved = M.resolve(os.getenv, require("infra.paths").driver_root()) or false
+		_resolved = M.resolve(os.getenv, require("core.fs.engine.paths").driver_root()) or false
 	end
 	return _resolved or nil
 end

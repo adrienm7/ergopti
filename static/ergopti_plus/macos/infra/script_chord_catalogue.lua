@@ -22,7 +22,7 @@
 local M = {}
 local BindingPublication = require("settings.engine.publication.binding_publication")
 
-local Paths        = require("infra.paths")
+local Paths        = require("core.fs.engine.paths")
 local Json         = require("core.text.engine.json")
 local ScriptChords = require("keyboard.engine.layers.script_chords")
 local ConfigKeys = require("settings.engine.keys")

@@ -230,7 +230,7 @@ local function load_fixture(options)
 		and "modules.llm.mlx_deps_checker"
 		or "modules.llm.ollama_deps_checker"
 	if options.backend == "mlx" then
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function()
 				return "/repo/modules/llm/ensure-mlx-deps.sh"
 			end,

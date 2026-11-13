@@ -80,7 +80,7 @@ helpers.describe("vscode_bridge caret ingest", function()
 	end)
 
 	helpers.it("keeps equal caret metadata independent of its sibling and the native graph", function()
-		helpers.with_fresh_modules({ "adapters.json_codec" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.json_codec" }, function()
 			local rectangle = { x = 10, y = 20 }
 			local native = { active = true, first = rectangle, second = rectangle }
 			local bridge, callback = load_fixture(function() return native end)

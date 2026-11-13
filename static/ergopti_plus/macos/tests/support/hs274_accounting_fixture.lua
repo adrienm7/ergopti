@@ -33,7 +33,7 @@ local OWNED_MODULES = {
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
-	"adapters.keyboard_hook", "adapters.input_source_broker", "adapters.storage",
+	"adapters.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
 	"modules.keystats.aggregator.physical", "ui.metrics_typing.init",

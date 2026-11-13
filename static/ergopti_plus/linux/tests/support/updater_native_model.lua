@@ -8,8 +8,8 @@ function M.with_fixture(body)
  local original_tmpname = os.tmpname -- Restore even when decoration fails before old inner cleanup.
  local names = { "modules.updater.manager", "infra.archive_output", "infra.monotonic", "infra.installation" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
- local Fs = require("adapters.file_system")
- local Move = require("infra.no_replace_move")
+ local Fs = require("core.fs.adapters.file_system")
+ local Move = require("core.fs.engine.no_replace_move")
  local owners, config_path, manager = {}, nil, nil
  local now = 0.25
  local function owned_operation(dispatch)

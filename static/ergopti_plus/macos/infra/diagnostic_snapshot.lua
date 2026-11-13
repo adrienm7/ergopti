@@ -48,9 +48,9 @@ local SOURCE_DIR = NativePath.dirname((debug.getinfo(1, "S").source:gsub("^@", "
 --- The adapter is looked up per call: the crash reporter reaches this module
 --- late, and a reference bound at first load would outlive the adapter it named.
 local GIT_FS = {
-	exists = function(path) return require("adapters.file_system").exists(path) == true end,
+	exists = function(path) return require("core.fs.adapters.file_system").exists(path) == true end,
 	read = function(path)
-		local content, status = require("adapters.file_system").read_with_status(path)
+		local content, status = require("core.fs.adapters.file_system").read_with_status(path)
 		if status == "ok" then return content end
 		return nil
 	end,
@@ -66,7 +66,7 @@ local GIT_FS = {
 function M.resolve_commit(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root
-	if shared_root == nil then shared_root = require("infra.paths").shared_root() end
+	if shared_root == nil then shared_root = require("core.fs.engine.paths").shared_root() end
 	local commit, source, detail = Snapshot.resolve_commit(opts.fs or GIT_FS, shared_root,
 		opts.source_dir or SOURCE_DIR)
 	if source == Snapshot.COMMIT_SOURCE_UNKNOWN then

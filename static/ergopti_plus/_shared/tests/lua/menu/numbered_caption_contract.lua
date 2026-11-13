@@ -29,7 +29,7 @@ end
 
 --- Appends independent policy subjects to the current already registered native renderer owner.
 function M.register(helpers, driver)
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menu/numbered_caption_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menu/numbered_caption_vectors.json"), "rb"))
 	local corpus = assert(Json.decode(file:read("*a")))
 	file:close()
 	assert(#corpus.positive == 3 and #corpus.grammar_refusals == 6 and #corpus.ownership_refusals == 10,

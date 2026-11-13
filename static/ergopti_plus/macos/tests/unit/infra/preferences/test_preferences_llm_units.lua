@@ -2,10 +2,10 @@
 
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
-local FS = require("adapters.file_system")
+local FS = require("core.fs.adapters.file_system")
 local function fixture(initial)
 	local content, writes = initial, 0
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() return content, "ok" end,
 		write = function() error("conditional publication required") end,
 		write_if_unchanged = function(_, candidate, expected)
@@ -108,7 +108,7 @@ helpers.describe("canonical LLM debounce persistence", function()
 		helpers.assert_eq(loaded.llm_min_words, 3)
 	end)
 end)
-package.loaded["adapters.file_system"] = FS
+package.loaded["core.fs.adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("Mac actual preference schema reader and publication", function()
@@ -128,8 +128,8 @@ helpers.describe("Mac actual preference schema reader and publication", function
 	for _, token in ipairs({ tostring(registry.current + 1), "true", '"11"', "11.5" }) do
 		helpers.it("rejects future/invalid native hydration and ordinary save after real boot " .. token, function()
 			Sandbox.with_config(current(false), function(path)
-				local previous, adapter = package.loaded["infra.preferences"], package.loaded["adapters.file_system"]
-				package.loaded["adapters.file_system"] = FS
+				local previous, adapter = package.loaded["infra.preferences"], package.loaded["core.fs.adapters.file_system"]
+				package.loaded["core.fs.adapters.file_system"] = FS
 				package.loaded["infra.preferences"] = nil
 				local called, detail = pcall(function()
 					helpers.assert_eq(Migration.boot({ path = path, driver = "hs", registry = registry, file_adapter = FS }).status, "current")
@@ -156,7 +156,7 @@ helpers.describe("Mac actual preference schema reader and publication", function
 					helpers.assert_eq(fresh_status, "ok")
 					helpers.assert_eq(fresh.llm_enabled, true, "fresh native reader and canonical decoder")
 				end)
-				package.loaded["infra.preferences"], package.loaded["adapters.file_system"] = previous, adapter
+				package.loaded["infra.preferences"], package.loaded["core.fs.adapters.file_system"] = previous, adapter
 				if not called then error(detail, 0) end
 			end)
 		end)

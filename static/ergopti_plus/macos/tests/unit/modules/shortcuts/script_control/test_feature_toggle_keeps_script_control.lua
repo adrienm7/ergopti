@@ -286,7 +286,7 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 
 		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },

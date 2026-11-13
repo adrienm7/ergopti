@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local shared = require("infra.paths").shared
+local shared = require("core.fs.engine.paths").shared
 
 require("tests.lua.layouts.keylayout_parser_contract").register(helpers, {
 	edge_cases = shared("tests/corpus/keylayout/edge_cases.json"),

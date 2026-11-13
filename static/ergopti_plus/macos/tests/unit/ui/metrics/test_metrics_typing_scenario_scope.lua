@@ -18,7 +18,7 @@ require("core.text.engine.utils_core")
 helpers.provide_timings()
 require("core.text.engine.toml_codec.source_memo")
 require("core.fs.engine.ports") -- the file-system owner checks itself against it when it loads
-require("adapters.write_lock_path") -- the file-system owner names its cooperative locks with it
+require("core.fs.adapters.write_lock_path") -- the file-system owner names its cooperative locks with it
 require("lfs") -- a native library: a scenario that loads it first cannot unload it again
 
 --- Collects actual scoped callbacks without publishing replacement registrations.

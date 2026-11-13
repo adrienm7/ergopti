@@ -36,7 +36,7 @@ local function fresh(options)
 		after = function(delay, fn) active_timer = { callback = fn, delay = delay }; return active_timer, true end,
 		cancel = function() return configuration.timer_refuse ~= true end,
 	}
-	package.loaded["adapters.file_system"] = { classify_no_follow = function()
+	package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function()
 		return { mode = "file", size = 512, modification = version, permissions = "rw-r--r--" }, "ok"
 	end, read_with_status = function() error("GUI synchronous metadata read forbidden") end }
 	package.loaded["modules.llm.managed_native_python"] = {
@@ -210,7 +210,7 @@ case(function()
 		{ directory_mode = "file" }, { directory_throw = true } }) do
 		fresh(options)
 		local classified = 0
-		package.loaded["adapters.file_system"].classify_no_follow = function() classified = classified + 1; error("missing optional parent must never enumerate child metadata") end
+		package.loaded["core.fs.adapters.file_system"].classify_no_follow = function() classified = classified + 1; error("missing optional parent must never enumerate child metadata") end
 		check(adapter.get(directory, driver), nil); check(created, 0); check(next(adapter._active_tasks), nil); check(classified, 0)
 	end
 end)

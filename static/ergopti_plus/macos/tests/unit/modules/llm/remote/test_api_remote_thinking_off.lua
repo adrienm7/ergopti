@@ -30,12 +30,12 @@ local function with_remote(callback)
 		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
-		"infra.logger", "core.events.timer_scheduler", "adapters.file_system",
-		"adapters.json_codec", "adapters.storage", "infra.manifest_reader",
+		"infra.logger", "core.events.timer_scheduler", "core.fs.adapters.file_system",
+		"core.fs.adapters.json_codec", "core.fs.adapters.storage", "infra.manifest_reader",
 		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
 		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.policy.thinking_off", "ai.engine.local_servers.discovery",
 		"core.lifecycle.engine.compat.utf8", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
-		"hotstrings.engine.catalogue.personal_files", "infra.fs_dir", "infra.toml.reader",
+		"hotstrings.engine.catalogue.personal_files", "core.fs.engine.dir", "infra.toml.reader",
 		"core.text.engine.json", "lfs", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
 		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
@@ -211,7 +211,7 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 				function() end, function() end)
 			posted_body(pending, posts)
 			posts[1].done(refusal("thinking is not supported"))
-			local ok, stored = require("adapters.storage").read_exact(remote.THINKING_REFUSED_KEY)
+			local ok, stored = require("core.fs.adapters.storage").read_exact(remote.THINKING_REFUSED_KEY)
 			helpers.assert_true(ok and type(stored) == "table", "the refusal is stored")
 			helpers.assert_eq(type(stored["deepseek|deepseek-flash"].thinking), "number", "with the time it was refused")
 			-- A restart: a fresh module over the same storage
@@ -223,7 +223,7 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			pending[#pending].done(true, "cleartext-key")
 			helpers.assert_eq(require("core.text.engine.json").decode(posts[#posts].body).thinking, nil,
 				"a fresh module reads the stored refusal")
-			require("adapters.storage").set(fresh.THINKING_REFUSED_KEY, nil)
+			require("core.fs.adapters.storage").set(fresh.THINKING_REFUSED_KEY, nil)
 		end)
 	end)
 

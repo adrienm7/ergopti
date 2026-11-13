@@ -422,10 +422,10 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			package.loaded["modules.hotstrings.loader"] = nil
 			local paths = {}
-			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			for key, value in pairs(require("core.fs.engine.paths")) do paths[key] = value end
 			-- The private fixture has no external installed layout roots.
 			paths.extension_roots = function() return {} end
-			package.loaded["infra.paths"] = paths
+			package.loaded["core.fs.engine.paths"] = paths
 			local loader = require("modules.hotstrings.loader")
 			local native_find = loader.find_toml_files
 			package.loaded["modules.hotstrings.loader"] = {
@@ -597,10 +597,10 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			package.loaded["modules.hotstrings.loader"] = nil
 			local paths = {}
-			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			for key, value in pairs(require("core.fs.engine.paths")) do paths[key] = value end
 			-- The private fixture has no external installed layout roots.
 			paths.extension_roots = function() return {} end
-			package.loaded["infra.paths"] = paths
+			package.loaded["core.fs.engine.paths"] = paths
 			local loader = require("modules.hotstrings.loader")
 			local native_find = loader.find_toml_files
 			package.loaded["modules.hotstrings.loader"] = {

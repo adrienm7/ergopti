@@ -17,7 +17,7 @@
 
 local M = {}
 
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local AppDirs = require("core.fs.engine.app_dirs")
 
 -- Under the user's own caches, not the temporary folder of one login shell.

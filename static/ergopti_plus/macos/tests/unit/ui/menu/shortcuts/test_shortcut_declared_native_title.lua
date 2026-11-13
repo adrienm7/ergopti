@@ -27,8 +27,8 @@ local function fixture(body, secondary)
 	local restored, scope_failure = pcall(function()
 		helpers.with_stub_scope({
 			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "infra.i18n",
-			"infra.locale", "core.i18n.engine.core", "infra.paths", "infra.logger", "adapters.json_codec",
-			"adapters.storage", "core.events.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
+			"infra.locale", "core.i18n.engine.core", "core.fs.engine.paths", "infra.logger", "core.fs.adapters.json_codec",
+			"core.fs.adapters.storage", "core.events.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
 			"ui.menu.shortcut_utils", "infra.text_utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()
 			local policy, lookup, dialog, prompt, scheduler

@@ -24,7 +24,7 @@ package.loaded["infra.i18n"] = {
 
 --- Stub Paths so that any load of api_remote (or catalogue users) can resolve
 --- _shared/ai/data/*.json from the real source tree during headless test runs.
-package.loaded["infra.paths"] = {
+package.loaded["core.fs.engine.paths"] = {
 	shared = function(rel) return helpers.shared(rel) end,
 	shared_root = function() return helpers.shared() end,
 	shared_llm_path = function(name)

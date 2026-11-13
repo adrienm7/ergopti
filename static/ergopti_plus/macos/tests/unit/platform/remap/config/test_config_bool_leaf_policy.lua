@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param original string Independently handwritten TOML fixture.
 --- @param body function Assertions receiving the owner and recorded boundary ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -33,7 +33,7 @@ local function with_file(original, body)
 		original, original_config = Text.file(original)
 		write(original)
 		Text.write_config(path, original_config)
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local native_read, native_write = files.read_with_status, files.write_if_unchanged
 		local controls = { writes = 0 }
 		files.write_if_unchanged = function(destination, content, expected)

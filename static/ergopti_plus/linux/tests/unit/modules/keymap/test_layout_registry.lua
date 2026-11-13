@@ -79,7 +79,7 @@ local function manager(options)
 		handle:close()
 	end
 	do
-		local handle = assert(io.open(require("infra.paths").shared("layouts/data/mac_keycodes.json"), "rb"))
+		local handle = assert(io.open(require("core.fs.engine.paths").shared("layouts/data/mac_keycodes.json"), "rb"))
 		state.files[KEYCODES_PATH] = handle:read("*a")
 		handle:close()
 	end
@@ -169,7 +169,7 @@ end
 
 helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("makes committed layout packs visible before user overrides", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local saved_registry = package.loaded["modules.keymap.layout_registry"]
 		local saved_config = package.loaded["infra.config_paths"]
 		package.loaded["modules.keymap.layout_registry"] = {
@@ -192,7 +192,7 @@ helpers.describe("layout manager (Linux): installing", function()
 	end)
 
 	helpers.it("still starts with the other packs when the installed record is damaged (config-outdated-installed)", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local saved_registry = package.loaded["modules.keymap.layout_registry"]
 		local saved_config = package.loaded["infra.config_paths"]
 		local saved_logger = package.loaded["core.logger.engine.shim"]
@@ -208,7 +208,7 @@ helpers.describe("layout manager (Linux): installing", function()
 			get_config_dir = function() return "/private/xdg/ergopti" end,
 		}
 		package.loaded["core.logger.engine.shim"] = recorder
-		local Fresh = helpers.load_module("infra.paths")
+		local Fresh = helpers.load_module("core.fs.engine.paths")
 		local ok, roots = pcall(function()
 			Fresh.extension_roots()
 			return Fresh.extension_roots()
@@ -216,7 +216,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		package.loaded["modules.keymap.layout_registry"] = saved_registry
 		package.loaded["infra.config_paths"] = saved_config
 		package.loaded["core.logger.engine.shim"] = saved_logger
-		package.loaded["infra.paths"] = Paths
+		package.loaded["core.fs.engine.paths"] = Paths
 		helpers.assert_true(ok, "a damaged record never stops the daemon: " .. tostring(roots))
 		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" })
 		helpers.assert_eq(roots[#roots], "/private/xdg/ergopti/extensions")
@@ -248,7 +248,7 @@ helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("names the shared defaults file it cannot decode (layout-registry-convert)", function()
 		-- The shared core/text/engine/json.lua answers nil to invalid JSON instead of raising, so a
 		-- reader that only checks the pcall status loses the reason.
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
 		local original_read = FileSystem.read
 		local served = 0
@@ -440,7 +440,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local Registry = require("modules.keymap.layout_registry")
 		local Managed = require("modules.keymap.managed_python")
 		local Http, Process = require("adapters.http_client"), require("adapters.process_runner")
-		local Shell, Files = require("adapters.shell_runner"), require("adapters.file_system")
+		local Shell, Files = require("adapters.shell_runner"), require("core.fs.adapters.file_system")
 		local Paths = require("infra.config_paths")
 		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
 			shell = Shell.run, exists = Files.exists, data = Paths.data }
@@ -896,7 +896,7 @@ require("tests.lua.layouts.installed_extension_manager_contract")(helpers, Json,
 --- @param options table Existing registry filesystem/transport fixture options.
 --- @param body function Receives the real registry and controlled physical helper ACK.
 local function with_shutdown_owner(options, body)
-	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "adapters.http_client", "adapters.file_digest" }
+	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "adapters.http_client", "core.fs.adapters.file_digest" }
 	local previous = {}
 	for _, name in ipairs(modules) do previous[name] = package.loaded[name] end
 	local physical = { settled = true, stops = 0, http_cancels = 0, digest_cancels = 0 }
@@ -910,7 +910,7 @@ local function with_shutdown_owner(options, body)
 		if physical.on_cancel then physical.on_cancel() end
 		return true -- Logical cancellation deliberately does not acknowledge helpers.
 	end }
-	package.loaded["adapters.file_digest"] = { cancel = function(owner)
+	package.loaded["core.fs.adapters.file_digest"] = { cancel = function(owner)
 		helpers.assert_eq(owner, "layout_registry"); physical.digest_cancels = physical.digest_cancels + 1; return true
 	end }
 	local ok, err = xpcall(function()

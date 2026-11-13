@@ -582,7 +582,7 @@ helpers.describe("hotstring catalogue: unreadable discovery", function()
 		local bad_root, link_root = root .. "/not-a-directory", root .. "/link-directory"
 		local stream = assert(io.open(bad_root, "wb")); assert(stream:write("not a directory")); assert(stream:close())
 		assert(uv.fs_symlink(root, link_root))
-		local paths = require("infra.paths")
+		local paths = require("core.fs.engine.paths")
 		local original_shared = paths.shared
 		local ok, err = pcall(function()
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")

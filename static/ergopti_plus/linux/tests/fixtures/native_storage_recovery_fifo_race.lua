@@ -27,7 +27,7 @@ Shell.exec_checked = function(command)
 	end
 	return ok, output, detail
 end
-local storage = require("adapters.storage")
+local storage = require("core.fs.adapters.storage")
 assert(storage.get("missing", "fallback") == "fallback")
 local status = storage.recovery_status()
 assert(swapped and status and status.preserved == true and status.path == backup .. ".1")

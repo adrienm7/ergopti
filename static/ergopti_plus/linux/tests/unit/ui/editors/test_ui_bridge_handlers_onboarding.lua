@@ -46,7 +46,7 @@ helpers.describe("ui.bridge_handlers", function()
 		end)
 
 		helpers.it("(onboarding-config-fifo) refuses an unacknowledged configuration close", function()
-			local reader = require("infra.regular_file_reader")
+			local reader = require("core.fs.engine.regular_file_reader")
 			local original = reader.open_source
 			reader.open_source = function() return { read = function() return "" end,
 				close = function() return nil, "close failed" end } end
@@ -515,7 +515,7 @@ helpers.describe("ui.bridge_handlers", function()
 				{ path = "tap_holds.keys.tab", value = true },
 			} })
 			local loaded = require("platform.remap.tap_hold_loader").load(
-				require("infra.paths").shared("tap_hold/data/defaults.toml"), target .. "/tap_hold.toml",
+				require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), target .. "/tap_hold.toml",
 				target .. "/config.toml")
 			os.remove(target .. "/tap_hold.toml")
 			os.remove(target .. "/config.toml")
@@ -561,11 +561,11 @@ helpers.describe("ui.bridge_handlers", function()
 			local result = import_left_alt(state, target)
 			local text = read_text(target .. "/layers.toml")
 			local ok, layer = pcall(require("platform.remap.nav_layer").load,
-				{ shared_root = require("infra.paths").shared_root(), config_dir = target })
+				{ shared_root = require("core.fs.engine.paths").shared_root(), config_dir = target })
 			remove_folder(target)
 			helpers.assert_eq(result, { done = true, restarted = true })
 			helpers.assert_eq(captured.errors, {})
-			helpers.assert_eq(text, read_text(require("infra.paths").shared("layouts/data/layers.recommended.toml")),
+			helpers.assert_eq(text, read_text(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml")),
 				"layers.toml holds the recommended layer's exact bytes")
 			helpers.assert_true(ok and next(layer) ~= nil, "the imported layer binds keys on Linux: " .. tostring(layer))
 		end)
@@ -789,7 +789,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = false\n[future]\nkeep = "independent"\n'
 			local concurrent = raw .. '# concurrent edit during candidate staging\n'
 			local original_open, staged = io.open, 0
-			local NativeWriter = require("infra.regular_file_writer")
+			local NativeWriter = require("core.fs.engine.regular_file_writer")
 			local original_stage = NativeWriter.open
 			local ok, err = pcall(function()
 				helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))

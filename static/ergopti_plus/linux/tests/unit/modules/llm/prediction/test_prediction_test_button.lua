@@ -92,7 +92,7 @@ helpers.describe("Linux test prediction engine", function()
 	end)
 
 	helpers.it("shows but does not log the backend's untrusted failure text", function()
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local logs = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) logs[#logs + 1] = line end)

@@ -10,7 +10,7 @@
 
 --- Register the exact shared proxy override controls.
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Contract = require("tests.lua.core.network_proxy_override_contract")
 local function read(relative)
     local file = assert(io.open(assert(Paths.shared(relative)), "rb"))

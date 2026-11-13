@@ -10,7 +10,7 @@
 --- Actual shared/coordinator sources, independent owned-child ports.
 --- These are causal ownership models, not native GIO/curl acceptance.
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Json = require("core.text.engine.json")
 local Managed = require("infra.managed_http")
 local Shared = require("core.network.engine.http_redirect")

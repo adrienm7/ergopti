@@ -39,12 +39,12 @@ local DRIVER_ROOT = helpers.driver_root()
 -- real adapter would therefore modify the developer's own configuration and
 -- make the next suite run depend on the previous one. Keep every case on a
 -- fresh in-memory store, then restore the exact modules this file displaced.
-local _previous_storage = package.loaded["adapters.storage"]
+local _previous_storage = package.loaded["core.fs.adapters.storage"]
 local _previous_keystats = package.loaded["modules.keystats.keystats"]
 
 --- Reloads the keystats with fresh module state.
 local function fresh_keystats(neutral)
-	package.loaded["adapters.storage"] = Fakes.storage()
+	package.loaded["core.fs.adapters.storage"] = Fakes.storage()
 	package.loaded["modules.keystats.keystats"] = nil
 	local kl = require("modules.keystats.keystats")
 	kl.init({})
@@ -498,5 +498,5 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 	end)
 end)
 
-package.loaded["adapters.storage"] = _previous_storage
+package.loaded["core.fs.adapters.storage"] = _previous_storage
 package.loaded["modules.keystats.keystats"] = _previous_keystats

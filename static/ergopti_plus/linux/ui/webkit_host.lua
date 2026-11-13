@@ -102,7 +102,7 @@ end
 --- @param path string Candidate asset path.
 --- @return boolean readable
 local function regular_file_exists(path)
-	local called, stream = pcall(require("infra.regular_file_reader").open_source, path)
+	local called, stream = pcall(require("core.fs.engine.regular_file_reader").open_source, path)
 	if not called or not stream then return false end
 	local closed, acknowledged = pcall(function() return stream:close() end)
 	return closed and acknowledged == true
@@ -178,7 +178,7 @@ end
 --- @return string The file content, or empty string if unreadable.
 local function read_file(path)
 	if type(path) ~= "string" or path == "" then return "" end
-	return require("infra.regular_file_reader").read_source(path) or ""
+	return require("core.fs.engine.regular_file_reader").read_source(path) or ""
 end
 
 --- Builds a self-contained HTML string by inlining local <script src> and

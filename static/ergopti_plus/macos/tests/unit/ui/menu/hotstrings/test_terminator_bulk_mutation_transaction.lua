@@ -89,7 +89,7 @@ local function run_action(label, outcome, options)
 		platform = "hs",
 		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local value = require("adapters.json_codec").decode(raw)
+			local value = require("core.fs.adapters.json_codec").decode(raw)
 			if options.reorder then
 				local rows = value.word_expanders_menu
 				rows[1], rows[3] = rows[3], rows[1]
@@ -309,7 +309,7 @@ helpers.describe("shared word-expander fixed commands", function()
 		local raw = assert(io.open(helpers.shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
 		local content = raw:read("*a")
 		raw:close()
-		return assert(require("adapters.json_codec").decode(content))
+		return assert(require("core.fs.adapters.json_codec").decode(content))
 	end
 
 	helpers.it("replays the independent three-command golden through the real child renderer", function()

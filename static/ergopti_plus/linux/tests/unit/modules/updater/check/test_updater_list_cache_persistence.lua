@@ -31,18 +31,18 @@ end
 --- @param etag_content string|nil What the saved ETag file reads as.
 --- @return table manager
 local function boot(storage, etag_content)
-	local names = { "adapters.file_system", "adapters.storage", "modules.updater.manager" }
+	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "modules.updater.manager" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local real_fs = require("adapters.file_system")
-	package.loaded["adapters.file_system"] = setmetatable({
+	local real_fs = require("core.fs.adapters.file_system")
+	package.loaded["core.fs.adapters.file_system"] = setmetatable({
 		exists = function() return true end,
 		read = function(path)
 			if tostring(path):find("/updater_etag_", 1, true) then return etag_content end
 			return real_fs.read(path)
 		end,
 	}, { __index = real_fs })
-	package.loaded["adapters.storage"] = storage
+	package.loaded["core.fs.adapters.storage"] = storage
 	package.loaded["modules.updater.manager"] = nil
 	local ok, fresh = pcall(require, "modules.updater.manager")
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end

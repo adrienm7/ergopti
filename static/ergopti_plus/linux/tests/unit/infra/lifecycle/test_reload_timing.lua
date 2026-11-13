@@ -22,7 +22,7 @@ local function fixture(budget_ms)
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(20)
 	local root = assert(require("luv").fs_mkdtemp("/var/tmp/eg-reload-XXXXXX"))
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	local Timings = require("infra.timings")
 	local held_path, held_ms = Storage.path, Timings.ms
 	Storage.path = function() return root .. "/store/state.json" end

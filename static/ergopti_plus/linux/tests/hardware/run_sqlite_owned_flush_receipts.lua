@@ -85,7 +85,7 @@ if arg[1] == "--stale-clock" then
 	local cached = uv.now()
 	uv.sleep(timeout + 50) -- Deliberately leave libuv's cached loop time stale.
 	assert(uv.now() == cached, "fixture must not refresh the loop before dispatch")
-	local request = assert(require("infra.sqlite_batch_process").start(arg[2] .. "/clock.sqlite", "SELECT 1;",
+	local request = assert(require("core.fs.engine.sqlite_batch_process").start(arg[2] .. "/clock.sqlite", "SELECT 1;",
 		{ owner = "native-sqlite-stale-clock", timeout_ms = timeout }))
 	local result
 	repeat uv.run("nowait"); result = request:poll(); if not result then uv.sleep(1) end until result
@@ -101,7 +101,7 @@ if arg[1] == "--parent-death" then
 		child_pid = pid
 		return handle, pid
 	end
-	local request = assert(require("infra.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
+	local request = assert(require("core.fs.engine.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
 		"WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<100000000) SELECT sum(x) FROM n;",
 		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	assert(child_pid)
@@ -122,7 +122,7 @@ local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled=true\n") and config:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
-local Process = require("infra.sqlite_batch_process")
+local Process = require("core.fs.engine.sqlite_batch_process")
 local Drain = require("tests.support.sqlite_flush_native")
 local Logger = require("core.logger.engine")
 assert(K.init({ sqlite_path = root .. "/metrics.sqlite", log_dir = root .. "/logs" }) ~= false)

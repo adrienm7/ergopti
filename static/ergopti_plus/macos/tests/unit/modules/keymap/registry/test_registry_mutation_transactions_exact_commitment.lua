@@ -360,7 +360,7 @@ helpers.describe("canonical hotstring cache projection", function()
 	local function fixture(source)
 		local state, registry = fresh_registry()
 		local files = { config = source }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
 			write_if_unchanged = function(path, content, expected)
 				if expected.status ~= (files[path] and "ok" or "absent")

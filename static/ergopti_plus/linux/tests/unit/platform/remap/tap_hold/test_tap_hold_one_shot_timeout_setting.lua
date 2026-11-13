@@ -17,7 +17,7 @@ local helpers, Engine = Fixture.helpers, Fixture.Engine
 local Loader = require("platform.remap.tap_hold_loader")
 local Timings = require("infra.timings")
 
-local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS_PATH = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 local function write_file(path, text)
 	local fh = assert(io.open(path, "w"))
@@ -112,7 +112,7 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 	end)
 
 	helpers.it("hands the engine the loaded timeout, not the registry constant (one-shot-timeout-setting)", function()
-		local source = assert(io.open(require("infra.paths").driver_root() .. "/platform/remap/tap_hold_manager.lua", "r"))
+		local source = assert(io.open(require("core.fs.engine.paths").driver_root() .. "/platform/remap/tap_hold_manager.lua", "r"))
 		local text = source:read("*a")
 		source:close()
 		helpers.assert_true(text:find("one_shot_timeout_ms = loaded.one_shot_timeout_ms,", 1, true) ~= nil,

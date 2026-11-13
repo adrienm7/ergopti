@@ -266,7 +266,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 			with_cleanup(function()
 				with_package_stubs({
-				["adapters.file_system"] = {
+				["core.fs.adapters.file_system"] = {
 					read_with_status = function() return "source", "ok" end,
 				},
 				["infra.config_paths"] = {

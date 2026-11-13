@@ -18,8 +18,8 @@ local function fixture(callback, cleanup_failures)
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
 			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "infra.i18n", "infra.locale", "core.i18n.engine.core",
-			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
-			"adapters.json_codec", "core.events.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
+			"infra.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
+			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
 			"adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
 			"_generated.locale_table", "_generated.logger_sub_files", "adapters.log_transport", "core.fs.engine.app_dirs",
@@ -339,7 +339,7 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 		fixture(function(state, builder, _, locale, _, open, ready, core, i18n)
 			retained_state = state
 			local original = assert(corpus.locales.de)
-			local Storage = require("adapters.storage")
+			local Storage = require("core.fs.adapters.storage")
 			local translate_owner = i18n.get
 			local locale_get_owner, locale_current_owner = locale.get, locale.current_locale
 			local core_get_owner, core_current_owner = core.get, core.current_locale

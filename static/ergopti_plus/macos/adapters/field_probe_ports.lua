@@ -110,7 +110,7 @@ end
 --- The Ergopti layout files installed for this user and for every user.
 --- @return table files { keylayouts = { path }, plists = { path } }
 local function layout_files()
-	local FsDir = require("infra.fs_dir")
+	local FsDir = require("core.fs.engine.dir")
 	local files = { keylayouts = {}, plists = {} }
 	local dirs = {}
 	local home = os.getenv("HOME")
@@ -159,7 +159,7 @@ local CONFIG_FILES = {
 --- @return table files { { name, path, present } }
 local function config_files()
 	local ConfigPaths = require("infra.config_paths")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local files = {}
 	for _, entry in ipairs(CONFIG_FILES) do
 		local path = ConfigPaths.get(entry.key)
@@ -185,7 +185,7 @@ end
 --- @return table facts { today_present, writable, files, bytes }
 local function log_facts()
 	local Logger = require("infra.logger")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local dir = Logger.logs_dir()
 	local facts = { today_present = FileSystem.exists(Logger.today_log_path()) == true, writable = false,
 		files = 0, bytes = 0 }
@@ -200,7 +200,7 @@ local function log_facts()
 		local closed = handle:close() == true
 		facts.writable = written and closed and os.remove(probe) == true
 	end
-	for _, name in ipairs(require("infra.fs_dir").entries(dir)) do
+	for _, name in ipairs(require("core.fs.engine.dir").entries(dir)) do
 		local attributes = hs.fs.attributes(dir .. "/" .. name)
 		local size = type(attributes) == "table" and attributes.mode == "file" and attributes.size or nil
 		if type(size) == "number" then
@@ -225,7 +225,7 @@ local function keystats_database()
 	local path = type(manager) == "table" and type(manager.get_sqlite_path) == "function"
 		and manager.get_sqlite_path() or nil
 	if type(path) ~= "string" or path == "" then return { path = nil, present = false } end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	-- The cache of earlier versions, <TMPDIR>/ergopti_metrics/<device>/db.sqlite,
 	-- which the log manager adopts once (log_manager._adopt_legacy_cache).
 	local device, tmp = path:match("([^/]+)/db%.sqlite$"), os.getenv("TMPDIR")
@@ -385,8 +385,8 @@ end
 --- @param since number|nil Epoch seconds of the current app start; nil judges the whole day.
 --- @return table counts { driver, driver_earlier, owned = { { process, kind } }, earlier = { process = n }, other }
 local function crash_counts(since)
-	local FileSystem = require("adapters.file_system")
-	local FsDir = require("infra.fs_dir")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local FsDir = require("core.fs.engine.dir")
 	local now = os.time()
 	local function recent(dir, visit)
 		if FileSystem.exists(dir) ~= true then return end
@@ -440,8 +440,8 @@ local PREDICTION_TIMEOUT_SECONDS = 60
 --- @param backend string "ollama" or "mlx".
 --- @return table models { { name, runtime_name, download_gb } }
 local function catalogue_models(backend)
-	local path = require("infra.paths").shared_llm_path("models.json")
-	local text = path and require("adapters.file_system").read(path) or nil
+	local path = require("core.fs.engine.paths").shared_llm_path("models.json")
+	local text = path and require("core.fs.adapters.file_system").read(path) or nil
 	if type(text) ~= "string" then return {} end
 	local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 	local models = {}
@@ -875,7 +875,7 @@ end
 --- category, never as an ERROR line of the session.
 --- @return table { dir, mode, exists, append, write }
 local function fifo()
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local tmp = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
 	local function expected_refusal() end
 	return {
@@ -977,7 +977,7 @@ function M.new()
 		end,
 		launcher = launcher,
 		exec_input = exec_input,
-		read_text = function(path) return require("adapters.file_system").read(path) end,
+		read_text = function(path) return require("core.fs.adapters.file_system").read(path) end,
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
 		ax_value_watch_counts = ax_value_watch_counts,

@@ -139,7 +139,7 @@ function M.with_publication(options, callback)
 				state.saves, state.disk_files = {}, {}
 				local Snapshot = package.loaded["ui.metrics_typing.snapshot"]
 				local original_save = Snapshot.save
-				local filesystem = package.loaded["adapters.file_system"]
+				local filesystem = package.loaded["core.fs.adapters.file_system"]
 				filesystem.read_with_status = function(path)
 					local content = state.disk_files[path]
 					return content, content and "ok" or "absent"

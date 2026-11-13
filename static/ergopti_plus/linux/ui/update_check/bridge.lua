@@ -134,7 +134,7 @@ function M.download_offered(updater, release, ctx)
 		if not current() or type(ctx.on_open_today_log) ~= "function" then return false end
 		local shell = require("adapters.shell_runner")
 		if shell.has_command("xdg-open") ~= true then return false end
-		local file = require("infra.regular_file_reader").open(require("infra.logger_sink").main_log_path())
+		local file = require("core.fs.engine.regular_file_reader").open(require("infra.logger_sink").main_log_path())
 		if not file then return false end
 		local closed, accepted = pcall(file.close, file)
 		return closed and accepted == true and current()

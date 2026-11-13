@@ -104,7 +104,7 @@ test('stale logical HTTP response does not publish callback or erase capability'
 end)
 
 local function relay_policy()
-	local file=assert(io.open(assert(require('infra.paths').shared('core/network/data/proxy_auth_relay.json')),'rb'))
+	local file=assert(io.open(assert(require('core.fs.engine.paths').shared('core/network/data/proxy_auth_relay.json')),'rb'))
 	local bytes=file:read('*a');assert(file:close())
 	return assert(require('core.network.engine.proxy_auth_relay_core').new(require('core.text.engine.json').decode(bytes)))
 end

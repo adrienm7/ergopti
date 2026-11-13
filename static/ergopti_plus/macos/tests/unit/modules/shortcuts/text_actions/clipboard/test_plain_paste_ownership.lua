@@ -23,7 +23,7 @@ local function with_plain(callback)
 			local board = f.hs_overrides.pasteboard
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
-			package.loaded["infra.paths"] = { shared = function() return nil end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 			Destination.install()
 			f.text = require("modules.shortcuts.actions.text")

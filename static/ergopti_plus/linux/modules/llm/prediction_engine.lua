@@ -498,7 +498,7 @@ end
 --- @return table|nil config
 local function live_config()
 	if _live_config then return _live_config end
-	local path = require("infra.paths").shared(LIVE_CONFIG_FILE)
+	local path = require("core.fs.engine.paths").shared(LIVE_CONFIG_FILE)
 	local text, status
 	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end

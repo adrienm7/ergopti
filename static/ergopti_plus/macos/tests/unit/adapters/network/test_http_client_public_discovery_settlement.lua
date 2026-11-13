@@ -12,12 +12,12 @@ local SourceFile = require("tests.support.source_file")
 local OWNED_MODULES = {
 	"modules.llm.api_remote", "modules.llm.local_servers", "adapters.http_client",
 	"core.events.timer_scheduler", "infra.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
-	"adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
+	"core.fs.adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
 	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
 	"infra.timings", "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
 	"modules.llm.api_common", "ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto",
 	"modules.llm.progressive_reveal", "modules.llm.remote_response_classifier",
-	"ai.engine.api.remote_formats", "modules.keystats", "adapters.file_system", "infra.http_header_policy",
+	"ai.engine.api.remote_formats", "modules.keystats", "core.fs.adapters.file_system", "infra.http_header_policy",
 }
 
 --- Reads an existing declared backend seam, without production test hooks.
@@ -71,7 +71,7 @@ local function isolated(scenario)
 		end
 		package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1 end }
 		package.loaded["modules.llm.api_common"] = { get_retry_policy = function() return 1, 0, 0 end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path) return SourceFile.read(path), "ok" end,
 		}
 		local api = require("modules.llm.api_remote")

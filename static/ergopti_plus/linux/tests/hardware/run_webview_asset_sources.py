@@ -25,7 +25,7 @@ elseif role == "html" or role == "script" or role == "style" then
     if regular and role == "script" then assert(content:find("ui_native_marker", 1, true)) end
     if regular and role == "style" then assert(content:find("ui_native_marker", 1, true)) end
 else
-    local paths = require("infra.paths")
+    local paths = require("core.fs.engine.paths")
     local original = paths.shared
     paths.shared = function(name)
         if name == "ui/apps.manifest.json" then return root .. "/geometry" end

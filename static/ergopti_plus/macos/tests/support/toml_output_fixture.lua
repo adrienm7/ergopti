@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local M = {}
-local WriteLockPath = require("adapters.write_lock_path")
+local WriteLockPath = require("core.fs.adapters.write_lock_path")
 
 --- Runs real writer/reader work against one owned temporary pathname.
 --- @param callback function Receives the output path and its writer lock path.

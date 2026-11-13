@@ -11,8 +11,8 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.updater.auto_check", "modules.updater", "infra.logger", "infra.paths", "infra.timings",
-	"adapters.file_system", "adapters.json_codec", "adapters.update_launcher",
+	"modules.updater.auto_check", "modules.updater", "infra.logger", "core.fs.engine.paths", "infra.timings",
+	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "adapters.update_launcher",
 	"infra.notifications", "infra.i18n", "core.text.engine.json", "updater.engine.channels", "updater.engine.schedule",
 	"updater.engine.release_parser", "updater.engine.check_result", "updater.engine.rate_limit", "updater.engine.version_core",
 }
@@ -33,10 +33,10 @@ local function with_owner(run)
 		local defaults = shared("updater/data/defaults.json")
 		local registry = assert(require("updater.engine.channels").load(shared("updater/data/channels.json")))
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = {}
+		package.loaded["core.fs.engine.paths"] = {}
 		package.loaded["infra.timings"] = Timings
-		package.loaded["adapters.file_system"] = {}
-		package.loaded["adapters.json_codec"] = { encode = Json.encode, decode = Json.decode }
+		package.loaded["core.fs.adapters.file_system"] = {}
+		package.loaded["core.fs.adapters.json_codec"] = { encode = Json.encode, decode = Json.decode }
 		package.loaded["modules.updater"] = { channels = function() return registry end }
 		package.loaded["adapters.update_launcher"] = {}
 		package.loaded["infra.notifications"] = {}

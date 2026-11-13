@@ -46,7 +46,7 @@ local Json          = require("core.text.engine.json")
 local NativePath    = require("core.fs.engine.native_path")
 local MediaStore    = require("metrics.engine.media.store")
 local AppCategoryStore = require("metrics.engine.apps.category_store")
-local RegularFileReader = require("infra.regular_file_reader")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local Queries = require("metrics.engine.queries")
 local LocalTime = require("metrics.engine.local_time")
@@ -290,14 +290,14 @@ local function _read_schema()
 	-- made schema loading depend on the process's current directory rather than
 	-- on where the driver is installed. Started from anywhere but one exact
 	-- directory, the keystats came up with no schema at all.
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local schema_path = Paths.shared("metrics/data/db/schema.sql")
 	if not schema_path then
 		Logger.error(LOG, "Cannot locate the shared tree — schema.sql is unreachable.")
 		return nil
 	end
 
-	local content, status, detail = require("adapters.file_system").read_with_status(schema_path)
+	local content, status, detail = require("core.fs.adapters.file_system").read_with_status(schema_path)
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "Cannot read schema.sql at %s: %s.", schema_path, ErrorDescription.describe(detail or status))
 		return nil
@@ -307,9 +307,9 @@ end
 
 --- Reads packaged media data through the existing classified native file port.
 local function _read_media_resource(relative)
-	local path = require("infra.paths").shared(relative)
+	local path = require("core.fs.engine.paths").shared(relative)
 	if type(path) ~= "string" then return nil end
-	local body, status = require("adapters.file_system").read_with_status(path)
+	local body, status = require("core.fs.adapters.file_system").read_with_status(path)
 	if status ~= "ok" or type(body) ~= "string" then
 		Logger.error(LOG, "Cannot read packaged semantic media resource.")
 		return nil
@@ -486,7 +486,7 @@ function M.has_private_file_debt() return PrivateSqlite ~= nil and PrivateSqlite
 --- A minimal daemon without luv may still read the last committed database.
 --- @return boolean
 function M.flush_transport_available()
-	return require("infra.sqlite_batch_process").is_available() == true
+	return require("core.fs.engine.sqlite_batch_process").is_available() == true
 end
 
 --- Reserves a private, unique folder for this attempt. Earlier backups are
@@ -665,7 +665,7 @@ function M.open_db(db_path)
 	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
 
 	-- Typed records stay private even when the selected parent is shared.
-	PrivateSqlite = PrivateSqlite or require("infra.private_sqlite_file")
+	PrivateSqlite = PrivateSqlite or require("core.fs.engine.private_sqlite_file")
 	local private, privacy_error = PrivateSqlite.admit(_db_path)
 	if not private then
 		Logger.error(LOG, "SQLite permissions admission refused: %s.", privacy_error)
@@ -1990,7 +1990,7 @@ function M.start_flush(device_id, payload)
 	if not M.is_available() or (_flush_owner and not _flush_owner:is_settled()) then return nil end
 	assert(type(device_id) == "string" and device_id ~= "")
 	assert(type(payload) == "table" and type(payload.raw) == "table" and type(payload.upserts) == "table")
-	local Process = require("infra.sqlite_batch_process")
+	local Process = require("core.fs.engine.sqlite_batch_process")
 	if not Process.is_available() then return nil end
 	local timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local function array(values)

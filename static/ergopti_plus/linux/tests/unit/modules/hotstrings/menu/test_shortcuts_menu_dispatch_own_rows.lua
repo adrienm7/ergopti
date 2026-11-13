@@ -728,7 +728,7 @@ helpers.describe("Shortcut frame genuine translated hierarchy", function()
 		local language = code
 		helpers.it("retains the handwritten cold and warm " .. language .. " wrap hierarchy and callbacks", function()
 			with_shortcut_locale(language, function()
-				local path = require("infra.paths").shared("tests/corpus/menus/shortcut_presentation_frames.json")
+				local path = require("core.fs.engine.paths").shared("tests/corpus/menus/shortcut_presentation_frames.json")
 				local file = assert(io.open(path, "rb"))
 				local bytes = assert(file:read("*a")); assert(file:close())
 				local expected = assert(require("core.text.engine.json").decode(bytes))[language]

@@ -10,7 +10,7 @@ local MODULES = {
 	"infra.i18n",
 	"infra.logger",
 	"infra.notifications",
-	"infra.paths", "infra.timings",
+	"core.fs.engine.paths", "infra.timings",
 	"ui.ui_builder",
 	"ui.menu.menu_llm.models_manager_mlx_hf",
 }
@@ -163,7 +163,7 @@ local function with_fixture(options, callback)
 			end,
 		}
 		helpers.provide_timings()
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(path)
 				if options.boundary_throw == "paths" then
 					error("HF paths boundary failure")
@@ -266,7 +266,7 @@ local function with_fixture(options, callback)
 		-- that same captured table here so the live prompt crosses the hostile path
 		-- boundary instead of a pre-load stand-in that production never observes.
 		if options.boundary_throw == "paths" then
-			package.loaded["infra.paths"].shared = function()
+			package.loaded["core.fs.engine.paths"].shared = function()
 				error("HF paths boundary failure")
 			end
 		end
