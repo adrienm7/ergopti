@@ -41,8 +41,9 @@ _OWOC_Source(Root) {
 _OWOC_Assets(Root) {
 	global _DriverDir, _SharedDir
 	_EDOT_Assets(Root)
-	FSCreateDirectoryExclusiveStrict(Root . "\shared\ui")
-	FileCopy(_SharedDir . "\ui\apps.manifest.json", Root . "\shared\ui\apps.manifest.json", false)
+	Manifest := "ui\apps.manifest.json"
+	_EDOT_CreateParents(Root . "\shared", [Manifest])
+	FileCopy(_SharedDir . "\" . Manifest, Root . "\shared\" . Manifest, false)
 	Loader := Root . "\vendor\64bit\WebView2Loader.dll"
 	FSDeleteStrict(Loader)
 	FileCopy(_DriverDir . "\vendor\64bit\WebView2Loader.dll", Loader, false)

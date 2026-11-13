@@ -84,8 +84,9 @@ _HNRT_Case(Mode) {
 	try {
 		_MBPT_StageAssets(Directory)
 		; The actual scope-owner class loads these shared picker tables at import.
-		FSCreateDirectoryExclusiveStrict(Directory . "\shared\tap_hold")
-		TapSource := _SharedDir . "\tap_hold\defaults.toml", TapTarget := Directory . "\shared\tap_hold\defaults.toml"
+		TapRelative := "tap_hold\defaults.toml"
+		_MBPT_CreateParents(Directory . "\shared", [TapRelative])
+		TapSource := _SharedDir . "\" . TapRelative, TapTarget := Directory . "\shared\" . TapRelative
 		TapBefore := FSReadBytesStrict(TapSource), TapHash := CryptoSha256Bytes(TapBefore)
 		FileCopy(TapSource, TapTarget, false)
 		TapAfter := FSReadBytesStrict(TapTarget)
