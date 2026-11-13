@@ -132,7 +132,7 @@ function H.collect_versions()
 		-- ships no version file to read
 		karabiner       = read("the Karabiner-Elements version", function()
 			local manifest = require("vendor.karabiner-elements.manifest")
-			local installed = require("core.fs.adapters.file_system").exists(require("platform.remap.ke_paths").CLI)
+			local installed = require("core.fs.adapters.file_system").exists(require("keyboard.adapters.karabiner.ke_paths").CLI)
 			return tostring(manifest.version) .. (installed and "" or " (not installed)")
 		end),
 	}
@@ -264,7 +264,7 @@ function H.collect_input()
 	local phase = read("the remapping lease", function()
 		-- A boot that stopped before the lease init still collects diagnostics:
 		-- asking status() then logged an ERROR for an answer already known.
-		local LeaseController = require("platform.remap.lease_controller")
+		local LeaseController = require("keyboard.adapters.karabiner.lease_controller")
 		if LeaseController.is_initialized() ~= true then return "uninitialized" end
 		return (LeaseController.status())
 	end)
@@ -425,7 +425,7 @@ local PERMISSION_READERS = {
 	input_monitoring = function() return "unknown" end,
 	-- A remap owner that never loaded is unknown
 	login_items      = function()
-		local remap = package.loaded["platform.remap"]
+		local remap = package.loaded["keyboard.engine"]
 		if type(remap) ~= "table" or type(remap.guardian_state) ~= "function" then return "unknown" end
 		return GUARDIAN_PERMISSION[remap.guardian_state()] or "unknown"
 	end,

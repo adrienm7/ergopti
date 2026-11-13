@@ -44,11 +44,11 @@ helpers.describe("empty configuration boot projection", function()
 	end)
 
 	helpers.it("does not seed missing remap children or an absent master in an existing file", function()
-		helpers.with_fresh_modules({ "platform.remap.config", "core.fs.adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "keyboard.engine.runtime.config", "core.fs.adapters.file_system" }, function()
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return "[tap_hold.keys]\n[mod_combos.config]\n", "ok" end,
 			}
-			local config = helpers.load_with_stubs("platform.remap.config")
+			local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 			local state, status = config.load_user_config({ { id = "left_shift" } },
 				{ { id = "lcmd_rcmd" } }, "/neutral/remap.toml")
 			helpers.assert_eq(status, "ok")
@@ -59,7 +59,7 @@ helpers.describe("empty configuration boot projection", function()
 	end)
 
 	helpers.it("keeps the real remap owner neutral without discarding its explicit recommended preset", function()
-		local config = helpers.load_with_stubs("platform.remap.config")
+		local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local state = config.build_default_state({ { id = "left_shift" } }, { { id = "lcmd_rcmd" } })
 		helpers.assert_eq(state.tap_holds_enabled, false)
 		helpers.assert_eq(state.tap_hold_config.left_shift.tap, "none")

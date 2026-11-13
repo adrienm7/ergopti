@@ -46,7 +46,7 @@ local OWNED_MODULES = {
 	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 	"ai.ui.menu",

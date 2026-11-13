@@ -23,8 +23,8 @@ local MODULE_NAMES = {
 	"core.events.timer_scheduler",
 	"platform.input.keyboard_geometry",
 	"platform.input.synthetic_input",
-	"platform.remap.ke_lifecycle",
-	"platform.remap.lease_controller",
+	"keyboard.adapters.karabiner.ke_lifecycle",
+	"keyboard.adapters.karabiner.lease_controller",
 	"core.logger.engine.boot_profiler",
 	"core.logger.adapters.boot_journal",
 	"core.i18n.engine.i18n",
@@ -50,7 +50,7 @@ local MODULE_NAMES = {
 	"core.timing.engine.timings",
 	"core.lifecycle.engine.launcher_guard",
 	"core.fs.adapters.file_system",
-	"platform.remap",
+	"keyboard.engine",
 	"platform.remap.tap_hold_file",
 	"menu.ui",
 	"ai.ui.menu",
@@ -249,8 +249,8 @@ local function run_isolated(options, assertions)
 					return true
 				end,
 			},
-			["platform.remap.ke_lifecycle"] = { HS_BOOT_READY_SETTING_KEY = "test.boot.ready" },
-			["platform.remap.lease_controller"] = LeaseController,
+			["keyboard.adapters.karabiner.ke_lifecycle"] = { HS_BOOT_READY_SETTING_KEY = "test.boot.ready" },
+			["keyboard.adapters.karabiner.lease_controller"] = LeaseController,
 			["core.logger.engine.boot_profiler"] = {
 				begin = function() end,
 				trace_requires = function() end,
@@ -372,7 +372,7 @@ local function run_isolated(options, assertions)
 				stop = function() return true end,
 			},
 			["core.fs.adapters.file_system"] = {},
-			["platform.remap"] = Karabiner,
+			["keyboard.engine"] = Karabiner,
 			-- The boot carries an old config_karabiner.toml over before the config
 			-- migration; this fixture has no file system, hence no old file.
 			["platform.remap.tap_hold_file"] = {

@@ -24,7 +24,7 @@ function M.request(action, changed, deps)
 		return action == "toggle"
 	end
 	deps = deps or {}
-	local resolver = deps.resolver or require("platform.remap.lease_helper")
+	local resolver = deps.resolver or require("keyboard.adapters.karabiner.lease_helper")
 	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local logger = deps.logger or require("core.logger.engine.logger")
 	local function alert(text_key, style)

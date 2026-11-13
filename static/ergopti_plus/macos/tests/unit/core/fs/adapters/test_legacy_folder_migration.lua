@@ -368,7 +368,7 @@ helpers.describe("macOS legacy folder migration", function()
 	end)
 
 	helpers.it("names the owned runtime folder apart from the Ergopti root", function()
-		local KePaths = require("platform.remap.ke_paths")
+		local KePaths = require("keyboard.adapters.karabiner.ke_paths")
 		helpers.assert_true(KePaths.OWNED.ARTIFACT_HOME:find(AppDirs.macos.support_relative, 1, true) ~= nil,
 			"the downloaded runtime lives in the Ergopti root")
 		helpers.assert_true(KePaths.OWNED.CONFIG_HOME:find(AppDirs.owned_runtime.macos_folder_name, 1, true) ~= nil,

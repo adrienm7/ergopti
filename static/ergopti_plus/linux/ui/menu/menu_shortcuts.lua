@@ -533,7 +533,7 @@ local function _build_shortcuts(ctx)
 	-- absent slot starts with its preset. The title is ticked from the switch.
 	local group_builders = {}
 	group_builders["key_combinations"] = function()
-		return require("ui.menu.key_combinations").build(ctx, {
+		return require("keyboard.ui.menu_key_combinations").build(ctx, {
 			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
 				return require("platform.input.keycodes.key_names").label(entry.key, "linux", i18n_safe)
 			end,

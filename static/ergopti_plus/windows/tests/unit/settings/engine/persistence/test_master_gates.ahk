@@ -117,7 +117,7 @@ Test("master gates: explicit category-gate callback contract fails fast", TestMa
 ; « Combinaisons de touches » is the only gate of the key combinations: the
 ; Shortcuts master does not reach them (decision of 2026-09-29, as on macOS).
 ; Their slots hold actions, which no master gate rewrites, and their hotkeys
-; ask the KeyCombinations gate alone (infra/key_combinations.ahk).
+; ask the KeyCombinations gate alone (keyboard/engine/keys/combinations.ahk).
 _MGKC_Candidate() {
 	return Map("shortcuts", Map(
 		"a_grave", Map("enabled", true, "letter", "q"),

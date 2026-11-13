@@ -12,7 +12,7 @@ local STATE_FIELDS = { "shortcuts", require("settings.engine.keys").LEAF.CHATGPT
 
 -- [shortcuts.caps_word] and its pointer kinds belong to their settings owner,
 -- which names their state keys; the scope applies them through it.
-local CapsWordAutoOff = require("infra.capsword_auto_off")
+local CapsWordAutoOff = require("keyboard.engine.capsword_auto_off")
 local TableUtil = require("core.text.engine.table_util")
 for _, key in ipairs({ CapsWordAutoOff.IDLE_KEY, CapsWordAutoOff.TERMINATORS_KEY, CapsWordAutoOff.POINTER_KEY }) do
 	STATE_FIELDS[#STATE_FIELDS + 1] = key

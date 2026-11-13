@@ -14,7 +14,7 @@ local Keycodes = require("platform.input.keycodes.core")
 local Timer = require("core.events.timer_scheduler")
 local SyntheticInput = require("platform.input.synthetic_input")
 local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
-local CapsWordOutput = require("infra.capsword_output")
+local CapsWordOutput = require("keyboard.engine.capsword_output")
 local CONTROL = {
 	[Keycodes.BACKSPACE] = "backspace", [Keycodes.FORWARD_DELETE] = "delete",
 	[Keycodes.RETURN] = "enter", [Keycodes.ENTER] = "enter",

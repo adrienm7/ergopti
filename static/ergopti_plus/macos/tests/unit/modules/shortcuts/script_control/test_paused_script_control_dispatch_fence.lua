@@ -59,7 +59,7 @@ package.loaded["ui.wpm.wpm_menubar"] = {
 package.loaded["ui.wpm.wpm_widget"] = {
 	is_running = function() return false end,
 }
-package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
+package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 
 package.loaded["platform.input.synthetic_input"] = nil

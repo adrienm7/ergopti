@@ -4,7 +4,7 @@
 ; MODULE: Number-Row Tap Key Hotkeys
 ; DESCRIPTION:
 ; The static hotkeys of the three number-row tap keys; their logic, their
-; assignments and their labels are infra/tap_keys.ahk.
+; assignments and their labels are keyboard/engine/tap_keys.ahk.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Static, and included before modules/keymap/layout.ahk. AutoHotkey fires the

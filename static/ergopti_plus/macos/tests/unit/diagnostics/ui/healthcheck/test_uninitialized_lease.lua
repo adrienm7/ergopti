@@ -19,7 +19,7 @@ helpers.describe("healthcheck: remapping phase before the lease init", function(
 		local status_calls = 0
 		local ok, err = xpcall(function()
 			helpers.load_with_stubs("core.logger.engine.logger")
-			package.loaded["platform.remap.lease_controller"] = {
+			package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 				is_initialized = function() return false end,
 				status = function()
 					status_calls = status_calls + 1

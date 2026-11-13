@@ -8,7 +8,7 @@
  * layers.toml), validates it against the physical-key registry and the layer
  * vocabulary, and resolves each binding for one OS. It implements the same
  * contract as the two driver loaders — _shared/layouts/engine/layers/layers.lua and
- * windows/platform/remap/layers_loader.ahk — so the JS gates can check the
+ * windows/keyboard/engine/layers/loader.ahk — so the JS gates can check the
  * shipped data, and so the shared corpus under
  * _shared/tests/corpus/keymap_layers/ can hold all three implementations to one
  * answer.

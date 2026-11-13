@@ -19,7 +19,7 @@
 local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("core.text.engine.utils")
-local ComposedText = require("infra.composed_text")
+local ComposedText = require("keyboard.engine.composed_text")
 local LlmContext = require("ai.engine.api.context")
 local EventProvenance = require("diagnostics.adapters.event_provenance")
 local KeyboardGeometry = require("platform.input.keyboard_geometry")
@@ -49,7 +49,7 @@ local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
 local UnicodeCarrier = require("clipboard.adapters.unicode_carrier")
 local EventClock = require("core.events.clock")
-local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
+local CapsLockChordEvidence = require("keyboard.engine.keys.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("diagnostics.engine.hid_diagnostic_mailbox")
 local ConfigKeys = require("settings.engine.keys")
 
@@ -733,7 +733,7 @@ end
 --- @return boolean accepted
 function M.arm_one_shot_shift()
 	if not _started or CoreState.processing_paused == true or not SyntheticInput.admission_open() then return false end
-	local remap = package.loaded["platform.remap"]
+	local remap = package.loaded["keyboard.engine"]
 	assert(type(remap) == "table" and type(remap.get_sticky_timeout) == "function",
 		"one-shot Shift requires the initialized remap configuration")
 	local timeout_ms = remap.get_sticky_timeout()
@@ -2959,9 +2959,9 @@ local function build_tap_copy()
 		-- The tap timeout Karabiner was given for the key: the lone tap window
 		-- when it applies (Generator.last_tap_timeouts), else its delay.
 		key_config = function(key_id)
-			local Remap = require("platform.remap")
+			local Remap = require("keyboard.engine")
 			if Remap.get_tap_holds_enabled() ~= true then return nil, nil end
-			local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+			local deployed = require("keyboard.engine.runtime.generator").last_tap_timeouts() or {}
 			return Remap.get_tap_action(key_id),
 				deployed[key_id] or Remap.get_tap_timeout(key_id) or Remap.get_tap_hold_timeout()
 		end,

@@ -15,7 +15,7 @@ local function with_crypto_fixture(options, body)
 	local names = {
 		"ai.engine.api.token_crypto", "core.process.adapters.shell_runner",
 		"core.events.timer_scheduler", "core.timing.engine.timings", "core.logger.engine.logger",
-		"platform.remap.lease_helper",
+		"keyboard.adapters.karabiner.lease_helper",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -51,7 +51,7 @@ local function with_crypto_fixture(options, body)
 			return 10
 		end,
 	}
-	package.loaded["platform.remap.lease_helper"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 		resolve = function()
 			if options.helper_throws then error("helper resolution exploded") end
 			if options.helper_unavailable then return nil, "helper missing" end
@@ -435,7 +435,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		"ai.engine.api.remote", "ai.engine.api.token_crypto",
 		"core.process.adapters.shell_runner", "core.events.timer_scheduler",
 		"core.network.adapters.http_client", "modules.shortcuts.script_control",
-		"platform.remap.lease_helper",
+		"keyboard.adapters.karabiner.lease_helper",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -470,7 +470,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 	}
 	local ok, err = xpcall(function()
 		helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
-		package.loaded["platform.remap.lease_helper"] = {
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 			resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end,
 		}
 		package.loaded["core.process.adapters.shell_runner"] = {

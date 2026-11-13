@@ -52,7 +52,7 @@ local function wheel_layer()
 		toml_decode = require("core.text.engine.toml_codec").decode, read_file = require("layouts.engine.layers.editor").read_shipped,
 	})
 	local function key(name) return { kind = "keystroke", chords = { { mods = {}, key = name } } } end
-	return require("platform.remap.nav_layer").compile({
+	return require("keyboard.engine.layers.nav_layer").compile({
 		WheelUp = key("AudioVolumeUp"), WheelDown = key("AudioVolumeDown"), KeyJ = key("ArrowLeft"),
 		MouseMiddle = key("Escape"),
 	}, ctx.registry)

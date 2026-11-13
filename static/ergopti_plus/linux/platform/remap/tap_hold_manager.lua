@@ -37,7 +37,7 @@ local original_combination_catalogue = BindingIdentity.combination_binding_catal
 local original_engine_constructor = Engine.new
 local original_config_load, original_config_document = Config.load, Config.load_document
 local NativeCatalogue = require("_generated.action_catalogue")
-local PairModule = require("platform.remap.key_combination_engine")
+local PairModule = require("keyboard.engine.keys.combination_engine")
 -- A private original constructor port; later module export replacements are refused.
 local CombinationEngine = { new = PairModule.new }
 local original_pair_constructor = CombinationEngine.new
@@ -47,7 +47,7 @@ local EmitActions = require("_generated.gesture_emit_actions")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
-local NavLayer = require("platform.remap.nav_layer")
+local NavLayer = require("keyboard.engine.layers.nav_layer")
 local Outdated = require("settings.engine.migration.outdated")
 local Codec = require("core.text.engine.toml_codec")
 
@@ -75,13 +75,13 @@ for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
 end
 
 local function nav_ports_current()
-	if not rawequal(package.loaded["platform.remap.nav_layer"], NavLayer) or getmetatable(NavLayer) ~= nil
+	if not rawequal(package.loaded["keyboard.engine.layers.nav_layer"], NavLayer) or getmetatable(NavLayer) ~= nil
 		or rawget(NavLayer, "load") ~= original_nav_load
 		or type(original_nav_capture) ~= "function" or rawget(NavLayer, "capture_source_observation") ~= original_nav_capture
 		or not rawequal(package.loaded["core.fs.engine.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
 		or not rawequal(package.loaded["core.text.engine.toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
 		or not rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine) or getmetatable(Engine) ~= nil
-		or not rawequal(package.loaded["platform.remap.key_combination_engine"], PairModule)
+		or not rawequal(package.loaded["keyboard.engine.keys.combination_engine"], PairModule)
 		or rawget(PairModule, "new") ~= original_pair_constructor then return false end
 	for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
 		local port = nav_engine_ports[name]
@@ -140,7 +140,7 @@ local _paused = false        -- The daemon's pause.
 local _combinations = nil
 local _installed_engine = nil
 local _generation = 0        -- Revokes queued actions across runtime installations.
-local _tap_copy = nil        -- Checks each tap's copy (platform/remap/tap_copy.lua).
+local _tap_copy = nil        -- Checks each tap's copy (keyboard/engine/tap_copy.lua).
 
 -- The catalogue action whose tap is checked against the clipboard.
 local COPY_ACTION = "copy"
@@ -220,7 +220,7 @@ local function _run_tap(action, binding)
 	-- even its counter: the copy is sent unchecked there.
 	if action == COPY_ACTION and _tap_copy and not _dry_run then
 		-- The copy is checked against the clipboard's change counter and sent
-		-- once more when it did not land (platform/remap/tap_copy.lua).
+		-- once more when it did not land (keyboard/engine/tap_copy.lua).
 		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
 			local sent, send_err = pcall(execute, action, source)
 			if not sent then error(send_err, 0) end
@@ -238,9 +238,9 @@ end
 
 --- Builds the copy owner over the live clipboard, timer and notifier.
 --- @param execute function The catalogue executor init() was handed.
---- @return table owner platform/remap/tap_copy.lua
+--- @return table owner keyboard/engine/tap_copy.lua
 local function build_tap_copy(execute, capture_destination)
-	return require("platform.remap.tap_copy").new({
+	return require("keyboard.engine.tap_copy").new({
 		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
 		read_counter = function() return require("clipboard.adapters.clipboard").change_counter() end,
 		capture_destination = function()
@@ -429,7 +429,7 @@ function M.managed_pair_options_current(owner,configured)
   and rawget(Combinations,"new")==original_combination_constructor
   and rawget(Engine,"new")==original_engine_constructor
   and rawequal(package.loaded["platform.remap.tap_hold_engine"],Engine)
-  and rawequal(package.loaded["platform.remap.key_combination_engine"],PairModule)
+  and rawequal(package.loaded["keyboard.engine.keys.combination_engine"],PairModule)
   and rawget(PairModule,"new")==original_pair_constructor
   and rawequal(package.loaded["platform.remap.tap_hold_loader"],Config)
   and rawget(Config,"load")==original_config_load and rawget(Config,"load_document")==original_config_document

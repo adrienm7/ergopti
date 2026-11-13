@@ -366,10 +366,10 @@ local function build_menu(mode, configure)
 		refreshes = 0,
 	}
 	local saved_logger = package.loaded["core.logger.engine.logger"]
-	local saved_controller = package.loaded["platform.remap.lease_controller"]
+	local saved_controller = package.loaded["keyboard.adapters.karabiner.lease_controller"]
 	local saved_manifest = package.loaded["menu.engine.manifest_menu"]
 	package.loaded["core.logger.engine.logger"] = recording_logger(observations)
-	package.loaded["platform.remap.lease_controller"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 		status = function() return "active", { phase = "active" } end,
 		stop = function() return true end,
 	}
@@ -390,7 +390,7 @@ local function build_menu(mode, configure)
 	-- group, not to the Tap-Holds first-row contract asserted below.
 	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
 	package.loaded["core.logger.engine.logger"] = saved_logger
-	package.loaded["platform.remap.lease_controller"] = saved_controller
+	package.loaded["keyboard.adapters.karabiner.lease_controller"] = saved_controller
 	package.loaded["menu.engine.manifest_menu"] = saved_manifest
 	return built, observations, remap
 end

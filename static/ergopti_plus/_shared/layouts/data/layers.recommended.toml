@@ -124,7 +124,7 @@ schema_version = 1
 "Digit9" = "repeat_count:9"
 "Digit0" = "repeat_count:10"
 
-# The Karabiner generator (macos/platform/remap/nav_layer.lua) sends every F1-F12
+# The Karabiner generator (macos/keyboard/engine/layers/nav_layer.lua) sends every F1-F12
 # keystroke with Fn added while macOS treats the top row as media keys, so the
 # number row reaches the function keys in either mode. The right Command key is
 # Escape on a tap and Option+Shift while held. Hammerspoon, not Karabiner, runs

@@ -388,8 +388,8 @@ Test("LLM accept meta: every menu, gesture and tap-hold Tab producer is enumerat
 _TLTSH_EveryPhysicalTabTapHoldAcceptsFirst() {
 	SplitPath(A_ScriptDir, , &Root)
 	; FileRead throws if the module moves, so the scan can never go vacuous.
-	Src := _StripFullLineComments(FileRead(Root . "\platform\remap\tab.ahk", "UTF-8"))
-	Assert(Src != "", "platform/remap/tab.ahk must be scanned")
+	Src := _StripFullLineComments(FileRead(Root . "\keyboard\engine\keys\tab.ahk", "UTF-8"))
+	Assert(Src != "", "keyboard/engine/keys/tab.ahk must be scanned")
 	Handlers := 0
 	Pos := 1
 	while (Pos := RegExMatch(Src, "m)^\$?SC00F::\s*(\{|_TabDispatch)", &Match, Pos)) {

@@ -32,7 +32,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
-const OWNER = path.join(MACOS, 'platform', 'remap', 'ke_paths.lua');
+const OWNER = path.join(MACOS, 'keyboard', 'adapters', 'karabiner', 'ke_paths.lua');
 
 // The PKG install root. Command-line helpers live under bin/, while current
 // Core Service releases use an app bundle beside it. A literal containing this

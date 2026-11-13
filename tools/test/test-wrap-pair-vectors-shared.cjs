@@ -12,7 +12,7 @@
  *
  * WHY:
  * The wrap_pair rule is implemented three times (_shared/keyboard/engine for
- * macOS and Linux, windows/infra/wrap_pair.ahk). The corpus is what keeps them
+ * macOS and Linux, windows/keyboard/engine/wrap_pair.ahk). The corpus is what keeps them
  * equal; a corpus whose expectations disagree with the catalogue, or that no
  * suite replays, pins nothing.
  * ==============================================================================

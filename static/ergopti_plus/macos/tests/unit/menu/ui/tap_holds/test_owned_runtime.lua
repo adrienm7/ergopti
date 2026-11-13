@@ -188,8 +188,8 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 
 	helpers.it("explains exactly the blocks the owner declares for the user", function()
 		local menu = menu_over_double(true)
-		package.loaded["platform.remap.runtime_owner"] = nil
-		local declared = require("platform.remap.runtime_owner").USER_BLOCKS
+		package.loaded["keyboard.adapters.runtime.owner"] = nil
+		local declared = require("keyboard.adapters.runtime.owner").USER_BLOCKS
 		local explained = menu._explained_owned_reasons()
 		for reason in pairs(declared) do helpers.assert_true(explained[reason] == true, reason .. " has no row") end
 		for reason in pairs(explained) do helpers.assert_true(declared[reason] == true, reason .. " is not declared") end
@@ -198,7 +198,7 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 	helpers.it("offers the driver-only update under an incompatible driver and only there", function()
 		local UPDATE = "menu.tapholds.vhid_update"
 		local opened = {}
-		package.loaded["ui.virtual_hid_update"] = {
+		package.loaded["keyboard.ui.virtual_hid_update"] = {
 			open = function(remap) opened[#opened + 1] = remap; return true end,
 		}
 		local function rows_for(status, with_facade)
@@ -223,7 +223,7 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		helpers.assert_nil(find(rows_for({ state = "ready" }, true), UPDATE))
 		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "virtual_hid_incompatible" }, false), UPDATE),
 			"no offer without the facade that performs it")
-		package.loaded["ui.virtual_hid_update"] = nil
+		package.loaded["keyboard.ui.virtual_hid_update"] = nil
 	end)
 
 	helpers.it("offers the first install under a missing runtime and only there", function()

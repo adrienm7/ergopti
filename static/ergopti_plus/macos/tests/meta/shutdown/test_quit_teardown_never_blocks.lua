@@ -34,7 +34,7 @@ local FORBIDDEN = {
 -- Files are resolved through package.path, so a module move cannot break this.
 local RECEIVER_MODULES = {
 	LauncherGuard = "core.lifecycle.engine.launcher_guard",
-	karabiner = "platform.remap",
+	karabiner = "keyboard.engine",
 	keymap = "hotstrings.engine.expander",
 	gestures = "gestures.engine",
 	shortcuts = "modules.shortcuts",

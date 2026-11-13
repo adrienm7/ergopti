@@ -210,7 +210,7 @@ try {
 			driver,
 			...(driver === 'windows'
 				? []
-				: ['ui', 'menu', 'ai', 'apps', 'diagnostics', 'gestures', 'hotstrings'])
+				: ['ui', 'menu', 'ai', 'apps', 'diagnostics', 'gestures', 'hotstrings', 'keyboard'])
 		);
 		reset();
 		fs.renameSync(scanRoot, scanRoot + '-wrong');

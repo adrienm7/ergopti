@@ -59,7 +59,7 @@ local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
 local Monotonic = require("core.logger.engine.monotonic")
 local Engine = require("platform.remap.tap_hold_engine")
-local Native = require("platform.remap.key_combination_engine")
+local Native = require("keyboard.engine.keys.combination_engine")
 local Owner = require("modules.shortcuts.key_combinations")
 
 -- Same node-publication and event-observation bounds as run_modifier_custody.lua.

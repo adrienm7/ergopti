@@ -413,7 +413,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = 'a38d6435205772a0215c2416b94e099a8da88831d5be329aabc03afb4cdd8023';
+const LEGACY_SHA256 = '30cdf24d412fa0acc41f4e2f67964d977d2e4fcc39e9c779eb835eab8dbe9e4a';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),

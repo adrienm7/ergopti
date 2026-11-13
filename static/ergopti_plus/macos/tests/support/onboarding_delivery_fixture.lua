@@ -11,7 +11,7 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "settings.ui.menu.paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
-		"core.fs.adapters.file_system", "settings.engine.paths", "platform.remap", "core.text.engine.json",
+		"core.fs.adapters.file_system", "settings.engine.paths", "keyboard.engine", "core.text.engine.json",
 		"modules.keymap.number_row_live" }, function()
 		-- No layout of ours types in the fixture: the number-row order is greyed.
 		package.loaded["modules.keymap.number_row_live"] = {
@@ -28,7 +28,7 @@ local function with_delivery(callback, native_timers)
 		}
 		-- The remap owner reports the tap-hold keys beside each config.toml read:
 		-- none here, so the pages start from config.toml's values alone.
-		package.loaded["platform.remap"] = {
+		package.loaded["keyboard.engine"] = {
 			recommended_key_report = function() return { enabled = false, keys = {} } end,
 		}
 		local picker = {}

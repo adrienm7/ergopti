@@ -15,7 +15,7 @@
 ;    ``[tap_hold]`` root flag and ``[tap_hold.keys.<id>]`` sections only. The
 ;    full TOML grammar is intentionally NOT supported here: this is a narrow
 ;    file format produced by the codegen pipeline. What a held layer DOES is
-;    not tap-hold data: it lives in layers.toml (platform/remap/layers_loader.ahk).
+;    not tap-hold data: it lives in layers.toml (keyboard/engine/layers/loader.ahk).
 ; 2. Returns a hierarchical Map with the shape:
 ;        TapHold["keys"]["caps_lock"]["tap_action"]        = "enter"
 ;        TapHold["keys"]["caps_lock"]["hold_modifier"]     = "ctrl"
@@ -40,7 +40,7 @@
 
 ; The global default tap-hold delay (TAPHOLD_DEFAULT_ACTIVATION_SECONDS) is the
 ; timing registry's tap_hold.default_activation_ms, loaded at boot by
-; TapHoldsLoadTimings() (platform/remap/constants.ahk) like every other tap-hold
+; TapHoldsLoadTimings() (keyboard/engine/keys/constants.ahk) like every other tap-hold
 ; timing; it is not a literal here.
 ; Upper sanity bound for a hold threshold read from the user-editable
 ; tap_hold.toml. A hold longer than this is certainly a typo (a stray unit, a
@@ -764,7 +764,7 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel) {
 
 ; What the one-shot Shift makes of the next character, read once from
 ; _shared/tap_hold/data/one_shot_shift.json, which the Linux driver reads too. The
-; results were an if/else chain in one_shot_shift.ahk, so Linux had none of
+; results were an if/else chain in ../../keyboard/engine/one_shot_shift.ahk, so Linux had none of
 ; them. A file that cannot be read is logged once and the failure kept: the
 ; one-shot only capitalises until the next start, rather than reading the file
 ; again, and logging again, at every tap.

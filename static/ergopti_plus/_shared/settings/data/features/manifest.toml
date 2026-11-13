@@ -2158,7 +2158,7 @@ reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 # [tap_hold.catalog], « first_then_second », and holds a catalogue action; its
 # sibling section [shortcuts.key_combination_holds] holds what the second key
 # holds instead (a value of [tap_hold.hold_picker]). Every ordered pair has both
-# slots (windows/infra/key_combinations.ahk); only the pairs that ship a
+# slots (windows/keyboard/engine/keys/combinations.ahk); only the pairs that ship a
 # recommendation are declared here, the three chords the driver always had:
 # AltGr then LAlt, AltGr then CapsLock, and LAlt then CapsLock. They were three
 # sections of ten mutually exclusive booleans each, one per action, for those

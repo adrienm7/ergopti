@@ -66,7 +66,7 @@ package.loaded["ui.wpm.wpm_widget"] = {
 	stop = function() return true end,
 	resume_after_pause = function() return true end,
 }
-package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
+package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 
 -- Force a fresh adapters.key_state so it captures THIS file's hs stub (the F-CRIT-1
 -- sentinel guard delegates the live right-AltGr query to that adapter).

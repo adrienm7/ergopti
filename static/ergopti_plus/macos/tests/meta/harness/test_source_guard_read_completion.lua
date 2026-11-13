@@ -132,7 +132,7 @@ local function with_sources(callback)
 	end
 	local outcome = table.pack(pcall(function()
 		directory(root)
-		for _, name in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings" }) do
+		for _, name in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard" }) do
 			directory(root .. "/" .. name)
 			write(root .. "/" .. name .. "/healthy.lua", "local safe = true\n")
 		end

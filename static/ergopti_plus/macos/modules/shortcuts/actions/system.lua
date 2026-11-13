@@ -1041,7 +1041,7 @@ end
 --- scrolls as usual.
 --- @param admission_guard function|nil The owning layer's delivery admission.
 --- @param wheel_slot function(axis, direction) -> { code, strokes }|nil: the
----   loaded layer's binding (platform/remap/nav_layer.lua wheel_slots, read by
+---   loaded layer's binding (keyboard/engine/layers/nav_layer.lua wheel_slots, read by
 ---   modules/shortcuts/bindings.lua). Asked inside the callback, so it may only
 ---   consult memory.
 --- @return table|nil Fake-hotkey object with :delete().

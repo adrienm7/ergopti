@@ -40,7 +40,7 @@ local CommandLines = require("tests.support.command_lines")
 -- Every subtree that ships in the driver. `adapters/` holds the hs.task GC pins,
 -- `ui/` the models managers, `modules/` the API clients — the class has bitten in
 -- all three, so none of them may be left out.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard" }
 
 -- Root-level sources that no subtree walk would reach.
 local ROOT_FILES = { "init.lua" }

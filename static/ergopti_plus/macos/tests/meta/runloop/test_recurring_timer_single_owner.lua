@@ -35,7 +35,7 @@ local RAW_TIMER_NEW_OWNERS = {
 	["modules.keystats"] = "legacy keystats runtime transaction pending migration",
 	["modules.keystats.log_manager"] = "legacy ingest owner pending migration",
 	["hotstrings.engine.expander"] = "legacy tap-watchdog owner pending migration",
-	["platform.remap.watchers"] = "legacy layout-poll owner pending migration",
+	["keyboard.engine.runtime.watchers"] = "legacy layout-poll owner pending migration",
 }
 
 --- Lists production Lua files recursively without relying on LuaFileSystem.

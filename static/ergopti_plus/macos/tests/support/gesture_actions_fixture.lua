@@ -35,7 +35,7 @@ local OWNERS = {
 	"shortcuts.engine.actions.catalogue_data",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.
-	"infra.script_chord_catalogue",
+	"keyboard.engine.layers.script_chord_catalogue",
 	"keyboard.engine.layers.script_chords",
 	"apps.engine.parameter",
 	"shortcuts.engine.brightness_actions",
@@ -82,9 +82,9 @@ local OWNERS = {
 	"gestures.engine.actions",
 	"gestures.adapters.native_app_switcher_action",
 	"gestures.adapters.native_app_switcher",
-	"adapters.system_switcher_input",
-	"adapters.system_switcher_sampler",
-	"adapters.system_switcher_runtime",
+	"keyboard.adapters.system_switcher_input",
+	"keyboard.adapters.system_switcher_sampler",
+	"keyboard.adapters.system_switcher_runtime",
 
 	"gestures.engine.actions_aux_owner",
 	"gestures.engine.actions_click",
@@ -127,9 +127,9 @@ local function fresh_actions(options)
 		"gestures.engine.actions",
 	"gestures.adapters.native_app_switcher_action",
 	"gestures.adapters.native_app_switcher",
-	"adapters.system_switcher_input",
-	"adapters.system_switcher_sampler",
-	"adapters.system_switcher_runtime",
+	"keyboard.adapters.system_switcher_input",
+	"keyboard.adapters.system_switcher_sampler",
+	"keyboard.adapters.system_switcher_runtime",
 
 		"core.ui.engine.notifications",
 		"core.events.timer_scheduler",

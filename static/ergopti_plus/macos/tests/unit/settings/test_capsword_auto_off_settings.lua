@@ -14,14 +14,14 @@ local helpers = require("tests.helpers")
 
 --- Loads a fresh settings owner with a capturing logger.
 local function fresh_owner()
-	package.loaded["infra.capsword_auto_off"] = nil
+	package.loaded["keyboard.engine.capsword_auto_off"] = nil
 	local errors = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_module, format_string, ...)
 		errors[#errors + 1] = string.format(format_string, ...)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	return require("infra.capsword_auto_off"), errors
+	return require("keyboard.engine.capsword_auto_off"), errors
 end
 
 --- A detached copy of the owner's defaults.
@@ -36,7 +36,7 @@ end
 
 helpers.describe("CapsWord auto-off settings owner", function()
 	helpers.it("takes the pointer kinds and defaults from the manifest", function()
-		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
+		helpers.with_stub_scope({ "keyboard.engine.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner = fresh_owner()
 			local Manifest = require("menu.engine.manifest_reader")
 			local declared = {}
@@ -56,7 +56,7 @@ helpers.describe("CapsWord auto-off settings owner", function()
 	end)
 
 	helpers.it("applies a valid state and keeps the previous one on refusal", function()
-		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
+		helpers.with_stub_scope({ "keyboard.engine.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner, errors = fresh_owner()
 			local Policy = require("keyboard.engine.caps_word_auto_off")
 			local state = default_state(Owner)
@@ -77,7 +77,7 @@ helpers.describe("CapsWord auto-off settings owner", function()
 	end)
 
 	helpers.it("persists through Preferences at the manifest paths", function()
-		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
+		helpers.with_stub_scope({ "keyboard.engine.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner = fresh_owner()
 			local Preferences = require("settings.engine.preferences.preferences")
 			helpers.assert_eq(Preferences.flat_key_for("shortcuts.caps_word.idle_timeout_seconds"), Owner.IDLE_KEY)

@@ -90,7 +90,7 @@ local MetricsState = require("infra.metrics_state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -2117,7 +2117,7 @@ end
 --- Captures the already loaded script publisher without initializing its source.
 --- @return function admission Pure final native owner and catalogue fence.
 local function script_parameter_admission()
-	local namespace = "infra.script_chord_catalogue"
+	local namespace = "keyboard.engine.layers.script_chord_catalogue"
 	local owner = rawget(package.loaded, namespace)
 	local getter = type(owner) == "table" and rawget(owner, "published_binding_catalogue") or nil
 	local captured = BindingPublication.current("script", namespace, owner)

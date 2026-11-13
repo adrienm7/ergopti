@@ -50,8 +50,8 @@ try {
 
 ; Keep exactly the main driver's input level and source include order.
 #InputLevel 2
-#Include ../../platform/remap/key_combination_keys.ahk
-#Include ../../platform/remap/altgr.ahk
+#Include ../../keyboard/engine/keys/combination_keys.ahk
+#Include ../../keyboard/engine/keys/altgr.ahk
 #InputLevel 0
 
 ; Write directly to the owned evidence path: a timed-out parent deliberately

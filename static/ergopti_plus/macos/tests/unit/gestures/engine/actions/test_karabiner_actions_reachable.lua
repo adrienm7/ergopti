@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Karabiner catalogue actions are reachable from a gesture
 --- DESCRIPTION:
---- macos/platform/remap/data/actions.json holds 73 actions the remap layer can put
+--- macos/keyboard/data/actions.json holds 73 actions the remap layer can put
 --- on a key. Until 2026-08-03 only 18 of them had a row in the shared action
 --- catalogue, so the gesture picker could not offer the rest: the same feature was
 --- reachable from a remapped key and unreachable from a swipe, and nothing said so.
@@ -64,7 +64,7 @@ local function fresh_registry(variable_write_result)
 		write.callback(ok, reason or (ok and "written" or "failed"), write.revision)
 	end
 
-	package.loaded["platform.remap.ke_variables"] = {
+	package.loaded["keyboard.adapters.karabiner.ke_variables"] = {
 		set = function(name, value, callback)
 			seen.current_revision = seen.current_revision + 1
 			seen.variables[#seen.variables + 1] = {
@@ -79,19 +79,19 @@ local function fresh_registry(variable_write_result)
 		capsword_known_active = function() return seen.capsword_active == true end,
 	}
 	seen.deactivations = 0
-	package.loaded["platform.remap.watchers"] = {
+	package.loaded["keyboard.engine.runtime.watchers"] = {
 		deactivate_capsword_by_action = function()
 			seen.deactivations = seen.deactivations + 1
 			return true
 		end,
 		note_capsword_activated = function() return true end,
 	}
-	package.loaded["platform.remap.lease_controller"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 		status = function()
 			return seen.lease_phase, { phase = seen.lease_phase, token = "test-token" }
 		end,
 	}
-	package.loaded["platform.remap"] = {
+	package.loaded["keyboard.engine"] = {
 		get_sticky_timeout = function() return STICKY_TIMEOUT_MS end,
 	}
 	package.loaded["gestures.engine.sticky_modifiers"] = {
@@ -170,7 +170,7 @@ helpers.describe("Karabiner catalogue actions: keystroke family", function()
 
 	helpers.it("the two F17 window actions reach the driver's own hotkeys", function()
 		-- These do NOT emit their behaviour directly: they press F17, which
-		-- platform/remap/watchers.lua binds to the native window cyclers. That
+		-- keyboard/engine/runtime/watchers.lua binds to the native window cyclers. That
 		-- indirection is deliberate — the native cycler is layout-independent where
 		-- cmd+` is not — so the keystroke is the contract, and a "simplification"
 		-- that replaced it with cmd+` would silently break AZERTY users.
@@ -385,7 +385,7 @@ helpers.describe("Karabiner catalogue actions: sticky modifiers", function()
 
 	helpers.it("refuses to arm when the remap layer cannot supply a delay", function()
 		local Actions, seen = fresh_registry()
-		package.loaded["platform.remap"] = { get_sticky_timeout = function() return nil end }
+		package.loaded["keyboard.engine"] = { get_sticky_timeout = function() return nil end }
 		Actions.execute_single("sticky_cmd")
 		helpers.assert_eq(#seen.sticky, 0,
 			"no fallback delay: the value is the user's, and inventing one here would override "

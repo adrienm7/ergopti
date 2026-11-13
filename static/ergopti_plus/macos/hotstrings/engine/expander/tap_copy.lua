@@ -31,7 +31,7 @@
 local M = {}
 
 -- The keys whose hold is the modifier they are, by Quartz keycode, named by
--- their tap-hold id (platform/remap/data/tap_hold_keys.json). Only these reach
+-- their tap-hold id (keyboard/data/tap_hold_keys.json). Only these reach
 -- the flagsChanged tap as themselves.
 M.KEY_IDS = {
 	[56] = "left_shift", [60] = "right_shift",

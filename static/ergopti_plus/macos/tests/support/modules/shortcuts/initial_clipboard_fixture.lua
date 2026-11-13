@@ -21,7 +21,7 @@ function M.run(kind, options, callback)
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
-		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "infra.capsword_output", "hotstrings.engine.expander.utils",
+		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "keyboard.engine.capsword_output", "hotstrings.engine.expander.utils",
 	}, function()
 		with_sender(function(f)
 			Destination.install()

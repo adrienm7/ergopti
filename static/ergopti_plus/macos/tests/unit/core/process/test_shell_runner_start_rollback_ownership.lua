@@ -7,7 +7,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.logger",
 	"core.process.adapters.shell_runner",
 	"core.process.adapters.owned_program_runner",
-	"platform.remap.lease_helper",
+	"keyboard.adapters.karabiner.lease_helper",
 }
 
 local function with_runner(callback)
@@ -15,7 +15,7 @@ local function with_runner(callback)
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/fixture/bundled/ErgoptiPlus" end }
+			package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return "/fixture/bundled/ErgoptiPlus" end }
 			local native = {
 				tasks = {},
 				start_mode = "true",

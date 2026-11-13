@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"description": "Cross-driver chord-notation corpus. Both the shared Lua core (_shared/keyboard/engine/chord/init.lua) and the AutoHotkey twin (windows/infra/chord.ahk) are run against these vectors by their own suites, which is what makes 'one notation' a fact rather than an intention. A chord that parses differently on two drivers means the same config file produces two different bindings.",
+	"description": "Cross-driver chord-notation corpus. Both the shared Lua core (_shared/keyboard/engine/chord/init.lua) and the AutoHotkey twin (windows/keyboard/engine/layers/chord.ahk) are run against these vectors by their own suites, which is what makes 'one notation' a fact rather than an intention. A chord that parses differently on two drivers means the same config file produces two different bindings.",
 	"canonicalize": [
 		{ "id": "already_canonical", "input": "Ctrl+Shift+S", "expect": "Ctrl+Shift+S" },
 		{ "id": "lowercase_input", "input": "ctrl+shift+s", "expect": "Ctrl+Shift+S" },

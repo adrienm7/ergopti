@@ -836,7 +836,7 @@ local INPUT_MODULES = {
 	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
 	"core.text.engine.unicode_case", "unicode_case.init", "core.text.engine.unicode_case.data", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.logger.engine.shim", "hotstrings.engine.catalogue.personal_files", "core.fs.engine.native_path", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
-	"platform.remap", "modules.shortcuts.keyboard_shortcuts",
+	"keyboard.engine", "modules.shortcuts.keyboard_shortcuts",
 }
 for _, name in ipairs(RESET_MODULES) do INPUT_MODULES[#INPUT_MODULES + 1] = name end
 
@@ -887,7 +887,7 @@ local function with_input_fixture(callback)
 				})
 				return owner
 			end }
-			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
+			package.loaded["keyboard.engine"] = { get_sticky_timeout = function() return 2000 end }
 		end)
 		local clock = require("core.events.clock")
 		clock.reset()

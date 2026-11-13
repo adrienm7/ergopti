@@ -393,7 +393,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"source": "static/ergopti_plus/macos/keyboard/adapters/karabiner/lease_controller.lua",
 			"template": "Karabiner lease %s read %s %.2f s after its deadline; task output was not being read meanwhile (an open menu or a modal window).",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f read PONG 1 124.50 s after its deadline; task output was not being read meanwhile (an open menu or a modal window).",
 			"expect": {
@@ -403,7 +403,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"source": "static/ergopti_plus/macos/keyboard/adapters/karabiner/lease_controller.lua",
 			"template": "Karabiner lease %s waited %.2f s for %s; the deadline timer fired %.2f s late.",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [karabiner.lease] Karabiner lease 1d5543ecc55c40d5b82c8d50b1bea79f waited 124.50 s for PONG 1; the deadline timer fired 0.00 s late.",
 			"expect": {

@@ -157,7 +157,7 @@ helpers.describe("onboarding empty configuration folder", function()
 					return attributes
 				end
 				package.loaded["core.text.engine.toml.codec"].decode = require("core.text.engine.toml_codec").decode
-				package.loaded["platform.remap"].recommended_key_report = function(path)
+				package.loaded["keyboard.engine"].recommended_key_report = function(path)
 					remap_paths[#remap_paths + 1] = path
 					return { enabled = false, keys = {} }
 				end
@@ -248,7 +248,7 @@ helpers.describe("onboarding retained configuration source", function()
 					if phase == "decode_refusal" then error("PRIVATE_NATIVE_DETAIL") end
 					return {}
 				end
-				package.loaded["platform.remap"].recommended_key_report = function()
+				package.loaded["keyboard.engine"].recommended_key_report = function()
 					if phase == "remap" or phase == "remap_refusal" or phase == "remap_throw" then replace_source() end
 					if phase == "remap_refusal" then return nil, "PRIVATE_NATIVE_DETAIL" end
 					if phase == "remap_throw" then error("PRIVATE_NATIVE_DETAIL") end

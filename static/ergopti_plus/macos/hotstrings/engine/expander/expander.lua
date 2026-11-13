@@ -38,7 +38,7 @@ local SyntheticInput = require("platform.input.synthetic_input")
 local TooltipRenderer  = require("core.ui.adapters.tooltip_renderer")
 local TerminatorReplay = require("hotstrings.engine.expander.terminator_replay")
 local Terminators      = require("hotstrings.engine.expander.terminators")
-local CapsWordOutput   = require("infra.capsword_output")
+local CapsWordOutput   = require("keyboard.engine.capsword_output")
 local ConfigKeys = require("settings.engine.keys")
 local LOG        = "keymap.expander"
 

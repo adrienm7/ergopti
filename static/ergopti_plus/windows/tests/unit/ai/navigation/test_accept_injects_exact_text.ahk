@@ -4,7 +4,7 @@
 ; MODULE: An accepted prediction is typed once, exactly, at SendLevel 0
 ; DESCRIPTION:
 ; Regression for llm-accept-injects-exact-text. The physical Tab accepts a
-; shown prediction from its SC00F hotkey (platform/remap/tab.ahk), which
+; shown prediction from its SC00F hotkey (keyboard/engine/keys/tab.ahk), which
 ; ErgoptiPlus.ahk includes under #InputLevel 2, so the accepting thread runs at
 ; SendLevel 2. TextSend's atomic outputs called their send primitive directly:
 ; the prediction left at the caller's SendLevel 2 instead of

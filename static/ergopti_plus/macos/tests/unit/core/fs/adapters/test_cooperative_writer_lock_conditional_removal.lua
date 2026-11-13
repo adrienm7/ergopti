@@ -277,7 +277,7 @@ helpers.describe("navigation-layer cohort native release debt", function()
 	for _, phase in ipairs({ "prepare", "restore", "no_effect_restore" }) do
 		helpers.it("settles the exact release before cohort " .. phase .. " acknowledgement", function()
 			with_fixture(function(fixture)
-				helpers.with_stub_scope({ "platform.remap.nav_layer", "platform.remap.scope_layer" }, function()
+				helpers.with_stub_scope({ "keyboard.engine.layers.nav_layer", "keyboard.engine.layers.scope_layer" }, function()
 					local path = os.tmpname():gsub("\\", "/")
 					local file = assert(io.open(path, "w")); assert(file:write("owned preset")); assert(file:close())
 					local blocked, unlinks = true, 0
@@ -298,14 +298,14 @@ helpers.describe("navigation-layer cohort native release debt", function()
 					end
 					local call_ok, detail = xpcall(function()
 						local preset = require("layouts.engine.layers.preset")
-						package.loaded["platform.remap.nav_layer"] = {
+						package.loaded["keyboard.engine.layers.nav_layer"] = {
 							import_recommended = function() return {
 								status = preset.IMPORTED, path = path, content = "owned preset",
 							} end,
 							undo_import = preset.undo, reconcile_wheel = function() end,
 						}
-						package.loaded["platform.remap.scope_layer"] = nil
-						local cohort = require("platform.remap.scope_layer")
+						package.loaded["keyboard.engine.layers.scope_layer"] = nil
+						local cohort = require("keyboard.engine.layers.scope_layer")
 						local imported = cohort.import()
 						helpers.assert_eq(imported.prepare(), true); imported.settled(true)
 						local inverse = assert(cohort.inverse(imported.receipt()))

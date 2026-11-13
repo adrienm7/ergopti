@@ -12,7 +12,7 @@
 ---    says that macOS asks for an administrator password and may then ask to
 ---    allow the driver in System Settings.
 --- 2. The Remap Bridge Acts: the launcher role, the helper and the driver
----    activation belong to platform/remap/runtime_install.lua through the
+---    activation belong to keyboard/adapters/runtime/install.lua through the
 ---    facade; this module only asks, reports and reloads.
 --- 3. Deferred Report: the outcome arrives from a task callback, where no
 ---    modal dialog may run, so the report goes through the timer scheduler.
@@ -30,8 +30,8 @@ local i18n   = require("core.i18n.engine.i18n")
 
 local LOG = "owned_runtime_install"
 
--- The reasons of platform/remap/runtime_install.lua this module acts on.
-local REASON = require("platform.remap.runtime_install").REASON
+-- The reasons of keyboard/adapters/runtime/install.lua this module acts on.
+local REASON = require("keyboard.adapters.runtime.install").REASON
 
 
 

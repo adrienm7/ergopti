@@ -79,7 +79,7 @@ end
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
 	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system",
-		"core.ui.ui.builder", "ui.layer_editor", "platform.remap.nav_layer", "platform.input.keycodes",
+		"core.ui.ui.builder", "ui.layer_editor", "keyboard.engine.layers.nav_layer", "platform.input.keycodes",
 		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
 		"core.ui.engine.notifications" }
 	local saved = {}
@@ -173,7 +173,7 @@ local function with_editor(scenario)
 				if world.on_regenerate then world.on_regenerate() end
 				return world.regenerate_accepts
 			end,
-			TAP_HOLD_KEYS = Json.decode(read_file(helpers.driver_root() .. "/platform/remap/data/tap_hold_keys.json")),
+			TAP_HOLD_KEYS = Json.decode(read_file(helpers.driver_root() .. "/keyboard/data/tap_hold_keys.json")),
 			get_hold_action = function(id)
 				local slot = defaults.hs_tap_hold[id]
 				return slot and slot.hold or "none"
@@ -385,7 +385,7 @@ helpers.describe("macOS navigation layer editor host", function()
 			helpers.assert_eq(world.wheel_reconciles, 1, "the wheel's owner reads the saved file (layer-wheel-slots)")
 			helpers.assert_eq(world.views[1].deleted, true, "a saved and applied layer closes the window")
 
-			local NavLayer = helpers.load_with_stubs("platform.remap.nav_layer")
+			local NavLayer = helpers.load_with_stubs("keyboard.engine.layers.nav_layer")
 			local layer = NavLayer.load({ shared_root = helpers.shared(), config_dir = world.dir })
 			local rule = NavLayer.build_rule(layer.bindings, layer.registry, "ansi")
 			local sent = {}

@@ -560,7 +560,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local target = scratch_dir()
 			local result = import_left_alt(state, target)
 			local text = read_text(target .. "/layers.toml")
-			local ok, layer = pcall(require("platform.remap.nav_layer").load,
+			local ok, layer = pcall(require("keyboard.engine.layers.nav_layer").load,
 				{ shared_root = require("core.fs.engine.paths").shared_root(), config_dir = target })
 			remove_folder(target)
 			helpers.assert_eq(result, { done = true, restarted = true })

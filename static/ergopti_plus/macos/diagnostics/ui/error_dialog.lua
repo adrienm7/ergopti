@@ -547,7 +547,7 @@ local decide_error
 --- @return boolean
 local function lease_is_running()
 	local ok, phase = pcall(function()
-		return (require("platform.remap.lease_controller").status())
+		return (require("keyboard.adapters.karabiner.lease_controller").status())
 	end)
 	return ok and phase == "active"
 end

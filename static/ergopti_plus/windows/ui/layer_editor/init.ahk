@@ -8,7 +8,7 @@
 ; "ready" with the user's layers.toml, the legends of the layout the user types
 ; with and the key whose hold enters the layer, and saves what it sends: the
 ; text must load without an error on every OS
-; (platform/remap/layers_loader.ahk), is published atomically, and the driver
+; (keyboard/engine/layers/loader.ahk), is published atomically, and the driver
 ; reloads so NavLayer_Init registers the edited layer. The macOS and Linux
 ; hosts implement the same contract through _shared/layouts/engine/layers/editor.lua.
 ;

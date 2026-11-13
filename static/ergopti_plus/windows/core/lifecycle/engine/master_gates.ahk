@@ -130,7 +130,7 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		_MG_SupersedeForEmulatedLayout(FeaturesTarget)
 
 		; Shortcuts master. The key combinations are not among its switches: their
-		; slots hold actions, read from config.toml by infra/key_combinations.ahk,
+		; slots hold actions, read from config.toml by keyboard/engine/keys/combinations.ahk,
 		; and only their own gate (KeyCombinations) governs them, as on macOS.
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
 				_MG_DisableFeatureNode(FeaturesTarget["shortcuts"], "shortcuts")

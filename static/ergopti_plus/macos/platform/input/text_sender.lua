@@ -32,7 +32,7 @@ local Clipboard = require("clipboard.adapters.clipboard")
 local ClipboardBorrowers = require("clipboard.borrowers")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
-local CapsWordOutput = require("infra.capsword_output")
+local CapsWordOutput = require("keyboard.engine.capsword_output")
 
 local LOG = "platform.input.text_sender"
 

@@ -42,7 +42,7 @@ package.loaded["platform.input.keycodes"] = {
 	F19_LAYER_NAV_EXITED   = 80,
 }
 
-local Generator = helpers.load_with_stubs("platform.remap.generator")
+local Generator = helpers.load_with_stubs("keyboard.engine.runtime.generator")
 local TEST_LEASE_TOKEN = "0123456789abcdef0123456789abcdef"
 local raw_build_karabiner_json = Generator.build_karabiner_json
 local raw_build_paused_script_control_rules = Generator.build_paused_script_control_rules

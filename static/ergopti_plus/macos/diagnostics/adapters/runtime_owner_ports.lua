@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Owned Runtime Ports (Hammerspoon)
 --- DESCRIPTION:
---- The real Mac side of platform/remap/runtime_owner.lua: file existence,
+--- The real Mac side of keyboard/adapters/runtime/owner.lua: file existence,
 --- read-only launchd and system extension queries, the detection and the consented
 --- closing of another Karabiner, the pinned artifact, the physical capture and a
 --- timer. Only required when the user opts in to the owned runtime.
@@ -12,7 +12,7 @@
 --- 1. Read-Only Observation: launchd is only ever asked to print a job and the
 ---    system extension tool only to list; the privileged jobs belong to the
 ---    installer.
---- 2. One Place Acts On Stock Karabiner: coexistence is adapters/karabiner_coexistence.lua,
+--- 2. One Place Acts On Stock Karabiner: coexistence is keyboard/adapters/karabiner/coexistence.lua,
 ---    which runs Karabiner's own quit steps and only when the owner holds the
 ---    user's consent.
 --- 3. No Process Here: the Console is owned by the launcher's installed-source
@@ -22,13 +22,13 @@
 ---    named refusal, never a guessed driver version.
 --- 5. One Command Runner: bounded commands reuse the field check's runner.
 --- 6. Fetched Into Ergopti's Folder: the first admission downloads and verifies
----    the pinned artifact through platform/remap/runtime_artifact_fetch.lua,
+---    the pinned artifact through keyboard/adapters/runtime/artifact_fetch.lua,
 ---    then every later one reuses that copy without the network.
 --- 7. Driver-Only Update On Request: the pinned VirtualHIDDevice replaces an
----    incompatible one only through platform/remap/runtime_vhid_update.lua,
+---    incompatible one only through keyboard/adapters/runtime/vhid_update.lua,
 ---    which the Tap-Holds row starts after the user's confirmation.
 --- 8. First Install On Request: the runtime is installed only through
----    platform/remap/runtime_install.lua, which the « not installed » row
+---    keyboard/adapters/runtime/install.lua, which the « not installed » row
 ---    starts after the user's confirmation.
 --- ==============================================================================
 
@@ -61,7 +61,7 @@ end
 local function pinned_artifact()
 	local manifest = load_manifest()
 	if not manifest then return nil, "the runtime manifest could not be read" end
-	return require("platform.remap.runtime_manifest").pinned(manifest)
+	return require("keyboard.adapters.runtime.manifest").pinned(manifest)
 end
 
 --- How many pin fields of the shipped runtime manifest are still unpinned.
@@ -69,7 +69,7 @@ end
 function M.unpinned_count()
 	local manifest = load_manifest()
 	if not manifest then return nil end
-	return #require("platform.remap.runtime_manifest").unpinned(manifest)
+	return #require("keyboard.adapters.runtime.manifest").unpinned(manifest)
 end
 
 --- The VirtualHIDDevice package version the shipped manifest pins.
@@ -77,7 +77,7 @@ end
 function M.virtual_hid_version()
 	local manifest = load_manifest()
 	if not manifest then return nil end
-	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
+	return require("keyboard.adapters.runtime.manifest").virtual_hid_version(manifest)
 end
 
 --- The driver extension version the pinned package installs, the one the
@@ -86,7 +86,7 @@ end
 function M.virtual_hid_extension_version()
 	local manifest = load_manifest()
 	if not manifest then return nil end
-	return require("platform.remap.runtime_manifest").virtual_hid_extension_version(manifest)
+	return require("keyboard.adapters.runtime.manifest").virtual_hid_extension_version(manifest)
 end
 
 --- Whether the pinned artifact was downloaded and verified: its receipt names
@@ -98,7 +98,7 @@ function M.artifact_receipt_state()
 	if type(runtime) ~= "table" or type(runtime.version) ~= "string" or type(runtime.sha256) ~= "string" then
 		return "unpinned"
 	end
-	local receipt = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME
+	local receipt = FileSystem.expand_path(require("keyboard.adapters.karabiner.ke_paths").OWNED.ARTIFACT_HOME
 		.. "/" .. runtime.version .. "/receipt")
 	if FileSystem.exists(receipt) ~= true then return "absent" end
 	return FileSystem.read(receipt) == runtime.sha256 .. "\n" and ("fetched:" .. runtime.version) or "mismatch"
@@ -114,10 +114,10 @@ function M.fetch_artifact(callback)
 	if not manifest then
 		return callback(false, "artifact_unpinned", "the runtime manifest could not be read")
 	end
-	fetcher = fetcher or require("platform.remap.runtime_artifact_fetch").new({
+	fetcher = fetcher or require("keyboard.adapters.runtime.artifact_fetch").new({
 		exec = FieldCheckPorts.exec,
 		network_command = function(curl_args)
-			return require("platform.remap.network_download").command("REMAP-RUNTIME", curl_args)
+			return require("keyboard.engine.network_download").command("REMAP-RUNTIME", curl_args)
 		end,
 		exists = FileSystem.exists,
 		read = FileSystem.read,
@@ -130,10 +130,10 @@ end
 local vhid_updater
 
 --- Replaces the installed VirtualHIDDevice with the pinned driver, once the
---- user confirmed it (platform/remap/runtime_vhid_update.lua).
+--- user confirmed it (keyboard/adapters/runtime/vhid_update.lua).
 --- @param callback function fn(ok, reason|nil, explanation|nil).
 function M.update_virtual_hid(callback)
-	local Update = require("platform.remap.runtime_vhid_update")
+	local Update = require("keyboard.adapters.runtime.vhid_update")
 	local manifest = load_manifest()
 	if not manifest then
 		return callback(false, Update.REASON.UNPINNED, "the runtime manifest could not be read")
@@ -148,19 +148,19 @@ end
 local runtime_installer
 
 --- The one owned runtime installer, created on first use.
---- @return table installer { install, repair } (platform/remap/runtime_install.lua).
+--- @return table installer { install, repair } (keyboard/adapters/runtime/install.lua).
 local function installer()
-	runtime_installer = runtime_installer or require("platform.remap.runtime_install").new({
-		launcher = function() return require("platform.remap.lease_helper").resolve() end,
+	runtime_installer = runtime_installer or require("keyboard.adapters.runtime.install").new({
+		launcher = function() return require("keyboard.adapters.karabiner.lease_helper").resolve() end,
 		exec = FieldCheckPorts.exec,
 		exists = FileSystem.exists,
 		fetch_driver = function(fetched)
-			local Update = require("platform.remap.runtime_vhid_update")
+			local Update = require("keyboard.adapters.runtime.vhid_update")
 			local manifest = load_manifest()
 			if not manifest then return fetched(false, Update.REASON.UNPINNED, "the runtime manifest could not be read") end
 			vhid_updater = vhid_updater or Update.new({ exec = FieldCheckPorts.exec, expand = FileSystem.expand_path,
 				network_command = function(curl_args)
-					return require("platform.remap.network_download").command("VIRTUAL-HID", curl_args)
+					return require("keyboard.engine.network_download").command("VIRTUAL-HID", curl_args)
 				end })
 			vhid_updater.fetch(manifest.virtual_hid_device, fetched)
 		end,
@@ -169,7 +169,7 @@ local function installer()
 end
 
 --- Installs the owned runtime through the signed launcher's install role, once
---- the user confirmed it (platform/remap/runtime_install.lua).
+--- the user confirmed it (keyboard/adapters/runtime/install.lua).
 --- @param callback function fn(ok, reason|nil, detail|nil).
 function M.install_runtime(callback)
 	installer().install(callback)
@@ -185,7 +185,7 @@ end
 --- The persisted record that Ergopti closed the user's own Karabiner.
 --- @return table marker { get, set, clear }.
 function M.marker()
-	local path = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.CLOSED_OTHER_MARKER)
+	local path = FileSystem.expand_path(require("keyboard.adapters.karabiner.ke_paths").OWNED.CLOSED_OTHER_MARKER)
 	return {
 		get = function() return FileSystem.exists(path) == true end,
 		set = function()
@@ -211,7 +211,7 @@ end
 function M.block_notice(notify)
 	assert(type(notify) == "function", "Missing notifier")
 	local shown = false
-	local blocks = require("platform.remap.runtime_owner").USER_BLOCKS
+	local blocks = require("keyboard.adapters.runtime.owner").USER_BLOCKS
 	return function(state, reason)
 		if shown or (state ~= "unavailable" and state ~= "failed") or not blocks[reason] then return end
 		shown = true
@@ -221,10 +221,10 @@ end
 
 local approval_watch
 
---- The one approval watch of this launch (platform/remap/runtime_approval_watch.lua).
+--- The one approval watch of this launch (keyboard/adapters/runtime/approval_watch.lua).
 --- @return table watch
 local function approval()
-	approval_watch = approval_watch or require("platform.remap.runtime_approval_watch").new({
+	approval_watch = approval_watch or require("keyboard.adapters.runtime.approval_watch").new({
 		listing = function(callback)
 			FieldCheckPorts.exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(code, output)
 				callback(code == 0 and output or nil)
@@ -257,20 +257,20 @@ function M.automatic_observer(notify)
 	return function(state, reason)
 		if field_run then return notice(state, reason) end
 		if state == "unavailable" and not offered
-			and require("platform.remap").OWNED_INSTALL_REASONS[reason] == true then
+			and require("keyboard.engine").OWNED_INSTALL_REASONS[reason] == true then
 			offered = true
 			local committed = require("core.timing.engine.deferred_work").after(0, function()
-				require("ai.ui.owned_runtime_install").open(require("platform.remap"))
+				require("ai.ui.owned_runtime_install").open(require("keyboard.engine"))
 			end, "owned_runtime_install.offer")
 			if committed == true then return end
-		elseif state == "unavailable" and reason == require("platform.remap.runtime_vhid").REASON_NOT_ACTIVE then
+		elseif state == "unavailable" and reason == require("keyboard.adapters.runtime.vhid").REASON_NOT_ACTIVE then
 			approval().start()
 		end
 		notice(state, reason)
 	end
 end
 
---- The ports of the activation rule (platform/remap/runtime_activation.lua).
+--- The ports of the activation rule (keyboard/adapters/runtime/activation.lua).
 --- @param owner table The bound runtime owner module.
 --- @param close_other_instances function fn() -> boolean, the user's consent.
 --- @param reload function fn() asking for a driver reload.
@@ -279,7 +279,7 @@ function M.activation(owner, close_other_instances, reload)
 	return {
 		owner = owner,
 		close_other_instances = close_other_instances,
-		restore = require("adapters.karabiner_coexistence").new().restore,
+		restore = require("keyboard.adapters.karabiner.coexistence").new().restore,
 		marker = M.marker(),
 		reload = reload,
 	}
@@ -289,7 +289,7 @@ end
 --- @return table ports For platform.remap.runtime_owner.init.
 function M.new()
 	local exec = FieldCheckPorts.exec
-	local Coexistence = require("adapters.karabiner_coexistence").new()
+	local Coexistence = require("keyboard.adapters.karabiner.coexistence").new()
 	return {
 		fs = {
 			exists = FileSystem.exists,
@@ -313,7 +313,7 @@ function M.new()
 		},
 		coexistence = {
 			detect = Coexistence.detect,
-			close = require("platform.remap.runtime_activation").remembering_close(Coexistence.close, M.marker(),
+			close = require("keyboard.adapters.runtime.activation").remembering_close(Coexistence.close, M.marker(),
 				announce_closed),
 		},
 		artifact = {

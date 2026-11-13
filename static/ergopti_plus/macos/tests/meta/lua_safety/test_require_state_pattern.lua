@@ -36,7 +36,7 @@ local KNOWN_VIOLATIONS = {
 
 	-- Additional for max coverage: personal, karabiner, llm api, gestures actions must not bypass pause
 	["hotstrings.engine.dynamic.personal_info"] = true,
-	["platform.remap"] = true,
+	["keyboard.engine"] = true,
 	["ai.engine.api.common"] = true,
 	["gestures.engine.actions"] = true,
 

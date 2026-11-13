@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["platform.remap.lease_controller"] = {
+package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 	status = function() return "active", { phase = "active" } end,
 	stop = function() return true end,
 }

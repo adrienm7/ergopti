@@ -739,7 +739,7 @@ local function text_case()
 end
 
 -- The keymap's Backspace tracker uses the same composed-text boundaries.
-local cursor_steps = require("infra.composed_text").count
+local cursor_steps = require("keyboard.engine.composed_text").count
 M._cursor_steps = cursor_steps
 
 --- Asynchronous text-transform engine.

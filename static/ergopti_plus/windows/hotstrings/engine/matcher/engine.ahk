@@ -74,14 +74,14 @@ global _HotstringRegistrar := 0
 global _SendHook := 0
 
 ; Whether AltGr needs the synthetic Up injection in HotstringHandler is the
-; AltGr family (infra/altgr_family.ahk) — auto-detected via a reverse VK→SC
+; AltGr family (keyboard/engine/keys/altgr_family.ahk) — auto-detected via a reverse VK→SC
 ; probe (KS_ProbeAltGrLayout), with a manual TOML override
 ; (ScriptInformation["AltGrIsKanaRemap"]) that always wins — decided at boot
 ; and then following the foreground window's layout.
 ; Keeping the resolved bool in a global lets the hot path skip a Map lookup
 ; and a truthy test on every hotstring firing.
 ; The `global _ALTGR_KANA_FIXUP := False` initializer deliberately does NOT live
-; here: a parse-time #HotIf (platform/remap/altgr.ahk) reads it in FIRST
+; here: a parse-time #HotIf (keyboard/engine/keys/altgr.ahk) reads it in FIRST
 ; position, and this file's include position is far below the first message pump,
 ; so the global would still be unset when that #HotIf is evaluated. It is seeded in
 ; the pre-pump block of ErgoptiPlus.ahk instead (single source, §5.2);
@@ -156,7 +156,7 @@ _ReadKanaTomlOverride() {
 }
 
 ; Decide the boot AltGr family from one layout read and one probe, and keep the
-; record of what decided it in _ALTGR_LAYOUT_PROBE (infra/altgr_family.ahk).
+; record of what decided it in _ALTGR_LAYOUT_PROBE (keyboard/engine/keys/altgr_family.ahk).
 ; The AltGrDetect log line, the magic-key scan, the layout poll's baseline and
 ; the Kana AltGr's send name all read that record: each used to read the layout
 ; again, so a layout switch during the seconds of boot left the family decided

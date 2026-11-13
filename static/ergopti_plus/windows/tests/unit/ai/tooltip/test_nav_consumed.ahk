@@ -213,7 +213,7 @@ _LTNC_ShiftTabIsTheFootersChord() {
 			}
 			LeftOnly := _LTNC_HeldFn(Map("LShift", true))
 			RightOnly := _LTNC_HeldFn(Map("RShift", true))
-			; The Tab key's own owners keep the press (platform/remap/tab.ahk).
+			; The Tab key's own owners keep the press (keyboard/engine/keys/tab.ahk).
 			LayerEnabled := true
 			AssertFalse(LLM_Menu_NavShiftTabIsOwned("LShift", LeftOnly),
 				"'" . Mods . "': the navigation layer keeps Tab while it is held")

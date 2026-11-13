@@ -552,7 +552,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 // layer used. The file was written on an Apple ISO board, so it resolves through
 // macos_iso.
 {
-	const layer = JSON.parse(read('macos/platform/remap/data/legacy_layer_keys.json'));
+	const layer = JSON.parse(read('macos/keyboard/data/legacy_layer_keys.json'));
 	const names = new Set();
 	for (const m of layer.manipulators) {
 		names.add(m.from.key_code);

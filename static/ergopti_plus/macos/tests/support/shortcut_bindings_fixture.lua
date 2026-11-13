@@ -33,11 +33,11 @@ function M.prefer_all(bindings)
 	-- The layer's wheel owner is derived from layers.toml: a layer that binds
 	-- a wheel direction selects it, through with_bindings' double of the layer
 	-- data, or one installed here instead of the host's configuration folder.
-	local layer = package.loaded["platform.remap.nav_layer"]
+	local layer = package.loaded["keyboard.engine.layers.nav_layer"]
 	if type(layer) == "table" and type(layer.select_wheel) == "function" then
 		layer.select_wheel(WHEEL_UP_VOLUME)
 	else
-		package.loaded["platform.remap.nav_layer"] = { load = function()
+		package.loaded["keyboard.engine.layers.nav_layer"] = { load = function()
 			return { bindings = {}, registry = {}, wheel = { vertical = { [1] = WHEEL_UP_VOLUME }, horizontal = {} } }
 		end }
 	end
@@ -210,7 +210,7 @@ function M.with_bindings(callback)
 	return helpers.with_stub_scope({
 		"modules.shortcuts.bindings",
 		"platform.input.hotkey_registrar",
-		"platform.remap.nav_layer",
+		"keyboard.engine.layers.nav_layer",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
@@ -240,7 +240,7 @@ function M.with_bindings(callback)
 		}
 		-- The layer's wheel bindings, which a case may fill (ctx.wheel), instead
 		-- of the configuration folder's layers.toml.
-		package.loaded["platform.remap.nav_layer"] = {
+		package.loaded["keyboard.engine.layers.nav_layer"] = {
 			load = function() return { bindings = {}, registry = {}, wheel = ctx.wheel } end,
 			select_wheel = function(slot) ctx.wheel.vertical[1] = slot end,
 		}

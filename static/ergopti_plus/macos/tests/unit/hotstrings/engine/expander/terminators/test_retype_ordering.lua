@@ -15,7 +15,7 @@ local OWNED = {
 	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "platform.input.synthetic_input",
 	"platform.input.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
-	"hs", "infra.capsword_output", "core.timing.engine.deferred_work",
+	"hs", "keyboard.engine.capsword_output", "core.timing.engine.deferred_work",
 	"hotstrings.engine.matcher.engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
 	"core.text.engine.utils", "core.timing.engine.timings", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",

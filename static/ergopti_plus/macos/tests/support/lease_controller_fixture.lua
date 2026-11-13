@@ -18,13 +18,13 @@ local UUIDS = {
 --- @return table ctx Controls and observations for spawned tasks and timers.
 local function load_controller(options)
 	options = options or {}
-	package.loaded["platform.remap.lease_controller"] = nil
+	package.loaded["keyboard.adapters.karabiner.lease_controller"] = nil
 	package.loaded["core.process.adapters.task_output_turn"] = nil
 	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["platform.remap.ke_paths"] = nil
-	package.loaded["platform.remap.lease_helper"] = nil
+	package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+	package.loaded["keyboard.adapters.karabiner.lease_helper"] = nil
 	local log_events = { debug = {}, info = {}, warn = {}, error = {}, evidence = {} }
 	local logger = helpers.make_logger_stub()
 	for _, level in ipairs({ "debug", "info", "warn", "error", "evidence" }) do
@@ -199,17 +199,17 @@ local function load_controller(options)
 		end,
 	}
 
-	package.loaded["platform.remap.ke_paths"] = {
+	package.loaded["keyboard.adapters.karabiner.ke_paths"] = {
 		CLI = "/test/karabiner_cli",
 	}
-	package.loaded["platform.remap.lease_helper"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 		resolve = function()
 			ctx.helper_resolve_calls = ctx.helper_resolve_calls + 1
 			return ctx.helper_path, ctx.helper_error, ctx.helper_environment
 		end,
 	}
 
-	local controller = helpers.load_with_stubs("platform.remap.lease_controller", {
+	local controller = helpers.load_with_stubs("keyboard.adapters.karabiner.lease_controller", {
 		host = {
 			uuid = function()
 				ctx.uuid_index = ctx.uuid_index + 1
@@ -346,8 +346,8 @@ end
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.lease_controller", "core.process.adapters.task_output_turn", "core.process.adapters.shell_runner", "core.fs.adapters.storage",
-		"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
+		"keyboard.adapters.karabiner.lease_controller", "core.process.adapters.task_output_turn", "core.process.adapters.shell_runner", "core.fs.adapters.storage",
+		"core.events.timer_scheduler", "keyboard.adapters.karabiner.ke_paths", "keyboard.adapters.karabiner.lease_helper",
 		"core.logger.engine.logger",
 	}, function()
 		return callback(load_controller)

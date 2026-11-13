@@ -113,7 +113,7 @@ local OWNED_MODULES = {
 	"modules.llm.remote_response_classifier",
 	"native_path",
 	"number_policy",
-	"platform.remap.lease_helper",
+	"keyboard.adapters.karabiner.lease_helper",
 	"core.fs.engine.sqlite.literal",
 	FIXTURE,
 	"text_utils",

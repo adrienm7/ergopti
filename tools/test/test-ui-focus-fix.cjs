@@ -940,7 +940,7 @@ for (const rel of [
 	'static/ergopti_plus/macos/ui/onboarding/init.lua',
 	'static/ergopti_plus/macos/diagnostics/ui/healthcheck/core.lua',
 	'static/ergopti_plus/macos/diagnostics/engine/reports/crash_reporter.lua',
-	'static/ergopti_plus/macos/platform/remap/onboarding.lua'
+	'static/ergopti_plus/macos/keyboard/engine/runtime/onboarding.lua'
 ]) {
 	record(
 		`Global Audit: No raw hs.dialog.blockAlert in ${rel}`,

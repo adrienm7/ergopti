@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Helper = require("platform.remap.lease_helper")
+local Helper = require("keyboard.adapters.karabiner.lease_helper")
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.logger")
 local hs = hs

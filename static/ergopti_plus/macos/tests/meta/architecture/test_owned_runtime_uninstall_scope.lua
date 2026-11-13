@@ -19,8 +19,8 @@ local IsolationSyntax = require("tests.support.karabiner_isolation.syntax")
 
 helpers.describe("owned runtime uninstall: scope", function()
 	helpers.it("names the very files and jobs the Lua owner and the installer declare", function()
-		package.loaded["platform.remap.ke_paths"] = nil
-		local owned = require("platform.remap.ke_paths").OWNED
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+		local owned = require("keyboard.adapters.karabiner.ke_paths").OWNED
 		local launcher = helpers.driver_root() .. "/launcher/Sources/ErgoptiPlus/"
 		-- The worker names its job labels through the generated identifier enum;
 		-- compare the values that enum holds with the Lua owner's declaration.

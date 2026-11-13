@@ -315,23 +315,23 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.karabiner_coexistence",
+		id       = "keyboard.adapters.karabiner.coexistence",
 		contract = { "new" },
 		-- Built by the owned runtime ports and the field check; acts only when consented.
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_switcher_sampler",
+		id       = "keyboard.adapters.system_switcher_sampler",
 		contract = { "new" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_switcher_input",
+		id       = "keyboard.adapters.system_switcher_input",
 		contract = { "new" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_switcher_runtime",
+		id       = "keyboard.adapters.system_switcher_runtime",
 		contract = { "descriptor" },
 		wired    = true,
 	},

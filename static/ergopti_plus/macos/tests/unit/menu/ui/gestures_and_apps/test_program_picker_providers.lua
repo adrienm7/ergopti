@@ -87,7 +87,7 @@ local function with_provider(kind, options, body)
 			return button, options.scalar or value
 		end
 		package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
-		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			if options.reject_schedule then return false end

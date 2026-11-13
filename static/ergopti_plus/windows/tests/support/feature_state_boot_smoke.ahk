@@ -53,7 +53,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\settings\engine\preferences\feature_state.ahk
 ; A second ordinary include must not reset the already published data owner.
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
-#Include ..\..\infra\tap_keys.ahk
+#Include ..\..\keyboard\engine\tap_keys.ahk
 #Include ..\..\settings\engine\io.ahk
 #Include ..\..\settings\engine\scope\scope.ahk
 ; Real journal dependencies; no test-only native issuer or READY metadata.

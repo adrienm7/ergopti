@@ -23,7 +23,7 @@ local function with_editor(module_name, callback)
 			"core.i18n.engine.i18n",
 			"hs",
 			"tests.stubs.hs",
-			"core.ui.adapters.webview_result", "core.fs.engine.dir", "core.text.engine.utils", "platform.remap.lease_helper",
+			"core.ui.adapters.webview_result", "core.fs.engine.dir", "core.text.engine.utils", "keyboard.adapters.karabiner.lease_helper",
 			"program_providers", "core.process.adapters.task_environment", "core.lifecycle.engine.compat.utf8", "diagnostics.engine.runtime_log",
 			"adapters.apple_shortcuts", "core.process.adapters.shell_runner", "adapters.apple_shortcuts_native",
 			"core.timing.engine.deferred_work", "core.lifecycle.engine.launcher_environment", "core.events.timer_scheduler", "app_dirs",

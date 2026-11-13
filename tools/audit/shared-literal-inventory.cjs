@@ -149,7 +149,7 @@ function kindOf(name, value) {
 function domainOf(treeRel) {
 	const target = Rules.mapPath(treeRel).split('/').slice(1);
 	// A feature root, or core/<domain> and platform/<domain>.
-	return ['core', 'platform', 'tray', 'ai'].includes(target[0]) && target.length > 2
+	return ['core', 'platform', 'tray', 'ai', 'keyboard'].includes(target[0]) && target.length > 2
 		? `${target[0]}/${target[1]}`
 		: target[0];
 }

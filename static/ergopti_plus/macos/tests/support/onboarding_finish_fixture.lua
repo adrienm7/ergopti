@@ -29,9 +29,9 @@ local MODULE_NAMES = {
 	"core.text.engine.toml.writer",
 	"settings.engine.paths",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
-	"platform.remap",
-	"platform.remap.defaults",
-	"platform.remap.nav_layer",
+	"keyboard.engine",
+	"keyboard.engine.runtime.defaults",
+	"keyboard.engine.layers.nav_layer",
 	"settings.ui.menu.paths",
 	"ui.onboarding",
 	"onboarding.engine.publication",
@@ -142,10 +142,10 @@ function M.with_finish(opts, scenario)
 	}
 	local function noop() end
 	-- The shipped presets and the layer rule, read before the path doubles.
-	local RealDefaults = require("platform.remap.defaults")
-	local RealNavLayer = require("platform.remap.nav_layer")
+	local RealDefaults = require("keyboard.engine.runtime.defaults")
+	local RealNavLayer = require("keyboard.engine.layers.nav_layer")
 	state.layer_imports, state.layer_undos = {}, {}
-	package.loaded["platform.remap.defaults"] = RealDefaults
+	package.loaded["keyboard.engine.runtime.defaults"] = RealDefaults
 	local nav_stub = setmetatable({
 		import_recommended = function(options)
 			state.layer_imports[#state.layer_imports + 1] = options.config_dir
@@ -164,7 +164,7 @@ function M.with_finish(opts, scenario)
 		if failed then nav_stub.undo_owned(failed) end
 		return imported, err
 	end
-	package.loaded["platform.remap.nav_layer"] = nav_stub
+	package.loaded["keyboard.engine.layers.nav_layer"] = nav_stub
 	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["core.fs.engine.paths"] = { shared = opts.canonical_files and helpers.shared
 		or function() return "/virtual/shared" end }
@@ -217,7 +217,7 @@ function M.with_finish(opts, scenario)
 	-- Either way the request names the backup the owner takes first.
 	local remap = opts.remap or {}
 	state.imports, state.saves, state.import_callbacks, state.backups, state.reports = {}, {}, {}, {}, {}
-	package.loaded["platform.remap"] = {
+	package.loaded["keyboard.engine"] = {
 		-- An initialized bridge may have stopped: only a running one takes
 		-- a transaction.
 		is_initialized = function() return remap.initialized == true end,

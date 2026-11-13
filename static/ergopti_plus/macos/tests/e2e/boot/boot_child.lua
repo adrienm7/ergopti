@@ -223,7 +223,7 @@ end
 -- the boot's activation and started a second worker (layout-name-forms).
 local lease_ok, lease_phase = pcall(function()
 	-- A fresh install stops at the wizard, before the controller exists.
-	local controller = require("platform.remap.lease_controller")
+	local controller = require("keyboard.adapters.karabiner.lease_controller")
 	if controller.is_initialized() ~= true then return "uninitialized" end
 	return (controller.status())
 end)

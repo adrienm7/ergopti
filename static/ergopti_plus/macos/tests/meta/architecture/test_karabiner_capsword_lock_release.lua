@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Karabiner CapsWord Pointer Watcher Meta Test
 --- DESCRIPTION:
---- Static source guard for platform/remap/watchers.lua.
+--- Static source guard for keyboard/engine/runtime/watchers.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- The CapsWord pointer watcher used to spawn karabiner_cli --get-variable
@@ -50,7 +50,7 @@ helpers.describe("karabiner/watchers.lua: CapsWord pointer watcher spawns no rea
 		local src = strip_comments(read_source("local function parse_layout_name"))
 		helpers.assert_true(src:find("get-variable", 1, true) == nil,
 			"karabiner_cli has no --get-variable option; the watcher must not spawn it")
-		helpers.assert_true(src:find("platform.remap.ke_paths", 1, true) == nil,
+		helpers.assert_true(src:find("keyboard.adapters.karabiner.ke_paths", 1, true) == nil,
 			"the pointer watcher needs no Karabiner executable path")
 		helpers.assert_true(src:find("KeVariables.supersede_capsword_activation", 1, true) ~= nil,
 			"a pointer event still cancels the CapsWord the driver knows about")

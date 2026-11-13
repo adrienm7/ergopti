@@ -97,7 +97,7 @@ const lua = [
 fs.writeFileSync(shared('shortcuts', 'engine', 'slot_roles_data.lua'), lua, 'utf8');
 
 // The Windows projection: one driver's table, its keys with the chord name and
-// label each one prints, read by windows/infra/slot_roles.ahk.
+// label each one prints, read by windows/keyboard/engine/slot_roles.ahk.
 const chords = JSON.parse(
 	fs.readFileSync(shared('shortcuts', 'data', 'actions', 'modifier_chords.json'), 'utf8')
 );

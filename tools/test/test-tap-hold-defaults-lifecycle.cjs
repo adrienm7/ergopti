@@ -72,7 +72,7 @@ const LOADERS = [
 			'passes the shared defaults to the tap-hold manager at boot; the loader merges the user file on top per key'
 	},
 	{
-		file: 'macos/platform/remap/defaults.lua',
+		file: 'macos/keyboard/engine/runtime/defaults.lua',
 		needle: 'tap_hold/data/defaults.toml',
 		lifecycle: 'reads [hs_*] in its module body at require time, unconditionally'
 	}

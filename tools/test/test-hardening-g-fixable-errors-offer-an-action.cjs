@@ -77,7 +77,7 @@ const NOTICE_FLOORS = { macos: 100, windows: 30, linux: 8 };
 // Offers today's fixes added: each file must keep a fixable-state dialog or
 // notice that offers an action.
 const REQUIRED_OFFERS = [
-	{ file: 'macos/ui/legacy_rules_cleanup.lua', why: 'legacy Karabiner rules (9ed15dcf9)' },
+	{ file: 'macos/keyboard/ui/legacy_rules_cleanup.lua', why: 'legacy Karabiner rules (9ed15dcf9)' },
 	{
 		file: 'macos/ai/engine/ollama/local_model_offer.lua',
 		why: 'a local model that is not pulled (2ffedefc1)'

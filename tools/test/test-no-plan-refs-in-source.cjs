@@ -36,16 +36,16 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // not a refactor-plan reference. Verified by reading each site.
 const PHASE_ALLOWLIST = new Set([
 	'static/ergopti_plus/linux/hotstrings/engine/injector.lua',
-	'static/ergopti_plus/macos/platform/remap/ke_lifecycle.lua',
+	'static/ergopti_plus/macos/keyboard/adapters/karabiner/ke_lifecycle.lua',
 	'static/ergopti_plus/macos/ai/engine/api/mlx_discovery.lua',
 	'static/ergopti_plus/macos/tests/unit/modules/keystats/lifecycle/test_keystats_privacy.lua',
 	'static/ergopti_plus/windows/modules/keystats/keystats_webview.ahk',
 	'static/ergopti_plus/windows/ai/engine/ollama/deps_checker.ahk',
-	'static/ergopti_plus/windows/platform/remap/backspace.ahk',
-	'static/ergopti_plus/windows/platform/remap/delete.ahk',
-	'static/ergopti_plus/windows/platform/remap/enter.ahk',
-	'static/ergopti_plus/windows/platform/remap/escape.ahk',
-	'static/ergopti_plus/windows/platform/remap/space.ahk',
+	'static/ergopti_plus/windows/keyboard/engine/keys/backspace.ahk',
+	'static/ergopti_plus/windows/keyboard/engine/keys/delete.ahk',
+	'static/ergopti_plus/windows/keyboard/engine/keys/enter.ahk',
+	'static/ergopti_plus/windows/keyboard/engine/keys/escape.ahk',
+	'static/ergopti_plus/windows/keyboard/engine/keys/space.ahk',
 	'tools/compact_data_sql.py'
 ]);
 

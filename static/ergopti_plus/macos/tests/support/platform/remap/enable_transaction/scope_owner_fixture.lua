@@ -22,7 +22,7 @@ local LAYERS = CONFIG_DIR .. "/layers.toml"
 --- @return table remap, table calls, table disk
 local function scoped_remap(fixture)
 	local remap, calls = fixture.load_enabled_remap()
-	local Config = package.loaded["platform.remap.config"]
+	local Config = package.loaded["keyboard.engine.runtime.config"]
 	local disk = { files = { ["/remap/tap_hold.toml"] = SOURCE }, expected = {}, regenerations = 0 }
 	local neutral_combo = { tap = "none", hold = "none", combo = "none" }
 	Config.build_default_state = function()

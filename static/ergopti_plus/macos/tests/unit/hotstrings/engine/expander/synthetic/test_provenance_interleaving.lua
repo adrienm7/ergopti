@@ -221,8 +221,8 @@ end
 helpers.describe("keymap synthetic provenance: explicit transactions under interleaving", function()
 	helpers.it("refuses one-shot activation without the configured timeout (one-shot-config)", function()
 		local fixture = load_fixture()
-		helpers.with_stub_scope({ "platform.remap" }, function()
-			package.loaded["platform.remap"] = { get_sticky_timeout = function() return nil end }
+		helpers.with_stub_scope({ "keyboard.engine" }, function()
+			package.loaded["keyboard.engine"] = { get_sticky_timeout = function() return nil end }
 			helpers.assert_true(fixture.keymap.start())
 			local ok, reason = pcall(fixture.keymap.arm_one_shot_shift)
 			helpers.assert_true(not ok and tostring(reason):find("invalid one%-shot Shift timeout") ~= nil)
@@ -234,8 +234,8 @@ helpers.describe("keymap synthetic provenance: explicit transactions under inter
 	end)
 	helpers.it("releases the physical key after a refused one-shot handoff (one-shot-rollback)", function()
 		local fixture = load_fixture()
-		helpers.with_stub_scope({ "platform.remap" }, function()
-			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
+		helpers.with_stub_scope({ "keyboard.engine" }, function()
+			package.loaded["keyboard.engine"] = { get_sticky_timeout = function() return 2000 end }
 			helpers.assert_true(fixture.keymap.start())
 			helpers.assert_true(fixture.handle(physical_event(fixture, "", KEYCODE_F20, { ctrl = true, alt = true })))
 			local leave_callback = fixture.synthetic.leave_callback
@@ -251,8 +251,8 @@ helpers.describe("keymap synthetic provenance: explicit transactions under inter
 	end)
 	helpers.it("routes a tagged Karabiner tap through the real one-shot serializer (one-shot-integration)", function()
 		local fixture = load_fixture()
-		helpers.with_stub_scope({ "platform.remap" }, function()
-			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
+		helpers.with_stub_scope({ "keyboard.engine" }, function()
+			package.loaded["keyboard.engine"] = { get_sticky_timeout = function() return 2000 end }
 			helpers.assert_true(fixture.keymap.start())
 			helpers.assert_true(fixture.handle(physical_event(fixture, "", KEYCODE_F20, { ctrl = true, alt = true })))
 			local consumed, events = fixture.handle(physical_event(fixture, " ", 49))

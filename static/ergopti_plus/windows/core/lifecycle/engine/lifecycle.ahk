@@ -33,7 +33,7 @@ ActivateEdit(*) {
 ; test_suspend_prefix_drain_covers_all_combos.ahk DERIVES the real prefix set
 ; from driver source and fails when a newly introduced combination is missing.
 ; LAlt left the list with "SC038 & SC03A::": the key combinations are plain
-; hotkeys of their second key now (platform/remap/key_combination_keys.ahk).
+; hotkeys of their second key now (keyboard/engine/keys/combination_keys.ahk).
 ;   SC138 = AltGr/Kana   SC01D = LCtrl   SC02A = LShift   SC11D = RCtrl
 global SUSPEND_CUSTOM_COMBO_PREFIX_KEYS := ["SC138", "SC01D", "SC02A", "SC11D"]
 global _SuspendPending := false
@@ -111,7 +111,7 @@ global LIFECYCLE_USER_QUIT_POLL_MS := 250
 ; suspend hotkey cannot silently reintroduce the « AltGr/LAlt bloqué »
 ; regression by bypassing the wait. Safe no-op when entering from suspended
 ; state or when no prefix key is physically held. SC138 is waited for on every
-; layout: the always-eligible ~SC138 anchor in platform/remap/altgr.ahk arms it
+; layout: the always-eligible ~SC138 anchor in keyboard/engine/keys/altgr.ahk arms it
 ; on every AltGr press, not only on Kana-style layouts.
 _SuspendPrefixesAreClear() {
 		if A_IsSuspended

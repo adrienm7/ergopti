@@ -149,7 +149,7 @@ through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
   switch left on becomes its action, off becomes `none`, a slot the user set wins
   (the same known edge as macOS: a cleared slot beats a switch left on).
 - Windows reads `slot_roles.json` through `windows/_generated/slot_roles.ahk` and
-  `windows/infra/slot_roles.ahk`, and replays `neutral_slots.json`. Its slot-only
+  `windows/keyboard/engine/slot_roles.ahk`, and replays `neutral_slots.json`. Its slot-only
   keys (`extra_keys`) are `quote`, `capslock` and `sc029`.
 - Three switch behaviours a slot did not have were kept, not lost. A slot's letter
   binds the key that types it under the emulation (`KeyboardSlotLayoutScan`), so

@@ -19,8 +19,8 @@ local function with_compiled_navigation(body, controls, files)
 	local saved, original_hs = {}, _G.hs
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local outcome = table.pack(xpcall(function()
-		return helpers.with_stub_scope({ "platform.remap.nav_layer" }, function()
-			package.loaded["platform.remap.nav_layer"] = nil
+		return helpers.with_stub_scope({ "keyboard.engine.layers.nav_layer" }, function()
+			package.loaded["keyboard.engine.layers.nav_layer"] = nil
 			return require("tests.support.remap_transaction_fixture")(function(fixture)
 				local remap, observations = fixture.load_enabled_remap({ real_user_config_path = path, initially_enabled = false })
 				local paths = package.loaded["settings.engine.paths"]
@@ -33,8 +33,8 @@ local function with_compiled_navigation(body, controls, files)
 				assert(accepted == true and terminal == true, "original Navigation compilation must actually publish: " .. tostring(reason))
 				local inventory = assert(remap.capture_configured_navigation_inventory(), "original compiled Navigation receipt is required")
 				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
-				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
-					["platform.remap.nav_layer"] = true, ["settings.engine.paths"] = true,
+				local retained = { ["keyboard.engine"] = true, ["keyboard.engine.runtime.config"] = true,
+					["keyboard.engine.layers.nav_layer"] = true, ["settings.engine.paths"] = true,
 					["core.fs.adapters.file_system"] = true, ["core.text.engine.json"] = true, ["core.text.engine.toml_codec"] = true,
 					["core.text.engine.toml_codec.writer"] = true, ["layouts.engine.layers.layers"] = true }
 				-- The scope's own recorded native/port identities stay unchanged.
@@ -127,7 +127,7 @@ local function run_fixture(body, source)
 	}
 	-- A layers.toml that binds no wheel direction: the layer's wheel owner
 	-- stays unbound, as for a user who never saved one.
-	package.loaded["platform.remap.nav_layer"] = {
+	package.loaded["keyboard.engine.layers.nav_layer"] = {
 		load = function() return { bindings = {}, registry = {}, wheel = { vertical = {}, horizontal = {} } } end,
 	}
 	local function handle(kind)

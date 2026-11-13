@@ -258,7 +258,7 @@ local layer_wheel_slots = { vertical = {}, horizontal = {} }
 --- @return boolean bound True when the layer binds at least one wheel direction.
 local function load_layer_wheel()
 	-- Required here, not at load: the layer data reads the configuration folder.
-	local ok, layer = xpcall(function() return require("platform.remap.nav_layer").load() end,
+	local ok, layer = xpcall(function() return require("keyboard.engine.layers.nav_layer").load() end,
 		debug.traceback)
 	if not ok or type(layer) ~= "table" or type(layer.wheel) ~= "table" then
 		-- NavLayer.load() raises only on a broken shipped registry or vocabulary,

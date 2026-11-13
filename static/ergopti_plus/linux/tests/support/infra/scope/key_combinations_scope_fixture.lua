@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local Codec = require("core.text.engine.toml_codec")
 
-local Scope = require("infra.key_combinations_scope")
+local Scope = require("keyboard.engine.keys.combinations_scope")
 
 local path, backup = "/controlled/config.toml", "/controlled/combination.bak"
 
@@ -64,7 +64,7 @@ local function with_owner(body, managed, public_chords)
 			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
-			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
+			package.loaded["keyboard.engine.layers.nav_layer"]={load=function() return {} end}
 			package.loaded["core.fs.adapters.file_system"]=files
 			package.loaded["settings.engine.paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
@@ -125,8 +125,8 @@ local function with_menu(body, public_chords)
 	with_owner(function(s)
 		package.loaded["core.fs.adapters.file_system"]=s.files
 		package.loaded["settings.engine.paths"]={config=function() return path end}
-		package.loaded["infra.key_combinations_scope"]=nil
-		package.loaded["ui.menu.key_combinations"]=nil
+		package.loaded["keyboard.engine.keys.combinations_scope"]=nil
+		package.loaded["keyboard.ui.menu_key_combinations"]=nil
 		local renderer=require("menu.engine.manifest_menu")
 		local i18n=require("core.i18n.engine.i18n")
 		local Holds=require("tap_hold.engine.hold_options")
@@ -155,7 +155,7 @@ local function with_menu(body, public_chords)
 			open_picker=function(label,current,binding,confirm,items)
 				s.picker={label=label,current=current,binding=binding,confirm=confirm,items=items};return true
 			end}
-		s.build=function() return require("ui.menu.key_combinations").build(ctx,ui) end
+		s.build=function() return require("keyboard.ui.menu_key_combinations").build(ctx,ui) end
 		s.translate=i18n.get;s.context=ctx
 		body(s)
 	end,false,public_chords)

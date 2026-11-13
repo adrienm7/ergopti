@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.logger.engine.logger", "diagnostics.adapters.field_check_ports", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
-	"platform.remap.lease_helper", "ai.engine.api.network_env",
+	"keyboard.adapters.karabiner.lease_helper", "ai.engine.api.network_env",
 }
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
 
@@ -123,7 +123,7 @@ local function run(script, launcher)
 				}
 			end,
 		}
-		package.loaded["platform.remap.lease_helper"] = {
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 			resolve = function() return launcher, nil, { LAUNCHER = "1" } end,
 		}
 		package.loaded["ai.engine.api.network_env"] = {
@@ -178,7 +178,7 @@ helpers.describe("network check relay probe port", function()
 	local function probe(script, launcher, present)
 		local calls, answers = {}, {}
 		helpers.with_stub_scope({ "core.logger.engine.logger", "diagnostics.adapters.field_check_ports", "core.process.adapters.shell_runner",
-			"core.events.timer_scheduler", "platform.remap.lease_helper", "core.fs.adapters.file_system" }, function()
+			"core.events.timer_scheduler", "keyboard.adapters.karabiner.lease_helper", "core.fs.adapters.file_system" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { stopped = false } end, cancel = function() return true end,
@@ -190,7 +190,7 @@ helpers.describe("network check relay probe port", function()
 						start = function() callback(script(args)); return true end, terminate = function() end }
 				end,
 			}
-			package.loaded["platform.remap.lease_helper"] = {
+			package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 				resolve = function() return launcher, nil, {} end,
 			}
 			local FileSystem = require("core.fs.adapters.file_system")

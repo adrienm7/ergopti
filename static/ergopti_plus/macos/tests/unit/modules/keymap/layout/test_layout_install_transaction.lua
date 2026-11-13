@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local original_resolver = package.loaded["platform.remap.lease_helper"]
-package.loaded["platform.remap.lease_helper"] = {
+local original_resolver = package.loaded["keyboard.adapters.karabiner.lease_helper"]
+package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 	resolve = function() return os.getenv("ERGOPTI_LAUNCHER_EXECUTABLE") end,
 }
 local original_getenv = os.getenv
@@ -210,8 +210,8 @@ helpers.describe("layout_install: transactional replacement", function()
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("refuses an unverified launcher before user installation", function()
-		local previous = package.loaded["platform.remap.lease_helper"]
-		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil, "identity mismatch" end }
+		local previous = package.loaded["keyboard.adapters.karabiner.lease_helper"]
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return nil, "identity mismatch" end }
 		local ok, err = xpcall(function()
 			local prompts = 0
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
@@ -222,7 +222,7 @@ helpers.describe("layout_install: transactional replacement", function()
 			helpers.assert_eq(reason, "launcher_unavailable")
 			helpers.assert_eq(prompts, 0, "an unverified executable must never start installation")
 		end, debug.traceback)
-		package.loaded["platform.remap.lease_helper"] = previous
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = previous
 		if not ok then error(err, 0) end
 	end)
 
@@ -546,4 +546,4 @@ helpers.describe("layout_install: missing optional directories", function()
 	end)
 end)
 
-package.loaded["platform.remap.lease_helper"] = original_resolver
+package.loaded["keyboard.adapters.karabiner.lease_helper"] = original_resolver

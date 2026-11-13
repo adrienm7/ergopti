@@ -84,7 +84,7 @@ package.path = root .. "/static/ergopti_plus/macos/?.lua;"
     .. root .. "/static/ergopti_plus/_shared/?.lua;"
     .. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 local helpers = require("tests.helpers")
-local Config = helpers.load_with_stubs("platform.remap.config")
+local Config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 local candidate = Config.build_default_state({ { id = "tab" } }, {})
 candidate.enabled = nil
 candidate.tap_hold_timeout_ms = 1234

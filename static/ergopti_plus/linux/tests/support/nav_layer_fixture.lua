@@ -20,7 +20,7 @@ function M.recommended()
 		toml_decode = Toml.decode, read_file = Files.read_shipped })
 	local preset = Layers.load(Files.read_shipped(shared .. "/layouts/data/layers.recommended.toml"), "linux", ctx, Toml.decode)
 	assert(preset.ok, "the recommended navigation fixture must load without errors")
-	return require("platform.remap.nav_layer").compile(preset.layers.nav, ctx.registry)
+	return require("keyboard.engine.layers.nav_layer").compile(preset.layers.nav, ctx.registry)
 end
 
 --- Imports the shared preset into an isolated manager configuration folder.

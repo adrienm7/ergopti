@@ -16,8 +16,8 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "core.logger.engine.logger", "diagnostics.engine.field_check.field_check", "diagnostics.engine.field_check.checks", "platform.remap.ke_paths",
-	"platform.remap.lease_memory_snapshot" }
+local MODULES = { "core.logger.engine.logger", "diagnostics.engine.field_check.field_check", "diagnostics.engine.field_check.checks", "keyboard.adapters.karabiner.ke_paths",
+	"keyboard.adapters.karabiner.lease_memory_snapshot" }
 
 --- Builds scripted ports; `world` records every command.
 --- @param overrides table|nil Fields replacing the defaults.
@@ -58,8 +58,8 @@ local function run_on(runtime, name, ports)
 	local steps, result
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["platform.remap.ke_paths"] = nil
-		if runtime then require("platform.remap.ke_paths").select_runtime(runtime) end
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+		if runtime then require("keyboard.adapters.karabiner.ke_paths").select_runtime(runtime) end
 		package.loaded["diagnostics.engine.field_check.field_check"] = nil
 		package.loaded["diagnostics.engine.field_check.checks"] = nil
 		local Engine = require("diagnostics.engine.field_check.field_check")

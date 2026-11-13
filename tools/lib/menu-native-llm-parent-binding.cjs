@@ -964,7 +964,7 @@ function closedSiblingRendererBindings(unit) {
 		'MagicKeySourceRows.menu_rows(Source.resolver(), { manifest = ManifestMenu',
 		'PersonalFileMenu.build({ manifest = ManifestMenu',
 		'PersonalFileMenu.apply_category_admission(rendered, { manifest = ManifestMenu',
-		'require("ui.menu.key_combinations").build(ctx, { manifest = ManifestMenu'
+		'require("keyboard.ui.menu_key_combinations").build(ctx, { manifest = ManifestMenu'
 	];
 	const optionPorts = new Set();
 	for (const pattern of optionCalls) {

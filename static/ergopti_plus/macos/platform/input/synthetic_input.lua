@@ -4435,7 +4435,7 @@ end
 local _system_switcher = nil
 function M.init_system_switcher(config, policy)
 	if _system_switcher ~= nil then return false end
-	local Input = require("adapters.system_switcher_input")
+	local Input = require("keyboard.adapters.system_switcher_input")
 	local candidate = Input.new(config, {
 		acquire = function(_, admission)
 			if not M.admission_open() or admission() ~= true then return nil end

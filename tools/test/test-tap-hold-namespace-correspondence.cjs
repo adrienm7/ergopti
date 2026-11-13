@@ -37,7 +37,7 @@
  *
  * IT DOES NOT ENFORCE THE UNIFICATION. Renaming ids in this file changes what
  * three loaders read at boot, and the "same action, two spellings" cases have to
- * be resolved in macos/platform/remap/data/actions.json first. This gate makes
+ * be resolved in macos/keyboard/data/actions.json first. This gate makes
  * that change checkable; it does not make it.
  * ==============================================================================
  */

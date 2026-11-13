@@ -56,7 +56,7 @@ function M.new(root, production, options)
 	modules["ai.adapters.managed_ollama_pull"] = { handles = function()
 		state.pull_calls = state.pull_calls + 1; return options.pull_supported
 	end }
-	modules["platform.remap.lease_helper"], modules["core.text.engine.json"] = {}, {}
+	modules["keyboard.adapters.karabiner.lease_helper"], modules["core.text.engine.json"] = {}, {}
 	modules["core.process.adapters.shell_runner"] = { spawn = function(executable, arguments, done, streaming, environment, private, owned)
 		local task = { executable = executable, arguments = arguments, streaming = streaming,
 			environment = environment, private = private, owned = owned, attempted = false,

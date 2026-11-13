@@ -65,7 +65,7 @@ end
 helpers.describe("the macOS Tap-Holds menu is inert and has no engine controls", function()
 	helpers.it("build and prime perform zero lease, shell, GUI, start or stop actions", function()
 		local calls = { status = 0, start = 0, stop = 0, execute = 0, gui = 0 }
-		package.loaded["platform.remap.lease_controller"] = {
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 			status = function()
 				calls.status = calls.status + 1
 				return "idle", { phase = "idle" }

@@ -51,7 +51,7 @@ local OWNERS = {
 	"gestures.engine.engine",
 	"gestures.engine.actions",
 	"platform.input.key_state",
-	"infra.script_chord_catalogue",
+	"keyboard.engine.layers.script_chord_catalogue",
 	"keyboard.engine.layers.script_chords",
 	"ai.engine.api.mlx",
 	"ai.engine.api.ollama",
@@ -59,7 +59,7 @@ local OWNERS = {
 	"ai.engine.local_servers.warmup_controller",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"core.text.engine.toml.reader",
 	"core.text.engine.toml_codec.reader",
@@ -88,7 +88,7 @@ local OWNERS = {
 	"hotstrings.engine.priority",
 	"hotstrings.engine.languages",
 	"hotstrings.engine.catalogue.personal_files",
-	"infra.capsword_output",
+	"keyboard.engine.capsword_output",
 	"core.timing.engine.deferred_work",
 	"core.fs.engine.dir",
 	"hotstrings.engine.matcher.engine",
@@ -126,7 +126,7 @@ local OWNERS = {
 	"ai.engine.settings.profiles",
 	"ai.engine.prediction.prompt_builder",
 	"ai.engine.api.streaming_handler",
-	"platform.remap.lease_helper",
+	"keyboard.adapters.karabiner.lease_helper",
 	"core.text.engine.utils_core",
 }
 
@@ -296,7 +296,7 @@ function M.with_runtime(callback)
 			package.loaded["gestures.engine.engine"] = {}
 			package.loaded["gestures.engine.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
 			package.loaded["platform.input.key_state"] = {}
-			package.loaded["infra.script_chord_catalogue"] = {}
+			package.loaded["keyboard.engine.layers.script_chord_catalogue"] = {}
 			local function yes() return true end
 			for _, name in ipairs({ "ai.engine.api.mlx", "ai.engine.api.ollama", "ai.engine.api.remote", "ai.engine.local_servers.warmup_controller" }) do
 				-- retry_deferred_warmup: a restored remote API entry replays the deferred warmup.
@@ -311,7 +311,7 @@ function M.with_runtime(callback)
 			remote.get_active_entry_id = function() return remote_active end
 			remote.prewarm_active_entry_decrypt = function() return true end
 			for _, name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do package.loaded[name] = { is_running = function() return false end } end
-			package.loaded["platform.remap.onboarding"] = { stop = yes }
+			package.loaded["keyboard.engine.runtime.onboarding"] = { stop = yes }
 			package.loaded["core.ui.ui.tooltip"] = { hide_forced = yes }
 			local control_path = driver .. "/modules/shortcuts/script_control.lua"
 			control = assert(loadfile(control_path))()

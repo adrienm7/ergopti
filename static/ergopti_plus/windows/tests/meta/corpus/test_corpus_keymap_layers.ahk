@@ -4,7 +4,7 @@
 ; MODULE: Layer-File Corpus Consumer (AHK)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/keymap_layers/vectors.json through the AHK
-; loader (platform/remap/layers_loader.ahk), which reads the shipped registry
+; loader (keyboard/engine/layers/loader.ahk), which reads the shipped registry
 ; and vocabulary at run time exactly as the driver will. The JS gate and the
 ; macOS and Linux suites replay the same vectors through their own loaders, so
 ; a file accepted, rejected or resolved differently on Windows fails here.

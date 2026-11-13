@@ -9,7 +9,7 @@
 --- manifest's tap-hold rows (`[tap_holds]` enabled, sticky_timeout_ms,
 --- lone_modifier_tap_max_ms and the whole `[mod_combos]`, the maintainer
 --- decision of 2026-11-11). This module translates both to and from the
---- Karabiner model macos/platform/remap/config.lua merges (the shape
+--- Karabiner model macos/keyboard/engine/runtime/config.lua merges (the shape
 --- config_karabiner.toml had: `[tap_holds]`, `[tap_holds.config.<macOS key>]`,
 --- `[mod_combos.config.<macOS combination>]`), and converts an old
 --- config_karabiner.toml once.
@@ -52,7 +52,7 @@ M.COMBOS = LEAF.MOD_COMBOS
 M.KARABINER = "karabiner"
 M.META = "_meta"
 
--- The model's own section names (macos/platform/remap/config.lua).
+-- The model's own section names (macos/keyboard/engine/runtime/config.lua).
 local MODEL_TAP_HOLDS = LEAF.TAP_HOLDS
 local MODEL_COMBOS = LEAF.MOD_COMBOS
 local MODEL_KARABINER = "karabiner"

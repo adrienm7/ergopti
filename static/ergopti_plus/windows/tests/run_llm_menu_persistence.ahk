@@ -27,7 +27,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../core/i18n/engine/locale.ahk
 #Include ../_generated/locale_table.ahk
 #Include ../core/i18n/engine/i18n.ahk
-#Include ../infra/chord.ahk
+#Include ../keyboard/engine/layers/chord.ahk
 #Include ../platform/input/hotkey_registrar.ahk
 #Include ../infra/hotpath_profiler.ahk
 #Include ../core/text/engine/toml/helpers.ahk
@@ -39,7 +39,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../settings/engine/migration/transition.ahk
 #Include ../settings/engine/migration/transition_runtime.ahk
 #Include ../settings/engine/migration/migrate.ahk
-#Include ../infra/magic_editor.ahk
+#Include ../keyboard/engine/magic_editor.ahk
 #Include ../settings/engine/io.ahk
 #Include ../settings/engine/scope/scope.ahk
 #Include ../infra/metrics/metrics_filters.ahk

@@ -34,9 +34,9 @@
 local Identifiers = require("core.text.engine.identifiers")
 local Logger = require("core.logger.engine.logger")
 local MainThreadHold = require("core.lifecycle.engine.main_thread_hold")
-local KePaths = require("platform.remap.ke_paths")
-local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
-local RuntimeVhid = require("platform.remap.runtime_vhid")
+local KePaths = require("keyboard.adapters.karabiner.ke_paths")
+local LeaseMemorySnapshot = require("keyboard.adapters.karabiner.lease_memory_snapshot")
+local RuntimeVhid = require("keyboard.adapters.runtime.vhid")
 local TextUtils = require("core.text.engine.utils_core")
 
 local M = {}
@@ -86,7 +86,7 @@ local function count_lines(text)
 	return count
 end
 
---- The driver as the owned runtime owner reads it (platform/remap/runtime_vhid.lua):
+--- The driver as the owned runtime owner reads it (keyboard/adapters/runtime/vhid.lua):
 --- the active copy when macOS still lists an older one, and the owner's verdict
 --- against the driver version the runtime manifest pins. One parser, so the field
 --- report shows exactly what the owner's admission would decide.

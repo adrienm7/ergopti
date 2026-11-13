@@ -135,7 +135,7 @@ TomlConfigForeignOwnershipRegistry() {
 ; [tap_hold.catalog] in _shared/tap_hold/data/defaults.toml. Spelled here because
 ; this loader runs before that catalogue is read, and in a function because a
 ; key can be asked about before this file's include position has run;
-; tests/unit/platform/remap/key_combinations/test_key_combinations.ahk holds the two together.
+; tests/unit/keyboard/engine/key_combinations/test_key_combinations.ahk holds the two together.
 TomlConfigKeyCombinationKeys() {
 	static Keys := "escape|tab|caps_lock|left_shift|left_ctrl|win|left_alt|space|alt_gr|right_ctrl|right_shift|enter|backspace|delete"
 	return Keys
@@ -339,7 +339,7 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	if (SectionPath == ConfigKey.SHORTCUTS_KEYBOARD && KeyboardSlotIsCatalogued(Key))
 		return "ConfigIO"
 	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
-	; « first_then_second » (infra/key_combinations.ahk); the manifest declares
+	; « first_then_second » (keyboard/engine/keys/combinations.ahk); the manifest declares
 	; only the pairs that ship a recommendation. The reader refuses a pair of
 	; one key twice.
 	if ((SectionPath == "shortcuts.key_combination_taps" || SectionPath == "shortcuts.key_combination_holds")

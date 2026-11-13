@@ -240,7 +240,7 @@ global CapsWordEnabled := False
 global _HardwareCapsLockOn := KS_CapsLockToggleState()
 global LayerEnabled := False
 global TapHold := Map("keys", Map())
-; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
+; Read in FIRST position by a parse-time #HotIf (keyboard/engine/keys/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
 ; hotstrings/engine/matcher/engine.ahk's include position. Seed it here so that #HotIf
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
@@ -394,7 +394,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 
 ; The chord notation the HotkeyRegistrar adapter parses with, loaded before the
 ; adapters block that consumes it
-#Include infra/chord.ahk
+#Include keyboard/engine/layers/chord.ahk
 
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
@@ -411,7 +411,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/process/adapters/uia_worker.ahk
 #Include platform/input/hotkey_registrar.ahk
 #Include ../_shared/shortcuts/data/magic_editor.ahk
-#Include infra/magic_editor.ahk
+#Include keyboard/engine/magic_editor.ahk
 #Include platform/system/notifier.ahk
 #Include tray/adapters/menu.ahk
 #Include platform/input/text_sender.ahk
@@ -466,12 +466,12 @@ if UIASW_IsWorkerInvocation()
 #Include core/network/engine/external_url_policy.ahk
 #Include core/text/engine/utils.ahk
 #Include hotstrings/engine/text_case.ahk
-#Include infra/wrap_pair.ahk
+#Include keyboard/engine/wrap_pair.ahk
 #Include infra/open_target.ahk
 #Include settings/engine/send_input_parameter.ahk
 #Include core/ui/ui/spotlight/init.ahk
-#Include infra/nav_layer_helpers.ahk
-#Include infra/capsword_state.ahk
+#Include keyboard/engine/layers/nav_layer_helpers.ahk
+#Include keyboard/engine/capsword_state.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
@@ -480,7 +480,7 @@ if UIASW_IsWorkerInvocation()
 #Include hotstrings/engine/matcher/engine.ahk
 ; The AltGr family HotstringEngineInit decides at boot and that then follows
 ; the foreground window's layout (AltGrFamilyStartFollowing, below).
-#Include infra/altgr_family.ahk
+#Include keyboard/engine/keys/altgr_family.ahk
 #Include hotstrings/engine/matcher/engine_main.ahk
 #Include hotstrings/engine/matcher/buffer_effects.ahk
 #Include hotstrings/engine/matcher/live_toggle.ahk
@@ -512,11 +512,11 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; Tap-hold timing constants must load HERE, before core/lifecycle/engine/boot.ahk calls
 ; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
 ; assignments at its #Include position, so if constants.ahk loaded at its natural
-; spot (inside platform/remap.ahk, far below boot.ahk) the sentinel 0s would
+; spot (inside keyboard/adapters/remap.ahk, far below boot.ahk) the sentinel 0s would
 ; re-clobber the registry values boot.ahk just loaded. #Include dedupes by path,
-; so the later include via platform/remap.ahk is a no-op (mirrors the
+; so the later include via keyboard/adapters/remap.ahk is a no-op (mirrors the
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
-#Include platform/remap/constants.ahk
+#Include keyboard/engine/keys/constants.ahk
 #Include core/lifecycle/engine/master_gates.ahk
 #Include menu/engine/manifest_descriptions.ahk
 #Include menu/engine/dispatcher.ahk
@@ -539,7 +539,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include core/process/adapters/program_providers.ahk
 #Include infra/program_actions.ahk
 #Include infra/user_actions.ahk
-#Include infra/sticky_modifiers.ahk
+#Include keyboard/engine/layers/sticky_modifiers.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include core/i18n/engine/locale.ahk
@@ -553,7 +553,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include hotstrings/ui/hotstrings_config_window/init.ahk
 #Include hotstrings/ui/hotstrings_config_window/webview.ahk
 #Include ai/ui/prompt_editor/init.ahk
-#Include infra/wrap_symbols_config.ahk
+#Include keyboard/engine/wrap_symbols_config.ahk
 #Include _generated/window_titles.ahk
 #Include core/ui/engine/native_dialogs.ahk
 #Include core/ui/engine/style.ahk
@@ -1280,9 +1280,9 @@ _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; offer optional configuration maintenance after ready
 _InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
-#Include infra/tap_keys.ahk
+#Include keyboard/engine/tap_keys.ahk
 TapKeysReadConfig(_IniCache)
-#Include infra/key_combinations.ahk
+#Include keyboard/engine/keys/combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
 TapHoldLoneTapReadConfig(_IniCache)
 TapHoldOneShotTimeoutReadConfig(_IniCache)
@@ -1429,9 +1429,9 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layer_editor/init.ahk
 #Include ui/physical_shortcuts/init.ahk
 
-#Include infra/suppressive_inputhook_ownership.ahk
+#Include keyboard/engine/suppressive_inputhook_ownership.ahk
 
-#Include infra/script_altgr_hotkeys.ahk
+#Include keyboard/engine/script_altgr_hotkeys.ahk
 BootProfile_StageBegin("layout and remaps")
 _RegisterScriptAltGrHotkeys()
 ; Update the original static slots in place: creating runtime variants would
@@ -1457,7 +1457,7 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 ; three scancodes. Their assignments are read before a press can reach them.
 #Include modules/shortcuts/tap_keys.ahk
 ; The key combinations: their slots are read before the pair hotkeys of
-; platform/remap.ahk can answer a press.
+; keyboard/adapters/remap.ahk can answer a press.
 #Include modules/keymap/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
@@ -1468,7 +1468,7 @@ KeyboardShortcutsBindAll()
 ; [shortcuts.caps_word], read before the first activation arms its listeners.
 CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")
-#Include platform/remap.ahk
+#Include keyboard/adapters/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
 #Include hotstrings/hotstrings.ahk
 MagicEditorStart()

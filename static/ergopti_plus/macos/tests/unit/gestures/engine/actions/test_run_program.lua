@@ -14,7 +14,7 @@ local function with_program(callback, program_admission)
 	os.remove(path)
 	local tasks, actions, auxiliary = {}, nil, nil
 	local owned = { "gestures.engine.actions", "gestures.engine.actions_aux_owner", "core.process.adapters.shell_runner",
-		"core.process.adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
+		"core.process.adapters.owned_program_runner", "keyboard.adapters.karabiner.lease_helper", "core.crypto.crypto",
 		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "settings.engine.preferences.preferences",
 		"settings.engine.paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.timing.engine.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
@@ -27,7 +27,7 @@ local function with_program(callback, program_admission)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, format = function(key) return key end }
 		package.loaded["settings.engine.paths"] = { get = function() return path end }
-		package.loaded["platform.remap.lease_helper"] = { resolve = function()
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function()
 			return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER,
 				ERGOPTI_LAUNCHER_DEVICE = "42", ERGOPTI_LAUNCHER_INODE = "73" }
 		end }
@@ -336,7 +336,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("refuses unbundled helper availability before any native construction", function()
 		with_program(function(actions, _, _, _, tasks)
-			package.loaded["platform.remap.lease_helper"].resolve = function() return nil, "unavailable" end
+			package.loaded["keyboard.adapters.karabiner.lease_helper"].resolve = function() return nil, "unavailable" end
 			helpers.assert_eq(actions.run_program("tap_3"), false)
 			helpers.assert_eq(#tasks, 0)
 		end)

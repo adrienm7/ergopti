@@ -47,10 +47,10 @@ M.GROUPS = {
 		"tests/unit/ai/test_local_server_detection_native.lua",
 		"tests/unit/ai/engine/runtime/test_owned_ollama_coexistence.lua",
 		"tests/unit/modules/updater/install/test_config_backup_files.lua",
-		"tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
+		"tests/unit/keyboard/tap_hold/test_integration.lua",
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
-	{ name = "core", prefixes = { "tests/unit/", "tests/unit/platform/" } },
+	{ name = "core", prefixes = { "tests/unit/", "tests/unit/" } },
 	{ name = "infra", prefixes = { "tests/unit/" } },
 	{ name = "input", prefixes = {
 		"tests/unit/hotstrings/engine/",

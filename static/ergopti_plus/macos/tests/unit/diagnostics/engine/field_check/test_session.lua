@@ -78,7 +78,7 @@ helpers.describe("field check session: costs and edge cases a program can answer
 		ports.end_callback_accounting = function()
 			events[#events + 1] = "end"
 			return {
-				{ site = "/Users/someone/ergopti/macos/platform/remap/watchers.lua:1201", count = 15, ms = 60.4 },
+				{ site = "/Users/someone/ergopti/macos/keyboard/engine/runtime/watchers.lua:1201", count = 15, ms = 60.4 },
 				{ site = "/Users/someone/ergopti/macos/diagnostics/engine/hid_diagnostic_mailbox.lua:271",
 					count = 120, ms = 12.2 },
 			}

@@ -201,13 +201,13 @@ or committed generated code. Schema: `_shared/hotstrings/data/catalogue/schema.m
 **Chord**
 A modifier key combination (two or more modifiers pressed simultaneously) that
 can be mapped to a custom action via Karabiner-Elements. Chord slots are defined
-in `macos/platform/remap/data/mod_combos.json` and configured via
+in `macos/keyboard/data/mod_combos.json` and configured via
 `platform/remap/init.lua`. Distinct from **→ Tap-Hold**.
 
 **Combo**
 In the Karabiner bridge context, a two-modifier combination that exposes three
 slots: `tap`, `hold`, and `chord`. Each slot maps to an action from the shared
-action dictionary. See `macos/platform/remap/data/mod_combos.json`.
+action dictionary. See `macos/keyboard/data/mod_combos.json`.
 
 **Hold Action**
 The action emitted when a **→ Tap-Hold** key is held past the activation
@@ -231,10 +231,10 @@ configuration folder, written in the vocabulary of
 `_shared/layouts/data/layer_actions.toml` against the physical-key registry
 `_shared/layouts/data/keycodes/physical_keys.json`. They are read by
 `_shared/layouts/engine/layers/layers.lua` (macOS, Linux) and
-`windows/platform/remap/layers_loader.ahk`. Windows and macOS build their
+`windows/keyboard/engine/layers/loader.ahk`. Windows and macOS build their
 navigation layer from the user's `layers.toml` (no file = no binding): Windows
-registers hotkeys (`windows/platform/remap/nav_layer_table.ahk`) and macOS
-deploys a Karabiner rule (`macos/platform/remap/nav_layer.lua`). Linux runs
+registers hotkeys (`windows/keyboard/engine/layers/nav_layer_table.ahk`) and macOS
+deploys a Karabiner rule (`macos/keyboard/engine/layers/nav_layer.lua`). Linux runs
 its navigation layer in `linux/platform/remap/tap_hold_engine.lua`; connecting
 the shared layer file to that native engine remains pending. Linux has no
 Kanata runtime or generated Kanata configuration. The preset reproduces the

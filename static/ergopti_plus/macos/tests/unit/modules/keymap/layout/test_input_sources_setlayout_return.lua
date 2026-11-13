@@ -36,10 +36,10 @@ local EXECUTABLE     = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
 local function selection_test(name, body)
 	helpers.it(name, function()
 		helpers.with_stub_scope({ "modules.keymap.input_sources", "modules.keymap.layout_install",
-			"adapters.input_source_selector", "platform.remap.lease_helper",
+			"adapters.input_source_selector", "keyboard.adapters.karabiner.lease_helper",
 			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.process.adapters.task_lifecycle" }, function()
 			local resolutions = 0
-			package.loaded["platform.remap.lease_helper"] = {
+			package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 				resolve = function()
 					resolutions = resolutions + 1
 					return EXECUTABLE, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = EXECUTABLE }

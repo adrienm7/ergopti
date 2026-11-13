@@ -1074,7 +1074,7 @@ local function legacy_rules_rows(karabiner)
 		[ConfigKeys.COMMAND.TAP_HOLD_LEGACY_RULES_CLEANUP] = function()
 			Logger.info(LOG, "Showing the legacy Karabiner rules cleanup from the Tap-Holds menu.")
 			local shown_ok, shown = xpcall(function()
-				return require("ui.legacy_rules_cleanup").open(karabiner)
+				return require("keyboard.ui.legacy_rules_cleanup").open(karabiner)
 			end, debug.traceback)
 			if not shown_ok then
 				Logger.error(LOG, "The legacy Karabiner rules cleanup could not be shown: %s.", tostring(shown))
@@ -1167,14 +1167,14 @@ local function owned_runtime_block_rows(karabiner)
 	local rows_fn = BLOCK_ROWS[status.reason]
 	if not rows_fn then return {} end
 	local rows = rows_fn() or {}
-	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
+	if status.reason == require("keyboard.adapters.runtime.vhid").REASON_INCOMPATIBLE
 		and type(karabiner.update_virtual_hid_driver) == "function" then
 		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
 		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_vhid_update_rows", {
 			[ConfigKeys.COMMAND.TAP_HOLD_VHID_UPDATE] = function()
 				Logger.info(LOG, "Showing the VirtualHIDDevice driver update from the Tap-Holds menu.")
 				local shown_ok, shown = xpcall(function()
-					return require("ui.virtual_hid_update").open(karabiner)
+					return require("keyboard.ui.virtual_hid_update").open(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The VirtualHIDDevice driver update could not be shown: %s.", tostring(shown))

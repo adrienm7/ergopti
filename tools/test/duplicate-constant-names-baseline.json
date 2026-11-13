@@ -86,7 +86,7 @@
 		"divergent": false
 	},
 	"POLL_INTERVAL_SEC": {
-		"files": ["macos/menu/engine/ui_restore.lua", "macos/platform/remap/onboarding.lua"],
+		"files": ["macos/menu/engine/ui_restore.lua", "macos/keyboard/engine/runtime/onboarding.lua"],
 		"divergent": false
 	},
 	"REQUEST_TIMEOUT_MS": {

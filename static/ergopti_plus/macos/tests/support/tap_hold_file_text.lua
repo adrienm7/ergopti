@@ -68,7 +68,7 @@ end
 --- @param path string
 --- @return string
 function M.config_path(path)
-	return require("platform.remap.config").config_toml_path_for(path)
+	return require("keyboard.engine.runtime.config").config_toml_path_for(path)
 end
 
 --- Writes, or with nil removes, the config.toml beside a tap_hold.toml path.

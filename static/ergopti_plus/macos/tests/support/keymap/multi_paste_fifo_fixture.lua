@@ -24,7 +24,7 @@ local OWNED = {
 	"hs.settings", "hs.spaces", "hs.sqlite3",
 	"hs.styledtext", "hs.task", "hs.timer",
 	"hs.urlevent", "hs.webview", "hs.window",
-	"infra.capsword_output", "hotstrings.engine.matcher.engine", "core.i18n.engine.i18n",
+	"keyboard.engine.capsword_output", "hotstrings.engine.matcher.engine", "core.i18n.engine.i18n",
 	"core.logger.engine.logger", "core.fs.engine.paths", "core.text.engine.utils",
 	"core.timing.engine.timings", "core.text.engine.toml.reader", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",

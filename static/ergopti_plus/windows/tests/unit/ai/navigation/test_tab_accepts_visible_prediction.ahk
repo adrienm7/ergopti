@@ -7,7 +7,7 @@
 ; Tab into the application instead of inserting the prediction on screen.
 ;
 ; ROOT CAUSE ENCODED (llm-tab-accepts-visible-prediction): the acceptance hotkey
-; was `Tab::` under `#HotIf LLM_Tooltip_GetText() != ""`. platform/remap/tab.ahk
+; was `Tab::` under `#HotIf LLM_Tooltip_GetText() != ""`. keyboard/engine/keys/tab.ahk
 ; declares static SC00F hotkeys, and AutoHotkey's hook then resolves every
 ; physical Tab through the scan code alone (hook.cpp: ChangeHookState sets
 ; ksc[sc].sc_takes_precedence for an explicit scan-code hotkey; LowLevelCommon

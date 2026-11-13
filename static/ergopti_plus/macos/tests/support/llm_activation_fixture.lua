@@ -54,7 +54,7 @@ local OWNED_MODULES = {
 	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 	"ai.ui.menu",
@@ -639,7 +639,7 @@ local function build_fixture(backend, save_results, options)
 			stop = function() return true end,
 			resume_after_pause = function() return true end,
 		}
-		package.loaded["platform.remap.onboarding"] = {
+		package.loaded["keyboard.engine.runtime.onboarding"] = {
 			stop = function() return true end,
 		}
 		package.loaded["core.ui.ui.tooltip"] = {

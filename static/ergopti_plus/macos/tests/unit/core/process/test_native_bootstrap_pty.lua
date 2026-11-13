@@ -55,7 +55,7 @@ local function receiving(body, options)
 	local ok, error_message = xpcall(function()
 		_G.hs = { host = { uuid = function() return NONCE end } }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["platform.remap.lease_helper"] = { resolve = function()
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function()
 			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 		end }
 		package.loaded["core.crypto.crypto"] = { sha256_bytes = function() return string.rep("b", 64) end }

@@ -26,19 +26,19 @@ local STUB_MODULES = {
 	"core.logger.engine.logger",
 	"settings.engine.paths",
 	"core.timing.engine.timings",
-	"platform.remap.defaults",
-	"platform.remap.config",
-	"platform.remap.generator",
-	"platform.remap.ke_lifecycle",
-	"platform.remap.managed_rule_removal",
-	"platform.remap.ke_variables",
-	"platform.remap.lease_controller",
-	"platform.remap.onboarding",
-	"platform.remap.watchers",
+	"keyboard.engine.runtime.defaults",
+	"keyboard.engine.runtime.config",
+	"keyboard.engine.runtime.generator",
+	"keyboard.adapters.karabiner.ke_lifecycle",
+	"keyboard.adapters.runtime.managed_rule_removal",
+	"keyboard.adapters.karabiner.ke_variables",
+	"keyboard.adapters.karabiner.lease_controller",
+	"keyboard.engine.runtime.onboarding",
+	"keyboard.engine.runtime.watchers",
 	"platform.input.hotkey_registrar",
 	"core.events.timer_scheduler",
 	"platform.system.info",
-	"platform.remap.deploy_pacing",
+	"keyboard.adapters.runtime.deploy_pacing",
 	"core.ui.engine.notifications",
 	"modules.keystats.kc_bridge",
 	"gestures.engine.engine",
@@ -46,7 +46,7 @@ local STUB_MODULES = {
 	"hs.caffeinate.watcher",
 	"hs",
 	"tests.stubs.hs",
-	"platform.remap",
+	"keyboard.engine",
 }
 
 local function index_of(values, expected)
@@ -198,7 +198,7 @@ local function with_remap(options, body)
 		get = function() return "tests/unit/platform/remap/guardian-recovery.toml" end,
 		get_config_dir = function() return config_dir end,
 	}
-	-- The two timings platform/remap/init.lua reads, and the input source limits
+	-- The two timings keyboard/engine/init.lua reads, and the input source limits
 	-- the navigation layer reader loads; any other read is a new dependency this
 	-- fixture must learn about, so it fails loudly. Those limits are the registry's.
 	local timings_sec = {
@@ -223,13 +223,13 @@ local function with_remap(options, body)
 			return value
 		end,
 	}
-	package.loaded["platform.remap.defaults"] = {
+	package.loaded["keyboard.engine.runtime.defaults"] = {
 		tap_hold_timeout_ms = 200,
 		sticky_timeout_ms = 1000,
 		simultaneous_threshold_ms = 50,
 		combo_symmetric = false,
 	}
-	package.loaded["platform.remap.config"] = {
+	package.loaded["keyboard.engine.runtime.config"] = {
 		load_available_actions = function() return { { id = "none" } } end,
 		load_tap_hold_keys = function() return { { id = "left_shift" } } end,
 		load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
@@ -303,7 +303,7 @@ local function with_remap(options, body)
 			return 1, "ansi"
 		end,
 	}
-	package.loaded["platform.remap.generator"] = {
+	package.loaded["keyboard.engine.runtime.generator"] = {
 		build_karabiner_json = function(...)
 			local token = select(7, ...)
 			calls.builds = calls.builds + 1
@@ -330,10 +330,10 @@ local function with_remap(options, body)
 	}
 	-- karabiner.json is not part of this scenario: the switch-off cleanup is
 	-- covered by the rule-removal tests.
-	package.loaded["platform.remap.managed_rule_removal"] = {
+	package.loaded["keyboard.adapters.runtime.managed_rule_removal"] = {
 		remove_managed_rules = function() return true, "unchanged", 0 end,
 	}
-	package.loaded["platform.remap.ke_lifecycle"] = {
+	package.loaded["keyboard.adapters.karabiner.ke_lifecycle"] = {
 		open_gui = function() return true end,
 		stop = function() return true end,
 		notify_ready = function()
@@ -344,7 +344,7 @@ local function with_remap(options, body)
 			end
 		end,
 	}
-	package.loaded["platform.remap.ke_variables"] = {
+	package.loaded["keyboard.adapters.karabiner.ke_variables"] = {
 		set_recovery_observer = function(observer)
 			helpers.assert_true(type(observer) == "function")
 			helpers.assert_nil(calls.ke_variables_recovery_observer)
@@ -357,7 +357,7 @@ local function with_remap(options, body)
 			return true
 		end,
 	}
-	package.loaded["platform.remap.onboarding"] = {
+	package.loaded["keyboard.engine.runtime.onboarding"] = {
 		run_first_run_wizard = function()
 			calls.first_run_wizard_runs = (calls.first_run_wizard_runs or 0) + 1
 			return true
@@ -432,7 +432,7 @@ local function with_remap(options, body)
 		return probe
 	end
 
-	package.loaded["platform.remap.lease_controller"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 		unregister_guardian = function(on_done)
 			calls.guardian_unregistrations = (calls.guardian_unregistrations or 0) + 1
 			calls.guardian_registration_due = true
@@ -576,7 +576,7 @@ local function with_remap(options, body)
 	local function make_handle(kind)
 		return { kind = kind, enabled = true }
 	end
-	package.loaded["platform.remap.watchers"] = {
+	package.loaded["keyboard.engine.runtime.watchers"] = {
 		start_gesture_watcher = function()
 			if calls.bind_failures_remaining > 0 then
 				calls.bind_failures_remaining = calls.bind_failures_remaining - 1
@@ -721,7 +721,7 @@ local function with_remap(options, body)
 		input_idle_seconds = function() return calls.input_idle_seconds end,
 	}
 	-- The pacing owner captures its probe at require time.
-	package.loaded["platform.remap.deploy_pacing"] = nil
+	package.loaded["keyboard.adapters.runtime.deploy_pacing"] = nil
 	-- Recorded, never sent: a real notice would arm its own retention timer on
 	-- the scheduler above and read as a recovery delay.
 	package.loaded["core.ui.engine.notifications"] = {
@@ -783,10 +783,10 @@ local function with_remap(options, body)
 	for key, value in pairs(hs_overrides) do hs_stub[key] = value end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["platform.remap"] = nil
+	package.loaded["keyboard.engine"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["core.fs.engine.dir"] = nil
-	local remap = require("platform.remap")
+	local remap = require("keyboard.engine")
 	remap.init({ expand_path = function(path) return path end })
 	local scenario_cancel_fails = calls.cancel_fails
 	local scenario_cancel_failures_remaining = calls.cancel_failures_remaining

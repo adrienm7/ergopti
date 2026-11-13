@@ -35,7 +35,7 @@ helpers.describe("the boot registers the legacy rules cleanup (karabiner-legacy-
 		helpers.assert_true(init_at < register_at and register_at < deploy_at,
 			"the presenter must exist before the boot deploy can be refused")
 		local registration = body:sub(register_at, body:find("\nend\n", register_at, true))
-		helpers.assert_true(registration:find('require("ui.legacy_rules_cleanup").offer(karabiner)', 1, true) ~= nil,
+		helpers.assert_true(registration:find('require("keyboard.ui.legacy_rules_cleanup").offer(karabiner)', 1, true) ~= nil,
 			"the presenter must offer the removal through the dialog module")
 		local guarded = body:sub(1, register_at):match(".*()xpcall%(function%(%)")
 		helpers.assert_true(guarded ~= nil and guarded > init_at,

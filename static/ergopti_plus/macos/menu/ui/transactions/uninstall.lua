@@ -30,7 +30,7 @@ function M.run(deps)
 	if lifecycle.is_pending() then return false end
 	local i18n = deps.i18n or require("core.i18n.engine.i18n")
 	local dialog = deps.dialog or require("core.ui.engine.dialog_util")
-	local resolver = deps.resolver or require("platform.remap.lease_helper")
+	local resolver = deps.resolver or require("keyboard.adapters.karabiner.lease_helper")
 	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local title = i18n.get("menu.global.uninstall")
 	local failure = i18n.get("dialog.uninstall.failed")

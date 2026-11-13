@@ -1123,7 +1123,7 @@ function expectedTapHold(driver, key) {
 			fs.readFileSync(path.join(SHARED, 'shortcuts/data/actions/actions.toml'), 'utf8')
 		).karabiner_aliases;
 		const karabiner = JSON.parse(
-			fs.readFileSync(path.join(SP, 'macos/platform/remap/data/actions.json'), 'utf8')
+			fs.readFileSync(path.join(SP, 'macos/keyboard/data/actions.json'), 'utf8')
 		);
 		// A modifier hold reads as its modifiers' key names (« Cmd + Shift »), a
 		// sticky one fills its template with them, and the layer hold reads as

@@ -301,7 +301,7 @@ end
 --- @return table|nil values nil when the remap settings cannot be read.
 local function tap_hold_values(config_path, is_current)
 	local ok, report, err = pcall(function()
-		return require("platform.remap").recommended_key_report(remap_settings_beside(config_path))
+		return require("keyboard.engine").recommended_key_report(remap_settings_beside(config_path))
 	end)
 	if is_current and not is_current() then return nil end
 	if not ok or type(report) ~= "table" then
@@ -709,7 +709,7 @@ end
 --- @param moved boolean Whether the wizard moved the configuration folder.
 --- @param on_done function Callback fn(ok, detail), called exactly once.
 local function import_tap_holds(keys, moved, on_done)
-	local ok_remap, Remap = pcall(require, "platform.remap")
+	local ok_remap, Remap = pcall(require, "keyboard.engine")
 	if not ok_remap or type(Remap) ~= "table" then
 		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
 		return
@@ -740,8 +740,8 @@ end
 --- @return boolean failed True when the layer was due and could not be written.
 local function import_nav_layer(keys)
 	local ok, import, failed = pcall(function()
-		local NavLayer = require("platform.remap.nav_layer")
-		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
+		local NavLayer = require("keyboard.engine.layers.nav_layer")
+		if not NavLayer.recommendation_enters_layer(keys, require("keyboard.engine.runtime.defaults").tap_hold) then
 			return nil, false
 		end
 		local imported = NavLayer.import_owned({ config_dir = require("settings.engine.paths").get_config_dir() })
@@ -988,7 +988,7 @@ local function commit_owned(answers, publication)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.
-		if not ok then require("platform.remap.nav_layer").undo_owned(layer) end
+		if not ok then require("keyboard.engine.layers.nav_layer").undo_owned(layer) end
 		if settled then
 			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
 				tostring(detail))

@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "core.logger.engine.logger", "diagnostics.engine.field_check.field_check", "diagnostics.engine.field_check.checks", "platform.remap.ke_paths" }
+local MODULES = { "core.logger.engine.logger", "diagnostics.engine.field_check.field_check", "diagnostics.engine.field_check.checks", "keyboard.adapters.karabiner.ke_paths" }
 
 local APP = "/Applications/ErgoptiPlus.app"
 local HOME = "/Users/someone"

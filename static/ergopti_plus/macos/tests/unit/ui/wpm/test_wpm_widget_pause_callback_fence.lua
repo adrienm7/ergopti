@@ -31,7 +31,7 @@ local FIXTURE_MODULES = {
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 }
@@ -264,7 +264,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				stop = function() return true end,
 				resume_after_pause = function() return true end,
 			}
-			package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
+			package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 
 			local ScriptControl = require("modules.shortcuts.script_control")
 			helpers.assert_true(ScriptControl.pause_all())

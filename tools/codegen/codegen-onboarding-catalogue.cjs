@@ -15,7 +15,7 @@
  *   _shared/hotstrings/data/catalogue/**.toml       file and section descriptions
  *   _shared/tap_hold/data/defaults.toml           tap-hold keys and each engine's preset
  *   _shared/shortcuts/data/actions/actions.toml     [karabiner_aliases] of the macOS tap-hold actions
- *   macos/platform/remap/data/actions.json   macOS tap-hold action labels without a locale key
+ *   macos/keyboard/data/actions.json   macOS tap-hold action labels without a locale key
  *   _shared/core/i18n/data/locales/*.json              label keys must exist in all 21
  *   _shared/core/i18n/data/locale_names.json           language-pack labels
  *
@@ -66,8 +66,7 @@ const MACOS_REMAP_ACTIONS_PATH = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'platform',
-	'remap',
+	'keyboard',
 	'data',
 	'actions.json'
 );
@@ -1106,7 +1105,7 @@ function hotstringGroups(id, page, platform, manifest, features, projection, lab
 
 /**
  * Creates the resolver of macOS tap-hold action labels, named as its tray
- * names them (macos/platform/remap/config.lua localise_action_labels): the
+ * names them (macos/keyboard/engine/runtime/config.lua localise_action_labels): the
  * action registry's label under the action's Karabiner alias, else the
  * Karabiner catalogue's own short label.
  * @param {object} labels Label helpers.

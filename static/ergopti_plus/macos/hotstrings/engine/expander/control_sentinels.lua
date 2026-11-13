@@ -47,7 +47,7 @@ M.TAP_HOLD_MODIFIER = "tap_hold_modifier"
 -- Reserved keycode → published signal. Karabiner prepends F20 to every action
 -- that activates the navigation layer, appends F19 to every one that turns it
 -- off, and leads every tap-hold hold pressing Ctrl, Cmd or Option with the
--- untagged context-menu key (platform/remap/generator.lua).
+-- untagged context-menu key (keyboard/engine/runtime/generator.lua).
 local SIGNAL_BY_KEYCODE = {
 	[Keycodes.F20_LAYER_NAV_ENTERED]          = M.NAV_LAYER_ENTERED,
 	[Keycodes.F19_LAYER_NAV_EXITED]           = M.NAV_LAYER_EXITED,

@@ -12,7 +12,7 @@ function M.with_session(options, body)
 	options = options or {}
 	local names = { "ffi", "core.logger.engine.monotonic", "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook",
 		"adapters.xkb_capture", "hotstrings.engine.device_finder", "platform.remap.tap_hold_engine",
-		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "menu.engine.manifest_reader" }
+		"keyboard.engine.keys.combination_engine", "modules.shortcuts.key_combinations", "menu.engine.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	if options.public_chords ~= true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 	local previous_preload = package.preload.ffi
@@ -156,7 +156,7 @@ function M.with_session(options, body)
 		local Engine = h.load_module("platform.remap.tap_hold_engine")
 		-- Preserve the actual source issuer through Pair construction and Manager.
 		local Owner = h.load_module("modules.shortcuts.key_combinations")
-		local Native = h.load_module("platform.remap.key_combination_engine")
+		local Native = h.load_module("keyboard.engine.keys.combination_engine")
 		if options.late_reader then
 			s.reader = h.load_module("platform.input.evdev_reader")
 		else
@@ -288,7 +288,7 @@ function M.with_manager_session(options, body)
 		local ConfigPaths = require("settings.engine.paths")
 		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
-		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "clipboard.adapters.clipboard" }
+		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "keyboard.engine.layers.nav_layer", "clipboard.adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local folder = os.tmpname(); os.remove(folder)
 		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))

@@ -25,7 +25,7 @@
 ;
 ; SCOPE: behavioural for the decline verdict itself (the engine is in this
 ; runner's include graph); source-level for the call sites, because
-; platform/remap/space.ahk defines live hotkeys and cannot be loaded headless.
+; keyboard/engine/keys/space.ahk defines live hotkeys and cannot be loaded headless.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

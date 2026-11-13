@@ -174,7 +174,7 @@ const ALLOWED = {
 	'macos/ai/ui/menu/models/manager.lua': {
 		basename: { count: 1, reason: 'last segment of an Ollama library URL, not a native path' }
 	},
-	'macos/platform/remap/runtime_manifest.lua': {
+	'macos/keyboard/adapters/runtime/manifest.lua': {
 		basename: { count: 1, reason: 'file name of a download URL, not a native path' }
 	},
 	'macos/core/process/adapters/shell_runner.lua': {

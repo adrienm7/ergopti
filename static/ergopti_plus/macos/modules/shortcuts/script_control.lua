@@ -22,7 +22,7 @@
 ---    (_shared/keyboard/engine/layers/script_chords.lua): an unassigned slot, every slot while the
 ---    submenu's switch is off, and while paused every action outside script
 ---    management leave the key combination to the system. Karabiner emits a
----    slot's sentinel only then (platform/remap/script_chord_rules.lua): this
+---    slot's sentinel only then (keyboard/engine/layers/script_chord_rules.lua): this
 ---    module hands it the plan (karabiner_chords) and asks for a regeneration
 ---    whenever the plan changes.
 --- ==============================================================================
@@ -44,7 +44,7 @@ local GestActions = require("gestures.engine.actions")
 local KeyState  = require("platform.input.key_state")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
 local ScriptChords = require("keyboard.engine.layers.script_chords")
-local ChordCatalogue = require("infra.script_chord_catalogue")
+local ChordCatalogue = require("keyboard.engine.layers.script_chord_catalogue")
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")
 
@@ -63,7 +63,7 @@ local LOG = "shortcuts.script_control"
 local SCRIPT_CONTROL_SHORTCUT_CLAIM = ConfigKeys.LEAF.SCRIPT_CONTROL
 
 -- Sentinel keycode -> script chord slot, built at the first key event.
--- Karabiner's script-control rules (platform/remap/script_chord_rules.lua)
+-- Karabiner's script-control rules (keyboard/engine/layers/script_chord_rules.lua)
 -- emit a slot's sentinel ONLY when the user physically presses right_command
 -- (or, paused, Option) with the slot's key. Tap actions that happen to emit
 -- backspace/return/escape (e.g. left_command tap → backspace) can NEVER
@@ -664,7 +664,7 @@ local function pause_all()
 		end
 	end
 
-	local onboarding, onboarding_reason = require_pause_module("platform.remap.onboarding")
+	local onboarding, onboarding_reason = require_pause_module("keyboard.engine.runtime.onboarding")
 	if onboarding_reason then return false, onboarding_reason end
 	if onboarding then
 		ok_step, step_reason = add_required_step(

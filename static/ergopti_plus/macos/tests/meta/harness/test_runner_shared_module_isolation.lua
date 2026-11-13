@@ -23,14 +23,14 @@ helpers.describe("tests/run.lua isolates shared and platform modules", function(
 			__index = function() return function() end end,
 		})
 		package.loaded["layouts.engine.utils"] = { poisoned = true }
-		package.loaded["platform.remap.ke_paths"] = { poisoned = true }
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = { poisoned = true }
 		package.loaded["hotstrings.engine.expander.terminators"] = nil
 
 		Isolation.purge(driver_root, shared_lua)
 
 		helpers.assert_nil(package.loaded["layouts.engine.layers.terminators"])
 		helpers.assert_nil(package.loaded["layouts.engine.utils"])
-		helpers.assert_nil(package.loaded["platform.remap.ke_paths"])
+		helpers.assert_nil(package.loaded["keyboard.adapters.karabiner.ke_paths"])
 		helpers.assert_eq(package.loaded["tests.helpers"], helpers_identity,
 			"test infrastructure must survive the production-module purge")
 

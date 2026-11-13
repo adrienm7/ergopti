@@ -10,7 +10,7 @@ import Security
 /// certificate leaf and its code hashes, and the administrator shell copies it root-owned and proves that
 /// requirement and its digest again before its one `--owned-install-first` transaction runs.
 ///
-/// One stdout line answers, for platform/remap/runtime_install.lua:
+/// One stdout line answers, for keyboard/adapters/runtime/install.lua:
 /// - `OWNED_RUNTIME_INSTALL|1|<result>` relays the helper's own closed line (exit 0);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|refused|<reason>` before any prompt (exit 77);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled` when the prompt was closed (exit 1);

@@ -4,10 +4,10 @@
 --- MODULE: Regression — a module that raises at require time must not cost the
 ---         user their keyboard
 --- DESCRIPTION:
---- `platform/remap/defaults.lua` calls `error()` at REQUIRE time — its top-level
+--- `keyboard/engine/runtime/defaults.lua` calls `error()` at REQUIRE time — its top-level
 --- body runs load_sections() and require_section(), and both raise — and the chain
 --- up to root `init.lua` was un-pcall'd: defaults.lua ← config.lua ←
---- karabiner/init.lua ← `karabiner = require("platform.remap")`. A raise there
+--- karabiner/init.lua ← `karabiner = require("keyboard.engine")`. A raise there
 --- aborts the top-level chunk, so every line below it never runs.
 ---
 --- 689d807c9 fixed WHERE the teardown is armed: the shutdown callback is now
@@ -41,9 +41,9 @@ local ARMING = "hs.shutdownCallback = shutdown_all_resources"
 
 -- The module whose require chain is proven to reach an error() at load time.
 -- Matched on the NAME rather than on a call spelling, so the guarded form
--- `pcall(require, "platform.remap")` is what this test looks at instead of
+-- `pcall(require, "keyboard.engine")` is what this test looks at instead of
 -- being invisible to it.
-local RISKY_MODULE = '"platform.remap"'
+local RISKY_MODULE = '"keyboard.engine"'
 
 
 
@@ -101,7 +101,7 @@ helpers.describe("boot: one raising module must not abort the rest of init", fun
 
 		local statement = line_at(code, at)
 		helpers.assert_true(statement:find("pcall(", 1, true) ~= nil,
-			"platform.remap reaches defaults.lua, which calls error() in its top-level "
+			"keyboard.engine reaches defaults.lua, which calls error() in its top-level "
 			.. "body, and this require sits above the menubar, the panic-button eventtap and "
 			.. "every other line of boot. Unguarded, a missing or truncated tap_hold "
 			.. "defaults.toml costs the whole session instead of one feature. Statement: "
@@ -167,7 +167,7 @@ helpers.describe("boot: exact lease revocation survives a failed require", funct
 		-- the fallback neither depends on the failed module nor infers ownership from
 		-- a stock process.
 		helpers.assert_true(body:find("LeaseController.stop", 1, true) ~= nil,
-			"when platform.remap never loaded, the early exact controller must still revoke "
+			"when keyboard.engine never loaded, the early exact controller must still revoke "
 				.. "the generation without touching stock Karabiner")
 
 		helpers.assert_true(body:find("is_hs_owned_bridge", 1, true) == nil,

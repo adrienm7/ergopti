@@ -44,7 +44,7 @@ local ProfileSelector = require("ai.engine.settings.profile_selector")
 local Tone          = require("ai.engine.prediction.tone")
 local Vision        = require("ai.engine.prediction.vision")
 local JsonCodec     = require("core.fs.adapters.json_codec")
-local ChordCatalogue = require("infra.script_chord_catalogue")
+local ChordCatalogue = require("keyboard.engine.layers.script_chord_catalogue")
 local LOG           = "gestures.actions"
 local Brightness = require("shortcuts.engine.brightness_actions").load()
 local ConfigKeys = require("settings.engine.keys")
@@ -898,7 +898,7 @@ end
 
 -- ── The Karabiner catalogue's non-keystroke actions ─────────────────────────
 --
--- macos/platform/remap/data/actions.json describes 73 actions the REMAP layer can
+-- macos/keyboard/data/actions.json describes 73 actions the REMAP layer can
 -- put on a key. 36 of them are tappable and had no row in the shared catalogue,
 -- so the gesture picker could not offer a single one — the same feature was
 -- reachable from a remapped key and unreachable from a swipe, with nothing
@@ -907,7 +907,7 @@ end
 --
 --   layer_on / layer_off / capsword  — state that lives INSIDE Karabiner. The
 --       only IPC is `karabiner_cli --set-variable`, so they are writes, not
---       keystrokes (platform/remap/ke_variables.lua).
+--       keystrokes (keyboard/adapters/karabiner/ke_variables.lua).
 --   the 15 sticky_*                  — `sticky_modifier` is a manipulator
 --       construct with no IPC at all, so macOS implements the behaviour itself
 --       (gestures/engine/sticky_modifiers.lua).
@@ -930,9 +930,9 @@ local MILLISECONDS_PER_SECOND = 1000
 --- remap layer still loads this registry.
 --- @return table|nil
 local function ke_variables()
-	local ok, mod = pcall(require, "platform.remap.ke_variables")
+	local ok, mod = pcall(require, "keyboard.adapters.karabiner.ke_variables")
 	if not ok or type(mod) ~= "table" then
-		Logger.error(LOG, "platform.remap.ke_variables could not be required — the gesture is a no-op.")
+		Logger.error(LOG, "keyboard.adapters.karabiner.ke_variables could not be required — the gesture is a no-op.")
 		return nil
 	end
 	return mod
@@ -944,9 +944,9 @@ end
 --- exact boot where the configuration failed to load.
 --- @return number|nil
 local function sticky_timeout_sec()
-	local ok, Remap = pcall(require, "platform.remap")
+	local ok, Remap = pcall(require, "keyboard.engine")
 	if not ok or type(Remap) ~= "table" or type(Remap.get_sticky_timeout) ~= "function" then
-		Logger.error(LOG, "platform.remap exposes no get_sticky_timeout — sticky gesture is a no-op.")
+		Logger.error(LOG, "keyboard.engine exposes no get_sticky_timeout — sticky gesture is a no-op.")
 		return nil
 	end
 	local ms = Remap.get_sticky_timeout()
@@ -1006,7 +1006,7 @@ sg("capsword", function()
 	-- The action toggles, as on Windows and Linux (decision of 2026-11-06): a
 	-- second invocation ends the running CapsWord through the watcher's clear.
 	if ke.capsword_known_active() then
-		local watchers_ok, watchers = pcall(require, "platform.remap.watchers")
+		local watchers_ok, watchers = pcall(require, "keyboard.engine.runtime.watchers")
 		if not watchers_ok or type(watchers) ~= "table" or type(watchers.deactivate_capsword_by_action) ~= "function" then
 			Logger.error(LOG, "CapsWord action cannot switch CapsWord off: %s.", tostring(watchers))
 			return
@@ -1021,7 +1021,7 @@ sg("capsword", function()
 			Logger.debug(LOG, "CapsWord gesture activation did not settle: %s.", tostring(reason))
 			return
 		end
-		local controller_ok, controller = pcall(require, "platform.remap.lease_controller")
+		local controller_ok, controller = pcall(require, "keyboard.adapters.karabiner.lease_controller")
 		if not controller_ok or type(controller) ~= "table"
 			or type(controller.status) ~= "function" then
 			Logger.error(LOG, "CapsWord gesture cannot verify the live remap lease: %s.",
@@ -1042,7 +1042,7 @@ sg("capsword", function()
 		Logger.pcall(LOG, KeyState.set_capslock, true)
 		-- This write raises no Karabiner control signal: start the inactivity
 		-- delay that the watcher otherwise starts from the signal.
-		local watchers_ok, watchers = pcall(require, "platform.remap.watchers")
+		local watchers_ok, watchers = pcall(require, "keyboard.engine.runtime.watchers")
 		if not watchers_ok then
 			Logger.error(LOG, "CapsWord gesture cannot start the inactivity delay: %s.", tostring(watchers))
 			return
@@ -1054,7 +1054,7 @@ sg("capsword", function()
 	-- event rather than a keyDown/keyUp pair, so keyStroke fails silently. The
 	-- adapter owns the only path that works after the lease-gated write settles,
 	-- and it is the same one
-	-- platform/remap/watchers.lua uses to switch CapsWord back off.
+	-- keyboard/engine/runtime/watchers.lua uses to switch CapsWord back off.
 end)
 
 sg("sticky_shift", function()
@@ -2471,7 +2471,7 @@ function M.action_parameter_binding_fits(binding)
 		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
 	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
-		local catalogue = BindingPublication.current("script", "infra.script_chord_catalogue", ChordCatalogue)
+		local catalogue = BindingPublication.current("script", "keyboard.engine.layers.script_chord_catalogue", ChordCatalogue)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
 	local gestures = rawget(package.loaded, "gestures.engine")

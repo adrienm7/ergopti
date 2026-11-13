@@ -287,7 +287,7 @@ local function install_script_control_dependencies(options)
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
-	package.loaded["platform.remap.onboarding"] = { stop = settled }
+	package.loaded["keyboard.engine.runtime.onboarding"] = { stop = settled }
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = settled }
 	package.loaded["modules.keystats"] = { resync_context = settled }
 end

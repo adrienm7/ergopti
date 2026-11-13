@@ -8,10 +8,10 @@
 
 local helpers = require("tests.helpers")
 -- The real contract: the double answers what the controller's Stop answers.
-local LeaseContract = require("platform.remap.lease_contract")
+local LeaseContract = require("keyboard.adapters.karabiner.lease_contract")
 local M = {}
 local REAL_MODULES = {
-	"core.fs.adapters.file_system", "core.fs.engine.dir", "platform.remap.ke_variables",
+	"core.fs.adapters.file_system", "core.fs.engine.dir", "keyboard.adapters.karabiner.ke_variables",
 	"core.fs.adapters.json_codec", "core.process.adapters.shell_runner", "core.timing.engine.deferred_work",
 }
 
@@ -25,12 +25,12 @@ local STUB_MODULES = {
 	"core.logger.engine.logger",
 	"settings.engine.paths",
 	"core.timing.engine.timings",
-	"platform.remap.defaults",
-	"platform.remap.config",
-	"platform.remap.generator",
-	"platform.remap.ke_lifecycle",
-	"platform.remap.lease_controller",
-	"platform.remap.watchers",
+	"keyboard.engine.runtime.defaults",
+	"keyboard.engine.runtime.config",
+	"keyboard.engine.runtime.generator",
+	"keyboard.adapters.karabiner.ke_lifecycle",
+	"keyboard.adapters.karabiner.lease_controller",
+	"keyboard.engine.runtime.watchers",
 	"platform.input.hotkey_registrar",
 	"core.events.timer_scheduler",
 	"modules.keystats.kc_bridge",
@@ -39,7 +39,7 @@ local STUB_MODULES = {
 	"hs.caffeinate.watcher",
 	"hs",
 	"tests.stubs.hs",
-	"platform.remap",
+	"keyboard.engine",
 }
 
 
@@ -136,7 +136,7 @@ local function with_remap(options, body)
 			get = function() return "tests/unit/platform/remap/activation-layout-barrier.toml" end,
 			get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 		}
-		-- The two timings platform/remap/init.lua reads; any other read is a new
+		-- The two timings keyboard/engine/init.lua reads; any other read is a new
 		-- dependency this fixture must learn about, so it fails loudly.
 		local timings_sec = {
 			["debounce.layout_tis_settle_ms"] = 0.5,
@@ -149,13 +149,13 @@ local function with_remap(options, body)
 				return value
 			end,
 		}
-		package.loaded["platform.remap.defaults"] = {
+		package.loaded["keyboard.engine.runtime.defaults"] = {
 			tap_hold_timeout_ms = 200,
 			sticky_timeout_ms = 1000,
 			simultaneous_threshold_ms = 50,
 			combo_symmetric = false,
 		}
-		package.loaded["platform.remap.config"] = {
+		package.loaded["keyboard.engine.runtime.config"] = {
 			load_available_actions = function() return { { id = "none" } } end,
 			load_tap_hold_keys = function() return { { id = "left_shift" } } end,
 			load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
@@ -182,7 +182,7 @@ local function with_remap(options, body)
 				return 1, "ansi"
 			end,
 		}
-		package.loaded["platform.remap.generator"] = {
+		package.loaded["keyboard.engine.runtime.generator"] = {
 			build_karabiner_json = function(...)
 				local token = select(7, ...)
 				calls.builds[#calls.builds + 1] = {
@@ -205,13 +205,13 @@ local function with_remap(options, body)
 			end,
 			KE_PHYSICAL_KC_LOG = nil,
 		}
-		package.loaded["platform.remap.ke_lifecycle"] = {
+		package.loaded["keyboard.adapters.karabiner.ke_lifecycle"] = {
 			open_gui = function() return true end,
 			stop = function() return true end,
 			notify_ready = function() return true end,
 		}
 
-		package.loaded["platform.remap.lease_controller"] = {
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 			init = function(listener)
 				calls.phase_listener = listener
 				return true
@@ -351,7 +351,7 @@ local function with_remap(options, body)
 		local function make_handle(kind)
 			return { kind = kind, enabled = true }
 		end
-		package.loaded["platform.remap.watchers"] = {
+		package.loaded["keyboard.engine.runtime.watchers"] = {
 			start_gesture_watcher = function() return make_handle("gesture") end,
 			stop_gesture_watcher = function(handle)
 				if handle then handle.enabled = false end
@@ -492,8 +492,8 @@ local function with_remap(options, body)
 		}
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
-		package.loaded["platform.remap"] = nil
-		local remap = require("platform.remap")
+		package.loaded["keyboard.engine"] = nil
+		local remap = require("keyboard.engine")
 		remap.init({
 			expand_path = function(path) return path end,
 			read = function() return nil end,

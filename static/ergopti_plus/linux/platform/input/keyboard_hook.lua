@@ -69,7 +69,7 @@ local ModifierBroker = require("platform.input.modifier_broker")
 local installed_output_broker = ModifierBroker.for_channel
 local INPUT_OUTPUT_PORT_NAMES = { "capture_output", "capture_output_observer", "output_view", "acquire_transaction", "transaction_view", "transaction_current",
 	"transaction_emit", "dispatch_transaction", "commit_transaction", "retire_transaction", "close_owned" }
-local InputIssuer = require("platform.remap.key_combination_engine")
+local InputIssuer = require("keyboard.engine.keys.combination_engine")
 local HookModuleSource = require("core.fs.engine.module_source_identity")
 local HookModuleDirectory = require("core.fs.engine.module_source_directory")
 local hook_directory = HookModuleDirectory.capture()
@@ -672,7 +672,7 @@ end
 
 local function _input_exports_current()
 	if package.loaded["platform.input.evdev_reader"] ~= EvdevReader
-		or package.loaded["platform.remap.key_combination_engine"] ~= InputIssuer then return false end
+		or package.loaded["keyboard.engine.keys.combination_engine"] ~= InputIssuer then return false end
 	for _, name in ipairs(INPUT_PORT_NAMES) do
 		local port = _input_ports[name]; if type(port) ~= "function" or rawget(InputIssuer, name) ~= port then return false end
 	end
@@ -2147,7 +2147,7 @@ local function position_runtime(record)
 		or _origin_generation ~= record.origin or _origin_ready ~= true
 		or not rawequal(package.loaded["platform.input.keyboard_hook"], M)
 		or not rawequal(package.loaded["platform.input.evdev_reader"], EvdevReader)
-		or not rawequal(package.loaded["platform.remap.key_combination_engine"], InputIssuer)
+		or not rawequal(package.loaded["keyboard.engine.keys.combination_engine"], InputIssuer)
 		or not _input_exports_current()
 		or not rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
 		or rawget(XkbCapture, "source_generation") ~= position_capture.source

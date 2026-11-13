@@ -38,7 +38,7 @@ global _ob_gui := 0
 ; and AltGr tap-hold owner is false, so the host Windows layout still produces
 ; its AltGr characters in the wizard's edit boxes (and anywhere else the user
 ; types while it is up). SC138 stays an armed prefix key during the wizard,
-; because the always-eligible "~SC138 & ~F24" anchor in platform/remap/altgr.ahk
+; because the always-eligible "~SC138 & ~F24" anchor in keyboard/engine/keys/altgr.ahk
 ; has no criterion, and that costs the wizard nothing: AutoHotkey reads SC138
 ; as the RAlt modifier on every layout and never suppresses a modifier prefix
 ; that no variant fires for (hook.cpp Case #1, "this_key.as_modifiersLR"), so
@@ -50,7 +50,7 @@ global _OB_ALTGR_PASSTHROUGH := false
 
 ; Public check used by other modules' #HotIf criteria to neutralise any
 ; AltGr-capturing hotkey (e.g. the AltGr tap-hold owners in
-; platform/remap/altgr_criteria.ahk) while the wizard is on screen. Standalone
+; keyboard/engine/keys/altgr_criteria.ahk) while the wizard is on screen. Standalone
 ; hotkeys disappear cleanly when their #HotIf returns false; the SC138 prefix
 ; itself stays armed by the "~SC138 & ~F24" anchor, and AutoHotkey passes that
 ; modifier's press through when no variant fires (see _OB_ALTGR_PASSTHROUGH

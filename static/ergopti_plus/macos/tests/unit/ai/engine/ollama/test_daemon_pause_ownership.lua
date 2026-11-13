@@ -247,7 +247,7 @@ local function load_fixture()
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
-	package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
+	package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control", hs_overrides)
 	return {

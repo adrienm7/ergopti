@@ -18,7 +18,7 @@ local with_fixture = Fixture.with_fixture
 helpers.describe("conditional publication retained admission", function()
 	local function with_owned_publication(body)
 		with_fixture(function(fixture)
-			helpers.with_stub_scope({ "platform.remap.nav_layer", "platform.remap.scope_layer" }, function()
+			helpers.with_stub_scope({ "keyboard.engine.layers.nav_layer", "keyboard.engine.layers.scope_layer" }, function()
 				local dir = os.tmpname():gsub("\\", "/")
 				os.remove(dir)
 				assert(fixture.HOST_MKDIR(dir))
@@ -68,14 +68,14 @@ helpers.describe("conditional publication retained admission", function()
 		helpers.it("retains a failed real layer import after publication=" .. tostring(not prepublication), function()
 			with_owned_publication(function(path, fs, control, seed)
 				control.refuse_rename = prepublication
-				local nav = require("platform.remap.nav_layer")
-				package.loaded["platform.remap.nav_layer"] = {
+				local nav = require("keyboard.engine.layers.nav_layer")
+				package.loaded["keyboard.engine.layers.nav_layer"] = {
 					import_recommended = function() return nav.import_recommended({
 						shared_root = helpers.shared(), config_dir = path:match("^(.*)/[^/]+$"), file_adapter = fs,
 					}) end,
 					undo_import = nav.undo_import, reconcile_wheel = function() end,
 				}
-				local sibling = require("platform.remap.scope_layer").import()
+				local sibling = require("keyboard.engine.layers.scope_layer").import()
 				helpers.assert_eq(sibling.prepare(), false, "no success before native release")
 				helpers.assert_eq(sibling.receipt(), nil, "failed preparation issues no successful public capability")
 				helpers.assert_eq(sibling.restore(), false, "no-record and absence shortcuts cannot settle debt")
@@ -244,14 +244,14 @@ helpers.describe("conditional publication retained admission", function()
 	helpers.it("retains the cohort inverse's restoration publication before acknowledging its target", function()
 		with_owned_publication(function(path, fs, control, seed)
 			control.blocked = false
-			local nav = require("platform.remap.nav_layer")
-			package.loaded["platform.remap.nav_layer"] = {
+			local nav = require("keyboard.engine.layers.nav_layer")
+			package.loaded["keyboard.engine.layers.nav_layer"] = {
 				import_recommended = function() return nav.import_recommended({
 					shared_root = helpers.shared(), config_dir = path:match("^(.*)/[^/]+$"), file_adapter = fs,
 				}) end,
 				undo_import = nav.undo_import, reconcile_wheel = function() end,
 			}
-			local cohort = require("platform.remap.scope_layer")
+			local cohort = require("keyboard.engine.layers.scope_layer")
 			local sibling = cohort.import()
 			helpers.assert_eq(sibling.prepare(), true); sibling.settled(true)
 			local bytes = fs.read_with_status(path)
@@ -276,7 +276,7 @@ helpers.describe("conditional publication retained admission", function()
 	local function with_native_remap(path, fs, control, seed, body)
 		require("tests.support.remap_transaction_fixture")(function(fixture)
 			local remap, calls = fixture.load_enabled_remap()
-			local configured = package.loaded["platform.remap.config"]
+			local configured = package.loaded["keyboard.engine.runtime.config"]
 			configured.build_default_state = function()
 				return { tap_holds_enabled = false, tap_hold_config = { left_shift = { tap = "none", hold = "none" } },
 					mod_combos_config = {}, tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000,
@@ -288,12 +288,12 @@ helpers.describe("conditional publication retained admission", function()
 				captured_files[method] = fs[method]
 			end
 			package.loaded["core.fs.adapters.file_system"] = fs
-			package.loaded["platform.remap.config"] = nil
-			local actual = helpers.load_with_stubs("platform.remap.config")
+			package.loaded["keyboard.engine.runtime.config"] = nil
+			local actual = helpers.load_with_stubs("keyboard.engine.runtime.config")
 			-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
 			actual.RUNTIME_DEFAULT = "shared"
 			configured.save_user_config = actual.save_user_config
-			package.loaded["platform.remap.config"] = configured
+			package.loaded["keyboard.engine.runtime.config"] = configured
 			seed(path, "[custom]\nkeep = 17\n")
 			control.blocked = false
 			helpers.assert_eq(remap.set_tap_action("left_shift", "escape"), true)
@@ -541,25 +541,25 @@ helpers.describe("conditional publication retained admission", function()
 	local function with_native_detached(path, fs, control, seed, body)
 		require("tests.support.remap_transaction_fixture")(function(fixture)
 			local remap, calls = fixture.load_enabled_remap({ skip_init = true })
-			local configured = package.loaded["platform.remap.config"]
+			local configured = package.loaded["keyboard.engine.runtime.config"]
 			configured.build_default_state = function()
 				return { tap_holds_enabled = false, tap_hold_config = { left_shift = { tap = "none", hold = "none" } },
 					mod_combos_config = {}, tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000,
 					simultaneous_threshold_ms = 50, combo_symmetric = false }
 			end
-			package.loaded["platform.remap.defaults"].tap_hold = { left_shift = { "escape", "none" } }
+			package.loaded["keyboard.engine.runtime.defaults"].tap_hold = { left_shift = { "escape", "none" } }
 			package.loaded["settings.engine.paths"].get = function() return path end
 			local captured_files = require("core.fs.adapters.file_system")
 			for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 				captured_files[method] = fs[method]
 			end
 			package.loaded["core.fs.adapters.file_system"] = fs
-			package.loaded["platform.remap.config"] = nil
-			local actual = helpers.load_with_stubs("platform.remap.config")
+			package.loaded["keyboard.engine.runtime.config"] = nil
+			local actual = helpers.load_with_stubs("keyboard.engine.runtime.config")
 			-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
 			actual.RUNTIME_DEFAULT = "shared"
 			configured.save_user_config, configured.load_user_config = actual.save_user_config, actual.load_user_config
-			package.loaded["platform.remap.config"] = configured
+			package.loaded["keyboard.engine.runtime.config"] = configured
 			body(remap, calls)
 		end)
 	end

@@ -110,7 +110,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 ; an empty expansion. They load in run_all.ahk's order.
 #Include ../../platform/input/text_sender.ahk
 #Include ../../platform/input/key_state.ahk
-#Include ../../platform/remap/constants.ahk
+#Include ../../keyboard/engine/keys/constants.ahk
 #Include ../../platform/remap/tap_hold_roll.ahk
 ; The number row (test_e2e_number_row.ahk): the modules the number-row hotkeys
 ; of modules/keymap/layout.ahk read and run, in run_all.ahk's order. None of
@@ -131,7 +131,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../modules/keymap/keylayout/keylayout_emulation.ahk
 #Include ../../core/crypto/crypto.ahk
 #Include ../../modules/keymap/keylayout/layout_registry.ahk
-#Include ../../infra/magic_editor.ahk
+#Include ../../keyboard/engine/magic_editor.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()

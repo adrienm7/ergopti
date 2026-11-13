@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: VirtualHIDDevice Driver Update Offer Tests
 --- DESCRIPTION:
---- Pins ui/virtual_hid_update.lua over a fake remap facade: nothing runs before
+--- Pins keyboard/ui/virtual_hid_update.lua over a fake remap facade: nothing runs before
 --- the user confirms, a cancelled administrator prompt shows nothing, a refusal
 --- is reported with its reason, and only a success reloads, after the report.
 ---
@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 
 -- The modules this file stubs, restored after each case so later files see the real ones.
-local STUBBED = { "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "ui.virtual_hid_update" }
+local STUBBED = { "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "keyboard.ui.virtual_hid_update" }
 local ORIGINALS = {}
 for _, name in ipairs(STUBBED) do ORIGINALS[name] = package.loaded[name] end
 
@@ -43,8 +43,8 @@ local function load(answer)
 		end,
 	}
 	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
-	package.loaded["ui.virtual_hid_update"] = nil
-	local Offer = require("ui.virtual_hid_update")
+	package.loaded["keyboard.ui.virtual_hid_update"] = nil
+	local Offer = require("keyboard.ui.virtual_hid_update")
 	return Offer, world
 end
 

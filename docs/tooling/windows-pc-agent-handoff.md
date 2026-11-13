@@ -135,7 +135,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - Dev 3852b250 (1 November, 02:30 UTC), from the latest PC pushes:
   `tools/test/test-config-key-literals.cjs` now counts 18 hand-typed config
-  keys in `windows/infra/key_combinations.ahk` (0 allowed) and 25 in
+  keys in `windows/keyboard/engine/keys/combinations.ahk` (0 allowed) and 25 in
   `windows/ui/menu/menu_shortcuts.ahk` (22 allowed): use the generated
   `ConfigKey`/`ConfigLeaf` constants. `tools/test/test-duplicate-constant-names.cjs`:
   `WINDOW_MS` gained a copy in `windows/infra/hotpath_profiler.ahk`, and its
@@ -201,7 +201,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
   compile-time directive cannot read it, so either drop the URL from the comment
   or give the gate a reviewed exemption for that one directive.
   `tools/test/test-config-key-literals.cjs` counts 7 hand-typed config keys in
-  `windows/infra/key_combinations.ahk` against a baseline of 1: use the
+  `windows/keyboard/engine/keys/combinations.ahk` against a baseline of 1: use the
   generated `ConfigKey`/`ConfigLeaf` constants.
 - Three new assignable actions are `hs,linux` (`run_command`, `open_path`) and
   `hs` (`run_apple_shortcut`, macOS only) in `actions.toml`

@@ -6,7 +6,7 @@
 #
 # READ AT RUNTIME BY THE macOS DRIVER through _shared/tap_hold/engine/shared_file.lua,
 # which translates the file to and from the Karabiner model of
-# macos/platform/remap/config.lua. The Linux driver reads the same file
+# macos/keyboard/engine/runtime/config.lua. The Linux driver reads the same file
 # directly (platform/remap/tap_hold_loader.lua); the Windows driver will read
 # it through its own port (windows/platform/remap/tap_hold_loader.ahk).
 #
@@ -60,7 +60,7 @@ karabiner_section = "karabiner"
 [modifiers]
 order = ["ctrl", "shift", "alt", "alt_gr", "win", "cmd", "fn"]
 
-# The macOS action catalogue (macos/platform/remap/data/actions.json) names its
+# The macOS action catalogue (macos/keyboard/data/actions.json) names its
 # modifiers in `modifiers`; each maps to one shared name.
 hs_names = { ctrl = "ctrl", shift = "shift", option = "alt", cmd = "cmd", fn = "fn" }
 

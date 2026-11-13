@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local M = {}
-local LauncherHelper = require("platform.remap.lease_helper")
+local LauncherHelper = require("keyboard.adapters.karabiner.lease_helper")
 local Timings = require("core.timing.engine.timings")
 local SELECT_FLAG = "--select-input-source"
 local SELECT_BY_NAME_FLAG = "--select-input-source-by-name"

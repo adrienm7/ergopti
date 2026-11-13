@@ -4,7 +4,7 @@
 --- MODULE: The Tap-Holds Submenu Lists Its Keys By Hand
 --- DESCRIPTION:
 --- Renders the real macOS Tap-Holds submenu through the shared manifest over
---- every key the remap engine knows (platform/remap/data/tap_hold_keys.json)
+--- every key the remap engine knows (keyboard/data/tap_hold_keys.json)
 --- and checks the hand sections the shared key catalogue decides.
 ---
 --- ROOT CAUSE ENCODED:
@@ -31,7 +31,7 @@ local Json    = require("core.text.engine.json")
 --- The remap engine's real key list.
 --- @return table
 local function engine_keys()
-	local fh = assert(io.open(helpers.driver_root() .. "platform/remap/data/tap_hold_keys.json", "r"))
+	local fh = assert(io.open(helpers.driver_root() .. "keyboard/data/tap_hold_keys.json", "r"))
 	local keys = Json.decode(fh:read("*a"))
 	fh:close()
 	return keys

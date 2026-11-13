@@ -113,7 +113,7 @@ end
 helpers.describe("canonical physical combination labels", function()
 	helpers.it("translates every native pair and family in all 21 locales without changing the matrix", function()
 		with_menu(function(menu, locale, codec)
-			local matrix_path = helpers.driver_root() .. "/platform/remap/data/mod_combos.json"
+			local matrix_path = helpers.driver_root() .. "/keyboard/data/mod_combos.json"
 			local original = read(matrix_path)
 			local definitions = codec.decode(original)
 			helpers.assert_eq(#definitions, 182, "the complete native matrix is covered")
@@ -142,7 +142,7 @@ helpers.describe("canonical physical combination labels", function()
 
 	helpers.it("invalidates the picker cache on a genuine locale switch while preserving stable-language reuse", function()
 		with_menu(function(menu, locale, codec)
-			local definitions = codec.decode(read(helpers.driver_root() .. "/platform/remap/data/mod_combos.json"))
+			local definitions = codec.decode(read(helpers.driver_root() .. "/keyboard/data/mod_combos.json"))
 			local facade = remap(definitions, { calls = {}, regenerations = 0, accepted = true })
 			locale.set_locale_no_reload("en")
 			local _, first = menu._build_picker_trees(facade, nil, true)
@@ -159,7 +159,7 @@ helpers.describe("canonical physical combination labels", function()
 	helpers.it("keeps the original three pair IDs and setter refusal boundaries for every slot", function()
 		with_menu(function(menu, locale, codec)
 			locale.set_locale_no_reload("en")
-			local all = codec.decode(read(helpers.driver_root() .. "/platform/remap/data/mod_combos.json"))
+			local all = codec.decode(read(helpers.driver_root() .. "/keyboard/data/mod_combos.json"))
 			local chosen = {}
 			local wanted = { ["right_option:left_option"] = true, ["right_option:caps_lock"] = true,
 				["left_option:caps_lock"] = true }

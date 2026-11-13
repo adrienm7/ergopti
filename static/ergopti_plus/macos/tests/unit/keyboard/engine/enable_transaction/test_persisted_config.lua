@@ -1,0 +1,143 @@
+--- tests/unit/keyboard/engine/enable_transaction/test_persisted_config.lua
+
+--- ==============================================================================
+--- MODULE: Remap Transaction Regression
+--- DESCRIPTION:
+--- Preserves exact lifecycle and persistence guarantees inside one fixture scope.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local with_fixture = require("tests.support.remap_transaction_fixture")
+
+helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert", function()
+	helpers.it("joins the real parser, remap owner, manifest route, and menu terminal", function()
+		with_fixture(function(fixture)
+			local corrupt_path = os.tmpname()
+			local corrupt_toml = "[karabiner\nenabled = true\n[tap_holds\nconfig = broken ]]\n"
+			local file = assert(io.open(corrupt_path, "w"), "cannot create malformed TOML fixture")
+			assert(file:write(corrupt_toml))
+			assert(file:close())
+
+			local remap, calls = fixture.load_enabled_remap({ real_user_config_path = corrupt_path })
+			helpers.assert_eq(calls.init_result, false,
+				"the genuine TOML decoder must refuse the malformed file")
+			helpers.assert_eq(remap.get_enabled(), false,
+				"failed initialization must expose only the fail-closed facade state")
+
+			local observations = { errors = 0, successes = 0, refreshes = 0 }
+			local logger = {}
+			for _, level in ipairs({ "debug", "done", "info", "start", "trace", "warn" }) do
+				logger[level] = function() end
+			end
+			logger.error = function() observations.errors = observations.errors + 1 end
+			logger.success = function() observations.successes = observations.successes + 1 end
+			local saved_logger = package.loaded["core.logger.engine.logger"]
+			package.loaded["core.logger.engine.logger"] = logger
+			local MenuRemap = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			package.loaded["core.logger.engine.logger"] = saved_logger
+
+			local function build_menu()
+				return MenuRemap.build({
+					karabiner = remap,
+					updateMenu = function()
+						observations.refreshes = observations.refreshes + 1
+					end,
+				})
+			end
+			local function children(row)
+				if type(row) ~= "table" then return {} end
+				return row.submenu or row.items or row.menu or {}
+			end
+			local function find_row(row, label)
+				if type(row) ~= "table" then return nil end
+				if row.label == label or row.title == label then return row end
+				for _, child in ipairs(children(row)) do
+					local found = find_row(child, label)
+					if found then return found end
+				end
+				return nil
+			end
+			local function find_prefixed(row, label)
+				if type(row) ~= "table" then return nil end
+				if type(row.title) == "string" and row.title:sub(1, #label) == label then return row end
+				for _, child in ipairs(children(row)) do
+					local found = find_prefixed(child, label)
+					if found then return found end
+				end
+				return nil
+			end
+			-- The failed owner reads off, so the category-off rule greys the row.
+			local greyed = find_prefixed(build_menu(), "common.clear_to_system")
+			helpers.assert_not_nil(greyed, "the real manifest must draw the Clear All row")
+			helpers.assert_eq(greyed.disabled, true, "Clear All is greyed while the failed owner reads off")
+			helpers.assert_nil(greyed.fn, "a greyed Clear All runs nothing")
+			-- Read on, the row is live and the command itself must still refuse.
+			local read_off = remap.get_tap_holds_enabled
+			remap.get_tap_holds_enabled = function() return true end
+			local built_ok, built = pcall(build_menu)
+			remap.get_tap_holds_enabled = read_off
+			if not built_ok then error(built, 0) end
+			local row = find_row(built, "common.clear_to_system")
+			helpers.assert_not_nil(row,
+				"the real manifest must expose the Clear All command")
+			local action = row and (row.action or row.fn)
+			helpers.assert_type(action, "function")
+			-- The row asks first; the user answers yes, so the owner decides.
+			local saved_dialogs = package.loaded["core.ui.engine.dialog_util"]
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, _, _, yes) return yes end }
+			local ran, result = pcall(action)
+			package.loaded["core.ui.engine.dialog_util"] = saved_dialogs
+			helpers.assert_true(ran, tostring(result))
+			helpers.assert_eq(result, false,
+				"the real command must propagate the uninitialized owner refusal")
+
+			local after = assert(io.open(corrupt_path, "r"))
+			local after_bytes = after:read("*a")
+			after:close()
+			os.remove(corrupt_path .. ".tmp")
+			os.remove(corrupt_path)
+
+			helpers.assert_eq(after_bytes, corrupt_toml,
+				"Clear All must leave the rejected TOML byte-identical")
+			helpers.assert_eq(remap.get_enabled(), false,
+				"Clear All must not synthesize enabled state after failed initialization")
+			helpers.assert_eq(observations.successes, 0,
+				"the menu must publish no false success")
+			helpers.assert_true(observations.errors >= 1,
+				"the composed refusal must remain visible")
+		end)
+	end)
+end)
+
+helpers.describe("karabiner init fails closed on unsafe persisted config", function()
+	helpers.it("HS-019 returns literal booleans for every early refusal class", function()
+		with_fixture(function(fixture)
+			local uninitialized = fixture.load_enabled_remap({ skip_init = true })
+			helpers.assert_eq(uninitialized.init(nil), false,
+				"an invalid adapter must return literal false, never nil")
+
+			local missing_data, missing_calls = fixture.load_enabled_remap({ empty_data = true })
+			helpers.assert_type(missing_data.init, "function")
+			helpers.assert_eq(missing_calls.init_result, false,
+				"required-data refusal must return literal false, never nil")
+
+			local initialized = fixture.load_enabled_remap()
+			helpers.assert_eq(initialized.init({ expand_path = function(path) return path end }), false,
+				"duplicate initialization is a refusal and must return literal false")
+		end)
+	end)
+
+	helpers.it("arms no state, lease, watcher, or regeneration surface", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({ config_error = true })
+			helpers.assert_eq(calls.init_result, false)
+			helpers.assert_eq(calls.lease_init, 0,
+				"an unreadable config may contain enabled=false, so no lease generation may be prepared")
+			helpers.assert_eq(calls.input_source_watchers, 0)
+			helpers.assert_eq(calls.build, 0)
+			helpers.assert_eq(calls.deploy, 0)
+			helpers.assert_eq(remap.get_enabled(), false,
+				"require_state must prove that no default state was published")
+		end)
+	end)
+end)

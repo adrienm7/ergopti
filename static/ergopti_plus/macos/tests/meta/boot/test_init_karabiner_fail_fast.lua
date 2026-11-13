@@ -68,7 +68,7 @@ local function remap_init_body(source)
 	local start_at = source:find(INIT_ANCHOR, 1, true)
 	local stop_at = start_at and source:find("--- Releases local watchers", start_at, true)
 	helpers.assert_true(start_at ~= nil and stop_at ~= nil and start_at < stop_at,
-		"platform.remap M.init must remain uniquely extractable")
+		"keyboard.engine M.init must remain uniquely extractable")
 	return source:sub(start_at, stop_at - 1)
 end
 
@@ -167,7 +167,7 @@ helpers.describe("root boot requires an exact Karabiner init commit", function()
 	end)
 end)
 
-helpers.describe("platform.remap init returns a literal boolean", function()
+helpers.describe("keyboard.engine init returns a literal boolean", function()
 	local remap_source, remap_source_err = helpers.read_driver_unit(INIT_ANCHOR)
 	local body = remap_source and remap_init_body(remap_source) or ""
 

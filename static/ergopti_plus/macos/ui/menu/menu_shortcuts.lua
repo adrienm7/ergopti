@@ -846,7 +846,7 @@ function M.build(ctx)
 		end,
 		[require("settings.engine.keys").LEAF.SCRIPT_CONTROL] = script_control_group,
 		-- « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.
-		["caps_word_auto_off"] = function() return require("ui.menu.menu_caps_word").build(ctx) end,
+		["caps_word_auto_off"] = function() return require("keyboard.ui.menu_caps_word").build(ctx) end,
 	}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own

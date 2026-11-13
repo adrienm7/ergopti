@@ -24,9 +24,9 @@ end
 --- @param save_result boolean|nil False makes every save fail.
 --- @param shipped boolean|nil True keeps the manifest defaults, as a fresh install has them.
 local function fresh(save_result, shipped)
-	package.loaded["ui.menu.menu_caps_word"] = nil
-	package.loaded["infra.capsword_auto_off"] = nil
-	local Owner = require("infra.capsword_auto_off")
+	package.loaded["keyboard.ui.menu_caps_word"] = nil
+	package.loaded["keyboard.engine.capsword_auto_off"] = nil
+	local Owner = require("keyboard.engine.capsword_auto_off")
 	local state = {}
 	for key, value in pairs(Owner.DEFAULT_STATE) do state[key] = value end
 	-- A known stored list, so the clicks below do not depend on the defaults.
@@ -39,7 +39,7 @@ local function fresh(save_result, shipped)
 		save_prefs = function() h.saves = h.saves + 1; return save_result ~= false end,
 		updateMenu = function() h.updates = h.updates + 1 end,
 	}
-	h.rows = require("ui.menu.menu_caps_word").build(h.ctx)
+	h.rows = require("keyboard.ui.menu_caps_word").build(h.ctx)
 	helpers.assert_type(h.rows, "table", "the group must render")
 	h.items = index_items(h.rows)
 	return h
@@ -58,7 +58,7 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 	helpers.it("(cws-002) captions the star delimiter with the literal ★ after a magic-key rename", function()
 		local h = fresh()
 		h.ctx.applyTriggerChar = function(text) return (text:gsub("★", "§")) end
-		local items = index_items(require("ui.menu.menu_caps_word").build(h.ctx))
+		local items = index_items(require("keyboard.ui.menu_caps_word").build(h.ctx))
 		local label = require("core.i18n.engine.i18n").get("terminators.label_star")
 		helpers.assert_true(label:find("★", 1, true) ~= nil, "control: the shipped caption names ★")
 		helpers.assert_true(find(items, label) ~= nil, "the star row keeps the literal ★")

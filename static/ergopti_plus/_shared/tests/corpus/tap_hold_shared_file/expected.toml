@@ -5,11 +5,11 @@
 # every manifest row lives in config.toml).
 #
 # linux_written is what the Linux writers write for the changes listed in
-# linux/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua;
+# linux/tests/unit/keyboard/tap_hold/test_shared_file.lua;
 # macos_written what the macOS writer writes for the state in
-# macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua;
+# macos/tests/unit/keyboard/engine/config/test_tap_hold_shared_file.lua;
 # windows_written what the Windows writers write for the changes in
-# windows/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk.
+# windows/tests/unit/keyboard/engine/tap_hold/test_shared_file.ahk.
 # Each suite pins its own tap_hold.toml byte for byte, its own config.toml rows
 # as values, and reads every pair with its own readers:
 #   - [reads.<name>.linux]: platform/remap/tap_hold_loader.lua, the effective

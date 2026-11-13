@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, '../../..');
 const source = fs.readFileSync(
 	path.join(
 		root,
-		'static/ergopti_plus/windows/tests/unit/platform/remap/key_combinations/test_key_combinations.ahk'
+		'static/ergopti_plus/windows/tests/unit/keyboard/engine/key_combinations/test_key_combinations.ahk'
 	),
 	'utf8'
 );

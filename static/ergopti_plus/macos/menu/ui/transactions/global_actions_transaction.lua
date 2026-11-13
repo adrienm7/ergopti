@@ -25,7 +25,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.logger")
-local ChordCatalogue = require("infra.script_chord_catalogue")
+local ChordCatalogue = require("keyboard.engine.layers.script_chord_catalogue")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu_global_actions"

@@ -2,7 +2,7 @@
 --- Bounded independent text and privacy boundary for the AI typing context.
 local ContextBuffer = require("ai.engine.policy.context_buffer")
 local LlmContextLimit = require("ai.engine.context_limit")
-local ComposedText = require("infra.composed_text")
+local ComposedText = require("keyboard.engine.composed_text")
 local text_utils = require("core.text.engine.utils_core")
 local M = {}
 

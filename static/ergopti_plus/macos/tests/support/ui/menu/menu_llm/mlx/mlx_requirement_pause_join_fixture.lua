@@ -38,7 +38,7 @@ local OWNED_MODULES = {
 	"modules.shortcuts.script_control",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"ai.ui.menu.profile_label",
 	"ai.ui.menu.prediction_lock_registry",
@@ -304,7 +304,7 @@ local function install_subject_stubs(native)
 			resume_after_pause = function() return true end,
 		}
 	end
-	package.loaded["platform.remap.onboarding"] = {
+	package.loaded["keyboard.engine.runtime.onboarding"] = {
 		stop = function() return true end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }

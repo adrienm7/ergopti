@@ -22,7 +22,7 @@
 #
 # Detection rules, per OS:
 #   source = "karabiner_generator"  macOS only. The features come from
-#                     macos/platform/remap/generator.lua: M.REQUIREMENT_STATE_FEATURES
+#                     macos/keyboard/engine/runtime/generator.lua: M.REQUIREMENT_STATE_FEATURES
 #                     maps each state field the generator reads to the features it
 #                     feeds, M.REQUIREMENT_FACADE_FEATURES each module calling the
 #                     injected remap facade (`content` below finds them).

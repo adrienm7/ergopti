@@ -158,8 +158,8 @@
 			"evidence": [
 				"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
 				"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
-				"static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
-				"static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_lone_tap_window.lua"
+				"static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_integration.lua",
+				"static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_lone_tap_window.lua"
 			]
 		},
 		"gestures": {
@@ -481,10 +481,10 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
-				"static/ergopti_plus/linux/platform/remap/key_combination_engine.lua",
+				"static/ergopti_plus/linux/keyboard/engine/keys/combination_engine.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
-				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
-				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
+				"static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua",
+				"static/ergopti_plus/linux/keyboard/ui/menu_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
@@ -501,8 +501,8 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
 				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
-				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
-				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
+				"static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua",
+				"static/ergopti_plus/linux/keyboard/ui/menu_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]

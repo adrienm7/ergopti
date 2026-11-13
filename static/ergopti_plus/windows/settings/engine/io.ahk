@@ -14,7 +14,7 @@
 #Include publication/write_lease.ahk
 #Include ../../core/text/engine/toml/refusals.ahk
 #Include migration/unused_keys.ahk
-#Include %A_LineFile%\..\../../infra/slot_roles.ahk
+#Include %A_LineFile%/../../../keyboard/engine/slot_roles.ahk
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not

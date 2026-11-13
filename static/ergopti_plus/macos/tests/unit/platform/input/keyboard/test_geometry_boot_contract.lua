@@ -20,7 +20,7 @@ helpers.describe("keyboard geometry boot ownership", function()
 		helpers.assert_true(position ~= nil, "root boot must explicitly initialize keyboard geometry")
 		helpers.assert_nil(source:find(initialize, position + #initialize, true),
 			"accessibility resume must not initialize a second geometry owner")
-		for _, marker in ipairs({ 'require("core.fs.adapters.file_system")', 'pcall(require, "platform.remap")',
+		for _, marker in ipairs({ 'require("core.fs.adapters.file_system")', 'pcall(require, "keyboard.engine")',
 			'require("menu.ui")', "local function finish_boot_after_onboarding()", "shortcuts.start_script_control" }) do
 			local consumer = source:find(marker, 1, true)
 			helpers.assert_true(consumer ~= nil, "the boot guard must retain consumer coverage: " .. marker)
@@ -36,7 +36,7 @@ helpers.describe("keyboard geometry boot ownership", function()
 		local position = source:find(register, 1, true)
 		helpers.assert_true(position ~= nil, "root boot must hand the deployed virtual form to geometry")
 		helpers.assert_nil(source:find(register, position + #register, true), "one registration per VM")
-		local bridge = source:find('pcall(require, "platform.remap")', 1, true)
+		local bridge = source:find('pcall(require, "keyboard.engine")', 1, true)
 		helpers.assert_true(bridge ~= nil and bridge < position, "the bridge must load before registration")
 		local reader = source:find("bridge.virtual_keyboard_form()", position, true)
 		helpers.assert_true(reader ~= nil, "the source must read the bridge's deployed form")

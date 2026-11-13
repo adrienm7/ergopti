@@ -709,7 +709,7 @@ end
 --- read_driver_source concatenates every matching file, which is right for
 --- "does this appear anywhere" and wrong for "does A appear before B": byte
 --- offsets across unrelated files answer a question nobody asked. The boot
---- guard compared `hs.shutdownCallback = function` against `"platform.remap"`
+--- guard compared `hs.shutdownCallback = function` against `"keyboard.engine"`
 --- that way; both live in init.lua, but two OTHER files carry the second marker
 --- alone, so whichever the scan reached first decided the verdict.
 ---

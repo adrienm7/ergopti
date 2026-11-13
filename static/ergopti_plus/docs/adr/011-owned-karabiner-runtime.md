@@ -178,7 +178,7 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
 - The realigned invariants: `docs/memory/macos-hammerspoon.md`
   (`project-hs-owned-remap-runtime`, `project-hs-karabiner-exact-lease-isolation`,
   `project-hs-fork-admission-in-both-launch-modes`).
-- The dual-mode description: `static/ergopti_plus/macos/platform/remap/README.md`
+- The dual-mode description: `static/ergopti_plus/macos/keyboard/engine/README.md`
   and `static/ergopti_plus/macos/launcher/README.md`.
 - R3 stays enforced for stock processes by
   `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`.

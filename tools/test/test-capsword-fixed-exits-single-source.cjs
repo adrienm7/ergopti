@@ -70,7 +70,7 @@ const SETTING_EXITS = new Set(['spacebar', 'return_or_enter', 'tab', 'g', 'v', '
  * @returns {string[]}
  */
 function macosKeys() {
-	const rule = JSON.parse(read('macos/platform/remap/data/capsword.json'));
+	const rule = JSON.parse(read('macos/keyboard/data/capsword.json'));
 	const keys = [];
 	for (const manipulator of rule.manipulators) {
 		const active = (manipulator.conditions || []).some(

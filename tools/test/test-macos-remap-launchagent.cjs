@@ -432,7 +432,16 @@ check(
 	'the GUI launcher must tell the driver that guardian registration is left to it'
 );
 const LEASE_CONTROLLER = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'platform', 'remap', 'lease_controller.lua'),
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'macos',
+		'keyboard',
+		'adapters',
+		'karabiner',
+		'lease_controller.lua'
+	),
 	'utf8'
 );
 check(

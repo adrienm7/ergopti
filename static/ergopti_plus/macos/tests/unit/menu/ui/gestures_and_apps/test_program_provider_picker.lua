@@ -56,7 +56,7 @@ local function fixture(body)
 		-- Availability cases consume the actual native predicate, never a copied rule.
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		package.loaded["adapters.apple_shortcuts_native"] = nil
-		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["core.process.adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
 		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, save) return save, f.typed end,

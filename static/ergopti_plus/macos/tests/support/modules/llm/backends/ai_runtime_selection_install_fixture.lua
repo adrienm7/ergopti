@@ -292,7 +292,7 @@ local STUBBED_MODULES = {
 	"ai.engine.prediction.progressive_reveal", "ai.engine.prediction.engine",
 	"ai.ui.menu.models.manager_ollama", "ai.engine.api.common",
 	"ai.engine.ollama.endpoint", "core.fs.adapters.storage", "core.process.adapters.owned_program_runner",
-	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
+	"keyboard.adapters.karabiner.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
 	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",
 }

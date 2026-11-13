@@ -440,7 +440,7 @@ end
 helpers.describe("the wizard requires its native import timeout before remap effects", function()
 	helpers.it("refuses a retained live import when native timer start fails and still applies other answers (wizard-timeout-admission)", function()
 		with_wizard_timeout_native_refusal(function(state, control)
-			local remap = package.loaded["platform.remap"]
+			local remap = package.loaded["keyboard.engine"]
 			local held = 0
 			remap.is_running = function() return true end
 			remap.import_recommended_keys = function() held = held + 1; return true end
@@ -481,7 +481,7 @@ helpers.describe("the wizard requires its native import timeout before remap eff
 
 	helpers.it("the same actual Finish retries after native timer repair with the original live import and single reload (wizard-timeout-admission)", function()
 		with_wizard_timeout_native_refusal(function(state, control)
-			local remap = package.loaded["platform.remap"]
+			local remap = package.loaded["keyboard.engine"]
 			local imports, completion = 0, nil
 			remap.is_running = function() return true end
 			remap.import_recommended_keys = function(request, callback)

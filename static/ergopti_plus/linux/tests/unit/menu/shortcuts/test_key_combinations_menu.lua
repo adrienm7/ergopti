@@ -26,7 +26,7 @@ local function with_menu(body)
 		local owner=Pair.new({keys=keys,hold_picker=defaults.tap_hold.hold_picker,route=function() return "/controlled/config.toml" end,
 			files={read_with_status=function() return state.source,"ok" end},is_paused=function() return state.paused end,
 			actions=gestures,changed=function() return true end});Pair.set_instance(owner)
-		package.loaded["infra.key_combinations_scope"]={retry_restore=function() return true end,
+		package.loaded["keyboard.engine.keys.combinations_scope"]={retry_restore=function() return true end,
 			edit=function(rows,receipt)
 				if receipt.guard()~=true then return false end
 				state.edits[#state.edits+1]=rows;return true
@@ -34,8 +34,8 @@ local function with_menu(body)
 		package.loaded["core.i18n.engine.i18n"]={get=t,section=t,get_locale=function() return "en" end}
 		package.loaded["menu.engine.manifest_menu"]=nil
 		local renderer=require("menu.engine.manifest_menu")
-		package.loaded["ui.menu.key_combinations"]=nil
-		local Menu=require("ui.menu.key_combinations")
+		package.loaded["keyboard.ui.menu_key_combinations"]=nil
+		local Menu=require("keyboard.ui.menu_key_combinations")
 		state.rows=Menu.build({tap_holds={key_catalog=function() return keys end,hold_options=function() return holds end},
 			gestures=gestures,is_paused=function() return state.paused end},{manifest=renderer,get=t,key_label=function(entry) return t(entry.label_key) end,
 			action_label=function(action) return action end,error=function() state.errors=state.errors+1 end,
@@ -80,7 +80,7 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			helpers.assert_eq(#notices,1)
 			helpers.assert_eq(notices[1][1],state.translate("menu.shortcuts.key_combinations"))
 			helpers.assert_eq(notices[1][2],not before)
-			package.loaded["infra.key_combinations_scope"].set_enabled=function() return false end
+			package.loaded["keyboard.engine.keys.combinations_scope"].set_enabled=function() return false end
 			state.click(row)
 			helpers.assert_eq(#notices,1,"a refused switch must not announce anything")
 		end)
@@ -206,7 +206,7 @@ local function with_canonical_locale_menu(callback)
 		local i18n = require("core.i18n.engine.i18n")
 		i18n.init()
 		local renderer = require("menu.engine.manifest_menu")
-		local provider = require("ui.menu.key_combinations")
+		local provider = require("keyboard.ui.menu_key_combinations")
 		local actions = require("gestures.engine.manager")
 		local last_pick
 		local context = {

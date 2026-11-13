@@ -9,7 +9,7 @@
 --- recommended tap-hold key that enters the layer held an empty layer on a
 --- fresh install. The first-run wizard's Tap-Holds import and the Tap-Holds
 --- « Restore recommended values » call it; the Windows driver implements the
---- same contract in windows/platform/remap/layers_loader.ahk.
+--- same contract in windows/keyboard/engine/layers/loader.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Additive only: an existing layers.toml is the user's and is never

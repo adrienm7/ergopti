@@ -14,7 +14,7 @@ local Logger         = require("core.logger.engine.logger")
 local ShellRunner    = require("core.process.adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings        = require("core.timing.engine.timings")
-local LauncherHelper = require("platform.remap.lease_helper")
+local LauncherHelper = require("keyboard.adapters.karabiner.lease_helper")
 
 local LOG = "llm.api_token_crypto"
 

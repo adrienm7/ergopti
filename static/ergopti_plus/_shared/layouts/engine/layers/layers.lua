@@ -9,7 +9,7 @@
 --- layer vocabulary (_shared/layouts/data/layer_actions.toml), and resolves every
 --- binding for one OS. The macOS and Linux drivers share this module; the
 --- Windows driver implements the same contract in
---- windows/platform/remap/layers_loader.ahk and the JS gates in
+--- windows/keyboard/engine/layers/loader.ahk and the JS gates in
 --- tools/lib/keymap-layers.cjs. _shared/tests/corpus/keymap_layers/vectors.json
 --- holds the three implementations to one answer.
 ---

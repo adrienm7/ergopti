@@ -21,8 +21,8 @@
 ---      benefit never delivered, and pcall swallowed the failure.
 ---
 --- WHY THIS TEST IS CLASS-WIDE:
---- Both defects were found and fixed in platform/remap/config.lua, and pinned
---- by tests/unit/platform/remap/config/test_config_repo_root.lua. That guard asserts
+--- Both defects were found and fixed in keyboard/engine/runtime/config.lua, and pinned
+--- by tests/unit/keyboard/engine/config/test_repo_root.lua. That guard asserts
 --- against ONE file, so the identical copy in settings/engine/preferences/preferences.lua — on the
 --- hotter path of the two, since every menu toggle calls save_prefs() — survived
 --- untouched. This test therefore enumerates every driver source file instead of
@@ -39,7 +39,7 @@ local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
 -- the forbidden strings does not trip the guard.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard" }
 
 -- The two forbidden markers, with the reason each one is banned.
 local FORBIDDEN = {

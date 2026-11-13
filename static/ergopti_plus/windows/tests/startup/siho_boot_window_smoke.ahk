@@ -11,7 +11,7 @@
 ; The include below sits after the first probe on purpose. Function definitions
 ; are hoisted, so SIHO_Count() is callable, but `global _SIHO_Owners := Map()`
 ; has not executed — which is precisely the state ErgoptiPlus.ahk is in between
-; its first line and infra/suppressive_inputhook_ownership.ahk's include
+; its first line and keyboard/engine/suppressive_inputhook_ownership.ahk's include
 ; position a thousand lines later.
 ;
 ; Before the fix this harness died with "This global variable has not been
@@ -59,7 +59,7 @@ if (SIHO_Count() != 0)
 if SIHO_HasActive()
 	ExitApp(11)
 
-#Include ../../infra/suppressive_inputhook_ownership.ahk
+#Include ../../keyboard/engine/suppressive_inputhook_ownership.ahk
 
 ; ---- The module has now run: the same answers, from real state. ----
 if !IsSet(_SIHO_Owners)

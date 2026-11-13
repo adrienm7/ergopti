@@ -48,7 +48,7 @@
 # that action says why.
 #
 # Loaders: _shared/layouts/engine/layers/layers.lua (macOS, Linux) and
-# windows/platform/remap/layers_loader.ahk (Windows).
+# windows/keyboard/engine/layers/loader.ahk (Windows).
 
 
 
@@ -114,7 +114,7 @@ groups = ["key", "cursor", "selection", "editing", "window", "media", "system"]
 # =============================
 
 # Windows counts with NumberOfRepetitions, macOS with the Karabiner variable
-# nav_repeat_count (macos/platform/remap/nav_layer.lua), Linux in its tap-hold
+# nav_repeat_count (macos/keyboard/engine/layers/nav_layer.lua), Linux in its tap-hold
 # engine (repeat_count): each resets the count at the next send and when the
 # layer is entered again.
 [parameters.repeat_count]

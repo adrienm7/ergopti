@@ -54,7 +54,6 @@ graph TD
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_input_source_selector["InputSourceSelector.lua"]
         MACOS_installed_physical_source["InstalledPhysicalSource.lua"]
-        MACOS_karabiner_coexistence["KarabinerCoexistence.lua"]
         MACOS_keyboard_layout_files["KeyboardLayoutFiles.lua"]
         MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
         MACOS_mouse_control["MouseControl.lua"]
@@ -65,9 +64,6 @@ graph TD
         MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
         MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
         MACOS_privacy_settings["PrivacySettings.lua"]
-        MACOS_system_switcher_input["SystemSwitcherInput.lua"]
-        MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
-        MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
     end

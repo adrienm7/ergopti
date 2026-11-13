@@ -126,7 +126,7 @@ _BuildAltGrTables() {
 ;      Physical RAlt is never down, so the gate must accept SC138 directly.
 ;
 ; The discriminator is _ALTGR_KANA_FIXUP, auto-detected via a reverse
-; VK_RMENU→SC probe (infra/altgr_family.ahk), at boot and then on every change
+; VK_RMENU→SC probe (keyboard/engine/keys/altgr_family.ahk), at boot and then on every change
 ; of the foreground window's layout, without a reload. Manual TOML override
 ; available via ScriptInformation["AltGrIsKanaRemap"] in case the probe ever
 ; misfires.
@@ -141,7 +141,7 @@ IsRealAltGrPress(PhysicalStateFn := unset) {
     ; defer to the host Windows layout. Returning false here neutralises every
     ; #HotIf that gates on IsRealAltGrPress(), which is the gate used by every
     ; static SC138 combo in the codebase. SC138 still stays an armed prefix:
-    ; the always-eligible "~SC138 & ~F24" anchor (platform/remap/altgr.ahk)
+    ; the always-eligible "~SC138 & ~F24" anchor (keyboard/engine/keys/altgr.ahk)
     ; has no criterion. AutoHotkey reads SC138 as the RAlt modifier and never
     ; suppresses a modifier prefix that no variant fires for (hook.cpp Case #1,
     ; "this_key.as_modifiersLR"), so the native AltGr press reaches the
@@ -169,7 +169,7 @@ IsRealAltGrPress(PhysicalStateFn := unset) {
 
 ; #HotIf of the script chords (AltGr+Escape quits, +Enter toggles the pause,
 ; +BackSpace reloads, +Delete opens the personal shortcuts), running and paused
-; (infra/script_altgr_hotkeys.ahk). On QWERTY the AltGr key is a plain right
+; (keyboard/engine/script_altgr_hotkeys.ahk). On QWERTY the AltGr key is a plain right
 ; Alt, and the always-eligible prefix anchor arms SC138 on its first press:
 ; RAlt+Esc, Windows' Alt+Esc, quit the driver. These chords are destructive, so
 ; they need a layout whose AltGr key is an AltGr; on QWERTY those keys stay
@@ -181,7 +181,7 @@ ScriptAltGrChordIsLive(AltGrPressed) {
 }
 
 ; #HotIf of the script chords' suffix-only twins on a Kana-style layout
-; (infra/script_altgr_hotkeys.ahk): there the chord runs from Enter, BackSpace,
+; (keyboard/engine/script_altgr_hotkeys.ahk): there the chord runs from Enter, BackSpace,
 ; Delete or Escape alone while SC138 is physically down. They are registered on
 ; every layout and read the family here, per press: the family follows the
 ; foreground window's layout, so a registration decided at boot would miss a
@@ -219,7 +219,7 @@ ScriptAltGrPausedChordRunsSlot(Slot, *) {
 }
 
 ; The script chord hotkeys, three per slot, each with the criterion bound to
-; its slot (infra/script_altgr_hotkeys.ahk registers them in this order).
+; its slot (keyboard/engine/script_altgr_hotkeys.ahk registers them in this order).
 ; - "SC138 & <key>": the AltGr key by its scan code only. "RAlt & Enter" and
 ;   "^!Enter" twins were dead: the SC138 hotkeys route every right Alt event to
 ;   the scan code's record, and the suffix scan-code hotkeys route those keys'
@@ -228,7 +228,7 @@ ScriptAltGrPausedChordRunsSlot(Slot, *) {
 ;   and paused, off a layout whose AltGr key is a plain Alt: on QWERTY RAlt+Esc
 ;   must stay Alt+Esc, not quit the driver.
 ; - "$<key>": the Kana-style twin, registered on every layout: the AltGr family
-;   follows the foreground window's layout (infra/altgr_family.ahk), so the
+;   follows the foreground window's layout (keyboard/engine/keys/altgr_family.ahk), so the
 ;   criterion decides per press whether this layout is a Kana one.
 ; - "$*<key>": the paused twin. With * it also matches under the LCtrl+RAlt an
 ;   AltGr layout holds: without it, AltGr+Enter could not unpause there.

@@ -883,7 +883,7 @@ end)
 
 helpers.describe("actual delegated ordered-pair list coverage", function()
 	helpers.it("requires the actual production delegate for all three declared lists", function()
-		local current, omitted = registered_providers(), registered_providers("ui.menu.key_combinations")
+		local current, omitted = registered_providers(), registered_providers("keyboard.ui.menu_key_combinations")
 		for _, id in ipairs({"key_combination_slots", "key_combination_rows_left", "key_combination_rows_right"}) do
 			helpers.assert_true(current[id] == true)
 			helpers.assert_eq(omitted[id], nil, "a missing delegate cannot satisfy a declared list")

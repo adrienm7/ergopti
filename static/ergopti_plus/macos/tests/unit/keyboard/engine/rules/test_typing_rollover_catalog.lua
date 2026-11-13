@@ -1,0 +1,15 @@
+--- tests/unit/keyboard/engine/rules/test_typing_rollover_catalog.lua
+
+--- ==============================================================================
+--- MODULE: Shared Typing-Priority Key Catalogue
+--- DESCRIPTION:
+--- Replays all backend aliases and invalid-list refusals against shipped TOML.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local Catalog = require("tap_hold.engine.key_catalog")
+local path = helpers.driver_root() .. "/../_shared/tap_hold/data/defaults.toml"
+local handle = assert(io.open(path, "r"))
+local defaults = require("core.text.engine.toml_codec").decode(handle:read("*a"))
+assert(handle:close())
+require("tests.lua.keyboard.tap_hold_rollover_contract")(helpers, Catalog, defaults)

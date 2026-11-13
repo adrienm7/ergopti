@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local assert_false = function(value, message) helpers.assert_eq(value, false, message) end
 local Owner = require("modules.shortcuts.key_combinations")
 local Engine = require("platform.remap.tap_hold_engine")
-local Native = require("platform.remap.key_combination_engine")
+local Native = require("keyboard.engine.keys.combination_engine")
 local catalog = {}; for _, id in ipairs({ "caps_lock", "tab", "left_shift", "left_alt", "space" }) do catalog[#catalog + 1] = { id = id, key = id } end
 local path, binding = "/controlled/config.toml", "combination__caps_lock_then_tab"
 local base_text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "run_program"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "shift"\n[gesture_parameters]\ncombination__caps_lock_then_tab__run_program = "executableargvv1:controlled"\n'
@@ -227,7 +227,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
-			["platform.remap.nav_layer"]={load=function() return {} end},
+			["keyboard.engine.layers.nav_layer"]={load=function() return {} end},
 			["core.fs.adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
 			["settings.engine.paths"]={config=function() return path end} },function()
 			-- The owner must capture these actual declared ports before the manager
@@ -324,7 +324,7 @@ helpers.describe("configured pair publication lifecycle",function()
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
-			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["keyboard.engine.layers.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["settings.engine.paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
@@ -405,7 +405,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
-			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["keyboard.engine.layers.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["settings.engine.paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
@@ -723,7 +723,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 				if replacement == "reader" then s.reader.source_current = function() return true end
 				elseif replacement == "writer" then s.writer.output_view = function() return { down = {}, write_epoch = 4 } end
 				elseif replacement == "engine" then s.base.plan_text = function() return { { keycode = 30, mods = { "shift" } } } end
-				elseif replacement == "issuer" then require("platform.remap.key_combination_engine").input_owner_current = function() return true end
+				elseif replacement == "issuer" then require("keyboard.engine.keys.combination_engine").input_owner_current = function() return true end
 				elseif replacement == "lease" then setmetatable(s.lease, {})
 				elseif replacement == "configuration" then s.paused = true
 				elseif replacement == "classification" then require("hotstrings.engine.device_finder").physical_sources = function() return {} end
@@ -1526,7 +1526,7 @@ helpers.describe("same-device third slot through original production consumers (
 	helpers.it("refuses a caller-normalized table even on an original installed Pair issuer",function()
 		with_chord({},function(s)
 			local Engine=require("platform.remap.tap_hold_engine")
-			local Pair=require("platform.remap.key_combination_engine")
+			local Pair=require("keyboard.engine.keys.combination_engine")
 			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},tap_min_ms=0,enabled=true,revision=0,
 				chords={tab_then_caps_lock="copy"},chord_settings={simultaneous_threshold_ms=100,combo_symmetric=true},
 				capture=function()return function()return true end end,capture_action=function()return function()return true end end,
@@ -1738,7 +1738,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
  end
  local function detach(s,configured)
   local Base=require("platform.remap.tap_hold_engine")
-  local Pair=require("platform.remap.key_combination_engine")
+  local Pair=require("keyboard.engine.keys.combination_engine")
   local base=Base.new({keys={tab={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},
    tap_min_ms=0,lone_tap_max_ms=0,one_shot_timeout_ms=1000})
   local received={}
@@ -1808,7 +1808,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
   if not ok then error(err,0) end
  end
  for _,spec in ipairs({{"modules.shortcuts.key_combinations","new"},
-  {"platform.remap.tap_hold_engine","new"},{"platform.remap.key_combination_engine","new"},
+  {"platform.remap.tap_hold_engine","new"},{"keyboard.engine.keys.combination_engine","new"},
   {"platform.remap.tap_hold_loader","load"},{"platform.remap.tap_hold_loader","load_document"}}) do
   helpers.it("retires pending custody after original constructor replacement "..spec[1].."."..spec[2],function()
    public(function(s)
@@ -2169,7 +2169,7 @@ end)
 helpers.describe("owned roll journal action acknowledgement", function()
 	helpers.it("does not advance a roll after an action explicitly refuses", function()
 		local Engine = require("platform.remap.tap_hold_engine")
-		local Pair = require("platform.remap.key_combination_engine")
+		local Pair = require("keyboard.engine.keys.combination_engine")
 		local base = Engine.new({ keys = { space = { hold_modifier = "shift" }, escape = { tap_action = "copy" },
 			delete = { tap_action = "paste" } }, roll_keys = { "space" }, tap_min_ms = 0,
 			lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })

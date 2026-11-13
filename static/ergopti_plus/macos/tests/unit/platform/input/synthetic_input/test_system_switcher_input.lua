@@ -4,10 +4,10 @@
 local helpers = require("tests.helpers")
 local eq = helpers.assert_eq
 local function with_input(body, setup)
-	local names = { "adapters.system_switcher_input", "adapters.system_switcher_sampler",
+	local names = { "keyboard.adapters.system_switcher_input", "keyboard.adapters.system_switcher_sampler",
 		"core.events.timer_scheduler", "gestures.adapters.native_app_switcher", "platform.input.synthetic_input",
 		"platform.focus.window_manager", "core.fs.adapters.storage", "core.logger.engine.logger", "core.timing.engine.timings",
-		"gestures.adapters.native_app_switcher_action", "adapters.system_switcher_runtime" }
+		"gestures.adapters.native_app_switcher_action", "keyboard.adapters.system_switcher_runtime" }
 	local saved, old_hs = {}, hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path = os.tmpname()
@@ -145,7 +145,7 @@ local function with_input(body, setup)
 	end
 	function f.action()
 		f.actual_synthetic()
-		package.loaded["adapters.system_switcher_runtime"] = { descriptor = function() return f.descriptor end }
+		package.loaded["keyboard.adapters.system_switcher_runtime"] = { descriptor = function() return f.descriptor end }
 		package.loaded["core.timing.engine.timings"] = { sec = function(_, key)
 			return key == "native_switcher_deadline_ms" and 8 or 0.02
 		end }
@@ -156,7 +156,7 @@ local function with_input(body, setup)
 	package.loaded["core.events.timer_scheduler"] = scheduler
 	_G.hs = native
 	local ok, failure = xpcall(function()
-		f.owner = assert(require("adapters.system_switcher_input").new(
+		f.owner = assert(require("keyboard.adapters.system_switcher_input").new(
 			{ path = path, sha256 = f.digest, dev = 1, ino = 2 }, {
 				acquire = function() f.lease_count = f.lease_count + 1; return {} end,
 				tag = function() f.tags = f.tags + 1; return f.tags end,

@@ -255,7 +255,7 @@ check(
 	) && !/PAUSED_ACTION_ALLOWLIST/.test(macControl),
 	'macOS script control must judge each chord with the shared rule and the shared paused actions'
 );
-const macRules = read('macos', 'platform', 'remap', 'script_chord_rules.lua');
+const macRules = read('macos', 'keyboard', 'engine', 'layers', 'script_chord_rules.lua');
 check(
 	/for _, slot in ipairs\(ordered\(plan\.normal\)\)/.test(macRules) &&
 		/for _, slot in ipairs\(ordered\(plan\.paused\)\)/.test(macRules),

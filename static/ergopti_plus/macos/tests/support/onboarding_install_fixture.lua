@@ -31,9 +31,9 @@ local MODULE_NAMES = {
 	"core.i18n.engine.label_value",
 	"core.fs.engine.native_path",
 	"core.text.engine.number_policy",
-	"platform.remap.ke_paths",
-	"platform.remap.network_download",
-	"platform.remap.onboarding",
+	"keyboard.adapters.karabiner.ke_paths",
+	"keyboard.engine.network_download",
+	"keyboard.engine.runtime.onboarding",
 	"tests.stubs.hs",
 }
 
@@ -41,7 +41,7 @@ local MODULE_NAMES = {
 --- @param executable string Native executable path.
 --- @return string stage Stable lifecycle stage.
 --- @param args table|nil Native argv: the download is curl behind the network
----   route's shell (platform/remap/network_download.lua, NET-001).
+---   route's shell (keyboard/engine/network_download.lua, NET-001).
 local function stage_for_executable(executable, args)
 	if executable == "/bin/sh" and type(args) == "table" and type(args[2]) == "string"
 		and args[2]:find('exec /usr/bin/curl "$@"', 1, true) then return "download" end
@@ -312,7 +312,7 @@ local function run_fixture(options, scenario)
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["platform.remap.ke_paths"] = {
+	package.loaded["keyboard.adapters.karabiner.ke_paths"] = {
 		CLI = "/test/karabiner_cli",
 		CORE_SERVICE = "/test/Karabiner-Core-Service",
 		GRABBER = "/test/karabiner_grabber",
@@ -320,7 +320,7 @@ local function run_fixture(options, scenario)
 
 	-- The download's network route: the shell shape of the production command,
 	-- without the prelude this fixture cannot read (test_network_download.lua).
-	package.loaded["platform.remap.network_download"] = {
+	package.loaded["keyboard.engine.network_download"] = {
 		command = function(tag, curl_args)
 			local args = { "-c", 'exec /usr/bin/curl "$@"', tag }
 			for _, value in ipairs(curl_args) do args[#args + 1] = value end
@@ -328,8 +328,8 @@ local function run_fixture(options, scenario)
 		end,
 	}
 	package.loaded["core.process.adapters.task_lifecycle"] = nil
-	package.loaded["platform.remap.onboarding"] = nil
-	onboarding = require("platform.remap.onboarding")
+	package.loaded["keyboard.engine.runtime.onboarding"] = nil
+	onboarding = require("keyboard.engine.runtime.onboarding")
 	onboarding.load_manifest = function()
 		return {
 			file_name = "Karabiner-Elements.dmg",

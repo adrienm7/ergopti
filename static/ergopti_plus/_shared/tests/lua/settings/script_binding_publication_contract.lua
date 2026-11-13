@@ -34,7 +34,7 @@ end
 --- @param helpers table Native registered test API.
 --- @param driver string macos or linux.
 function M.register(helpers, driver)
-	local native = driver == "macos" and "infra.script_chord_catalogue" or "modules.shortcuts.script_chords"
+	local native = driver == "macos" and "keyboard.engine.layers.script_chord_catalogue" or "modules.shortcuts.script_chords"
 	local policy = require("settings.engine.publication.binding_identity")
 	local function fresh_catalogue()
 		package.loaded[native] = nil
@@ -331,7 +331,7 @@ end
 --- @param helpers table Actual registered native assertion and loader API.
 --- @param driver string macos or linux.
 function M.register_late(helpers, driver)
-	local native = driver == "macos" and "infra.script_chord_catalogue" or "modules.shortcuts.script_chords"
+	local native = driver == "macos" and "keyboard.engine.layers.script_chord_catalogue" or "modules.shortcuts.script_chords"
 	local policy = require("settings.engine.publication.binding_identity")
 	local retired, current = "script__removed_script_slot", "script__script_altgr_enter"
 	local function publish(owner)

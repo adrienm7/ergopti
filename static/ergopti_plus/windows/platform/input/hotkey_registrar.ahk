@@ -10,7 +10,7 @@
 ; and a key, and without knowing that AutoHotkey hands back no object at all.
 ;
 ; FEATURES & RATIONALE:
-; 1. Canonical chords only: every chord is parsed by infra/chord.ahk before it is
+; 1. Canonical chords only: every chord is parsed by keyboard/engine/layers/chord.ahk before it is
 ;    translated, so "shift+ctrl+s" and "Ctrl+Shift+S" produce ONE registration
 ;    rather than two live bindings that both fire.
 ; 2. Handles are tokens, not chord strings: AutoHotkey addresses a hotkey by its

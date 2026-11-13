@@ -55,7 +55,7 @@ local function run_fixture(body, source)
 	}
 	-- A layers.toml that binds no wheel direction: the layer's wheel owner
 	-- stays unbound, as for a user who never saved one.
-	package.loaded["platform.remap.nav_layer"] = {
+	package.loaded["keyboard.engine.layers.nav_layer"] = {
 		load = function() return { bindings = {}, registry = {}, wheel = { vertical = {}, horizontal = {} } } end,
 	}
 	local function handle(kind)

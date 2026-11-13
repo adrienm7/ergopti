@@ -42,7 +42,10 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANIFEST = path.join(ROOT, 'static/ergopti_plus/macos/vendor/remap-runtime/manifest.json');
-const VALIDATOR = path.join(ROOT, 'static/ergopti_plus/macos/platform/remap/runtime_manifest.lua');
+const VALIDATOR = path.join(
+	ROOT,
+	'static/ergopti_plus/macos/keyboard/adapters/runtime/manifest.lua'
+);
 const BUILD_SOURCE = path.join(ROOT, 'tools/build/remap_runtime_source.py');
 
 // The fields that exist only after the hosted build has produced and signed the artifact.

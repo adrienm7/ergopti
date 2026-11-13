@@ -23,7 +23,7 @@ local OWNERS = {
 	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.keystats",
 	"diagnostics.adapters.event_provenance",

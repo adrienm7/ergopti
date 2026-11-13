@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Owned Runtime Owner Fixture
 --- DESCRIPTION:
---- A modelled Mac for platform/remap/runtime_owner.lua: an in-memory filesystem,
+--- A modelled Mac for keyboard/adapters/runtime/owner.lua: an in-memory filesystem,
 --- launchd, system extension listing, other-Karabiner processes, a physical
 --- capture and a manual timer, every one of them recording its calls. A test
 --- that needs a callback to arrive later sets `world.deferred = true` and
@@ -32,7 +32,7 @@ end
 --- Builds a world in which the owned runtime is installed, compatible and alone.
 --- @return table world
 function M.new_world()
-	local KePaths = require("platform.remap.ke_paths")
+	local KePaths = require("keyboard.adapters.karabiner.ke_paths")
 	local world = {
 		deferred = false,
 		pending = {},
@@ -151,10 +151,10 @@ end
 --- @return table owner
 function M.load_owner()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["platform.remap.ke_paths"] = nil
-	package.loaded["platform.remap.runtime_vhid"] = nil
-	package.loaded["platform.remap.runtime_owner"] = nil
-	return require("platform.remap.runtime_owner")
+	package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+	package.loaded["keyboard.adapters.runtime.vhid"] = nil
+	package.loaded["keyboard.adapters.runtime.owner"] = nil
+	return require("keyboard.adapters.runtime.owner")
 end
 
 return M

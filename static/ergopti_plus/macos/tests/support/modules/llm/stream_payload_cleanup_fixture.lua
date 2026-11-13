@@ -18,7 +18,7 @@ local OWNED = {
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
 	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "ai.engine.api.network_env",
 	"ai.engine.ollama.binary", "ai.engine.ollama.server_command", "ai.engine.api.opaque_network_admission",
-	"ai.engine.settings.profiles", "ai.engine.prediction.progressive_reveal", "platform.remap.lease_helper",
+	"ai.engine.settings.profiles", "ai.engine.prediction.progressive_reveal", "keyboard.adapters.karabiner.lease_helper",
 }
 
 

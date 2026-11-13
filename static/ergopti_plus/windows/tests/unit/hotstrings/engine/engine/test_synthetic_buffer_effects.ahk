@@ -19,7 +19,7 @@
 ;
 ; The class assertion below is the important one: it re-derives the payload of
 ; EVERY sending key of the recommended layer from the table the driver registers
-; (platform/remap/nav_layer_table.ahk) and requires each to be classified
+; (keyboard/engine/layers/nav_layer_table.ahk) and requires each to be classified
 ; correctly. A key added to the preset later is covered the day it is written,
 ; which is the failure mode this driver keeps hitting — the one missed sibling
 ; site.
@@ -112,7 +112,7 @@ _SBE_MixedPayloadIsTreatedAsAMove() {
 ; ===================================================================
 
 ; Rebuild the payload of every layer key that sends, from the table the driver
-; registers for Ergopti's recommended layer (platform/remap/nav_layer_table.ahk).
+; registers for Ergopti's recommended layer (keyboard/engine/layers/nav_layer_table.ahk).
 ; A repeatable action carries its repetition count in the payload
 ; ("{Up 2}"), so the table's open Send text is closed with a concrete count here.
 _SBE_LayerPayloads() {

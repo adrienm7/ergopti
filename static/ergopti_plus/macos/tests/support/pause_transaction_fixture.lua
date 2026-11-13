@@ -23,7 +23,7 @@ local OWNERS = {
 	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"platform.remap.onboarding",
+	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.keystats",
 	"diagnostics.adapters.event_provenance",
@@ -186,7 +186,7 @@ local function load_context(options)
 		stop = function() return true end,
 		resume_after_pause = function() return true end,
 	}
-	package.loaded["platform.remap.onboarding"] = {
+	package.loaded["keyboard.engine.runtime.onboarding"] = {
 		stop = function() return true end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }

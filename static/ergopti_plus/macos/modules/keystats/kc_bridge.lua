@@ -37,7 +37,7 @@ local TableUtil = require("core.text.engine.table_util")
 local LOG     = "keystats.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
--- Must match the KE_PHYSICAL_KC_LOG constant in platform/remap/generator.lua.
+-- Must match the KE_PHYSICAL_KC_LOG constant in keyboard/engine/runtime/generator.lua.
 -- Resolved via the central menu_paths module — no local fallback.
 local KC_LOG_PATH
 do
@@ -373,7 +373,7 @@ function M.is_ke_managed_output_kc(kc_num)
 end
 
 --- Rebuilds the output suppression set after the user changes their KE config.
---- Should be called by platform/remap/init.lua after M.apply_config().
+--- Should be called by keyboard/engine/init.lua after M.apply_config().
 --- @param tap_hold_config table Map of key_id → {tap, hold} action ids.
 --- @param available_actions table List of action definitions from actions.json.
 --- @return boolean refreshed True only after the replacement set is published.

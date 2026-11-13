@@ -22,8 +22,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("native Karabiner lease uses the canonical CLI only", function()
 	helpers.it("matches the Lua endpoint byte-for-byte", function()
-		package.loaded["platform.remap.ke_paths"] = nil
-		local paths = require("platform.remap.ke_paths")
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+		local paths = require("keyboard.adapters.karabiner.ke_paths")
 		local worker_path = helpers.driver_root()
 			.. "/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift"
 		local file, open_err = io.open(worker_path, "r")
@@ -44,8 +44,8 @@ helpers.describe("native Karabiner lease uses the canonical CLI only", function(
 	end)
 
 	helpers.it("admits the owned runtime's tool byte-for-byte and nothing else of that runtime", function()
-		package.loaded["platform.remap.ke_paths"] = nil
-		local paths = require("platform.remap.ke_paths")
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+		local paths = require("keyboard.adapters.karabiner.ke_paths")
 		local file = assert(io.open(helpers.driver_root()
 			.. "/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift", "r"))
 		local source = file:read("*a")
@@ -67,10 +67,10 @@ helpers.describe("native Karabiner lease uses the canonical CLI only", function(
 	end)
 
 	helpers.it("selects the endpoint through the one launcher argument both runtimes share", function()
-		package.loaded["platform.remap.ke_paths"] = nil
-		local paths = require("platform.remap.ke_paths")
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
+		local paths = require("keyboard.adapters.karabiner.ke_paths")
 		paths.select_runtime("owned")
-		local file = assert(io.open(helpers.driver_root() .. "/platform/remap/lease_controller.lua", "r"))
+		local file = assert(io.open(helpers.driver_root() .. "/keyboard/adapters/karabiner/lease_controller.lua", "r"))
 		local controller = file:read("*a")
 		file:close()
 		-- Both spawn sites pass the runtime-selected tool and add no endpoint of
@@ -79,11 +79,11 @@ helpers.describe("native Karabiner lease uses the canonical CLI only", function(
 		helpers.assert_eq(spawns, 2, "the worker and the revoker are the only lease CLI consumers")
 		helpers.assert_true(controller:find("ergoptiplus_remap_cli", 1, true) == nil)
 		helpers.assert_eq(paths.CLI, paths.OWNED.CLI)
-		package.loaded["platform.remap.ke_paths"] = nil
+		package.loaded["keyboard.adapters.karabiner.ke_paths"] = nil
 	end)
 
 	helpers.it("does not confuse the CLI with any shared process family", function()
-		local cli = require("platform.remap.ke_paths").CLI:lower()
+		local cli = require("keyboard.adapters.karabiner.ke_paths").CLI:lower()
 		local basename = cli:match("([^/]+)$")
 		helpers.assert_eq(basename, "karabiner_cli",
 			"the only child executable must be karabiner_cli")

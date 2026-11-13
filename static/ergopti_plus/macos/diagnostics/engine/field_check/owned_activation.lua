@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The developer field run's proof, on the maintainer's Mac and with no manual
 --- action, of the maintainer's rule of 2026-10-31 for Ergopti's own Karabiner
---- runtime (ADR 011; platform/remap/runtime_activation.lua):
+--- runtime (ADR 011; keyboard/adapters/runtime/activation.lua):
 --- 1. owned_start: Ergopti runs, so the pinned artifact is verified in its own
 ---    folder, its runtime is ready, and a user Karabiner is closed with the
 ---    close recorded. After a resume the driver reloads and starts the same

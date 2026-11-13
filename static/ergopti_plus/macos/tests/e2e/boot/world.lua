@@ -592,7 +592,7 @@ local function owned_artifact_paths(args)
 	for _, arg in ipairs(args) do
 		if tostring(arg):sub(1, 1) ~= "-" then
 			-- The owned folder's name comes from app_dirs (one Ergopti folder per OS).
-			local artifact_home = require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME:gsub("^~", "")
+			local artifact_home = require("keyboard.adapters.karabiner.ke_paths").OWNED.ARTIFACT_HOME:gsub("^~", "")
 			if not tostring(arg):find(artifact_home .. "/", 1, true) then
 				return false
 			end
@@ -683,7 +683,7 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
 	end
 	-- A remap download runs curl behind the system network prelude
-	-- (platform/remap/network_download.lua): /bin/sh -c '<prelude>exec /usr/bin/curl "$@"'
+	-- (keyboard/engine/network_download.lua): /bin/sh -c '<prelude>exec /usr/bin/curl "$@"'
 	-- <tag> <curl arguments>. The shell becomes curl, so it answers as curl does
 	-- here; the generic shell answer below would report a download that never ran.
 	if path == "/bin/sh" and args[1] == "-c" and tostring(args[2]):find('exec /usr/bin/curl "$@"', 1, true) then
@@ -692,7 +692,7 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		return machine_answer("/usr/bin/curl", curl_args, helper, environment, launcher_environment)
 	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
-	-- Ergopti's own runtime artifact (platform/remap/runtime_artifact_fetch.lua):
+	-- Ergopti's own runtime artifact (keyboard/adapters/runtime/artifact_fetch.lua):
 	-- its folder steps succeed and the E2E Mac is offline, so the download fails
 	-- by name and the owned boot reports artifact_fetch_failed.
 	if (path == "/bin/rm" or path == "/bin/mkdir") and owned_artifact_paths(args) then return { code = 0 } end

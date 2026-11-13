@@ -101,7 +101,7 @@ if (fallbackMs !== null && (fallbackMs < 100 || fallbackMs > 500)) {
 }
 
 // Windows loads the registry value at boot into its constant; no literal remains.
-const AHK_CONSTANTS = read('windows', 'platform', 'remap', 'constants.ahk');
+const AHK_CONSTANTS = read('windows', 'keyboard', 'engine', 'keys', 'constants.ahk');
 if (!/^global TAPHOLD_DEFAULT_ACTIVATION_SECONDS\s*:=\s*0\s*$/m.test(AHK_CONSTANTS)) {
 	errors.push(
 		'windows platform/remap/constants.ahk must declare TAPHOLD_DEFAULT_ACTIVATION_SECONDS with ' +
@@ -138,21 +138,21 @@ if (
 		'linux tap_hold_loader.lua must read GLOBAL_DEFAULT_SECONDS from the timing registry.'
 	);
 }
-const MACOS_DEFAULTS_SRC = read('macos', 'platform', 'remap', 'defaults.lua');
+const MACOS_DEFAULTS_SRC = read('macos', 'keyboard', 'engine', 'runtime', 'defaults.lua');
 if (
 	!/D\.tap_hold_timeout_ms\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
 		MACOS_DEFAULTS_SRC
 	)
 ) {
 	errors.push(
-		'macos/platform/remap/defaults.lua must read the global delay from the timing registry.'
+		'macos/keyboard/engine/runtime/defaults.lua must read the global delay from the timing registry.'
 	);
 }
 if (
 	/tap_hold_key_timeouts_ms|load_thresholds|get_tap_default_timeout/.test(
 		MACOS_DEFAULTS_SRC +
-			read('macos', 'platform', 'remap', 'generator.lua') +
-			read('macos', 'platform', 'remap', 'init.lua')
+			read('macos', 'keyboard', 'engine', 'runtime', 'generator.lua') +
+			read('macos', 'keyboard', 'engine', 'init.lua')
 	)
 ) {
 	errors.push(
@@ -246,8 +246,9 @@ const MACOS_DEFAULTS = path.join(
 	'static',
 	'ergopti_plus',
 	'macos',
-	'platform',
-	'remap',
+	'keyboard',
+	'engine',
+	'runtime',
 	'defaults.lua'
 );
 if (
@@ -256,7 +257,7 @@ if (
 	)
 ) {
 	errors.push(
-		'macos/platform/remap/defaults.lua must read the one-shot timeout from the timing registry ' +
+		'macos/keyboard/engine/runtime/defaults.lua must read the one-shot timeout from the timing registry ' +
 			'(tap_hold.one_shot_shift_timeout_ms).'
 	);
 }

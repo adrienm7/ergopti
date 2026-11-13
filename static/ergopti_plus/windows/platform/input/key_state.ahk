@@ -438,7 +438,7 @@ KS_LayoutHasAltGrLevel(Hkl) {
 	return false
 }
 
-; The probe record that decides the AltGr family now (infra/altgr_family.ahk):
+; The probe record that decides the AltGr family now (keyboard/engine/keys/altgr_family.ahk):
 ; the KS_ProbeAltGrLayout result of the current layout plus "source" ("probe",
 ; "override" when the TOML flag decided, "unresolved" when no layout could be
 ; read). Seeded here as unresolved; HotstringEngineInit replaces it before the

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * A one-shot Shift tap followed by Space types "-", by "." types " :", by the
  * magic key types "J", and so on. Those results were an if/else chain inside
- * windows/platform/remap/one_shot_shift.ahk, so the Linux driver, which has the
+ * windows/keyboard/engine/one_shot_shift.ahk, so the Linux driver, which has the
  * same one-shot Shift, had none of them and shifted the key instead.
  *
  * WHAT IS CHECKED:
@@ -25,7 +25,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DATA = path.join(SP, '_shared', 'tap_hold', 'data', 'one_shot_shift.json');
-const AHK_ONE_SHOT = path.join(SP, 'windows', 'platform', 'remap', 'one_shot_shift.ahk');
+const AHK_ONE_SHOT = path.join(SP, 'windows', 'keyboard', 'engine', 'one_shot_shift.ahk');
 const AHK_LOADER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_loader.ahk');
 const LINUX_MANAGER = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_manager.lua');
 const LINUX_ENGINE = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua');
@@ -56,7 +56,7 @@ if (typeof data.magic_key_result !== 'string' || data.magic_key_result === '') {
 const oneShot = fs.readFileSync(AHK_ONE_SHOT, 'utf8');
 const start = oneShot.indexOf('OneShotShift() {');
 const body = start >= 0 ? oneShot.slice(start, oneShot.indexOf('\n}', start)) : '';
-if (body === '') errors.push('windows/platform/remap/one_shot_shift.ahk has no OneShotShift().');
+if (body === '') errors.push('windows/keyboard/engine/one_shot_shift.ahk has no OneShotShift().');
 if (/SpecialCharacter\s*:=\s*("[^"]|Chr\()/.test(body)) {
 	errors.push(
 		'OneShotShift() spells a one-shot result itself again instead of reading the shared table.'

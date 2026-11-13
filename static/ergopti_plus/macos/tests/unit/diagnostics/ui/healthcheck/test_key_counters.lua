@@ -28,7 +28,7 @@ local function with_collector(body)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = xpcall(function()
 		helpers.load_with_stubs("core.logger.engine.logger")
-		package.loaded["platform.remap.lease_controller"] = {
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 			is_initialized = function() return true end,
 			status = function() return "running", { phase = "running" } end,
 		}

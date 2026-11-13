@@ -4,7 +4,7 @@
 --- MODULE: Shared Tap-Hold File (macOS)
 --- DESCRIPTION:
 --- Binds the shared tap_hold.toml (_shared/tap_hold/data/SCHEMA.md) to the Karabiner
---- model platform/remap/config.lua merges: a read decodes the file, migrates
+--- model keyboard/engine/runtime/config.lua merges: a read decodes the file, migrates
 --- it in memory (_shared/tap_hold/data/migrations.toml) and translates it with
 --- _shared/tap_hold/engine/shared_file.lua; a save writes back only the leaves the
 --- model changed, stamped with the current version. The switch, the timings and

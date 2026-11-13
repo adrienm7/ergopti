@@ -9,7 +9,7 @@
 ; calls several WinGet* functions per window with NO try/catch at all — a
 ; window closing mid-enumeration (a routine race, not a bug) threw
 ; TargetError uncaught, which for the two tap-hold hotkey call sites
-; (platform/remap/lalt.ahk, platform/remap/tab.ahk) was misreported to
+; (keyboard/engine/keys/lalt.ahk, keyboard/engine/keys/tab.ahk) was misreported to
 ; the user as a driver crash via the full ErgoptiGlobalErrorHandler
 ; crash-report/toast pipeline. GestureGetCyclableWindows (the sibling in
 ; gestures/adapters/window_cycle.ahk) was correctly hardened for the identical

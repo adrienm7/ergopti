@@ -121,7 +121,7 @@ local core_mods = {
 	keystats     = safe_require("modules.keystats", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("hotstrings.engine.dynamic", "dynamic hotstrings engine"),
-	capsword_auto_off = safe_require("infra.capsword_auto_off", "CapsWord auto-off settings"),
+	capsword_auto_off = safe_require("keyboard.engine.capsword_auto_off", "CapsWord auto-off settings"),
 }
 
 M._active_tasks = {}

@@ -42,9 +42,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
 const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
-const MAC_KEYS = path.join(SP, 'macos', 'platform', 'remap', 'data', 'tap_hold_keys.json');
+const MAC_KEYS = path.join(SP, 'macos', 'keyboard', 'data', 'tap_hold_keys.json');
 const LINUX_ENGINE = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua');
-const WINDOWS_REMAP = path.join(SP, 'windows', 'platform', 'remap');
+const WINDOWS_REMAP = path.join(SP, 'windows');
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 const HANDS = new Set(['left', 'right']);
@@ -217,7 +217,7 @@ try {
 } catch (e) {
 	errors.push(`tap_hold_keys.json does not parse: ${e.message}`);
 }
-sameKeys('hs', macKeys, 'macos/platform/remap/data/tap_hold_keys.json', true);
+sameKeys('hs', macKeys, 'macos/keyboard/data/tap_hold_keys.json', true);
 
 // Linux: the evdev code table of the tap-hold engine.
 const linuxEngine = stripLineComments(read(LINUX_ENGINE), '.lua');
@@ -312,7 +312,7 @@ if (!/local parts = \{ enabled and "1" or "0", i18n\.get_locale\(\) \}/.test(mac
 	errors.push('the combination picker cache must include the active locale');
 }
 
-const nativeMatrix = JSON.parse(read(path.join(SP, 'macos/platform/remap/data/mod_combos.json')));
+const nativeMatrix = JSON.parse(read(path.join(SP, 'macos/keyboard/data/mod_combos.json')));
 if (nativeMatrix.length !== 182)
 	errors.push('the full ordered macOS physical pair matrix must retain 182 entries');
 const macIds = new Set(columns.hs);
@@ -329,7 +329,7 @@ for (const pair of nativeMatrix) {
 
 // Windows already translates both the family and the pair from this catalogue.
 const windowsCombos = stripLineComments(
-	read(path.join(SP, 'windows/infra/key_combinations.ahk')),
+	read(path.join(SP, 'windows/keyboard/engine/keys/combinations.ahk')),
 	'.ahk'
 );
 if (
@@ -358,7 +358,7 @@ const linuxManager = stripLineComments(
 	'.lua'
 );
 const linuxPairs = stripLineComments(
-	read(path.join(SP, 'linux/platform/remap/key_combination_engine.lua')),
+	read(path.join(SP, 'linux/keyboard/engine/keys/combination_engine.lua')),
 	'.lua'
 );
 const linuxOwner = stripLineComments(
@@ -366,7 +366,7 @@ const linuxOwner = stripLineComments(
 	'.lua'
 );
 const linuxMenu = stripLineComments(
-	read(path.join(SP, 'linux/ui/menu/key_combinations.lua')),
+	read(path.join(SP, 'linux/keyboard/ui/menu_key_combinations.lua')),
 	'.lua'
 );
 
@@ -545,7 +545,7 @@ function savedLinuxOneShotClosure(sources) {
  * @returns {boolean} Exact ordered Linux admission, never a chord claim.
  */
 const linuxCombinationScope = stripLineComments(
-	read(path.join(SP, 'linux/infra/key_combinations_scope.lua')),
+	read(path.join(SP, 'linux/keyboard/engine/keys/combinations_scope.lua')),
 	'.lua'
 );
 const linuxCombinationPolicy = stripLineComments(
@@ -622,7 +622,7 @@ function orderedLinuxAdmission(declaration, sources) {
 			.filter((item) => ['combo_symmetric', 'combo_timings', 'copy_tap_to_combo'].includes(item.id))
 			.every((item) => item.platforms?.join(',') === 'hs') ||
 			simultaneousLinuxAdmission(declaration, sources)) &&
-		manager.includes('require("platform.remap.key_combination_engine")') &&
+		manager.includes('require("keyboard.engine.keys.combination_engine")') &&
 		manager.includes('CombinationEngine.new(') &&
 		manager.includes('.engine_options(') &&
 		wrapper.includes('require("tap_hold.engine.key_combinations")') &&
@@ -656,7 +656,7 @@ if (!orderedLinuxAdmission(manifest, linuxSources)) {
 // Independently reject each lost native admission boundary instead of replacing
 // the previous unavailable-driver assertion with unconditional availability.
 for (const [index, token] of [
-	[0, 'require("platform.remap.key_combination_engine")'],
+	[0, 'require("keyboard.engine.keys.combination_engine")'],
 	[1, 'receipt.physical == true'],
 	[1, 'current.source == receipt.source'],
 	[2, 'action~=\"one_shot_shift\"'],
@@ -827,7 +827,7 @@ if (
 }
 
 // macOS reads the chord delay and symmetry from defaults.toml [hs_timeouts]
-// (macos/platform/remap/defaults.lua), Windows and Linux from the manifest's
+// (macos/keyboard/engine/runtime/defaults.lua), Windows and Linux from the manifest's
 // mod_combos records: two copies of one default, pinned here so they cannot
 // drift (chord-defaults-single-source).
 {

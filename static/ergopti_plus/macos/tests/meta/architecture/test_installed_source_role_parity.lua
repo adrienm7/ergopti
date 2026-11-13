@@ -60,7 +60,7 @@ end)
 
 helpers.describe("installed source role: the Lua side owns no Console", function()
 	helpers.it("never names the Console executable outside the install checks", function()
-		local owner = read("platform/remap/runtime_owner.lua")
+		local owner = read("keyboard/adapters/runtime/owner.lua")
 		local ports = unit("Owned Runtime Ports (Hammerspoon)")
 		local capture = unit("Owned Runtime Capture Port (Hammerspoon)")
 		local source = unit("Installed Physical Source Task Port (Hammerspoon)")

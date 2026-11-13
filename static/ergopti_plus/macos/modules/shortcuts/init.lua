@@ -21,7 +21,7 @@ local HotkeyRegistrar   = require("platform.input.hotkey_registrar")
 local StartupTransaction = require("core.lifecycle.engine.startup_transaction")
 local Logger             = require("core.logger.engine.logger")
 local Manifest           = require("menu.engine.manifest_reader")
-local ChordCatalogue     = require("infra.script_chord_catalogue")
+local ChordCatalogue     = require("keyboard.engine.layers.script_chord_catalogue")
 local ConfigKeys = require("settings.engine.keys")
 
 local M = {}
@@ -106,7 +106,7 @@ end)
 -- ================================
 
 -- The script chords of an empty configuration: every slot on its preset and
--- the switch on (infra/script_chord_catalogue.lua).
+-- the switch on (keyboard/engine/layers/script_chord_catalogue.lua).
 local _script_chord_defaults, _script_chords_on = ChordCatalogue.defaults()
 
 M.DEFAULT_STATE = {

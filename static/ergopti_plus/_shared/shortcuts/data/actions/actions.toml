@@ -1575,7 +1575,7 @@ equivalent_hs = ["toggle_capslock"]
 emit_linux = "Caps_Lock"
 
 # --- Actions du remap Karabiner (macOS) ---
-# Les 36 actions « tappables » de macos/platform/remap/data/actions.json qui
+# Les 36 actions « tappables » de macos/keyboard/data/actions.json qui
 # n'étaient déclarées nulle part ici : le picker de gestes ne pouvait donc pas
 # les proposer, alors que le remap clavier les exécute depuis toujours.
 #

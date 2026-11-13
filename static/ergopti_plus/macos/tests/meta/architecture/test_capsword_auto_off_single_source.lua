@@ -47,7 +47,7 @@ end)
 
 helpers.describe("CapsWord auto-off lists live in the manifest and the catalogue", function()
 	helpers.it("the watcher maps exactly the declared macOS pointer kinds", function()
-		local Owner = require("infra.capsword_auto_off")
+		local Owner = require("keyboard.engine.capsword_auto_off")
 		local declared = {}
 		for _, kind in ipairs(Owner.pointer_kinds()) do declared[kind] = false end
 		local src = strip_comments(helpers.read_driver_source("local function capsword_pointer_kind"))
@@ -77,7 +77,7 @@ helpers.describe("CapsWord auto-off lists live in the manifest and the catalogue
 	end)
 
 	helpers.it("the settings owners spell no pointer kind and no source a catalogue delimiter", function()
-		local Owner = require("infra.capsword_auto_off")
+		local Owner = require("keyboard.engine.capsword_auto_off")
 		local catalogue = require("layouts.engine.layers.terminators_catalogue")
 		local owner_checks = 0
 		for _, selector in ipairs({ "local KEY_MAP = {", "function M.current_values()" }) do

@@ -96,7 +96,7 @@ end
 --- @return table runtime_keys Set of preference keys.
 local function runtime_setting_keys()
 	local runtime_keys = {}
-	for _, key in ipairs(require("platform.remap.lease_controller").RUNTIME_SETTING_KEYS) do
+	for _, key in ipairs(require("keyboard.adapters.karabiner.lease_controller").RUNTIME_SETTING_KEYS) do
 		runtime_keys[key] = true
 	end
 	return runtime_keys

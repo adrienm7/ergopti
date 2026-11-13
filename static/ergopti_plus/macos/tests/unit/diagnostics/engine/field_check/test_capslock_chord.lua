@@ -95,8 +95,8 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["modules.shortcuts.ai_actions"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-		package.loaded["infra.capslock_chord_evidence"] = nil
-		local Evidence = require("infra.capslock_chord_evidence")
+		package.loaded["keyboard.engine.keys.capslock_chord_evidence"] = nil
+		local Evidence = require("keyboard.engine.keys.capslock_chord_evidence")
 		require("tests.support.keyboard_config_fixture").install(
 			{ secondary_capslock = "script_pause_toggle", primary_a = "script_pause_toggle" })
 		local subject = require("modules.shortcuts.keyboard_shortcuts")
@@ -121,8 +121,8 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 	end)
 
 	helpers.it("counts presses and deliveries for the session", function()
-		package.loaded["infra.capslock_chord_evidence"] = nil
-		local Evidence = require("infra.capslock_chord_evidence")
+		package.loaded["keyboard.engine.keys.capslock_chord_evidence"] = nil
+		local Evidence = require("keyboard.engine.keys.capslock_chord_evidence")
 		Evidence.reset()
 		Evidence.note_press(); Evidence.note_press(); Evidence.note_delivery()
 		helpers.assert_eq(Evidence.counts(), { presses = 2, deliveries = 1 })

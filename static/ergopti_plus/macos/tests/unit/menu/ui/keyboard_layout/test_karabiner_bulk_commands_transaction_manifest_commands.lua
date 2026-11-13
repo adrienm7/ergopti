@@ -575,9 +575,9 @@ helpers.describe("the Tap-Hold submenu offers the legacy rules cleanup (karabine
 	end)
 
 	helpers.it("the row reopens the cleanup dialog (karabiner-legacy-cleanup)", function()
-		local saved_cleanup = package.loaded["ui.legacy_rules_cleanup"]
+		local saved_cleanup = package.loaded["keyboard.ui.legacy_rules_cleanup"]
 		local opened = {}
-		package.loaded["ui.legacy_rules_cleanup"] = {
+		package.loaded["keyboard.ui.legacy_rules_cleanup"] = {
 			open = function(remap)
 				opened[#opened + 1] = remap
 				return true
@@ -596,7 +596,7 @@ helpers.describe("the Tap-Hold submenu offers the legacy rules cleanup (karabine
 				"the dialog reads the same remap facade as the row")
 			helpers.assert_eq(count_logs(observations, "error"), 0)
 		end)
-		package.loaded["ui.legacy_rules_cleanup"] = saved_cleanup
+		package.loaded["keyboard.ui.legacy_rules_cleanup"] = saved_cleanup
 		if not ok then error(err, 0) end
 	end)
 end)

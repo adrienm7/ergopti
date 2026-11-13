@@ -1,7 +1,7 @@
 # _shared/tests/corpus/tap_hold_migrations/cases.toml
 # Index of the tap_hold.toml migration corpus, replayed by the Linux driver
 # (_shared/tests/lua/keyboard/tap_hold_migrate_contract.lua), by the Windows driver
-# (windows/tests/unit/platform/remap/tap_hold/test_tap_hold_migration.ahk) and by
+# (windows/tests/unit/keyboard/engine/tap_hold/test_migration.ahk) and by
 # the independent reference interpreter of tools/test/test-tap-hold-migrations.cjs.
 #
 # Every case is a directory holding:

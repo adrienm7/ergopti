@@ -462,7 +462,7 @@ UpdateCapsLockLED() {
 }
 
 ; Toggle helpers consulted by tap-hold and shortcut dispatchers.
-; Real implementations live in platform/remap.ahk (not included by tests).
+; Real implementations live in keyboard/adapters/remap.ahk (not included by tests).
 ToggleCapsLock() {
     global _Stub_SentText
     _Stub_SentText.Push({ kind: "toggle_capslock" })

@@ -446,7 +446,7 @@ require("tests.lua.settings.obsolete_parents_contract").register(helpers)
 helpers.describe("shortcut fixture final script publication admission", function()
 	helpers.it("refuses a withdrawn genuine accessor and retries with the original native owner", function()
 		Fixture.run(function(f)
-			local catalogue = require("infra.script_chord_catalogue")
+			local catalogue = require("keyboard.engine.layers.script_chord_catalogue")
 			local original = catalogue.published_binding_catalogue
 			local before, writes = f.files.config, f.controls.writes
 			local parameters = f.gestures.get_all_action_parameters()

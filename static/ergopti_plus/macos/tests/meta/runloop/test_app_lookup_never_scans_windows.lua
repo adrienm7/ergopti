@@ -50,7 +50,7 @@ local WINDOW_SCAN_BASELINE = {
 	["core.process.adapters.lifecycle"] = 2,
 	["platform.focus.window_info"] = 1,
 	["platform.focus.window_manager"] = 5,
-	["platform.remap.watchers"] = 1,
+	["keyboard.engine.runtime.watchers"] = 1,
 }
 
 -- Call shapes that reach hs.window.allWindows(), directly or through

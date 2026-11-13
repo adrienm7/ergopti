@@ -22,7 +22,7 @@
 ; Only a layout the boot registrations do not fit reloads: without the Ergopti
 ; emulation, the magic key's source key is registered at load on the key that
 ; types its character on one layout (LayoutRemapSignature). The AltGr family
-; (infra/altgr_family.ahk) and the digit-row swap (DigitRowIsSwapped) follow the
+; (keyboard/engine/keys/altgr_family.ahk) and the digit-row swap (DigitRowIsSwapped) follow the
 ; foreground layout live instead, so with the emulation on (the default) no
 ; switch reloads, as with Windows' per-window input methods.
 ; ==============================================================================

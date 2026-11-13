@@ -50,7 +50,7 @@ local function with_owner(body, managed, prepare)
 			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
-			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
+			package.loaded["keyboard.engine.layers.nav_layer"]={load=function() return {} end}
 			package.loaded["core.fs.adapters.file_system"]=files
 			package.loaded["settings.engine.paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)

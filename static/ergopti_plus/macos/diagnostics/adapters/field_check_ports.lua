@@ -135,11 +135,11 @@ end
 
 --- Remap facts, read from memory.
 local function remap_facts()
-	local Remap = require("platform.remap")
+	local Remap = require("keyboard.engine")
 	local phase = "unknown"
-	local ok, current = pcall(function() return (require("platform.remap.lease_controller").status()) end)
+	local ok, current = pcall(function() return (require("keyboard.adapters.karabiner.lease_controller").status()) end)
 	if ok and type(current) == "string" then phase = current end
-	local KePaths = require("platform.remap.ke_paths")
+	local KePaths = require("keyboard.adapters.karabiner.ke_paths")
 	-- Nil for the shared runtime; for the owned one, whether its owner admitted it
 	local owned_admitted = nil
 	if KePaths.selected_runtime() == KePaths.RUNTIME_OWNED then
@@ -154,14 +154,14 @@ end
 --- model asks for, for diagnostics/engine/field_check/tap_hold_thresholds.lua.
 --- @return table facts { enabled, config, reason, expected, tag }.
 local function tap_hold_threshold_facts()
-	local Remap = require("platform.remap")
-	local KePaths = require("platform.remap.ke_paths")
+	local Remap = require("keyboard.engine")
+	local KePaths = require("keyboard.adapters.karabiner.ke_paths")
 	local facts = { enabled = Remap.get_enabled() == true, expected = {},
-		tag = require("platform.remap.lease_contract").MANAGED_TAG_LABEL }
+		tag = require("keyboard.adapters.karabiner.lease_contract").MANAGED_TAG_LABEL }
 	local global = Remap.get_tap_hold_timeout()
 	-- A modifier key pressed alone may tap for longer than its delay (the lone
 	-- tap window): the generator says what it gave each key.
-	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+	local deployed = require("keyboard.engine.runtime.generator").last_tap_timeouts() or {}
 	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do
 		local key_code = type(key.from) == "table" and key.from.key_code
 		if type(key_code) == "string" then
@@ -204,9 +204,9 @@ end
 --- was given, the pasteboard counter now, and the copy watch statistics.
 --- @return table facts
 local function tap_copy_facts()
-	local Remap = require("platform.remap")
-	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
-	local rollover = require("platform.remap.defaults").rollover_keys
+	local Remap = require("keyboard.engine")
+	local deployed = require("keyboard.engine.runtime.generator").last_tap_timeouts() or {}
+	local rollover = require("keyboard.engine.runtime.defaults").rollover_keys
 	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {}, deployed = next(deployed) ~= nil,
 		change_count = (require("clipboard.adapters.clipboard")._change_count()),
 		stats = require("hotstrings.engine.expander").tap_copy_statistics() }
@@ -224,7 +224,7 @@ end
 --- @return string|nil status The registration's answer, nil before it settled.
 local function guardian_registration_note()
 	local ok, note, status = pcall(function()
-		return require("platform.remap.lease_controller").guardian_registration_note()
+		return require("keyboard.adapters.karabiner.lease_controller").guardian_registration_note()
 	end)
 	if not ok then return nil, nil end
 	return note, status
@@ -287,7 +287,7 @@ local function route_plan(callback)
 	local NetworkEnv = require("ai.engine.api.network_env")
 	local origins = NetworkEnv.route_origins("ollama")
 	local budget = NetworkEnv.route_lookup_budget_seconds()
-	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	local launcher, _, environment = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	if not origins or not budget then return callback({ failure = "route-origins-unavailable" }) end
 	if not launcher then return callback({ failure = "launcher_unavailable" }) end
 	local entries = {}
@@ -311,7 +311,7 @@ end
 --- source checkout, or a bundle built before the relay shipped.
 --- @return string|nil path
 local function relay_executable()
-	local launcher = require("platform.remap.lease_helper").resolve()
+	local launcher = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	if not launcher then return nil end
 	local path = NativePath.dirname(launcher) .. "/" .. require("core.network.engine.proxy_auth_relay_core").EXECUTABLE_NAME
 	return FileSystem.exists(path) and path or nil
@@ -358,7 +358,7 @@ end
 --- from a bundled application (a source checkout).
 --- @return string|nil path
 local function app_path()
-	local launcher = require("platform.remap.lease_helper").resolve()
+	local launcher = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	if not launcher then return nil end
 	return (launcher:gsub("/Contents/MacOS/ErgoptiPlus$", ""))
 end
@@ -367,7 +367,7 @@ end
 --- the only process that may query it (the same read-only role the menu uses).
 --- @param callback function fn(state|nil) with enabled, disabled, approval or unavailable.
 local function login_startup_status(callback)
-	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	local launcher, _, environment = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	if not launcher then return callback(nil) end
 	exec(launcher, { "--login-startup", "status" }, 5, function(code, output)
 		local state = code == 0 and tostring(output):match("^(%a+)%s*$") or nil
@@ -382,7 +382,7 @@ end
 --- role, which never prompts (ledger L32).
 --- @param callback function fn("granted"|"denied"|"unknown"|nil); nil when unreadable.
 local function input_monitoring_access(callback)
-	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	local launcher, _, environment = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	if not launcher then return callback(nil) end
 	exec(launcher, { "--input-monitoring", "status" }, 5, function(code, output)
 		local state = code == 0 and tostring(output):match("^(%a+)%s*$") or nil
@@ -399,7 +399,7 @@ end
 ---   active = integer|nil, virtual_hid_version = string|nil }).
 local function owned_readiness(callback)
 	local source_available = require("adapters.installed_physical_source").new().available()
-	require("adapters.karabiner_coexistence").new().describe(function(facts)
+	require("keyboard.adapters.karabiner.coexistence").new().describe(function(facts)
 		local OwnerPorts = require("diagnostics.adapters.runtime_owner_ports")
 		local readiness = {
 			unpinned = OwnerPorts.unpinned_count(),
@@ -411,7 +411,7 @@ local function owned_readiness(callback)
 		}
 		-- The install role refuses an ad hoc launcher (launcher_unsigned): the
 		-- helper must carry this launcher's own certificate leaf.
-		local launcher = require("platform.remap.lease_helper").resolve()
+		local launcher = require("keyboard.adapters.karabiner.lease_helper").resolve()
 		local bundle = type(launcher) == "string" and launcher:match("^(.-%.app)/Contents/") or nil
 		if not bundle then
 			readiness.launcher_identity = "no_launcher"
@@ -433,7 +433,7 @@ end
 --- @return table port
 local function owned_activation()
 	-- Resolved per call: building the ports must not load the remap bridge.
-	local function Remap() return require("platform.remap") end
+	local function Remap() return require("keyboard.engine") end
 	local function owner_status()
 		local owner = Remap()._owned and Remap()._owned.owner
 		if not owner then return { state = "unbound" } end
@@ -450,7 +450,7 @@ local function owned_activation()
 		owner_state = function() return owner_status().state end,
 		owner_reason = function() return owner_status().reason end,
 		fetch = function(callback) require("diagnostics.adapters.runtime_owner_ports").fetch_artifact(callback) end,
-		other_active = function(callback) require("adapters.karabiner_coexistence").new().detect(callback) end,
+		other_active = function(callback) require("keyboard.adapters.karabiner.coexistence").new().detect(callback) end,
 		marker = function() return require("diagnostics.adapters.runtime_owner_ports").marker().get() end,
 		-- The first install with no confirmation dialog: the field run is the request.
 		install_reasons = function() return Remap().OWNED_INSTALL_REASONS end,
@@ -461,12 +461,12 @@ local function owned_activation()
 			exec("/usr/bin/systemextensionsctl", { "list" }, 5, function(code, output)
 				local version = require("diagnostics.adapters.runtime_owner_ports").virtual_hid_extension_version()
 				if code ~= 0 or type(version) ~= "string" then return callback(nil) end
-				local Vhid = require("platform.remap.runtime_vhid")
+				local Vhid = require("keyboard.adapters.runtime.vhid")
 				callback(Vhid.assess(Vhid.parse(output), version).ok == true)
 			end)
 		end,
 		open_driver_pane = function()
-			return hs.urlevent.openURL(require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL)
+			return hs.urlevent.openURL(require("keyboard.adapters.karabiner.ke_paths").EXTENSIONS_SETTINGS_URL)
 		end,
 	}
 end
@@ -501,7 +501,7 @@ function M.new()
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("core.logger.engine.key_event_health").counts() end,
 		swallowed_keys = function() return require("core.logger.engine.keystroke_integrity").drop_count() end,
-		deploy_facts = function() return require("platform.remap.generator").last_deploy() end,
+		deploy_facts = function() return require("keyboard.engine.runtime.generator").last_deploy() end,
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
 		network_chain = function(callback) return network_chain(callback) end,

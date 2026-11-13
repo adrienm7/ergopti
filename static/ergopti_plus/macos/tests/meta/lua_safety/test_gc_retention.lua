@@ -400,7 +400,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings" }) do walk(d .. "/", d .. "/") end
+		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard" }) do walk(d .. "/", d .. "/") end
 		-- Root-level sources are NOT inside those four directories, and init.lua is
 		-- the largest of them. The shell fallback below scans the whole tree, so
 		-- coverage silently depended on which of the two paths ran — green on a
@@ -517,7 +517,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
-		assert_gc_pinned("local function run_pkg_with_sudo_async") -- platform/remap/onboarding.lua
+		assert_gc_pinned("local function run_pkg_with_sudo_async") -- keyboard/engine/runtime/onboarding.lua
 	end)
 
 	helpers.it("menu_apps: open task is pinned", function()

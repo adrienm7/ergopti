@@ -87,19 +87,19 @@ constructs from `tests/helpers`.
 
 ## What each layer covers
 
-| Directory        | Purpose                                                                                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `meta/`          | Invariants no runtime call can check: boot order, teardown paths, ports, Lua and Hammerspoon foot-guns, the test harness itself.   |
-| `unit/`          | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
-| `unit/`          | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
-| `unit/`          | Domain modules: keymap, keystats, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                  |
-| `unit/platform/` | The Karabiner remap bridge.                                                                                                        |
-| `unit/`          | Windows, dialogs, tooltips and the tray menu.                                                                                      |
-| `integration/`   | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API. |
+| Directory      | Purpose                                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `meta/`        | Invariants no runtime call can check: boot order, teardown paths, ports, Lua and Hammerspoon foot-guns, the test harness itself.   |
+| `unit/`        | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
+| `unit/`        | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
+| `unit/`        | Domain modules: keymap, keystats, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                  |
+| `unit/`        | The Karabiner remap bridge.                                                                                                        |
+| `unit/`        | Windows, dialogs, tooltips and the tray menu.                                                                                      |
+| `integration/` | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API. |
 
 ## Updating snapshot fixtures
 
-Snapshot tests under `tests/unit/platform/remap/` compare generated output
+Snapshot tests under `tests/unit/keyboard/engine/` compare generated output
 against committed `.expected.json` files in `tests/fixtures/karabiner_configs/`.
 To regenerate after an intentional change:
 

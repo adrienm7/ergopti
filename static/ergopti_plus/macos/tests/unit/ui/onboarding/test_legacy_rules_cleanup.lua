@@ -13,7 +13,7 @@
 local helpers    = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
-local MODULES = { "ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
+local MODULES = { "keyboard.ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
 	"core.timing.engine.deferred_work" }
 
 --- Installs recording doubles and loads the dialog module.
@@ -41,7 +41,7 @@ local function load_cleanup(h)
 			return true
 		end,
 	}
-	local cleanup = helpers.load_with_stubs("ui.legacy_rules_cleanup")
+	local cleanup = helpers.load_with_stubs("keyboard.ui.legacy_rules_cleanup")
 	-- The loader installs its echoing i18n stub, which the module captured:
 	-- give that same table a format that shows its arguments.
 	package.loaded["core.i18n.engine.i18n"].format = function(key, ...)

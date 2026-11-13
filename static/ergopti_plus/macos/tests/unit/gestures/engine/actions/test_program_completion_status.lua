@@ -9,7 +9,7 @@ local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 local OWNED_MODULES = {
 	"gestures.engine.actions_aux_owner", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "tests.stubs.hs", "hs",
-	"core.process.adapters.owned_program_runner", "platform.remap.lease_helper",
+	"core.process.adapters.owned_program_runner", "keyboard.adapters.karabiner.lease_helper",
 }
 
 local function with_program_owner(callback)
@@ -37,7 +37,7 @@ local function with_program_owner(callback)
 				fixture.errors[#fixture.errors + 1] = string.format(format, ...)
 			end
 			package.loaded["core.logger.engine.logger"] = logger
-			package.loaded["platform.remap.lease_helper"] = { resolve = function()
+			package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function()
 				return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER,
 					ERGOPTI_LAUNCHER_DEVICE = "42", ERGOPTI_LAUNCHER_INODE = "73" }
 			end }

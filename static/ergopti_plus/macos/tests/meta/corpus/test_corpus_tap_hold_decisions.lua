@@ -13,7 +13,7 @@
 ---
 --- The corpus speaks the shared vocabulary ([tap_hold.keys.*] taps and
 --- holds, [tap_hold.catalog] keys); the two tables below translate it to the
---- action ids of platform/remap/data/actions.json, and an unknown name fails.
+--- action ids of keyboard/data/actions.json, and an unknown name fails.
 --- ==============================================================================
 
 local helpers        = require("tests.helpers")
@@ -24,7 +24,7 @@ local ControlSignals = require("layouts.engine.layers.control_signals")
 local Contract       = require("tests.lua.keyboard.tap_hold_decision_contract")
 
 local TOKEN    = "0123456789abcdef0123456789abcdef"
-local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
+local DATA_DIR = helpers.driver_root() .. "keyboard/data/"
 local TIMEOUT_PARAMETER = "basic.to_if_alone_timeout_milliseconds"
 
 local defaults = require("core.text.engine.toml_codec").decode(SourceFile.read(helpers.shared("tap_hold/data/defaults.toml")))
@@ -84,8 +84,8 @@ helpers.with_fresh_modules({
 	"platform.input.keycodes",
 	"core.logger.engine.logger",
 	"core.text.engine.toml.codec",
-	"platform.remap.config",
-	"platform.remap.generator",
+	"keyboard.engine.runtime.config",
+	"keyboard.engine.runtime.generator",
 	"modules.keymap.layout_registry",
 	"core.text.engine.toml_codec",
 	"adapters.one_shot_shift",
@@ -119,10 +119,10 @@ helpers.with_fresh_modules({
 	package.loaded["modules.keymap.layout_registry"] =
 		require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 
-	local Config    = helpers.load_with_stubs("platform.remap.config")
-	local Generator = helpers.load_with_stubs("platform.remap.generator")
+	local Config    = helpers.load_with_stubs("keyboard.engine.runtime.config")
+	local Generator = helpers.load_with_stubs("keyboard.engine.runtime.generator")
 	local OneShot   = require("adapters.one_shot_shift")
-	local Defaults  = require("platform.remap.defaults")
+	local Defaults  = require("keyboard.engine.runtime.defaults")
 
 	local actions = assert(Config.load_available_actions(DATA_DIR .. "actions.json"))
 	local keys    = assert(Config.load_tap_hold_keys(DATA_DIR .. "tap_hold_keys.json"))

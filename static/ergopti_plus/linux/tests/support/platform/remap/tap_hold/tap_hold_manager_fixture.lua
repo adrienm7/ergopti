@@ -36,7 +36,7 @@ end
 local function manager(user_text, opts)
 	-- Earlier enrolled fixtures reload the shared Writer. A fresh Manager's
 	-- original Nav issuer must capture that same current dependency graph.
-	helpers.load_module("platform.remap.nav_layer")
+	helpers.load_module("keyboard.engine.layers.nav_layer")
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
 	write(user_path, user_text)

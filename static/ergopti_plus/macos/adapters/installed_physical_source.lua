@@ -74,7 +74,7 @@ end
 --- @return table|nil resolved { launcher = string, native = table }.
 --- @return string|nil reason Why the installed source is unavailable.
 local function resolve_real()
-	local launcher, helper_reason = require("platform.remap.lease_helper").resolve()
+	local launcher, helper_reason = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	if not launcher then return nil, helper_reason end
 	local path, path_reason = M.module_path(launcher)
 	if not path then return nil, path_reason end

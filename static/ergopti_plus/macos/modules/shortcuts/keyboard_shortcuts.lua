@@ -27,7 +27,7 @@ local Registrar   = require("platform.input.hotkey_registrar")
 local FileSystem  = require("core.fs.adapters.file_system")
 local Paths       = require("core.fs.engine.paths")
 local Logger      = require("core.logger.engine.logger")
-local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
+local CapsLockChordEvidence = require("keyboard.engine.keys.capslock_chord_evidence")
 local OperationReporter = require("diagnostics.engine.operation_reporter")
 local GestActions = nil
 local Codec       = require("core.text.engine.toml_codec")
@@ -604,7 +604,7 @@ function M.validate_physical_edits(rows, claim)
 	end
 	local navigation, remap, navigation_checked = nil, nil, false
 	local function navigation_current()
-		if not navigation_checked or navigation == nil or package.loaded["platform.remap"] ~= remap then return false end
+		if not navigation_checked or navigation == nil or package.loaded["keyboard.engine"] ~= remap then return false end
 		local called, accepted = pcall(navigation.current)
 		return called and accepted == true and current()
 	end
@@ -625,7 +625,7 @@ function M.validate_physical_edits(rows, claim)
 			if row.value ~= "none" then
 				if not navigation_checked then
 					navigation_checked = true
-					remap = package.loaded["platform.remap"]
+					remap = package.loaded["keyboard.engine"]
 					if type(remap) ~= "table" or getmetatable(remap) ~= nil
 						or type(rawget(remap, "capture_configured_navigation_inventory")) ~= "function" then return false, "unavailable" end
 					local read, captured = pcall(remap.capture_configured_navigation_inventory)

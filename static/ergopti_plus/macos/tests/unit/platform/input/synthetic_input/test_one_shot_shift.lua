@@ -51,7 +51,7 @@ helpers.describe("one-shot native boundary", function()
 	-- observer once its returned events are handed off, so a space-only CapsWord
 	-- ends on " :" though the physical "." keeps it (one-shot-capsword-relay).
 	helpers.it("relays the serialized result to the CapsWord observer on handoff (one-shot-capsword-relay)", function()
-		local CapsWordOutput = require("infra.capsword_output")
+		local CapsWordOutput = require("keyboard.engine.capsword_output")
 		local Policy = require("keyboard.engine.caps_word_auto_off")
 		local reported = {}
 		helpers.assert_true(CapsWordOutput.set_observer(function(text) reported[#reported + 1] = text end))

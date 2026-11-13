@@ -43,7 +43,9 @@ const LUA_HOST = read(shared('layouts', 'engine', 'layers', 'editor.lua'));
 const MODEL = read(shared('ui', 'layer_editor', 'layer_model.js'));
 const WINDOWS_HOST = read(path.join(DRIVERS, 'windows', 'ui', 'layer_editor', 'init.ahk'));
 const LINUX_ENGINE = read(path.join(DRIVERS, 'linux', 'platform', 'remap', 'tap_hold_engine.lua'));
-const MACOS_NAV_LAYER = read(path.join(DRIVERS, 'macos', 'platform', 'remap', 'nav_layer.lua'));
+const MACOS_NAV_LAYER = read(
+	path.join(DRIVERS, 'macos', 'keyboard', 'engine', 'layers', 'nav_layer.lua')
+);
 
 // Floors: a corpus or a table that stopped being read must not pass empty.
 const MIN_CHARACTER_KEYS = 45;

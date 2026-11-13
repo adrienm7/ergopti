@@ -413,7 +413,7 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 	-- The path will also run under administrator privileges for a system
 	-- install. Admit only the executable bound to this running app and its
 	-- exported device/inode, not an arbitrary environment-supplied program.
-	local resolver = require("platform.remap.lease_helper")
+	local resolver = require("keyboard.adapters.karabiner.lease_helper")
 	local resolved, launcher = pcall(resolver.resolve)
 	if not resolved or type(launcher) ~= "string" or launcher:sub(1, 1) ~= "/" then
 		return nil, "native exclusive rename unavailable; launch ErgoptiPlus to install keyboard layouts", "launcher_unavailable"

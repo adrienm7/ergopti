@@ -47,7 +47,7 @@ M.GROUPS = {
 		"tests/unit/menu/ui/wrap/test_preferences_round_trip.lua",
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
-	{ name = "core", prefixes = { "tests/unit/", "tests/unit/", "tests/unit/platform/" } },
+	{ name = "core", prefixes = { "tests/unit/", "tests/unit/", "tests/unit/" } },
 	{ name = "modules", prefixes = { "tests/unit/" } },
 	{ name = "menu_llm", prefixes = { "tests/unit/ai/ui/menu/" } },
 	{ name = "menu_input", prefixes = {

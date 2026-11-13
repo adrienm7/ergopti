@@ -71,7 +71,7 @@ _CTHD_ModifierTable() {
 _CTHD_GateSource(Key) {
 	global _DriverDir
 	if (Key == "caps_lock") {
-		Source := FileRead(_DriverDir . "\platform\remap\capslock.ahk", "UTF-8")
+		Source := FileRead(_DriverDir . "\keyboard\engine\keys\capslock.ahk", "UTF-8")
 		Start := InStr(Source, "#HotIf _CapsLockHasHoldModifier()", true)
 		Finish := InStr(Source, "`n#HotIf", true, Start + 1)
 		AssertTrue(Start > 0 && Finish > Start, "the CapsLock hold-modifier hotkey must exist")

@@ -9,7 +9,7 @@
  * and derives, from the drivers' real inputs, what each feature actually
  * reaches. The closed vocabulary and the per-OS detection rules live in
  * _shared/settings/data/features/requirements.toml; the macOS Karabiner mapping lives
- * in macos/platform/remap/generator.lua, beside the state fields it maps.
+ * in macos/keyboard/engine/runtime/generator.lua, beside the state fields it maps.
  *
  * FEATURES & RATIONALE:
  * 1. No free text: a requirement is derived from code, never from prose. The
@@ -39,7 +39,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const PLUS = path.join(ROOT, 'static/ergopti_plus');
 const MANIFEST_PATH = path.join(PLUS, '_shared/settings/data/features/manifest.toml');
 const VOCABULARY_PATH = path.join(PLUS, '_shared/settings/data/features/requirements.toml');
-const GENERATOR_PATH = path.join(PLUS, 'macos/platform/remap/generator.lua');
+const GENERATOR_PATH = path.join(PLUS, 'macos/keyboard/engine/runtime/generator.lua');
 const TABLE_PATH = path.join(ROOT, 'docs/design/feature-requirements.md');
 
 // The manifest names drivers by platform id; `requires` names them by OS, as

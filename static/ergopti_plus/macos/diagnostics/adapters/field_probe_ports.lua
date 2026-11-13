@@ -253,7 +253,7 @@ local LOOPBACK_PORT_MIN, LOOPBACK_PORT_MAX = 49152, 65535
 --- The launcher this runtime resolves, with the environment it is run with.
 --- @return string|nil launcher, table|nil environment
 local function launcher()
-	local path, _, environment = require("platform.remap.lease_helper").resolve()
+	local path, _, environment = require("keyboard.adapters.karabiner.lease_helper").resolve()
 	return path, environment
 end
 
@@ -1002,7 +1002,7 @@ function M.new()
 		gesture_frame_counts = function() return require("gestures.engine.frame_evidence").counts() end,
 		capslock_chord_facts = function()
 			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
-			local counts = require("infra.capslock_chord_evidence").counts()
+			local counts = require("keyboard.engine.keys.capslock_chord_evidence").counts()
 			return {
 				action = Shortcuts.get_action("secondary_capslock"),
 				bound = Shortcuts.is_slot_bound("secondary_capslock"),

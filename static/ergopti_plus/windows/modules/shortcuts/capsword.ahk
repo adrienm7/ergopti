@@ -10,7 +10,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The state machine (toggle, deactivation, the LED, the end callback) lives
-;    in infra/capsword_state.ahk, where the unit suite drives it. This module
+;    in keyboard/engine/capsword_state.ahk, where the unit suite drives it. This module
 ;    keeps the entry points the rest of the driver calls and the two native
 ;    delimiter hotkeys, the only parts that cannot run in the suite.
 ; 2. The user's genuine CapsLock intent is flipped only by ToggleCapsLock and is

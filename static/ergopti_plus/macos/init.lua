@@ -189,13 +189,13 @@ local LOG                = "init"
 -- future rename in only one file used to silently desync the boot-readiness
 -- notification with no error — reading it here instead of re-declaring the
 -- literal makes that impossible.
-local HS_BOOT_READY_SETTING_KEY = require("platform.remap.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
+local HS_BOOT_READY_SETTING_KEY = require("keyboard.adapters.karabiner.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
 
 -- Loaded before any config-dependent Karabiner module so the early shutdown
 -- callback can revoke an already-prepared generation even if a later require
 -- aborts boot. Requiring the controller is side-effect free; init/start happen
 -- only inside platform.remap after its own validation.
-local ok_lease_controller, LeaseController = pcall(require, "platform.remap.lease_controller")
+local ok_lease_controller, LeaseController = pcall(require, "keyboard.adapters.karabiner.lease_controller")
 if not ok_lease_controller then
 	LeaseController = nil
 	Logger.error(LOG, "Exact Karabiner lease controller failed to load — remapping remains fail-closed.")
@@ -1236,15 +1236,15 @@ end
 -- the virtual keyboard form the bridge deploys does (registered below).
 require("platform.input.keyboard_geometry").initialize()
 local file_system        = require("core.fs.adapters.file_system")
--- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
+-- Guarded: platform.remap reaches keyboard/engine/runtime/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
 -- This require sits above the menubar, the panic-button eventtap and every other
 -- line of boot, so a missing or truncated tap_hold defaults.toml used to cost the
 -- whole session rather than one feature.
 local ok_karabiner
-ok_karabiner, karabiner = pcall(require, "platform.remap")
+ok_karabiner, karabiner = pcall(require, "keyboard.engine")
 if not ok_karabiner then
-	Logger.error(LOG, "platform.remap failed to load: %s — the Karabiner bridge is "
+	Logger.error(LOG, "keyboard.engine failed to load: %s — the Karabiner bridge is "
 		.. "disabled for this session; everything else continues.", tostring(karabiner))
 	karabiner = nil
 else
@@ -1373,7 +1373,7 @@ do
 	-- carried over into tap_hold.toml first, so a 1.0.9 configuration moves in
 	-- this one boot (_shared/tap_hold/data/migrations.toml [legacy_imports.hs]).
 	local tap_hold_path = config_paths.get("TapHoldConfigPath")
-	-- platform/remap/config.lua reads the rows from the config.toml beside it.
+	-- keyboard/engine/runtime/config.lua reads the rows from the config.toml beside it.
 	local TapHoldFile = require("platform.remap.tap_hold_file")
 	if TapHoldFile.config_toml_path_for(tap_hold_path) ~= config_paths.get("ConfigTomlPath") then
 		Logger.error(LOG, "tap_hold.toml '%s' is not beside config.toml '%s': the remap settings cannot find their rows.",
@@ -2345,7 +2345,7 @@ end
 do
 	local presenter_ok, registered = xpcall(function()
 		return karabiner.set_legacy_cleanup_presenter(function()
-			return require("ui.legacy_rules_cleanup").offer(karabiner)
+			return require("keyboard.ui.legacy_rules_cleanup").offer(karabiner)
 		end)
 	end, debug.traceback)
 	if presenter_ok ~= true or registered ~= true then
@@ -2543,7 +2543,7 @@ pcall(function()
 	end
 end)
 pcall(function()
-	local ok_l, kl = pcall(require, "platform.remap.ke_lifecycle")
+	local ok_l, kl = pcall(require, "keyboard.adapters.karabiner.ke_lifecycle")
 	if ok_l and kl and type(kl.flush_pending_ready_notification) == "function" then
 		kl.flush_pending_ready_notification()
 	end

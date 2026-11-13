@@ -147,8 +147,8 @@ helpers.describe("developer source mode: the launcher helper is found from the r
 		local identity = { mode = "file", permissions = "rwxr-xr-x", dev = 7, ino = 9 }
 		local original_getenv = os.getenv
 		local ok, failure = xpcall(function()
-			package.loaded["platform.remap.lease_helper"] = nil
-			local helper = helpers.load_with_stubs("platform.remap.lease_helper", {
+			package.loaded["keyboard.adapters.karabiner.lease_helper"] = nil
+			local helper = helpers.load_with_stubs("keyboard.adapters.karabiner.lease_helper", {
 				processInfo = { bundlePath = RUNTIME },
 				fs = {
 					symlinkAttributes = function(path) return path == helper_path and identity or nil end,
@@ -174,7 +174,7 @@ helpers.describe("developer source mode: the launcher helper is found from the r
 		end, debug.traceback)
 		os.getenv = original_getenv
 		package.loaded["core.lifecycle.engine.dev_source"] = saved
-		package.loaded["platform.remap.lease_helper"] = nil
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = nil
 		if not ok then error(failure, 0) end
 	end)
 end)

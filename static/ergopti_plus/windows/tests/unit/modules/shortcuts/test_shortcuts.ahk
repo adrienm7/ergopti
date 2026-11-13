@@ -27,7 +27,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	_Stub_SpotlightCalls.Push({ x: X, y: Y, duration: DurationMs })
 }
 
-; OneShotShiftFix is in platform/remap/one_shot_shift.ahk (not included).
+; OneShotShiftFix is in keyboard/engine/one_shot_shift.ahk (not included).
 ; A key combination calls it to drop the one-shot Shift one of its keys
 ; armed; the stub counts the calls.
 global _Stub_OneShotShiftFixCalls := 0

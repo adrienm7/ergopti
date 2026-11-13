@@ -83,13 +83,13 @@ local function load_remap(options)
 		success = log("success"),
 		done = log("done"),
 	}
-	package.loaded["platform.remap.defaults"] = {
+	package.loaded["keyboard.engine.runtime.defaults"] = {
 		tap_hold_timeout_ms = 200,
 		sticky_timeout_ms = 1000,
 		simultaneous_threshold_ms = 50,
 		combo_symmetric = false,
 	}
-	package.loaded["platform.remap.config"] = {
+	package.loaded["keyboard.engine.runtime.config"] = {
 		load_available_actions = function() return { { id = "none" } } end,
 		load_tap_hold_keys = function() return { { id = "left_shift" } } end,
 		load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
@@ -115,7 +115,7 @@ local function load_remap(options)
 			return 3, "ansi"
 		end,
 	}
-	package.loaded["platform.remap.generator"] = {
+	package.loaded["keyboard.engine.runtime.generator"] = {
 		build_karabiner_json = function(state)
 			calls.build = calls.build + 1
 			calls.built_products[#calls.built_products + 1] = state.virtual_keyboard_product
@@ -131,10 +131,10 @@ local function load_remap(options)
 	}
 	-- karabiner.json is not part of this scenario: the switch-off cleanup is
 	-- covered by the rule-removal tests.
-	package.loaded["platform.remap.managed_rule_removal"] = {
+	package.loaded["keyboard.adapters.runtime.managed_rule_removal"] = {
 		remove_managed_rules = function() return true, "unchanged", 0 end,
 	}
-	package.loaded["platform.remap.ke_lifecycle"] = {
+	package.loaded["keyboard.adapters.karabiner.ke_lifecycle"] = {
 		open_gui = function() return true end,
 		stop = function()
 			calls.ke_stop = calls.ke_stop + 1
@@ -143,7 +143,7 @@ local function load_remap(options)
 		end,
 		notify_ready = function() end,
 	}
-	package.loaded["platform.remap.lease_controller"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 		unregister_guardian = function(on_done)
 			calls.guardian_unregistrations = (calls.guardian_unregistrations or 0) + 1
 			calls.unregister_callback = on_done
@@ -255,7 +255,7 @@ local function load_remap(options)
 			return true
 		end,
 	}
-	package.loaded["platform.remap.watchers"] = {
+	package.loaded["keyboard.engine.runtime.watchers"] = {
 		start_gesture_watcher = function()
 			calls.lease_bound_start = calls.lease_bound_start + 1
 			append("lease-bound-start")
@@ -309,7 +309,7 @@ local function load_remap(options)
 			return options.rebind_result ~= false
 		end,
 	}
-	package.loaded["platform.remap.onboarding"] = {
+	package.loaded["keyboard.engine.runtime.onboarding"] = {
 		run_first_run_wizard = function()
 			calls.wizard_runs = calls.wizard_runs + 1
 		end,
@@ -398,7 +398,7 @@ local function load_remap(options)
 		end,
 	}
 
-	local remap = helpers.load_with_stubs("platform.remap", {
+	local remap = helpers.load_with_stubs("keyboard.engine", {
 		execute = function() return "", true end,
 		keycodes = {
 			inputSourceChanged = function() end,

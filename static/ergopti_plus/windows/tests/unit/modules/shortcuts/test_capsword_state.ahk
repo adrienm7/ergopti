@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: CapsWord State Tests
 ; DESCRIPTION:
-; Drives infra/capsword_state.ahk, the state machine behind ToggleCapsWord,
+; Drives keyboard/engine/capsword_state.ahk, the state machine behind ToggleCapsWord,
 ; DisableCapsWord and UpdateCapsLockLED, with its ports replaced: no hotkey is
 ; registered and the real CapsLock LED is never written. The auto-off listeners
 ; behind it are the real ones, so a delimiter typed through the HookDispatcher

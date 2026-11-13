@@ -131,7 +131,7 @@ end)
 
 helpers.describe("one form owns one action generation (iso-typing-convention)", function()
 	helpers.it("captures the registry declaration once before resolving every logical character", function()
-		helpers.with_stub_scope({ "modules.keymap.layout_registry", "modules.keymap.layout", "platform.remap.config" }, function()
+		helpers.with_stub_scope({ "modules.keymap.layout_registry", "modules.keymap.layout", "keyboard.engine.runtime.config" }, function()
 			local reads = 0
 			package.loaded["modules.keymap.layout_registry"] = { snapshot = function()
 				reads = reads + 1
@@ -140,7 +140,7 @@ helpers.describe("one form owns one action generation (iso-typing-convention)", 
 				} } }
 			end }
 			_G.hs.keycodes.map = { ["ê"] = 50, ["$"] = 10 }
-			local Config = require("platform.remap.config")
+			local Config = require("keyboard.engine.runtime.config")
 			local actions = { { id = "extra", logical_char = "ê" }, { id = "top", logical_char = "$" } }
 			local count, form = Config.resolve_layout_actions(actions)
 			helpers.assert_eq(count, 2)

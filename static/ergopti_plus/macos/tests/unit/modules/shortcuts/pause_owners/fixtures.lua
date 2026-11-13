@@ -201,7 +201,7 @@ local function load_inventory_context(options)
 		stop = invoke("wpm_widget", "pause"),
 		resume_after_pause = invoke("wpm_widget", "resume"),
 	}
-	package.loaded["platform.remap.onboarding"] = {
+	package.loaded["keyboard.engine.runtime.onboarding"] = {
 		stop = invoke("remap_onboarding", "pause"),
 	}
 	package.loaded["core.ui.ui.tooltip"] = {

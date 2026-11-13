@@ -229,7 +229,7 @@ end
 --- Builds with the actual ordered-pair owner over an owned neutral source.
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
-	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
+	local names = {"modules.shortcuts.key_combinations", "keyboard.engine.keys.combinations_scope", "keyboard.ui.menu_key_combinations",
 		"core.fs.adapters.storage", "hotstrings.ui.hotstring_editor.bridge", "gestures.ui.conflicts",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
@@ -282,9 +282,9 @@ local function build_fixture_menu(context)
 			files = {read_with_status = function() return nil, "absent" end},
 			actions = context.gestures, is_paused = context.is_paused, changed = function() return true end})
 		helpers.assert_true(Pair.set_instance(owner))
-		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
+		package.loaded["keyboard.engine.keys.combinations_scope"] = {retry_restore = function() return true end,
 			edit = function() error("menu-shape fixture cannot publish") end}
-		package.loaded["ui.menu.key_combinations"] = nil
+		package.loaded["keyboard.ui.menu_key_combinations"] = nil
 		-- Native delegates retain module tables. This fixture's new producer must
 		-- share the exact current locale/manifest cohort used by its assertions.
 		package.loaded["core.i18n.engine.i18n"], package.loaded["menu.engine.manifest_menu"] = i18n, ManifestMenu

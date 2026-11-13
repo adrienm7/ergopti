@@ -299,18 +299,18 @@ helpers.describe("Mac scope None and deletion preserve original collision admiss
 	for _, mode in ipairs({ "none_free", "none_conflict", "delete" }) do
 		helpers.it("(physical-nav-scope-regression) absent Navigation owner retains " .. mode, function()
 			Fixture.run(function(f)
-				local original_remap = package.loaded["platform.remap"]
+				local original_remap = package.loaded["keyboard.engine"]
 				local registrar = require("platform.input.hotkey_registrar")
 				local original_conflict, calls = registrar.has_physical_conflict, 0
 				local claim = {}
 				helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
-				package.loaded["platform.remap"] = nil
+				package.loaded["keyboard.engine"] = nil
 				registrar.has_physical_conflict = function() calls = calls + 1; return mode == "none_conflict" end
 				local invoked, accepted, reason = pcall(f.keyboard.validate_physical_edits, {
 					{ section = "shortcuts.keyboard", key = "physical_none_KeyJ", value = "none", delete = mode == "delete" },
 				}, claim)
 				registrar.has_physical_conflict = original_conflict
-				package.loaded["platform.remap"] = original_remap
+				package.loaded["keyboard.engine"] = original_remap
 				helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
 				helpers.assert_eq(invoked, true)
 				helpers.assert_eq(accepted, mode ~= "none_conflict")

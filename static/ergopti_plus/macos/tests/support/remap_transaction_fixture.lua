@@ -10,12 +10,12 @@ local helpers = require("tests.helpers")
 local lfs = require("lfs")
 
 local OWNED_MODULES = {
-	"platform.remap.defaults",
-	"platform.remap.config",
-	"platform.remap.generator",
-	"platform.remap.ke_lifecycle",
-	"platform.remap.lease_controller",
-	"platform.remap.watchers",
+	"keyboard.engine.runtime.defaults",
+	"keyboard.engine.runtime.config",
+	"keyboard.engine.runtime.generator",
+	"keyboard.adapters.karabiner.ke_lifecycle",
+	"keyboard.adapters.karabiner.lease_controller",
+	"keyboard.engine.runtime.watchers",
 	"platform.input.hotkey_registrar",
 	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
@@ -23,13 +23,13 @@ local OWNED_MODULES = {
 	"modules.keystats.kc_bridge",
 	"gestures.engine.engine",
 	"modules.shortcuts",
-	"platform.remap.onboarding",
-	"platform.remap",
+	"keyboard.engine.runtime.onboarding",
+	"keyboard.engine",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"core.ui.engine.notifications",
 	"core.text.engine.utils",
-	"platform.remap.ke_paths",
+	"keyboard.adapters.karabiner.ke_paths",
 	"core.process.adapters.task_lifecycle",
 	"platform.input.keycodes",
 	"gestures.engine.actions",
@@ -44,17 +44,17 @@ local OWNED_MODULES = {
 	"modules.keystats",
 	"platform.input.synthetic_input",
 	"modules.shortcuts.script_control",
-	"platform.remap.ke_variables",
+	"keyboard.adapters.karabiner.ke_variables",
 	"core.fs.adapters.json_codec",
 	"core.process.adapters.shell_runner",
 	"core.timing.engine.deferred_work",
-	"platform.remap.lease_contract",
+	"keyboard.adapters.karabiner.lease_contract",
 	"modules.keymap.layout",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.dir",
 	"diagnostics.adapters.event_provenance",
 	"core.fs.adapters.storage",
-	"platform.remap.managed_rule_removal",
+	"keyboard.adapters.runtime.managed_rule_removal",
 }
 
 --- Runs native construction and every retained callback before restoring state.
@@ -66,7 +66,7 @@ return function(run, dependencies)
 			assert(type(dependencies) == "table" and type(dependencies.files) == "table", "fixture file port is required")
 			package.loaded["core.fs.adapters.file_system"] = dependencies.files
 		end
-		local RealConfig = helpers.load_with_stubs("platform.remap.config")
+		local RealConfig = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		-- This fixture models a Mac on the shared runtime: a file that names no
 		-- runtime reads as shared here, while Ergopti's own runtime is the product default.
 		RealConfig.RUNTIME_DEFAULT = "shared"
@@ -145,13 +145,13 @@ return function(run, dependencies)
 				if calls.phase_listener then calls.phase_listener(phase, lease_token) end
 			end
 
-			package.loaded["platform.remap.defaults"] = {
+			package.loaded["keyboard.engine.runtime.defaults"] = {
 				tap_hold_timeout_ms = 200,
 				sticky_timeout_ms = 1000,
 				simultaneous_threshold_ms = 50,
 				combo_symmetric = false,
 			}
-			package.loaded["platform.remap.config"] = {
+			package.loaded["keyboard.engine.runtime.config"] = {
 				-- The boot reads this when a file names no runtime (a first launch).
 				RUNTIME_DEFAULT = RealConfig.RUNTIME_DEFAULT,
 				load_available_actions = function()
@@ -228,7 +228,7 @@ return function(run, dependencies)
 			local CopyCodec = require("core.text.engine.toml_codec")
 			local CopyWriter = require("core.text.engine.toml_codec.writer")
 			local CopyPolicy = require("tap_hold.engine.key_combinations")
-			local copy_config = package.loaded["platform.remap.config"]
+			local copy_config = package.loaded["keyboard.engine.runtime.config"]
 			local original_save = copy_config.save_user_config
 			calls.copy_source = ""
 			copy_config.save_user_config = function(state, ...)
@@ -271,7 +271,7 @@ return function(run, dependencies)
 				if accepted == true then calls.copy_source = plan.candidate end
 				return accepted
 			end
-			package.loaded["platform.remap.generator"] = {
+			package.loaded["keyboard.engine.runtime.generator"] = {
 				-- The facade only delegates to this rule; the real one is pinned
 				-- by test_generator_combo_gate_split.lua.
 				key_combinations_enabled = function(state)
@@ -295,7 +295,7 @@ return function(run, dependencies)
 				REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts",
 				KE_PHYSICAL_KC_LOG = nil,
 			}
-			package.loaded["platform.remap.managed_rule_removal"] = {
+			package.loaded["keyboard.adapters.runtime.managed_rule_removal"] = {
 				remove_managed_rules = function(path)
 					calls.rule_removals[#calls.rule_removals + 1] = path
 					if options.rule_removal_succeeds == false then
@@ -313,7 +313,7 @@ return function(run, dependencies)
 					return true, "removed", 2, "/backup/karabiner.json.bak"
 				end,
 			}
-			package.loaded["platform.remap.ke_lifecycle"] = {
+			package.loaded["keyboard.adapters.karabiner.ke_lifecycle"] = {
 				open_gui = function() return true end,
 				stop = function()
 					calls.lifecycle_stop_attempts = calls.lifecycle_stop_attempts + 1
@@ -325,7 +325,7 @@ return function(run, dependencies)
 				end,
 				notify_ready = function() end,
 			}
-			package.loaded["platform.remap.lease_controller"] = {
+			package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 				unregister_guardian = function(on_done)
 					calls.unregister_guardian = (calls.unregister_guardian or 0) + 1
 					calls.unregister_callback = on_done
@@ -404,7 +404,7 @@ return function(run, dependencies)
 					}
 				end,
 			}
-			package.loaded["platform.remap.watchers"] = {
+			package.loaded["keyboard.engine.runtime.watchers"] = {
 				start_gesture_watcher = function()
 					calls.lease_bound_starts = calls.lease_bound_starts + 1
 					return { stop = function() end }
@@ -512,9 +512,9 @@ return function(run, dependencies)
 				is_paused = function() return paused_now end,
 			}
 			if options.onboarding_module then
-				package.loaded["platform.remap.onboarding"] = options.onboarding_module
+				package.loaded["keyboard.engine.runtime.onboarding"] = options.onboarding_module
 			else
-				package.loaded["platform.remap.onboarding"] = {
+				package.loaded["keyboard.engine.runtime.onboarding"] = {
 					run_first_run_wizard = function()
 						calls.wizard_runs = calls.wizard_runs + 1
 						return true
@@ -530,9 +530,9 @@ return function(run, dependencies)
 					end,
 				}
 			end
-			package.loaded["platform.remap"] = nil
+			package.loaded["keyboard.engine"] = nil
 
-			local remap = helpers.load_with_stubs("platform.remap", {
+			local remap = helpers.load_with_stubs("keyboard.engine", {
 				execute = function()
 					calls.execute = calls.execute + 1
 					return "", true
@@ -630,11 +630,11 @@ return function(run, dependencies)
 				"core.i18n.engine.i18n",
 				"core.ui.engine.notifications",
 				"core.text.engine.utils",
-				"platform.remap.ke_paths",
+				"keyboard.adapters.karabiner.ke_paths",
 				"core.events.timer_scheduler",
 				"core.process.adapters.task_lifecycle",
-				"platform.remap.network_download",
-				"platform.remap.onboarding",
+				"keyboard.engine.network_download",
+				"keyboard.engine.runtime.onboarding",
 			}
 			local saved_modules = {}
 			for _, module_name in ipairs(isolated_module_names) do
@@ -691,7 +691,7 @@ return function(run, dependencies)
 				escape_gsub_replacement = function(value) return value end,
 				shell_quote = function(value) return value end,
 			}
-			package.loaded["platform.remap.ke_paths"] = {
+			package.loaded["keyboard.adapters.karabiner.ke_paths"] = {
 				CLI = "/test/karabiner_cli",
 				CORE_SERVICE = "/test/Karabiner-Core-Service",
 				GRABBER = "/test/karabiner_grabber",
@@ -709,8 +709,8 @@ return function(run, dependencies)
 				every = function() return nil, false end,
 			}
 			-- The DMG download's network route, in its production shell shape
-			-- (platform/remap/network_download.lua, NET-001).
-			package.loaded["platform.remap.network_download"] = {
+			-- (keyboard/engine/network_download.lua, NET-001).
+			package.loaded["keyboard.engine.network_download"] = {
 				command = function(tag, curl_args)
 					local args = { "-c", 'exec /usr/bin/curl "$@"', tag }
 					for _, value in ipairs(curl_args) do args[#args + 1] = value end
@@ -718,8 +718,8 @@ return function(run, dependencies)
 				end,
 			}
 			package.loaded["core.process.adapters.task_lifecycle"] = nil
-			package.loaded["platform.remap.onboarding"] = nil
-			local onboarding = require("platform.remap.onboarding")
+			package.loaded["keyboard.engine.runtime.onboarding"] = nil
+			local onboarding = require("keyboard.engine.runtime.onboarding")
 			onboarding.load_manifest = function()
 				return {
 					file_name = "Karabiner-Elements.dmg",
@@ -816,7 +816,7 @@ return function(run, dependencies)
 			package.loaded["ui.wpm.wpm_widget"] = {
 				is_running = function() return false end,
 			}
-			package.loaded["platform.remap.onboarding"] = {
+			package.loaded["keyboard.engine.runtime.onboarding"] = {
 				stop = function(on_done)
 					if type(on_done) == "function" then on_done(true, "stopped") end
 					return true

@@ -15,7 +15,7 @@ local function fixture(body)
 	local ok, failure = xpcall(function()
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["core.timing.engine.timings"] = Timings
-		package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/owned/ErgoptiPlus" end }
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return "/owned/ErgoptiPlus" end }
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, done, chunks, environment, private, owned, limit)
 			H.assert_eq(executable, "/owned/ErgoptiAutomationQuery"); H.assert_true(private); H.assert_true(owned)
 			H.assert_eq(limit, 90000); H.assert_nil(environment)

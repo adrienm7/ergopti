@@ -16,7 +16,7 @@ Every feature declares what it needs outside its driver, per OS it is available 
 
 The declarations are checked, not trusted: `npm run test:feature-requirements` derives them and fails in both directions, per OS, naming the evidence.
 
-- macOS `karabiner` comes from `macos/platform/remap/generator.lua`: `M.REQUIREMENT_STATE_FEATURES` maps each state field the generator reads to the features it feeds, and `M.REQUIREMENT_FACADE_FEATURES` lists each module reaching Karabiner without it (the `_karabiner` facade, `platform.remap.ke_variables`, the physical key ledger). A new `state.<field>` read, or a new facade caller, fails until it is mapped there.
+- macOS `karabiner` comes from `macos/keyboard/engine/runtime/generator.lua`: `M.REQUIREMENT_STATE_FEATURES` maps each state field the generator reads to the features it feeds, and `M.REQUIREMENT_FACADE_FEATURES` lists each module reaching Karabiner without it (the `_karabiner` facade, `platform.remap.ke_variables`, the physical key ledger). A new `state.<field>` read, or a new facade caller, fails until it is mapped there.
 - Every other id comes from a source signature of `requirements.toml` (the grab ioctl, a spawned program, an owner module named for its runtime). Each file it finds is an owner of named features or plumbing with a reason; an unclassified file, or an owner or plumbing entry that finds nothing, fails.
 
 After changing a declaration or the vocabulary, run `npm run codegen:feature-requirements` to regenerate `docs/design/feature-requirements.md`.

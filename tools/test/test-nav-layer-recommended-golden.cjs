@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * `_shared/layouts/data/layers.recommended.toml` is Ergopti's navigation layer as
  * data, and the Windows layer that used to be written by hand in
- * windows/platform/remap/nav_layer.ahk is its canonical behaviour. That layer
+ * windows/keyboard/engine/layers/nav_layer.ahk is its canonical behaviour. That layer
  * is frozen, hotkey by hotkey, in windows/tests/fixtures/nav_layer_golden.json;
  * this gate requires the recommended layer, resolved for Windows through the
  * physical-key registry and the layer vocabulary, to produce exactly the same
@@ -49,7 +49,7 @@ const {
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const NAV_LAYER_AHK = path.join(SP, 'windows', 'platform', 'remap', 'nav_layer.ahk');
+const NAV_LAYER_AHK = path.join(SP, 'windows', 'keyboard', 'engine', 'layers', 'nav_layer.ahk');
 const GOLDEN_PATH = path.join(SP, 'windows', 'tests', 'fixtures', 'nav_layer_golden.json');
 const TAP_HOLD_DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
 

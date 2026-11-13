@@ -24,9 +24,9 @@ end
 
 helpers.describe("TextSender reports driver output to CapsWord", function()
 	helpers.it("an accepted text reaches the CapsWord relay, a refused one does not", function()
-		helpers.with_stub_scope({ "platform.input.text_sender", "platform.input.synthetic_input", "infra.capsword_output" }, function()
-			package.loaded["infra.capsword_output"] = nil
-			local Output = require("infra.capsword_output")
+		helpers.with_stub_scope({ "platform.input.text_sender", "platform.input.synthetic_input", "keyboard.engine.capsword_output" }, function()
+			package.loaded["keyboard.engine.capsword_output"] = nil
+			local Output = require("keyboard.engine.capsword_output")
 			local reported = {}
 			helpers.assert_true(Output.set_observer(function(text) reported[#reported + 1] = text end))
 			local Sender = load_sender(true)

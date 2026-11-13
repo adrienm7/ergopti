@@ -5,7 +5,7 @@ import Foundation
 
 /// The signed `ErgoptiPlus-Runtime-Installer.app` the administrator install stages.
 ///
-/// `platform/remap/runtime_artifact_fetch.lua` downloads the pinned artifact, checks its size,
+/// `keyboard/adapters/runtime/artifact_fetch.lua` downloads the pinned artifact, checks its size,
 /// digest and closed member list, extracts it to
 /// `~/Library/Application Support/Ergopti/RemapRuntime/<version>/payload/` and writes the
 /// `receipt`, which names the pinned SHA-256, last. The helper comes from that payload only, and

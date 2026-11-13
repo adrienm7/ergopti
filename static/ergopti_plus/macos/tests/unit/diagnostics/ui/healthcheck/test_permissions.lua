@@ -32,7 +32,7 @@ local function with_permissions(states, body)
 			permission_state = function() return table.unpack(states.screen_recording, 1, 2) end,
 			request_permission = function() prompts[#prompts + 1] = "screen" return true end,
 		}
-		package.loaded["platform.remap.lease_controller"] = {
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = {
 			is_initialized = function() return true end,
 			status = function()
 				if states.guardian == "raise" then error("not initialised") end
@@ -41,7 +41,7 @@ local function with_permissions(states, body)
 		}
 		-- The remap owner's diagnostic state: it alone knows whether Ergopti
 		-- uses Karabiner at all, which the lease controller cannot tell.
-		package.loaded["platform.remap"] = {
+		package.loaded["keyboard.engine"] = {
 			guardian_state = function()
 				if states.guardian == "raise" then error("not initialised") end
 				return states.guardian

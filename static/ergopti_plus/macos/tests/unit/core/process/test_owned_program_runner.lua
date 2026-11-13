@@ -19,11 +19,11 @@ local function with_runner(body, options)
 		end
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.process.adapters.task_environment"] = nil
-		package.loaded["platform.remap.lease_helper"] = { resolve = function()
+		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function()
 			if options.missing_helper then return nil, "unavailable" end
 			return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER, ERGOPTI_LAUNCHER_DEVICE = "42", ERGOPTI_LAUNCHER_INODE = "73" }
 		end }
-		if options.real_helper then package.loaded["platform.remap.lease_helper"] = nil end
+		if options.real_helper then package.loaded["keyboard.adapters.karabiner.lease_helper"] = nil end
 		_G.hs = { task = { new = function(executable, done, chunk, arguments)
 			if options.construct_throw then error("PRIVATE executable and argv") end
 			local task = { executable = executable, arguments = arguments, inputs = {}, running = false, terminate_calls = 0,

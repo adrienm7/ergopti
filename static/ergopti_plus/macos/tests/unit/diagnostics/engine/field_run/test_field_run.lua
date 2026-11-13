@@ -1098,10 +1098,10 @@ end)
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
 		local stubbed = { "core.logger.engine.logger", "diagnostics.adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
-			"settings.engine.paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
+			"settings.engine.paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "keyboard.adapters.karabiner.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
+			package.loaded["keyboard.adapters.karabiner.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
 			local files = { ["/cfg/config.toml"] = "a = 1\n" }
 			local settings = { llm_backend = "ollama", keep = true }
 			package.loaded["settings.engine.paths"] = { get = function(key)
@@ -1156,7 +1156,7 @@ end)
 helpers.describe("field run ports: configuration guard and runtime state", function()
 	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
 		local stubbed = { "core.logger.engine.logger", "diagnostics.adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
-			"settings.engine.paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
+			"settings.engine.paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "keyboard.adapters.karabiner.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["settings.engine.paths"] = { get = function(key) return "/cfg/" .. key end }
@@ -1177,7 +1177,7 @@ helpers.describe("field run ports: configuration guard and runtime state", funct
 				set = function(key, value) settings[key] = value; return true end,
 				delete = function(key) settings[key] = nil; return true end,
 			}
-			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = { "karabiner.used_tokens.v1" } }
+			package.loaded["keyboard.adapters.karabiner.lease_controller"] = { RUNTIME_SETTING_KEYS = { "karabiner.used_tokens.v1" } }
 			package.loaded["core.process.adapters.shell_runner"] = { exec = function() return "" end }
 			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
 			package.loaded["diagnostics.adapters.field_run_ports"] = nil

@@ -42,7 +42,7 @@ local function reset_fixture_modules()
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["adapters.input_source_selector"] = nil
-	package.loaded["platform.remap.lease_helper"] = nil
+	package.loaded["keyboard.adapters.karabiner.lease_helper"] = nil
 end
 
 
@@ -78,7 +78,7 @@ end
 local function load_fixture(options)
 	options = options or {}
 	reset_fixture_modules()
-	package.loaded["platform.remap.lease_helper"] = {
+	package.loaded["keyboard.adapters.karabiner.lease_helper"] = {
 		resolve = function()
 			if options.helper_unavailable == true then return nil, "helper_unavailable" end
 			return NATIVE_HELPER, nil, {
@@ -182,7 +182,7 @@ local function status_test(name, body)
 			"modules.keymap.input_sources", "modules.keymap.layout_install",
 			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.process.adapters.task_lifecycle",
 			"ai.adapters.python_interpreter", "core.fs.engine.openstep_plist",
-			"adapters.input_source_selector", "platform.remap.lease_helper",
+			"adapters.input_source_selector", "keyboard.adapters.karabiner.lease_helper",
 		}, body)
 	end)
 end

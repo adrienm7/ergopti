@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local LegacyReleaseFixtures = require("tests.fixtures.karabiner_legacy_releases")
-local LegacyReleaseSchemas = require("platform.remap.legacy_release_fixtures")
+local LegacyReleaseSchemas = require("keyboard.engine.runtime.legacy_release_fixtures")
 
 local TOKEN = "0123456789abcdef0123456789abcdef"
 local OLD_TOKEN_A = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -208,7 +208,7 @@ end
 --- @param callback function Receives the real generator and mutable filesystem fixture.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system",
+		"keyboard.engine.runtime.generator", "core.logger.engine.logger", "core.fs.adapters.file_system",
 		"settings.engine.paths", "platform.input.keycodes",
 	}, function()
 		local fixture = {}
@@ -291,7 +291,7 @@ local function with_fixture(callback)
 			F19_LAYER_NAV_EXITED  = 80,
 		}
 
-		local Generator = helpers.load_with_stubs("platform.remap.generator")
+		local Generator = helpers.load_with_stubs("keyboard.engine.runtime.generator")
 
 
 		local function build(token)

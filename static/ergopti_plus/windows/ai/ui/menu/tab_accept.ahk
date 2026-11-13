@@ -6,7 +6,7 @@
 ; Owns the slot-navigation hotkeys (nav_modifiers + an arrow, val_modifiers +
 ; 1..9, 0) that move the active slot when the tooltip shows multiple
 ; predictions. The physical Tab that accepts the visible prediction is an SC00F
-; variant in platform/remap/tab.ahk: AutoHotkey looks the physical Tab up by
+; variant in keyboard/engine/keys/tab.ahk: AutoHotkey looks the physical Tab up by
 ; its scan code once any SC00F hotkey exists, so a `Tab::` hotkey here never
 ; fired (llm-tab-accepts-visible-prediction).
 ;
@@ -83,7 +83,7 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 ; ===============================================
 
 ; The physical Tab that accepts a prediction is not declared here: see the
-; module header and platform/remap/tab.ahk (8.5).
+; module header and keyboard/engine/keys/tab.ahk (8.5).
 ;
 ; These hotkeys own the cycle: while the native owner routes a multi-slot
 ; prediction, they move its marker and swallow the chord, so the caret never
@@ -102,7 +102,7 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 ;
 ; Shift+Tab is the footer's other chord, whatever nav_modifiers holds: the left
 ; Shift steps back and the right one forward, as on macOS, with no other
-; modifier. The physical Tab is its scan code, SC00F (platform/remap/tab.ahk).
+; modifier. The physical Tab is its scan code, SC00F (keyboard/engine/keys/tab.ahk).
 ; A side-specific Shift is the most specific SC00F hotkey under that Shift, so
 ; the hook resolves the chord here first and falls back to the Tab key's other
 ; owners, which keep every other Shift+Tab, when the criterion refuses it.
@@ -243,7 +243,7 @@ LLM_Menu_NavShiftTabSide(ModifierIsHeldFn := 0) {
  * The #HotIf of the hotkeys that consume Shift+Tab: whether Side's Shift alone
  * is held with the Tab being resolved while the native owner routes a
  * multi-slot prediction. The Tab key's own owners keep the press
- * (platform/remap/tab.ahk): the navigation layer while it is held, the Kana
+ * (keyboard/engine/keys/tab.ahk): the navigation layer while it is held, the Kana
  * AltGr, which AutoHotkey does not count as a modifier, and the auto-repeat of
  * a press a Tab tap-hold owns.
  * @param {String} Side - "LShift" or "RShift".

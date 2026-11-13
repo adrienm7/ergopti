@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Owned Runtime Capture Port (Hammerspoon)
 --- DESCRIPTION:
---- The production capture owner behind platform/remap/runtime_owner.lua: it
+--- The production capture owner behind keyboard/adapters/runtime/owner.lua: it
 --- prepares the managed physical history session over the installed-source task
 --- port, starts it from the pinned capture declaration, reports its first
 --- admitted stream and its loss, and stops it with exact settlement. The

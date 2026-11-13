@@ -61,7 +61,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../platform/input/key_state.ahk
 #Include ../platform/input/text_sender.ahk
 #Include ../diagnostics/ui/console_window.ahk
-#Include ../infra/key_combinations.ahk
+#Include ../keyboard/engine/keys/combinations.ahk
 #Include ../core/text/engine/toml/helpers.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
@@ -70,11 +70,11 @@ global _DefaultLogsDir := _LogsDir
 ; died on an unset ConfigKey in constants.ahk.
 #Include ../_generated/config_keys.ahk
 #Include ../menu/engine/manifest_reader.ahk
-#Include ../platform/remap/constants.ahk
-#Include ../platform/remap/altgr_criteria.ahk
+#Include ../keyboard/engine/keys/constants.ahk
+#Include ../keyboard/engine/keys/altgr_criteria.ahk
 
 ; Both complete test modules retain their original registrations and callbacks.
 #Include unit/diagnostics/adapters/test_console_window.ahk
-#Include unit/platform/remap/key_combinations/test_key_combinations.ahk
+#Include unit/keyboard/engine/key_combinations/test_key_combinations.ahk
 
 RunTests()

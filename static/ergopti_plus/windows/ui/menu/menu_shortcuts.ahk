@@ -19,7 +19,7 @@
 ; The key combinations are the manifest's ``key_combinations_group``: its own
 ; first-row switch, then one row per ordered pair of tap-hold keys, in two
 ; lists (the hand of the key held first) supplied as data by
-; KeyCombinationRows (infra/key_combinations.ahk).
+; KeyCombinationRows (keyboard/engine/keys/combinations.ahk).
 
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,

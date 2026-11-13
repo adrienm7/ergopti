@@ -24,8 +24,8 @@ helpers.describe("karabiner watchers guard their natives", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua must guard allWindows() against nil return", function()
-		local src = read_src("local function parse_layout_name") -- platform/remap/watchers.lua
-		assert(src, "platform/remap/watchers.lua must be readable")
+		local src = read_src("local function parse_layout_name") -- keyboard/engine/runtime/watchers.lua
+		assert(src, "keyboard/engine/runtime/watchers.lua must be readable")
 		-- The bug: app:allWindows() can return nil if the app exits mid-call.
 		-- ipairs(nil) would crash with "bad argument #1".
 		assert(
@@ -39,8 +39,8 @@ helpers.describe("karabiner watchers guard their natives", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua inner hs.task must be nil-checked before :start()", function()
-		local src = read_src("local function parse_layout_name") -- platform/remap/watchers.lua
-		assert(src, "platform/remap/watchers.lua must be readable")
+		local src = read_src("local function parse_layout_name") -- keyboard/engine/runtime/watchers.lua
+		assert(src, "keyboard/engine/runtime/watchers.lua must be readable")
 		-- The bug: hs.task.new(...):start() chained with no nil-check — crashes
 		-- if the CLI binary is missing and hs.task.new() returns nil.
 		-- Use [^\n]* (not .-) because in Lua 5.4 the dot matches newlines,
@@ -56,8 +56,8 @@ helpers.describe("karabiner watchers guard their natives", function()
 	-- =======================================================================
 
 	helpers.it("karabiner/watchers.lua F17 hotkeys must use a pcall wrapper", function()
-		local src = read_src("local function parse_layout_name") -- platform/remap/watchers.lua
-		assert(src, "platform/remap/watchers.lua must be readable")
+		local src = read_src("local function parse_layout_name") -- keyboard/engine/runtime/watchers.lua
+		assert(src, "keyboard/engine/runtime/watchers.lua must be readable")
 		-- This started as "the plain F17 hotkey must wrap its callback in pcall
 		-- like Shift+F17 and Alt+F17 already do" — three separately written
 		-- wrappers, and the one that was forgotten is what the audit found. The

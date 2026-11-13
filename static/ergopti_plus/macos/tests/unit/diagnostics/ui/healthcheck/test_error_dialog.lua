@@ -337,7 +337,7 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 
 	--- Installs a lease controller stub reporting a phase.
 	local function lease_phase(phase)
-		package.loaded["platform.remap.lease_controller"] = { status = function() return phase, { phase = phase } end }
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = { status = function() return phase, { phase = phase } end }
 	end
 
 	helpers.it("holds a Karabiner lease failure and opens nothing once the lease runs again (hold-recoverable-error)", function()
@@ -349,7 +349,7 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		lease_phase("active")
 		fire_timers(context)
 		fire_timers(context)
-		package.loaded["platform.remap.lease_controller"] = nil
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = nil
 		helpers.assert_eq(context.windows, nil, "a failure that recovered by itself never opens the window")
 	end)
 
@@ -361,7 +361,7 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		lease_phase("fenced")
 		fire_timers(context)
 		fire_timers(context)
-		package.loaded["platform.remap.lease_controller"] = nil
+		package.loaded["keyboard.adapters.karabiner.lease_controller"] = nil
 		helpers.assert_eq(context.windows, 1, "after the grace period the failure is decided like any error")
 	end)
 

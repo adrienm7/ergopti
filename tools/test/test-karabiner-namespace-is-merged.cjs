@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: The Karabiner and Gesture Action Namespaces Are One
  * DESCRIPTION:
- * macos/platform/remap/data/actions.json and _shared/shortcuts/data/actions/actions.toml
+ * macos/keyboard/data/actions.json and _shared/shortcuts/data/actions/actions.toml
  * describe the same actions. Until 2026-08-03 they overlapped on 18 ids out of 73
  * and nothing compared them, so a feature could be reachable from a remapped key
  * and unreachable from a swipe with no symptom anywhere.
@@ -44,7 +44,7 @@ const toml = require('smol-toml');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const CATALOGUE = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
-const KARABINER = path.join(SP, 'macos', 'platform', 'remap', 'data', 'actions.json');
+const KARABINER = path.join(SP, 'macos', 'keyboard', 'data', 'actions.json');
 
 // Floors — a walk that collapses would find nothing missing and pass having
 // compared nothing, which is the failure mode every gate in this suite shares.
