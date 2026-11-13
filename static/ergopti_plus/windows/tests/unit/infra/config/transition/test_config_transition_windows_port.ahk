@@ -17,7 +17,7 @@
 #Requires AutoHotkey v2.0
 #Include ../../../../test_framework.ahk
 #Include ../../../../../adapters/file_system.ahk
-#Include ../../../../../adapters/crypto.ahk
+#Include ../../../../../core/crypto/crypto.ahk
 #Include ../../../../../infra/config_write_lease.ahk
 #Include ../../../../../infra/config_transition.ahk
 #Include ../../../../../infra/config_transition_runtime.ahk

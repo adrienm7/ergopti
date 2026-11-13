@@ -146,7 +146,7 @@ end
 local function load_runner(store)
 	-- adapters/crypto captures the shell adapter at ITS load time; reload it so
 	-- it binds to the instance currently cached, or sha256 runs a REAL command.
-	helpers.load_module("adapters.crypto")
+	helpers.load_module("core.crypto.crypto")
 	local previous = package.loaded["infra.openssl_cipher"]
 	local function transform(_, _, input)
 		if crypto_options.fail_crypto then return nil, "controlled native refusal" end
