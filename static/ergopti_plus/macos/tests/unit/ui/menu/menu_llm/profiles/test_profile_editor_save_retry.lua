@@ -98,6 +98,10 @@ helpers.describe("profile editor rejected Save remains retryable", function()
 			helpers.assert_eq(fixture.durable().llm_user_profiles[1].label, "Recovered draft")
 			helpers.assert_eq(native.deletes, 1)
 			helpers.assert_true(fixture.manager.scope_idle())
+			-- Each refused Save is told once, as deferred work (prompt-editor-save-failure).
+			local notices = 0
+			while fixture.timer_count() > 0 do fixture.fire_timer(); notices = notices + 1 end
+			helpers.assert_eq(notices, 2, "the two refused Saves were told")
 		end)
 	end)
 
