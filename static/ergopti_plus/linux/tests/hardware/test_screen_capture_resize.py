@@ -41,13 +41,25 @@ with tempfile.TemporaryDirectory(prefix="ergopti-resize-native-") as temp:
         os.chmod(bindir + "/" + name, 0o700)
     for name in ["rm", "mv"]:
         os.symlink("/bin/" + name, bindir + "/" + name)
+    # A genuine write failure, proved by a pair instead of ImageMagick 6's
+    # « WriteBlob Failed » text (ImageMagick 7 on Ubuntu 26.04 words it
+    # differently): the size-limited convert fails on this input and the same
+    # unlimited convert succeeds.
+    probe = [source, "-resize", "50%"]
+    limited = subprocess.run(
+        [bindir + "/convert", *probe, temp + "/limited.png"], capture_output=True
+    )
+    assert limited.returncode != 0, "the size-limited convert must fail to write"
+    unlimited = subprocess.run(
+        ["/usr/bin/convert", *probe, temp + "/unlimited.png"], capture_output=True
+    )
+    assert unlimited.returncode == 0, unlimited.stderr
     env.update(PATH=bindir, SOURCE_PNG=source, WAYLAND_DISPLAY="")
     out = temp + "/screen.png"
     result = subprocess.run(
         ["/bin/sh", "-c", script, "sh", out, "64", "full"], env=env, capture_output=True
     )
     data = open(out, "rb").read()
-    assert b"WriteBlob Failed" in result.stderr, "expected a genuine ImageMagick write failure"
     assert result.returncode == 0, "capture must retain the original on resize failure"
     assert result.stdout.decode().strip() == "ergopti-unscaled"
     assert data == png, "failed ImageMagick write must not truncate the original"
