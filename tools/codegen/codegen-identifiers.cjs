@@ -50,13 +50,18 @@ const GROUPS = [
 	'bytecode_package',
 	'macos_notifications',
 	'linux_stage',
+	'linux_desktop',
 	'locales'
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
 // AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone, and
 // so is the name its atomic-write stages carry (linux/infra/stage_owner.lua). The
 // catalogue shown for a system language without one also reaches AutoHotkey.
-const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'locales']);
+// The Linux desktop names (the Ergopti GNOME Shell extension's D-Bus switch, the
+// Compose state file the user installer writes, the Wayland protocols of the
+// COSMIC focus worker) are the Linux daemon's: its Python installer and the
+// extension pin the same values in their tests.
+const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'linux_desktop', 'locales']);
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
 // the launcher's quit request to its embedded runtime (MLC-002).
 const MACOS_ONLY_GROUPS = new Set(['macos_notifications']);
@@ -73,7 +78,13 @@ const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
 // The bytecode package's file names, wire markers and the compiler's root-relative
 // path (linux/infra/bytecode_package.lua, modules/updater/installer.lua).
-const GROUP_SHAPE = { field_report: PATH_SHAPE, bytecode_package: PATH_SHAPE };
+// The Linux desktop names add a D-Bus object path and a dot file name.
+const LINUX_DESKTOP_SHAPE = /^(?:(?:\/[A-Za-z0-9_]+)+|\.?[A-Za-z0-9][A-Za-z0-9._-]*)$/;
+const GROUP_SHAPE = {
+	field_report: PATH_SHAPE,
+	bytecode_package: PATH_SHAPE,
+	linux_desktop: LINUX_DESKTOP_SHAPE
+};
 
 /** Stops generation with one exact reason. */
 function fail(message) {

@@ -56,10 +56,11 @@ M.X11 = "x11"
 local GNOME_SCHEMA = "org.gnome.desktop.input-sources"
 -- Exported by desktop_focus/gnome/extension.js on GNOME Shell's own connection;
 -- tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua pins both.
-M.GNOME_SWITCH_PATH = "/org/ergopti/InputSource"
-M.GNOME_SWITCH_INTERFACE = "org.ergopti.InputSource1"
+local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
+M.GNOME_SWITCH_PATH = LinuxDesktop.gnome_switch_path
+M.GNOME_SWITCH_INTERFACE = LinuxDesktop.gnome_switch_interface
 -- The refusal code a switch reports when the extension does not answer.
-M.GNOME_EXTENSION_MISSING = "gnome_extension_missing"
+M.GNOME_EXTENSION_MISSING = LinuxDesktop.gnome_extension_missing
 -- What GDBus answers for a path or method nobody exports on the Shell.
 local GNOME_MISSING_ERRORS = { "org.freedesktop.DBus.Error.UnknownMethod", "org.freedesktop.DBus.Error.UnknownObject",
 	"org.freedesktop.DBus.Error.UnknownInterface" }
@@ -327,7 +328,7 @@ end
 --- @return table|nil steps Array of { program, args, expect?, missing? }: a step
 ---   with `expect` fails unless its trimmed output is exactly that text; a
 ---   failed step whose stderr holds one of `missing.markers` reports
----   `missing.reason` and `missing.code` instead of the command's own error.
+---   `missing.detail` and `missing.code` instead of the command's own error.
 --- @return string|nil reason Why no plan exists.
 function M.plan(listing, id)
 	if listing.backend == M.GNOME then
@@ -341,7 +342,7 @@ function M.plan(listing, id)
 				M.GNOME_SWITCH_PATH, "--method", M.GNOME_SWITCH_INTERFACE .. ".Activate", "'" .. id .. "'" },
 				expect = "(true,)",
 				missing = { markers = GNOME_MISSING_ERRORS, code = M.GNOME_EXTENSION_MISSING,
-					reason = "the Ergopti GNOME Shell extension (focus@ergopti.fr) is not running: it is installed "
+					detail = "the Ergopti GNOME Shell extension (focus@ergopti.fr) is not running: it is installed "
 						.. "with the driver outside Flatpak and needs a new login after an install or an update" } },
 		}
 	end
@@ -492,7 +493,7 @@ function M.new(port)
 				if step.missing ~= nil then
 					for _, marker in ipairs(step.missing.markers) do
 						if stderr:find(marker, 1, true) then
-							return on_done(false, step.missing.reason .. " (" .. reason .. ")", step.missing.code)
+							return on_done(false, step.missing.detail .. " (" .. reason .. ")", step.missing.code)
 						end
 					end
 				end
