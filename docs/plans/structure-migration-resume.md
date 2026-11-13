@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 23:05)
+## Where things stand (2026-11-14, 00:35)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -42,27 +42,33 @@ same commit as each step or checkpoint. Times are Paris time.
 - Proof 19 (S03–S05 on the tip): both Lua suites match the baseline
   exactly (the logger order leak is gone). Windows AHK changes are
   unverified locally (no AutoHotkey here); CI is their proof.
-- **Proof 21 (current): branch `…-proof-21` at `86de9408`, run 43514443381
-  (dispatched 22:52).** It is the night tooling's S03–S05 (core/events,
-  core/fs, core/i18n) replayed on dev `ed5adcad` with every fix above. It
-  proves the block lands: any red outside run 43309556011's list is the
-  steps'. Local JS suite on the same tree: scratchpad `js-p21.json` against
-  `js-night.json`.
-- Next commands:
-  1. When run 43514443381 completes, compare its red jobs with the baseline
-     list below. A flaky-looking red is reported with both run ids.
-  2. If only baseline reds: `git fetch origin dev`, rebase the three step
-     commits onto `origin/dev` (re-run a step if dev added files its moves
-     meet), check 0 merges and 0 trailers, run the format and convention
-     gates, then `git push origin HEAD:refs/heads/dev` and send the
-     coordinator one line (range, run id).
-  3. Otherwise triage with the local suites and fix the tooling, never the
-     stepped output.
-  4. Next block S06–S08 (core/lifecycle, core/logger, core/network): in
-     wt-seq, from the S05 tip,
-     `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs
---to core/network --receipt <file>`; simulations show 0 refusals for
-     S06–S16. Then both Lua suites and the JS suite against the baselines.
+- Proof 21 (`…-proof-21` at `86de9408`, run 43514443381, S03–S05 on dev
+  `ed5adcad`): two reds beyond the baseline, both fixed on night since:
+  - Data and source contracts: the path-forms check expected the OS-purity
+    edit again on a tree where it had landed, because that edit appends to
+    its own text (`3d0d23e2`);
+  - Windows unit core: the read interlock child copied the reader's ports
+    sibling by its old name, file_system_ports.ahk (listed edit `3838a95a`).
+- S06–S08, built locally on the S05 tip: both Lua suites match the
+  baseline (six Linux case names embed the moved module path). The JS suite
+  had 14 new reds, all fixed on night (`93ec1adc`..`812b987b`):
+  - tools naming the Windows driver now follow its .ahk paths;
+  - a bare Python `Path(__file__).parents[n]` in a moving file is recounted;
+  - regex-escaped tool paths (`infra\/x\.lua`) follow their unique tail;
+  - a scan list gains each new home once, never nested under another;
+  - a join onto a scattered folder no longer widens to the driver root;
+  - listed edits: the opaque admission fixture, the flatpak probe's
+    installed path (`/app/lib/ergopti/…`), its portable runtime fixture;
+  - five Linux tests find the network probes by module name.
+- Installed-tree paths (`lib/ergopti/<driver-relative>`) are not read by
+  the plan; later steps that move `ui/dialog_host.lua` or
+  `modules/updater/manager.lua` need listed edits for those sites.
+- **Next: one block S03–S08.** wt-seq is rebuilding S03–S08 from night
+  `812b987b` (scratchpad `s0308-run.log`). Then: both Lua suites and the
+  JS suite against the baselines; rebase the six step commits onto
+  `origin/dev` as `…-proof-22`; dispatch ci.yml once proof 21 has finished
+  (one run at a time); land if only baseline reds:
+  `git push origin HEAD:refs/heads/dev`, then one line to the coordinator.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
