@@ -111,6 +111,29 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The flatpak manifest runs the network runtime probe from the installed
+		// tree (/app/lib/ergopti is the Linux driver root); S08 moves the probe
+		// to core/network/adapters.
+		file: 'tools/build/build-linux-flatpak.sh',
+		moves: 'linux/platform/network/runtime_probe.lua',
+		from: '/app/lib/ergopti/platform/network/runtime_probe.lua',
+		to: '/app/lib/ergopti/core/network/adapters/runtime_probe.lua'
+	},
+	{
+		// The portable runtime check pins that manifest command.
+		file: 'tools/test/test-linux-portable-network-runtime.cjs',
+		moves: 'linux/platform/network/runtime_probe.lua',
+		from: "'/app/lib/ergopti/platform/network/runtime_probe.lua /app/lib/ergopti/_shared'",
+		to: "'/app/lib/ergopti/core/network/adapters/runtime_probe.lua /app/lib/ergopti/_shared'"
+	},
+	{
+		// Its package fixture creates the probe's folder under usr/lib/ergopti.
+		file: 'tools/test/test-linux-portable-network-runtime.cjs',
+		moves: 'linux/platform/network/runtime_probe.lua',
+		from: "(driver/'platform/network').mkdir(parents=True)",
+		to: "(driver/'core/network/adapters').mkdir(parents=True)"
+	},
+	{
 		// The read interlock child copies the reader adapter's ports sibling by
 		// its bare name beside the copied adapter; S04 renames it ports.ahk.
 		file: 'static/ergopti_plus/windows/tests/unit/adapters/test_file_read_activity.ahk',
