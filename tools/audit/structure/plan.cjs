@@ -403,7 +403,15 @@ function categoryOf(file) {
  * form it was written in so the rewrite can keep that form.
  * @returns {{form: string, lead: string, oldRepo: string, newRepo: string}|null}
  */
-function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false, folders = null) {
+function resolvePathToken(
+	raw,
+	file,
+	inTree,
+	byRepoPath,
+	sharedArgument = false,
+	folders = null,
+	toolDriver = null
+) {
 	// //go:build or a // comment: a comment marker, never a path the plan
 	// moves (file:///A.app/… is a path, after its empty authority).
 	if (/^\/\/(?!\/)/.test(raw)) return null;
@@ -477,6 +485,15 @@ function resolvePathToken(raw, file, inTree, byRepoPath, sharedArgument = false,
 				});
 		}
 	}
+	// A tool that works on one Lua driver ('infra/paths.lua' in a set of that
+	// driver's files): a bare path under the driver root names its file there.
+	if (toolDriver && /^[A-Za-z_][\w-]*\/[\w./-]*[\w-]\.[A-Za-z0-9]+$/.test(token))
+		candidates.push({
+			form: 'driver',
+			lead: '',
+			drivers: [toolDriver],
+			abs: path.posix.normalize(`${PREFIX}${toolDriver}/${token}`)
+		});
 	// require('../../static/ergopti_plus/_shared/x.json') from a tool.
 	if (!inTree && /^\.\.?\//.test(token))
 		candidates.push({
@@ -1545,6 +1562,28 @@ function scanFile(file, text, ctx) {
 	const rows = [];
 	const code = /\.(lua|ahk)$/.test(file) ? stripComments(text, path.extname(file)) : null;
 	const inTree = file.startsWith(PREFIX) ? file.slice(PREFIX.length).split('/')[0] : null;
+	// A tool that names no driver but requires a module only one driver has
+	// (tools/diagnostics/hs_karabiner_config_native.lua: adapters.json_codec)
+	// runs on that driver's package.path.
+	const required = [...text.matchAll(/\brequire\s*\(?\s*["']([A-Za-z_][\w.]*)["']/g)].map(
+		(m) => m[1]
+	);
+	const ownsAlone = (d) =>
+		required.some(
+			(n) =>
+				presentNames.has(`${d}|${n}`) &&
+				!['macos', 'linux'].some((o) => o !== d && presentNames.has(`${o}|${n}`))
+		);
+	// The Lua drivers a file outside the trees names: in its path, as a path
+	// segment, as one piece of a joined path (path.join(root, 'macos')), or by
+	// requiring a module only that driver has.
+	const namedDrivers = ['macos', 'linux'].filter(
+		(d) =>
+			file.includes(d) ||
+			text.includes(`/${d}`) ||
+			new RegExp(`\\bpath\\.(?:join|resolve)\\([^)]*(["'])${d}\\1`).test(text) ||
+			ownsAlone(d)
+	);
 	const category = categoryOf(file);
 	const seen = new Set();
 	const add = (kind, oldToken, newToken, resolution = null) => {
@@ -1653,7 +1692,15 @@ function scanFile(file, text, ctx) {
 	for (const m of text.matchAll(pathToken)) {
 		const hit = stays(
 			m[0],
-			resolvePathToken(m[0], file, inTree, byRepoPath, isSharedArgument(text, m.index), byRepoDir)
+			resolvePathToken(
+				m[0],
+				file,
+				inTree,
+				byRepoPath,
+				isSharedArgument(text, m.index),
+				byRepoDir,
+				!inTree && namedDrivers.length === 1 ? namedDrivers[0] : null
+			)
 		);
 		if (hit) add('path', m[0], hit.newRepo === PREFIX ? '(retired)' : hit.newRepo, hit);
 		// base .. "/modules/llm/defaults.json" read as _shared: the same file's
@@ -2248,28 +2295,6 @@ function scanFile(file, text, ctx) {
 	}
 	// A Lua file outside the trees (a tool's fixture) loads the modules of the
 	// drivers it names, shared ones first.
-	// A tool that names no driver but requires a module only one driver has
-	// (tools/diagnostics/hs_karabiner_config_native.lua: adapters.json_codec)
-	// runs on that driver's package.path.
-	const required = [...text.matchAll(/\brequire\s*\(?\s*["']([A-Za-z_][\w.]*)["']/g)].map(
-		(m) => m[1]
-	);
-	const ownsAlone = (d) =>
-		required.some(
-			(n) =>
-				presentNames.has(`${d}|${n}`) &&
-				!['macos', 'linux'].some((o) => o !== d && presentNames.has(`${o}|${n}`))
-		);
-	// The Lua drivers a file outside the trees names: in its path, as a path
-	// segment, as one piece of a joined path (path.join(root, 'macos')), or by
-	// requiring a module only that driver has.
-	const namedDrivers = ['macos', 'linux'].filter(
-		(d) =>
-			file.includes(d) ||
-			text.includes(`/${d}`) ||
-			new RegExp(`\\bpath\\.(?:join|resolve)\\([^)]*(["'])${d}\\1`).test(text) ||
-			ownsAlone(d)
-	);
 	const luaRoots = Census.DRIVERS.includes(inTree)
 		? [inTree, '_shared']
 		: inTree === '_shared'
