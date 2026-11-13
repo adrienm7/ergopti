@@ -187,8 +187,9 @@ _FRAI_NativeModuleSource(Name) {
 	return Owner
 }
 
-; Destinations come from the unchanged child fixture's own real include layout.
-; Only these three fixture aliases are admitted; they never select driver paths.
+; Destinations come from the unchanged child fixture's own real include layout,
+; whatever folders it names: a module that moves deeper keeps its relative place.
+; Only these three module names are admitted; they never select driver paths.
 _FRAI_CopyNativeModules(Directory, Fixture) {
 	Symbols := Map("file_system.ahk", "_FSReadUtf8ExactImpl",
 		"config_write_lease.ahk", "_ConfigWriteLeaseTryAcquire",
@@ -200,12 +201,14 @@ _FRAI_CopyNativeModules(Directory, Fixture) {
 			continue
 		Relative := StrReplace(Include[1], "/", "\")
 		Parts := StrSplit(Relative, "\")
-		AssertTrue(Parts.Length == 2 && (Parts[1] == "infra" || Parts[1] == "adapters")
-			&& Symbols.Has(Parts[2]), "Only the fixture's declared relative module aliases are admitted.")
-		Name := Symbols[Parts[2]]
+		AssertTrue(Parts.Length >= 2 && !InStr(Relative, "..") && Symbols.Has(Parts[Parts.Length]),
+			"Only the fixture's declared relative module aliases are admitted.")
+		Name := Symbols[Parts[Parts.Length]]
 		AssertFalse(Published.Has(Name), "A fixture alias cannot copy the same source owner twice.")
 		Owner := _FRAI_NativeModuleSource(Name)
 		Destination := Directory . "\" . Relative
+		SplitPath(Destination, , &DestinationDir)
+		DirCreate(DestinationDir)
 		FileCopy(Owner.Path, Destination)
 		AssertTrue(FSUtf8ExactMatches(Destination, Owner.Content),
 			"The native child receives the entire exact module, including its declarations and includes.")
@@ -218,15 +221,13 @@ _FRAI_CopyNativeModules(Directory, Fixture) {
 	SplitPath(Published["_FSReadUtf8ExactImpl"], , &PublishedDir)
 	FileCopy(AdapterDir . "\file_system_ports.ahk", PublishedDir . "\file_system_ports.ahk")
 	DirCreate(Directory . "\_generated")
-	FileCopy(AdapterDir . "\..\_generated\file_system_ports.ahk", Directory . "\_generated\file_system_ports.ahk")
+	FileCopy(_DriverDir . "\_generated\file_system_ports.ahk", Directory . "\_generated\file_system_ports.ahk")
 	return Published
 }
 
 _FRAI_RunNative(Mode) {
 	Directory := A_Temp . "\ergopti-read-interlock-" . A_TickCount . "-" . Random(100000, 999999)
 	DirCreate(Directory)
-	DirCreate(Directory . "\infra")
-	DirCreate(Directory . "\adapters")
 	Fixture := Mode == "boundaries" ? "read_write_native.ahk" : "read_write_close.ahk"
 	Published := _FRAI_CopyNativeModules(Directory, Fixture)
 	Path := Published["_FSReadUtf8ExactImpl"]
