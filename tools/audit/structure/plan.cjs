@@ -1818,6 +1818,34 @@ function scanFile(file, text, ctx) {
 				m[1].toLowerCase(),
 				path.posix.normalize(`${path.posix.dirname(file)}/${m[2].replace(/\\/g, '/')}`)
 			);
+		// $SharedRoot = [IO.Path]::Combine($RepoRoot, 'static', 'ergopti_plus',
+		// '_shared'), then [IO.Path]::Combine($SharedRoot, 'data', 'x.json'): the
+		// same base and joined path, in pieces ($RepoRoot names the checkout).
+		const pieces = (list) => [...list.matchAll(/'([\w.-]+)'/g)].map((x) => x[1]);
+		for (const m of text.matchAll(
+			/^\s*\$(\w+)\s*=\s*\[IO\.Path\]::Combine\(\$RepoRoot((?:\s*,\s*'[\w.-]+')+)\s*\)\s*$/gim
+		))
+			bases.set(m[1].toLowerCase(), pieces(m[2]).join('/'));
+		for (const m of text.matchAll(/\[IO\.Path\]::Combine\(\$(\w+)((?:\s*,\s*'[\w.-]+')+)\s*\)/gi)) {
+			const base = bases.get(m[1].toLowerCase());
+			if (!base) continue;
+			const old = path.posix.normalize(`${base}/${pieces(m[2]).join('/')}`);
+			const moved = byRepoPath.get(old) || byRepoDir.get(old);
+			if (!moved || moved === SPLIT) continue;
+			if (!moved.startsWith(`${base}/`)) {
+				add('dir-split', m[0], '(split)', { oldRepo: old });
+				continue;
+			}
+			const fresh = moved
+				.slice(base.length + 1)
+				.split('/')
+				.map((x) => `'${x}'`)
+				.join(', ');
+			add('lua-module-quoted', m[0], `[IO.Path]::Combine($${m[1]}, ${fresh})`, {
+				oldRepo: old,
+				newRepo: moved
+			});
+		}
 		for (const m of text.matchAll(/Join-Path\s+\$(\w+)\s+'([\w.\\\/-]+)'/g)) {
 			const base = bases.get(m[1].toLowerCase());
 			if (!base) continue;
