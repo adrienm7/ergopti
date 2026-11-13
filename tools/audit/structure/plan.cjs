@@ -2188,6 +2188,68 @@ function scanFile(file, text, ctx) {
 					'_shared',
 					...['macos', 'linux'].filter((d) => file.includes(d) || text.includes(`/${d}`))
 				];
+	if (file.endsWith('.lua') && /\bpackage\.loaded\b/.test(text)) {
+		// A module-name prefix as a Lua pattern, name:match("^modules%.llm%."):
+		// a sweep of package.loaded over every module it covers. A step that
+		// moves some of them out of it changes what the sweep covers. The
+		// literal follows only when all of them land under one new prefix that
+		// holds nothing else; otherwise the step is refused, and the site is
+		// listed (edits.cjs) or sweeps through the driver's shared predicate.
+		const listed = Edits.FOLDER_EDITS.filter((e) => e.file === file).map((e) => e.from);
+		const sweep = /(["'])\^((?:[A-Za-z_]\w*%\.)*[A-Za-z_]\w*(?:%\.)?)\1/g;
+		for (const m of text.matchAll(sweep)) {
+			if (listed.some((from) => from.includes(m[0]))) continue;
+			const stem = m[2].replace(/%\./g, '.');
+			const verdicts = [];
+			for (const r of luaRoots) {
+				const under = [...presentNames]
+					.filter((k) => k.startsWith(`${r}|${stem}`) && !k.endsWith('.init'))
+					.map((k) => k.slice(r.length + 1));
+				if (under.length === 0) continue;
+				const fresh = under.map((u) => {
+					const hit = byLuaName.get(`${r}|${u}`);
+					return [u, hit ? hit[2] : u, hit];
+				});
+				const out = fresh.filter(([, n]) => !n || !n.startsWith(stem));
+				if (out.length === 0) {
+					// Nothing leaves: the literal stays, held whole so the escaped
+					// name rule never respells the module it happens to name.
+					if (fresh.some(([, , hit]) => hit)) verdicts.push({ to: m[0], oldRepo: null });
+					continue;
+				}
+				const first = out[0][2];
+				const oldRepo = first ? PREFIX + first[0] : null;
+				const heads = new Set(
+					fresh.map(([u, n]) => {
+						const tail = u.slice(stem.length);
+						return n && n.endsWith(tail) ? n.slice(0, n.length - tail.length) : null;
+					})
+				);
+				const head = heads.size === 1 ? [...heads][0] : null;
+				const images = new Set(fresh.map(([, n]) => `${r}|${n}`));
+				const alone =
+					head &&
+					[...targetNames].filter((k) => k.startsWith(`${r}|${head}`)).every((k) => images.has(k));
+				if (alone) {
+					verdicts.push({ to: `${m[1]}^${head.replace(/\./g, '%.')}${m[1]}`, oldRepo });
+				} else {
+					const names = out.slice(0, 3).map(([u, n]) => `${u} -> ${n || '(gone)'}`);
+					verdicts.push({
+						split: `(prefix sweep scatters: ${names.join(', ')}${out.length > 3 ? ', …' : ''})`,
+						oldRepo
+					});
+				}
+			}
+			const split = verdicts.find((v) => v.split);
+			if (split) add('lua-prefix-split', m[0], split.split, { oldRepo: split.oldRepo });
+			else if (verdicts.length && new Set(verdicts.map((v) => v.to)).size === 1)
+				add('lua-prefix-pattern', m[0], verdicts[0].to, {
+					oldRepo: verdicts.find((v) => v.oldRepo)?.oldRepo ?? null
+				});
+			else if (verdicts.length)
+				add('lua-prefix-split', m[0], '(prefix sweep follows two trees apart)', { oldRepo: null });
+		}
+	}
 	if (file.endsWith('.lua')) {
 		// A quoted prefix completed by concatenation: "modules.llm." .. name.
 		for (const m of text.matchAll(
