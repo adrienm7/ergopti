@@ -1,4 +1,4 @@
-﻿; tests/unit/adapters/test_crypto_sha256_is_real.ahk
+﻿; tests/unit/core/crypto/test_sha256_is_real.ahk
 
 ; ==============================================================================
 ; MODULE: CryptoSha256 Real-Digest Regression Test

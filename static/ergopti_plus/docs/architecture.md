@@ -48,7 +48,6 @@ graph TD
         LINUX_compositor_focus["CompositorFocus.lua"]
         LINUX_compositor_focus_worker["CompositorFocusWorker.lua"]
         LINUX_cosmic_toplevel_worker["CosmicToplevelWorker.lua"]
-        LINUX_crypto["Crypto.lua"]
         LINUX_curl_http_client["CurlHttpClient.lua"]
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
@@ -107,7 +106,6 @@ graph TD
         MACOS_boot_fatal["BootFatal.lua"]
         MACOS_boot_journal["BootJournal.lua"]
         MACOS_clipboard["Clipboard.lua"]
-        MACOS_crypto["Crypto.lua"]
         MACOS_event_clock["EventClock.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
         MACOS_field_check_ports["FieldCheckPorts.lua"]
@@ -196,7 +194,6 @@ graph TD
         WINDOWS_clipboard["Clipboard.ahk"]
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
-        WINDOWS_crypto["Crypto.ahk"]
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
         WINDOWS_driver_control["DriverControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
@@ -263,7 +260,6 @@ graph TD
 
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
-    P_Crypto -->|implements| LINUX_crypto
     P_FileSystem -->|implements| LINUX_file_system
     P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_HttpClient -->|implements| LINUX_http_client
@@ -279,7 +275,6 @@ graph TD
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
-    P_Crypto -->|implements| MACOS_crypto
     P_FileSystem -->|implements| MACOS_file_system
     P_GraphicsRenderer -->|implements| MACOS_graphics_renderer
     P_HotkeyRegistrar -->|implements| MACOS_hotkey_registrar
@@ -302,7 +297,6 @@ graph TD
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
-    P_Crypto -->|implements| WINDOWS_crypto
     P_FileSystem -->|implements| WINDOWS_file_system
     P_GraphicsRenderer -->|implements| WINDOWS_graphics_renderer
     P_HotkeyRegistrar -->|implements| WINDOWS_hotkey_registrar
