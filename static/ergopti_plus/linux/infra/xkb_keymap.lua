@@ -52,6 +52,7 @@ local TableUtil = require("core.text.engine.table_util")
 local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
+local Keysym = require("infra.keysym")
 
 local LOG = "infra.xkb_keymap"
 
@@ -224,6 +225,14 @@ end
 local function split_levels(list)
 	local levels = {}
 	for index, entry in ipairs(split_items(list) or {}) do
+		-- libxkbcommon 1.13 writes keysyms by number (`0x61`); the readers of
+		-- this table compare names, so a numeric keysym takes its canonical name
+		-- and stays numeric only where no name is known.
+		local numeric = entry:match("^0[xX](%x+)$")
+		if numeric then
+			local sym = tonumber(numeric, 16)
+			entry = sym == 0 and NO_SYMBOL or Keysym.name_of(sym) or entry
+		end
 		if entry == "" or entry == NO_SYMBOL or entry:sub(1, 1) == "{" then
 			levels[index] = false
 		else
