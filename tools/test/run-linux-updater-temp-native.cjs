@@ -59,6 +59,24 @@ const STDERR_TAIL_CHARS = 400;
 function refused() {
 	throw new Error('Temporary updater native admission or physical closure refused.');
 }
+/**
+ * Names where a refusal was raised: the error message and the first frame in
+ * this tool folder, so a CI log says which admission check refused without
+ * printing private evidence (paths outside the tool folder are dropped).
+ * @param {unknown} reason The caught value.
+ * @returns {string} One line such as "Pinned ... refused. at prepare-linux-lua54-native-provider.cjs:212".
+ */
+function refusalSite(reason) {
+	if (!(reason instanceof Error)) return 'non-Error refusal';
+	const message = String(reason.message)
+		.replace(/[\r\n]+/g, ' ')
+		.slice(0, 200);
+	const frame = String(reason.stack || '')
+		.split('\n')
+		.map((line) => line.match(/[\\/]tools[\\/]test[\\/]([\w.-]+\.cjs):(\d+):\d+\)?$/))
+		.find(Boolean);
+	return frame ? message + ' at ' + frame[1] + ':' + frame[2] : message;
+}
 // An explicit work root is supplied and owned by the caller; never create it.
 function temporaryWorkRoot(environment) {
 	const configured = Object.hasOwn(environment, 'ERGOPTI_UPDATER_TEMP_NATIVE_WORK_ROOT');
@@ -720,12 +738,14 @@ async function run({
 		}
 		current();
 		return failed ? 1 : 0;
-	} catch {
+	} catch (reason) {
 		error(
 			'[FAIL] Linux updater temporary native ' +
 				phase +
 				': admission or physical closure refused; private evidence retained.' +
-				(refusedChild ? ' Refused command: ' + refusedChild : '')
+				(refusedChild ? ' Refused command: ' + refusedChild : '') +
+				' Refusal: ' +
+				refusalSite(reason)
 		);
 		return 1;
 	} finally {
@@ -786,5 +806,6 @@ module.exports = {
 	evidenceCount,
 	captureReceipt,
 	cryptoReceipt,
-	refusedChildSummary
+	refusedChildSummary,
+	refusalSite
 };

@@ -329,8 +329,27 @@ control('refused child names its command and bounded stderr tail', () => {
 	});
 	assert.equal(long, 'cc exit 1; stderr: ' + 'x'.repeat(400));
 });
-assert.equal(count, 50, 'Independent C receipt extension floor changed');
-console.log('[OK] Linux updater namespace receipts: 17 source controls passed; no native credit.');
+control('refusal site names the tool frame', () => {
+	let caught;
+	try {
+		require('./prepare-linux-lua54-native-provider.cjs').bindMeson(
+			Buffer.from('not the pinned meson.build')
+		);
+	} catch (reason) {
+		caught = reason;
+	}
+	assert.match(
+		runner.refusalSite(caught),
+		/^Pinned native Lua54 provider prerequisite refused\. at prepare-linux-lua54-native-provider\.cjs:\d+$/
+	);
+	assert.equal(runner.refusalSite('text'), 'non-Error refusal');
+	assert.match(
+		runner.refusalSite(new Error('a\nb')),
+		/^a b at test-linux-updater-temp-native\.cjs:\d+$/
+	);
+});
+assert.equal(count, 51, 'Independent C receipt extension floor changed');
+console.log('[OK] Linux updater namespace receipts: 18 source controls passed; no native credit.');
 
 // Actual filesystem admission controls; no child process or native qualification.
 if (process.platform === 'linux') {
