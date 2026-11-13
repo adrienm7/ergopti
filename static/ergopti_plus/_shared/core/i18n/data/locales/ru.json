@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Раскладка при паузе / возобновлении",
 	"menu.layout.pause_layout_unsupported_desktop": "Раскладка при паузе / возобновлении: недоступно в этой среде (только GNOME, KDE или X11)",
 	"menu.layout.select_failed": "Не удалось переключить раскладку клавиатуры. Подробности — в журналах.",
+	"menu.layout.select_failed_gnome_extension": "Не удалось переключить раскладку клавиатуры: в GNOME Ergopti переключает её через своё расширение GNOME Shell, которое не запущено. Выйдите из сеанса и войдите снова после установки или обновления Ergopti; версия Flatpak не может его установить.",
 	"menu.layout.system_layout_install": "Скачать установщик системной раскладки Ergopti (неподписанный, права администратора)…",
 	"menu.layout.system_layout_update": "Скачать установщик системной раскладки Ergopti заново, чтобы обновить её…",
 	"menu.layout.system_layout_installed": "Системная раскладка Ergopti установлена",

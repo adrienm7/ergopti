@@ -21,6 +21,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
+local InputSourceSwitch = require("adapters.input_source_switch")
 local ManifestMenu = require("infra.manifest_menu")
 local Shell = require("adapters.shell_runner")
 local COMMAND = require("settings.engine.keys").COMMAND
@@ -88,12 +89,15 @@ function M.rows(ctx)
 			disabled = choice.active == true,
 			action = function()
 				Logger.start(LOG, "Switching the keyboard layout to '%s' from the menu…", id)
-				switcher.select(id, function(ok, detail)
+				switcher.select(id, function(ok, detail, code)
 					if ok then
 						Logger.success(LOG, "Keyboard layout switched to '%s' from the menu.", id)
 					else
 						Logger.error(LOG, "Keyboard layout not switched to '%s': %s.", id, tostring(detail))
-						ctx.show_error(ctx.t("menu.layout.select_failed"), ctx.t("common.error_title"))
+						-- GNOME switches only through the Ergopti Shell extension: say so.
+						local message = code == InputSourceSwitch.GNOME_EXTENSION_MISSING
+							and "menu.layout.select_failed_gnome_extension" or "menu.layout.select_failed"
+						ctx.show_error(ctx.t(message), ctx.t("common.error_title"))
 					end
 					switcher.refresh(function() ctx.on_changed() end)
 				end)

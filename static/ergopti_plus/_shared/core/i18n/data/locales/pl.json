@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Układ przy pauzie / wznowieniu",
 	"menu.layout.pause_layout_unsupported_desktop": "Układ przy pauzie / wznowieniu: niedostępne na tym pulpicie (tylko GNOME, KDE lub X11)",
 	"menu.layout.select_failed": "Nie można przełączyć układu klawiatury. Szczegóły znajdziesz w dziennikach.",
+	"menu.layout.select_failed_gnome_extension": "Nie można przełączyć układu klawiatury: w GNOME Ergopti przełącza go przez swoje rozszerzenie GNOME Shell, które nie działa. Wyloguj się i zaloguj ponownie po zainstalowaniu lub aktualizacji Ergopti; wersja Flatpak nie może go zainstalować.",
 	"menu.layout.system_layout_install": "Pobierz instalator układu systemowego Ergopti (niepodpisany, uprawnienia administratora)…",
 	"menu.layout.system_layout_update": "Pobierz ponownie instalator układu systemowego Ergopti, aby go zaktualizować…",
 	"menu.layout.system_layout_installed": "Układ systemowy Ergopti zainstalowany",

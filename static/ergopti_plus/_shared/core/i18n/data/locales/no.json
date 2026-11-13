@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Layout ved pause / gjenopptakelse",
 	"menu.layout.pause_layout_unsupported_desktop": "Oppsett ved pause / gjenopptak: ikke tilgjengelig på dette skrivebordet (kun GNOME, KDE eller X11)",
 	"menu.layout.select_failed": "Kunne ikke bytte tastaturoppsett. Se loggene for detaljer.",
+	"menu.layout.select_failed_gnome_extension": "Kunne ikke bytte tastaturoppsett: i GNOME bytter Ergopti det via sin GNOME Shell-utvidelse, som ikke kjører. Logg ut og inn igjen etter at du har installert eller oppdatert Ergopti; Flatpak-versjonen kan ikke installere den.",
 	"menu.layout.system_layout_install": "Last ned installasjonsprogrammet for Ergopti-systemoppsettet (usignert, administratorrettigheter)…",
 	"menu.layout.system_layout_update": "Last ned installasjonsprogrammet for Ergopti-systemoppsettet på nytt for å oppdatere det…",
 	"menu.layout.system_layout_installed": "Ergopti-systemoppsett installert",

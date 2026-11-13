@@ -796,6 +796,23 @@ Action: reuse `merge_gsettings_source()` / `merge_layout_specs()` from
 `layout_package.py`, run activation as the desktop user, and never hand-write
 a sources value.
 
+### project-gnome-runtime-layout-switch-goes-through-the-shell-extension
+
+A running GNOME Shell (checked on 46) keeps its input sources in memory: it
+ignores runtime writes of `current` and `mru-sources`, and a `sources` change
+makes it activate its first entry, so no gsettings sequence switches it
+reliably. The daemon therefore asks the `focus@ergopti.fr` extension
+(`org.ergopti.InputSource1.Activate` at `/org/ergopti/InputSource` on
+`org.gnome.Shell`), which calls the source's `activate(true)` as the Shell's
+own switcher does. A GDBus `UnknownMethod`/`UnknownObject` answer means the
+extension is not running (Flatpak, turned off, or an updated copy not loaded
+before the next login): report `gnome_extension_missing`, never fall back to
+rewriting `sources`. Action: keep the extension's constants pinned to
+`input_source_switch.lua` by `test_compositor_focus_assets.lua`, and prove a
+change with `tests/hardware/run_input_sources_live.sh gnome` and
+`gnome-no-extension` (needs gnome-shell, python3-dbusmock, xwayland and a
+world-writable `/tmp/.X11-unix`).
+
 ### project-a-keymap-that-compiles-can-still-have-dead-layers
 
 libxkbcommon and xkbcomp both accept a symbols file whose key type is

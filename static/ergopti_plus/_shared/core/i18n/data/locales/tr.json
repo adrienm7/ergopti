@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "Duraklatma / devam ettirmede düzen",
 	"menu.layout.pause_layout_unsupported_desktop": "Duraklatma / sürdürmede düzen: bu masaüstünde kullanılamaz (yalnızca GNOME, KDE veya X11)",
 	"menu.layout.select_failed": "Klavye düzeni değiştirilemedi. Ayrıntılar için günlüklere bakın.",
+	"menu.layout.select_failed_gnome_extension": "Klavye düzeni değiştirilemedi: GNOME'da Ergopti bunu kendi GNOME Shell uzantısıyla değiştirir, ancak uzantı çalışmıyor. Ergopti'yi kurduktan veya güncelledikten sonra oturumu kapatıp yeniden açın; Flatpak sürümü bunu kuramaz.",
 	"menu.layout.system_layout_install": "Ergopti sistem düzeni yükleyicisini indir (imzasız, yönetici hakları)…",
 	"menu.layout.system_layout_update": "Güncellemek için Ergopti sistem düzeni yükleyicisini yeniden indir…",
 	"menu.layout.system_layout_installed": "Ergopti sistem düzeni yüklü",

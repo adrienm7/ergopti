@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "التخطيط عند الإيقاف / الاستئناف",
 	"menu.layout.pause_layout_unsupported_desktop": "التخطيط عند الإيقاف المؤقت / الاستئناف: غير متاح على سطح المكتب هذا (GNOME أو KDE أو X11 فقط)",
 	"menu.layout.select_failed": "تعذّر تغيير تخطيط لوحة المفاتيح. راجع السجلات لمزيد من التفاصيل.",
+	"menu.layout.select_failed_gnome_extension": "تعذّر تبديل تخطيط لوحة المفاتيح: في GNOME، يبدّله Ergopti عبر امتداد GNOME Shell الخاص به، وهو غير مُشغَّل. سجّل الخروج ثم الدخول بعد تثبيت Ergopti أو تحديثه؛ لا يمكن لإصدار Flatpak تثبيته.",
 	"menu.layout.system_layout_install": "تنزيل مثبّت تخطيط النظام Ergopti (غير موقّع، صلاحيات المسؤول)…",
 	"menu.layout.system_layout_update": "تنزيل مثبّت تخطيط النظام Ergopti مجددًا لتحديثه…",
 	"menu.layout.system_layout_installed": "تم تثبيت تخطيط النظام Ergopti",

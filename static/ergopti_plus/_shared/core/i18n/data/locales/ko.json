@@ -2052,6 +2052,7 @@
 	"menu.layout.pause_layout_section": "일시정지/재개 시 레이아웃",
 	"menu.layout.pause_layout_unsupported_desktop": "일시 정지 / 재개 시 레이아웃: 이 데스크톱에서는 사용할 수 없음 (GNOME, KDE 또는 X11만)",
 	"menu.layout.select_failed": "키보드 레이아웃을 전환할 수 없습니다. 자세한 내용은 로그를 확인하세요.",
+	"menu.layout.select_failed_gnome_extension": "키보드 레이아웃을 전환할 수 없습니다. GNOME에서는 Ergopti가 자체 GNOME Shell 확장으로 전환하는데, 이 확장이 실행 중이 아닙니다. Ergopti를 설치하거나 업데이트한 후 로그아웃했다가 다시 로그인하세요. Flatpak 버전은 이를 설치할 수 없습니다.",
 	"menu.layout.system_layout_install": "Ergopti 시스템 레이아웃 설치 프로그램 다운로드(서명되지 않음, 관리자 권한)…",
 	"menu.layout.system_layout_update": "Ergopti 시스템 레이아웃 설치 프로그램을 다시 다운로드하여 업데이트…",
 	"menu.layout.system_layout_installed": "Ergopti 시스템 레이아웃 설치됨",
