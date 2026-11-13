@@ -12,7 +12,7 @@
 
 ; Ultimate fallback when neither a user override nor a TOML default is set.
 ; LOADED AT BOOT from the shared cross-driver canon
-; (_shared/modules/hotstrings/defaults.toml) by HotstringsConfigLoadSharedDefaults() —
+; (_shared/hotstrings/data/catalogue/defaults.toml) by HotstringsConfigLoadSharedDefaults() —
 ; the SINGLE source shared verbatim with the Hammerspoon driver. They start
 ; empty so a missing file/key fails fast (rule 5.3) rather than masking driver
 ; drift behind a hardcoded literal (rules 5.2 / 5.4). ``GLOBAL_DEFAULT_COLOR``
@@ -22,7 +22,7 @@ global GLOBAL_DEFAULT_DELAY := ""
 global GLOBAL_DEFAULT_COLOR := ""
 
 ; Default activation delay (seconds) for the dynamic hotstrings (dates, phone /
-; SSN / IBAN prefixes). Loaded from _shared/modules/hotstrings/defaults.toml
+; SSN / IBAN prefixes). Loaded from _shared/hotstrings/data/catalogue/defaults.toml
 ; [delays] dynamichotstrings_sec by HotstringsConfigLoadSharedDefaults() — the
 ; SINGLE source shared verbatim with the macOS DELAYS_DEFAULT.dynamichotstrings —
 ; so it can never drift behind a re-typed literal (rules 5.2 / 5.4). Starts empty
@@ -35,10 +35,10 @@ global DYN_HOTSTRINGS_DEFAULT_DELAY := ""
 
 ; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
 ; TOML _meta or user override sets a color. Both baselines load at boot from the
-; shared canon — "personal" from _shared/modules/hotstrings/defaults.toml via
+; shared canon — "personal" from _shared/hotstrings/data/catalogue/defaults.toml via
 ; HotstringsConfigLoadSharedDefaults() (kept in lock-step with macOS), and
 ; "llm_prediction" from the canonical AI loading hex
-; (_shared/modules/tooltip/constants.toml [accent_colors] ai_loading_hex, exposed as
+; (_shared/core/ui/data/tooltip/constants.toml [accent_colors] ai_loading_hex, exposed as
 ; UI_AI_LOADING_HEX) via HotstringsConfigLoadLlmPredictionColor(). They start
 ; empty so a missing load fails fast (rule 5.3) rather than masking drift behind
 ; a re-typed literal (rules 5.2 / 5.4).
@@ -48,7 +48,7 @@ global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
 
 ; Shared terminator catalogue instance — the single source of truth for the
 ; word-expander LIST (labels, order, separators) AND the default-enabled set,
-; generated from _shared/core/domain/Terminators.spec.js and shared verbatim with
+; generated from _shared/core/text/data/domain/Terminators.spec.js and shared verbatim with
 ; macOS. Both the tray submenu and the config-window checkboxes render
 ; HSE_Terminators.all() so the catalogue can never drift between the two UIs or
 ; between drivers. Created once at load — before initMenu and before the default

@@ -2,8 +2,8 @@
 
 --- Replays the neutral keyboard-slot contract through the macos gate.
 local helpers = require("tests.helpers")
-local Json = require("json")
-local SlotRoles = require("shortcuts.slot_roles")
+local Json = require("core.text.engine.json")
+local SlotRoles = require("shortcuts.engine.slot_roles")
 
 --- Reads the checked-in independent vectors.
 --- @param relative string Path below the shared tree.
@@ -16,7 +16,7 @@ local function read_shared(relative)
 	return Json.decode(raw)
 end
 
-require("test.slot_roles_contract")(helpers, SlotRoles, {
+require("tests.lua.keyboard.slot_roles_contract")(helpers, SlotRoles, {
 	driver = "macos",
 	corpus = read_shared("tests/corpus/shortcuts/neutral_slots.json"),
 })

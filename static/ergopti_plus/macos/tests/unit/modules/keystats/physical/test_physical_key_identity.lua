@@ -12,9 +12,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Identity = require("modules.keystats.physical_key_identity")
-local Keycodes = require("keycodes")
+local Keycodes = require("platform.input.keycodes.core")
 
 -- HID usage pages.
 local PAGE_KEYBOARD = 0x07
@@ -32,7 +32,7 @@ local USAGE_F21 = 0x70
 --- @param name string File name under _shared/data/keycodes.
 --- @return table data
 local function keycode_data(name)
-	local handle = assert(io.open(helpers.shared("data/keycodes/" .. name), "r"))
+	local handle = assert(io.open(helpers.shared("layouts/data/keycodes/" .. name), "r"))
 	local text = handle:read("a")
 	handle:close()
 	return Json.decode(text)

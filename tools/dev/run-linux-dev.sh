@@ -8,7 +8,7 @@
 # same entry point the packages start, install/launch.sh, with the tray: the
 # same input-permission request, session lock, native archive backend, luv,
 # config folder (~/.config/ergopti, paths.toml) and AI runtimes. A saved .lua of
-# the driver or of _shared/lua restarts the daemon (infra/dev_source.lua); the
+# the driver or of _shared restarts the daemon (infra/dev_source.lua); the
 # tray's Reload does it on demand. The updater is off: a checkout is a source
 # run (infra/installation.lua).
 #
@@ -26,8 +26,8 @@ set -euo pipefail
 # directory name. Capture a sentinel and remove only that final byte afterward.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "$(pwd -P)")"
 REPO_ROOT="${REPO_ROOT%.}"
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 DRIVER_ROOT="$REPO_ROOT/static/ergopti_plus/linux"
 NATIVE_SOURCE="$DRIVER_ROOT/native/archive_output"
 NATIVE_LIBRARY="$DRIVER_ROOT/bin/libergopti_archive_publication.so"
@@ -70,7 +70,7 @@ if [ "$native_stale" = true ]; then
 	rm -rf "$stage"
 fi
 
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$REPO_ROOT/static/ergopti_plus/_shared/lua/?.lua;$REPO_ROOT/static/ergopti_plus/_shared/lua/?/init.lua;;"
+export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$REPO_ROOT/static/ergopti_plus/_shared/?.lua;$REPO_ROOT/static/ergopti_plus/_shared/?/init.lua;;"
 export "$ERGOPTI_DEV_SOURCE_ENVIRONMENT=$REPO_ROOT"
 log "Starting the daemon from $DRIVER_ROOT (developer source mode)."
 log "A saved .lua reloads it; the tray's Reload does it on demand."

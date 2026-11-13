@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local M = {}
-local BasicString = require("toml_codec.basic_string")
-local Overrides = require("hotstrings.overrides")
+local BasicString = require("core.text.engine.toml_codec.basic_string")
+local Overrides = require("hotstrings.engine.overrides")
 
 --- Returns whether a value is one bare TOML key segment used by this schema.
 --- @param value any Candidate value.
@@ -55,7 +55,7 @@ end
 --- @return boolean valid
 function M.is_color(value)
 	return type(value) == "string" and value:sub(1, 1) == "#"
-		and require("color.hex").parse(value) ~= nil
+		and require("core.ui.engine.color_hex").parse(value) ~= nil
 end
 
 --- Returns whether a value is a finite, non-negative activation delay.

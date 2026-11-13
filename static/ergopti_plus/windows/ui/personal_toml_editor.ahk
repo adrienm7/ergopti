@@ -68,14 +68,14 @@ _EditorPrefSet(Key, Value, WriterFn := 0, NotifyFn := 0) {
 ; =====================================
 
 ; Personal source-default priority read from the shared single source
-; (_shared/modules/hotstrings/priority.json) so the editor never hardcodes it. Falls back
+; (_shared/hotstrings/data/catalogue/priority.json) so the editor never hardcodes it. Falls back
 ; to the engine constant — which the parity gate keeps identical to that file —
 ; if the shared file cannot be read.
 _GetSharedPersonalDefault() {
 	global _SharedDir
 	try {
 		if IsSet(_SharedDir) {
-			Path := _SharedDir . "\modules\hotstrings\priority.json"
+			Path := _SharedDir . "\hotstrings\data\catalogue\priority.json"
 			if FileExist(Path) {
 				Data := JsonParse(FileRead(Path, "UTF-8"))
 				if (Data is Map and Data.Has("personal")) {

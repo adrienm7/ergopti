@@ -4,7 +4,7 @@
 ; MODULE: Onboarding / Answers Contract
 ; DESCRIPTION:
 ; The Windows side of the one contract between the first-run wizard page and
-; its hosts, mirroring _shared/lua/onboarding_answers.lua: the generated
+; its hosts, mirroring _shared/onboarding/engine/answers.lua: the generated
 ; catalogue (_shared/ui/_generated/onboarding_catalogue.json) names the manifest
 ; paths the wizard may write on Windows, and this module turns the page's
 ; finish payload into the rows of one atomic config.toml batch and the
@@ -369,7 +369,7 @@ OnboardingReadCurrentValues(Index, ConfigPath) {
 		}
 	}
 	TapHoldPath := TapHoldConfigPathBeside(ConfigPath)
-	Report := TapHoldKeyReport(TapHoldPath, _SharedDir . "\tap_hold\defaults.toml")
+	Report := TapHoldKeyReport(TapHoldPath, _SharedDir . "\tap_hold\data\defaults.toml")
 	if (Report is String) {
 		try LoggerError("Onboarding", "The tap-hold keys at {1} could not be read: {2}.", TapHoldPath, Report)
 		return Report

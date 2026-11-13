@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -57,8 +57,8 @@ end)
 
 helpers.describe("llm_vision parameter: native prompt, picker choices and refusal", function()
 	helpers.it("lists the local server, then every vision provider in catalogue order", function()
-		local config = read_json("modules/llm/vision.json")
-		local catalogue = read_json("modules/llm/api_providers.json")
+		local config = read_json("ai/data/vision.json")
+		local catalogue = read_json("ai/data/api_providers.json")
 		local i18n = package.loaded["infra.i18n"]
 		local saved_get = i18n.get
 		local ok, err = pcall(helpers.with_fresh_modules, { "modules.llm.api_remote" }, function()

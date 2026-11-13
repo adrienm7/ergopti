@@ -5,9 +5,9 @@
  * MODULE: LLM Profiles Data AHK Codegen
  * DESCRIPTION:
  * Generates `static/ergopti_plus/windows/_generated/llm_profiles_data.ahk` from
- * two shared JSON sources: `_shared/modules/llm/legacy_ids.json` (profile-ID
+ * two shared JSON sources: `_shared/ai/data/legacy_ids.json` (profile-ID
  * migration table) and the "basic" profile's `system_single` prompt in
- * `_shared/modules/llm/profiles.json` (the ultimate fallback prompt).
+ * `_shared/ai/data/profiles.json` (the ultimate fallback prompt).
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: both facts were previously hand-copied literals in
@@ -30,10 +30,10 @@ const { shared, sharedRel } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OUT_PATH = path.resolve(ROOT, 'static/ergopti_plus/windows/_generated/llm_profiles_data.ahk');
-const LEGACY_IDS_PATH = shared('modules/llm/legacy_ids.json');
-const PROFILES_PATH = shared('modules/llm/profiles.json');
-const LEGACY_IDS_REL = sharedRel('modules/llm/legacy_ids.json');
-const PROFILES_REL = sharedRel('modules/llm/profiles.json');
+const LEGACY_IDS_PATH = shared('ai/data/legacy_ids.json');
+const PROFILES_PATH = shared('ai/data/profiles.json');
+const LEGACY_IDS_REL = sharedRel('ai/data/legacy_ids.json');
+const PROFILES_REL = sharedRel('ai/data/profiles.json');
 
 // ==================================================
 // ==================================================

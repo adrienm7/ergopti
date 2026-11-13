@@ -46,7 +46,7 @@ _WPF_CheckCaptions(Root) {
 	AssertEqual(21, Corpus.Count, "the frozen predecessor contains every supported translation")
 	Calls := Map("count", 0)
 	for Language, Subject in Corpus {
-		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Language . ".json", "UTF-8"))
 		_I18nCacheLoaded := true
 		Child := Menu(), Target := Menu()
 		try {
@@ -334,7 +334,7 @@ _FFP_WithOriginalLocale(Code, Body) {
 	HadCache := IsSet(_I18nCache), Cache := HadCache ? _I18nCache : false
 	HadLoaded := IsSet(_I18nCacheLoaded), Loaded := HadLoaded ? _I18nCacheLoaded : false
 	try {
-		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 		_I18nCacheLoaded := true
 		return Body.Call()
 	} finally {

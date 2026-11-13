@@ -183,7 +183,7 @@ end
 -- ERGOPTI_SEVEN_LEVEL: 1 base, 2 Caps, 3 Shift, 4 Shift+Caps, 5 the chord level
 -- (Ctrl, Alt, Win), 6 AltGr, 7 Shift+AltGr.
 local BASE, SHIFT, ALTGR, SHIFT_ALTGR = 1, 3, 6, 7
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local payload_path = arg[1]
 if type(payload_path) ~= "string" then fail_environment("usage: run_layout_source_live.lua <install-payload.json>") end

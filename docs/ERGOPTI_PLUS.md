@@ -92,12 +92,12 @@ static/ergopti_plus/
 └── docs/             architecture.md (généré), ADR, spec keystats, glossaire
 ```
 
-**La frontière la plus source de confusion** : `_shared/lua/` contre `_shared/modules/`. Ce
+**La frontière la plus source de confusion** : `_shared/` contre `_shared/modules/`. Ce
 ne sont pas deux endroits pour la même chose.
 
 | Dossier                | Contenu                                                         | Consommé par                                      |
 | ---------------------- | --------------------------------------------------------------- | ------------------------------------------------- |
-| `_shared/lua/`         | **du code Lua exécuté** — `require`é au runtime                 | macOS + Linux                                     |
+| `_shared/`             | **du code Lua exécuté** — `require`é au runtime                 | macOS + Linux                                     |
 | `_shared/modules/<x>/` | **de la donnée, des specs, des scripts** — aucun `.lua` runtime | les trois drivers (comme donnée) + l'outillage JS |
 | `_shared/core/`        | **des contrats JS** — le contrat _est_ le test cross-driver     | la suite JS                                       |
 | `_shared/data/`        | de la donnée pure, aucun code                                   | tous, plus le site                                |
@@ -107,13 +107,13 @@ ne sont pas deux endroits pour la même chose.
 recouvrement, seulement une coïncidence de nom. `lua/llm/parser.lua` est du code ;
 `modules/llm/defaults.json` est de la donnée.
 
-⚠ **Et `_shared/lua/` n'est partagé qu'à 37,7 %.** Sur ses 8 473 lignes, **3 195 seulement**
+⚠ **Et `_shared/` n'est partagé qu'à 37,7 %.** Sur ses 8 473 lignes, **3 195 seulement**
 sont réellement requises en production par **les deux** drivers Lua ; **36,9 % sont
 macOS-only** (dont `llm/parser.lua` 843 l, `text_utils` 634 l, `toml_codec/codec.lua`
 612 l) et **22,7 % Linux-only** (dont `llm/linux_bridge.lua` 365 l, `logger/init.lua` 282 l
 et — le cas le plus frappant — `hotstring_engine/` 282 l, que **macOS ne `require` jamais**
 malgré une docstring affirmant l'inverse). Vérifiez toujours qui consomme réellement un
-module de `_shared/lua/` avant de supposer qu'une modification y atteint les deux drivers.
+module de `_shared/` avant de supposer qu'une modification y atteint les deux drivers.
 
 ### 2.1 L'arbre d'un driver, aujourd'hui
 
@@ -157,20 +157,20 @@ ne jamais l'éditer à la main.
 
 | Fichier                                                                              | Contenu                                                                      | Généré ?                   | Lu par                                              | Barrière                                          |
 | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------- | ------------------------------------------------- |
-| `_shared/modules/features/manifest.toml` (3 313 l)                                   | tout toggle de fonctionnalité, son défaut, sa clé i18n, ses plateformes      | non — **c'est la source**  | via les manifestes générés                          | `test:manifest-parity`, `test:feature-read-sites` |
+| `_shared/settings/data/features/manifest.toml` (3 313 l)                             | tout toggle de fonctionnalité, son défaut, sa clé i18n, ses plateformes      | non — **c'est la source**  | via les manifestes générés                          | `test:manifest-parity`, `test:feature-read-sites` |
 | `windows/_generated/features_manifest.ahk`, `macos/_generated/features_manifest.lua` | projection pré-résolue du précédent                                          | **oui** (`build:manifest`) | `lib/manifest_reader.*`                             | `test-features-manifest-no-drift`                 |
-| `_shared/modules/menu/menu_manifest.json` (862 l)                                    | l'arbre de menu : ordre, types, filtres de plateforme                        | **oui** (`build:menu`)     | Windows + macOS. **Pas Linux**                      | `test-menu-manifest`, `test:manifest-equivalence` |
-| `_shared/modules/actions/actions.toml` (765 l)                                       | le catalogue d'actions : id, plateforme, ordre, paramètres                   | non                        | les trois drivers                                   | `test-gesture-slots-single-source`                |
-| `_shared/modules/actions/modifier_chords.json`                                       | **le seul fichier exprimant une équivalence de modificateur par OS**         | non                        | les trois + le générateur Karabiner                 | —                                                 |
-| `_shared/modules/hotstrings/*.toml` (2 994 entrées)                                  | les hotstrings livrées, par catégorie                                        | non                        | les trois                                           | corpus `hotstrings/`                              |
-| `_shared/modules/hotstrings/priority.json`                                           | les 3 rangs de priorité (10/30/50)                                           | non                        | Windows + macOS                                     | `test:priority-parity`                            |
-| `_shared/tap_hold/defaults.toml` (430 l)                                             | défauts tap-hold ⚠ **deux espaces de noms non reliés dans un seul fichier** | non                        | Windows + Linux (`[tap_hold.*]`) ; macOS (`[hs_*]`) | corpus `tap_hold/`                                |
-| `_shared/modules/timings/constants.toml` (523 l)                                     | tous les délais nommés                                                       | non                        | les trois                                           | `test-keystats-timings-single-source` etc.        |
-| `_shared/modules/tooltip/constants.toml` (360 l)                                     | style visuel de l'infobulle                                                  | non                        | Windows + macOS (échec bruyant si manquant)         | `test:tooltip-shared-style` (partiel)             |
-| `_shared/modules/llm/*.json`                                                         | fournisseurs, modèles, profils, défauts, layout du menu IA                   | `models.json` **oui**      | les trois (partiellement)                           | famille `*-single-source`                         |
-| `_shared/data/locales/en.json` + 20 autres                                           | **toutes** les chaînes visibles par l'utilisateur                            | non                        | les trois + les webviews                            | `test_locale_json_valid.ahk`                      |
-| `_shared/data/keycodes/{azerty,evdev}.json`                                          | espaces de codes de touches                                                  | non                        | heatmap métriques + agrégateur macOS                | `test:keycode-data-js-parity`                     |
-| `_shared/data/db/schema.sql` (661 l, 44 tables)                                      | le DDL des métriques                                                         | non                        | les trois                                           | —                                                 |
+| `_shared/menu/data/menu_manifest.json` (862 l)                                       | l'arbre de menu : ordre, types, filtres de plateforme                        | **oui** (`build:menu`)     | Windows + macOS. **Pas Linux**                      | `test-menu-manifest`, `test:manifest-equivalence` |
+| `_shared/shortcuts/data/actions/actions.toml` (765 l)                                | le catalogue d'actions : id, plateforme, ordre, paramètres                   | non                        | les trois drivers                                   | `test-gesture-slots-single-source`                |
+| `_shared/shortcuts/data/actions/modifier_chords.json`                                | **le seul fichier exprimant une équivalence de modificateur par OS**         | non                        | les trois + le générateur Karabiner                 | —                                                 |
+| `_shared/hotstrings/data/catalogue/*.toml` (2 994 entrées)                           | les hotstrings livrées, par catégorie                                        | non                        | les trois                                           | corpus `hotstrings/`                              |
+| `_shared/hotstrings/data/catalogue/priority.json`                                    | les 3 rangs de priorité (10/30/50)                                           | non                        | Windows + macOS                                     | `test:priority-parity`                            |
+| `_shared/tap_hold/data/defaults.toml` (430 l)                                        | défauts tap-hold ⚠ **deux espaces de noms non reliés dans un seul fichier** | non                        | Windows + Linux (`[tap_hold.*]`) ; macOS (`[hs_*]`) | corpus `tap_hold/`                                |
+| `_shared/core/timing/data/constants.toml` (523 l)                                    | tous les délais nommés                                                       | non                        | les trois                                           | `test-keystats-timings-single-source` etc.        |
+| `_shared/core/ui/data/tooltip/constants.toml` (360 l)                                | style visuel de l'infobulle                                                  | non                        | Windows + macOS (échec bruyant si manquant)         | `test:tooltip-shared-style` (partiel)             |
+| `_shared/ai/data/*.json`                                                             | fournisseurs, modèles, profils, défauts, layout du menu IA                   | `models.json` **oui**      | les trois (partiellement)                           | famille `*-single-source`                         |
+| `_shared/core/i18n/data/locales/en.json` + 20 autres                                 | **toutes** les chaînes visibles par l'utilisateur                            | non                        | les trois + les webviews                            | `test_locale_json_valid.ahk`                      |
+| `_shared/layouts/data/keycodes/{azerty,evdev}.json`                                  | espaces de codes de touches                                                  | non                        | heatmap métriques + agrégateur macOS                | `test:keycode-data-js-parity`                     |
+| `_shared/metrics/data/db/schema.sql` (661 l, 44 tables)                              | le DDL des métriques                                                         | non                        | les trois                                           | —                                                 |
 | `_shared/core/ports/*.spec.js` (20) + `contracts.json`                               | les contrats de ports                                                        | `contracts.json` **oui**   | la suite JS + macOS                                 | `test:port-compliance`                            |
 | `_shared/ui/apps.manifest.json` (14 apps)                                            | géométrie et nom d'hôte de chaque fenêtre                                    | non                        | les trois hôtes                                     | `test:webview-geometry-single-source`             |
 | `_shared/tests/corpus/**` (16 fichiers, 258 vecteurs)                                | le comportement attendu, en donnée                                           | non                        | les 3 suites                                        | ADR-006                                           |
@@ -192,7 +192,7 @@ séquence commune, avec les correspondances.
 | Phase                     | Windows                                                                                                                           | macOS                                                                                                          | Linux                                                                                                               |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | **1. Garde de processus** | mutex nommé (premier statement), classe de priorité, 6 globales pré-pompe, `OnError` armé **au-dessus** de l'extraction du bundle | implicite (Hammerspoon est un singleton)                                                                       | **aucune** — seul `Restart=on-failure` de systemd                                                                   |
-| **2. Amorçage**           | `_StaticDir` / `_VendorDir` / `_SharedDir` / `_DriverDir`, extraction du zip embarqué en mode compilé                             | injection de `package.path` vers `_shared/lua`, chercheur custom pour le vendor tactile                        | `SCRIPT_DIR` par `debug.getinfo`, `package.path`, installation du polyfill `utf8` (LuaJIT n'a pas celui de Lua 5.3) |
+| **2. Amorçage**           | `_StaticDir` / `_VendorDir` / `_SharedDir` / `_DriverDir`, extraction du zip embarqué en mode compilé                             | injection de `package.path` vers `_shared`, chercheur custom pour le vendor tactile                            | `SCRIPT_DIR` par `debug.getinfo`, `package.path`, installation du polyfill `utf8` (LuaJIT n'a pas celui de Lua 5.3) |
 | **3. Journalisation**     | `LoggerInit()` — ⚠ **après** ~40 appels `try Logger*` antérieurs                                                                 | `require("lib.logger")`, patch de `hs.logger.new` pour museler les modules bruyants, `Logger.init_log_path`    | `require("logger.shim")` — ⚠ **aucun sink n'est installé, rien n'est écrit** (blocage B1 du plan)                  |
 | **4. Chemins**            | `lib/boot.ahk` : lecture de `paths.toml`, `_ConfigDir`, chargement des défauts partagés                                           | `ui/menu/menu_paths.init(base_dir)` ⚠ un module de menu porte la SSOT des chemins                             | ⚠ **aucun résolveur** — 12 expressions indépendantes                                                               |
 | **5. Configuration**      | `ManifestEnsureLoaded()` → `Features := ManifestBuildFeaturesMap()`, `ApplyConfigToml`, `I18nInit`                                | `manifest_reader`, `config_overrides.apply`, `i18n.init`, cache TOML                                           | ⚠ **pas de manifeste du tout** ; défauts par fichier                                                               |
@@ -231,7 +231,7 @@ macos/init.lua
  → modules/keymap/init.lua → modules/keymap/llm_bridge.lua
  → modules/llm/prediction_engine.lua
  → modules/keystats/init.lua → watchers → log_manager → aggregator → aggregator/events → aggregator/core
- → lib/timings.lua → lib/toml/reader.lua → _shared/lua/toml_codec/reader.lua → _shared/lua/logger/shim.lua
+ → lib/timings.lua → lib/toml/reader.lua → _shared/core/text/engine/toml_codec/reader.lua → _shared/core/logger/engine/shim.lua
 ```
 
 Lisez-la comme un énoncé de risque de changement : **ouvrir le menu Hotstrings charge
@@ -309,20 +309,20 @@ aujourd'hui.
 
 | #   | Implémentation                                                               | Utilisée par                                                                                |
 | --- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 1   | `_shared/lua/hotstring_engine/init.lua` (281 l)                              | **Linux uniquement** — malgré une docstring affirmant « partagée par tous les drivers Lua » |
+| 1   | `_shared/hotstrings/engine/matcher/init.lua` (281 l)                         | **Linux uniquement** — malgré une docstring affirmant « partagée par tous les drivers Lua » |
 | 2   | `macos/modules/keymap/{registry*,expander}.lua` (2 302 l)                    | macOS                                                                                       |
 | 3   | `windows/infra/hotstrings/hotstring_match.ahk` + `hotstring_engine_main.ahk` | Windows                                                                                     |
 | 4   | un matcher **écrit dans un fichier de test AHK**                             | personne (fixture)                                                                          |
 | 5   | un algorithme de référence JS dans un script de mutation                     | personne                                                                                    |
 
-**Données** : `_shared/modules/hotstrings/<catégorie>.toml`. La forme réelle d'une entrée :
+**Données** : `_shared/hotstrings/data/catalogue/<catégorie>.toml`. La forme réelle d'une entrée :
 
 ```toml
 [[assign]]
 " #!" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 ```
 
-⚠ `_shared/modules/hotstrings/schema.md` décrit un **format qui n'existe pas** (`trigger` /
+⚠ `_shared/hotstrings/data/catalogue/schema.md` décrit un **format qui n'existe pas** (`trigger` /
 `replacement` / `flags[]`). Ignorez-le ; les champs réels sont ceux ci-dessus plus
 `is_case_sensitive_strict` (utilisé par 1 302 entrées, documenté nulle part) et les blocs
 `[_meta]` / `[_meta.sections]` / `sections_order` / `section_priorities`.
@@ -334,7 +334,7 @@ candidate n'a pas de priorité : 50 vs 10 ; catégorie `custom` ; un niveau de d
 supplémentaire sur macOS).
 
 **Le seul composant du moteur qui n'a jamais dérivé** est le catalogue de terminateurs :
-une source (`_shared/core/domain/Terminators.spec.js`), un générateur qui émet **les deux
+une source (`_shared/core/text/data/domain/Terminators.spec.js`), un générateur qui émet **les deux
 cibles en une passe** (AHK + Lua). C'est le patron à copier pour le reste.
 
 ### 6.2 Hotstrings dynamiques
@@ -355,7 +355,7 @@ antislash.
 | Touches mortes      | machine à états dans `layout.ahk`                                            | dans le bundle `.keylayout`                            | un seul `@deadtrema`                        |
 | Seuil de maintien   | **par touche**, 200–350 ms                                                   | **un seul global, 1000 ms**                            | **par touche**, 200–350 ms                  |
 
-`_shared/tap_hold/defaults.toml` **n'est pas un fichier partagé** : les lignes 17–163
+`_shared/tap_hold/data/defaults.toml` **n'est pas un fichier partagé** : les lignes 17–163
 servent Windows et kanata, les lignes 168–430 servent macOS, avec des ids différents
 (`left_ctrl` vs `left_control`), des actions différentes (`paste` vs `cut` sur la même
 touche) et un seuil 3 à 5 fois différent. Le chargeur AHK ignore chaque en-tête `[hs_*]`,
@@ -417,9 +417,9 @@ l'application » (copier/coller/annuler). Voir le runbook §10.2.
 ### 6.6 LLM et prédiction
 
 ```
-_shared/modules/llm/*.json          données : fournisseurs, modèles, profils, défauts
-_shared/core/domain/*.js            implémentation de référence JS (jamais exécutée par un driver)
-_shared/lua/llm/                    runtime Lua : parser (842 l), prompt_builder, profile_selector
+_shared/ai/data/*.json          données : fournisseurs, modèles, profils, défauts
+_shared/core/text/data/domain/*.js            implémentation de référence JS (jamais exécutée par un driver)
+_shared/ai/engine/                    runtime Lua : parser (842 l), prompt_builder, profile_selector
    ├── macos : deux shims fins + un wrapper i18n
    ├── linux : consomme prompt_builder + profile_selector, PAS le parser
    └── windows : prompt_builder « généré » ; parser écrit à la main (946 l)
@@ -455,7 +455,7 @@ Trois pipelines, une base de données déclarée partagée, trois formes sur dis
 | Disque                     | `metrics/by_device/<uuid>/{device.json,data.sql,today.log}`                                                          | idem + un `db.sqlite` en tmpdir                                   | `metrics.sqlite` (autorité) exporté vers `metrics/by_device/<id>/{device.json,data.sql}` ; import des autres appareils à venir |
 | Désactivable               | oui (opt-out)                                                                                                        | oui (opt-in par conception)                                       | ⚠ **non**                                                                                                                     |
 
-`_shared/data/db/schema.sql` est vraiment la source DDL unique — les trois l'exécutent.
+`_shared/metrics/data/db/schema.sql` est vraiment la source DDL unique — les trois l'exécutent.
 Mais **aucun runner de migration n'existe** sur aucun driver, et
 `migrations/0001_initial.sql` est un fichier de commentaires sans une seule instruction SQL.
 Le schéma utilise `CREATE TABLE IF NOT EXISTS` partout : les changements additifs
@@ -474,7 +474,7 @@ s'appliquent seuls, les destructifs échouent silencieusement.
 ### 6.8 Menu tray
 
 Le manifeste `menu_manifest.json` est généré par une projection **verbatim** des tables
-`[menu.*]` de `_shared/modules/menu/menu.toml` (séparées du manifeste de fonctionnalités le
+`[menu.*]` de `_shared/menu/data/menu.toml` (séparées du manifeste de fonctionnalités le
 2026-10-31) : aucune validation, aucune normalisation,
 aucune expansion de plateforme au build. Toute la sémantique vit dans deux « marcheurs »
 runtime, l'un AHK, l'autre Lua — c'est pourquoi ils peuvent diverger, et divergent.
@@ -495,7 +495,7 @@ existent sur les deux drivers : le manifeste **désinforme activement** sur le p
 
 ### 6.9 Infobulle, widget WPM, spotlight
 
-L'infobulle est **trois implémentations indépendantes**. `_shared/modules/tooltip/`
+L'infobulle est **trois implémentations indépendantes**. `_shared/core/ui/data/tooltip/`
 contient 1 483 lignes de modules JS de référence + une spec normative de 392 lignes… que
 **rien ne `require`**. La barrière nommée « tooltip corpus parity » ne charge aucun des deux
 modules JS qu'elle prétend comparer ; le test macOS rejoue un clone interne au fichier de
@@ -629,17 +629,17 @@ Le prétexte historique « l'AHK ne peut pas lire les données partagées » est
 > coûterait des millisecondes mesurables ; sinon on lit la donnée au runtime. Et quand on
 > génère, on génère de la **donnée**, jamais de la **logique**.
 
-| Artefact généré                                                                       | Source                              | Verdict                                                                                                                                                                                                    |
-| ------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `{windows,macos}/_generated/features_manifest.*`                                      | `manifest.toml` (3 313 l)           | **garder** — collapse en 263/714 lignes pré-résolues, résout le filtre de plateforme et l'aplatissement                                                                                                    |
-| `_shared/modules/menu/menu_manifest.json`                                             | tables `[menu.*]`                   | **garder** — 64 lignes de générateur, les deux drivers lisent déjà le JSON au runtime                                                                                                                      |
-| `_shared/lua/keymap/terminators_catalogue.lua` + `windows/_generated/terminators.ahk` | `Terminators.spec.js`               | **garder le catalogue** ; sortir les 130 lignes de logique de classe du générateur vers une source AHK écrite à la main, pour que les deux côtés aient la **même forme** (donnée générée + logique écrite) |
-| `_shared/ui/metrics_typing/_generated/keycode_data.js`                                | `azerty.json`                       | **garder** — les pages partagées se chargent en `<script src>` sans bundler                                                                                                                                |
-| `_shared/core/ports/contracts.json`                                                   | les 20 specs                        | **garder**, et l'utiliser sur les trois drivers (Windows a des tests de surface écrits à la main, Linux une liste de 9 noms en dur)                                                                        |
-| `windows/_generated/prompt_builder.ahk`                                               | _prétend_ `prompt_builder.lua`      | **supprimer le générateur** : il ne lit rien. Déplacer le fichier tel quel en source écrite à la main, le corpus devient le contrat                                                                        |
-| `windows/_generated/llm_profiles_data.ahk`                                            | `legacy_ids.json` + `profiles.json` | **remplacer par une lecture runtime** : 215 lignes de générateur pour livrer une Map de 4 entrées, dans un fichier qui parse déjà le JSON voisin                                                           |
-| `_shared/_generated/config_template.toml` + `{windows,macos,linux}/_generated/…`      | `manifest.toml`                     | ✅ **fusionné** : un seul modèle pour les trois drivers ; chaque driver garde sa projection, livrée à l'octet près par l'empaquetage                                                                       |
-| ~~`tools/codegen/codegen-prompt-builder-hs.cjs`~~                                     | —                                   | ✅ **supprimé** (2026-07-31) : 34 lignes qui n'émettaient rien ; l'explication de l'asymétrie vit maintenant dans `macos/_generated/README.md`                                                             |
+| Artefact généré                                                                                  | Source                              | Verdict                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{windows,macos}/_generated/features_manifest.*`                                                 | `manifest.toml` (3 313 l)           | **garder** — collapse en 263/714 lignes pré-résolues, résout le filtre de plateforme et l'aplatissement                                                                                                    |
+| `_shared/menu/data/menu_manifest.json`                                                           | tables `[menu.*]`                   | **garder** — 64 lignes de générateur, les deux drivers lisent déjà le JSON au runtime                                                                                                                      |
+| `_shared/layouts/engine/layers/terminators_catalogue.lua` + `windows/_generated/terminators.ahk` | `Terminators.spec.js`               | **garder le catalogue** ; sortir les 130 lignes de logique de classe du générateur vers une source AHK écrite à la main, pour que les deux côtés aient la **même forme** (donnée générée + logique écrite) |
+| `_shared/ui/metrics_typing/_generated/keycode_data.js`                                           | `azerty.json`                       | **garder** — les pages partagées se chargent en `<script src>` sans bundler                                                                                                                                |
+| `_shared/core/ports/contracts.json`                                                              | les 20 specs                        | **garder**, et l'utiliser sur les trois drivers (Windows a des tests de surface écrits à la main, Linux une liste de 9 noms en dur)                                                                        |
+| `windows/_generated/prompt_builder.ahk`                                                          | _prétend_ `prompt_builder.lua`      | **supprimer le générateur** : il ne lit rien. Déplacer le fichier tel quel en source écrite à la main, le corpus devient le contrat                                                                        |
+| `windows/_generated/llm_profiles_data.ahk`                                                       | `legacy_ids.json` + `profiles.json` | **remplacer par une lecture runtime** : 215 lignes de générateur pour livrer une Map de 4 entrées, dans un fichier qui parse déjà le JSON voisin                                                           |
+| `_shared/_generated/config_template.toml` + `{windows,macos,linux}/_generated/…`                 | `manifest.toml`                     | ✅ **fusionné** : un seul modèle pour les trois drivers ; chaque driver garde sa projection, livrée à l'octet près par l'empaquetage                                                                       |
+| ~~`tools/codegen/codegen-prompt-builder-hs.cjs`~~                                                | —                                   | ✅ **supprimé** (2026-07-31) : 34 lignes qui n'émettaient rien ; l'explication de l'asymétrie vit maintenant dans `macos/_generated/README.md`                                                             |
 
 **La commande à lancer** après avoir édité une donnée partagée : `npm run codegen` (alias de
 `build:domain`). ⚠ Elle lance 6 des 9 générateurs vivants : `codegen:contracts` et
@@ -713,9 +713,9 @@ correspondant du plan. Si l'écart vous choque, c'est l'intérêt du plan.
 
 **Aujourd'hui — 8 fichiers minimum, et elle restera non liable sur macOS et Linux :**
 
-1. `_shared/modules/actions/actions.toml` : ajouter `[sg_actions.copy_word]` avec
+1. `_shared/shortcuts/data/actions/actions.toml` : ajouter `[sg_actions.copy_word]` avec
    `platform = "all"`, puis ajouter l'id à `[sg_order].items` dans le bon groupe.
-2. `_shared/data/locales/en.json` : ajouter `"sg_actions.copy_word"`, puis
+2. `_shared/core/i18n/data/locales/en.json` : ajouter `"sg_actions.copy_word"`, puis
    `python tools/locale/check_locales.py --fix` pour la propager aux 20 autres locales.
 3. `windows/modules/gestures/actions.ahk` : ajouter la lambda dans `GESTURE_ACTIONS`.
 4. `macos/modules/gestures/actions.lua` : ajouter l'entrée `sg(...)`.
@@ -730,7 +730,7 @@ correspondant du plan. Si l'écart vous choque, c'est l'intérêt du plan.
 **Cible (plan, lot 6) — 2 fichiers, aucun fichier de driver :**
 
 ```toml
-# _shared/modules/actions/actions.toml
+# _shared/shortcuts/data/actions/actions.toml
 [actions.copy_word]
 platforms     = ["windows", "macos", "linux"]
 label_key     = "actions.copy_word"
@@ -767,7 +767,7 @@ disponibles pour les cas réellement spécifiques.
 **Aujourd'hui** : il n'existe aucune notation neutre. Quatre dialectes coexistent (préfixes
 AHK `^+!#`, forme touche-préfixe `SC138 & SC01C`, tableau de modificateurs Hammerspoon,
 `key_code` Karabiner, `xdotool`). Le seul fichier exprimant une équivalence par OS est
-`_shared/modules/actions/modifier_chords.json` — mais c'est une table de _modificateurs_,
+`_shared/shortcuts/data/actions/modifier_chords.json` — mais c'est une table de _modificateurs_,
 pas une _notation d'accord_ : les ids d'action qui en résultent sont eux-mêmes spécifiques à
 la plateforme (`win_a` / `cmd_a` / `super_a`), donc un accord ne peut jamais être nommé
 portablement.
@@ -808,7 +808,7 @@ C'est exactement le défaut de la couche B actuelle. Pour une touche nommée (`e
 ### 10.3 Ajouter une entrée de menu
 
 **Aujourd'hui** (2026-10-31), le menu tray est défini dans **un seul fichier**,
-`_shared/modules/menu/menu.toml` :
+`_shared/menu/data/menu.toml` :
 
 - **Toute entrée** : ajouter la ligne dans la table `[[menu.<sous-menu>]]` voulue (`check`,
   `command`, `choice`, `group`, `list`, `toggle`, `---`…), avec son `i18n`, son ordre, ses
@@ -821,14 +821,14 @@ C'est exactement le défaut de la couche B actuelle. Pour une touche nommée (`e
   `RegisterMenuItemInsert`, jamais par `Menu.Add` brut. AHK 2.0 perd silencieusement 30 à
   50 % des clics de menu tray sans ce contournement. **Non négociable.**
 
-**Cible (plan, lot 5)** : une ligne dans `_shared/modules/menu/menu.toml`, avec au besoin un
+**Cible (plan, lot 5)** : une ligne dans `_shared/menu/data/menu.toml`, avec au besoin un
 `action` / `state` / `provider` déclaré dans `registry.json` et implémenté une fois par
 driver. Le manifeste devient **tout** le menu ; le renderer par driver fait moins de 300
 lignes ; macOS et Linux partagent le même.
 
 ### 10.4 Ajouter ou modifier un toggle de fonctionnalité
 
-1. Éditer `_shared/modules/features/manifest.toml` : une entrée `[[features.<chemin>]]`
+1. Éditer `_shared/settings/data/features/manifest.toml` : une entrée `[[features.<chemin>]]`
    avec `id`, `default`, `description_key`, et `platforms` si la fonctionnalité n'est pas
    universelle.
 2. `npm run build:domain` — régénère les manifestes des drivers, le gabarit de config, et
@@ -852,11 +852,11 @@ l'autorise. Si votre fonctionnalité existe sur Linux, ajoutez-la — c'est le d
 
 | Je veux changer…                                                | J'édite                                                                                  | Puis                                                                                                                                       |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Le texte ou les flags d'une hotstring                           | `_shared/modules/hotstrings/<catégorie>.toml`                                            | rien d'autre. Les trois drivers lisent ce fichier. Supprimer le cache `.tsv` si le côté Windows semble périmé (il s'auto-répare par mtime) |
+| Le texte ou les flags d'une hotstring                           | `_shared/hotstrings/data/catalogue/<catégorie>.toml`                                     | rien d'autre. Les trois drivers lisent ce fichier. Supprimer le cache `.tsv` si le côté Windows semble périmé (il s'auto-répare par mtime) |
 | Le délai / la couleur / l'infobulle par défaut d'une catégorie  | le bloc `[_meta]` / `[_meta.sections]` de ce TOML                                        | `npm run test:js`                                                                                                                          |
-| Le repli global de délai / couleur                              | `_shared/modules/hotstrings/defaults.toml`                                               | les deux drivers échouent bruyamment sur une clé manquante — lancer les deux suites                                                        |
+| Le repli global de délai / couleur                              | `_shared/hotstrings/data/catalogue/defaults.toml`                                        | les deux drivers échouent bruyamment sur une clé manquante — lancer les deux suites                                                        |
 | Un rang de priorité de collision                                | `priority.json` **et** les constantes `HSE_PRIORITY_*` (AHK) **et** `PRIORITY_*` (macOS) | `npm run test:priority-parity` (scan de texte sur les trois)                                                                               |
-| Quels caractères terminent un mot                               | `_shared/core/domain/Terminators.spec.js`                                                | `npm run codegen:terminators`, puis les trois suites. **Ne jamais** éditer les deux fichiers générés                                       |
+| Quels caractères terminent un mot                               | `_shared/core/text/data/domain/Terminators.spec.js`                                      | `npm run codegen:terminators`, puis les trois suites. **Ne jamais** éditer les deux fichiers générés                                       |
 | Le plafond de tampon                                            | 4 sites : le moteur partagé, deux fichiers AHK, et `macos/modules/keymap/init.lua`       | ⚠ la barrière de parité de plafond **ne vérifie pas le site macOS** (d'où la valeur 500 contre 256 ailleurs)                              |
 | **La logique de correspondance / frontière de mot / départage** | trois endroits non symétriques, voir ci-dessous                                          | corpus obligatoire                                                                                                                         |
 
@@ -876,7 +876,7 @@ chacun :
    aussi**. Sa docstring documente que deux implémentations indépendantes avaient auparavant
    divergé sur quatre points. **N'ajoutez jamais un second prédicat.** L'ordre de tri est
    dans `registry.lua`.
-3. **Linux** — `_shared/lua/hotstring_engine/init.lua` : `is_word_char`, `engine:on_char`,
+3. **Linux** — `_shared/hotstrings/engine/matcher/init.lua` : `is_word_char`, `engine:on_char`,
    le tri du bucket. ⚠ Ce fichier est `require`é **par Linux uniquement** : une modification
    ici n'atteint pas macOS, malgré ce que dit sa propre docstring.
 
@@ -899,7 +899,7 @@ que le terminateur n'est jamais consommé.
 
 ### 10.6 Ajouter ou modifier une hotstring livrée
 
-Un seul fichier : `_shared/modules/hotstrings/<catégorie>.toml`. Les champs réels sont
+Un seul fichier : `_shared/hotstrings/data/catalogue/<catégorie>.toml`. Les champs réels sont
 `output`, `is_word`, `is_case_sensitive`, `is_case_sensitive_strict`, `auto_expand`,
 `final_result`. Les trois drivers lisent le TOML directement.
 
@@ -913,7 +913,7 @@ sur Linux**.
 **Règle absolue du projet : aucune chaîne visible n'est écrite en dur, nulle part, webviews
 incluses.** 21 langues.
 
-1. Ajouter la clé dans `_shared/data/locales/en.json` — c'est le jeu de clés canonique.
+1. Ajouter la clé dans `_shared/core/i18n/data/locales/en.json` — c'est le jeu de clés canonique.
 2. `python tools/locale/check_locales.py --fix` — remplit la clé dans les 20 autres locales
    avec le texte anglais comme placeholder. Les traductions viennent après.
 3. Lire : `t("ma.cle")` (AHK), `i18n.get("ma.cle")` (macOS/Linux), `data-i18n` (webviews
@@ -955,7 +955,7 @@ drivers, un seul hôte lisant la géométrie du manifeste, un seul protocole de 
 
 ### 10.9 Ajouter une valeur de configuration ou un délai
 
-- **Un délai** : `_shared/modules/timings/constants.toml`, section existante. Lire par
+- **Un délai** : `_shared/core/timing/data/constants.toml`, section existante. Lire par
   `Timings.ms(...)` / `Timings.sec(...)`. Ne jamais retaper le nombre.
 - **Un scalaire partagé** (port, température, plafond…) : le mettre dans le JSON/TOML
   partagé du domaine concerné **et** ajouter son test single-source dans le même commit —
@@ -1088,7 +1088,7 @@ Ce sont ceux qui ont réellement mordu, avec leur symptôme. Liste complète dan
 
 | Piège                                                                  | Symptôme                                                                                                                                                             |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pas de bibliothèque `utf8` de Lua 5.3                                  | le polyfill `_shared/lua/compat/utf8.lua` doit être installé au boot                                                                                                 |
+| Pas de bibliothèque `utf8` de Lua 5.3                                  | le polyfill `_shared/core/lifecycle/engine/compat/utf8.lua` doit être installé au boot                                                                               |
 | Le hook tourne en **mode observe**                                     | tout ce qui est tapé pendant la fenêtre de boot est tamponné puis rejoué avec un horodatage lu **au rejeu**, ce qui biaise les délais inter-frappes du premier burst |
 | `string.format("%q")` est un quoteur de **littéral Lua**, pas de shell | il laisse `$`, `` ` `` et `$( )` vivants ; utiliser `shell_runner.quote()`                                                                                           |
 | Le décodeur evdev n'est ni exécuté ni testé                            | —                                                                                                                                                                    |
@@ -1139,7 +1139,7 @@ renommage.**
 | Question                                                      | Document                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | « Que faut-il changer, dans quel ordre, et pour quel gain ? » | [TODO.md](../TODO.md) — §0 porte le programme de simplification complet                                                                                                                                                                                                                                                                                |
-| « Quelles sont les règles de style, de log, de nommage ? »    | [AGENTS.md](../AGENTS.md), les [skills des drivers](../.agents/skills/) et le [contrat du logger](../static/ergopti_plus/_shared/modules/logger/SPEC.md)                                                                                                                                                                                               |
+| « Quelles sont les règles de style, de log, de nommage ? »    | [AGENTS.md](../AGENTS.md), les [skills des drivers](../.agents/skills/) et le [contrat du logger](../static/ergopti_plus/_shared/core/logger/data/SPEC.md)                                                                                                                                                                                             |
 | « Ce piège a-t-il déjà mordu quelqu'un ? »                    | [memory/README.md](memory/README.md)                                                                                                                                                                                                                                                                                                                   |
 | « Comment lancer quoi ? »                                     | [TESTING.md](TESTING.md)                                                                                                                                                                                                                                                                                                                               |
 | « Que veut dire ce terme ? »                                  | [glossary.md](glossary.md) (français) et [../static/ergopti_plus/docs/glossary.md](../static/ergopti_plus/docs/glossary.md) (anglais) — ⚠ **ce ne sont pas deux versions du même document** ; l'anglais annonce « neuf ports » puis en liste treize alors qu'il y en a 20, et nomme des répertoires `hammerspoon/` / `autohotkey/` qui n'existent pas |

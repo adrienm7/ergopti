@@ -130,7 +130,7 @@ def resolve_locales_dir(app_root: str) -> str:
 
     Priority: ERGOPTI_LOCALES_DIR env var → path derived from the
     app bundle location (app lives inside static/ergopti_plus/macos/apps/,
-    locales are at static/ergopti_plus/_shared/data/locales/).
+    locales are at static/ergopti_plus/_shared/core/i18n/data/locales/).
     """
     d = os.environ.get("ERGOPTI_LOCALES_DIR", "").strip()
     if d:
@@ -138,7 +138,7 @@ def resolve_locales_dir(app_root: str) -> str:
     # Climb to the payload root; source and installed bundles preserve its layout.
     candidate = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(app_root))),
-        "_shared", "data", "locales",
+        "_shared", "core", "i18n", "data", "locales",
     )
     if os.path.isdir(candidate):
         return candidate

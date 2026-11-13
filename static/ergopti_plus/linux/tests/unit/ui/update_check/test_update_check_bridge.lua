@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local STUBBED = {
 	"ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
@@ -232,7 +232,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()
 			if package.config:sub(1, 1) == "\\" then return end
 			local path = os.tmpname(); os.remove(path)
-			local quote, root = require("text_utils").shell_quote, helpers.driver_root()
+			local quote, root = require("core.text.engine.utils_core").shell_quote, helpers.driver_root()
 			if kind == "fifo" then
 				local made = os.execute("mkfifo " .. quote(path))
 				assert(made == true or made == 0)
@@ -240,7 +240,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 				local file = assert(io.open(path, "w")); assert(file:write("log")); assert(file:close())
 			end
 			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
-				.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;") .. "..package.path;"
+				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;") .. "..package.path;"
 				.. "package.loaded['infra.installation']={is_source_run=function()return false end};"
 				.. "package.loaded['infra.logger_sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
 				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"

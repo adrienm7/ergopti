@@ -11,7 +11,7 @@
 --- mocks and no input/hardware claims. Menus/configuration are not exercised.
 local uv = require("luv")
 local ffi = require("ffi")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 ffi.cdef("void tzset(void);")
 local native_date, native_time = os.date, os.time
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-local-event-days-XXXXXX"))
@@ -25,7 +25,7 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Calendar = require("modules.keystats.calendar")
 local Monotonic = require("infra.monotonic")
 local native_capture = Calendar.capture

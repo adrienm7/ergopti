@@ -121,7 +121,7 @@ COMMIT;
 	assert(Writer.open_db(database), "real legacy schema failed to migrate")
 	-- The store already held the shipped purge triggers, which read devices:
 	-- the upgrade drops them and the same open recreates them on the new table.
-	local purge_file = assert(io.open("../_shared/data/db/purge_schema.sql", "rb"))
+	local purge_file = assert(io.open("../_shared/metrics/data/db/purge_schema.sql", "rb"))
 	local purge = assert(purge_file:read("*a")); assert(purge_file:close())
 	local _, shipped = purge:gsub("CREATE TRIGGER IF NOT EXISTS [%w_]+", "")
 	local triggers = assert(Writer.query_rows("SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'metrics_purge_%' AND sql NOT LIKE '%devices_pre_linux%';"))
@@ -139,7 +139,7 @@ end)
 
 check("shipped legacy DDL migrates with a real SQLite database", function()
 	Writer.close_db()
-	local schema_file = assert(io.open("../_shared/data/db/schema.sql", "rb"))
+	local schema_file = assert(io.open("../_shared/metrics/data/db/schema.sql", "rb"))
 	local schema = assert(schema_file:read("*a")); assert(schema_file:close())
 	local ddl = assert(schema:match("(CREATE TABLE IF NOT EXISTS devices%s*%b())%s*;"))
 	local legacy, replacements = ddl:gsub(",%s*'linux'", "", 1)

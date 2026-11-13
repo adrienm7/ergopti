@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Prompt Action Parameter (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/prompt_action.lua. Encodes and decodes
+; AutoHotkey port of _shared/ai/engine/prediction/prompt_action.lua. Encodes and decodes
 ; the per-binding parameter of the "llm_prompt_prediction" action: which prompt
 ; profile to run and how many predictions to request.
 ;

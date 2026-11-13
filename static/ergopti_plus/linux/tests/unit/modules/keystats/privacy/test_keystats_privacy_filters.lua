@@ -9,7 +9,7 @@
 ---
 --- THE ROOT CAUSE ENCODED:
 --- The three drivers are supposed to read one privacy posture from
---- _shared/modules/features/manifest.toml. Linux could not: [sections.metrics]
+--- _shared/settings/data/features/manifest.toml. Linux could not: [sections.metrics]
 --- listed only ["ahk", "hs"], and the codegen emitted features_manifest.lua for
 --- Windows and macOS only. The driver had nowhere to read the flags FROM, so it
 --- had none of them. This suite fails if either half regresses — the manifest
@@ -115,7 +115,7 @@ helpers.describe("keystats privacy — the posture is read, not re-typed", funct
 
 	it("does not hardcode the four defaults in the driver", function()
 		local code = unit_code("local function new_live_tracker(")
-		local KEY = require("config_keys").KEY
+		local KEY = require("settings.engine.keys").KEY
 		for _, entry in ipairs({
 			{ "METRICS_ENABLED",                    "metrics.enabled" },
 			{ "METRICS_PRIVATE_FILTER_ENABLED",     "metrics.private_filter_enabled" },
@@ -204,7 +204,7 @@ helpers.describe("keystats privacy — private browsing", function()
 	end)
 
 	it("refreshes changed private markers and honors extra Unicode keywords", function()
-		local matcher = require("keystats.private_window")
+		local matcher = require("metrics.engine.view.private_window")
 		local original = matcher.KEYWORDS
 		local ok, err = pcall(function()
 			matcher.KEYWORDS = { "Old marker" }
@@ -491,7 +491,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 
 	it("uses the shared keyword list rather than a driver-local copy", function()
 		local code = unit_code("local function new_live_tracker(")
-		helpers.assert_contains(code, 'require("keystats.private_window")',
+		helpers.assert_contains(code, 'require("metrics.engine.view.private_window")',
 			"the markers are a cross-driver privacy guarantee and live in _shared")
 		helpers.assert_true(code:find("Incognito", 1, true) == nil,
 			"the keyword list must not be duplicated into this driver")

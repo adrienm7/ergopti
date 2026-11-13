@@ -131,7 +131,7 @@ end
 local function with_healthcheck(controls, callback)
 	controls = controls or {}
 	helpers.with_fresh_modules({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
+		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 		"infra.dialog_util", "adapters.timer_scheduler", "hs", "tests.stubs.hs",
 	}, function()
@@ -146,7 +146,7 @@ local function with_healthcheck(controls, callback)
 		}
 		package.loaded["infra.logger"] = logger_spy(state)
 		package.loaded["ui.healthcheck.helpers"] = {}
-		package.loaded["healthcheck.snapshot"] = {}
+		package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 		package.loaded["infra.paths"] = { shared = function() return "/shared" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return true end }

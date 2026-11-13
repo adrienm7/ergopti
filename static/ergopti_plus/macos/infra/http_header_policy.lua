@@ -17,11 +17,11 @@ local function forbidden_bytes()
 	if cached then return cached end
 	local Paths = require("infra.paths")
 	local FileSystem = require("adapters.file_system")
-	local path = Paths.shared("data/http/header_policy.json")
+	local path = Paths.shared("core/network/data/http/header_policy.json")
 	if not path then return nil, "HTTP header policy is unavailable" end
 	local content, status = FileSystem.read_bounded(path, 4096)
 	if status ~= "ok" or type(content) ~= "string" then return nil, "HTTP header policy is unavailable" end
-	local ok, policy = pcall(require("json").decode, content)
+	local ok, policy = pcall(require("core.text.engine.json").decode, content)
 	local bytes = ok and type(policy) == "table" and policy.forbidden_bytes
 	if type(bytes) ~= "table" or #bytes == 0 then return nil, "HTTP header policy is invalid" end
 	local result, count = {}, 0

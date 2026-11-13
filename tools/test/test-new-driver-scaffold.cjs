@@ -12,7 +12,7 @@
  *   REPO_ROOT   = resolve(__dirname, '..')      → tools/, not the repo root
  *   DRIVERS_DIR = REPO_ROOT/static/drivers      → the old tree, since renamed
  *   PORTS_DIR   = DRIVERS_DIR/_shared/ports     → moved to _shared/core/ports
- *   DOMAIN_DIR  = DRIVERS_DIR/_shared/domain    → moved to _shared/core/domain
+ *   DOMAIN_DIR  = DRIVERS_DIR/_shared/domain    → moved to _shared/core/text/data/domain
  *
  * So readSpecNames() scanned a directory with no specs in it and returned an
  * empty list. The tool then did exactly what it was told: created the directory
@@ -43,7 +43,7 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const PORTS = path.join(SP, '_shared', 'core', 'ports');
-const DOMAIN = path.join(SP, '_shared', 'core', 'domain');
+const DOMAIN = path.join(SP, '_shared', 'core', 'text', 'data', 'domain');
 const TOOL = path.join(ROOT, 'tools', 'codegen', 'new-driver.js');
 
 // A name no real driver will ever take, so a failed cleanup is obvious rather

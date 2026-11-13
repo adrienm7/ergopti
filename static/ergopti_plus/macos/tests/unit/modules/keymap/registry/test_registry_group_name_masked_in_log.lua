@@ -52,7 +52,7 @@ helpers.describe("Registry: a group name is masked in the log", function()
 		Logger.set_level(previous_level)
 		helpers.assert_true(ok, tostring(failure))
 		helpers.assert_true(#lines > 0, "the fixture must have produced log lines")
-		local placeholder = require("diagnostics.private_label").PLACEHOLDER
+		local placeholder = require("diagnostics.engine.private_label").PLACEHOLDER
 		local masked = false
 		for _, line in ipairs(lines) do
 			helpers.assert_true(line:find(SECRET, 1, true) == nil, "the group name reached the log in clear text: " .. line)
@@ -62,9 +62,9 @@ helpers.describe("Registry: a group name is masked in the log", function()
 	end)
 
 	helpers.it("(group-name-log-mask) pins the placeholder to the redaction policy", function()
-		local file = assert(io.open(helpers.shared("modules/diagnostics/redaction.json"), "rb"))
-		local policy = require("json").decode(file:read("*a"))
+		local file = assert(io.open(helpers.shared("diagnostics/data/redaction.json"), "rb"))
+		local policy = require("core.text.engine.json").decode(file:read("*a"))
 		file:close()
-		require("test.private_label_contract")(helpers, policy)
+		require("tests.lua.private_label_contract")(helpers, policy)
 	end)
 end)

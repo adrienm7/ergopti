@@ -5,7 +5,7 @@
  * MODULE: Section-Title Decoration Parity & Single-Source Guard
  * DESCRIPTION:
  * Every disabled menu section header of the three drivers is drawn by one
- * format, _shared/modules/menu/section_header.json, so its style changes in one
+ * format, _shared/menu/data/section_header.json, so its style changes in one
  * place and no title frames itself (the maintainer, 2026-11-03: « — Section
  * truc — », the case as the locale writes it, never capitals by hand).
  *
@@ -39,7 +39,7 @@ const FAIL_SYMBOL = '✗';
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const MACOS_ROOT = path.join(REPO_ROOT, 'static/ergopti_plus/macos');
 const I18N_KERNEL = path.join(MACOS_ROOT, 'infra/i18n.lua');
-const SHARED_LABELS = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/lua/menu/labels.lua');
+const SHARED_LABELS = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/menu/engine/labels.lua');
 
 let total_pass = 0;
 let total_fail = 0;
@@ -84,11 +84,11 @@ function collectLua(dir, acc) {
 
 console.log('\n=== Section-Title Decoration Parity & Single-Source ===');
 
-// 1. One format: _shared/modules/menu/section_header.json, projected into the
+// 1. One format: _shared/menu/data/section_header.json, projected into the
 //    Lua data menu.labels reads and the AHK constants MenuSectionTitle reads.
 const FORMAT = JSON.parse(
 	fs.readFileSync(
-		path.join(REPO_ROOT, 'static/ergopti_plus/_shared/modules/menu/section_header.json'),
+		path.join(REPO_ROOT, 'static/ergopti_plus/_shared/menu/data/section_header.json'),
 		'utf8'
 	)
 ).format;
@@ -107,7 +107,7 @@ function generated(label, file, pattern) {
 }
 generated(
 	'shared: menu/section_header_data.lua carries the format of section_header.json',
-	'static/ergopti_plus/_shared/lua/menu/section_header_data.lua',
+	'static/ergopti_plus/_shared/menu/engine/section_header_data.lua',
 	/prefix = "([^"]*)",\s*suffix = "([^"]*)"/
 );
 generated(
@@ -117,8 +117,8 @@ generated(
 );
 check(
 	'shared: menu/labels.lua decorate_section frames with the generated format',
-	'static/ergopti_plus/_shared/lua/menu/labels.lua',
-	/require\("menu\.section_header_data"\)[\s\S]*function M\.decorate_section\(text\)\s*return SectionHeader\.prefix \.\. text \.\. SectionHeader\.suffix/
+	'static/ergopti_plus/_shared/menu/engine/labels.lua',
+	/require\("menu\.engine\.section_header_data"\)[\s\S]*function M\.decorate_section\(text\)\s*return SectionHeader\.prefix \.\. text \.\. SectionHeader\.suffix/
 );
 check(
 	'macOS: infra/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
@@ -143,7 +143,7 @@ check(
 //    MenuUtils.build_section_header, MenuSectionTitle); only the kernels hold the
 //    frame, and they read it from the generated format. Test files are exempt:
 //    they stub the kernel.
-const DRIVER_ROOTS = ['macos', 'linux', 'windows', '_shared/lua', '_shared/modules'].map((d) =>
+const DRIVER_ROOTS = ['macos', 'linux', 'windows', '_shared', '_shared'].map((d) =>
 	path.join(REPO_ROOT, 'static/ergopti_plus', d)
 );
 function collectSources(dir, acc) {
@@ -191,10 +191,10 @@ if (handFramed.length === 0) {
 //    ends, no section header title carrying a dash, and no menu title in
 //    capitals, which the maintainer retired (« Section truc », as the locale
 //    writes it).
-const LOCALE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales');
+const LOCALE_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales');
 const MANIFEST = JSON.parse(
 	fs.readFileSync(
-		path.join(REPO_ROOT, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+		path.join(REPO_ROOT, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json'),
 		'utf8'
 	)
 );

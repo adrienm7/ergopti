@@ -4,14 +4,14 @@
 --- MODULE: LLM Menu Persistence Tests (Hammerspoon)
 --- DESCRIPTION:
 --- Ensures every LLM menu setting mapped in infra/preferences.lua is written
---- to config.toml and read back. Contract: _shared/modules/llm/menu_persistence_contract.json
+--- to config.toml and read back. Contract: _shared/ai/data/menu_persistence_contract.json
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.preferences_roundtrip_fixture")
 
 local function contract_path()
-	return helpers.shared("modules/llm/menu_persistence_contract.json")
+	return helpers.shared("ai/data/menu_persistence_contract.json")
 end
 
 local function load_contract()

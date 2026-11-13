@@ -779,7 +779,7 @@ const pullRoot = path.resolve(__dirname, '../..');
 const pullProgram = `
 local root = ${JSON.stringify(pullRoot)}
 local driver = root .. "/static/ergopti_plus/macos"
-local shared = root .. "/static/ergopti_plus/_shared/lua"
+local shared = root .. "/static/ergopti_plus/_shared"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. driver .. "/tests/stubs/?.lua;" .. package.path
 _G.hs = require("hs")
 assert(loadfile(driver .. "/tests/unit/ui/menu/menu_llm/ollama/test_managed_ollama_pull_activation.lua"))()

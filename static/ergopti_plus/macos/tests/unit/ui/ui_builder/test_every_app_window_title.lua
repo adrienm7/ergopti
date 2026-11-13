@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads one shared JSON document.
 --- @param relative string Path under the shared tree.
@@ -22,7 +22,7 @@ local function read_shared(relative)
 end
 
 local MANIFEST = read_shared("ui/apps.manifest.json")
-local LOCALES = read_shared("data/locale_order.json").order
+local LOCALES = read_shared("core/i18n/data/locale_order.json").order
 
 --- Runs callback with the real factory, translator and title policy loaded over
 --- a modeled native webview that records every caption it receives.
@@ -31,9 +31,9 @@ local function with_factory(callback)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.webview_close_owner", "infra.i18n", "infra.locale", "locale.core",
+			"ui.ui_builder", "ui.webview_close_owner", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 			"infra.logger", "infra.paths", "infra.deferred_work", "adapters.json_codec",
-			"adapters.timer_scheduler", "adapters.storage", "webview.i18n_seed", "window_titles",
+			"adapters.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
 			"hs", "tests.stubs.hs",
 		}, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()

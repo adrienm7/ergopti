@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
 local Response = require("tests.support.modules.llm.selection_translation_fixture")
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 local RESULT = "A formal rewrite"
 local function seconds(key) return require("infra.timings").sec("debounce", key) end
 

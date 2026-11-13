@@ -20,7 +20,7 @@
 
 **CoreState** — Table Lua centralisée créée par `init.lua` et injectée dans chaque module via `M.init(state)`. Évite les globals ; toute dépendance partagée (feature flags, config, registries) passe par cette table.
 
-**Corpus test** — Test cross-driver en JavaScript (`_shared/core/domain/*.spec.js`) qui vérifie qu'un contrat comportemental est respecté par les trois drivers (Windows/AHK, macOS/Lua, Linux/Lua) à partir du même jeu de vecteurs. Voir ADR 006.
+**Corpus test** — Test cross-driver en JavaScript (`_shared/core/text/data/domain/*.spec.js`) qui vérifie qu'un contrat comportemental est respecté par les trois drivers (Windows/AHK, macOS/Lua, Linux/Lua) à partir du même jeu de vecteurs. Voir ADR 006.
 
 ---
 
@@ -32,7 +32,7 @@
 
 **Debounce** — Délai minimal entre le dernier événement déclenchant et le lancement d'une opération coûteuse (requête LLM, rebuild menu, écriture config). Évite les déclenchements parasites lors d'une frappe rapide.
 
-**Domain spec** — Fichier JavaScript dans `_shared/core/domain/` (ex. `HotstringMatcher.spec.js`) définissant le contrat comportemental cross-driver d'un composant. Exécuté par la suite JS pour certifier la parité des drivers.
+**Domain spec** — Fichier JavaScript dans `_shared/core/text/data/domain/` (ex. `HotstringMatcher.spec.js`) définissant le contrat comportemental cross-driver d'un composant. Exécuté par la suite JS pour certifier la parité des drivers.
 
 **Driver** — L'une des trois implémentations complètes d'ErgoptiPlus : `windows/` (AutoHotkey v2), `macos/` (Hammerspoon/Lua) ou `linux/` (Lua/LuaJIT). Les trois partagent données et frontends via `_shared/`.
 
@@ -50,7 +50,7 @@
 
 ## F
 
-**Feature toggle** — Drapeau booléen dans `_shared/modules/features/manifest.toml` activant ou désactivant une fonctionnalité. Valeur par défaut dans le manifest ; valeur runtime lue depuis `config.toml` via la `Features map`.
+**Feature toggle** — Drapeau booléen dans `_shared/settings/data/features/manifest.toml` activant ou désactivant une fonctionnalité. Valeur par défaut dans le manifest ; valeur runtime lue depuis `config.toml` via la `Features map`.
 
 **Features map** — Table en mémoire (`Map` AHK / table Lua) construite au boot depuis `config.toml` et le manifest. Source de vérité runtime de l'état de chaque fonctionnalité ; jamais re-déclarée dans le code module.
 
@@ -62,7 +62,7 @@
 
 **Hold** — La moitié "maintien" d'un tap-hold : maintenir la touche au-delà du seuil `TAP_MIN_DURATION_MS` active une couche ou un modificateur au lieu de déclencher l'action tap.
 
-**Hotstring** — Séquence de touches déclenchant une expansion de texte en temps réel. Définie dans les fichiers TOML sous `_shared/modules/hotstrings/` ; l'expansion peut être statique (texte fixe) ou dynamique (calculée à la frappe).
+**Hotstring** — Séquence de touches déclenchant une expansion de texte en temps réel. Définie dans les fichiers TOML sous `_shared/hotstrings/data/catalogue/` ; l'expansion peut être statique (texte fixe) ou dynamique (calculée à la frappe).
 
 **Hotstring engine** — Le sous-système (centré sur `modules/keymap/`) qui intercepte les frappes, compare les séquences tapées au catalogue de déclencheurs, et déclenche l'expansion correspondante.
 
@@ -72,7 +72,7 @@
 
 **InputHook** (AHK) — Objet AHK v2 `InputHook()` qui intercepte les caractères de façon transparente, sans les consommer du flux d'événements OS. Utilisé par le prefix watcher et le LLM bridge.
 
-**Ingest tick** — Timer périodique qui lit `today.log`, écrit les événements dans `db.sqlite`, et vide le buffer mémoire. Fréquence configurable dans `_shared/modules/timings/constants.toml [keystats]`.
+**Ingest tick** — Timer périodique qui lit `today.log`, écrit les événements dans `db.sqlite`, et vide le buffer mémoire. Fréquence configurable dans `_shared/core/timing/data/constants.toml [keystats]`.
 
 ---
 
@@ -98,7 +98,7 @@
 
 **Magic key** — Touche synthétique (étoile `★` / `Chr(0x2605)`) utilisée comme sentinelle dans les expansions de hotstrings avancées et les liaisons du layout. N'est pas une touche physique ; émise par l'expander via `Send`.
 
-**Manifest** — `_shared/modules/features/manifest.toml` : source de vérité de tous les feature toggles, leurs valeurs par défaut, et leurs métadonnées (label, section). Généré en `_generated/features_manifest.{ahk,lua}` par `npm run codegen`.
+**Manifest** — `_shared/settings/data/features/manifest.toml` : source de vérité de tous les feature toggles, leurs valeurs par défaut, et leurs métadonnées (label, section). Généré en `_generated/features_manifest.{ahk,lua}` par `npm run codegen`.
 
 **MLX** — Framework Apple (open-source) pour l'inférence LLM locale sur Apple Silicon. L'un des deux backends LLM locaux supportés par ErgoptiPlus (avec Ollama).
 
@@ -106,7 +106,7 @@
 
 ## N
 
-**Navigation layer** — Couche virtuelle activée par le maintien d'une touche tap-hold (ex. LAlt), mappant les touches de lettres/chiffres à des actions de navigation (flèches, mot/ligne/document, gestion de fenêtres, volume). Ses touches sont des données : le préréglage d'Ergopti dans `_shared/keymap/layers.recommended.toml` et le `layers.toml` de l'utilisateur dans le dossier de configuration, écrits dans le vocabulaire `_shared/keymap/layer_actions.toml` et identifiés par `KeyboardEvent.code` (`_shared/data/keycodes/physical_keys.json`). Il n'existe plus de table `[tap_hold.layers.*]` : `defaults.toml` ne fait que nommer la couche qu'une touche active.
+**Navigation layer** — Couche virtuelle activée par le maintien d'une touche tap-hold (ex. LAlt), mappant les touches de lettres/chiffres à des actions de navigation (flèches, mot/ligne/document, gestion de fenêtres, volume). Ses touches sont des données : le préréglage d'Ergopti dans `_shared/layouts/data/layers.recommended.toml` et le `layers.toml` de l'utilisateur dans le dossier de configuration, écrits dans le vocabulaire `_shared/layouts/data/layer_actions.toml` et identifiés par `KeyboardEvent.code` (`_shared/layouts/data/keycodes/physical_keys.json`). Il n'existe plus de table `[tap_hold.layers.*]` : `defaults.toml` ne fait que nommer la couche qu'une touche active.
 
 **N-gram** — Séquence de N frappes consécutives analysée par le keystats pour les statistiques ergonomiques (fréquence de bigrammes, SFBs, vitesse par finger).
 
@@ -186,4 +186,4 @@
 
 **WPM (Words Per Minute)** — Vitesse de frappe en mots par minute, calculée sur une fenêtre glissante de keystrokes récents. Affiché par le widget WPM flottant et (macOS) la barre de menu.
 
-**Wrap symbols** — Fonctionnalité encadrant une sélection de texte avec une paire de caractères (parenthèses, guillemets, crochets, etc.) via un raccourci. Le catalogue des paires vit dans `_shared/modules/wrap_symbols/wrap_symbols.json`.
+**Wrap symbols** — Fonctionnalité encadrant une sélection de texte avec une paire de caractères (parenthèses, guillemets, crochets, etc.) via un raccourci. Le catalogue des paires vit dans `_shared/keyboard/data/wrap_symbols/wrap_symbols.json`.

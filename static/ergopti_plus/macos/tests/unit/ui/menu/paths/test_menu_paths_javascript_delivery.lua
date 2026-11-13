@@ -202,7 +202,7 @@ end)
 helpers.describe("paths editor scalar native JSON boundary", function()
 	helpers.it("(hs-scalar-json-paths) actual browse keeps control and Unicode bytes with native table-only JSON", function()
 		with_editor(function(_, calls, _, evaluations, pending)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local picked = '/PRIVATE/é漢😀/\r\n\t"\\");globalThis.__injected=true;//'
 			local native_tables = 0
 			-- Explicit native boundary double; the selected directory is a string.
@@ -227,7 +227,7 @@ helpers.describe("paths editor scalar native JSON boundary", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		helpers.it("(hs-scalar-json-paths) selected path quotation " .. mode .. " refuses privately", function()
 			with_editor(function(_, calls, _, evaluations, pending)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local original = Json.quote
 				local ok, err = xpcall(function()
 					Json.quote = function()

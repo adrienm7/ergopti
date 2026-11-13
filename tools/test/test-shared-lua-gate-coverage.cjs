@@ -18,7 +18,7 @@ const path = require('node:path');
 const { GATE_COMMANDS, selectGates } = require('./verify-change.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const PREFIX = 'static/ergopti_plus/_shared/lua/';
+const PREFIX = 'static/ergopti_plus/_shared/';
 const CONSUMER_GATES = ['hs', 'linux', 'hs-e2e', 'linux-e2e'];
 const files = [];
 const missing = [];
@@ -71,7 +71,7 @@ for (const file of [
 	}
 }
 
-for (const tree of ['core', 'tests']) {
+for (const tree of ['core/ports', 'tests']) {
 	const gates = selectGates([`static/ergopti_plus/_shared/${tree}/contract.json`]);
 	for (const gate of ['ahk-suite', 'hs', 'linux']) {
 		assert(gates.has(gate), 'shared contracts retain every driver unit gate');

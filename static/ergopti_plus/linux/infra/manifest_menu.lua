@@ -26,11 +26,11 @@
 --- work possible, not what completes it.
 --- ==============================================================================
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
-local json   = require("json")
-local Renderer = require("menu.renderer")
+local json   = require("core.text.engine.json")
+local Renderer = require("menu.engine.renderer")
 
 local LOG = "manifest_menu"
 
@@ -39,7 +39,7 @@ local instance, err = Renderer.new({
 	-- Resolved on every read rather than once here, matching the macOS binding:
 	-- Paths.shared probes for the shared root and can answer differently before
 	-- and after the daemon has settled its install layout.
-	manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+	manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 	-- Pure Lua, deliberately. macOS injects hs.json.decode because it has a C
 	-- decoder on its boot path; this driver has none and must not pretend to.
 	json_decode   = json.decode,

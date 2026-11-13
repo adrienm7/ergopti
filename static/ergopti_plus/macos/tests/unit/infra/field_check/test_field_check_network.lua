@@ -223,7 +223,7 @@ helpers.describe("network check", function()
 
 	helpers.it("names as many Ollama origins as the shared inventory holds", function()
 		local origins = assert(require("modules.llm.network_env").route_origins("ollama"))
-		helpers.assert_eq(#origins, #require("network.field_check_network").OLLAMA_ORIGIN_TOKENS)
+		helpers.assert_eq(#origins, #require("core.network.engine.field_check_network").OLLAMA_ORIGIN_TOKENS)
 	end)
 
 	helpers.it("never lets the PAC address or a host reach a step value", function()

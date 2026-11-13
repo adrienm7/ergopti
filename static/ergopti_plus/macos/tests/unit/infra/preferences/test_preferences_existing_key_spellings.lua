@@ -8,8 +8,8 @@
 --- (toml-batch-existing-key).
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec.codec")
-local Migrate = require("config_migrate")
+local Codec = require("core.text.engine.toml_codec.codec")
+local Migrate = require("settings.engine.migration.migrate")
 
 local PATH = "/switch/config.toml"
 local GROUPS = { "autocorrection", "distancesreduction", "magickey" }
@@ -106,7 +106,7 @@ end
 local function migrated_old_build_file()
 	local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
 	local catalogue = dofile(helpers.shared("../macos/_generated/action_catalogue.lua"))
-	local context, detail = Migrate.load_context(helpers.shared("modules/actions/modifier_chords.json"), catalogue)
+	local context, detail = Migrate.load_context(helpers.shared("shortcuts/data/actions/modifier_chords.json"), catalogue)
 	helpers.assert_true(context ~= nil, detail)
 	-- The v22 step reads the tap_hold.toml beside it: this old build had none.
 	context.companions = { ["tap_hold.toml"] = { status = "absent" } }
@@ -131,7 +131,7 @@ helpers.describe("the Hotstrings switch saves over existing key spellings (toml-
 		local shapes = {
 			{ "older build whole-file encoder", old_build_file() },
 			{ "older build after the boot migration", migrated_old_build_file() },
-			{ "shipped macOS example config", shared_file("core/config_schema/examples/hs_config.example.toml") },
+			{ "shipped macOS example config", shared_file("settings/data/config_schema/examples/hs_config.example.toml") },
 			{ "quoted bare-compatible keys", '# kept comment\n[hotstrings]\n"enabled" = false\n"magic_key_source" = "auto"\n'
 				.. '[hotstrings.groups]\n"autocorrection" = false\n[future]\nkeep = 99\n' },
 			{ "hand-written [[hotstrings.terminators]] list", '# kept comment\n[hotstrings]\nexpansion_delay = 0.5\n\n'

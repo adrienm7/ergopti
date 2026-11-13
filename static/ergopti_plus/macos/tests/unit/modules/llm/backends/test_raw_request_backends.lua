@@ -4,7 +4,7 @@
 --- MODULE: Local backends answer a raw single request (llm-tone)
 --- DESCRIPTION:
 --- The tone actions send one request with a ladder prompt and read the answer
---- themselves (llm/tone.lua extract): the text is a selection, not the typed
+--- themselves (ai/engine/prediction/tone.lua extract): the text is a selection, not the typed
 --- buffer the prediction parser aligns against. Ollama and MLX must post that
 --- request without streaming, with the text as PREFIX and TAIL, and hand the
 --- answer back unparsed. The remote backend is covered end to end by
@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Selector = require("llm.profile_selector")
+local json = require("core.text.engine.json")
+local Selector = require("ai.engine.settings.profile_selector")
 
 local SOURCE = "Merci pour votre aide."
 local ANSWER = "REWRITE: Merci pour votre aide."

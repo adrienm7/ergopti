@@ -32,9 +32,9 @@ local Logger = require("infra.logger")
 local PhaseStats = require("infra.phase_stats")
 local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
-local RuntimeLog = require("diagnostics.runtime_log")
-local TableUtil = require("table_util")
-local ErrorDescription = require("error_description")
+local RuntimeLog = require("diagnostics.engine.runtime_log")
+local TableUtil = require("core.text.engine.table_util")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "adapters.shell_runner"
 

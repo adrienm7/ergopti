@@ -365,8 +365,8 @@ class _UpdaterNativeDownloadRun {
 			_UpdaterNativeStagingWorkerPath(this), _Updater_SwapWorkerPath(), Url, this.Digest,
 			this.NewExe, this.SwapPath, this.CurrentExe, UPDATER_MIN_EXE_SIZE_BYTES, 5000,
 			_VendorDir . "\ergopti_updater_download.ps1", this.DeadlineMs, this.StartedTick,
-			_SharedDir . "\modules\network\proxy_policy.json",
-			_SharedDir . "\modules\updater\defaults.json")
+			_SharedDir . "\core\network\data\proxy_policy.json",
+			_SharedDir . "\updater\data\defaults.json")
 		try {
 			Prefix := this.Transport.Prefix
 			Pair := {Name: Prefix . "_TEST_PAC", Value: "http://127.0.0.1:" . this.Owner.State["http_port"] . "/updater.pac"}
@@ -773,7 +773,7 @@ _UpdaterNative_WithContract(Callback) {
 	Saved := _UpdaterManagedFailureContract
 	try {
 		_UpdaterManagedFailureContract := ManagedNetworkFailureContract(
-			JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8")))
+			JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8")))
 		Callback.Call(_UpdaterManagedFailureContract)
 	} finally _UpdaterManagedFailureContract := Saved
 }

@@ -4,7 +4,7 @@
 --- MODULE: Model Capabilities Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/model_capabilities_vectors.json through the
---- shared module (_shared/lua/llm/model_capabilities.lua) and the thinking-off
+--- shared module (_shared/ai/engine/local_servers/model_capabilities.lua) and the thinking-off
 --- resolver under the Linux runtime (LuaJIT in CI), as the macOS suite and the
 --- AutoHotkey port do:
 --- recorded OpenRouter, Anthropic and Gemini listings, the controls they say
@@ -16,12 +16,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 
-local ThinkingOff = require("llm.thinking_off")
-local Caps = require("llm.model_capabilities")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
+local Caps = require("ai.engine.local_servers.model_capabilities")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -66,8 +66,8 @@ end
 
 helpers.describe("model_capabilities replays the shared corpus (thinking-off-capabilities)", function()
 	local corpus = read_json("tests/corpus/llm/model_capabilities_vectors.json")
-	local providers = read_json("modules/llm/api_providers.json").providers
-	local raw_families = read_json("modules/llm/thinking_off.json")
+	local providers = read_json("ai/data/api_providers.json").providers
+	local raw_families = read_json("ai/data/thinking_off.json")
 	local families = assert(ThinkingOff.parse_families(raw_families))
 
 	--- The records of one recorded listing answer.

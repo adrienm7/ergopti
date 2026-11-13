@@ -16,7 +16,7 @@
 #    is refused, because its route is unknown and a guess may leak it.
 # 3. Refusals are a closed enum; neither a URL nor a relay address ever
 #    appears in a reason.
-# 4. The Lua (_shared/lua/network/route_plan.lua), Go and shell twins answer
+# 4. The Lua (_shared/core/network/engine/route_plan.lua), Go and shell twins answer
 #    the same vectors (_shared/tests/corpus/network/route_plan_vectors.json),
 #    replayed here by tools/test/test-windows-route-plan.cjs.
 # 5. Windows PowerShell 5.1 syntax only: the driver runs on the stock host.
@@ -331,7 +331,7 @@ function Test-ErgoptiRelayTunnel {
 }
 
 # The local sign-in relay's command line and answers, the twin of the shared
-# network/proxy_auth_relay.lua (docs/design/proxy-auth-relay.md): pure policy, with
+# core/network/engine/proxy_auth_relay_core.lua (docs/design/proxy-auth-relay.md): pure policy, with
 # reasons and statuses that never carry a URL, host, header or token.
 
 # The upstream the relay may sign in to, '' when it does not apply: only a plain

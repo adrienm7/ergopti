@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local Calendar = require("modules.keystats.calendar")
@@ -57,7 +57,7 @@ local function scenario(day, body)
 	Calendar.capture, Monotonic.now_ms = original_capture, original_now
 	os.date, os.time = original_date, original_time
 	os.remove(path)
-	os.execute("rm -rf -- " .. require("text_utils").shell_quote(path .. ".logs"))
+	os.execute("rm -rf -- " .. require("core.text.engine.utils_core").shell_quote(path .. ".logs"))
 	assert(ok, failure)
 end
 
@@ -328,7 +328,7 @@ end)
 scenario({ month = 10, day = 25 }, function(k, writer)
 	writer.close_db()
 	k.on_keydown("a", Monotonic.now_ms(), "shutdown-app")
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local original, errors = logger.error, 0
 	logger.error = function(tag, message, ...)
 		if tag == "modules.keystats.keystats" and message == "Final SQLite history remains uncommitted; summary publication cannot acknowledge its source." then
@@ -355,7 +355,7 @@ scenario({ month = 10, day = 25, hour = 12, min = 0, sec = 0 }, function(k, writ
 	local prior = assert(io.open(path, "wb")); prior:write("prior summary\n"); prior:close()
 	k.on_app_focus("éditeur", Monotonic.now_ms())
 	k.on_keydown("a", Monotonic.now_ms(), "éditeur")
-	local good = assert(require("json").decode(assert(k.export_json())))
+	local good = assert(require("core.text.engine.json").decode(assert(k.export_json())))
 	equal(good.apps["éditeur"].keystrokes, 1)
 	k.on_app_focus("bad" .. string.char(255), Monotonic.now_ms())
 	k.on_keydown("a", Monotonic.now_ms(), "bad" .. string.char(255))

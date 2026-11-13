@@ -10,8 +10,8 @@
 local root, temporary = assert(arg[1]), assert(arg[2])
 local driver = root .. "/static/ergopti_plus/macos"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
-local json = require("json")
+	.. root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
+local json = require("core.text.engine.json")
 local function request(message)
 	message.kind = "request"
 	assert(io.stdout:write(json.encode(message) .. "\n")); assert(io.stdout:flush())

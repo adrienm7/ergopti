@@ -171,7 +171,7 @@ local function fresh()
 	-- An earlier suite module may leave a stand-in provider catalogue or entries
 	-- owner behind; the real ones classify this file's entry.
 	for _, name in ipairs({ "modules.llm.api_remote", "modules.llm.local_server_catalogue",
-		"llm.provider_config_policy", "llm.local_server_auth" }) do
+		"ai.engine.policy.provider_config_policy", "ai.engine.local_servers.auth" }) do
 		package.loaded[name] = nil
 	end
 	local store = helpers.load_module("modules.llm.api_token_store")
@@ -208,7 +208,7 @@ end
 -- The real child-process owners: an earlier suite module may leave a stand-in
 -- that "succeeds" at once without spawning anything, and every case here is
 -- about a real child (CI 43024025237: each attempt ended "done" at once).
-local PROCESS_OWNERS = { "adapters.owned_process", "adapters.shell_runner", "adapter_errors" }
+local PROCESS_OWNERS = { "adapters.owned_process", "adapters.shell_runner", "diagnostics.engine.adapter_errors" }
 
 -- Longest wait for a child to answer: a bound on a loaded runner, never a
 -- timing the case relies on.
@@ -270,7 +270,7 @@ helpers.describe("api_key_migration: a locked keyring never delays input readine
 			helpers.assert_eq(migration.status(), "done")
 			local text = read(PATH)
 			helpers.assert_eq(text:find(CANARY, 1, true), nil, "the plaintext key left the file")
-			local reference = require("json").decode(text).entries[1].token
+			local reference = require("core.text.engine.json").decode(text).entries[1].token
 			helpers.assert_true(store.is_reference(reference), "the file names the key: " .. tostring(reference))
 			helpers.assert_eq(read(DIR .. "/stdin"), CANARY, "secret-tool read the key on its standard input")
 			helpers.assert_eq((read(DIR .. "/argv") or ""):find(CANARY, 1, true), nil, "the key never reached an argument")
@@ -338,9 +338,9 @@ end)
 helpers.describe("api_key_migration: an attempt overtaken by a save or a shutdown", function()
 	--- Loads a fresh migration over scripted entries and store ports.
 	local function faked()
-		local saved_migration, saved_logger = package.loaded["modules.llm.api_key_migration"], package.loaded["logger.shim"]
+		local saved_migration, saved_logger = package.loaded["modules.llm.api_key_migration"], package.loaded["core.logger.engine.shim"]
 		local world = { logs = {}, timers = {}, pending = {}, cleared = {}, plaintext = 2 }
-		package.loaded["logger.shim"] = setmetatable({}, { __index = function(_, level)
+		package.loaded["core.logger.engine.shim"] = setmetatable({}, { __index = function(_, level)
 			return function(_, fmt, ...) world.logs[#world.logs + 1] = level .. ": " .. string.format(fmt, ...) end
 		end })
 		package.loaded["modules.llm.api_key_migration"] = nil
@@ -374,7 +374,7 @@ helpers.describe("api_key_migration: an attempt overtaken by a save or a shutdow
 		world.restore = function()
 			migration.shutdown()
 			package.loaded["modules.llm.api_key_migration"] = saved_migration
-			package.loaded["logger.shim"] = saved_logger
+			package.loaded["core.logger.engine.shim"] = saved_logger
 		end
 		return migration, world
 	end

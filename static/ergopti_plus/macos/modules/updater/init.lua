@@ -14,14 +14,14 @@
 local M = {}
 
 local hs         = hs
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
-local Channels   = require("updater.channels")
-local VersionLabel = require("updater.version_label")
-local Snapshot   = require("diagnostics.snapshot")
+local Channels   = require("updater.engine.channels")
+local VersionLabel = require("updater.engine.version_label")
+local Snapshot   = require("diagnostics.engine.snapshot")
 local DevSource  = require("infra.dev_source")
 
 local LOG = "updater"
@@ -32,7 +32,7 @@ local DEFAULT_GITHUB = { owner = "adrienm7", repo = "ergopti" }
 --- engine. Missing or invalid generated data remains visible in the log.
 --- @return table github Repository owner and name.
 local function load_github_identity()
-	local defaults_path = Paths.shared("modules/updater/defaults.json")
+	local defaults_path = Paths.shared("updater/data/defaults.json")
 	if type(defaults_path) == "string" and defaults_path ~= "" then
 		local raw = FileSystem.read(defaults_path)
 		if raw then
@@ -55,7 +55,7 @@ end
 --- channel list could point the launcher at another channel's feed.
 --- @return table registry updater.channels interpreter.
 local function load_channel_registry()
-	local path = Paths.shared("modules/updater/channels.json")
+	local path = Paths.shared("updater/data/channels.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
 	local decoded, decode_err = JsonCodec.decode(raw)

@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Snapshot = require("diagnostics.snapshot")
+local Json = require("core.text.engine.json")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "c3005e0b9aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "c3005e0b9"
@@ -93,7 +93,7 @@ local CHECKOUTS = {
 --- The shipped French catalogue, so the row is checked against real wording.
 --- @return table
 local function french()
-	local handle = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded

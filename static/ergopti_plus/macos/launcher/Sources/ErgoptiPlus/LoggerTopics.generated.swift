@@ -1,5 +1,5 @@
 // Sources/ErgoptiPlus/LoggerTopics.generated.swift
-// AUTO-GENERATED from _shared/modules/logger/sub_files.toml.
+// AUTO-GENERATED from _shared/core/logger/data/sub_files.toml.
 // DO NOT EDIT BY HAND -- run `npm run codegen:logger-sub-files` to refresh.
 
 // ==============================================================================

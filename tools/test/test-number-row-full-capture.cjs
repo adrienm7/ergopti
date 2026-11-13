@@ -135,12 +135,12 @@ function validate(input) {
 }
 
 const manifest = toml.parse(
-	read('_shared/modules/features/manifest.toml').replace(
+	read('_shared/settings/data/features/manifest.toml').replace(
 		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
 	)
 );
-const catalogue = toml.parse(read('_shared/modules/actions/actions.toml'));
+const catalogue = toml.parse(read('_shared/shortcuts/data/actions/actions.toml'));
 const input = {
 	entry: (manifest.entries || []).find(
 		(entry) => entry.path_prefix === 'shortcuts.tap_keys' && entry.id === 'number_row_left'

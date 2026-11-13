@@ -4,7 +4,7 @@
 --- MODULE: Rewrite Request Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/rewrite_vectors.json through the shared
---- rewrite helpers (_shared/lua/llm/rewrite.lua), which macOS and Linux both use
+--- rewrite helpers (_shared/ai/engine/prediction/rewrite.lua), which macOS and Linux both use
 --- and the AutoHotkey port replays too: the sentence a rewrite prompt rewrites,
 --- its token budget, and which prompts are rewrite prompts.
 ---
@@ -15,13 +15,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Rewrite = require("llm.rewrite")
-local Tone = require("llm.tone")
+local Rewrite = require("ai.engine.prediction.rewrite")
+local Tone = require("ai.engine.prediction.tone")
 
 local CORPUS = helpers.shared("tests/corpus/llm/rewrite_vectors.json")
 
@@ -81,7 +81,7 @@ end)
 
 helpers.describe("the shipped rewrite profile is a rewrite prompt", function()
 	helpers.it("profiles.json holds a rewrite profile the helpers recognise", function()
-		local fh = assert(io.open(helpers.shared("modules/llm/profiles.json"), "r"))
+		local fh = assert(io.open(helpers.shared("ai/data/profiles.json"), "r"))
 		local profiles = json.decode(fh:read("*a"))
 		fh:close()
 		local found
@@ -98,11 +98,11 @@ helpers.describe("the shipped rewrite profile is a rewrite prompt", function()
 		helpers.assert_eq(found.batch, false, "a rewrite is one request per prediction")
 	end)
 
-	-- The tone ladder (llm/tone.lua) rewrites a selection into a register, and
+	-- The tone ladder (ai/engine/prediction/tone.lua) rewrites a selection into a register, and
 	-- the live translations (translate_<language>) rewrite the current sentence
 	-- into another language: they are rewrite prompts too, and nothing else may be one
 	helpers.it("no other built-in profile than the tone ladder and the translations is a rewrite profile", function()
-		local fh = assert(io.open(helpers.shared("modules/llm/profiles.json"), "r"))
+		local fh = assert(io.open(helpers.shared("ai/data/profiles.json"), "r"))
 		local profiles = json.decode(fh:read("*a"))
 		fh:close()
 		local ladder = {}

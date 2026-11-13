@@ -36,7 +36,7 @@ local DEFAULT_DEPS = {
 	-- tray starts with that path): this file's own source path is then
 	-- "./ui/native_dialog.lua", and every dialog refused to open.
 	driver_root = function() return require("infra.paths").driver_root() end,
-	quote = function(value) return require("text_utils").shell_quote(value) end,
+	quote = function(value) return require("core.text.engine.utils_core").shell_quote(value) end,
 }
 
 

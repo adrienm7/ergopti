@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shared Timings Reader Tests (macOS)
 --- DESCRIPTION:
---- Pins the shared timings reader (_shared/lua/timings.lua) that
+--- Pins the shared timings reader (_shared/core/timing/engine/timings_core.lua) that
 --- infra/timings.lua binds: an unreachable shared tree, an unreadable or empty
 --- registry, a missing section and a non-numeric key all raise naming the
 --- cause, and the seconds and count helpers read the same value as the
@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Timings = require("timings")
+local Timings = require("core.timing.engine.timings_core")
 
 local function ports(overrides)
 	local logged = {}

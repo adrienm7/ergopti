@@ -692,7 +692,7 @@ _ScopeObsoleteGlobal(Mode) {
 	TapSource := '[tap_hold.keys.space]`ntap_action = "open_url"`n'
 	Assert(FSWriteDurable(TapPath, TapSource))
 	Fixture.options["tap_hold_path"] := TapPath
-	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 	Bundle := 0, Refusal := 0, Backups := 0, Launches := 0
 	Backup(Path, Content) {
 		Backups += 1

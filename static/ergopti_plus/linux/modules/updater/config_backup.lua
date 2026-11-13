@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Configuration Backup (Linux)
 --- DESCRIPTION:
---- Binds the shared configuration backup owner (_shared/lua/updater/
+--- Binds the shared configuration backup owner (_shared/updater/engine/
 --- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder, the settings
 --- store beside it (storage.json, which holds the folder override and the tray
 --- choices), the remote API entries (api_keys.json, secret-service references
@@ -13,7 +13,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule set: the extensions, the excluded folders and the names come
----    from the config_backup block of _shared/modules/updater/defaults.json.
+---    from the config_backup block of _shared/updater/data/defaults.json.
 --- 2. Exact bytes: copies are created and restored through toml_codec.writer's
 ---    classified read and compare-and-publish, never through a plain write.
 --- 3. Native directory entries preserve every filename byte. Links to folders
@@ -23,16 +23,16 @@
 
 local M = {}
 
-local Logger      = require("logger.shim")
+local Logger      = require("core.logger.engine.shim")
 local TokenStore  = require("modules.llm.api_token_store")
 local Paths       = require("infra.paths")
 local ConfigPaths = require("infra.config_paths")
-local Json        = require("json")
+local Json        = require("core.text.engine.json")
 local Shell       = require("adapters.shell_runner")
 local NativeDirectory = require("infra.native_directory")
-local Writer      = require("toml_codec.writer")
-local Binding     = require("updater.config_backup_binding")
-local ErrorDescription = require("error_description")
+local Writer      = require("core.text.engine.toml_codec.writer")
+local Binding     = require("updater.engine.config_backup_binding")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "modules.updater.config_backup"
 
@@ -150,7 +150,7 @@ end
 --- @return table|nil defaults
 --- @return string|nil error
 local function read_defaults()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw, status
 	if path then raw, status = Writer.read_classified(path) end
 	if status ~= "ok" then return nil, "the shared updater defaults are unreadable" end

@@ -25,10 +25,10 @@
 
 local M = {}
 
-local Keycodes       = require("keycodes")
+local Keycodes       = require("platform.input.keycodes.core")
 local Logger         = require("infra.logger")
 local SyntheticInput = require("adapters.synthetic_input")
-local ControlSignals = require("keymap.control_signals")
+local ControlSignals = require("layouts.engine.layers.control_signals")
 
 local LOG = "keymap.control_sentinels"
 

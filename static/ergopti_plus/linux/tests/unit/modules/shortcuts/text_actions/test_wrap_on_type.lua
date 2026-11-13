@@ -383,9 +383,9 @@ end)
 local function with_wrap_feature(body)
 	local manager_name, builder_name = "modules.shortcuts.manager", "ui.menu.builder"
 	local previous_manager, previous_builder = package.loaded[manager_name], package.loaded[builder_name]
-	local writer = require("toml_codec.writer")
+	local writer = require("core.text.engine.toml_codec.writer")
 	local original_batch = writer.batch_write
-	local sandbox = require("test.config_unused_keys_contract").sandbox
+	local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local ok, err = pcall(function()
 		sandbox.with_config('[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[foreign]\nvalue = "keep"\n',
 			function(path)
@@ -428,7 +428,7 @@ helpers.describe("wrap feature callback ownership", function()
 			helpers.assert_eq(held(), true)
 			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
 			helpers.assert_eq(observed.changed, 1)
-			local parsed = require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			local parsed = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(observed.path))
 			helpers.assert_eq(parsed.shortcuts.wrap_text_if_selected, true)
 			helpers.assert_eq(parsed.foreign.value, "keep")
 			helpers.assert_eq(held(), true)
@@ -446,7 +446,7 @@ helpers.describe("wrap feature callback ownership", function()
 			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
 			helpers.assert_eq(observed.desired, false)
 			helpers.assert_eq(observed.changed, 1)
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(observed.path))
 				.shortcuts.wrap_text_if_selected, false)
 		end)
 	end)
@@ -580,20 +580,20 @@ end)
 --- Keeps the real source readers/decoder and controls only private file routing.
 local function with_wrap_inventory(body, options)
 	options = options or {}
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local Routes, Paths = require("infra.config_paths"), require("infra.paths")
 	local name = "modules.shortcuts.manager"
 	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
 	local catalogue_path = os.tmpname()
 	local release_source = function() end
-	local original = assert(open(shared("modules/wrap_symbols/wrap_symbols.json"), "rb"))
+	local original = assert(open(shared("keyboard/data/wrap_symbols/wrap_symbols.json"), "rb"))
 	local original_bytes = assert(original:read("*a")); assert(original:close() == true)
 	Sandbox.write_bytes(catalogue_path, original_bytes)
 	local passed, failure = pcall(function()
 		Sandbox.with_config(options.source or '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
 			Routes.config = function(file) assert(file == "config.toml"); return path end
 			Paths.shared = function(relative)
-				if relative == "modules/wrap_symbols/wrap_symbols.json" then return catalogue_path end
+				if relative == "keyboard/data/wrap_symbols/wrap_symbols.json" then return catalogue_path end
 				return shared(relative)
 			end
 			if options.close_target then
@@ -920,7 +920,7 @@ end)
 
 helpers.describe("wrap on type: committed shortcut context epochs", function()
 	local function with_persisted_wrap(body)
-		require("test.config_unused_keys_contract").sandbox.with_config(
+		require("tests.lua.settings.unused_keys_contract").sandbox.with_config(
 			'[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
 				with_daemon_wrap(body, { manager_init = { persist = true, config_path = path } })
 			end)
@@ -1007,7 +1007,7 @@ helpers.describe("wrap on type: committed shortcut context epochs", function()
 			local read_ok, current = pcall(state.shortcuts.wrap_selection_epoch)
 			io.open, io.popen = open_file, process
 			helpers.assert_true(read_ok); helpers.assert_eq(current, epoch)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local write = writer.batch_write
 			writer.batch_write = function() return false, "controlled durable refusal" end
 			local ok, err = pcall(function()

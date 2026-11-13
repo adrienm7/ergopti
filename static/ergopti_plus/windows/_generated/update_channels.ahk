@@ -1,5 +1,5 @@
 ﻿; _generated/update_channels.ahk
-; AUTO-GENERATED from _shared/modules/updater/channels.json.
+; AUTO-GENERATED from _shared/updater/data/channels.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:update-channels` to refresh.
 #Requires AutoHotkey v2.0
 

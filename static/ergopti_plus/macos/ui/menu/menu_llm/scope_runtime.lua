@@ -5,8 +5,8 @@ local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
 local Logger = require("infra.logger")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "menu_llm.scope"
 
 local clone = TableUtil.deep_copy

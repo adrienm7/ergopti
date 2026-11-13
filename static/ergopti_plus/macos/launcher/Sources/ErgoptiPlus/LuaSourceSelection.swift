@@ -16,7 +16,7 @@
 //    init.lua, refuses the launch with a named reason; the payload is never run
 //    in its place.
 // 3. One spelling: the key is Identifiers.DevSource.plistKey, generated from
-//    _shared/data/identifiers.json like the build script's and the release
+//    _shared/core/text/data/identifiers.json like the build script's and the release
 //    guard's.
 // ==============================================================================
 

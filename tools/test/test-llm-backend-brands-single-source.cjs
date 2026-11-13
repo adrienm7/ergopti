@@ -5,7 +5,7 @@
  * MODULE: AI Backend Brand Single-Source Guard
  * DESCRIPTION:
  * The brand and emoji of every AI backend live in
- * _shared/modules/llm/backends.json. The tray's model button on Windows, macOS
+ * _shared/ai/data/backends.json. The tray's model button on Windows, macOS
  * and Linux reads "<emoji> <model>" from it, and the model selector page draws
  * the same emoji, injected by the drivers.
  *
@@ -27,7 +27,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const brands = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'llm', 'backends.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'ai', 'data', 'backends.json'), 'utf8')
 );
 
 // Log-label sites of the prediction engines: they name the backend in a log
@@ -38,9 +38,9 @@ const REVIEWED_LITERAL_SITES = new Set([
 ]);
 
 const READERS = {
-	'macos/ui/menu/menu_llm/backend_labels.lua': 'modules/llm/backends.json',
+	'macos/ui/menu/menu_llm/backend_labels.lua': 'ai/data/backends.json',
 	'windows/modules/llm/models.ahk': 'LLM_GetSharedPath("backends.json")',
-	'linux/modules/llm/backend_brands.lua': 'modules/llm/backends.json'
+	'linux/modules/llm/backend_brands.lua': 'ai/data/backends.json'
 };
 
 /** Collects the production sources of the three drivers and the shared tree. */

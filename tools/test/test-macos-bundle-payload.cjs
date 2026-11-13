@@ -122,15 +122,15 @@ const CURATED_READS = [
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_bootstrap_http.py',
 		needles: [
-			'SHARED_ROOT / "data/http/redirect_policy.json"',
-			'SHARED_ROOT / "python/network_proxy_policy.py"',
-			'SHARED_ROOT / "modules/llm/managed_python_release.json"',
+			'SHARED_ROOT / "core/network/data/http/redirect_policy.json"',
+			'SHARED_ROOT / "core/network/adapters/python_network_proxy_policy.py"',
+			'SHARED_ROOT / "ai/data/managed_python_release.json"',
 			'DRIVER_ROOT / "platform/network/native_http.py"'
 		],
 		targets: [
-			'ergopti_plus/_shared/data/http/redirect_policy.json',
-			'ergopti_plus/_shared/python/network_proxy_policy.py',
-			'ergopti_plus/_shared/modules/llm/managed_python_release.json',
+			'ergopti_plus/_shared/core/network/data/http/redirect_policy.json',
+			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
+			'ergopti_plus/_shared/ai/data/managed_python_release.json',
 			'ergopti_plus/macos/platform/network/native_http.py'
 		],
 		why: 'offline inputs retain the canonical routing policy, pinned Python and native request owner'
@@ -145,31 +145,31 @@ const CURATED_READS = [
 		reader: 'ergopti_plus/macos/platform/network/managed_http.py',
 		needles: [
 			'with_name("native_http.py")',
-			'_ROOT.parent / "_shared/python/network_proxy_policy.py"'
+			'_ROOT.parent / "_shared/core/network/adapters/python_network_proxy_policy.py"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/network/native_http.py',
-			'ergopti_plus/_shared/python/network_proxy_policy.py'
+			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py'
 		],
 		why: 'the HTTPX transport loads the exact native protocol owner and shared policy'
 	},
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
 		needles: [
-			'SHARED / "python/managed_ollama_runtime.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_runtime.py"',
 			'DRIVER / "modules/llm/managed_bootstrap_http.py"',
-			'SHARED / "python/network_proxy_policy.py"',
-			'SHARED / "python/managed_source_alias.py"',
-			'SHARED / "modules/llm/managed_ollama_runtime.json"',
-			'SHARED / "modules/llm/managed_ollama_release.json"'
+			'SHARED / "core/network/adapters/python_network_proxy_policy.py"',
+			'SHARED / "ai/adapters/python/managed_source_alias.py"',
+			'SHARED / "ai/data/managed_ollama_runtime.json"',
+			'SHARED / "ai/data/managed_ollama_release.json"'
 		],
 		targets: [
-			'ergopti_plus/_shared/python/managed_ollama_runtime.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py',
 			'ergopti_plus/macos/modules/llm/managed_bootstrap_http.py',
-			'ergopti_plus/_shared/python/network_proxy_policy.py',
-			'ergopti_plus/_shared/python/managed_source_alias.py',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_release.json'
+			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py',
+			'ergopti_plus/_shared/ai/data/managed_ollama_runtime.json',
+			'ergopti_plus/_shared/ai/data/managed_ollama_release.json'
 		],
 		why: 'native runtime admission retains its canonical source, alias and network policy'
 	},
@@ -178,28 +178,28 @@ const CURATED_READS = [
 		needles: [
 			'DRIVER / "platform/network/native_ollama_api.py"',
 			'with_name("managed_ollama_runtime.py")',
-			'SHARED / "python/managed_ollama_pull.py"',
-			'SHARED / "python/managed_ollama_sessions.py"',
-			'SHARED / "python/managed_operation_receipt.py"',
-			'SHARED / "python/managed_ollama_operation_authority.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_pull.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_sessions.py"',
+			'SHARED / "ai/adapters/python/managed_operation_receipt.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"',
 			'with_name("managed_ollama_cleanup.py")',
 			'DRIVER / "platform/ollama_daemon_authority.py"',
 			'DRIVER / "platform/ollama_bootstrap_owner.py"',
-			'SHARED / "python/network_proxy_policy.py"',
-			'SHARED / "modules/llm/managed_ollama_bootstrap.json"'
+			'SHARED / "core/network/adapters/python_network_proxy_policy.py"',
+			'SHARED / "ai/data/managed_ollama_bootstrap.json"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/network/native_ollama_api.py',
 			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
-			'ergopti_plus/_shared/python/managed_ollama_pull.py',
-			'ergopti_plus/_shared/python/managed_ollama_sessions.py',
-			'ergopti_plus/_shared/python/managed_operation_receipt.py',
-			'ergopti_plus/_shared/python/managed_ollama_operation_authority.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_pull.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_sessions.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_operation_receipt.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_operation_authority.py',
 			'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py',
 			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
 			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
-			'ergopti_plus/_shared/python/network_proxy_policy.py',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json'
+			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
+			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json'
 		],
 		why: 'the request owner loads its original session, receipt and cleanup authorities'
 	},
@@ -207,15 +207,15 @@ const CURATED_READS = [
 		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py',
 		needles: [
 			'DRIVER / "platform/network/native_ollama_api.py"',
-			'SHARED / "python/managed_ollama_operation_authority.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"',
 			'with_name("managed_ollama_runtime.py")',
-			'SHARED / "python/managed_operation_receipt.py"'
+			'SHARED / "ai/adapters/python/managed_operation_receipt.py"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/network/native_ollama_api.py',
-			'ergopti_plus/_shared/python/managed_ollama_operation_authority.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_operation_authority.py',
 			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
-			'ergopti_plus/_shared/python/managed_operation_receipt.py'
+			'ergopti_plus/_shared/ai/adapters/python/managed_operation_receipt.py'
 		],
 		why: 'explicit retirement resumes only the original request authority'
 	},
@@ -228,32 +228,32 @@ const CURATED_READS = [
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_hint.py',
 		needles: [
-			'SHARED / "python/managed_ollama_runtime.py"',
-			'SHARED / "python/managed_ollama_hint.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_runtime.py"',
+			'SHARED / "ai/adapters/python/managed_ollama_hint.py"',
 			'DRIVER / "platform/ollama_hint_metadata.py"',
 			'driver / "modules/llm/network-retry.sh"',
-			'driver.parent / "_shared/modules/llm"',
+			'driver.parent / "_shared/ai/data"',
 			'shared / "managed_ollama_bootstrap.json"',
 			'shared / "managed_ollama_runtime.json"',
 			'shared / "managed_ollama_release.json"',
-			'driver.parent / "_shared/modules/network/bootstrap_retry.json"'
+			'driver.parent / "_shared/core/network/data/bootstrap_retry.json"'
 		],
 		targets: [
-			'ergopti_plus/_shared/python/managed_ollama_runtime.py',
-			'ergopti_plus/_shared/python/managed_ollama_hint.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_hint.py',
 			'ergopti_plus/macos/platform/ollama_hint_metadata.py',
 			'ergopti_plus/macos/modules/llm/network-retry.sh',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_release.json',
-			'ergopti_plus/_shared/modules/network/bootstrap_retry.json'
+			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
+			'ergopti_plus/_shared/ai/data/managed_ollama_runtime.json',
+			'ergopti_plus/_shared/ai/data/managed_ollama_release.json',
+			'ergopti_plus/_shared/core/network/data/bootstrap_retry.json'
 		],
 		why: 'bounded metadata reads retain actual shared policy, native FD owner and catalogue inputs'
 	},
 	{
-		reader: 'ergopti_plus/_shared/python/managed_ollama_pull.py',
+		reader: 'ergopti_plus/_shared/ai/adapters/python/managed_ollama_pull.py',
 		needles: ['Path(__file__).with_name("managed_ollama_runtime.py")'],
-		targets: ['ergopti_plus/_shared/python/managed_ollama_runtime.py'],
+		targets: ['ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py'],
 		why: 'the shared operation caller retains the exact runtime admission policy'
 	},
 	{
@@ -265,9 +265,9 @@ const CURATED_READS = [
 		why: 'explicit retirement derives its worker from the original caller script'
 	},
 	{
-		reader: 'ergopti_plus/_shared/python/managed_ollama_sessions.py',
+		reader: 'ergopti_plus/_shared/ai/adapters/python/managed_ollama_sessions.py',
 		needles: ['Path(__file__).with_name("managed_ollama_runtime.py")'],
-		targets: ['ergopti_plus/_shared/python/managed_ollama_runtime.py'],
+		targets: ['ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py'],
 		why: 'session authentication reuses the shared runtime admission policy'
 	},
 	{
@@ -278,10 +278,10 @@ const CURATED_READS = [
 			'DRIVER / "platform/source_alias_owner.py"',
 			'DRIVER / "platform/ollama_bootstrap_owner.py"',
 			'DRIVER / "platform/ollama_daemon_authority.py"',
-			'SHARED / "python/network_proxy_policy.py"',
+			'SHARED / "core/network/adapters/python_network_proxy_policy.py"',
 			'DRIVER / "platform/network/native_http.py"',
-			'SHARED / "modules/llm/managed_ollama_bootstrap.json"',
-			'SHARED / "modules/network/proxy_policy.json"'
+			'SHARED / "ai/data/managed_ollama_bootstrap.json"',
+			'SHARED / "core/network/data/proxy_policy.json"'
 		],
 		targets: [
 			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
@@ -289,10 +289,10 @@ const CURATED_READS = [
 			'ergopti_plus/macos/platform/source_alias_owner.py',
 			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
 			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
-			'ergopti_plus/_shared/python/network_proxy_policy.py',
+			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 			'ergopti_plus/macos/platform/network/native_http.py',
-			'ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
-			'ergopti_plus/_shared/modules/network/proxy_policy.json'
+			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
+			'ergopti_plus/_shared/core/network/data/proxy_policy.json'
 		],
 		why: 'the serve owner binds original source, empty bootstrap and sealed daemon authority'
 	},
@@ -312,11 +312,11 @@ const CURATED_READS = [
 		reader: 'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
 		needles: [
 			'Path(__file__).with_name("suspended_image_owner.py")',
-			'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_bootstrap.py"'
+			'Path(__file__).absolute().parents[2] / "_shared/ai/adapters/python/managed_ollama_bootstrap.py"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/suspended_image_owner.py',
-			'ergopti_plus/_shared/python/managed_ollama_bootstrap.py'
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_bootstrap.py'
 		],
 		why: 'native descriptor ownership delegates bootstrap data and policy to shared code'
 	},
@@ -324,54 +324,56 @@ const CURATED_READS = [
 		reader: 'ergopti_plus/macos/platform/ollama_daemon_authority.py',
 		needles: [
 			'Path(__file__).with_name("suspended_image_owner.py")',
-			'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py"'
+			'Path(__file__).absolute().parents[2]\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/suspended_image_owner.py',
-			'ergopti_plus/_shared/python/managed_ollama_daemon_authority.py'
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_daemon_authority.py'
 		],
 		why: 'the same-session source receipt retains its shared lexical authority'
 	},
 	{
-		reader: 'ergopti_plus/_shared/python/managed_ollama_daemon_authority.py',
+		reader: 'ergopti_plus/_shared/ai/adapters/python/managed_ollama_daemon_authority.py',
 		needles: [
 			'Path(__file__).with_name("managed_ollama_runtime.py")',
 			'Path(__file__).with_name("managed_source_alias.py")'
 		],
 		targets: [
-			'ergopti_plus/_shared/python/managed_ollama_runtime.py',
-			'ergopti_plus/_shared/python/managed_source_alias.py'
+			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py',
+			'ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py'
 		],
 		why: 'sealed source admission preserves the original session and strict alias policy'
 	},
 	{
 		reader: 'ergopti_plus/macos/platform/source_alias_owner.py',
-		needles: ['Path(__file__).resolve().parents[2] / "_shared/python/managed_source_alias.py"'],
-		targets: ['ergopti_plus/_shared/python/managed_source_alias.py'],
+		needles: [
+			'Path(__file__).resolve().parents[2] / "_shared/ai/adapters/python/managed_source_alias.py"'
+		],
+		targets: ['ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py'],
 		why: 'the native alias owner retains the canonical private namespace admission'
 	},
 	{
 		reader: 'ergopti_plus/macos/platform/network/native_ollama_api.py',
 		needles: [
 			'Path(__file__).with_name("native_http.py")',
-			'Path(__file__).resolve().parents[3] / "_shared/python/managed_source_alias.py"'
+			'Path(__file__).resolve().parents[3] / "_shared/ai/adapters/python/managed_source_alias.py"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/network/native_http.py',
-			'ergopti_plus/_shared/python/managed_source_alias.py'
+			'ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py'
 		],
 		why: 'authenticated loopback calls keep the actual native wire and alias contract'
 	},
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_native_python.lua',
 		needles: [
-			'require("core.llm.managed_python_locator")',
+			'require("core.lifecycle.engine.core.managed_python_locator")',
 			'require("adapters.native_python_probe")',
 			'require("adapters.timer_scheduler")',
 			'require("modules.llm.bootstrap_retry_generated")'
 		],
 		targets: [
-			'ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua',
+			'ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua',
 			'ergopti_plus/macos/adapters/native_python_probe.lua',
 			'ergopti_plus/macos/adapters/timer_scheduler.lua',
 			'ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'
@@ -385,9 +387,9 @@ const CURATED_READS = [
 		why: 'the exact native header probe preserves canonical original admission and retirement budgets'
 	},
 	{
-		reader: 'ergopti_plus/_shared/python/network_proxy_policy.py',
-		needles: ['Path(__file__).parent.parent / "modules/network/proxy_policy.json"'],
-		targets: ['ergopti_plus/_shared/modules/network/proxy_policy.json'],
+		reader: 'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
+		needles: ['Path(__file__).parent.parent / "core/network/data/proxy_policy.json"'],
+		targets: ['ergopti_plus/_shared/core/network/data/proxy_policy.json'],
 		why: 'Python routing consumes the same canonical proxy policy as the other clients'
 	}
 ];
@@ -395,7 +397,7 @@ const CURATED_READS = [
 // Paths that must never be staged, whatever the manifest says
 const FORBIDDEN = [
 	{ group: 'tests', test: (target) => /(^|\/)tests\//.test(target) },
-	{ group: 'tests', test: (target) => target.startsWith(`${SHARED_ROOT}/lua/test/`) },
+	{ group: 'tests', test: (target) => target.startsWith(`${SHARED_ROOT}/tests/lua/`) },
 	{ group: 'tests', test: (target) => /(^|\/)test_[^/]*\.py$/.test(target) },
 	{
 		group: 'documentation',
@@ -408,10 +410,10 @@ const FORBIDDEN = [
 		group: 'developer-tooling',
 		test: (target) =>
 			/(^|\/)(generate_models|validate_[^/]*)\.py$/.test(target) ||
-			target === `${SHARED_ROOT}/modules/features/behaviors.json` ||
+			target === `${SHARED_ROOT}/settings/data/features/behaviors.json` ||
 			target.startsWith(`${SHARED_ROOT}/modules/llm/install/`) ||
-			target.startsWith(`${SHARED_ROOT}/native/`) ||
-			target.startsWith(`${SHARED_ROOT}/go/`)
+			target.startsWith(`${SHARED_ROOT}/core/network/native/`) ||
+			target.startsWith(`${SHARED_ROOT}/core/network/native/go/`)
 	},
 	{
 		group: 'duplicate-copies',
@@ -563,7 +565,7 @@ function referencesOf(reader, text) {
 								touchdevice[1] ? `${touchdevice[1]}.so` : 'init.lua'
 							}`
 						]
-					: [SHARED_ROOT + '/lua', DRIVER_ROOT].flatMap((root) => {
+					: [SHARED_ROOT, DRIVER_ROOT].flatMap((root) => {
 							const stem = `${root}/${name.replace(/\./g, '/')}`;
 							return [`${stem}.lua`, `${stem}/init.lua`];
 						});
@@ -762,7 +764,7 @@ const OWNED_COPIES = new Set(['bundle_keyboard_layout', 'bundle_layout_registry'
 
 // This one absent repository file is generated only by its exact qualified
 // owner. An external entry inventories an output; it never supplies its bytes.
-const MANAGED_CATALOGUE_TARGET = 'ergopti_plus/_shared/modules/llm/managed_ollama_release.json';
+const MANAGED_CATALOGUE_TARGET = 'ergopti_plus/_shared/ai/data/managed_ollama_release.json';
 const MANAGED_CATALOGUE_OWNER = 'tools/build/stage-macos-managed-ollama-inputs.py';
 const MANAGED_CATALOGUE_RECIPE = [
 	'python3 "$REPO_ROOT/tools/build/stage-macos-managed-ollama-inputs.py" \\',
@@ -772,7 +774,7 @@ const MANAGED_CATALOGUE_RECIPE = [
 	'--go "${ERGOPTI_MANAGED_OLLAMA_GO:?absolute pinned Go is required}" \\',
 	'--release "${ERGOPTI_RELEASE:-false}" --release-tag "${ERGOPTI_RELEASE_TAG:-}" \\',
 	'--release-version "${ERGOPTI_RELEASE_VERSION:-}" --release-channel "$ERGOPTI_CHANNEL" \\',
-	'--output "$static_root/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"'
+	'--output "$static_root/ergopti_plus/_shared/ai/data/managed_ollama_release.json"'
 ];
 
 /** Bind the precise generated external to one actual source-qualified owner. */
@@ -906,7 +908,7 @@ const bypasses = [
 		'a duplicate copy at the static root',
 		BUILD.replace(
 			stageLine,
-			`${stageLine}\tcp -R "$REPO_ROOT/static/ergopti_plus/_shared/data/locales" "$static_root/"\n`
+			`${stageLine}\tcp -R "$REPO_ROOT/static/ergopti_plus/_shared/core/i18n/data/locales" "$static_root/"\n`
 		)
 	],
 	[
@@ -950,7 +952,7 @@ const managedOwnerMutants = [
 	[
 		'foreign output',
 		BUILD.replace(
-			'--output "$static_root/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"',
+			'--output "$static_root/ergopti_plus/_shared/ai/data/managed_ollama_release.json"',
 			'--output "$static_root/foreign_catalogue.json"'
 		)
 	],
@@ -991,7 +993,7 @@ for (const [label, externals] of [
 		'foreign catalogue target',
 		manifest.external.map((entry) =>
 			entry === managedExternal
-				? { ...entry, target: 'ergopti_plus/_shared/modules/llm/foreign_catalogue.json' }
+				? { ...entry, target: 'ergopti_plus/_shared/ai/data/foreign_catalogue.json' }
 				: entry
 		)
 	]
@@ -1151,10 +1153,10 @@ try {
 
 	// One removal per reference kind: the audit must name the missing file
 	const removals = [
-		['ergopti_plus/_shared/lua/json.lua', 'a required shared Lua module'],
+		['ergopti_plus/_shared/core/text/engine/json.lua', 'a required shared Lua module'],
 		['ergopti_plus/macos/modules/llm/network-retry.sh', 'a file a bootstrap script sources'],
 		['ergopti_plus/_shared/ui/host_bridge.js', 'a script a WebView page loads'],
-		['ergopti_plus/_shared/modules/hotstrings/defaults.toml', 'a shared data file'],
+		['ergopti_plus/_shared/hotstrings/data/catalogue/defaults.toml', 'a shared data file'],
 		['img/logo/logo_white.png', 'a curated image read'],
 		['ergopti_plus/macos/uv.lock', 'the committed MLX lock file'],
 		['ergopti_plus/_shared/ui/vendor/LICENSES.md', 'the vendored code license notice']
@@ -1176,14 +1178,14 @@ try {
 
 	// One injection per forbidden group: the audit must refuse it
 	const injections = [
-		`${SHARED_ROOT}/modules/features/behaviors.json`,
+		`${SHARED_ROOT}/settings/data/features/behaviors.json`,
 		`${DRIVER_ROOT}/tests/run.lua`,
 		`${SHARED_ROOT}/tests/corpus/x.json`,
-		`${SHARED_ROOT}/lua/test/format.lua`,
+		`${SHARED_ROOT}/tests/lua/format.lua`,
 		`${DRIVER_ROOT}/README.md`,
 		`${DRIVER_ROOT}/vendor/hs_asm/undocumented/touchdevice/watcher.so.dSYM/Contents/Info.plist`,
 		`${DRIVER_ROOT}/launcher/Package.swift`,
-		`${SHARED_ROOT}/modules/llm/validate_api_providers.py`,
+		`${SHARED_ROOT}/ai/data/validate_api_providers.py`,
 		'locales/fr.json',
 		'img/og_image.jpg',
 		`${DRIVER_ROOT}/paths.toml`

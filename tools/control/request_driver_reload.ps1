@@ -10,7 +10,7 @@ window message (the Diagnostics control endpoint). The driver hands the request
 to its own reload owner, which keeps the pause and the configuration hand-off.
 This script never starts a driver, never ends one and never retries: a reload
 that stays "requested" past the timeout has an unknown outcome. The declaration
-is static/ergopti_plus/_shared/modules/control/driver_control.json.
+is static/ergopti_plus/_shared/diagnostics/data/control/driver_control.json.
 
 Exit codes: 0 completed, 1 refused, 2 still requested at the timeout, 3 no
 reachable driver.

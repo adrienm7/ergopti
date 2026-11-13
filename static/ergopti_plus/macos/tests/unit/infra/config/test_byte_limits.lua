@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.byte_limits_contract").register(helpers, { driver = "macos", timings = require("infra.timings") })
+require("tests.lua.byte_limits_contract").register(helpers, { driver = "macos", timings = require("infra.timings") })

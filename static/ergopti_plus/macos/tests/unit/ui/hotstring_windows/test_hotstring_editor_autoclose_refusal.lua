@@ -39,7 +39,7 @@ local function load_editor(write)
 	_G.hs = hs_stub
 	package.loaded["adapters.file_system"] = { read_with_status = function() return "original", "ok" end }
 	package.loaded["infra.toml.writer"] = { write_if_unchanged = function() return write() end }
-	package.loaded["toml_codec.writer"] = nil
+	package.loaded["core.text.engine.toml_codec.writer"] = nil
 	package.loaded["infra.toml.reader"] = {
 		parse = function() return { sections = {}, sections_order = {} }, true end,
 	}

@@ -4,7 +4,7 @@
 --- MODULE: copy_selected_path opens what the selection names (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/shortcuts/open_target_vectors.json, which the
---- Linux and Windows suites replay too, through _shared/lua/open_target with
+--- Linux and Windows suites replay too, through _shared/shortcuts/engine with
 --- the corpus's POSIX environment, then drives copy_or_open_path's
 --- selection handler with recording URL, open(1), file and notice ports.
 ---
@@ -16,8 +16,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local OpenTarget = require("open_target")
+local json = require("core.text.engine.json")
+local OpenTarget = require("shortcuts.engine.open_target")
 
 local CORPUS = helpers.shared("tests/corpus/shortcuts/open_target_vectors.json")
 

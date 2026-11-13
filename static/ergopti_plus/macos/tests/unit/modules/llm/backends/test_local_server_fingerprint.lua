@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 package.loaded["tests.support.modules.llm.backends.local_openai_backends_fixture"] = nil
 local Fixture = require("tests.support.modules.llm.backends.local_openai_backends_fixture")
@@ -51,8 +51,8 @@ local function answer_all(world, answers)
 end
 
 helpers.describe("Local server fingerprint (local-server-fingerprint)", function()
-	require("test.local_server_fingerprint_contract").run(read("tests/corpus/llm/local_server_fingerprint.json"),
-		read("modules/llm/local_servers.json"), helpers)
+	require("tests.lua.core.local_server_fingerprint_contract").run(read("tests/corpus/llm/local_server_fingerprint.json"),
+		read("ai/data/local_servers.json"), helpers)
 end)
 
 helpers.describe("macOS local server rows at a shared address (local-server-fingerprint)", function()

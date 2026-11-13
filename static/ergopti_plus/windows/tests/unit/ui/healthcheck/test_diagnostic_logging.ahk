@@ -4,7 +4,7 @@
 ; MODULE: Boot diagnostics, runtime events and log privacy (Windows)
 ; DESCRIPTION:
 ; 1. The diagnostic snapshot is a cross-driver contract: the field list matches
-;    _shared/modules/logger/diagnostic_snapshot.json, every shared vector renders
+;    _shared/core/logger/data/diagnostic_snapshot.json, every shared vector renders
 ;    byte for byte, and the emitted line is one INFO line with every field.
 ; 2. Boot stages pair START with SUCCESS (or a WARNING abort), and the entry
 ;    point closes every stage it opens and logs the snapshot after "ready".
@@ -41,7 +41,7 @@ _TDL_RingText() {
 ; The shared snapshot contract.
 _TDL_Contract() {
 	global _SharedDir
-	return JsonParse(FileRead(_SharedDir . "\modules\logger\diagnostic_snapshot.json", "UTF-8"))
+	return JsonParse(FileRead(_SharedDir . "\core\logger\data\diagnostic_snapshot.json", "UTF-8"))
 }
 
 ; Reads the driver entry point as text.

@@ -35,7 +35,7 @@ if not ok_webkit then
 end
 local Gtk = lgi.require("Gtk", "3.0")
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local profile = assert(uv.fs_mkdtemp("/tmp/ergopti-typing-none-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	local directory = profile .. "/" .. name:lower()
@@ -43,7 +43,7 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", directory))
 end
 print("OWNED_PROFILE " .. profile)
-local J=require('json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
+local J=require('core.text.engine.json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
 -- Flushes are asynchronous owned SQLite batches; wait for their physical ACK.
 local Drain=require('tests.support.sqlite_flush_native')
 local root=assert(os.getenv('XDG_CONFIG_HOME')); assert(uv.fs_mkdir(root..'/ergopti',448))

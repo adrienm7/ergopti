@@ -266,7 +266,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 				if item.title == I18n.get("menu.layout.title") then layout = item.menu end
 			end
 			helpers.assert_type(layout, "table", "the tray has a keyboard-layout submenu")
-			local prefix = require("locale.label_value").compose(I18n.get, I18n.get("menu.layout.magic_key_source"), "")
+			local prefix = require("core.i18n.engine.label_value").compose(I18n.get, I18n.get("menu.layout.magic_key_source"), "")
 			local row
 			for _, item in ipairs(layout) do
 				if type(item.title) == "string" and item.title:sub(1, #prefix) == prefix then row = item end
@@ -427,7 +427,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 		local ok, err = pcall(function()
 			local Config = helpers.load_module(names[2])
 			Choices.with_file(Config, source, function(path)
-				local engine, attempts = require("hotstring_engine").new(), 0
+				local engine, attempts = require("hotstrings.engine.matcher").new(), 0
 				local load = engine.load_mappings
 				engine.load_mappings = function(self, mappings)
 					attempts = attempts + 1
@@ -493,7 +493,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 			with_replace(SOURCE, function(Config, path, state, row)
 				local item = row()
 				helpers.assert_type(item, "table")
-				local Writer, Modal = require("toml_codec.writer"), require("ui.modal")
+				local Writer, Modal = require("core.text.engine.toml_codec.writer"), require("ui.modal")
 				local previous_write, previous_modal = Writer.batch_write, Modal.run
 				local writes, notices = 0, 0
 				Writer.batch_write = function(...)
@@ -730,19 +730,19 @@ helpers.describe("magic key source: tap assignment admission", function()
 		with_source(nil, function(Source)
 			helpers.assert_nil(Source.tap_override_reason(41, "send_text"), "the automatic source owns no tap key")
 		end)
-		local en = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/en.json", "rb"))
+		local en = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local text = en:read("*a"); en:close()
 		helpers.assert_true(text:find('"' .. "menu.shortcuts.tap_keys.overrides_magic_key_source" .. '"', 1, true) ~= nil,
 			"the reason the menu shows is a declared locale key")
 	end)
 
 	helpers.it("(magic-key-tap-override) a press yielding to a tap action is logged once per yield", function()
-		local saved_logger = package.loaded["logger.shim"]
+		local saved_logger = package.loaded["core.logger.engine.shim"]
 		local warnings = {}
 		local recorder = setmetatable({ warn = function(_, message, ...)
 			warnings[#warnings + 1] = string.format(message, ...)
 		end }, { __index = function() return function() end end })
-		package.loaded["logger.shim"] = recorder
+		package.loaded["core.logger.engine.shim"] = recorder
 		local ok, err = pcall(with_source, '[hotstrings]\nmagic_key_source = "Backquote"\n', function(Source)
 			local state = { active = true, replace = true, typed_ok = true, blocked_code = 41 }
 			local calls = wire(Source, state)
@@ -758,7 +758,7 @@ helpers.describe("magic key source: tap assignment admission", function()
 			helpers.assert_eq(calls.typed, { "★" })
 			Source._reset_for_test()
 		end)
-		package.loaded["logger.shim"] = saved_logger
+		package.loaded["core.logger.engine.shim"] = saved_logger
 		if not ok then error(err, 0) end
 	end)
 end)

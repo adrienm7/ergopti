@@ -3,7 +3,7 @@
 # Each [layers.<layer>.<section>] table binds physical keys, named by their
 # W3C KeyboardEvent.code, while the layer is held. `all` applies on every
 # system; a `windows`, `macos` or `linux` entry replaces it on that system.
-# The values are the actions of _shared/keymap/layer_actions.toml.
+# The values are the actions of _shared/layouts/data/layer_actions.toml.
 
 [_meta]
 schema_version = 1

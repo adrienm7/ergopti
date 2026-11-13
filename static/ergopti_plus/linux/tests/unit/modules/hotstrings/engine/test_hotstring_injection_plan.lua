@@ -9,6 +9,6 @@
 local helpers = require("tests.helpers")
 
 local file = assert(io.open(require("infra.paths").shared("tests/corpus/hotstrings/injection_plan_vectors.json"), "rb"))
-local corpus = assert(require("json").decode_lossless(file:read("*a")))
+local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 file:close()
-require("test.hotstring_injection_plan_contract")(helpers, corpus, 18)
+require("tests.lua.hotstrings.injection_plan_contract")(helpers, corpus, 18)

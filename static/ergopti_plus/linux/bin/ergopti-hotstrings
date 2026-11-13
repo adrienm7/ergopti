@@ -121,7 +121,7 @@ DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
 # location on startup (ergopti_hotstrings.lua) — so the exported LUA_PATH was
 # never the entry that resolved a shared module, and a directory that does not
 # exist simply never matched.
-SHARED_LUA="${ERGOPTI_ROOT}/_shared/lua"
+SHARED_LUA="${ERGOPTI_ROOT}/_shared"
 
 if [ ! -d "${DRIVER_ROOT}" ]; then
 	ergopti_msg launcher.driver_missing "${DRIVER_ROOT}" >&2

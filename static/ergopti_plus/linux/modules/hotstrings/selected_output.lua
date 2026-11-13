@@ -7,7 +7,7 @@
 --- transactions. Cold range observations never hold modifier custody.
 --- ==============================================================================
 local M = {}
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local Layout = require("adapters.keyboard_layout")
 local Clipboard = require("adapters.clipboard")
 local Broker = require("adapters.modifier_broker")

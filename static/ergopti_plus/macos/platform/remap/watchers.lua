@@ -46,7 +46,7 @@ local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
 local CapsWordOutput = require("infra.capsword_output")
-local AutoOffPolicy  = require("caps_word.auto_off")
+local AutoOffPolicy  = require("keyboard.engine.caps_word_auto_off")
 -- Layout observation does not own keyboard-control resources. Acquire this
 -- dependency only when the CapsWord generation starts its gesture watcher.
 local ControlSentinels = nil

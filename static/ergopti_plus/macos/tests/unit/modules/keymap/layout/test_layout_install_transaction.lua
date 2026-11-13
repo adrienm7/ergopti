@@ -94,7 +94,7 @@ end
 
 helpers.describe("layout_install: transactional replacement", function()
 	helpers.it("keeps the old bundle when the staged bundle has no layouts (layout-empty-staging)", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = os.tmpname(); os.remove(root)
 		local target, source, launcher = root .. "/target", root .. "/source", root .. "/launcher"
 		local old, new = "Ergopti_v1.0.0.bundle", "Ergopti_v2.0.0.bundle"
@@ -227,7 +227,7 @@ helpers.describe("layout_install: transactional replacement", function()
 	end)
 
 	helpers.it("retains the backup when a concurrent bundle occupies rollback (layout-rollback-exclusive)", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = os.tmpname()
 		os.remove(root)
 		local target, source, launcher = root .. "/target", root .. "/source", root .. "/launcher"

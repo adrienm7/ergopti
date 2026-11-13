@@ -4,7 +4,7 @@
 --- MODULE: Layer-File Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/keymap_layers/vectors.json through the shared
---- Lua loader (_shared/lua/keymap/layers.lua) with the shared TOML codec, the
+--- Lua loader (_shared/layouts/engine/layers/layers.lua) with the shared TOML codec, the
 --- decoder the macOS driver reads its configuration with. The JS gate, the
 --- Linux suite and the AHK suite replay the same vectors, so the four
 --- implementations of the layer-file schema answer every file identically.
@@ -19,10 +19,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local json = require("json")
-local toml_codec = require("toml_codec")
-local Layers = require("keymap.layers")
+local AppDirs = require("core.fs.engine.app_dirs")
+local json = require("core.text.engine.json")
+local toml_codec = require("core.text.engine.toml_codec")
+local Layers = require("layouts.engine.layers.layers")
 
 -- Floor: a corpus that stopped being read would otherwise pass with nothing replayed.
 local MIN_VECTORS = 25
@@ -72,14 +72,14 @@ local function sorted_copy(list)
 	return out
 end
 
---- The text a vector hands the loader. _shared/lua/json.lua decodes a JSON null
+--- The text a vector hands the loader. _shared/core/text/engine/json.lua decodes a JSON null
 --- inside an object to its own sentinel table, not to nil, and the JS gate lets
 --- "toml" be only a string or null: anything else here is that null, the absent
 --- file, which load() takes as nil.
 --- @param v table One vector.
 --- @return string|nil text
 local function vector_text(v)
-	if v.file then return read_file(helpers.shared("keymap/" .. v.file)) end
+	if v.file then return read_file(helpers.shared("layouts/data/" .. v.file)) end
 	if type(v.toml) == "string" then return v.toml end
 	return nil
 end

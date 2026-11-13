@@ -61,8 +61,8 @@ helpers.describe("prediction engine — a settings change retires the request in
 	end)
 end)
 
-helpers.describe("llm.request_settings — the shared snapshot and its change", function()
-	local RequestSettings = require("llm.request_settings")
+helpers.describe("ai.engine.settings.request_settings — the shared snapshot and its change", function()
+	local RequestSettings = require("ai.engine.settings.request_settings")
 
 	helpers.it("names the first changed field in FIELDS order (settings-retire-inflight)", function()
 		local before = RequestSettings.snapshot({ backend = "api", entry = "a", model = "m", key = "k" })

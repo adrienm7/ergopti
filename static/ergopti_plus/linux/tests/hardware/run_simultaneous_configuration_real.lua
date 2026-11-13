@@ -54,7 +54,7 @@ local Scope = require("infra.key_combinations_scope")
 local Paths = require("infra.config_paths")
 local SharedPaths = require("infra.paths")
 local Files = require("adapters.file_system")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local Hotstrings = require("modules.hotstrings.engine")
 local Monotonic = require("infra.monotonic")
 
@@ -234,7 +234,7 @@ local function run()
 	Gestures.init({config_path=config_path,persist=true,enabled=false,is_paused=script.is_paused})
 	assert(Manager.init({keyboard_hook=Hook,execute_action=Gestures.execute_action,
 		action_names=Gestures.get_executable_action_names,on_text_injected=function() hotstrings:reset() end,
-		defaults_path=SharedPaths.shared("tap_hold/defaults.toml"),user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path)}), "original saved Manager startup")
+		defaults_path=SharedPaths.shared("tap_hold/data/defaults.toml"),user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path)}), "original saved Manager startup")
 	manager_initialized = true
 	Hook.start({intercept=true,requireOutputBroker=true,outputBroker=broker,onEmitRaw=Writer.emit})
 	assert(Hook.isRunning() and Layout.publish_current_capture(), "actual grabbed session and current inverse publication")

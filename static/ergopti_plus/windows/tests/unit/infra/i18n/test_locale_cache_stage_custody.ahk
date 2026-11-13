@@ -30,7 +30,7 @@ _ILSC_Case(Collision, StaleCache) {
 	Root := A_Temp . "\ergopti_locale_stage_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
 	Folders := []
 	; The locale folder under the shared root; the fixture makes each level of it.
-	LocalesRel := "\data\locales"
+	LocalesRel := "\core\i18n\data\locales"
 	Path := Root . LocalesRel . "\de.json"
 	Tsv := Root . LocalesRel . "\de.tsv", Stage := Tsv . ".tmp"
 	Foreign := "independent locale staging bytes é😀`n"

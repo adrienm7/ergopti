@@ -95,7 +95,7 @@ def main():
                             if limit is not None
                             else "false",
                             "ERGOPTI_NATIVE_UPDATER_CALLBACK": "true" if callback else "false",
-                            "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                            "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                         }
                     )
                     child = None

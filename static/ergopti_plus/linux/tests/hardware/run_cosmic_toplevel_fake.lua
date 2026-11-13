@@ -124,7 +124,7 @@ ffi.C.setenv("XDG_RUNTIME_DIR", runtime, 1)
 ffi.C.setenv("WAYLAND_DISPLAY", socket_name, 1)
 local parent = ffi.C.getpid()
 local argv_strings = { "luajit", "adapters/cosmic_toplevel_worker.lua", "libwayland-client.so.0", tostring(parent),
-	"../_shared/lua" }
+	"../_shared" }
 local argv = ffi.new("char *[?]", #argv_strings + 1)
 local anchor = {}
 for index, text in ipairs(argv_strings) do

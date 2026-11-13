@@ -25,7 +25,7 @@
 local M = {}
 
 local UpdateLauncher = require("adapters.update_launcher")
-local VersionOrder = require("updater.version")
+local VersionOrder = require("updater.engine.version_core")
 
 --- The tag of a feed-only list that Sparkle would install for a channel: the
 --- channel's newest tag, when the shared offer rule offers it.

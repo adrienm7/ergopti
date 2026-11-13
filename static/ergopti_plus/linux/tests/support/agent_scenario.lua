@@ -15,7 +15,7 @@ local M = {}
 
 local Fakes = require("tests.fakes")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 -- The key the user stored for Cerebras
@@ -141,7 +141,7 @@ function M.run(opts, body)
 					world.model_offers[#world.model_offers + 1] = { command = command }
 					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
 					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1",
-						opts.download_choice == true and nil or require("adapter_errors").COMMAND_EXITED_NONZERO,
+						opts.download_choice == true and nil or require("diagnostics.engine.adapter_errors").COMMAND_EXITED_NONZERO,
 						opts.download_choice == true and nil or 1
 				end,
 			}

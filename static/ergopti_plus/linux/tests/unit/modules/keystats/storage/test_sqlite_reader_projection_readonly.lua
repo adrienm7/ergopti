@@ -634,7 +634,7 @@ end)
 helpers.describe("linux-sqlite-null-boundary", function()
 
 	helpers.it("linux-sqlite-null-boundary: only the tagged null scalar is removed", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		with_stubbed_sqlite(function()
 			-- Controlled JSON shape checks are units, not native SQLite output.
 			return '[{"date":"2026-10-03","battery_min":[],"battery_max":{},"battery_sum":{"keep":null},"battery_count":0}]'
@@ -662,7 +662,7 @@ helpers.describe("linux-sqlite-null-boundary", function()
 	end)
 
 	helpers.it("linux-sqlite-null-boundary: optional manifest minutes stay absent without changing nested JSON text", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM agg_app_day_chars_class", 1, true) then
 				return '[{"date":"2026-10-03","app":"café","letter":3,"first_min":null,"last_min":null}]'
@@ -957,10 +957,10 @@ end)
 
 
 helpers.describe("linux-sqlite-catalogue", function()
-	-- The manifest SQL is the shared catalogue's (_shared/data/db/queries.sql) in
+	-- The manifest SQL is the shared catalogue's (_shared/metrics/data/db/queries.sql) in
 	-- the CLI dialect: the reader must issue exactly those renderings, each once,
 	-- so a statement retyped here cannot drift from macOS and Windows again.
-	local Queries = require("keystats.queries")
+	local Queries = require("metrics.engine.queries")
 	for _, case in ipairs({
 		{ label = "unfiltered", where = "", date_where = "" },
 		{ label = "filtered", first = "2026-10-01", last = "2026-10-02", apps = { "editor" },
@@ -992,7 +992,7 @@ helpers.describe("linux-sqlite-system-day", function()
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
 		local vectors = Json.decode(file:read("*a"))
 		file:close()
-		local keys = require("keystats.manifest_keys")
+		local keys = require("metrics.engine.view.manifest_keys")
 		for _, vector in ipairs(vectors) do
 			helpers.assert_eq(keys.encode(vector.label), vector.key)
 			helpers.assert_eq(keys.decode(vector.key), vector.label)
@@ -1061,7 +1061,7 @@ end)
 helpers.describe("linux-sqlite-ngram-catalogue", function()
 	-- The token reads are the catalogue's ngram.tokens in the CLI dialect, one
 	-- per family table, so macOS and Linux sum n-grams with one statement.
-	local Queries = require("keystats.queries")
+	local Queries = require("metrics.engine.queries")
 	helpers.it("linux-sqlite-ngram-catalogue: every family read is the catalogue rendering", function()
 		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
 			reader.read_ngrams("/db/metrics.sqlite", "2026-10-01", "2026-10-02", { "editor" })

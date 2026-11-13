@@ -15,7 +15,7 @@ helpers.describe("prediction Unicode boundaries", function()
 	for _, prefix in ipairs({ "...", "…", "• " }) do
 		helpers.it("still removes model padding " .. prefix .. " (unicode-padding)", function()
 			helpers.load_with_stubs("infra.logger")
-			local result = require("llm.parser").process_prediction("hello", "hello",
+			local result = require("ai.engine.api.parser_core").process_prediction("hello", "hello",
 				prefix .. "completion...", { min_words = 1, max_words = 0 })
 			helpers.assert_not_nil(result)
 			helpers.assert_eq(result.to_type, " completion")
@@ -24,7 +24,7 @@ helpers.describe("prediction Unicode boundaries", function()
 
 	helpers.it("accepts parsed Unicode through the real overlap and injection pipeline (unicode-padding)", function()
 		helpers.load_with_stubs("infra.logger")
-		local prediction = require("llm.parser").process_prediction("hello", "hello",
+		local prediction = require("ai.engine.api.parser_core").process_prediction("hello", "hello",
 			"TAIL_CORRECTED: hello\nNEXT_WORDS: € completion", { min_words = 1, max_words = 0 })
 		helpers.assert_not_nil(prediction)
 		local result = ApplyPrediction.run({ buffer = "hello", text = prediction.to_type,
@@ -47,7 +47,7 @@ helpers.describe("prediction Unicode boundaries", function()
 		for _, text in ipairs({ "— completion", "€ completion", "completion æ", "completion …!" }) do
 			helpers.it("preserves " .. format .. " boundary " .. text .. " (unicode-padding)", function()
 				helpers.load_with_stubs("infra.logger")
-				local parser = require("llm.parser")
+				local parser = require("ai.engine.api.parser_core")
 				local block = format == "advanced" and "TAIL_CORRECTED: hello\nNEXT_WORDS: " .. text or text
 				local result = parser.process_prediction("hello", "hello", block, { min_words = 1, max_words = 0 })
 				helpers.assert_not_nil(result, "valid model punctuation must not become invalid UTF-8 internally")
@@ -60,13 +60,13 @@ helpers.describe("prediction Unicode boundaries", function()
 
 	for _, marker in ipairs({ "—", "…", "€", "«" }) do
 		helpers.it("does not classify " .. marker .. " as leading whitespace (unicode-padding)", function()
-			local utils = helpers.load_with_stubs("keymap.utils")
+			local utils = helpers.load_with_stubs("layouts.engine.utils")
 			local deletes, text = utils.resolve_prediction_overlap("hello " .. marker, 0, marker .. "completion")
 			helpers.assert_eq(deletes, 1, "a complete nonspacing Unicode prefix must still participate in overlap")
 			helpers.assert_eq(text, marker .. "completion")
 		end)
 		helpers.it("trims spacing without slicing " .. marker .. " (unicode-padding)", function()
-			local utils = helpers.load_with_stubs("keymap.utils")
+			local utils = helpers.load_with_stubs("layouts.engine.utils")
 			for _, space in ipairs({ " ", "\u{00A0}", "\u{202F}" }) do
 				local deletes, text = utils.resolve_prediction_overlap("hello ", 0, space .. marker .. " completion")
 				helpers.assert_eq(deletes, 0)

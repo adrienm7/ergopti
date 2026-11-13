@@ -19,7 +19,7 @@
 ---    than the write it failed to report.
 --- ==============================================================================
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local M = {}
 
@@ -39,7 +39,7 @@ end
 --- Lists every registered scope, pending or not.
 --- @return table names Sorted scope names.
 function M.names()
-	return require("table_util").sorted_keys(probes)
+	return require("core.text.engine.table_util").sorted_keys(probes)
 end
 
 --- Lists the scopes whose write or rollback is still pending.

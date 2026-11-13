@@ -4,7 +4,7 @@
 --- MODULE: Hotstring Engine (Hammerspoon re-export)
 --- DESCRIPTION:
 --- Hammerspoon-local re-export of the shared hotstring matcher core. Delegates
---- entirely to _shared/lua/hotstring_engine and adds no HS-specific extensions.
+--- entirely to _shared/hotstrings/engine/matcher and adds no HS-specific extensions.
 ---
 --- WHY macOS TAKES ONLY PART OF IT:
 --- the core also carries a whole engine instance — its own rolling buffer, its
@@ -17,4 +17,4 @@
 --- the decision is not.
 --- ==============================================================================
 
-return require("hotstring_engine")
+return require("hotstrings.engine.matcher")

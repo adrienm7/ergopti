@@ -190,7 +190,7 @@ helpers.describe("gestures.actions: get_label", function()
 	-- « Enter ») in every locale; each key is now named in the user's language.
 	helpers.it("names shared modifier chords in the user's language", function()
 		local i18n = require("infra.i18n")
-		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 		local french = assert(require("adapters.json_codec").decode(assert(file:read("*a"))))
 		file:close()
 		local saved = i18n.get
@@ -610,7 +610,7 @@ helpers.describe("gestures.actions: published parameter binding identity", funct
 		with_actions(function(actions)
 			for _, binding in ipairs({ "keyboard__primary_k", "tap_key__a", "script__reload", "tap_hold__caps_lock", "combination__caps_lock_then_space" }) do
 				local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-				local published = require("config_keyboard_publication").current(owner) ~= nil
+				local published = require("settings.engine.publication.keyboard_publication").current(owner) ~= nil
 				if binding == "keyboard__primary_k" and published then
 					helpers.assert_eq(actions.action_parameter_binding_fits(binding), true, "the actual published Mac Cmd+K is current")
 				else
@@ -737,15 +737,15 @@ end)
 local binding_vectors_path = helpers.shared("tests/corpus/config_binding_identity/vectors.json")
 local binding_vectors_file = assert(io.open(binding_vectors_path, "rb"))
 local binding_vectors_source = assert(binding_vectors_file:read("*a")); assert(binding_vectors_file:close())
-require("test.config_binding_identity_contract").register(helpers, assert(require("json").decode(binding_vectors_source)))
+require("tests.lua.settings.binding_identity_contract").register(helpers, assert(require("core.text.engine.json").decode(binding_vectors_source)))
 
 
-require("test.script_binding_publication_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.settings.script_binding_publication_contract").register(require("tests.helpers"), "macos")
 
-require("test.tap_binding_publication_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.keyboard.tap_binding_publication_contract").register(require("tests.helpers"), "macos")
 
-require("test.binding_publication_authority_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.binding_publication_authority_contract").register(require("tests.helpers"), "macos")
 
-require("test.keyboard_binding_publication_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.layouts.keyboard_binding_publication_contract").register(require("tests.helpers"), "macos")
 
-require("test.script_binding_publication_contract").register_late(require("tests.helpers"), "macos")
+require("tests.lua.settings.script_binding_publication_contract").register_late(require("tests.helpers"), "macos")

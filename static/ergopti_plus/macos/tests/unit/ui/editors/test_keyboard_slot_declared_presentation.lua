@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local corpus = assert(Json.decode(assert(helpers.read_fixture("keyboard_slot_selection_original_presentation.json"))))
 
 local function fixture(callback, cleanup_failures)
@@ -17,13 +17,13 @@ local function fixture(callback, cleanup_failures)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "infra.i18n", "infra.locale", "locale.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
-			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "webview.i18n_seed",
-			"window_titles", "webview.presentation", "program_provider_picker",
+			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
+			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
 			"adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
-			"_generated.locale_table", "_generated.logger_sub_files", "adapters.log_transport", "app_dirs",
-			"diagnostics.redact", "infra.launcher_environment", "infra.log_folders", "logger", "menu.labels",
+			"_generated.locale_table", "_generated.logger_sub_files", "adapters.log_transport", "core.fs.engine.app_dirs",
+			"diagnostics.engine.reports.redact", "infra.launcher_environment", "infra.log_folders", "core.logger.engine", "menu.engine.labels",
 		}, function()
 			local state = { creates = 0, bridges = 0, views = {}, contents = {}, payloads = {}, confirmations = 0 }
 			state.cleanup_failures = cleanup_failures
@@ -99,7 +99,7 @@ local function fixture(callback, cleanup_failures)
 				package.loaded["infra.i18n"] = nil
 				local i18n = require("infra.i18n")
 				local locale = require("infra.locale")
-				local core = require("locale.core")
+				local core = require("core.i18n.engine.core")
 				local original_core_get = core.get
 				core.get = function(key)
 					if state.translate_hook then state.translate_hook(key) end
@@ -112,7 +112,7 @@ local function fixture(callback, cleanup_failures)
 				package.loaded["ui.action_picker"] = nil
 				local picker = require("ui.action_picker")
 				close_owned_picker = picker.close
-				local titles = require("window_titles")
+				local titles = require("core.ui.engine.window_titles")
 				local function open(opts)
 					return picker.open(opts or { presentation_id = "keyboard_slot_selection", items = {} }, function()
 						state.confirmations = state.confirmations + 1
@@ -359,7 +359,7 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 			helpers.assert_eq(i18n.get_locale(), "de")
 			helpers.assert_eq(locale.current_locale(), "de")
 			helpers.assert_eq(core.current_locale(), "de")
-			for name, owner in pairs({ ["infra.i18n"] = i18n, ["infra.locale"] = locale, ["locale.core"] = core }) do
+			for name, owner in pairs({ ["infra.i18n"] = i18n, ["infra.locale"] = locale, ["core.i18n.engine.core"] = core }) do
 				helpers.assert_true(rawequal(package.loaded[name], owner), "initialization must retain " .. name)
 			end
 			helpers.assert_eq(i18n.get, translate_owner)

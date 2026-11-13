@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Every driver logs one boot "Diagnostic snapshot (...)" line whose field names,
  * order and rendering rules come from
- * _shared/modules/logger/diagnostic_snapshot.json. Each driver suite replays the
+ * _shared/core/logger/data/diagnostic_snapshot.json. Each driver suite replays the
  * shared vectors through its own formatter; this guard pins what those suites
  * cannot see from inside one driver:
  *
@@ -34,7 +34,7 @@ function read(rel) {
 }
 
 const errors = [];
-const contract = JSON.parse(read('_shared/modules/logger/diagnostic_snapshot.json'));
+const contract = JSON.parse(read('_shared/core/logger/data/diagnostic_snapshot.json'));
 const fields = contract.fields;
 
 // 1. Contract coherence ------------------------------------------------------
@@ -75,9 +75,9 @@ function compareList(label, list) {
 		);
 	}
 }
-const luaSnapshot = read('_shared/lua/diagnostics/snapshot.lua');
+const luaSnapshot = read('_shared/diagnostics/engine/snapshot.lua');
 const luaBlock = luaSnapshot.match(/M\.FIELDS\s*=\s*\{([\s\S]*?)\}/);
-if (!luaBlock) errors.push('_shared/lua/diagnostics/snapshot.lua no longer declares M.FIELDS');
+if (!luaBlock) errors.push('_shared/diagnostics/engine/snapshot.lua no longer declares M.FIELDS');
 else
 	compareList(
 		'Lua',

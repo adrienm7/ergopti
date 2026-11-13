@@ -40,12 +40,12 @@ _WCR_WithCategory(Body) {
 	Category := _WCR_Category()
 	SavedShared := _SharedDir
 	Root := A_Temp . "\" . Category
-	DirCreate(Root . "\modules\hotstrings")
-	File := Root . "\modules\hotstrings\" . Category . ".toml"
+	DirCreate(Root . "\hotstrings\data\catalogue")
+	File := Root . "\hotstrings\data\catalogue\" . Category . ".toml"
 	; The path owner reads the language packs here, and the logger its redaction rules.
-	DirCreate(Root . "\modules\diagnostics")
-	FileCopy(SavedShared . "\modules\hotstrings\_index.toml", Root . "\modules\hotstrings\_index.toml")
-	FileCopy(SavedShared . "\modules\diagnostics\redaction.json", Root . "\modules\diagnostics\redaction.json")
+	DirCreate(Root . "\diagnostics\data")
+	FileCopy(SavedShared . "\hotstrings\data\catalogue\_index.toml", Root . "\hotstrings\data\catalogue\_index.toml")
+	FileCopy(SavedShared . "\diagnostics\data\redaction.json", Root . "\diagnostics\data\redaction.json")
 	try {
 		_SharedDir := Root
 		Body.Call(Category, File)

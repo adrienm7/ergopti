@@ -225,9 +225,9 @@ return function(run, dependencies)
 			}
 			-- Controlled source port for the shared copy planner. The original save
 			-- callback and its failure/counter contract remain the publication port.
-			local CopyCodec = require("toml_codec")
-			local CopyWriter = require("toml_codec.writer")
-			local CopyPolicy = require("tap_hold.key_combinations")
+			local CopyCodec = require("core.text.engine.toml_codec")
+			local CopyWriter = require("core.text.engine.toml_codec.writer")
+			local CopyPolicy = require("tap_hold.engine.key_combinations")
 			local copy_config = package.loaded["platform.remap.config"]
 			local original_save = copy_config.save_user_config
 			calls.copy_source = ""

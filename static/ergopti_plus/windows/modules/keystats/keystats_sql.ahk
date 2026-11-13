@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Type-specific INSERT statement builders for every keystats event kind. Mirrors the macOS sqlite_writer module.
 ; A statement the three drivers share is rendered from the catalogue
-; (_shared/data/db/queries.sql) by name; the others are Windows spellings.
+; (_shared/metrics/data/db/queries.sql) by name; the others are Windows spellings.
 ;
 ; Extracted from keystats.ahk (audit F1) and #Include'd in place by it. Pure
 ; definitions only - AHK resolves these symbols across the whole compilation

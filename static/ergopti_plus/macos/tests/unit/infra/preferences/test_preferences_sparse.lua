@@ -1,7 +1,7 @@
 --- tests/unit/infra/preferences/test_preferences_sparse.lua
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
+local codec = require("core.text.engine.toml_codec")
 
 helpers.describe("sparse preference transactions", function()
 	helpers.it("saves a real neutral module snapshot without adding enabled overrides", function()

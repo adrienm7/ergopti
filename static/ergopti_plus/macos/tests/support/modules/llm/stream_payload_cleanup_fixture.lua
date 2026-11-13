@@ -10,13 +10,13 @@ local OWNED = {
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
 	"adapters.shell_runner", "adapters.timer_scheduler", "adapters.http_client", "adapters.file_system",
 	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
-	"llm.prompt_builder", "llm.rewrite", "modules.keystats",
-	"adapters.json_codec", "adapters.storage", "compat.utf8", "infra.toml.reader", "json",
-	"llm.parser", "logger", "logger.shim", "text_utils", "toml_codec.basic_string",
-	"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
-	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "app_dirs", "config_defaults",
-	"core.llm.managed_ollama_daemon_receipt", "core.llm.ollama_runtime_choice", "hotstrings.personal_files",
-	"infra.manifest_reader", "llm.local_model_policy", "llm.profile_selector", "modules.llm.network_env",
+	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
+	"adapters.json_codec", "adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
+	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
+	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
+	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
+	"infra.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
 	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
 	"modules.llm.profiles", "modules.llm.progressive_reveal", "platform.remap.lease_helper",
 }
@@ -33,9 +33,9 @@ function M.with_stream(backend, callback)
 		logger.error = function(_, message, ...) h.errors[#h.errors + 1] = string.format(message, ...) end
 		package.loaded["infra.logger"] = logger
 		package.loaded["modules.keystats"] = {}
-		local defaults_file = assert(io.open(helpers.shared("modules/llm/defaults.json"), "rb"))
+		local defaults_file = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))
 		local defaults_raw = assert(defaults_file:read("*a")); assert(defaults_file:close())
-		local defaults = assert(require("json").decode(defaults_raw))
+		local defaults = assert(require("core.text.engine.json").decode(defaults_raw))
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults }
 		local scheduler = { now = function() return 0 end }
 		function scheduler.after(delay, callback_fn)

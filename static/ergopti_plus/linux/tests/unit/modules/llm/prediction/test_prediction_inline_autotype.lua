@@ -49,7 +49,7 @@ local function offering(count, apply_ok, inline)
 	local Trigger = require("modules.llm.trigger_settings")
 	state.previous_get = Trigger.get
 	Trigger.get = function(name, ...)
-		if name == require("config_keys").LEAF.INLINE_AUTOTYPE then return inline == true end
+		if name == require("settings.engine.keys").LEAF.INLINE_AUTOTYPE then return inline == true end
 		return state.previous_get(name, ...)
 	end
 	local engine = helpers.load_module("modules.llm.prediction_engine")

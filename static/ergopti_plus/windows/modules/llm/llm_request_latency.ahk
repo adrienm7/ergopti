@@ -8,7 +8,7 @@
 ; remote), its provider, its model family, its outcome and its duration, read
 ; by tools/dev/field-log-analyse.py and judged against the [budgets]
 ; llm_local_request_ms and llm_remote_request_ms of
-; _shared/modules/timings/constants.toml.
+; _shared/core/timing/data/constants.toml.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Never content: no prompt, context or answer reaches the line, and every

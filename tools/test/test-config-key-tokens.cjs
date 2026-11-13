@@ -56,9 +56,9 @@ assert.deepEqual(
 // 2. A module alias reads the same; a bare table alias stays identifiers, because gates
 //    already pin that spelling as it is.
 assert.deepEqual(
-	shape('local CK = require("config_keys")\nx = Manifest.default_for(CK.KEY.LLM_ENABLED)').slice(
-		-literal.length
-	),
+	shape(
+		'local CK = require("settings.engine.keys")\nx = Manifest.default_for(CK.KEY.LLM_ENABLED)'
+	).slice(-literal.length),
 	literal
 );
 assert.ok(
@@ -66,18 +66,18 @@ assert.ok(
 	'a table alias is not rewritten'
 );
 assert.ok(
-	shape('local COMMAND = require("config_keys").COMMAND\nx = f[COMMAND.SCOPE_RESTORE]').includes(
-		'i:COMMAND'
-	)
+	shape(
+		'local COMMAND = require("settings.engine.keys").COMMAND\nx = f[COMMAND.SCOPE_RESTORE]'
+	).includes('i:COMMAND')
 );
 
 // 2b. A direct require of the module reads the same, for files with no local to spare.
 assert.deepEqual(
-	shape('x = Manifest.default_for(require("config_keys").KEY.LLM_ENABLED)'),
+	shape('x = Manifest.default_for(require("settings.engine.keys").KEY.LLM_ENABLED)'),
 	literal
 );
 assert.ok(
-	shape('x = f(require("config_keys").KEY.LLM_ENABLE)').includes('i:LLM_ENABLE'),
+	shape('x = f(require("settings.engine.keys").KEY.LLM_ENABLE)').includes('i:LLM_ENABLE'),
 	'a wrong name through a direct require is refused'
 );
 
@@ -130,7 +130,7 @@ assert.equal(
 		'utf8'
 	);
 	assert.ok(
-		/(ConfigKeys|require\("config_keys"\))\.(KEY|LEAF|COMMAND)\./.test(raw),
+		/(ConfigKeys|require\("settings.engine.keys"\))\.(KEY|LEAF|COMMAND)\./.test(raw),
 		'the probe file names constants'
 	);
 	require('../lib/config-key-source-view.cjs').install();
@@ -139,7 +139,7 @@ assert.equal(
 		'utf8'
 	);
 	assert.ok(
-		!/(ConfigKeys|require\("config_keys"\))\.(KEY|LEAF|COMMAND)\./.test(viewed),
+		!/(ConfigKeys|require\("settings.engine.keys"\))\.(KEY|LEAF|COMMAND)\./.test(viewed),
 		'the view resolves them'
 	);
 	const json = fs.readFileSync(path.join(root, 'package.json'), 'utf8');

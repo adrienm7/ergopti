@@ -39,7 +39,7 @@ local M = {}
 local Logger       = require("infra.logger")
 local Timer        = require("adapters.timer_scheduler")
 local EventClock   = require("adapters.event_clock")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "key_event_health"
 

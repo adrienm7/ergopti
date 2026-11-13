@@ -4,8 +4,8 @@
 
 -- Owned public live synthetic-source projection; real SQLite/software input.
 local uv = require("luv")
-require("compat.utf8").install()
-local Json = require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local owned = assert(uv.fs_mkdtemp("/tmp/ergopti-live-extra-source-XXXXXX"))
 for _, name in ipairs({"CONFIG", "DATA", "CACHE", "STATE"}) do
  assert(uv.os_setenv("XDG_" .. name .. "_HOME", owned .. "/" .. name:lower()))

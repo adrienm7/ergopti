@@ -338,7 +338,7 @@ end)
 --- Parses `CHECK (<col> IN ('a','b'))` constraints out of the canonical schema.
 --- @return table Map of table name -> { column -> { allowed value -> true } }.
 local function parse_check_constraints()
-	local fh = io.open(helpers.shared("data/db/schema.sql"), "r")
+	local fh = io.open(helpers.shared("metrics/data/db/schema.sql"), "r")
 	helpers.assert_true(fh ~= nil, "schema.sql must be readable")
 	local schema = fh:read("*a"); fh:close()
 

@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 
 local Signature = helpers.load_module("infra.asset_signature")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_vectors()
 	local path = helpers.driver_root() .. "/../_shared/tests/corpus/updater/asset_signature_vectors.json"
@@ -61,7 +61,7 @@ helpers.describe("update asset signature (Linux)", function()
 	end)
 
 	helpers.it("(linux-asset-signature) a public key with trailing DER bytes is refused", function()
-		local Base64 = require("compat.base64")
+		local Base64 = require("core.lifecycle.engine.compat.base64")
 		local extended = Base64.encode(assert(Base64.decode(V.public_key_spki_base64)) .. "junk")
 		local ok, reason = Signature.verify(extended, valid_record(), V.valid.signature_base64)
 		helpers.assert_true(not ok, "a valid key prefix cannot authorize a malformed complete key")

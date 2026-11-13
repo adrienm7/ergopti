@@ -28,7 +28,7 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
 local WebviewResult = require("adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
 local OwnWindow = require("adapters.own_window")
@@ -36,7 +36,7 @@ local OwnWindow = require("adapters.own_window")
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
-local Json       = require("json")
+local Json       = require("core.text.engine.json")
 local FileSystem = require("adapters.file_system")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")

@@ -13,13 +13,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Admission = require("modules.llm.opaque_network_admission")
 
 --- The shared policy list, read independently of the module under test.
 --- @return table stages
 local function policy_stages()
-	local file = assert(io.open("../_shared/modules/network/proxy_policy.json", "rb"))
+	local file = assert(io.open("../_shared/core/network/data/proxy_policy.json", "rb"))
 	local policy = Json.decode(file:read("*a"))
 	file:close()
 	return policy.pac_unavailable_fallback.stages

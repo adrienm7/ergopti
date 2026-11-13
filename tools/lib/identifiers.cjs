@@ -5,7 +5,7 @@
  * MODULE: Tooling Identifiers
  * DESCRIPTION:
  * The application names, bundle ids, service labels and external hosts of
- * _shared/data/identifiers.json, for the Node build, CI and developer tools.
+ * _shared/core/text/data/identifiers.json, for the Node build, CI and developer tools.
  * Reading the declaration through one module keeps those tools from spelling
  * the values again (tools/test/test-repo-url-single-source.cjs holds them to a
  * shrinking baseline of typed copies).
@@ -22,7 +22,7 @@
 const fs = require('fs');
 const { shared } = require('./paths.cjs');
 
-const SOURCE = shared('data', 'identifiers.json');
+const SOURCE = shared('core', 'text', 'data', 'identifiers.json');
 const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts'];
 
 const identifiers = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));

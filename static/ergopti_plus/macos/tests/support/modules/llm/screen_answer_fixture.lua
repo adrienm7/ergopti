@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local TEXT_ENTRY_ID = "vision-cerebras"
 local TEXT_MODEL = "qwen-3.8-27b"
 local VISION_ENTRY_ID = "vision-openai"

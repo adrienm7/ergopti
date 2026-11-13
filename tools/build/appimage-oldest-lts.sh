@@ -37,9 +37,9 @@ set -euo pipefail
 OLDEST_LTS_IMAGE="ubuntu:22.04"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
-# The external hosts are declared once in _shared/data/identifiers.json.
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# The external hosts are declared once in _shared/core/text/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 BUILD_ROOT="$PROJECT_ROOT/build/linux"
 SELF="tools/build/appimage-oldest-lts.sh"
 SMOKE_USER="catalogue"
@@ -63,7 +63,7 @@ build_owned_luaposix() {
 	{ read -r url; read -r commit; } < <(python3 -c '
 import json, sys
 source = json.load(open(sys.argv[1]))["network_runtime"]["portable"]["flatpak_sources"]["luaposix"]
-print(source["url"]); print(source["commit"])' static/ergopti_plus/_shared/data/linux_native_runtime.json)
+print(source["url"]); print(source["commit"])' static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json)
 	work="$(mktemp -d)"
 	git -c advice.detachedHead=false clone -q "$url" "$work/luaposix"
 	git -C "$work/luaposix" -c advice.detachedHead=false checkout -q "$commit"

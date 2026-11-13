@@ -5,7 +5,7 @@
  * MODULE: Layout Registry Location Single Source
  * DESCRIPTION:
  * Pins where every driver downloads keyboard layouts from to one file,
- * _shared/modules/layouts/defaults.json, and that file to the real repository
+ * _shared/layouts/data/defaults.json, and that file to the real repository
  * folder the index is committed in.
  *
  * WHY:
@@ -32,8 +32,8 @@ const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const DEFAULTS_PATH = path.join(SP, '_shared', 'modules', 'layouts', 'defaults.json');
-const UPDATER_DEFAULTS_PATH = path.join(SP, '_shared', 'modules', 'updater', 'defaults.json');
+const DEFAULTS_PATH = path.join(SP, '_shared', 'layouts', 'data', 'defaults.json');
+const UPDATER_DEFAULTS_PATH = path.join(SP, '_shared', 'updater', 'data', 'defaults.json');
 
 let failures = 0;
 
@@ -147,7 +147,7 @@ check('no driver source spells the registry host or folder', () => {
 		...driverSources(path.join(SP, 'windows'), ['.ahk']),
 		...driverSources(path.join(SP, 'macos'), ['.lua']),
 		...driverSources(path.join(SP, 'linux'), ['.lua']),
-		...driverSources(path.join(SP, '_shared', 'lua'), ['.lua'])
+		...driverSources(path.join(SP, '_shared'), ['.lua'])
 	];
 	assert.ok(files.length > 300, `scanned only ${files.length} driver files`);
 	const offenders = [];
@@ -167,7 +167,8 @@ function usesRegistrySettings(source) {
 		if (tokens[at].kind !== 'identifier' || tokens[at].value !== 'require') continue;
 		const parenthesized = tokens[at + 1]?.value === '(';
 		const argument = tokens[at + (parenthesized ? 2 : 1)];
-		if (argument?.kind !== 'string' || argument.value !== 'layouts.registry') continue;
+		if (argument?.kind !== 'string' || argument.value !== 'layouts.engine.registry.registry_core')
+			continue;
 		// Only the exact direct parenthesized metadata call is exempt; Lua import sugar stays a client.
 		if (!parenthesized || tokens[at + 3]?.value !== ')') return true;
 		const metadataOnly =
@@ -181,34 +182,41 @@ function usesRegistrySettings(source) {
 
 check('registry metadata lookup does not become a URL settings client', () => {
 	for (const source of [
-		'local Registry = require("layouts.registry")',
-		"local Registry = require 'layouts.registry'",
-		'local Registry = require [[layouts.registry]]',
-		'return require("layouts.registry").unknown(index)',
-		'return (require("layouts.registry")).find_entry(index, id)',
-		'local find = require("layouts.registry").find_entry; return find(index, id)',
-		'local entry = require("layouts.registry").find_entry(index, id); return require("layouts.registry").unknown(entry)',
-		'return require("layouts.registry", extra).find_entry(index, id)',
-		"return require 'layouts.registry'",
-		'return require [[layouts.registry]]',
-		'return require("layouts.registry").resolve(layouts, updater)',
-		'return require("layouts.registry").url(settings, file)',
-		'return require("layouts.registry").find_entry',
-		'local entry = require("layouts.registry").find_entry(index, id); local Registry = require("layouts.registry")'
+		'local Registry = require("layouts.engine.registry.registry_core")',
+		"local Registry = require 'layouts.engine.registry.registry_core'",
+		'local Registry = require [[layouts.engine.registry.registry_core]]',
+		'return require("layouts.engine.registry.registry_core").unknown(index)',
+		'return (require("layouts.engine.registry.registry_core")).find_entry(index, id)',
+		'local find = require("layouts.engine.registry.registry_core").find_entry; return find(index, id)',
+		'local entry = require("layouts.engine.registry.registry_core").find_entry(index, id); return require("layouts.engine.registry.registry_core").unknown(entry)',
+		'return require("layouts.engine.registry.registry_core", extra).find_entry(index, id)',
+		"return require 'layouts.engine.registry.registry_core'",
+		'return require [[layouts.engine.registry.registry_core]]',
+		'return require("layouts.engine.registry.registry_core").resolve(layouts, updater)',
+		'return require("layouts.engine.registry.registry_core").url(settings, file)',
+		'return require("layouts.engine.registry.registry_core").find_entry',
+		'local entry = require("layouts.engine.registry.registry_core").find_entry(index, id); local Registry = require("layouts.engine.registry.registry_core")'
 	])
 		assert.equal(usesRegistrySettings(source), true, source);
 	for (const source of [
-		'return require("layouts.registry").find_entry(index, id)',
-		"return require ( 'layouts.registry' ) . find_entry ( index, id )",
-		'-- require("layouts.registry")\nreturn entry',
-		'return [[require("layouts.registry")]]'
+		'return require("layouts.engine.registry.registry_core").find_entry(index, id)',
+		"return require ( 'layouts.engine.registry.registry_core' ) . find_entry ( index, id )",
+		'-- require("layouts.engine.registry.registry_core")\nreturn entry',
+		'return [[require("layouts.engine.registry.registry_core")]]'
 	])
 		assert.equal(usesRegistrySettings(source), false, source);
 });
 
 // The Lua drivers share one registry client, which receives the decoded
 // defaults; each driver settings constructor reads the two files itself.
-const SHARED_LUA_CLIENT = path.join(SP, '_shared', 'lua', 'layouts', 'registry.lua');
+const SHARED_LUA_CLIENT = path.join(
+	SP,
+	'_shared',
+	'layouts',
+	'engine',
+	'registry',
+	'registry_core.lua'
+);
 
 /** Finds settings constructors through their real module binding, not pure lookups. */
 function constructsLuaRegistrySettings(source) {
@@ -246,7 +254,7 @@ function constructsLuaRegistrySettings(source) {
 			tokens[at].value !== 'require' ||
 			tokens[at + 1]?.value !== '(' ||
 			tokens[at + 2]?.kind !== 'string' ||
-			tokens[at + 2].value !== 'layouts.registry' ||
+			tokens[at + 2].value !== 'layouts.engine.registry.registry_core' ||
 			tokens[at + 3]?.value !== ')'
 		)
 			continue;
@@ -274,57 +282,65 @@ function constructsLuaRegistrySettings(source) {
 /** A settings constructor must retain both independent shared configuration inputs. */
 function assertRegistryDefaults(source, label) {
 	assert.ok(
-		source.includes('modules/layouts/defaults.json'),
+		source.includes('layouts/data/defaults.json'),
 		`${label} does not read the layouts defaults`
 	);
 	assert.ok(
-		source.includes('modules/updater/defaults.json'),
+		source.includes('updater/data/defaults.json'),
 		`${label} does not read owner/repo from the updater defaults`
 	);
 }
 
 check('registry configuration ownership excludes pure lookup and decorative references', () => {
 	assert.strictEqual(
-		constructsLuaRegistrySettings('return require("layouts.registry").find_entry(index, id)'),
-		false
-	);
-	assert.strictEqual(
-		constructsLuaRegistrySettings('return require("layouts.registry")["find_entry"](index, id)'),
-		false
-	);
-	assert.strictEqual(
 		constructsLuaRegistrySettings(
-			'local R = require("layouts.registry")\nreturn R.find_entry(index, id)'
+			'return require("layouts.engine.registry.registry_core").find_entry(index, id)'
 		),
 		false
 	);
 	assert.strictEqual(
 		constructsLuaRegistrySettings(
-			'-- local R = require("layouts.registry")\nreturn Other.resolve(settings)'
+			'return require("layouts.engine.registry.registry_core")["find_entry"](index, id)'
 		),
 		false
 	);
 	assert.strictEqual(
-		constructsLuaRegistrySettings('local text = [[require("layouts.registry").resolve(settings)]]'),
+		constructsLuaRegistrySettings(
+			'local R = require("layouts.engine.registry.registry_core")\nreturn R.find_entry(index, id)'
+		),
 		false
 	);
 	assert.strictEqual(
 		constructsLuaRegistrySettings(
-			'local R = require("layouts.registry")\nreturn R.resolve(layouts, updater)'
+			'-- local R = require("layouts.engine.registry.registry_core")\nreturn Other.resolve(settings)'
+		),
+		false
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings(
+			'local text = [[require("layouts.engine.registry.registry_core").resolve(settings)]]'
+		),
+		false
+	);
+	assert.strictEqual(
+		constructsLuaRegistrySettings(
+			'local R = require("layouts.engine.registry.registry_core")\nreturn R.resolve(layouts, updater)'
 		),
 		true
 	);
 	assert.strictEqual(
-		constructsLuaRegistrySettings('return require("layouts.registry").resolve(layouts, updater)'),
+		constructsLuaRegistrySettings(
+			'return require("layouts.engine.registry.registry_core").resolve(layouts, updater)'
+		),
 		true
 	);
 	for (const source of [
-		'local R = require("layouts.registry")\nreturn R["resolve"](layouts, updater)',
-		'return (require("layouts.registry"))["resolve"](layouts, updater)',
-		'local R = (require("layouts.registry"))\nreturn R.resolve(layouts, updater)',
-		'return (require("layouts.registry")).resolve(layouts, updater)',
-		'local R = ((require("layouts.registry")))\nlocal Other = (R)\nreturn (Other).resolve(layouts, updater)',
-		'local R = require("layouts.registry")\nlocal Other = R\nreturn Other.resolve(layouts, updater)'
+		'local R = require("layouts.engine.registry.registry_core")\nreturn R["resolve"](layouts, updater)',
+		'return (require("layouts.engine.registry.registry_core"))["resolve"](layouts, updater)',
+		'local R = (require("layouts.engine.registry.registry_core"))\nreturn R.resolve(layouts, updater)',
+		'return (require("layouts.engine.registry.registry_core")).resolve(layouts, updater)',
+		'local R = ((require("layouts.engine.registry.registry_core")))\nlocal Other = (R)\nreturn (Other).resolve(layouts, updater)',
+		'local R = require("layouts.engine.registry.registry_core")\nlocal Other = R\nreturn Other.resolve(layouts, updater)'
 	])
 		assert.strictEqual(constructsLuaRegistrySettings(source), true, source);
 });
@@ -333,7 +349,7 @@ check('the actual settings owner refuses withdrawal of either shared defaults in
 	const source = fs.readFileSync(path.join(SP, 'macos/modules/keymap/layout_registry.lua'), 'utf8');
 	assert.strictEqual(constructsLuaRegistrySettings(source), true);
 	assertRegistryDefaults(source, 'actual macOS owner');
-	for (const input of ['modules/layouts/defaults.json', 'modules/updater/defaults.json']) {
+	for (const input of ['layouts/data/defaults.json', 'updater/data/defaults.json']) {
 		const mutant = source.replaceAll(input, 'withdrawn/defaults.json');
 		assert.notStrictEqual(mutant, source, `Withdraw the actual ${input} read`);
 		assert.strictEqual(constructsLuaRegistrySettings(mutant), true);
@@ -351,7 +367,7 @@ check(
 			macos: driverSources(path.join(SP, 'macos'), ['.lua']),
 			linux: driverSources(path.join(SP, 'linux'), ['.lua'])
 		};
-		const shared = driverSources(path.join(SP, '_shared', 'lua'), ['.lua']);
+		const shared = driverSources(path.join(SP, '_shared'), ['.lua']);
 		const code = (file) =>
 			stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).replace(/\\\\?/g, '/');
 		const templateUsers = [...Object.values(platforms).flat(), ...shared].filter(
@@ -383,7 +399,7 @@ check("every copy of the registry id rule is the index builder's", () => {
 	const canonical = ID_RE.source;
 	assert.ok(/^\^.+\$$/.test(canonical), `the builder's id rule ${canonical} is not anchored`);
 	const copies = {
-		'_shared/lua/layouts/registry.lua': /M\.ID_PATTERN\s*=\s*"([^"]+)"/,
+		'_shared/layouts/engine/registry/registry_core.lua': /M\.ID_PATTERN\s*=\s*"([^"]+)"/,
 		'windows/modules/keymap/keylayout/layout_registry.ahk':
 			/LAYOUT_REGISTRY_ID_PATTERN\s*:=\s*"([^"]+)"/
 	};
@@ -397,7 +413,10 @@ check("every copy of the registry id rule is the index builder's", () => {
 		);
 	}
 	const schema = JSON.parse(
-		fs.readFileSync(path.join(SP, '_shared', 'core', 'config_schema', 'config.schema.json'), 'utf8')
+		fs.readFileSync(
+			path.join(SP, '_shared', 'settings', 'data', 'config_schema', 'config.schema.json'),
+			'utf8'
+		)
 	);
 	const selection = schema.$defs.layout.properties.emulated_layout;
 	assert.strictEqual(
@@ -411,9 +430,11 @@ check("every copy of the registry id rule is the index builder's", () => {
 // the user agent drifts the day one of them is bumped.
 check("every copy of the registry user agent is the shared client's", () => {
 	const read = (rel) => fs.readFileSync(path.join(SP, ...rel.split('/')), 'utf8');
-	const shared = /^M\.USER_AGENT\s*=\s*"([^"]+)"$/m.exec(read('_shared/lua/layouts/registry.lua'));
-	assert.ok(shared, '_shared/lua/layouts/registry.lua declares no M.USER_AGENT');
-	const catalogue = stripComments(read('_shared/lua/layouts/catalogue.lua'), '.lua');
+	const shared = /^M\.USER_AGENT\s*=\s*"([^"]+)"$/m.exec(
+		read('_shared/layouts/engine/registry/registry_core.lua')
+	);
+	assert.ok(shared, '_shared/layouts/engine/registry/registry_core.lua declares no M.USER_AGENT');
+	const catalogue = stripComments(read('_shared/layouts/engine/composer/catalogue.lua'), '.lua');
 	assert.ok(
 		!catalogue.includes(`"${shared[1]}"`),
 		'catalogue.lua repeats the user agent instead of Registry.USER_AGENT'

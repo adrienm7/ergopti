@@ -4,7 +4,7 @@
 --- MODULE: Local Driver Control (Linux)
 --- DESCRIPTION:
 --- A tool run by the same user asks this daemon to reload. The policy is the
---- shared _shared/lua/control/driver_control.lua; this module owns the session
+--- shared _shared/diagnostics/engine/control_driver_control.lua; this module owns the session
 --- in $XDG_RUNTIME_DIR, the request it consumes and the result it reports.
 ---
 --- FEATURES & RATIONALE:
@@ -23,10 +23,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Policy = require("control.driver_control")
-local Json = require("json")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local Policy = require("diagnostics.engine.control_driver_control")
+local Json = require("core.text.engine.json")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "infra.driver_control"
 local PRIVATE_MODE = 448 -- 0700
@@ -298,13 +298,13 @@ function M.start(opts)
 	Logger.start(LOG, "Starting the local reload control…")
 	local ok, session_or_err = pcall(function()
 		local file = assert(require("infra.regular_file_reader").open(
-			opts.declaration or require("infra.paths").shared("modules/control/driver_control.json")))
+			opts.declaration or require("infra.paths").shared("diagnostics/data/control/driver_control.json")))
 		local read, text = pcall(file.read, file, "*a")
 		local closed, acknowledged = pcall(file.close, file)
 		assert(read and type(text) == "string", "the control declaration could not be read")
 		assert(closed and acknowledged == true, "the control declaration close was not acknowledged")
 		local spec = Policy.validate(Json.decode(text))
-		local folder, why = Policy.folder(spec, "linux", os.getenv, require("app_dirs").linux.folder_name, "/")
+		local folder, why = Policy.folder(spec, "linux", os.getenv, require("core.fs.engine.app_dirs").linux.folder_name, "/")
 		if not folder then error(why, 0) end
 		local session = M.new({ spec = spec, folder = folder, pid = opts.pid, reload = opts.reload,
 			boot_outcome = opts.boot_outcome })

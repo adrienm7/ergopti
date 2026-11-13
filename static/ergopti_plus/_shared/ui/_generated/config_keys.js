@@ -2,8 +2,8 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Sources: static/ergopti_plus/_shared/core/config_schema/config.schema.json
-//          static/ergopti_plus/_shared/modules/menu/menu_manifest.json
+// Sources: static/ergopti_plus/_shared/settings/data/config_schema/config.schema.json
+//          static/ergopti_plus/_shared/menu/data/menu_manifest.json
 // Run: npm run codegen:config-keys
 // ==========================================
 

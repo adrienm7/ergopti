@@ -36,9 +36,9 @@
 
 local M = {}
 
-local ClickIntent = require("menu.click_intent")
+local ClickIntent = require("menu.engine.click_intent")
 local Logger = require("infra.logger")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local LOG = "menu.click_gate"
 

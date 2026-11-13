@@ -21,7 +21,7 @@ local M = {}
 -- A test file run on its own, without tests/run.lua, still loads these helpers
 -- first: isolating here keeps its logs and config away from the account's own
 -- ~/Library/Logs/Ergopti. Idempotent, the runner already isolated.
-require("test.runner_home").isolate()
+require("tests.lua.core.runner_home").isolate()
 
 --- English formats of the keys a caption with several getters (caption_getters) reads.
 --- Such a caption refuses a format without its placeholders, so a stub that echoes
@@ -49,7 +49,7 @@ local REAL_TIMINGS = nil
 local function real_timings()
 	if REAL_TIMINGS == nil then
 		local silent = setmetatable({}, { __index = function() return function() end end })
-		REAL_TIMINGS = require("timings").new({
+		REAL_TIMINGS = require("core.timing.engine.timings_core").new({
 			logger = silent, log = "timings", loaded_level = "done",
 			shared_path = function(rel) return M.shared(rel) end,
 			parse = require("infra.toml.reader").parse,
@@ -68,10 +68,10 @@ function M.provide_timings()
 	package.loaded["infra.timings"] = real_timings()
 end
 local SourceFile = require("tests.support.source_file")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
-local fmt = require("test.format")
+local fmt = require("tests.lua.format")
 local _timing = nil
 local _current_module = nil
 M.inspect = fmt.inspect
@@ -163,11 +163,11 @@ end
 local CASE_TWIN_KEY = "dialog.config_save.case_twin"
 setmetatable(M.I18N_PLACEHOLDER_FORMATS, { __index = function(formats, key)
 	if key ~= CASE_TWIN_KEY then return nil end
-	local english = require("json").decode(SourceFile.read(M.shared("data/locales/en.json")))
+	local english = require("core.text.engine.json").decode(SourceFile.read(M.shared("core/i18n/data/locales/en.json")))
 	rawset(formats, key, assert(english[key], "the case-twin notice is localized"))
 	return formats[key]
 end })
-local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
+local logger_privacy_policy = SourceFile.read(M.shared("diagnostics/data/redaction.json"))
 local logger_privacy_owners = setmetatable({}, { __mode = "k" })
 
 --- Gives a real logger instance the same explicit privacy boot as production.
@@ -430,7 +430,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- utf8_len / repl_title). Without this, modules that capture text_utils at
 	-- require-time get the stub instead of the full shared module, causing
 	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
-	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
+	-- core/text/engine/utils_core.lua is pure Lua with no hs deps, so reloading it is safe.
 	loaded["infra.text_utils"] = nil
 
 	-- Clear any toml_codec stub installed at module level by test files that
@@ -439,8 +439,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
 	loaded["infra.toml.codec"]   = nil
-	loaded["toml_codec"]       = nil
-	loaded["toml_codec.codec"] = nil
+	loaded["core.text.engine.toml_codec"]       = nil
+	loaded["core.text.engine.toml_codec.codec"] = nil
 
 	-- Clear any partial lib.timings stub installed at module level by test files
 	-- that only need M.sec (e.g. test_apply_prediction_paste_ops.lua installs
@@ -522,8 +522,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 		has             = function(key) return PLACEHOLDER_FORMATS[key] ~= nil end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
-		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,
-		section          = function(key) return require("menu.labels").decorate_section(key) end,
+		decorate_section = function(text) return require("menu.engine.labels").decorate_section(text) end,
+		section          = function(key) return require("menu.engine.labels").decorate_section(key) end,
 		-- Mirrors the real {n} substitution. A stub narrower than the module it
 		-- stands in for is how a production call to a missing function reaches
 		-- nil under test and nobody notices: every consumer of i18n.format would
@@ -539,7 +539,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	}
 
 	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
-	-- can find _shared/modules/llm/api_providers.json and profiles.json during headless
+	-- can find _shared/ai/data/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
 	loaded["infra.paths"] = {
@@ -548,9 +548,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 		-- production Paths.shared contract (nil/"" → the shared root dir).
 		shared          = function(rel) return M.shared(rel) end,
 		shared_root     = function() return M.shared() end,
-		shared_llm_path = function(name) return M.shared("modules/llm/" .. name) end,
+		shared_llm_path = function(name) return M.shared("ai/data/" .. name) end,
 		find_from_configdir = function(relative_target)
-			-- relative_target is usually "static/ergopti_plus/_shared/data/locales"
+			-- relative_target is usually "static/ergopti_plus/_shared/core/i18n/data/locales"
 			-- M.driver_root() is .../static/ergopti_plus/macos/
 			-- We want to return .../relative_target
 			return M.driver_root() .. "../../" .. relative_target
@@ -642,15 +642,15 @@ local _production_sources = nil
 --- @param text string Lua source text.
 --- @return string expanded
 function M.expand_config_keys(text)
-	local keys = require("config_keys")
+	local keys = require("settings.engine.keys")
 	local function resolve(whole, root_table, name)
 		local found, tbl = pcall(function() return keys[root_table] end)
 		if not found then return whole end
 		local ok, value = pcall(function() return tbl[name] end)
 		return ok and type(value) == "string" and string.format("%q", value) or whole
 	end
-	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
-		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	text = text:gsub('require%("settings.engine.keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("settings.engine.keys").' .. root_table .. "." .. name, root_table, name)
 	end)
 	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
 		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
@@ -660,7 +660,7 @@ end
 local function production_sources()
 	if _production_sources then return _production_sources end
 
-	local Discovery = require("test.runner_discovery")
+	local Discovery = require("tests.lua.core.runner_discovery")
 
 	-- The relative directory census excludes the harness, never a checkout's parents.
 	-- Native pathnames remain data, including newlines and shell syntax.
@@ -778,7 +778,7 @@ end
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 
--- The seven assertions come from _shared/lua/test/assertions.lua. Both drivers
+-- The seven assertions come from _shared/tests/lua/assertions.lua. Both drivers
 -- carried their own copy: six of the seven bodies were byte-identical once
 -- whitespace was normalised, and the seventh differed by a single COMMENT line.
 -- Two copies of an assertion library is two places for a fix to land in one of,
@@ -786,7 +786,7 @@ local deep_equal = fmt.deep_equal
 --
 -- fail_msg is injected because it is the one genuinely per-driver part: it skips
 -- the stack frames belonging to THIS file so a failure reports the caller's line.
-local _assertions = require("test.assertions").build("helpers[/\\\\]init%.lua$", fmt)
+local _assertions = require("tests.lua.assertions").build("helpers[/\\\\]init%.lua$", fmt)
 M.assert_eq        = _assertions.assert_eq
 M.assert_true      = _assertions.assert_true
 M.assert_nil       = _assertions.assert_nil
@@ -913,7 +913,7 @@ function M.make_logger_stub()
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
 		-- The level table is the real shared one: production reads Logger.LEVELS
 		-- to gate work that only an enabled level prints.
-		LEVELS = require("logger").LEVELS,
+		LEVELS = require("core.logger.engine").LEVELS,
 		ring_buffer_snapshot = function() return {} end,
 		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
@@ -963,7 +963,7 @@ function M.set_only_filter(substr) _only_filter = substr end
 --- Support imports by E2E do not acquire a clock or claim unit timing coverage.
 function M.initialize_timing()
 	assert(_timing == nil, "Lua unit timing is already initialized")
-	_timing = require("test.runner_timing").capture("macos")
+	_timing = require("tests.lua.core.runner_timing").capture("macos")
 end
 
 --- Measures one module load while retaining its current case ownership.

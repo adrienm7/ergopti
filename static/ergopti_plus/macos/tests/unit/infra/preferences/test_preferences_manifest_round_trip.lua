@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
+local codec = require("core.text.engine.toml_codec")
 
 --- Reports whether a manifest entry applies to the macOS driver.
 --- @param entry table Manifest feature entry.

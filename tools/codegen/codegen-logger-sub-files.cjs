@@ -5,7 +5,7 @@
  * MODULE: Logger Sub-file Routing Codegen
  * DESCRIPTION:
  * Emits the logger's sub-file routing table for each driver (macOS, Windows,
- * Linux) from the canonical _shared/modules/logger/sub_files.toml.
+ * Linux) from the canonical _shared/core/logger/data/sub_files.toml.
  *
  * WHY THIS EXISTS:
  * Both drivers hand-rolled a TOML [[array_of_tables]] parser for this one file —
@@ -41,10 +41,10 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared/modules/logger/sub_files.toml');
+const SOURCE = path.join(SP, '_shared/core/logger/data/sub_files.toml');
 // The file-name prefix and extension belong to the application-folders
 // registry, which names every log file; this table only adds the topic.
-const APP_DIRS = path.join(SP, '_shared/modules/paths/app_dirs.toml');
+const APP_DIRS = path.join(SP, '_shared/core/fs/data/paths/app_dirs.toml');
 
 const parsed = toml.parse(fs.readFileSync(SOURCE, 'utf8'));
 const entries = parsed.sub_files || [];
@@ -128,7 +128,7 @@ function emitLua(platform, driver, consumer) {
 
 	return (
 		'--- _generated/logger_sub_files.lua\n' +
-		'--- AUTO-GENERATED from _shared/modules/logger/sub_files.toml.\n' +
+		'--- AUTO-GENERATED from _shared/core/logger/data/sub_files.toml.\n' +
 		'--- DO NOT EDIT BY HAND — run `npm run codegen:logger-sub-files` to refresh.\n' +
 		'\n' +
 		'--- ==============================================================================\n' +
@@ -164,7 +164,7 @@ function emitAhk() {
 
 	return (
 		'﻿; _generated/logger_sub_files.ahk\n' +
-		'; AUTO-GENERATED from _shared/modules/logger/sub_files.toml.\n' +
+		'; AUTO-GENERATED from _shared/core/logger/data/sub_files.toml.\n' +
 		'; DO NOT EDIT BY HAND — run `npm run codegen:logger-sub-files` to refresh.\n' +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +
@@ -201,7 +201,7 @@ function emitSwift() {
 
 	return (
 		'// Sources/ErgoptiPlus/LoggerTopics.generated.swift\n' +
-		'// AUTO-GENERATED from _shared/modules/logger/sub_files.toml.\n' +
+		'// AUTO-GENERATED from _shared/core/logger/data/sub_files.toml.\n' +
 		'// DO NOT EDIT BY HAND -- run `npm run codegen:logger-sub-files` to refresh.\n' +
 		'\n' +
 		'// ==============================================================================\n' +

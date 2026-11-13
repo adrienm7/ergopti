@@ -64,7 +64,7 @@ Test("dev source: accepts only the clone the script runs from (windows-dev-mode)
 ; told otherwise, a .git folder ("file" makes it a linked worktree's .git file).
 _DST_Clone(GitKind := "dir") {
 	Root := A_Temp . "\ergopti_dev_clone_" . A_TickCount . "_" . Random(1, 1000000)
-	Identifiers := Root . "\static\ergopti_plus\_shared\data\identifiers.json"
+	Identifiers := Root . "\static\ergopti_plus\_shared\core\text\data\identifiers.json"
 	; The identifiers' own folder, wherever the shared tree keeps them.
 	SplitPath(Identifiers, , &IdentifiersDir)
 	DirCreate(IdentifiersDir)
@@ -102,7 +102,7 @@ _DST_DerivedRefused() {
 	try {
 		AssertEqual("", DevSource_ResolveRoot("", NoGit . "\static\ergopti_plus\windows", 1),
 			"a source tree without .git is a plain source run")
-		FileDelete(NoTree . "\static\ergopti_plus\_shared\data\identifiers.json")
+		FileDelete(NoTree . "\static\ergopti_plus\_shared\core\text\data\identifiers.json")
 		AssertEqual("", DevSource_ResolveRoot("", NoTree . "\static\ergopti_plus\windows", 1),
 			"a checkout without this repository's tree")
 		AssertEqual("", DevSource_ResolveRoot("", NoTree . "\static\ergopti_plus", 1),

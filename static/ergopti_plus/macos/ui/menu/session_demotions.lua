@@ -13,7 +13,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local LOG = "menu"
 
 

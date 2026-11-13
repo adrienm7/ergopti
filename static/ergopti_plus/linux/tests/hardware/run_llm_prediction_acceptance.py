@@ -66,8 +66,8 @@ def main():
             [
                 str(driver / "?.lua"),
                 str(driver / "?" / "init.lua"),
-                str(driver.parent / "_shared" / "lua" / "?.lua"),
-                str(driver.parent / "_shared" / "lua" / "?" / "init.lua"),
+                str(driver.parent / "_shared" / "?.lua"),
+                str(driver.parent / "_shared" / "?" / "init.lua"),
                 env.get("LUA_PATH", ";"),
             ]
         )

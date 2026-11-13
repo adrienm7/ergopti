@@ -46,7 +46,7 @@ class MetricsFilters {
 		; placeholders only: MetricsFiltersApplyManifestDefaults() overwrites all
 		; four from the shared manifest before CS_Load() applies the user's config,
 		; so the effective default has exactly one declaration
-		; (_shared/modules/features/manifest.toml, [[features.metrics]]).
+		; (_shared/settings/data/features/manifest.toml, [[features.metrics]]).
 		;
 		; They used to be the defaults, hardcoded, alongside a SECOND set of
 		; manifest entries declaring the same three toggles AHK-only under

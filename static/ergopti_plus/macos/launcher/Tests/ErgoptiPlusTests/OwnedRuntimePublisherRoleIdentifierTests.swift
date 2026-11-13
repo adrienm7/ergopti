@@ -6,7 +6,7 @@
 // The publisher roles are the code-signing identifiers every owned-runtime
 // trust check names. A Swift raw value must be a literal, so the enum keeps
 // its own spelling; this test pins each one to the single declaration in
-// _shared/data/identifiers.json (Identifiers.generated.swift), so a renamed
+// _shared/core/text/data/identifiers.json (Identifiers.generated.swift), so a renamed
 // signing id cannot leave a role checking the old name.
 // ==============================================================================
 

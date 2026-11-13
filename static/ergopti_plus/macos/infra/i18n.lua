@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local M = {}
-local _scope = require("scope_owner").new({ name = "infra.i18n", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "infra.i18n", module = M })
 
 local hs     = hs
 local Logger = require("infra.logger")
@@ -31,7 +31,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local LOG    = "i18n"
 
 local locale_mod = require("infra.locale")
-local Labels     = require("menu.labels")
+local Labels     = require("menu.engine.labels")
 
 
 
@@ -46,8 +46,8 @@ local Labels     = require("menu.labels")
 --- Ordered list of supported locales, in the canonical language-menu order.
 ---
 --- Generated, not written here: the order comes from
---- _shared/data/locale_order.json and the native names from
---- _shared/data/locale_names.json. Three hand-maintained copies is how the Linux
+--- _shared/core/i18n/data/locale_order.json and the native names from
+--- _shared/core/i18n/data/locale_names.json. Three hand-maintained copies is how the Linux
 --- table came to hold 16 of the 21 shipped locales, its five missing rows
 --- rendering in the menu as bare two-letter codes. Do not re-sort at runtime.
 local LOCALES = require("_generated.locale_table")
@@ -118,8 +118,8 @@ function M.detect_system_locale()
 		local ok, val = pcall(hs.host.locale.current)
 		if ok and type(val) == "string" then raw = val end
 	end
-	-- Declared once in _shared/data/identifiers.json (locales.system_fallback).
-	local fallback = require("identifiers").locales.system_fallback
+	-- Declared once in _shared/core/text/data/identifiers.json (locales.system_fallback).
+	local fallback = require("core.text.engine.identifiers").locales.system_fallback
 	if not raw or raw == "" then
 		Logger.debug(LOG, "detect_system_locale: API unavailable — falling back to '%s'.", fallback)
 		return fallback
@@ -213,7 +213,7 @@ end
 --- @return boolean committed
 local function rewrite_configured(code)
 	local committed, detail, receipt = require("infra.script_scope").rewrite_configured_owned(
-		require("config_keys").KEY.SCRIPT_LOCALE, code)
+		require("settings.engine.keys").KEY.SCRIPT_LOCALE, code)
 	_locale_rewrite_debt = receipt
 	if committed ~= true then
 		Logger.error(LOG, "Configured locale rewrite was refused: %s.", tostring(detail))
@@ -286,7 +286,7 @@ local function persist_selected_locale(code)
 	debt.backup_path = path .. ".locale-" .. tostring(hs.timer.absoluteTime()) .. "-"
 		.. tostring(_locale_storage_serial) .. ".settings"
 	debt.files = require("adapters.file_system")
-	debt.backup_bytes = require("json").encode({ format = "ergopti-owned-settings-v1", cells = debt.cells })
+	debt.backup_bytes = require("core.text.engine.json").encode({ format = "ergopti-owned-settings-v1", cells = debt.cells })
 	if type(debt.backup_bytes) ~= "string" then return false end
 	return Storage.publish_owned(debt.owner, debt.receipt,
 		{ [SETTINGS_KEY] = { present = true, value = code } }, debt.backup_path, debt.files) == true
@@ -533,7 +533,7 @@ end
 
 --- Returns a shallow copy of LOCALES in canonical display order. LOCALES is
 --- already declared in that order (single-sourced from
---- _shared/data/locale_order.json and pinned by the parity test), so this
+--- _shared/core/i18n/data/locale_order.json and pinned by the parity test), so this
 --- simply hands back a copy — every surface that lists locales (menubar
 --- language submenu, onboarding step 1, …) shares the one order and can
 --- never desync. The canonical order keeps Latin-script names first and the
@@ -618,7 +618,7 @@ end
 local function scope_state()
 	return { locale = _locale, backend = locale_mod.current_locale(),
 		setter = locale_mod.set_locale, getter = locale_mod.current_locale, loader = locale_mod.all, backend_parent = package.loaded["infra.locale"],
-		core_parent = package.loaded["locale.core"], injector = _locale_set_fn, timer = _reload_timer, reload_generation = _reload_generation }
+		core_parent = package.loaded["core.i18n.engine.core"], injector = _locale_set_fn, timer = _reload_timer, reload_generation = _reload_generation }
 end
 
 --- Publishes one locale through the injected backend setter, raising on refusal.

@@ -45,7 +45,7 @@ global KL_MIG_INSERT_MARKER := "INSERT OR IGNORE INTO events_typing "
 
 ; The columns a conversion may rewrite, with the suffix each one's IV input
 ; carries. MUST match KL_BuildInsertTyping and the shared Lua plan
-; (_shared/lua/keystats/text_migration.lua): the IV is not stored, it is
+; (_shared/metrics/engine/privacy/text_migration_core.lua): the IV is not stored, it is
 ; recomputed from the row identity, so a suffix that drifts produces rows that
 ; decrypt to garbage. The aggregates are deliberately absent - the dashboard
 ; computes over them, and an encrypted blob in one would break every query while

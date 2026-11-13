@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives client, scheduler and independent observations.
 local function with_client(scenario)
 	helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler", "infra.logger",
-		"error_description", "number_policy", "infra.http_header_policy" }, function()
+		"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "infra.http_header_policy" }, function()
 		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
 		local h = { timers = {}, requests = {}, refused = {}, errors = {} }
 		local function native_request(url, callback)

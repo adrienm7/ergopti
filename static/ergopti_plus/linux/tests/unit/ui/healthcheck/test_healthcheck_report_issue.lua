@@ -14,11 +14,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Share = require("healthcheck.share")
+local Json = require("core.text.engine.json")
+local Share = require("diagnostics.engine.healthcheck.share")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 local HOME = "/home/jdoe"
 local LOGS_DIR = "/var/tmp/ergopti_report_logs"
@@ -38,13 +38,13 @@ end
 --- The documents a host works from, read from their single sources.
 --- @return table
 local function documents()
-	local schema = shared_json("modules/diagnostics/schema.json")
-	schema.export_strings = shared_json("data/locales/en.json")
+	local schema = shared_json("diagnostics/data/schema.json")
+	schema.export_strings = shared_json("core/i18n/data/locales/en.json")
 	return {
 		schema     = schema,
-		templates  = shared_json("modules/diagnostics/issue_templates.json"),
-		redaction  = shared_json("modules/diagnostics/redaction.json"),
-		repository = shared_json("modules/updater/defaults.json").github,
+		templates  = shared_json("diagnostics/data/issue_templates.json"),
+		redaction  = shared_json("diagnostics/data/redaction.json"),
+		repository = shared_json("updater/data/defaults.json").github,
 	}
 end
 
@@ -225,7 +225,7 @@ helpers.describe("healthcheck page actions (linux)", function()
 	-- an ERROR, which created that very file, counted as a session error and
 	-- would raise the error dialog (open-missing-file)
 	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
-		local Logger = require("logger")
+		local Logger = require("core.logger.engine")
 		local emitted = 0
 		Logger.set_sink(function(_, variant)
 			if variant == "warn" or variant == "error" then emitted = emitted + 1 end
@@ -719,7 +719,7 @@ end)
 helpers.describe("diagnostic opener late port failure", function()
 	helpers.it("(diagnostic-opener-late) logs an exception after inline completion without a second outcome", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local held, errors, results = Logger.error, {}, {}
 		Logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 		local ok, detail = xpcall(function()
@@ -745,7 +745,7 @@ helpers.describe("redaction context carries the configuration directory (config-
 		local context = Report.redaction_context(overrides)
 		helpers.assert_eq(context.config_dir, dir)
 		helpers.assert_eq(
-			require("diagnostics.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
+			require("diagnostics.engine.reports.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
 			"read '<config>/hotstrings/<name>/<name>'")
 	end)
 end)
@@ -757,7 +757,7 @@ local function completed_action_for(Report, action, config, context, overrides, 
 end
 
 helpers.describe("opt-in day log in the report actions (day-log-host)", function()
-	local DayLogHost = require("healthcheck.day_log")
+	local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 	local LOG_TEXT = "2026-09-24 09:00:00:001 [INFO] [A] opened /home/jdoe/x\n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl\n"
 	local REDACTED = "2026-09-24 09:00:00:001 [INFO] [A] opened ~/x\n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>\n"
 
@@ -767,7 +767,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local calls = {}
 		local overrides = recording(calls)
 		local config = documents()
-		config.day_log = shared_json("modules/diagnostics/day_log.json")
+		config.day_log = shared_json("diagnostics/data/day_log.json")
 		local snapshot = host_snapshot(false)
 		local context = Report.redaction_context(overrides)
 		local function run(action)

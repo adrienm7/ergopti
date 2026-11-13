@@ -12,9 +12,9 @@ local M = {}
 local Files = require("adapters.file_system")
 local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 local Native = require("luv")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local sequence = 0
 
 local function marker_path()

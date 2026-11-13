@@ -52,8 +52,8 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		local Preview = require("ui.menu.preview_transaction")
 		translate = translate or function(key) return key end
 		package.loaded["infra.i18n"] = { get = translate }
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
 				local decoded = require("adapters.json_codec").decode(raw)
 				if declaration_label and decoded[section] then
@@ -275,7 +275,7 @@ helpers.describe("declared coloured preview checkbox", function()
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_colored_control.json"))
 		local count = 0
 		for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-			local catalog = read_json(Paths.shared("data/locales/" .. locale .. ".json"))
+			local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"))
 			local function translate(key) return catalog[key] or key end
 			with_fixture("ok", function(f)
 				local function group(rows)
@@ -370,7 +370,7 @@ helpers.describe("magic preview shared label contract", function()
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_magic_control.json"))
 		local observed = 0
 		for _, code in ipairs(corpus.locales) do
-			local catalog = read_json(Paths.shared("data/locales/" .. code .. ".json"))
+			local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. code .. ".json"))
 			local function translate(key) return catalog[key] or key end
 			with_fixture("ok", function(f)
 				helpers.assert_eq(f.row.label, catalog[corpus.row.i18n])
@@ -459,7 +459,7 @@ helpers.describe("ordered presence checkbox locale contract", function()
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
 		local observed = 0
 		for _, locale in ipairs(corpus.locales) do
-			local catalog = read_json(Paths.shared("data/locales/" .. locale .. ".json"))
+			local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"))
 			local function translate(key) return catalog[key] or key end
 			for _, reverse in ipairs({ false, true }) do
 				with_fixture("ok", function(f)

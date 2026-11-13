@@ -33,7 +33,7 @@ local M = {}
 
 local EvdevCodes = require("infra.evdev_codes")
 local InputEvent = require("infra.input_event")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local TapDetector = require("modules.gestures.tap_detector")
 
 local LOG = "keystats.pointer_metrics"

@@ -21,20 +21,20 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local Codec = require("toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local Codec = require("core.text.engine.toml_codec")
 local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local Terminators = require("keymap.terminators")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Terminators = require("layouts.engine.layers.terminators")
+local ConfigKeys = require("settings.engine.keys")
 local KEY = ConfigKeys.KEY
-local NativePath = require("native_path")
-local SectionOrder = require("hotstrings.section_order")
+local NativePath = require("core.fs.engine.native_path")
+local SectionOrder = require("hotstrings.engine.section_order")
 
 local LOG = "infra.hotstring_preferences"
 

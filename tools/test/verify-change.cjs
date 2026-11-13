@@ -322,7 +322,7 @@ function checkScannedSymbolsExist(files) {
  * was the only one whose edit selected no driver suite at all — a corpus vector
  * could be changed and land fully "verified" having executed nothing.
  *
- * The layer data belongs here for the same reason: `_shared/keymap/` and the
+ * The layer data belongs here for the same reason: `_shared/layouts/data/` and the
  * physical-key registry are read by the AHK and Lua layer loaders and replayed
  * by every driver's corpus consumer, and no JS gate runs those loaders.
  * @param {string} f Repo-relative path.
@@ -330,10 +330,13 @@ function checkScannedSymbolsExist(files) {
  */
 function isCrossDriverContract(f) {
 	return (
-		f.startsWith('static/ergopti_plus/_shared/core/') ||
+		f === 'static/ergopti_plus/_shared/core/features.json' ||
+		f.startsWith('static/ergopti_plus/_shared/core/ports/') ||
+		f.startsWith('static/ergopti_plus/_shared/core/text/data/domain/') ||
+		f.startsWith('static/ergopti_plus/_shared/settings/data/config_schema/') ||
 		f.startsWith('static/ergopti_plus/_shared/tests/') ||
-		f.startsWith('static/ergopti_plus/_shared/keymap/') ||
-		f === 'static/ergopti_plus/_shared/data/keycodes/physical_keys.json'
+		f.startsWith('static/ergopti_plus/_shared/layouts/data/') ||
+		f === 'static/ergopti_plus/_shared/layouts/data/keycodes/physical_keys.json'
 	);
 }
 
@@ -343,7 +346,7 @@ function isCrossDriverContract(f) {
  * @returns {boolean} Whether both Lua consumers require verification.
  */
 function isSharedLuaSource(f) {
-	return f.startsWith('static/ergopti_plus/_shared/lua/') && f.endsWith('.lua');
+	return f.startsWith('static/ergopti_plus/_shared/') && f.endsWith('.lua');
 }
 
 /**
@@ -463,7 +466,7 @@ const RULES = [
 		match: (f) =>
 			f.startsWith('static/ergopti/linux/') ||
 			f.startsWith('static/layouts/registry/') ||
-			f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
+			f.startsWith('static/ergopti_plus/_shared/layouts/data/')
 	},
 	{
 		gate: 'swift-launcher',
@@ -518,10 +521,10 @@ const RULES = [
 				'static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua',
 				'static/ergopti_plus/linux/ergopti_hotstrings.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
-				'static/ergopti_plus/_shared/lua/shortcuts/magic_editor.lua',
+				'static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua',
 				'tools/test/run-linux-xkb-source.cjs',
 				'.github/workflows/ci-linux.yml'
-			].includes(f) || f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
+			].includes(f) || f.startsWith('static/ergopti_plus/_shared/layouts/data/')
 	},
 	{
 		gate: 'linux-window-switch',
@@ -535,12 +538,12 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/libuv_exit.lua',
 				'static/ergopti_plus/linux/modules/gestures/manager.lua',
 				'static/ergopti_plus/linux/ergopti_hotstrings.lua',
-				'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
-				'static/ergopti_plus/_shared/lua/cursor_window_policy.lua',
-				'static/ergopti_plus/_shared/modules/actions/actions.toml',
+				'static/ergopti_plus/_shared/core/lifecycle/engine/native_worker_owner.lua',
+				'static/ergopti_plus/_shared/core/ui/engine/cursor_window_policy.lua',
+				'static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml',
 				'static/ergopti_plus/linux/_generated/action_catalogue.lua',
-				'static/ergopti_plus/_shared/lua/actions/catalogue.lua',
-				'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
+				'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue.lua',
+				'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue_data.lua',
 				'static/ergopti_plus/linux/_generated/action_emit.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py',
 				'static/ergopti_plus/linux/tests/hardware/run_window_switch_operation.lua',
@@ -556,8 +559,8 @@ const RULES = [
 		why: 'streaming HTTP receipts require actual libuv/curl status, complete error bodies and native owner settlement',
 		match: (f) =>
 			[
-				'static/ergopti_plus/_shared/lua/network/proxy_policy.lua',
-				'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+				'static/ergopti_plus/_shared/core/network/engine/proxy_policy_core.lua',
+				'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
 				'static/ergopti_plus/linux/adapters/curl_http_client.lua',
 				'static/ergopti_plus/linux/adapters/system_proxy.lua',
 				'static/ergopti_plus/linux/infra/curl_identity.lua',
@@ -584,9 +587,9 @@ const RULES = [
 				'static/ergopti_plus/linux/modules/llm/api_remote.lua',
 				'static/ergopti_plus/linux/modules/llm/api_entries.lua',
 				'static/ergopti_plus/linux/modules/llm/local_server_catalogue.lua',
-				'static/ergopti_plus/_shared/lua/llm/local_server_auth.lua',
-				'static/ergopti_plus/_shared/modules/llm/local_servers.json',
-				'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua',
+				'static/ergopti_plus/_shared/ai/engine/local_servers/auth.lua',
+				'static/ergopti_plus/_shared/ai/data/local_servers.json',
+				'static/ergopti_plus/_shared/ai/engine/ollama/local_model_policy.lua',
 				'tools/test/run-linux-http-stream-receipts.cjs',
 				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
@@ -633,9 +636,9 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/managed_http.lua',
 				'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
 				'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
-				'static/ergopti_plus/_shared/lua/updater/transfer_budget.lua',
-				'static/ergopti_plus/_shared/modules/updater/defaults.json',
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/updater/engine/transfer_budget.lua',
+				'static/ergopti_plus/_shared/updater/data/defaults.json',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
@@ -675,9 +678,9 @@ const RULES = [
 				'static/ergopti_plus/linux/install.sh',
 				'static/ergopti_plus/linux/install/ownership.sh',
 				'static/ergopti_plus/linux/install/standalone_launcher.sh',
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
-				'static/ergopti_plus/_shared/modules/updater/defaults.json',
-				'static/ergopti_plus/_shared/lua/updater/transfer_budget.lua',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/updater/data/defaults.json',
+				'static/ergopti_plus/_shared/updater/engine/transfer_budget.lua',
 				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
@@ -700,7 +703,7 @@ const RULES = [
 				'tools/test/run-linux-managed-http-phase.py',
 				'tools/build/stage-linux-network-runtime.py',
 				'static/ergopti_plus/linux/install.sh',
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 				'tools/codegen/codegen-linux-native-runtime.cjs',
 				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
@@ -728,26 +731,26 @@ const RULES = [
 				'tools/test/fixtures/linux-managed-http-phase-protocol.cjs',
 				'tools/test/test-linux-managed-http-phase-protocol.cjs',
 				'static/ergopti_plus/linux/adapters/http_client.lua',
-				'static/ergopti_plus/_shared/lua/network/http_redirect.lua',
-				'static/ergopti_plus/_shared/data/http/redirect_policy.json',
+				'static/ergopti_plus/_shared/core/network/engine/http_redirect.lua',
+				'static/ergopti_plus/_shared/core/network/data/http/redirect_policy.json',
 				'static/ergopti_plus/linux/infra/http_redirect_policy.lua',
 				'static/ergopti_plus/linux/infra/http_redirect_receipt.lua',
 				'static/ergopti_plus/linux/infra/managed_redirect_policy.lua',
 				'static/ergopti_plus/linux/infra/http_header_policy.lua',
-				'static/ergopti_plus/_shared/data/http/header_policy.json',
-				'static/ergopti_plus/_shared/lua/network/http_headers.lua',
+				'static/ergopti_plus/_shared/core/network/data/http/header_policy.json',
+				'static/ergopti_plus/_shared/core/network/engine/http_headers.lua',
 				'static/ergopti_plus/linux/infra/http_transport_policy.lua',
-				'static/ergopti_plus/_shared/data/http/transport_policy.json',
+				'static/ergopti_plus/_shared/core/network/data/http/transport_policy.json',
 				'static/ergopti_plus/linux/infra/http_body_pipe.lua',
 				'static/ergopti_plus/linux/infra/libuv_process_group.lua',
 				'static/ergopti_plus/linux/infra/libuv_exit.lua',
 				'static/ergopti_plus/linux/infra/monotonic.lua',
 				'static/ergopti_plus/linux/adapters/shell_runner.lua',
 				'static/ergopti_plus/linux/_generated/native_runtime.lua',
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 				'static/ergopti_plus/linux/platform/network/runtime_probe.lua',
 				'static/ergopti_plus/linux/infra/timings.lua',
-				'static/ergopti_plus/_shared/modules/timings/constants.toml',
+				'static/ergopti_plus/_shared/core/timing/data/constants.toml',
 				'static/ergopti_plus/linux/adapters/curl_http_client.lua',
 				'static/ergopti_plus/linux/adapters/system_proxy.lua',
 				'static/ergopti_plus/linux/infra/managed_http.lua',
@@ -760,8 +763,8 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/proxy_policy.lua',
 				'static/ergopti_plus/linux/platform/network/system_proxy_probe.lua',
 				'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
-				'static/ergopti_plus/_shared/lua/network/proxy_policy.lua',
-				'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+				'static/ergopti_plus/_shared/core/network/engine/proxy_policy_core.lua',
+				'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
 				'tools/build/stage-linux-network-runtime.py',
 				'tools/lib/git_bash.py',
 				'tools/__init__.py',
@@ -788,7 +791,7 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/openssl_digest.lua',
 				'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
 				'static/ergopti_plus/linux/_generated/native_runtime.lua',
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 				'tools/codegen/codegen-linux-native-runtime.cjs',
 				'tools/test/run-linux-nix-native.cjs',
 				'tools/test/fixtures/linux-nix-installed-runtime.lua',
@@ -802,10 +805,10 @@ const RULES = [
 		gate: 'go-route-plan',
 		why: 'the Go twin of the shared route plan answers route_plan_vectors.json only under go test',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/_shared/go/route_plan/') ||
+			f.startsWith('static/ergopti_plus/_shared/core/network/native/go/route_plan/') ||
 			[
 				'static/ergopti_plus/_shared/tests/corpus/network/route_plan_vectors.json',
-				'static/ergopti_plus/_shared/modules/network/route_origins.json',
+				'static/ergopti_plus/_shared/core/network/data/route_origins.json',
 				'tools/test/run-go-route-plan.cjs'
 			].includes(f)
 	},
@@ -813,10 +816,12 @@ const RULES = [
 		gate: 'go-proxy-relay',
 		why: 'the local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md) is proven only under go test',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/_shared/go/native_http/proxyrelay/') ||
-			f.startsWith('static/ergopti_plus/_shared/go/native_http/cmd/ergopti-proxy-relay/') ||
+			f.startsWith('static/ergopti_plus/_shared/core/network/native/go/native_http/proxyrelay/') ||
+			f.startsWith(
+				'static/ergopti_plus/_shared/core/network/native/go/native_http/cmd/ergopti-proxy-relay/'
+			) ||
 			[
-				'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json',
+				'static/ergopti_plus/_shared/core/network/data/proxy_auth_relay.json',
 				'static/ergopti_plus/_shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json',
 				'tools/test/run-go-proxy-relay.cjs'
 			].includes(f)
@@ -825,11 +830,13 @@ const RULES = [
 		gate: 'windows-proxy-relay-e2e',
 		why: 'only the real launcher, relay and SSPI through the fake network show a managed start and pull work on Windows',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/_shared/go/native_http/proxyrelay/') ||
-			f.startsWith('static/ergopti_plus/_shared/go/native_http/cmd/ergopti-proxy-relay/') ||
+			f.startsWith('static/ergopti_plus/_shared/core/network/native/go/native_http/proxyrelay/') ||
+			f.startsWith(
+				'static/ergopti_plus/_shared/core/network/native/go/native_http/cmd/ergopti-proxy-relay/'
+			) ||
 			f.startsWith('tools/test/fixtures/ollama-stub/') ||
 			[
-				'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json',
+				'static/ergopti_plus/_shared/core/network/data/proxy_auth_relay.json',
 				'static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1',
 				'static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1',
 				'static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1',
@@ -850,7 +857,7 @@ const RULES = [
 		why: 'only the real adapter, managed worker and staging worker through the fake network show every download honours the override',
 		match: (f) =>
 			[
-				'static/ergopti_plus/_shared/modules/network/proxy_override.json',
+				'static/ergopti_plus/_shared/core/network/data/proxy_override.json',
 				'static/ergopti_plus/windows/adapters/http_client.ahk',
 				'static/ergopti_plus/windows/adapters/proxy_override.ahk',
 				'static/ergopti_plus/windows/tests/live/proxy_override_owner.ahk',
@@ -867,8 +874,8 @@ const RULES = [
 		why: 'only the real transport against the fake Agent API shows the drivers speak its documented shape',
 		match: (f) =>
 			[
-				'static/ergopti_plus/_shared/lua/llm/remote_formats.lua',
-				'static/ergopti_plus/_shared/lua/llm/remote_response_classifier.lua',
+				'static/ergopti_plus/_shared/ai/engine/api/remote_formats.lua',
+				'static/ergopti_plus/_shared/ai/engine/policy/remote_response_classifier.lua',
 				'static/ergopti_plus/windows/modules/llm/remote_formats.ahk',
 				'static/ergopti_plus/windows/tests/live/perplexity_agent_owner.ahk',
 				'tools/test/fixtures/perplexity-agent-client.lua',
@@ -881,7 +888,7 @@ const RULES = [
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
 			[
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 				'static/ergopti_plus/linux/_generated/native_runtime.lua',
 				'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
 				'static/ergopti_plus/linux/platform/network/runtime_probe.lua',
@@ -922,7 +929,7 @@ const RULES = [
 		why: 'portable network packages require actual installed ELF, GIO, schema and owned timeout retirement',
 		match: (f) =>
 			[
-				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+				'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 				'tools/build/build-linux-appimage.sh',
 				'tools/build/build-linux-flatpak.sh',
 				'tools/build/stage-linux-network-runtime.py',
@@ -939,11 +946,11 @@ const RULES = [
 		why: 'runtime prerequisites require actual process/file receipts on both Linux ABIs and physical wrapper teardown',
 		match: (f) =>
 			[
-				'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
-				'static/ergopti_plus/_shared/lua/llm/process_port.lua',
-				'static/ergopti_plus/_shared/lua/llm/finite_process_port.lua',
-				'static/ergopti_plus/_shared/lua/llm/process_limits.lua',
-				'static/ergopti_plus/_shared/lua/llm/ollama_archive_installer.lua',
+				'static/ergopti_plus/_shared/core/lifecycle/engine/native_worker_owner.lua',
+				'static/ergopti_plus/_shared/ai/engine/policy/process_port.lua',
+				'static/ergopti_plus/_shared/ai/engine/policy/finite_process_port.lua',
+				'static/ergopti_plus/_shared/ai/engine/policy/process_limits.lua',
+				'static/ergopti_plus/_shared/ai/engine/ollama/archive_installer.lua',
 				'static/ergopti_plus/linux/adapters/owned_process.lua',
 				'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',

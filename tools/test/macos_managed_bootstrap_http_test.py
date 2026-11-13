@@ -32,7 +32,7 @@ SPEC.loader.exec_module(BOOTSTRAP)
 # test-macos-opaque-network-admission.cjs.
 INHERITED_TRUST_VARIABLES = tuple(
     json.loads(
-        (ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json").read_text(
+        (ROOT / "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json").read_text(
             encoding="utf-8"
         )
     )["trust_environment"]

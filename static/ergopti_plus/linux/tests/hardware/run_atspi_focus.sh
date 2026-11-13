@@ -16,7 +16,7 @@
 
 set -u
 cd "$(dirname "$0")/../.." || exit 2
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 FIXTURE="tests/hardware/atspi_fixture_app.py"
 BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do

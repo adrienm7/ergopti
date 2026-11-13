@@ -44,7 +44,7 @@ function driverUi(platform) {
 	return join(REPO_ROOT, 'static', 'ergopti_plus', platform, 'ui');
 }
 
-const MANIFEST = JSON.parse(readFileSync(shared('modules/menu/menu_manifest.json'), 'utf8'));
+const MANIFEST = JSON.parse(readFileSync(shared('menu/data/menu_manifest.json'), 'utf8'));
 
 // Types that arrive through the handler slot (3rd argument) and through the
 // provider slot (6th). `group` uses the 4th and is not compared here.

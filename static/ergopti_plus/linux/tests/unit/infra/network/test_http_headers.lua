@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Headers = require("network.http_headers")
+local Headers = require("core.network.engine.http_headers")
 local Policy = require("infra.http_header_policy")
 
 helpers.describe("immutable HTTP header snapshots", function()

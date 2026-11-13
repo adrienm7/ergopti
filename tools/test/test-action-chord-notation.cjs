@@ -49,7 +49,8 @@ const REGISTRY = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
+	'shortcuts',
+	'data',
 	'actions',
 	'actions.toml'
 );

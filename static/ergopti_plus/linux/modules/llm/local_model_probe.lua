@@ -14,7 +14,7 @@ local ResponseEngine = require("modules.llm.prediction_engine")
 local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response, ResponseEngine.runtime_response_current
 assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
 	"original runtime response owner unavailable")
-local Policy = require("llm.local_model_policy")
+local Policy = require("ai.engine.ollama.local_model_policy")
 local HttpClient = require("adapters.http_client")
 local Timings = require("infra.timings")
 local Bridge = require("infra.llm_bridge")

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Defaults Loader
 ; DESCRIPTION:
-; Reads static/ergopti_plus/_shared/modules/llm/defaults.json at boot and exposes a global
+; Reads static/ergopti_plus/_shared/ai/data/defaults.json at boot and exposes a global
 ; LLM_Defaults Map so every LLM module reads its initial values from a single
 ; cross-platform source of truth instead of duplicating hardcoded constants.
 ;
@@ -155,7 +155,7 @@ _LLMD_HasKey(raw, key) {
 ; ================================
 
 /**
- * Loads defaults.json from _shared/modules/llm/ and populates the global LLM_Defaults
+ * Loads defaults.json from _shared/ai/data/ and populates the global LLM_Defaults
  * Map. defaults.json is REQUIRED: a missing/unreadable file or any missing
  * shared key raises (fail fast) rather than substituting a hardcoded mirror that
  * could drift from the JSON. Only the AHK-local keys (model, backend) come from
@@ -170,8 +170,8 @@ LLM_Defaults_Load() {
 	try raw := FileRead(path, "UTF-8")
 
 	if (raw == "") {
-		LoggerError("LLMDefaults", "_shared/modules/llm/defaults.json not found or empty at '{1}' — LLM defaults cannot be initialised.", path)
-		throw Error("ergopti_plus: _shared/modules/llm/defaults.json is required but was not found")
+		LoggerError("LLMDefaults", "_shared/ai/data/defaults.json not found or empty at '{1}' — LLM defaults cannot be initialised.", path)
+		throw Error("ergopti_plus: _shared/ai/data/defaults.json is required but was not found")
 	}
 
 	d       := Map()
@@ -232,8 +232,8 @@ LLM_Defaults_Load() {
 	}
 
 	if (missing.Length > 0) {
-		LoggerError("LLMDefaults", "_shared/modules/llm/defaults.json is missing required key(s): {1} — LLM defaults incomplete.", _LLMD_JoinArray(missing, ", "))
-		throw Error("ergopti_plus: _shared/modules/llm/defaults.json is missing required key(s): " . _LLMD_JoinArray(missing, ", "))
+		LoggerError("LLMDefaults", "_shared/ai/data/defaults.json is missing required key(s): {1} — LLM defaults incomplete.", _LLMD_JoinArray(missing, ", "))
+		throw Error("ergopti_plus: _shared/ai/data/defaults.json is missing required key(s): " . _LLMD_JoinArray(missing, ", "))
 	}
 
 	; AHK-local keys (model, backend) — not part of the cross-platform JSON.
@@ -247,7 +247,7 @@ LLM_Defaults_Load() {
 /**
  * Returns the shared default modifier chord in the tray string form.
  * Fails fast when the defaults were not loaded, so no caller can substitute a
- * literal that drifts from _shared/modules/llm/defaults.json.
+ * literal that drifts from _shared/ai/data/defaults.json.
  * @param {string} SharedKey - "llm_val_modifiers" or "llm_nav_modifiers".
  * @returns {string} Chord such as "alt" or "alt+ctrl"; "" means bare keys.
  */

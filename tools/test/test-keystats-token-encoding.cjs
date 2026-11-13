@@ -22,7 +22,7 @@ const ROOT = path.join(__dirname, '..', '..');
 const STATIC = path.join(ROOT, 'static/ergopti_plus');
 const read = (relative) => fs.readFileSync(path.join(STATIC, relative), 'utf8');
 
-const shared = JSON.parse(read('_shared/data/keystats_tokens.json'));
+const shared = JSON.parse(read('_shared/metrics/data/keystats_tokens.json'));
 const vectors = JSON.parse(read('_shared/tests/corpus/keystats/token_encoding_vectors.json'));
 const known = new Set(shared.markers);
 

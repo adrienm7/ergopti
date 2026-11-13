@@ -64,7 +64,7 @@
 
 ; Maximum buffer length. Anything older than the longest registered trigger
 ; is irrelevant for matching; we cap so memory and lookup cost stay bounded.
-; Mirrors the shared cap _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS
+; Mirrors the shared cap _shared/hotstrings/engine/matcher/init.lua BUFFER_MAX_CHARS
 ; (256) and the prefix watcher's _MAX_BUFFER_LEN; pinned equal by
 ; tools/test/test-hotstring-buffer-cap-parity.cjs.
 global HSE_MAX_BUFFER_LEN := 256
@@ -104,7 +104,7 @@ global HSE_CONSUMED_DELIMITERS := ""
 ; lowest, third-party "package" (extension TOML) in the middle, and the user's
 ; own "personal" hotstrings highest — so personal beats a package beats a common
 ; trigger of the same length without any manual tuning.
-; SINGLE SOURCE OF TRUTH: _shared/modules/hotstrings/priority.json. These literals are
+; SINGLE SOURCE OF TRUTH: _shared/hotstrings/data/catalogue/priority.json. These literals are
 ; held identical to it (and to the macOS PRIORITY_* in registry.lua) by the gate
 ; tools/test/test-priority-parity.cjs — change the JSON and all three together.
 global HSE_PRIORITY_COMMON   := 10
@@ -1391,7 +1391,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 
 
 ; Whether one character is part of a word, the rule macOS and Linux share
-; (text_utils.is_hotstring_word_char in _shared/lua/text_utils/init.lua): every
+; (text_utils.is_hotstring_word_char in _shared/core/text/engine/utils_core.lua): every
 ; non-ASCII character, "@", letters, digits and "_". The shared repeat_key
 ; corpus pins the three drivers to it.
 ; @param Ch {String} One character (a surrogate pair counts as one).

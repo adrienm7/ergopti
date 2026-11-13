@@ -6,12 +6,12 @@
 local root = assert(arg[1], "repository root required")
 local samples = tonumber(arg[2]) or 7
 local driver = root .. "/static/ergopti_plus/linux"
-local shared = root .. "/static/ergopti_plus/_shared/lua"
+local shared = root .. "/static/ergopti_plus/_shared"
 package.path = table.concat({
 	driver .. "/?.lua", driver .. "/?/init.lua", shared .. "/?.lua", shared .. "/?/init.lua",
 	driver .. "/tests/?.lua", driver .. "/tests/?/init.lua", package.path,
 }, ";")
-local compat = require("compat.utf8")
+local compat = require("core.lifecycle.engine.compat.utf8")
 if compat.install then compat.install() end
 local luv = require("luv")
 
@@ -136,17 +136,17 @@ end
 -- 3/ Startup parsing: the migration registry (decoded on every boot) and the
 -- shipped hotstring packs (the bulk of the config stage).
 do
-	local codec = require("toml_codec")
-	local reader = require("toml_codec.reader")
+	local codec = require("core.text.engine.toml_codec")
+	local reader = require("core.text.engine.toml_codec.reader")
 	local function slurp(path)
 		local handle = assert(io.open(path, "rb"))
 		local content = handle:read("*a")
 		handle:close()
 		return content
 	end
-	local registry = slurp(root .. "/static/ergopti_plus/_shared/core/config_schema/migrations.toml")
+	local registry = slurp(root .. "/static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml")
 	local packs = {}
-	for path in io.popen("find '" .. root .. "/static/ergopti_plus/_shared/modules/hotstrings' -name '*.toml'"):lines() do
+	for path in io.popen("find '" .. root .. "/static/ergopti_plus/_shared/hotstrings/data/catalogue' -name '*.toml'"):lines() do
 		packs[#packs + 1] = slurp(path)
 	end
 	local decode_ms, reader_ms = {}, {}

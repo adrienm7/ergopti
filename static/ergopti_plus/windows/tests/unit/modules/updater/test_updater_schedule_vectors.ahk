@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Update-Check Schedule Vector Tests
 ; DESCRIPTION:
-; Replays the shared _shared/modules/updater/schedule_vectors.json through the
+; Replays the shared _shared/updater/data/schedule_vectors.json through the
 ; AHK port (modules/updater/schedule.ahk) over the generated timing data. The
 ; JavaScript module and the Lua port replay the same file, so the drivers
 ; cannot disagree on when an automatic check is due, how a retired interval
@@ -11,7 +11,7 @@
 ; ==============================================================================
 
 _UpdSchedTest_Vectors() {
-	Path := A_ScriptDir . "\..\..\_shared\modules\updater\schedule_vectors.json"
+	Path := A_ScriptDir . "\..\..\_shared\updater\data\schedule_vectors.json"
 	AssertTrue(FileExist(Path) != "", "schedule vectors must exist at: " . Path)
 	return JsonParse(FileRead(Path, "UTF-8"))
 }

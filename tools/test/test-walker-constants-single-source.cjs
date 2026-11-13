@@ -5,7 +5,7 @@
  * MODULE: Keystats Walker Constants — Single Source
  * DESCRIPTION:
  * The two keystats walkers are the clearest surviving case of §5.2 being
- * declared and not held. `_shared/lua/keystats/aggregator_helpers.lua` holds the
+ * declared and not held. `_shared/metrics/engine/aggregator/helpers.lua` holds the
  * bucket edges and caps the aggregation is defined by; the AutoHotkey walker
  * re-declares the same names as `static` literals inside its class, and the macOS
  * aggregator has its own copies too. Three declarations of one number.
@@ -41,7 +41,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const P = (rel) => path.join(ROOT, 'static/ergopti_plus', rel);
 
-const SHARED = '_shared/lua/keystats/aggregator_helpers.lua';
+const SHARED = '_shared/metrics/engine/aggregator/helpers.lua';
 const AHK_WALKER = 'windows/modules/keystats/keystats_walker_core.ahk';
 const HS_AGGREGATOR = [
 	'macos/modules/keystats/aggregator/core.lua',

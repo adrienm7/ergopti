@@ -46,10 +46,10 @@ helpers.describe("linux: daemon fails fast on a missing terminator catalogue", f
 	end)
 
 	if type(src) == "string" then
-		helpers.it("still loads the shared keymap.terminators single source", function()
-			-- Loaded via pcall(require, "keymap.terminators") — match the module ref.
-			helpers.assert_true(src:find('"keymap%.terminators"') ~= nil,
-				"daemon must require the shared keymap.terminators module")
+		helpers.it("still loads the shared layouts.engine.layers.terminators single source", function()
+			-- Loaded via pcall(require, "layouts.engine.layers.terminators") — match the module ref.
+			helpers.assert_true(src:find('"layouts%.engine%.layers%.terminators"') ~= nil,
+				"daemon must require the shared layouts.engine.layers.terminators module")
 		end)
 
 		helpers.it("does not declare a hardcoded minimal terminator fallback", function()
@@ -59,7 +59,7 @@ helpers.describe("linux: daemon fails fast on a missing terminator catalogue", f
 
 		helpers.it("fails loudly (error) when the catalogue cannot load", function()
 			-- The terminators loader block must raise rather than return a stub.
-			helpers.assert_true(src:find("keymap%.terminators is required") ~= nil,
+			helpers.assert_true(src:find("layouts%.engine%.layers%.terminators is required") ~= nil,
 				"daemon must error() with a clear message on a terminators load failure")
 		end)
 	end
@@ -92,7 +92,7 @@ helpers.describe("linux: word-delimiter menu changes are durable", function()
 	end)
 
 	helpers.it("rolls a live toggle back when the atomic preference write fails", function()
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local before = Terminators.is_terminator_enabled("space")
 		local persists, rebuilds = 0, 0

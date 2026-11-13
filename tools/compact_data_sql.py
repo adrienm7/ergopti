@@ -46,11 +46,12 @@ from tools.lib.paths import shared  # noqa: E402
 def find_schema(metrics_dir: Path) -> Path | None:
     """Locate schema.sql relative to the metrics directory."""
     candidates = [
-        shared("data", "db", "schema.sql"),
+        shared("metrics", "data", "db", "schema.sql"),
         metrics_dir.parent.parent.parent
         / "static"
         / "ergopti_plus"
         / "_shared"
+        / "metrics"
         / "data"
         / "db"
         / "schema.sql",

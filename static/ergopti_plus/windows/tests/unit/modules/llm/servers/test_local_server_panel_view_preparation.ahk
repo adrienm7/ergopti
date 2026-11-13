@@ -314,7 +314,7 @@ _LSCF_InstallSource(Fixture) {
 ; The sweep probes each catalogue server, then the configured entry behind them.
 _LSCF_CatalogueCount() {
 	global _SharedDir
-	return JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json"))["server_order"].Length
+	return JsonParse(FSReadUtf8Exact(_SharedDir . "\ai\data\local_servers.json"))["server_order"].Length
 }
 
 _LSCF_JoinedConfiguredView(Status := 200) {
