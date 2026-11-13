@@ -1770,19 +1770,20 @@ function scanFile(file, text, ctx) {
 		const old = path.posix.normalize(`${base}/${m[3]}`);
 		const moved = byRepoPath.get(old) || byRepoDir.get(old);
 		if (!moved || moved === SPLIT || moved === old) continue;
-		if (!moved.startsWith(`${base}/`)) {
+		// The constant's own folder may move with the step (its literal follows
+		// it through the path rules): the piece is then spelled from there.
+		const baseMoved = byRepoDir.get(base);
+		const newBase = baseMoved && baseMoved !== SPLIT ? baseMoved : base;
+		if (!moved.startsWith(`${newBase}/`)) {
 			add('dir-split', m[0], '(split)', { oldRepo: old });
 			continue;
 		}
-		add(
-			'lua-module-quoted',
-			m[0],
-			m[0].replace(`${m[2]}${m[3]}${m[2]}`, `${m[2]}${moved.slice(base.length + 1)}${m[2]}`),
-			{
-				oldRepo: old,
-				newRepo: moved
-			}
-		);
+		const rel = moved.slice(newBase.length + 1);
+		if (rel === m[3]) continue;
+		add('lua-module-quoted', m[0], m[0].replace(`${m[2]}${m[3]}${m[2]}`, `${m[2]}${rel}${m[2]}`), {
+			oldRepo: old,
+			newRepo: moved
+		});
 	}
 	// path.join(root, `../data/locales/${code}.json`): the template's leading
 	// folder joined onto a known base follows that folder.
