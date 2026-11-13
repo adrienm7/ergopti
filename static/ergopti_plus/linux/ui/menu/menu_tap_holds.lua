@@ -111,20 +111,19 @@ local function _build_tap_holds(ctx)
 	local feature_on = th.file_enabled() and th.is_enabled()
 
 	local capture_edit = th.capture_configuration_edit
+	-- Runs while paused: a pause stops typing, not configuration (EDD-1). The
+	-- manager's scope retires an editor across a pause or resume transition.
 	local function edit_guard(setter_name)
-		local setter, is_paused = Writer[setter_name], ctx.is_paused
+		local setter = Writer[setter_name]
 		if type(capture_edit) ~= "function" or type(setter) ~= "function" then return nil end
 		local ok, scope = pcall(capture_edit)
 		if not ok or type(scope) ~= "function" then return nil end
 		local function ports_current()
 			return ctx.tap_holds == th and th.capture_configuration_edit == capture_edit
 				and package.loaded["platform.remap.tap_hold_writer"] == Writer and Writer[setter_name] == setter
-				and type(is_paused) == "function" and ctx.is_paused == is_paused
 		end
 		local function current()
 			if not ports_current() then return false end
-			local called, paused = pcall(is_paused)
-			if not called or paused ~= false or not ports_current() then return false end
 			local checked, live = pcall(scope)
 			return checked and live == true and ports_current()
 		end

@@ -1018,10 +1018,14 @@ function M.get_tap_action(key_id)
 end
 
 --- Captures an editor's original configuration, independently of input authority.
---- Disabled features and an absent user file remain editable; pause retires it.
+--- Disabled features, an absent user file and a pause remain editable: a pause
+--- stops typing, not configuration (EDD-1). The reload of an edit made while
+--- paused builds the engine without installing it, and resume installs it. A
+--- pause or resume transition retires an editor captured before it, through the
+--- generation set_paused() advances.
 --- @return function|nil current Strict true only while the original scope survives.
 function M.capture_configuration_edit()
-	if not _initialized or not _loaded or _paused or not config_exports_current() then return nil end
+	if not _initialized or not _loaded or not config_exports_current() then return nil end
 	local Files = require("adapters.file_system")
 	local read, factory = Files.read_with_status, M.capture_configuration_edit
 	local path, defaults, loaded, config_path = _user_path, _defaults_path, _loaded, _config_path
@@ -1032,7 +1036,7 @@ function M.capture_configuration_edit()
 	local file_enabled, lone, one_shot_ms = loaded.enabled, loaded.lone_tap_max_ms, loaded.one_shot_timeout_ms
 	local function runtime()
 		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
-			and M.capture_configuration_edit == factory and _initialized and not _paused
+			and M.capture_configuration_edit == factory and _initialized
 			and _generation == generation and _user_path == path and _defaults_path == defaults
 			and _config_path == config_path
 			and rawequal(_loaded, loaded) and rawequal(_engine, engine) and rawequal(_installed_engine, installed)
