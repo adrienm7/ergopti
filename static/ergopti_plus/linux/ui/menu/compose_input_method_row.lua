@@ -24,10 +24,12 @@ local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.compose_input_method_row"
 
+local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
+
 -- Written by user_layout_installer.py (COMPOSE_STATE_NAME) in the user XKB tree.
-M.STATE_FILE = ".ergopti_plus_compose_input_method"
+M.STATE_FILE = LinuxDesktop.compose_state_file
 -- The installer's override of the user XKB tree (ENV_USER_ROOT there).
-M.ROOT_ENV = "ERGOPTI_XKB_USER_ROOT"
+M.ROOT_ENV = LinuxDesktop.xkb_user_root_env
 
 -- Installer state -> label key (layout_package.IM_STATE_*).
 local LABELS = {

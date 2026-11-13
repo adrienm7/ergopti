@@ -38,6 +38,22 @@ end
 ---    and the unit tests drive them directly.
 --- ==============================================================================
 
+-- Run as the daemon's child: the shared Lua tree joins the search path before
+-- the requires below, which read from it.
+local RUN_AS_SCRIPT = type(arg) == "table" and type(arg[0]) == "string"
+	and arg[0]:match("cosmic_toplevel_worker%.lua$") ~= nil
+if RUN_AS_SCRIPT then
+	local shared_lua = arg[3]
+	assert(type(shared_lua) == "string" and shared_lua ~= "", "canonical shared Lua directory unavailable")
+	if literal_driver then
+		local resolver = assert(package.loaded["infra.literal_module_loader"])
+		resolver.prepend({ { ".", ".lua" }, { ".", "/init.lua" },
+			{ shared_lua, ".lua" }, { shared_lua, "/init.lua" } })
+	else
+		package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
+	end
+end
+
 local M = {}
 
 -- The class and title bounds every focus worker shares.
@@ -46,8 +62,10 @@ local Focus = require("adapters.compositor_focus")
 -- The globals this worker binds, and the versions whose events it implements.
 M.INFO_INTERFACE = "zcosmic_toplevel_info_v1"
 M.HANDLE_INTERFACE = "zcosmic_toplevel_handle_v1"
-M.LIST_INTERFACE = "ext_foreign_toplevel_list_v1"
-M.FOREIGN_HANDLE_INTERFACE = "ext_foreign_toplevel_handle_v1"
+-- Version 2's window list (ext-foreign-toplevel-list-v1, wayland-protocols).
+local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
+M.LIST_INTERFACE = LinuxDesktop.wayland_toplevel_list
+M.FOREIGN_HANDLE_INTERFACE = LinuxDesktop.wayland_toplevel_handle
 M.INFO_VERSION_V1 = 1
 M.INFO_VERSION_V2 = 2
 M.LIST_VERSION = 1
@@ -514,17 +532,7 @@ function M.run(soname, parent_pid, emit)
 	return stopped, parent_gone
 end
 
-if type(arg) == "table" and type(arg[0]) == "string"
-	and arg[0]:match("cosmic_toplevel_worker%.lua$") then
-	local shared_lua = arg[3]
-	assert(type(shared_lua) == "string" and shared_lua ~= "", "canonical shared Lua directory unavailable")
-	if literal_driver then
-		local resolver = assert(package.loaded["infra.literal_module_loader"])
-		resolver.prepend({ { ".", ".lua" }, { ".", "/init.lua" },
-			{ shared_lua, ".lua" }, { shared_lua, "/init.lua" } })
-	else
-		package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
-	end
+if RUN_AS_SCRIPT then
 	local Json = require("core.text.engine.json")
 	local function emit(record)
 		local written = io.stdout:write(Json.encode(record), "\n")

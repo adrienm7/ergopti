@@ -63,6 +63,15 @@ return {
 	linux_stage = {
 		infix = "ergopti",
 	},
+	linux_desktop = {
+		gnome_switch_path = "/org/ergopti/InputSource",
+		gnome_switch_interface = "org.ergopti.InputSource1",
+		gnome_extension_missing = "gnome_extension_missing",
+		compose_state_file = ".ergopti_plus_compose_input_method",
+		xkb_user_root_env = "ERGOPTI_XKB_USER_ROOT",
+		wayland_toplevel_list = "ext_foreign_toplevel_list_v1",
+		wayland_toplevel_handle = "ext_foreign_toplevel_handle_v1",
+	},
 	locales = {
 		system_fallback = "en",
 	},

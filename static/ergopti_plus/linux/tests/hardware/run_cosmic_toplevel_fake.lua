@@ -51,6 +51,8 @@ ffi.cdef([[
 local AF_UNIX, SOCK_STREAM = 1, 1
 local POLLIN = 1
 local WNOHANG = 1
+-- The worker reads its protocol names from the shared identifiers.
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local Worker = dofile("adapters/cosmic_toplevel_worker.lua")
 local MODE = arg and arg[1]
 local MODES = { v1 = { offer = 1, list = false, bound = 1 }, v2 = { offer = 3, list = true, bound = 2 },
