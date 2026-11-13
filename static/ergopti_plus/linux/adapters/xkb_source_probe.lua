@@ -1088,13 +1088,16 @@ local function build_receiving_map(ffi, native, connection, association, token, 
 			if not uint(size, 1048576) or size == 0 then return nil end
 			return ports.string(pointer, size)
 		end
-		local function canonical(map)
-			local raw = text(map)
+		-- Both sides go through the same parse and serialization: libxkbcommon
+		-- 1.13 drops the types a parsed map never references, so a raw text
+		-- and its own reparsed copy no longer compare equal.
+		local function project(raw)
 			if not raw then return nil end
 			local parsed = allocation(ports.map_parse, "map", connection.context, raw, 1, 0)
 			local rendered = parsed and text(parsed)
 			return rendered and ordered_aliases(rendered) or nil
 		end
+		local function canonical(map) return project(text(map)) end
 		local called, result = pcall(function()
 			if drain() ~= true or not current() then return nil end
 			local observed_input_epoch = input_epoch()
@@ -1106,7 +1109,7 @@ local function build_receiving_map(ffi, native, connection, association, token, 
 			local master = allocation(ports.keymap, "map", connection.context, connection.xcb, facts.attachment, 0)
 			if not slave or not master then return nil end
 			local slave_map, master_map = canonical(slave), canonical(master)
-			local acknowledged = ordered_aliases(expected_map)
+			local acknowledged = project(expected_map)
 			if not acknowledged or slave_map ~= acknowledged or master_map ~= acknowledged or not current() then return nil end
 			local state = allocation(ports.state, "state", master, connection.xcb, facts.attachment)
 			if not state or not current() then return nil end
@@ -1234,7 +1237,9 @@ local function read(expected, groups, require_locked, require_input)
 	if require_locked and _locked_generation ~= acknowledged_locked then return nil, "native-locked-modifiers-raced" end
 	if require_input and _input_generation ~= acknowledged_input then return nil, "native-input-modifiers-raced" end
 	if expected ~= _last_expected then
-		local canonical = ordered_aliases(expected)
+		-- The same projection as the server's map above (libxkbcommon 1.13
+		-- drops unreferenced types when it reserializes).
+		local canonical = canonical_keymap(native, connection, expected)
 		if canonical == nil then return nil, "native-keymap-canonicalization-refused" end
 		_last_expected, _last_canonical_expected = expected, canonical
 	end
