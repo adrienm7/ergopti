@@ -38,19 +38,16 @@ const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
+const { driverNames } = require('../lib/driver-roots.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SCHEMA_PATH = shared('core/config_schema/config.schema.json');
 
-// A driver is a directory with an adapters/ tree — the hexagonal marker. Naming
-// the drivers by hand is what let Linux be missed; listing every subdirectory
-// would sweep in docs/, extensions/ and old/.
+// A driver is a directory with a _generated tree (driver-roots.cjs). Naming the
+// drivers by hand is what let Linux be missed; listing every subdirectory would
+// sweep in docs/, extensions/ and old/.
 const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
-const DRIVERS = fs
-	.readdirSync(DRIVERS_DIR, { withFileTypes: true })
-	.filter((e) => e.isDirectory() && fs.existsSync(path.join(DRIVERS_DIR, e.name, 'adapters')))
-	.map((e) => e.name)
-	.sort();
+const DRIVERS = driverNames(DRIVERS_DIR);
 
 // A discovery that collapses must fail rather than report a clean run over less.
 const MIN_DRIVERS = 3;
