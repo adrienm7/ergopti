@@ -5,7 +5,7 @@
  * MODULE: Source-Tree Scan Coverage Gate
  * DESCRIPTION:
  * Twenty meta-tests and tools enumerate a driver's source by a HARDCODED list of
- * top-level folders — `{ "adapters", "infra", "modules", "ui" }` and its
+ * top-level folders — `{ "adapters", "infra", "modules", "ui", "core" }` and its
  * variants. Adding a new top-level tree makes every one of them quietly stop
  * covering it.
  *
@@ -45,7 +45,7 @@ const REQUIRED_DRIVERS = ['linux', 'macos', 'windows'];
 // `data`, `_generated`, `tests`, `vendor`, `build`, `docs` and install helpers are deliberately
 // NOT here: they are not hand-written driver source and the scanners that care
 // about them say so. Per-driver native/toolchain trees have their own gates.
-const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui'];
+const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui', 'core'];
 
 // Folders that legitimately sit beside the canonical trees. `apps`, `launcher`,
 // `bin` and `native` hold code in another language/toolchain entirely

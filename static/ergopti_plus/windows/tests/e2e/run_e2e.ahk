@@ -129,7 +129,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../modules/keymap/keylayout/keylayout_parser.ahk
 #Include ../../modules/keymap/keylayout/keylayout_tables.ahk
 #Include ../../modules/keymap/keylayout/keylayout_emulation.ahk
-#Include ../../adapters/crypto.ahk
+#Include ../../core/crypto/crypto.ahk
 #Include ../../modules/keymap/keylayout/layout_registry.ahk
 #Include ../../infra/magic_editor.ahk
 

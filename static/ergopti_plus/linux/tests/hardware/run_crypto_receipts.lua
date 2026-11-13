@@ -2,7 +2,7 @@
 --- Drives production Crypto with the real OpenSSL native binding on Linux. The
 --- shared independent byte vectors include NUL, UTF-8 and shell metacharacters.
 --- No primitive is mocked; no keyboard or graphical session is required.
-local Crypto = require("adapters.crypto")
+local Crypto = require("core.crypto.crypto")
 local checks, failures = 0, 0
 for _, row in ipairs(require("tests.support.crypto_vectors")) do
 	checks = checks + 1

@@ -496,7 +496,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.crypto",
+		id       = "core.crypto.crypto",
 		contract = { "sha256" },
 		wired    = true,
 	},

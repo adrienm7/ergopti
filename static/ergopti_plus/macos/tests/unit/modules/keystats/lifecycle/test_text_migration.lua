@@ -86,7 +86,7 @@ end
 -- first. Own the writer too: it captures the cipher reloaded by each scenario.
 local OWNED_MODULES = {
 	"hs.fs", "hs.json", "hs.sqlite3",
-	"adapters.crypto", "adapters.shell_runner",
+	"core.crypto.crypto", "adapters.shell_runner",
 	"modules.keystats.text_cipher", "modules.keystats.text_migration",
 	"modules.keystats.sqlite_writer",
 }
@@ -174,7 +174,7 @@ end
 --- @return table cipher, table migration.
 local function load_runner(store)
 	-- Both adapters capture the global hs at load: reload them under the doubles.
-	package.loaded["adapters.crypto"] = nil
+	package.loaded["core.crypto.crypto"] = nil
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["modules.keystats.text_cipher"] = nil
 	package.loaded["modules.keystats.text_migration"] = nil

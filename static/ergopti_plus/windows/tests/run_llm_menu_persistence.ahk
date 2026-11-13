@@ -20,7 +20,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../infra/legacy_folder_migration.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
-#Include ../adapters/crypto.ahk
+#Include ../core/crypto/crypto.ahk
 #Include ../adapters/file_system.ahk
 #Include ../adapters/timer_scheduler.ahk
 #Include ../infra/json.ahk

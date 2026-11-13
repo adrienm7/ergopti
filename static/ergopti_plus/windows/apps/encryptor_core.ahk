@@ -9,7 +9,7 @@
 ; Linux Encryptors (and `openssl enc -d`), and the other way round.
 ;
 ; FEATURES & RATIONALE:
-; 1. CNG through adapters/crypto.ahk (the PBKDF2 and AES-CBC the keystats
+; 1. CNG through core/crypto/crypto.ahk (the PBKDF2 and AES-CBC the keystats
 ;    cipher already relies on): no OpenSSL to ship, and the password never
 ;    leaves this process, so no command line or file ever holds it.
 ; 2. Every constant is read from the shared format file.
