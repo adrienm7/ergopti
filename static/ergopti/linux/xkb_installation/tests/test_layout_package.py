@@ -1,13 +1,16 @@
 """Unit tests for the shared installer core (layout_package)."""
 
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import layout_package  # noqa: E402
 from layout_package import (  # noqa: E402
     LayoutSpec,
     build_evdev_post,
@@ -276,3 +279,76 @@ class VariantPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ComposeInputMethodTests(unittest.TestCase):
+    """gtk3-compose-ibus: IBus only when no input method runs, never over fcitx5."""
+
+    def setUp(self) -> None:
+        self.config = Path(tempfile.mkdtemp(prefix="ergopti-im-"))
+        self.addCleanup(shutil.rmtree, self.config, True)
+        self.written = []
+
+    def write(self, path: Path, text: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        self.written.append(path)
+
+    def publish(
+        self, environ, running=frozenset(), ibus="/usr/bin/ibus-daemon", wanted=True
+    ) -> str:
+        return layout_package.publish_compose_input_method(
+            self.config, wanted, dict(environ), set(running), ibus, self.write
+        )
+
+    def test_names_the_session_input_method(self) -> None:
+        detect = layout_package.session_input_method
+        self.assertIsNone(detect({}, set()))
+        self.assertIsNone(detect({"GTK_IM_MODULE": "gtk-im-context-simple"}, set()))
+        self.assertEqual(detect({"GTK_IM_MODULE": "fcitx"}, set()), "fcitx")
+        self.assertEqual(detect({"XMODIFIERS": "@im=fcitx"}, set()), "fcitx")
+        self.assertEqual(detect({}, {"fcitx5"}), "fcitx5")
+        self.assertEqual(
+            detect({"GTK_IM_MODULE": "ibus"}, {"fcitx5"}), "fcitx5", "a running fcitx5 wins"
+        )
+        self.assertEqual(detect({}, {"ibus-daemon"}), "ibus")
+        self.assertEqual(
+            detect({"XDG_CURRENT_DESKTOP": "ubuntu:GNOME"}, set()), "ibus", "GNOME runs IBus"
+        )
+
+    def test_each_state(self) -> None:
+        self.assertEqual(self.publish({}, ibus=None), layout_package.IM_STATE_NO_IBUS)
+        self.assertEqual(self.written, [])
+        self.assertEqual(
+            self.publish({"XDG_CURRENT_DESKTOP": "GNOME"}), layout_package.IM_STATE_IBUS_ACTIVE
+        )
+        self.assertEqual(self.written, [], "GNOME already composes through IBus")
+        self.assertEqual(self.publish({}, {"fcitx5"}), layout_package.IM_STATE_OTHER_ACTIVE)
+        self.assertEqual(self.written, [], "fcitx5 is never replaced")
+        self.assertEqual(self.publish({}), layout_package.IM_STATE_IBUS_ENABLED)
+        self.assertEqual(len(self.written), 2)
+        # The next login reads GTK_IM_MODULE=ibus from Ergopti's own file.
+        self.assertEqual(
+            self.publish({"GTK_IM_MODULE": "ibus"}), layout_package.IM_STATE_IBUS_ENABLED
+        )
+        self.assertEqual(self.publish({}, wanted=False), layout_package.IM_STATE_NONE)
+        self.assertFalse((self.config / layout_package.IM_ENVIRONMENT_FILE).exists())
+        self.assertFalse((self.config / layout_package.IM_AUTOSTART_FILE).exists())
+
+    def test_a_file_of_the_users_is_never_touched(self) -> None:
+        user_file = self.config / layout_package.IM_ENVIRONMENT_FILE
+        user_file.parent.mkdir(parents=True)
+        user_file.write_text("GTK_IM_MODULE=xim\n", encoding="utf-8")
+        with self.assertRaises(OSError):
+            self.publish({})
+        self.assertEqual(self.publish({}, wanted=False), layout_package.IM_STATE_NONE)
+        self.assertEqual(user_file.read_text(encoding="utf-8"), "GTK_IM_MODULE=xim\n")
+        self.assertFalse((self.config / layout_package.IM_AUTOSTART_FILE).exists())
+
+    def test_reads_process_names_from_proc(self) -> None:
+        proc = self.config / "proc"
+        for pid, name in (("12", "fcitx5"), ("40", "bash")):
+            (proc / pid).mkdir(parents=True)
+            (proc / pid / "comm").write_text(name + "\n", encoding="utf-8")
+        (proc / "self").mkdir()
+        self.assertEqual(layout_package.running_process_names(proc), {"fcitx5", "bash"})

@@ -41,7 +41,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -73,6 +73,8 @@ from layout_package import (  # noqa: E402
     LayoutSpec,
     build_evdev_post,
     inline_xcompose_block,
+    publish_compose_input_method,
+    running_process_names,
     patch_symbols_default,
     strip_xcompose_block,
     validate_layout_files,
@@ -93,6 +95,9 @@ ENV_USER_HOME = "ERGOPTI_XKB_USER_HOME"
 LAYOUT_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 MANIFEST_NAME = ".ergopti_plus_layouts.json"
+# The Compose input method state the daemon's layout menu reads
+# (linux/ui/menu/compose_input_method_row.lua pins this name).
+COMPOSE_STATE_NAME = ".ergopti_plus_compose_input_method"
 MANIFEST_SCHEMA = 1
 RULES_MARKER = "// ErgoptiPlus managed rules: registry layouts"
 REGISTRY_MARKER = "<!-- ErgoptiPlus managed registry: registry layouts -->"
@@ -284,9 +289,20 @@ def owned_by_us(path: Path, marker: str) -> bool:
     return marker in head
 
 
-def publish_shared_files(root: Path, home: Path, layouts: Dict[str, dict]) -> None:
-    """Writes (or removes, when empty) the rules, the registry, the manifest
-    and the ~/.XCompose block from the installed layouts."""
+def probe_input_method() -> Tuple[Dict[str, str], Set[str], Optional[str]]:
+    """The session's environment, running process names and ibus-daemon path."""
+    return dict(os.environ), running_process_names(), shutil.which("ibus-daemon")
+
+
+def publish_shared_files(
+    root: Path,
+    home: Path,
+    layouts: Dict[str, dict],
+    probe: Optional[Callable[[], Tuple[Dict[str, str], Set[str], Optional[str]]]] = None,
+) -> str:
+    """Writes (or removes, when empty) the rules, the registry, the manifest,
+    the ~/.XCompose block and the GTK 3 Compose input method from the installed
+    layouts; returns the input method state (layout_package IM_STATE_*)."""
     rules = root / "rules" / "evdev"
     registry = root / "rules" / "evdev.xml"
     if layouts:
@@ -313,6 +329,18 @@ def publish_shared_files(root: Path, home: Path, layouts: Dict[str, dict]) -> No
             write_text(xcompose, content)
     elif xcompose.exists():
         xcompose.unlink()
+    # Looked up at call time, so a test can stand in for the session.
+    environ, running, ibus_daemon = (probe or probe_input_method)()
+    # The user tree is $XDG_CONFIG_HOME/xkb: environment.d and autostart are its siblings.
+    state = publish_compose_input_method(
+        root.parent, bool(texts), environ, running, ibus_daemon, write_text
+    )
+    state_file = root / COMPOSE_STATE_NAME
+    if texts:
+        write_text(state_file, state + "\n")
+    elif state_file.exists():
+        state_file.unlink()
+    return state
 
 
 def check_conflicts(root: Path, layout_id: str, installed: Dict[str, dict]) -> None:

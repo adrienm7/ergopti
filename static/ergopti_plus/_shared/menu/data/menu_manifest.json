@@ -2400,6 +2400,14 @@
 			}
 		},
 		{
+			"type": "list",
+			"id": "compose_input_method",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.compose_input_method_is_linux"
+		},
+		{
 			"type": "command",
 			"id": "layout_manager",
 			"i18n": "menu.layout.manage"
