@@ -18,7 +18,7 @@ local function child()
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
  package.loaded['infra.logger'] = logger
- package.loaded['modules.keystats.text_cipher'] = { encrypt = function(_, _, value) return value end }
+ package.loaded['modules.keystats.text_cipher'] = { is_enabled = function() return false end, encrypt = function(_, _, value) return value end }
  local field = assert(os.getenv('ERGOPTI_LLM_FIELD'))
  local entry = { type='llm_generation', timestamp='2026-10-17 12:00:00', app='Editor' }
  entry[field] = {'prediction one', 'prediction two'}
