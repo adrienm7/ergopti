@@ -23,7 +23,7 @@ import sys
 
 # The application name and bundle come from the one identifier declaration.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-IDENTIFIERS = os.path.join(REPO_ROOT, "static/ergopti_plus/_shared/data/identifiers.json")
+IDENTIFIERS = os.path.join(REPO_ROOT, "static/ergopti_plus/_shared/core/text/data/identifiers.json")
 with open(IDENTIFIERS, encoding="utf-8") as identifiers_file:
     APP = json.load(identifiers_file)["app"]
 

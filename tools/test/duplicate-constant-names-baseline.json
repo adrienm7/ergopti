@@ -35,7 +35,10 @@
 		"divergent": false
 	},
 	"MAX_BYTES": {
-		"files": ["_shared/lua/network/pac_check.lua", "windows/infra/config_registry_cache.ahk"],
+		"files": [
+			"_shared/core/network/engine/pac_check.lua",
+			"windows/infra/config_registry_cache.ahk"
+		],
 		"divergent": true
 	},
 	"MAX_FRAME_BYTES": {
@@ -110,7 +113,7 @@
 	},
 	"UI_PAUSE_BUCKETS_MS": {
 		"files": [
-			"_shared/lua/keystats/aggregator_helpers.lua",
+			"_shared/metrics/engine/aggregator/helpers.lua",
 			"_shared/ui/metrics_typing/state.js",
 			"macos/modules/keystats/aggregator/core.lua",
 			"windows/modules/keystats/keystats_walker_core.ahk"

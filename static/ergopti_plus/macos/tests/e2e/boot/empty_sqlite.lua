@@ -9,7 +9,7 @@ function M.install(hs, shared)
 	local sqlite = hs.sqlite3
 	local definitions = {}
 	for _, name in ipairs({ "schema.sql", "media_schema.sql" }) do
-		local file = assert(io.open(shared .. "/data/db/" .. name, "rb"))
+		local file = assert(io.open(shared .. "/metrics/data/db/" .. name, "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		for table_name, columns in source:gmatch("CREATE TABLE IF NOT EXISTS%s+([%w_]+)%s*(%b())%s*;") do
 			definitions[table_name] = "CREATE TABLE " .. table_name .. " " .. columns

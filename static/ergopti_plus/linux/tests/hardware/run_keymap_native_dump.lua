@@ -39,7 +39,7 @@ if not (ok_xkbcomp == true or ok_xkbcomp == 0) then
 	os.exit(2)
 end
 
-local logger = require("logger")
+local logger = require("core.logger.engine")
 logger.set_sink(function() end)
 logger.set_level(40)
 local Probe = require("adapters.xkb_source_probe")

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 --- Independent literal transfer budget controls. No native or transport ports.
-local Budget = require("updater.transfer_budget")
+local Budget = require("updater.engine.transfer_budget")
 local tests = {}
 local function policy()
 	return { archive_transfer = { schema_version = 1,
@@ -26,8 +26,8 @@ test("(release-archive-budget) the archive limits come from the shared declarati
 	assert(limits.absolute_ms == 300000 and limits.idle_ms == 60000)
 	p.archive_transfer.archive_idle_timeout_ms = 400000
 	assert(Budget.archive_limits(p) == nil, "an idle bound past the absolute cap is refused")
-	local file = assert(io.open(require("infra.paths").shared("modules/updater/defaults.json"), "rb"))
-	local shared = require("json").decode(file:read("*a")); file:close()
+	local file = assert(io.open(require("infra.paths").shared("updater/data/defaults.json"), "rb"))
+	local shared = require("core.text.engine.json").decode(file:read("*a")); file:close()
 	local declared = assert(Budget.archive_limits(shared), "the shipped defaults declare both bounds")
 	-- Decided by the maintainer on 2026-11-12, aligned on Windows' WinHTTP bounds.
 	assert(declared.absolute_ms == 1200000 and declared.idle_ms == 600000)

@@ -14,7 +14,7 @@
 --- only real file managers prove which windows publish their folder.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local DisplayServer = require("infra.display_server")
 assert(DisplayServer.is_x11(), "the file manager folder receipt needs an X11 display")
 

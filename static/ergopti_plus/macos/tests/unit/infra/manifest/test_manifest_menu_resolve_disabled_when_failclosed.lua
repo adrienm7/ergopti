@@ -94,8 +94,8 @@ local function with_group_policy_rows(platform, row, callback)
 	local strings = { ["probe.group"] = "Mode: %s", ["probe.reason"] = "Unavailable： native detail" }
 	local i18n = { get = function(key) return strings[key] or key end,
 		section = function(key) return strings[key] or key end }
-	local renderer = assert(require("menu.renderer").new({ platform = platform,
-		manifest_path = function() return helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json" end,
+	local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+		manifest_path = function() return helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json" end,
 		json_decode = function() return { group_policy_probe = { row } } end,
 		i18n = i18n, logger = logger,
 	}))

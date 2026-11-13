@@ -38,11 +38,11 @@ function M.new(engine, profiles)
 	if not relay_policy then return nil, relay_reason end
 	local source = require("modules.llm.runtime_source").new({
 		preferences = require("infra.llm_preferences"), profiles = profiles,
-		writer = require("toml_codec.writer"), manifest = require("infra.manifest_reader"),
+		writer = require("core.text.engine.toml_codec.writer"), manifest = require("infra.manifest_reader"),
 		engine = engine, backend_key = engine.backend_key,
 		path = require("infra.config_paths").config("config.toml"),
 	})
-	local process = require("llm.process_port").new(require("native_worker_owner"),
+	local process = require("ai.engine.policy.process_port").new(require("core.lifecycle.engine.native_worker_owner"),
 		require("adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))
 	local timer = require("modules.llm.owned_timer").new(native, require("infra.native_timer"))
 	local installed = require("modules.llm.ollama_installed_runtime")
@@ -51,7 +51,7 @@ function M.new(engine, profiles)
 		file_factory = require("modules.llm.ollama_install_files"),
 		archive_factory = require("infra.archive_output"),
 		admission = require("modules.llm.ollama_install_admission"),
-		install_phase = require("llm.ollama_install_phase"), process = process,
+		install_phase = require("ai.engine.ollama.install_phase"), process = process,
 		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,
 		serve_environment = serve_environment,
 		network = { policy = proxy_policy, lookup = require("adapters.system_proxy").lookup_owned,

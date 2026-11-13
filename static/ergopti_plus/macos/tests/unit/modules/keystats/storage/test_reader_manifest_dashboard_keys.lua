@@ -19,9 +19,9 @@
 
 local helpers = require("tests.helpers")
 local vectors_file = assert(io.open(helpers.shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
-local vectors = require("json").decode(vectors_file:read("*a"))
+local vectors = require("core.text.engine.json").decode(vectors_file:read("*a"))
 vectors_file:close()
-local keys = require("keystats.manifest_keys")
+local keys = require("metrics.engine.view.manifest_keys")
 for _, vector in ipairs(vectors) do
 	helpers.assert_eq(keys.encode(vector.label), vector.key)
 	helpers.assert_eq(keys.decode(vector.key), vector.label)

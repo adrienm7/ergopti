@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local MODULES = {
 	"adapters.keyboard_source_probe", "adapters.shell_runner", "adapters.timer_scheduler",
 	"adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "infra.logger",

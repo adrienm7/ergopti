@@ -25,9 +25,9 @@ local hs       = hs
 local utf8     = utf8
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
-local WPMActivity = require("keystats.wpm_activity")
+local WPMActivity = require("metrics.engine.wpm.activity")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local i18n     = require("infra.i18n")
 local dialog   = require("infra.dialog_util")
@@ -43,17 +43,17 @@ local Timestamp      = require("modules.keystats.timestamp")
 local PrivacyContext = require("modules.keystats.privacy_context")
 local ClipboardTelemetry = require("modules.keystats.clipboard_telemetry")
 -- The WPM formula lives once, in the shared metrics module. This file used to
--- divide by a literal 5 in two places while _shared/lua/keystats/metrics.lua
+-- divide by a literal 5 in two places while _shared/metrics/engine/metrics.lua
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
 -- docstring says macOS uses — the shared copy existed only to be shadowed.
-local Metrics        = require("keystats.metrics")
-local TriggerRoi     = require("keystats.trigger_roi")
+local Metrics        = require("metrics.engine.metrics")
+local TriggerRoi     = require("metrics.engine.privacy.trigger_roi")
 local Watchers       = require("modules.keystats.watchers")
 local ProcessLifecycle = require("adapters.process_lifecycle")
 local KeyboardHook   = require("adapters.keyboard_hook")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local LOG            = "keystats"
 
 
@@ -67,7 +67,7 @@ local LOG            = "keystats"
 -- ============================
 
 -- Timing thresholds come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [keystats]) so the AHK and macOS keystatss
+-- (_shared/core/timing/data/constants.toml [keystats]) so the AHK and macOS keystatss
 -- stay in sync; the comment after each names the canonical value for reference.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keystats", "micro_idle_timeout_ms")
@@ -1325,7 +1325,7 @@ function M.bind_physical_configuration_observer(owner, capacity, receive, on_ref
 	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function",
 		"Invalid physical configuration subscriber")
 	if _physical_configuration_binding then return false, "Physical configuration subscriber already bound" end
-	local Observation = require("keystats.physical_configuration_observation")
+	local Observation = require("metrics.engine.capture.physical_configuration_observation")
 	-- Verify policy data before installing ownership or severing legacy aliases.
 	Observation.copy({ disabled_apps = CoreState.disabled_apps,
 		private_filter_enabled = CoreState.private_filter_enabled,
@@ -1397,7 +1397,7 @@ end
 --- @return boolean committed Exact policy acknowledgement.
 function M.apply_configuration(config)
 	if _physical_configuration_binding then
-		local Observation = require("keystats.physical_configuration_observation")
+		local Observation = require("metrics.engine.capture.physical_configuration_observation")
 		-- Own and validate the complete bound plan before encryption, migration
 		-- or posture callbacks can mutate caller aliases or observe partial policy.
 		config = Observation.own_data(config)
@@ -1427,7 +1427,7 @@ function M.apply_configuration(config)
 	CoreState.options = copy_configuration(config.options)
 	sync_roi_text()
 	CoreState.disabled_apps = _physical_configuration_binding
-		and require("keystats.physical_configuration_observation").own_apps(config.disabled_apps)
+		and require("metrics.engine.capture.physical_configuration_observation").own_apps(config.disabled_apps)
 		or copy_configuration(config.disabled_apps)
 	CoreState.private_filter_enabled = config.private_filter_enabled
 	CoreState.secure_field_filter_enabled = config.secure_field_filter_enabled
@@ -1442,7 +1442,7 @@ end
 function M.set_disabled_apps(apps)
 	local assigned = type(apps) == "table" and apps or {}
 	CoreState.disabled_apps = _physical_configuration_binding
-		and require("keystats.physical_configuration_observation").own_apps(assigned) or assigned
+		and require("metrics.engine.capture.physical_configuration_observation").own_apps(assigned) or assigned
 	assert(settle_context_modifiers(), "Disabled apps modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Disabled apps updated (%d entry(ies)).", #CoreState.disabled_apps)
@@ -2279,7 +2279,7 @@ local function teardown_runtime(opts)
 end
 
 --- Engine observations are dormant; actual pause commits remain a separate writer.
-local _physical_lifecycle = require("keystats.physical_lifecycle_observation").new("engine", function()
+local _physical_lifecycle = require("metrics.engine.capture.physical_lifecycle_observation").new("engine", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
 

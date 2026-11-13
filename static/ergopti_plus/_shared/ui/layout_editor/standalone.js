@@ -52,7 +52,7 @@
 	}
 
 	// The shared Lua root and the XKB converter data the site serves (static/).
-	const LUA_ROOT = new URL('../../lua/', location.href);
+	const LUA_ROOT = new URL('../../', location.href);
 	const XKB_DATA = new URL('../../../../ergopti/linux/xkb_generation/data/', location.href);
 	// Loaded on the first XKB or KLC download only: the Lua VM and the KLC generator.
 	const ON_DEMAND_SCRIPTS = ['../vendor/fengari-web.js', '_generated/klc_generator.js'];

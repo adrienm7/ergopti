@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Draws a frame, decides nothing. The pill's colours, its text, the graph's
----    curve and when to show are _shared/lua/wpm_widget/model.lua's; this file
+---    curve and when to show are _shared/metrics/engine/wpm_widget_model.lua's; this file
 ---    only turns a frame into pixels, so macOS and Linux cannot drift apart on
 ---    anything but the pixels.
 --- 2. Its own window. It used to call a `show_widget` the preview renderer
@@ -26,7 +26,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "adapters.wpm_surface"
 

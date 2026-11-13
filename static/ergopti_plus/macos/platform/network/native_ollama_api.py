@@ -73,7 +73,9 @@ def listener(value):
 
 def source_alias_proof(value):
     """Receive only the canonical optional alias schema; no filesystem admission here."""
-    policy_path = Path(__file__).resolve().parents[3] / "_shared/python/managed_source_alias.py"
+    policy_path = (
+        Path(__file__).resolve().parents[3] / "_shared/ai/adapters/python/managed_source_alias.py"
+    )
     try:
         spec = importlib.util.spec_from_file_location("ergopti_ollama_alias_schema", policy_path)
         policy = importlib.util.module_from_spec(spec)

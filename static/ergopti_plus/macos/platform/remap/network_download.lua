@@ -10,7 +10,7 @@
 --- and was told it was offline (NET-001). Each download now runs behind the
 --- same system network prelude as the Ollama and MLX children
 --- (modules/llm/network_env.lua), resolved for the `karabiner` client of
---- _shared/modules/network/route_origins.json, and a refused route is named
+--- _shared/core/network/data/route_origins.json, and a refused route is named
 --- through the shared managed network failure classes.
 --- ==============================================================================
 

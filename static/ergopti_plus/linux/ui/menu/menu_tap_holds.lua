@@ -10,9 +10,9 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
-local KeyNames = require("keycodes.key_names")
-local Logger = require("logger.shim")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local KeyNames = require("platform.input.keycodes.key_names")
+local Logger = require("core.logger.engine.shim")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -83,8 +83,8 @@ local function _build_tap_holds(ctx)
 		return declared[1]
 	end
 	local Writer = require("platform.remap.tap_hold_writer")
-	local HoldOptions = require("tap_hold.hold_options")
-	local KeyCatalog = require("tap_hold.key_catalog")
+	local HoldOptions = require("tap_hold.engine.hold_options")
+	local KeyCatalog = require("tap_hold.engine.key_catalog")
 
 	local function changed(ok)
 		if not ok then SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end) end
@@ -324,11 +324,11 @@ local function _build_tap_holds(ctx)
 			local ms = own_delay and math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5) or global_ms
 
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_NATIVE] = function() changed(Writer.set_native(key_id)) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_TAP] = function() pick_tap(catalog_entry, tap) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function() return pick_hold(catalog_entry, hold) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_NATIVE] = function() changed(Writer.set_native(key_id)) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_TAP] = function() pick_tap(catalog_entry, tap) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function() return pick_hold(catalog_entry, hold) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
@@ -373,8 +373,8 @@ local function _build_tap_holds(ctx)
 			local current_ms = th.lone_tap_max_ms()
 			-- The windows offered are the feature's preset_values, the one list the
 			-- three drivers read; 0 is Off, the strict tap-hold.
-			local offered = require("tap_hold.lone_tap").choices(require("infra.manifest_reader")
-				.find_entry_by_path(require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
+			local offered = require("tap_hold.engine.lone_tap").choices(require("infra.manifest_reader")
+				.find_entry_by_path(require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 			local choices = {}
 			for _, ms in ipairs(offered) do
 				choices[#choices + 1] = {
@@ -398,7 +398,7 @@ local function _build_tap_holds(ctx)
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
 	-- The feature switch is persisted in config.toml ([tap_holds] enabled), as
 	-- the Windows toggle is; turning it on also lifts a runtime « Disable all ».
-	render_ctx.commands[require("config_keys").COMMAND.TAPHOLDS_TOGGLE] = function()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.TAPHOLDS_TOGGLE] = function()
 		local want = not feature_on
 		local ok = Writer.set_enabled(want)
 		if ok and want then ok = th.set_enabled(true) end
@@ -413,15 +413,15 @@ local function _build_tap_holds(ctx)
 		changed(committed)
 		return committed
 	end
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
 	-- The navigation layer editor: the shared page, saved and applied by
 	-- ui/layer_editor/bridge.lua.
-	render_ctx.commands[require("config_keys").COMMAND.EDIT_NAV_LAYER] = function()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_NAV_LAYER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
 			return

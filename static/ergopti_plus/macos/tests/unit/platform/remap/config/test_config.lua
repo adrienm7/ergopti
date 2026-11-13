@@ -17,7 +17,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 -- stub it out so the module loads without crashing. _load_toml_file is then
 -- monkey-patched per test where TOML parsing matters.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
-package.loaded["toml_codec"]     = _toml_stub
+package.loaded["core.text.engine.toml_codec"]     = _toml_stub
 package.loaded["infra.toml.codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("platform.remap.config")
@@ -201,7 +201,7 @@ end
 --- @return table|nil rows
 local function config_rows_of(state)
 	local restore = stub_files(nil)
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local original_prepare = Writer.prepare_batch
 	local rows
 	Writer.prepare_batch = function(_, batch) rows = batch; return false, "stopped before the disk write" end
@@ -352,7 +352,7 @@ helpers.describe("Config: the Tap-Holds feature switch", function()
 		local state = Config.build_default_state({}, {})
 		helpers.assert_eq(state.tap_holds_enabled, false, "a fresh install leaves Tap-Holds off")
 		state.tap_holds_enabled = true
-		-- The switch is a config.toml row (_shared/tap_hold/SCHEMA.md).
+		-- The switch is a config.toml row (_shared/tap_hold/data/SCHEMA.md).
 		helpers.assert_eq(row_value(config_rows_of(state), "tap_holds", "enabled"), true)
 
 		for _, case in ipairs({ { stored = false, expected = false }, { stored = true, expected = true }, { expected = false } }) do
@@ -376,7 +376,7 @@ helpers.describe("Config: the key-combinations switch", function()
 	helpers.it("persists [mod_combos] enabled when set and leaves it absent otherwise", function()
 		local state = Config.build_default_state({}, {})
 		helpers.assert_nil(state.mod_combos_enabled, "a fresh install leaves the switch absent")
-		-- [mod_combos] is a config.toml section (_shared/tap_hold/SCHEMA.md).
+		-- [mod_combos] is a config.toml section (_shared/tap_hold/data/SCHEMA.md).
 		local rows = config_rows_of(state)
 		helpers.assert_true(type(rows) == "table", "the save reaches the config.toml rows")
 		helpers.assert_nil(row_value(rows, "mod_combos", "enabled"), "an inherited switch is not written")

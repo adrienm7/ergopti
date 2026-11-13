@@ -2,9 +2,9 @@
 --- Literal portable receiving vectors; no native daemon or SDK authority.
 local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/managed_ollama_cleanup_receipt_test%.lua$"))
-package.path = root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
-local Json = require("json")
-local Receipt = require("core.llm.managed_ollama_cleanup_receipt")
+package.path = root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
+local Json = require("core.text.engine.json")
+local Receipt = require("core.lifecycle.engine.core.managed_ollama_cleanup_receipt")
 local expected = {
 	nonce = "abcdef12-abcd-4321-abcd-123456789abc",
 	original_nonce = "12345678-abcd-4321-abcd-123456789abc",

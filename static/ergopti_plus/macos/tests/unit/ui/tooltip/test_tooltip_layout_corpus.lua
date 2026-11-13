@@ -57,7 +57,7 @@ local corpus_root, corpus_err = read_corpus()
 -- ===============================================
 -- ===============================================
 
--- Mirrors _shared/modules/tooltip/layout.js resolvePosition + clampToScreen.
+-- Mirrors _shared/core/ui/data/tooltip/layout.js resolvePosition + clampToScreen.
 -- Pure functions — no OS calls, no hs.*. Used to validate the layout corpus
 -- vectors against the canonical math without depending on the real renderer.
 

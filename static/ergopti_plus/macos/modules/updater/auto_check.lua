@@ -9,7 +9,7 @@
 --- (SUEnableAutomaticChecks is false in the launcher's Info.plist).
 ---
 --- FEATURES & RATIONALE:
---- 1. One schedule on every driver: _shared/lua/updater/schedule.lua decides
+--- 1. One schedule on every driver: _shared/updater/engine/schedule.lua decides
 ---    from the wall clock and the persisted check record (Storage port, shared
 ---    key), so every menu preset works (Sparkle refuses intervals under an
 ---    hour), a restart mid-interval does not check at boot, and a Mac that was
@@ -46,12 +46,12 @@ local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec = require("adapters.json_codec")
-local Schedule  = require("updater.schedule")
-local ListCache = require("updater.list_cache")
-local Parser   = require("updater.release_parser")
-local CheckResult = require("updater.check_result")
-local RateLimit = require("updater.rate_limit")
-local ReleaseSources = require("updater.release_sources")
+local Schedule  = require("updater.engine.schedule")
+local ListCache = require("updater.engine.list_cache")
+local Parser   = require("updater.engine.release_parser")
+local CheckResult = require("updater.engine.check_result")
+local RateLimit = require("updater.engine.rate_limit")
+local ReleaseSources = require("updater.engine.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
@@ -80,7 +80,7 @@ local MS_PER_SEC = 1000
 --- no fallback: a guessed cadence or URL would check the wrong list or never.
 --- @return table config { timing, state_key, list_key, releases_url, feed_url, timeout_sec }
 function M.load_config()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then error("the shared updater defaults are unreadable", 0) end
 	local decoded, decode_err = JsonCodec.decode(raw)

@@ -20,7 +20,7 @@
 ---      MenuLayout.row_disabled(<id>, ...) rather than hardcoding is_disabled/paused.
 ---   5. The retired second description has not come back.
 ---
---- MOVED 2026-08-07: this contract used to read _shared/modules/llm/menu_layout.json,
+--- MOVED 2026-08-07: this contract used to read _shared/ai/data/menu_layout.json,
 --- a spec file of its own. One menu therefore had TWO shared descriptions — that
 --- file and the manifest's ``llm_menu`` key, which described a two-row menu only
 --- the Linux driver drew — and neither mentioned the other. Case 5 below is what
@@ -57,8 +57,8 @@ end
 --- Reads and decodes the whole shared menu manifest.
 --- @return table The decoded manifest.
 local function manifest()
-	local fh = io.open(DRIVER_ROOT .. "../_shared/modules/menu/menu_manifest.json", "r")
-	helpers.assert_true(fh ~= nil, "_shared/modules/menu/menu_manifest.json must be readable")
+	local fh = io.open(DRIVER_ROOT .. "../_shared/menu/data/menu_manifest.json", "r")
+	helpers.assert_true(fh ~= nil, "_shared/menu/data/menu_manifest.json must be readable")
 	local raw = fh:read("*a")
 	fh:close()
 	return hs.json.decode(raw)
@@ -70,8 +70,8 @@ end
 --- as menu_layout.lua filters them at runtime.
 --- @return table Ordered list of manifest rows.
 local function manifest_rows()
-	local fh = io.open(DRIVER_ROOT .. "../_shared/modules/menu/menu_manifest.json", "r")
-	helpers.assert_true(fh ~= nil, "_shared/modules/menu/menu_manifest.json must be readable")
+	local fh = io.open(DRIVER_ROOT .. "../_shared/menu/data/menu_manifest.json", "r")
+	helpers.assert_true(fh ~= nil, "_shared/menu/data/menu_manifest.json must be readable")
 	local raw = fh:read("*a")
 	fh:close()
 	local data = hs.json.decode(raw)
@@ -201,10 +201,10 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the retired second description has not come back", function()
-		local fh = io.open(DRIVER_ROOT .. "../_shared/modules/llm/menu_layout.json", "r")
+		local fh = io.open(DRIVER_ROOT .. "../_shared/ai/data/menu_layout.json", "r")
 		if fh then fh:close() end
 		helpers.assert_true(fh == nil,
-			"_shared/modules/llm/menu_layout.json must not exist — the IA menu is described in the " ..
+			"_shared/ai/data/menu_layout.json must not exist — the IA menu is described in the " ..
 			"menu manifest's llm_menu key, and a second shared description would drift from it")
 	end)
 end)
@@ -238,6 +238,6 @@ end)
 helpers.describe("Single manual LLM profile selection", function()
 	helpers.it("retires shortcut overrides without losing the original transaction returns", function()
 		local source = read_source("deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts")
-		require("test.manual_profile_selection").assert_selection(helpers, "hs", source)
+		require("tests.lua.manual_profile_selection").assert_selection(helpers, "hs", source)
 	end)
 end)

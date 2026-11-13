@@ -12,9 +12,9 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
-require("test.clipboard_events_contract").register(helpers)
+require("tests.lua.clipboard_events_contract").register(helpers)
 
 local HAS_SQLITE = (function()
 	local status = os.execute("command -v sqlite3 >/dev/null 2>&1")
@@ -160,7 +160,7 @@ helpers.describe("Linux clipboard copy/paste bursts", function()
 		local db = os.tmpname()
 		local script = os.tmpname()
 		local handle = assert(io.open(script, "wb"))
-		local schema = assert(io.open(require("infra.paths").shared("data/db/schema.sql"), "rb"))
+		local schema = assert(io.open(require("infra.paths").shared("metrics/data/db/schema.sql"), "rb"))
 		handle:write(".output /dev/null\n", schema:read("*a"), "\n.output stdout\n", table.concat(inserts, "\n"),
 			"\nSELECT kind || '|' || app || '|' || meta_json FROM events_clipboard ORDER BY id;\n")
 		schema:close()

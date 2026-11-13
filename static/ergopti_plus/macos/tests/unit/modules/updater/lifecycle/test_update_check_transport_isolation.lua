@@ -23,7 +23,7 @@ local BODY = '[{"tag_name":"v0.0.0-dev.150","prerelease":true,"published_at":"20
 
 local function with_owner(run)
 	helpers.with_stub_scope(OWNED, function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		-- The real registry reader, loaded before infra.paths is stubbed below:
 		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
 		local Timings = require("infra.timings")
@@ -36,8 +36,8 @@ local function with_owner(run)
 			assert(file:close())
 			return Json.decode(raw)
 		end
-		local defaults = shared("modules/updater/defaults.json")
-		local registry = assert(require("updater.channels").load(shared("modules/updater/channels.json")))
+		local defaults = shared("updater/data/defaults.json")
+		local registry = assert(require("updater.engine.channels").load(shared("updater/data/channels.json")))
 		local ctx = { now = 1700000000, requests = {}, schedule = {}, values = {}, writes = 0, notices = 0 }
 		local Http = helpers.load_with_stubs("adapters.http_client", {
 			timer = { new = function(_, callback)

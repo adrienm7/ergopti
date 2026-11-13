@@ -5,7 +5,7 @@
 The launch diagnostics seed and inspect the folders the packaged application
 writes: the logs folder, the configuration folder and the paths.toml beside
 them. Spelling those paths here would drift the day a folder moves, so each
-one comes from _shared/modules/paths/app_dirs.toml, like the drivers'
+one comes from _shared/core/fs/data/paths/app_dirs.toml, like the drivers'
 generated files and tools/dev/field-report-paths.py.
 """
 
@@ -13,7 +13,8 @@ from pathlib import Path
 import tomllib
 
 APP_DIRS = (
-    Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared/modules/paths/app_dirs.toml"
+    Path(__file__).resolve().parents[2]
+    / "static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml"
 )
 
 with APP_DIRS.open("rb") as _handle:

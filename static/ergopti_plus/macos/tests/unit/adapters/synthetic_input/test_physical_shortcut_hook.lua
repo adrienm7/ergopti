@@ -9,8 +9,8 @@ helpers.describe("physical native tap terminal ownership", function()
 		local called, detail = xpcall(function()
 local passed=0
 local function eq(a,b,msg) assert(a==b,msg..' ('..tostring(a)..' ~= '..tostring(b)..')');passed=passed+1 end
-local Json=require('json');local f=assert(io.open(helpers.shared('data/keycodes/physical_keys.json'),'rb'));local registry=Json.decode(f:read('*a'));f:close()
-local model=require('shortcuts.physical_slots').new(registry)
+local Json=require('core.text.engine.json');local f=assert(io.open(helpers.shared('layouts/data/keycodes/physical_keys.json'),'rb'));local registry=Json.decode(f:read('*a'));f:close()
+local model=require('shortcuts.engine.physical_slots').new(registry)
 local tap,callback,source_callback,constructs,executed,timers,settings
 local log={}
 package.loaded['infra.logger']={error=function(...) log[#log+1]={...} end}

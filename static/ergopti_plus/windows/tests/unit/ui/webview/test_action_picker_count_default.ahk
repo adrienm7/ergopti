@@ -27,7 +27,7 @@ Test("action picker: the count default reaches the page raw (action-picker-count
 TestAPCD_EveryLocaleNamesTheMenuTitle() {
 	global _SharedDir
 	Checked := 0
-	loop files _SharedDir . "\data\locales\*.json" {
+	loop files _SharedDir . "\core\i18n\data\locales\*.json" {
 		Locale := JsonParse(FileRead(A_LoopFileFullPath, "UTF-8"))
 		; The title opens with its emoji; the sentence quotes the words.
 		Title := RegExReplace(Locale["menu.llm.title"], "^[^\p{L}]+")

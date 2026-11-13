@@ -66,9 +66,9 @@ function stripLua(src) {
 
 // ── The canonical values ─────────────────────────────────────────────────────
 
-const defaultsPath = path.join(SHARED, 'modules', 'llm', 'defaults.json');
+const defaultsPath = path.join(SHARED, 'ai', 'data', 'defaults.json');
 if (!fs.existsSync(defaultsPath)) {
-	console.error('[ERROR] _shared/modules/llm/defaults.json is missing.');
+	console.error('[ERROR] _shared/ai/data/defaults.json is missing.');
 	process.exit(1);
 }
 const DEFAULTS = JSON.parse(fs.readFileSync(defaultsPath, 'utf8'));

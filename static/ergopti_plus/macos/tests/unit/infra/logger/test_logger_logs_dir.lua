@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local Fixture = require("tests.support.logger_async_sink_fixture")
 

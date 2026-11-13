@@ -24,14 +24,14 @@ local function with_editor(module_name, callback)
 			"hs",
 			"tests.stubs.hs",
 			"adapters.webview_result", "infra.fs_dir", "infra.text_utils", "platform.remap.lease_helper",
-			"program_providers", "adapters.task_environment", "compat.utf8", "diagnostics.runtime_log",
+			"program_providers", "adapters.task_environment", "core.lifecycle.engine.compat.utf8", "diagnostics.engine.runtime_log",
 			"adapters.apple_shortcuts", "adapters.shell_runner", "adapters.apple_shortcuts_native",
 			"infra.deferred_work", "infra.launcher_environment", "adapters.timer_scheduler", "app_dirs",
-			"lfs", "program_provider_picker", "diagnostics.operation_reporter", "infra.config_paths",
+			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "infra.config_paths",
 			"infra.log_folders", "program_parameter", "user_action_parameter", "text_utils", "adapters.program_providers",
 			"adapters.file_system", "json",
-			"infra.toml.codec", "toml_codec", "toml_codec.codec", "toml_codec.basic_string",
-			"toml_codec.bom", "toml_codec.key_path", "toml_codec.record_scanner",
+			"infra.toml.codec", "toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.basic_string",
+			"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
 		}, function()
 			local state = {
 				bridges = {},

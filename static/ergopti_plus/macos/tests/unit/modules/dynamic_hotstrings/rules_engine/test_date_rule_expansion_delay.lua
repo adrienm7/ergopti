@@ -26,7 +26,7 @@ end
 --- @param allowed boolean What the keymap's delay verdict answers.
 --- @return table fixture
 local function start(allowed)
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 	local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 	local fixture = { engine = RulesEngine, asked = {} }
@@ -56,7 +56,7 @@ end
 
 local function stop(fixture)
 	fixture.engine.stop()
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 end
 

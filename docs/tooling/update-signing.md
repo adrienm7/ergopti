@@ -4,7 +4,7 @@ The macOS archives carry a Sparkle EdDSA signature. The Windows executable
 (`ErgoptiPlus.exe`) and the Linux bundle (`ergopti-plus-linux.tar.gz`) are signed
 the same way in spirit: each release publishes a detached `<asset>.sig` and both
 updaters verify it before installing. The policy is
-`static/ergopti_plus/_shared/modules/updater/asset_signing.json`.
+`static/ergopti_plus/_shared/updater/data/asset_signing.json`.
 
 ## What is signed
 
@@ -56,7 +56,7 @@ code-signature requirement of the staged app.
 
 | Part                          | File                                                                 |
 | ----------------------------- | -------------------------------------------------------------------- |
-| Policy                        | `_shared/modules/updater/asset_signing.json`                         |
+| Policy                        | `_shared/updater/data/asset_signing.json`                            |
 | Signer and reference verifier | `tools/build/update-asset-signature.cjs`                             |
 | Shared vectors                | `_shared/tests/corpus/updater/asset_signature_vectors.json`          |
 | Linux verifier                | `linux/infra/asset_signature.lua` (OpenSSL)                          |

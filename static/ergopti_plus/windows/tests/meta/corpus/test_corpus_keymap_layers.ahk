@@ -79,7 +79,7 @@ _KLCorpus_Signatures(Result) {
 _KLCorpus_Replay(Vec, Ctx) {
 	Id := Vec["id"]
 	if Vec.Has("file") {
-		Result := KeymapLayers_Load(Vec["os"], Ctx, FileRead(_KLCorpus_SharedDir() . "\keymap\" . Vec["file"], "UTF-8"))
+		Result := KeymapLayers_Load(Vec["os"], Ctx, FileRead(_KLCorpus_SharedDir() . "\layouts\data\" . Vec["file"], "UTF-8"))
 	} else if (Vec["toml"] is String) {
 		Result := KeymapLayers_Load(Vec["os"], Ctx, Vec["toml"])
 	} else {
@@ -223,8 +223,8 @@ Test("keymap_layers  --  an unreadable layers.toml is an error, not an empty lay
 ; ==========================================
 
 _KLCorpus_BrokenShippedDataThrows() {
-	Sections := TOML_ParseFreshFile(_KLCorpus_SharedDir() . "\keymap\layer_actions.toml")
-	Registry := JsonParse(FileRead(_KLCorpus_SharedDir() . "\data\keycodes\physical_keys.json", "UTF-8"))
+	Sections := TOML_ParseFreshFile(_KLCorpus_SharedDir() . "\layouts\data\layer_actions.toml")
+	Registry := JsonParse(FileRead(_KLCorpus_SharedDir() . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	AssertThrows(() => KeymapLayers_NewContext(Map(), Sections), "a registry without keys must throw")
 	WithoutMeta := Map()
 	for Name, Section in Sections {

@@ -24,7 +24,7 @@
 --- this script again with ERGOPTI_LIVE_PHASE=after_login, which checks W1 to W3.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 local uv = require("luv")
 local ffi = require("ffi")
@@ -72,7 +72,7 @@ local Registry = require("modules.keymap.layout_registry")
 local desktop = os.getenv("XDG_CURRENT_DESKTOP")
 print("=== user-tree layout on " .. tostring(desktop) .. " Wayland (W1 to W3) ===")
 local registry_dir = "../../layouts/registry/"
-local index = require("json").decode(read(registry_dir .. "index.json"))
+local index = require("core.text.engine.json").decode(read(registry_dir .. "index.json"))
 local LAYOUT = "bepo"
 local entry
 for _, candidate in ipairs(index.layouts) do if candidate.id == LAYOUT then entry = candidate end end

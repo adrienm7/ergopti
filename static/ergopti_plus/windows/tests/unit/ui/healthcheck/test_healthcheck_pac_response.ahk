@@ -77,7 +77,7 @@ _HCPR_Case(Mode) {
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\healthcheck_pac_response_peer.ps1", "-Mode", Mode,
 				"-Directory", Directory, "-WorkerPath", _VendorDir . "\ergopti_network_pac.ps1",
-				"-PolicyPath", _SharedDir . "\modules\network\proxy_policy.json"], _HCPR_Complete.Bind(State))
+				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json"], _HCPR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The private PAC source/HTTP owner must start")
 		Started := A_TickCount
 		while !FSStrictExists(Directory . "\ready.json") && State.Completed == 0 && TickElapsed(Started) < 20000 {

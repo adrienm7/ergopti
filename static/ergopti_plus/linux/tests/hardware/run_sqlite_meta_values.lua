@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local Shell = require("adapters.shell_runner")
 local Writer = require("modules.keystats.sqlite_writer")
 local real_sqlite = assert(Shell.exec_line("command -v sqlite3"))

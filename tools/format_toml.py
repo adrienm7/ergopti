@@ -42,13 +42,13 @@ _ERGOPTI_HOTSTRINGS = (
 )
 
 HOTSTRING_FILES = [
-    shared("modules/hotstrings", "distancesreduction.toml"),
-    shared("modules/hotstrings", "autocorrection.toml"),
-    shared("modules/hotstrings", "magickey.toml"),
+    shared("hotstrings", "data", "catalogue", "distancesreduction.toml"),
+    shared("hotstrings", "data", "catalogue", "autocorrection.toml"),
+    shared("hotstrings", "data", "catalogue", "magickey.toml"),
     # Language packs (declared in _index.toml [languages]).
-    shared("modules/hotstrings", "french/distancesreduction.toml"),
-    shared("modules/hotstrings", "french/autocorrection.toml"),
-    shared("modules/hotstrings", "french/magickey.toml"),
+    shared("hotstrings", "data", "catalogue", "french", "distancesreduction.toml"),
+    shared("hotstrings", "data", "catalogue", "french", "autocorrection.toml"),
+    shared("hotstrings", "data", "catalogue", "french", "magickey.toml"),
     # The Ergopti layout extension carries the hotstrings written for its key
     # positions (static/layouts/registry/ergopti/manifest.toml).
     _ERGOPTI_HOTSTRINGS / "sfbsreduction.toml",

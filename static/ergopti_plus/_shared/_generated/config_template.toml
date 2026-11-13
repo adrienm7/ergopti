@@ -1,5 +1,5 @@
 # _shared/_generated/config_template.toml
-# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# AUTO-GENERATED from _shared/settings/data/features/manifest.toml.
 # DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
 # The default v2 config of the three drivers (ahk, hs, linux), written once.
 # - `key = value` holds for every driver whose view contains the table.

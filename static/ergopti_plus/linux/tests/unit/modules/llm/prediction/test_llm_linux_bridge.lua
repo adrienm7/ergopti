@@ -343,7 +343,7 @@ helpers.describe("infra.llm_bridge", function()
       helpers.assert_eq(LB.OLLAMA_CHAT_PATH, "/api/chat")
       helpers.assert_eq(LB.OLLAMA_TAGS_PATH, "/api/tags")
       helpers.assert_eq(LB.OLLAMA_DEFAULT_HOST, "127.0.0.1")
-      -- These mirror _shared/modules/llm/defaults.json; the JS gate
+      -- These mirror _shared/ai/data/defaults.json; the JS gate
       -- test-linux-llm-defaults-single-source pins them equal so they cannot drift.
       helpers.assert_eq(LB.OLLAMA_OWNED_PORT, 11435)        -- llm_ollama_owned_port
       helpers.assert_eq(LB.OLLAMA_STOCK_PORT, 11434)        -- llm_ollama_port (the user's own)

@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the diagnostics page's host actions: what a host accepts from the page and what it refuses, with the stable refusal code it logs. `schema` and `templates` are cut-down copies of _shared/modules/diagnostics/schema.json and issue_templates.json with a small max_export_bytes, so the byte bound is exercised by short texts; text lengths are counted in UTF-8 bytes. `expected` is the normalized action, `error` the refusal code. Replayed by _shared/lua/healthcheck/actions.lua in the macOS and Linux suites and by windows/ui/healthcheck/actions.ahk in the AHK suite.",
+	"description": "Golden vectors for the diagnostics page's host actions: what a host accepts from the page and what it refuses, with the stable refusal code it logs. `schema` and `templates` are cut-down copies of _shared/diagnostics/data/schema.json and issue_templates.json with a small max_export_bytes, so the byte bound is exercised by short texts; text lengths are counted in UTF-8 bytes. `expected` is the normalized action, `error` the refusal code. Replayed by _shared/diagnostics/engine/healthcheck/actions.lua in the macOS and Linux suites and by windows/ui/healthcheck/actions.ahk in the AHK suite.",
 	"schema": {
 		"max_export_bytes": 64,
 		"report": {

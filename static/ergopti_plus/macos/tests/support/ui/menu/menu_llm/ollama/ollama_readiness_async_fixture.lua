@@ -129,7 +129,7 @@ local function receive_pull_argv(executable, argv)
 		helpers.assert_eq(closed, true, output)
 		helpers.assert_eq(reason, "exit")
 		helpers.assert_eq(code, 0)
-		local packet = assert(require("json").decode(output))
+		local packet = assert(require("core.text.engine.json").decode(output))
 		helpers.assert_eq(packet.executable, "/opt/homebrew/bin/ollama")
 		helpers.assert_type(packet.args, "table")
 		return packet.args

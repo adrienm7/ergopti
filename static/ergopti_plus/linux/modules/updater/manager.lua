@@ -21,16 +21,16 @@
 ---    so background checks that return 304 Not Modified do not count against
 ---    the API rate limit. A 304 has no body: it reuses the list held for that
 ---    ETag, and a request is conditional only while that list is held. The
----    lists are kept in the Storage port (_shared/lua/updater/list_cache.lua
+---    lists are kept in the Storage port (_shared/updater/engine/list_cache.lua
 ---    validates them), so the first request after a start is conditional too,
 ---    provided the ETag file still names the stored list.
---- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
+--- 3. Shared parser: delegates JSON parsing to _shared/updater/engine/release_parser.lua
 ---    which requires no full JSON decoder.
 --- 4. Shared channels: every channel reads the same release list and keeps its
----    latest release through _shared/lua/updater/channels.lua (the registry in
----    _shared/modules/updater/channels.json); version order comes from
----    _shared/lua/updater/version.lua.
---- 5. Background schedule: _shared/lua/updater/schedule.lua decides from the
+---    latest release through _shared/updater/engine/channels.lua (the registry in
+---    _shared/updater/data/channels.json); version order comes from
+---    _shared/updater/engine/version_core.lua.
+--- 5. Background schedule: _shared/updater/engine/schedule.lua decides from the
 ---    wall clock and the persisted record, so a restart mid-interval does not
 ---    check at boot and a machine off past its due time catches up after the
 ---    boot delay. luv timers are monotonic and stop during a suspend, so every
@@ -47,23 +47,23 @@
 
 local M = {}
 
-local Identifiers = require("identifiers")
-local Logger    = require("logger.shim")
+local Identifiers = require("core.text.engine.identifiers")
+local Logger    = require("core.logger.engine.shim")
 local Paths     = require("infra.paths")
 local Timings   = require("infra.timings")
 local NoReplaceMove = require("infra.no_replace_move")
-local Version   = require("updater.version")
-local Parser    = require("updater.release_parser")
-local CheckResult = require("updater.check_result")
-local RateLimit = require("updater.rate_limit")
-local Channels  = require("updater.channels")
-local Schedule  = require("updater.schedule")
-local ListCache = require("updater.list_cache")
-local ReleaseSources = require("updater.release_sources")
+local Version   = require("updater.engine.version_core")
+local Parser    = require("updater.engine.release_parser")
+local CheckResult = require("updater.engine.check_result")
+local RateLimit = require("updater.engine.rate_limit")
+local Channels  = require("updater.engine.channels")
+local Schedule  = require("updater.engine.schedule")
+local ListCache = require("updater.engine.list_cache")
+local ReleaseSources = require("updater.engine.release_sources")
 local Installer = require("modules.updater.installer")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
 local Fs        = require("adapters.file_system")
 local HttpClient = require("adapters.http_client")
 local FileDigest = require("adapters.file_digest")
@@ -79,8 +79,8 @@ M._file_digest = FileDigest
 
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 
 -- =========================================
 -- =========================================
@@ -88,14 +88,14 @@ local ConfigKeys = require("config_keys")
 -- =========================================
 -- =========================================
 
--- Hardcoded fallback mirroring _shared/modules/updater/defaults.json — keeps
+-- Hardcoded fallback mirroring _shared/updater/data/defaults.json — keeps
 -- the engine functional when the shared tree is unreachable (packaged edge-case)
 local _DEFAULTS_FALLBACK = {
 	github = { owner = "adrienm7", repo = "ergopti" },
 	timing = { default_check_interval_sec = 86400, boot_check_delay_sec = 30 },
 }
 
---- Resolves the absolute path to _shared/modules/updater/defaults.json.
+--- Resolves the absolute path to _shared/updater/data/defaults.json.
 ---
 --- Through infra.paths, which knows both layouts that ship. Stripping four path
 --- components off this file's own location described the checkout only: an
@@ -103,7 +103,7 @@ local _DEFAULTS_FALLBACK = {
 --- leaves the install and the updater falls back to its hardcoded scalars.
 --- @return string|nil Absolute path, or nil if it cannot be resolved.
 local function resolve_defaults_path()
-	return Paths.shared("modules/updater/defaults.json")
+	return Paths.shared("updater/data/defaults.json")
 end
 
 --- Loads the shared updater scalars from defaults.json. Falls back to
@@ -127,7 +127,7 @@ end
 
 local _defs = load_updater_defaults()
 
--- GitHub repo coordinates (single source: _shared/modules/updater/defaults.json)
+-- GitHub repo coordinates (single source: _shared/updater/data/defaults.json)
 local GH_OWNER = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
 local GH_REPO  = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
 
@@ -153,7 +153,7 @@ local CHECK_RELEASES_URL = require_check_releases_url(_defs)
 --- no fallback: a guessed channel list could offer another channel's artifacts.
 --- @return table registry updater.channels interpreter.
 local function load_channel_registry()
-	local path = Paths.shared("modules/updater/channels.json")
+	local path = Paths.shared("updater/data/channels.json")
 	local raw = path and Fs.read(path) or nil
 	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
 	local registry, err = Channels.load(Json.decode(raw))
@@ -972,7 +972,7 @@ end
 
 M._select_checksum_asset = _select_checksum_asset
 
---- The detached-signature gate (policy: _shared/modules/updater/asset_signing.json).
+--- The detached-signature gate (policy: _shared/updater/data/asset_signing.json).
 --- Built on first use; M._signature_gate is a test seam.
 --- @return table gate
 local function get_signature_gate()
@@ -980,7 +980,7 @@ local function get_signature_gate()
 	M._signature_gate = require("modules.updater.signature_gate").new({
 		verifier = require("infra.asset_signature"),
 		read_policy = function()
-			local text = Fs.read(Paths.shared("modules/updater/asset_signing.json"))
+			local text = Fs.read(Paths.shared("updater/data/asset_signing.json"))
 			if type(text) ~= "string" then return nil, "bad_policy" end
 			local decoded_ok, decoded = pcall(Json.decode, text)
 			if not decoded_ok or type(decoded) ~= "table" then return nil, "bad_policy" end

@@ -228,7 +228,7 @@ local function with_real_api_add(provider_id, scenario, body)
 		assert(exact(rows, "➕ " .. provider.label), "the actual Add action must be present").action()
 		state.entry, state.list = entries.active(), entries.list()
 		local handle = assert(io.open(path, "rb")); state.bytes = handle:read("*a"); assert(handle:close())
-		state.image = require("json").decode(state.bytes)
+		state.image = require("core.text.engine.json").decode(state.bytes)
 		if state.done then
 			if scenario == "http-refused" then
 				state.done({ ok = false, status = 401, error_body = '{"error":{"message":"inert key required"}}' })

@@ -12,13 +12,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Catalog = require("tap_hold.key_catalog")
+local Json = require("core.text.engine.json")
+local Catalog = require("tap_hold.engine.key_catalog")
 local Timings = require("infra.timings")
 local EvdevCodes = require("infra.evdev_codes")
 local Engine = require("platform.remap.tap_hold_engine")
 local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
-local Contract = require("test.tap_hold_decision_contract")
+local Contract = require("tests.lua.keyboard.tap_hold_decision_contract")
 
 local SHARED = helpers.driver_root() .. "/../_shared"
 local DOWN, UP = 1, 0
@@ -47,7 +47,7 @@ local function read(path)
 	return text
 end
 
-local defaults = require("toml_codec").decode(read(SHARED .. "/tap_hold/defaults.toml"))
+local defaults = require("core.text.engine.toml_codec").decode(read(SHARED .. "/tap_hold/data/defaults.toml"))
 local corpus = Json.decode(read(SHARED .. "/tests/corpus/tap_hold/decision_vectors.json"))
 
 -- Catalogue id -> this driver's key id and evdev code, through its own column.

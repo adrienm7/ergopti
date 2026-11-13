@@ -13,7 +13,7 @@
 local M = {}
 M.bridge_name = "metrics_apps_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.metrics_apps"
 local Flush = require("ui.metrics_flush_bridge")
 
@@ -135,7 +135,7 @@ local function handle(payload, state, request)
 	if action == "edit" then
 		if (payload.app ~= nil and type(payload.app) ~= "string")
 			or (payload.cat ~= nil and type(payload.cat) ~= "string")
-			or (payload.score ~= nil and not require("keystats.app_category_store").score_valid(payload.score)) then
+			or (payload.score ~= nil and not require("metrics.engine.apps.category_store").score_valid(payload.score)) then
 			Logger.warn(LOG, "Application category edit refused invalid input.")
 			return with_payload({ saved = false })
 		end
@@ -160,7 +160,7 @@ local function handle(payload, state, request)
 				string.format(i18n.get("metrics_apps.score_prompt"), app_name), tostring(payload.score or 0))
 			if score_text == nil or not request.valid() then return nil end
 			local score = tonumber(score_text)
-			if not require("keystats.app_category_store").score_valid(score) then
+			if not require("metrics.engine.apps.category_store").score_valid(score) then
 				return refused("metrics_apps.score_error")
 			end
 			if not chosen:find("%S") then return refused("healthcheck.status.failed") end

@@ -12,7 +12,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_toml_fifo_source%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 
 local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
 local function run(command)
@@ -32,8 +32,8 @@ assert(file:write("[s]\nk = \"v\"\n"))
 assert(file:close())
 
 local FileSystem = require("adapters.file_system")
-local Reader = require("toml_codec.reader")
-local Writer = require("toml_codec.writer")
+local Reader = require("core.text.engine.toml_codec.reader")
+local Writer = require("core.text.engine.toml_codec.writer")
 local checks, failures = 0, 0
 local function check(name, test)
 	checks = checks + 1

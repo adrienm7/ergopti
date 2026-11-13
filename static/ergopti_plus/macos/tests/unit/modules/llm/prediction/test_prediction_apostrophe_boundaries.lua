@@ -19,7 +19,7 @@ helpers.describe("prediction apostrophe classification", function()
 				local buffer = "hello" .. suffix
 				local raw = format == "advanced"
 					and "TAIL_CORRECTED: " .. buffer .. "\nNEXT_WORDS: then left" or "then left"
-				local prediction = require("llm.parser").process_prediction(buffer, buffer, raw,
+				local prediction = require("ai.engine.api.parser_core").process_prediction(buffer, buffer, raw,
 					{ min_words = 1, max_words = 0 })
 				helpers.assert_not_nil(prediction)
 				helpers.assert_eq(prediction.deletes, 0)
@@ -37,7 +37,7 @@ helpers.describe("prediction apostrophe classification", function()
 				local buffer = "l" .. apostrophe
 				local raw = format == "advanced"
 					and "TAIL_CORRECTED: " .. buffer .. "\nNEXT_WORDS: idée claire" or "idée claire"
-				local prediction = require("llm.parser").process_prediction(buffer, buffer, raw,
+				local prediction = require("ai.engine.api.parser_core").process_prediction(buffer, buffer, raw,
 					{ min_words = 1, max_words = 0 })
 				helpers.assert_not_nil(prediction)
 				helpers.assert_eq(prediction.to_type, "idée claire")
@@ -47,7 +47,7 @@ helpers.describe("prediction apostrophe classification", function()
 
 	helpers.it("keeps the advanced hyphen continuation (unicode-apostrophe)", function()
 		helpers.load_with_stubs("infra.logger")
-		local prediction = require("llm.parser").process_prediction("anti-", "anti-",
+		local prediction = require("ai.engine.api.parser_core").process_prediction("anti-", "anti-",
 			"TAIL_CORRECTED: anti-\nNEXT_WORDS: spam utile", { min_words = 1, max_words = 0 })
 		helpers.assert_not_nil(prediction)
 		helpers.assert_eq(prediction.to_type, "spam utile")

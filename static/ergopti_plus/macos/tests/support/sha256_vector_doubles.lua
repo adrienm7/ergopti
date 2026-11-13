@@ -8,7 +8,7 @@
 --- hs.hash (a length-carrying byte API).
 ---
 --- FEATURES & RATIONALE:
---- 1. The vectors come from _shared/data/crypto/sha256_vectors.json, the corpus
+--- 1. The vectors come from _shared/core/crypto/data/crypto/sha256_vectors.json, the corpus
 ---    the Linux suites also replay, so no digest is computed by the code under
 ---    test or by a second Lua implementation.
 --- 2. The shell double keeps the C-string boundary: popen(3) receives a char *
@@ -19,11 +19,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local M = {}
 
-local file = assert(io.open(helpers.shared("data/crypto/sha256_vectors.json"), "rb"))
+local file = assert(io.open(helpers.shared("core/crypto/data/crypto/sha256_vectors.json"), "rb"))
 local rows = assert(json.decode(file:read("a")))
 assert(file:close())
 assert(#rows == 18, "the shared SHA-256 corpus must be complete")

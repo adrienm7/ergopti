@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 
-require("test.logger_volume_contract")(helpers, helpers.shared(""))
+require("tests.lua.core.logger_volume_contract")(helpers, helpers.shared(""))
 
 local Logger = require("infra.logger")
 helpers.admit_logger_privacy(Logger)

@@ -71,7 +71,7 @@ local function with_runtime(body)
 	Atspi._set_command_runner_for_test(function(command)
 		helpers.assert_contains(command, "timeout -s KILL")
 		if f.probe_hook then f.probe_hook() end
-		return true, "FOCUS:" .. require("json").encode({ role = f.secure and 40 or 61, name = "Document",
+		return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = f.secure and 40 or 61, name = "Document",
 			attributes = {}, native_bus_name = ":1.42", native_object_path = f.path, active_scope = true })
 	end)
 	Detector._set_probe_for_test(nil)
@@ -144,7 +144,7 @@ local with_native_injector = require("tests.support.infra.preferences.user_hotst
 --- Runs actual global and dynamic scope owners around the native callback fixture.
 local function with_configuration_scope(f, body)
 	local modules = { "infra.hotstrings_scope", "infra.dynamic_hotstrings_scope", "modules.dynamic_hotstrings.manager",
-		"modules.dynamic_hotstrings.prefix_rules", "dynamic_hotstrings", "modules.hotstrings.hotstrings_config",
+		"modules.dynamic_hotstrings.prefix_rules", "hotstrings.engine.dynamic.core", "modules.hotstrings.hotstrings_config",
 		"modules.hotstrings.loader", "infra.hotstring_preferences", "modules.hotstrings.repeat_key",
 		"modules.hotstrings.magic_key", "modules.hotstrings.terminator_settings", "modules.hotstrings.preview_settings" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do modules[#modules + 1] = name end
@@ -163,7 +163,7 @@ local function with_configuration_scope(f, body)
 			config = function(relative) return relative and directory .. "/" .. relative or directory end,
 			home = function() return directory end, config_home = function() return directory end,
 			-- The storage adapter keeps storage.json in the default configuration folder.
-			default_config_dir = function() return directory .. "/" .. require("app_dirs").linux.folder_name end,
+			default_config_dir = function() return directory .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end,
 			data_home = function() return directory end }, { __index = NativeConfigPaths })
 		package.loaded["modules.hotstrings.loader"] = { find_toml_files = function() return {} end,
 			list_subdirs = function() return {} end, read_file = function() return nil end,
@@ -174,7 +174,7 @@ local function with_configuration_scope(f, body)
 		if f.zero_builtin then
 			-- A refusing builtin registrar is the availability fault under test;
 			-- the manager still derives its actual count from the real rule store.
-			local builtin = require("dynamic_hotstrings")
+			local builtin = require("hotstrings.engine.dynamic.core")
 			builtin.register_date_rules = function() builtin.reset_rules(); return false end
 		end
 		helpers.assert_true(Dynamic.init({ trigger_char = "★", personal_info_path = directory .. "/personal_info.toml" }))
@@ -393,14 +393,14 @@ helpers.describe("programmable native Linux runtime", function()
 		with_runtime(function(f)
 			helpers.assert_true(f.User.stop()); f.absent = true
 			helpers.assert_true(f.User.start(f.native)); helpers.assert_true(f.User.set_time_activation(0.5))
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
 			Logger.warn = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then warned[#warned + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then warned[#warned + 1] = message end
 				return warn(module, message, ...)
 			end
 			Logger.error = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then errors[#errors + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then errors[#errors + 1] = message end
 				return err(module, message, ...)
 			end
 			local ok, failure = pcall(function()
@@ -743,7 +743,7 @@ helpers.describe("programmable native Linux runtime", function()
 				helpers.assert_true(f.User.is_enabled())
 				helpers.assert_true(Preferences.set("hotstrings.dynamic.user_code.time_activation_seconds", 0.125))
 				local input = assert(io.open(path, "r")); local bytes = input:read("*a"); input:close()
-				local decoded = require("toml_codec").decode(bytes)
+				local decoded = require("core.text.engine.toml_codec").decode(bytes)
 				helpers.assert_eq(decoded.other.untouched, "foreign")
 				helpers.assert_eq(decoded.hotstrings.dynamic.user_code.neighbor, "kept")
 				package.loaded["infra.hotstring_preferences"] = nil

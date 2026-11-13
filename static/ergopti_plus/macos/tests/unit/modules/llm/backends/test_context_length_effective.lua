@@ -20,15 +20,15 @@
 
 local helpers = require("tests.helpers")
 
--- Inject the _shared/lua/ path so the shared prompt_builder can be required
-local _shared_lua = helpers.shared("lua")
+-- Inject the _shared/ path so the shared prompt_builder can be required
+local _shared_lua = helpers.shared("")
 local _entry = _shared_lua .. "/?.lua"
 if not package.path:find(_entry, 1, true) then
 	package.path = _entry .. ";" .. package.path
 end
 
 -- Load the shared module under its canonical path
-local ok_shared, SharedPB = pcall(require, "llm.prompt_builder")
+local ok_shared, SharedPB = pcall(require, "ai.engine.prediction.prompt_builder_core")
 
 local LONG_BUFFER = ("x "):rep(1000)  -- 2000 chars, well over any heuristic cap
 
@@ -46,7 +46,7 @@ helpers.describe("M-8: context_window_chars is honoured in build_params", functi
 
 	helpers.it("shared module is loadable", function()
 		helpers.assert_true(ok_shared,
-			"_shared/lua/llm/prompt_builder.lua must be loadable — check path: " .. _shared_lua)
+			"_shared/ai/engine/prediction/prompt_builder_core.lua must be loadable — check path: " .. _shared_lua)
 	end)
 
 	helpers.it("context_window_chars=200 caps a 2000-char buffer to ≤200 chars", function()
@@ -128,7 +128,7 @@ helpers.describe("M-8: HS prompt_builder shim threads context_window_chars", fun
 		if not ok_shared then return end
 		-- Load the HS shim with the real shared module (not a stub)
 		package.loaded["modules.llm.prompt_builder"] = nil
-		-- The shim requires "llm.prompt_builder" which is already in package.loaded from above
+		-- The shim requires "ai.engine.prediction.prompt_builder_core" which is already in package.loaded from above
 		helpers.load_with_stubs("infra.logger")
 		local ok_shim, ShimPB = pcall(require, "modules.llm.prompt_builder")
 		helpers.assert_true(ok_shim, "modules.llm.prompt_builder shim must be loadable")

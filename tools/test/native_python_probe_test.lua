@@ -4,10 +4,10 @@ local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/native_python_probe_test%.lua$"))
 local repository = arg[1] or root
 -- The provider names its folders through the generated app_dirs table.
-package.path = root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+package.path = root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
 package.loaded["infra.logger"] = { error = function() end }
 local Parser = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
-local locator = assert(loadfile(root .. "/static/ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua"))()
+local locator = assert(loadfile(root .. "/static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua"))()
 local cases, assertions = 0, 0
 local function check(value, expected, label)
 	assert(value == expected, label or "private Python receiving assertion"); assertions = assertions + 1
@@ -27,7 +27,7 @@ local function with_case(options, callback)
 			fixture.clock = fixture.clock + (options.system_delay or 0)
 			return fixture.system
 		end }
-	package.loaded["core.llm.managed_python_locator"] = locator
+	package.loaded["core.lifecycle.engine.core.managed_python_locator"] = locator
 	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, idle_seconds = 60, retirement_seconds = 600 }
 	package.loaded["infra.logger"] = { error = function() end }
 	package.loaded["adapters.file_system"] = {

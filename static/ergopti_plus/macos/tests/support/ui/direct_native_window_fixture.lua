@@ -9,18 +9,18 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 --- Composes one direct controller with observable native ownership roots.
 --- @param domain string healthcheck or error.
 --- @param scenario function Receives native observations and public actions.
 local function with_window(domain, scenario)
 	return helpers.with_stub_scope({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot", "healthcheck.cleanup", "healthcheck.actions",
-		"ui.error_dialog", "diagnostics.error_policy", "diagnostics.error_report", "diagnostics.issue_report", "diagnostics.redact",
+		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot", "diagnostics.engine.healthcheck.cleanup", "diagnostics.engine.healthcheck.actions",
+		"ui.error_dialog", "diagnostics.engine.reports.error_policy", "diagnostics.engine.reports.error_report", "diagnostics.engine.reports.issue_report", "diagnostics.engine.reports.redact",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 		"adapters.timer_scheduler", "adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
-		"tests.support.webview_recursive_close_fixture", "json", "adapters.json_codec",
+		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "adapters.json_codec",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
 			timers = {}, script_refs = {}, controllers = {}, serial = 0 }
@@ -99,7 +99,7 @@ local function with_window(domain, scenario)
 		end
 		local product
 		if domain == "healthcheck" then
-			package.loaded["ui.healthcheck.helpers"], package.loaded["healthcheck.snapshot"] = {}, {}
+			package.loaded["ui.healthcheck.helpers"], package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}, {}
 			product = require("ui.healthcheck.core")
 			product.run = function() return {} end
 			product.config = function() return { schema = {}, templates = {} } end

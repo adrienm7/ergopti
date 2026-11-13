@@ -81,7 +81,7 @@ global ERGOPTI_NO_BREAK_SPACES := [Chr(0xA0), Chr(0x202F)]
 
 ; Overlay: outputs that wrap the selection (WrapTextIfSelected) on each level,
 ; spelled like the shared wrap catalogue
-; (_shared/modules/wrap_symbols/wrap_symbols.json), which gives the pair of an
+; (_shared/keyboard/data/wrap_symbols/wrap_symbols.json), which gives the pair of an
 ; asymmetric symbol and whose spelling the wrap-symbol settings are keyed by.
 ; A symbol the catalogue lacks wraps with itself on both sides.
 global ERGOPTI_WRAP_CHARACTERS := Map(
@@ -400,7 +400,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 
 /**
  * Pairs of the shared wrap catalogue.
- * @param {string} Path - _shared/modules/wrap_symbols/wrap_symbols.json.
+ * @param {string} Path - _shared/keyboard/data/wrap_symbols/wrap_symbols.json.
  * @returns {Array} Map("left", ..., "right", ...) per pair.
  * @throws {Error} When the catalogue is missing or malformed.
  */
@@ -538,7 +538,7 @@ ErgoptiLayout_Init(RegistryDir) {
 			throw Error("Ergopti and Ergopti+ number their keys differently in the registry.")
 		Spec := ErgoptiLayout_BuildSpec(Keylayout_Parse(Ergopti["Text"]), Keylayout_Parse(Plus["Text"]),
 			KeylayoutEmulation_KeyCodes(LayoutRegistry_Keycodes(), Convention),
-			ErgoptiLayout_ReadWrapPairs(_SharedDir . "\modules\wrap_symbols\wrap_symbols.json"))
+			ErgoptiLayout_ReadWrapPairs(_SharedDir . "\keyboard\data\wrap_symbols\wrap_symbols.json"))
 		DeadKeys := Spec["dead_keys"]
 		for State, Name in ERGOPTI_DEAD_KEY_NAMES
 			if !DeadKeys.Has(Name)

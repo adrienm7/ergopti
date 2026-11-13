@@ -16,40 +16,40 @@ import zipfile
 SOURCE_COMMIT = "2476d5ead197abe04629651028f83d48dc75d2b2"
 SOURCE_FILES = (
     "tools/build/build-macos-managed-ollama.py",
-    "static/ergopti_plus/_shared/go/native_http/transport.go",
-    "static/ergopti_plus/_shared/go/native_http/range_response.go",
-    "static/ergopti_plus/_shared/go/native_http/range_response_test.go",
-    "static/ergopti_plus/_shared/go/native_http/worker_darwin.go",
-    "static/ergopti_plus/_shared/go/native_http/worker_other.go",
-    "static/ergopti_plus/_shared/go/native_http/admission.go",
-    "static/ergopti_plus/_shared/go/native_http/address_policy.go",
-    "static/ergopti_plus/_shared/go/native_http/serve_environment.go",
-    "static/ergopti_plus/_shared/go/native_http/network_bootstrap.go",
-    "static/ergopti_plus/_shared/go/native_http/network_bootstrap_posix.go",
-    "static/ergopti_plus/_shared/go/native_http/network_bootstrap_unsupported.go",
-    "static/ergopti_plus/_shared/go/native_http/transport_test.go",
-    "static/ergopti_plus/_shared/go/native_http/admission_test.go",
-    "static/ergopti_plus/_shared/go/native_http/address_policy_test.go",
-    "static/ergopti_plus/_shared/go/native_http/serve_environment_test.go",
-    "static/ergopti_plus/_shared/go/native_http/network_bootstrap_test.go",
-    "static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go",
-    "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
-    "static/ergopti_plus/_shared/modules/llm/managed_ollama_environment.json",
-    "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/transport.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/range_response.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/range_response_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/worker_darwin.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/worker_other.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/admission.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/address_policy.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/serve_environment.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_posix.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_unsupported.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/transport_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/admission_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/address_policy_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/serve_environment_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_darwin_test.go",
+    "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json",
+    "static/ergopti_plus/_shared/ai/data/managed_ollama_environment.json",
+    "static/ergopti_plus/_shared/core/network/data/proxy_policy.json",
     "tools/diagnostics/macos_owned_process.py",
-    "static/ergopti_plus/_shared/go/native_http/listener_event_posix.go",
-    "static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go",
-    "static/ergopti_plus/_shared/go/native_http/listener_event_linux.go",
-    "static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go",
-    "static/ergopti_plus/_shared/go/native_http/listener_event_test.go",
-    "static/ergopti_plus/_shared/go/native_http/failure_stage_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_posix.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_darwin.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_linux.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_unsupported.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_test.go",
+    "static/ergopti_plus/_shared/core/network/native/go/native_http/failure_stage_test.go",
 )
 VERSION = "0.40.6"
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"
 REPOSITORY = "adrienm7/ergopti"
 CATALOGUE = "managed_ollama_release.json"
 BUNDLE_CATALOGUE = (
-    "ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/" + CATALOGUE
+    "ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/ai/data/" + CATALOGUE
 )
 NATIVE_ASSETS = (
     ("arm64", "ollama-ergopti-native-http-darwin-arm64.tgz"),
@@ -90,9 +90,7 @@ def native_archive(path):
 
 def fixture(repository, assets, tag, channel):
     """Bind handwritten fixture metadata to actual private source and file bytes."""
-    contract_path = (
-        repository / "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
-    )
+    contract_path = repository / "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json"
     contract_bytes = contract_path.read_bytes()
     contract = json.loads(contract_bytes)
     # These are independent reviewed declarations, not a generated oracle.
@@ -106,7 +104,7 @@ def fixture(repository, assets, tag, channel):
     ):
         raise ValueError("The independently reviewed publication fixture declarations changed")
     defaults = json.loads(
-        (repository / "static/ergopti_plus/_shared/modules/updater/defaults.json").read_bytes()
+        (repository / "static/ergopti_plus/_shared/updater/data/defaults.json").read_bytes()
     )
     if defaults["github"]["owner"] + "/" + defaults["github"]["repo"] != REPOSITORY:
         raise ValueError("The independently reviewed publication repository changed")

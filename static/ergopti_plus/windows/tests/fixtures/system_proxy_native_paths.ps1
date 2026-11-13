@@ -13,15 +13,15 @@ $Body=[scriptblock]::Create($Source.Substring($Start,$End-$Start))
 $Directory=Join-Path ([IO.Path]::GetTempPath()) ('ergopti-native-pac-paths-'+[Guid]::NewGuid().ToString('N'))
 $Directories=@($Directory,(Join-Path $Directory 'product'),(Join-Path $Directory 'product/windows'),
     (Join-Path $Directory 'product/windows/tests'),(Join-Path $Directory 'product/windows/vendor'),
-    (Join-Path $Directory 'product/_shared'),(Join-Path $Directory 'product/_shared/modules'),
-    (Join-Path $Directory 'product/_shared/modules/updater'))
+    (Join-Path $Directory 'product/_shared'),(Join-Path $Directory 'product/_shared'),
+    (Join-Path $Directory 'product/_shared/updater/data'))
 $Files=@();$Created=@();$Utf8=[Text.UTF8Encoding]::new($false);$Passed=0
 try {
     foreach ($Path in $Directories) {
         if ([IO.Directory]::Exists($Path)) {throw 'Owned path namespace is not fresh.'}
         [IO.Directory]::CreateDirectory($Path)|Out-Null;$Created+=,$Path
     }
-    $Expected=Join-Path $Directory 'product/_shared/modules/updater/defaults.json'
+    $Expected=Join-Path $Directory 'product/_shared/updater/data/defaults.json'
     [IO.File]::WriteAllText($Expected,'{"release_sources":{"proxy_resolve_timeout_sec":10}}',$Utf8);$Files+=,$Expected
     $Worker=Join-Path $Directory 'product/windows/vendor/worker.ps1'
     [IO.File]::WriteAllText($Worker,'# Owned path-only input; never executed.',$Utf8);$Files+=,$Worker

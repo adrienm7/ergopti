@@ -42,8 +42,8 @@ if not os.getenv("DISPLAY") and not os.getenv("WAYLAND_DISPLAY") then abort("no 
 local ok_lgi, lgi = pcall(require, "lgi")
 if not ok_lgi then abort("lgi is not installed.") end
 local Gtk = lgi.require("Gtk", "3.0")
-require("compat.utf8").install()
-local Json = require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local recorder = assert(arg[1], "usage: run_release_notes.lua <xdg-open record file>")
 
 --- The release body the publisher writes: a marked changelog, then downloads.

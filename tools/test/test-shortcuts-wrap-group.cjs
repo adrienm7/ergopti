@@ -28,8 +28,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const WRAP_PATH = 'shortcuts.wrap_text_if_selected';
 const LABEL_KEYS = ['shortcuts.label_wrap_text', 'menu.shortcuts.selection_symbol'];

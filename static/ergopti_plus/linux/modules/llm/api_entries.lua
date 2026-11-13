@@ -34,18 +34,18 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
 local ConfigPaths = require("infra.config_paths")
-local ConfigOutdated = require("config_outdated")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
-local AuthPolicy = require("llm.local_server_auth")
-local SourceWriter = require("toml_codec.writer")
-local ProviderConfig = require("llm.provider_config_policy")
-local EntryIdentity = require("llm.api_entry_identity")
-local NativePath = require("native_path")
+local AuthPolicy = require("ai.engine.local_servers.auth")
+local SourceWriter = require("core.text.engine.toml_codec.writer")
+local ProviderConfig = require("ai.engine.policy.provider_config_policy")
+local EntryIdentity = require("ai.engine.api.entry_identity")
+local NativePath = require("core.fs.engine.native_path")
 local TokenStore = require("modules.llm.api_token_store")
 
 local LOG = "modules.llm.api_entries"
@@ -683,7 +683,7 @@ end
 --- @param model string A model id the shared listing rule admits.
 --- @return boolean
 function M.set_model(id, model)
-	if not require("llm.api_model_listing").valid_id(model) then return false end
+	if not require("ai.engine.api.model_listing").valid_id(model) then return false end
 	local current = state()
 	if current.publishing or current.write_refusal then return false end
 	for index, entry in ipairs(current.entries) do

@@ -48,11 +48,11 @@ local function with_native(options, body)
 	end
 	function library.EVP_EncodeBlock(output, input, length)
 		local value = type(input) == "string" and input or input.text
-		output.text = require("compat.base64").encode(value:sub(1, length))
+		output.text = require("core.lifecycle.engine.compat.base64").encode(value:sub(1, length))
 		return options.encode_status or #output.text
 	end
 	function library.EVP_DecodeBlock(output, input, length)
-		local value = require("compat.base64").decode(input:sub(1, length))
+		local value = require("core.lifecycle.engine.compat.base64").decode(input:sub(1, length))
 		if not value then return -1 end
 		output.text = value
 		return options.decode_status or #input / 4 * 3

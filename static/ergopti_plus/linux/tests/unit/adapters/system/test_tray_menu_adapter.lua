@@ -195,11 +195,11 @@ end)
 helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 
 	helpers.it("shows the bundled logo from the shared tree", function()
-		-- The candidates used to hang off "<driver root>/../_shared/assets", a
+		-- The candidates used to hang off "<driver root>/../_shared/tray/data", a
 		-- directory that did not exist: every Linux user got the themed
 		-- "input-keyboard" glyph instead of the logo macOS and Windows show.
 		local Paths = helpers.load_module("infra.paths")
-		local expected = Paths.shared("assets/ergopti_tray.png")
+		local expected = Paths.shared("tray/data/ergopti_tray.png")
 		local tray, log = with_indicator(true)
 		tray.setMenu({})
 		helpers.assert_eq(log.created.icon, expected,
@@ -231,7 +231,7 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		local Protocol = helpers.load_module("tray.protocol")
 		local Paths = helpers.load_module("infra.paths")
 		local root = Paths.shared_root()
-		helpers.assert_contains(Protocol.resolve_tray_icon(root, false), "/assets/ergopti_tray.png")
+		helpers.assert_contains(Protocol.resolve_tray_icon(root, false), "/tray/data/ergopti_tray.png")
 		helpers.assert_eq(Protocol.resolve_tray_icon(nil, false), "",
 			"no shared tree means no file, and the caller falls back to a themed name")
 	end)
@@ -248,7 +248,7 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), false)
 		package.config = real_config
 		helpers.assert_true(ok, tostring(icon))
-		helpers.assert_eq(icon, Paths.shared("assets/ergopti_tray.png"),
+		helpers.assert_eq(icon, Paths.shared("tray/data/ergopti_tray.png"),
 			"the icon is the shared root's own path to the logo")
 	end)
 

@@ -2,7 +2,7 @@
 
 --- Exercises genuine editor/window/picker callbacks over an exact file receipt.
 local helpers = require("tests.helpers")
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 require("adapters.shell_runner")
 require("ui.physical_shortcuts.bridge")
 require("ui.action_picker.bridge")
@@ -10,7 +10,7 @@ require("ui.action_picker.bridge")
 local function with_editor(body)
 	local names = { "ui.physical_shortcuts.bridge", "ui.action_picker.bridge", "ui.webview_manager",
 		"modules.gestures.manager", "adapters.keyboard_hook", "adapters.program_providers", "infra.i18n",
-		"ui.text_prompt", "ui.app_chooser", "logger.shim" }
+		"ui.text_prompt", "ui.app_chooser", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local path = os.tmpname()
@@ -77,7 +77,7 @@ local function with_editor(body)
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function() state.errors = state.errors + 1 end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["ui.text_prompt"] = { ask = function()
 			state.prompts = state.prompts + 1
 			if state.on_prompt then state.on_prompt() end

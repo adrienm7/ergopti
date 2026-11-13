@@ -1,7 +1,7 @@
 --- tests/unit/modules/llm/prediction/test_prediction_parser_privacy.lua
 local helpers = require("tests.helpers")
-local Parser = helpers.load_with_stubs("llm.parser")
-local logger = require("logger.shim")
+local Parser = helpers.load_with_stubs("ai.engine.api.parser_core")
+local logger = require("core.logger.engine.shim")
 
 helpers.describe("prediction parser diagnostic privacy", function()
 	helpers.it("rejects stale predictions without logging the user's text", function()

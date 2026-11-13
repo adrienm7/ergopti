@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 require("modules.llm.api_remote")
 
 local CHAT = { provider = "openai_compat", model = "owned-model", token = "owned-fixture-token",
@@ -18,7 +18,7 @@ local PROBE = { provider = "typesafe", model = "jev-latest", token = "owned-fixt
 	base_url = "http://127.0.0.1:1234/decision" }
 
 local function isolated(body)
-	local names = { "modules.llm.api_remote", "adapters.http_client", "logger.shim" }
+	local names = { "modules.llm.api_remote", "adapters.http_client", "core.logger.engine.shim" }
 	local saved, world = {}, { calls = {}, cancels = {}, refuse = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	package.loaded["adapters.http_client"] = {
@@ -32,7 +32,7 @@ local function isolated(body)
 			return world.refuse[owner] ~= true
 		end,
 	}
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	local ok, detail = xpcall(function()
 		world.remote = helpers.load_module("modules.llm.api_remote")
 		world.remote._reset_for_test()

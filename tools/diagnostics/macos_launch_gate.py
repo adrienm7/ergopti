@@ -104,7 +104,7 @@ LUA_FATAL = "FATAL at boot stage"
 # which the boot log names when it lists the launcher environment.
 FATAL_WORD = re.compile(r"(?<![A-Za-z0-9_])FATAL(?![A-Za-z0-9_])")
 # The default logs folder: launcher.log, the fallback boot log and, without a
-# LogsDirPath override, the driver's own logs (_shared/modules/paths/app_dirs.toml).
+# LogsDirPath override, the driver's own logs (_shared/core/fs/data/paths/app_dirs.toml).
 LOGS_RELATIVE = app_dirs.LOGS_RELATIVE
 LAUNCHER_LOG_NAME = app_dirs.LAUNCHER_LOG_NAME
 FALLBACK_BOOT_LOG_NAME = "ErgoptiPlus_boot.log"

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Resolves the effective expansion delay and tooltip colour for each hotstring group and section by merging three priority layers: user overrides read from the personal TOML, section-level `[_meta]` keys from the hotstring TOML files, and global defaults from `_shared/modules/hotstrings/defaults.toml`. Exposes a single `get_config(group, section)` accessor consumed by the keymap expander and the config-window UI.
+Resolves the effective expansion delay and tooltip colour for each hotstring group and section by merging three priority layers: user overrides read from the personal TOML, section-level `[_meta]` keys from the hotstring TOML files, and global defaults from `_shared/hotstrings/data/catalogue/defaults.toml`. Exposes a single `get_config(group, section)` accessor consumed by the keymap expander and the config-window UI.
 
 ## Ports used (`_shared/core/ports/`)
 
@@ -11,7 +11,7 @@ Resolves the effective expansion delay and tooltip colour for each hotstring gro
 | `FileSystem` | Reading the personal overrides TOML and the shared defaults TOML |
 | `TomlCodec`  | Parsing the merged config tables                                 |
 
-## Shared data (`_shared/modules/hotstrings/`)
+## Shared data (`_shared/hotstrings/data/catalogue/`)
 
 `defaults.toml` — canonical defaults for every config key; `hotstrings_config.lua` must never re-declare a default locally (§5.4).
 

@@ -143,7 +143,10 @@ function loadMetricsPage(app, host, afterScript) {
 		},
 		_i18n_locale: 'fr',
 		_i18n_strings: JSON.parse(
-			fs.readFileSync(path.resolve(path.dirname(page), '../../data/locales/fr.json'), 'utf8')
+			fs.readFileSync(
+				path.resolve(path.dirname(page), '../../core/i18n/data/locales/fr.json'),
+				'utf8'
+			)
 		)
 	});
 	context.window = context;

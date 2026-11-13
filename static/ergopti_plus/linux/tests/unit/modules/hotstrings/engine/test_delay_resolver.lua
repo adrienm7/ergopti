@@ -37,7 +37,7 @@ local DEFAULTS = {
 --- @param inputs table Partial inputs, merged over the defaults.
 --- @return table
 local function resolve(inputs)
-	local resolver = helpers.load_module("hotstrings.delay_resolver")
+	local resolver = helpers.load_module("hotstrings.engine.delay_resolver")
 	local merged = {}
 	for k, v in pairs(DEFAULTS) do merged[k] = v end
 	for k, v in pairs(inputs or {}) do merged[k] = v end
@@ -226,7 +226,7 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 
 	helpers.it("reads the shared defaults rather than a local literal", function()
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
-		-- 750 ms is declared once, in _shared/modules/hotstrings/defaults.toml,
+		-- 750 ms is declared once, in _shared/hotstrings/data/catalogue/defaults.toml,
 		-- and read by all three drivers. A driver carrying its own copy expands at
 		-- a different speed from the one the user configured elsewhere.
 		helpers.assert_eq(config.get_global_default_delay_ms(), 750,

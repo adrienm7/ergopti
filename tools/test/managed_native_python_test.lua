@@ -3,7 +3,7 @@
 local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/managed_native_python_test%.lua$"))
 local repository = arg[1] or root
-package.path = repository .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+package.path = repository .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
 package.loaded["infra.logger"] = { error = function() end }
 local Interpreter = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
 local system = nil
@@ -17,7 +17,7 @@ local Locator = {
 	arm64 = "cpython-3.11.16-macos-aarch64-none/bin/python3.11",
 	x86_64 = "cpython-3.11.16-macos-x86_64-none/bin/python3.11",
 }
-package.loaded["core.llm.managed_python_locator"] = Locator
+package.loaded["core.lifecycle.engine.core.managed_python_locator"] = Locator
 package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30 }
 package.loaded["adapters.file_system"] = {
 	read_with_status = function() error("GUI catalogue reads are forbidden") end,

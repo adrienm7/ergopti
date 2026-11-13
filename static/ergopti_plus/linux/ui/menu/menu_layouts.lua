@@ -13,9 +13,9 @@ local M = {}
 
 local NativePresentation = require("infra.native_presentation")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
-local NumberRowPolicy = require("layout.number_row_policy")
-local Logger = require("logger.shim")
-local MagicKeySourceRows = require("keymap.magic_key_source")
+local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
+local Logger = require("core.logger.engine.shim")
+local MagicKeySourceRows = require("layouts.engine.layers.magic_key_source")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -43,21 +43,21 @@ local function _build_layouts(ctx)
 	-- The "Manage layouts…" row opens the shared layout manager window.
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
-	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = function()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.LAYOUT_MANAGER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layout manager cannot open.")
 			return false
 		end
-		return ctx.webview.show(require("config_keys").COMMAND.LAYOUT_MANAGER)
+		return ctx.webview.show(require("settings.engine.keys").COMMAND.LAYOUT_MANAGER)
 	end
 	-- « Create or edit a layout… »: the same window, straight on the layout editor
 	-- (ui/layout_manager/bridge.lua open_editor answers once the page is ready).
-	render_ctx.commands[require("config_keys").COMMAND.OPEN_LAYOUT_EDITOR] = function()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.OPEN_LAYOUT_EDITOR] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layout editor cannot open.")
 			return false
 		end
-		local shown = ctx.webview.show(require("config_keys").COMMAND.LAYOUT_MANAGER)
+		local shown = ctx.webview.show(require("settings.engine.keys").COMMAND.LAYOUT_MANAGER)
 		if shown == false then return false end
 		return require("ui.layout_manager.bridge").open_editor()
 	end
@@ -114,7 +114,7 @@ local function _build_layouts(ctx)
 			end
 
 			-- Ordered: `pairs` would reshuffle the list on every menu build.
-			local names = require("table_util").sorted_keys(known)
+			local names = require("core.text.engine.table_util").sorted_keys(known)
 
 			local rows = {}
 			for _, name in ipairs(names) do
@@ -147,7 +147,7 @@ local function _build_layouts(ctx)
 		if committed and reloaded == false then show_error(i18n_safe("menu.layout.emulation_failed")) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
-	local EmulationRows = require("layouts.emulation_menu")
+	local EmulationRows = require("layouts.engine.emulation.menu")
 	providers["layout_emulation"] = function()
 		local Preferences = require("infra.layout_emulation_preferences")
 		local Registry = require("modules.keymap.layout_registry")
@@ -167,10 +167,10 @@ local function _build_layouts(ctx)
 		})
 	end
 	providers["layout_features_base"] = function()
-		return { switch_rows(require("config_keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
+		return { switch_rows(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
 	end
 	providers["layout_features_altgr"] = function()
-		return { switch_rows(require("config_keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
+		return { switch_rows(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
 	end
 	render_ctx.feature_rows = {}
 	for path, row in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[path] = row end
@@ -182,7 +182,7 @@ local function _build_layouts(ctx)
 	-- The physical magic key: the key typing the magic key, chosen by pressing it
 	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
 	-- are the shared ones macOS draws too.
-	providers[require("config_keys").LEAF.MAGIC_KEY_SOURCE] = function()
+	providers[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
 		local Source = ctx.magic_key_source
 		if type(Source) ~= "table" then
 			Logger.error(LOG, "No physical magic-key owner in the menu context — its row cannot be built.")
@@ -246,14 +246,14 @@ local function _build_layouts(ctx)
 		-- its refusal is told when it settles.
 		return not settled or committed == true
 	end
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()
 		return apply_layout_scope("recommended")
 	end
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_layout_scope("clear") end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_layout_scope("clear") end
 
 	-- Native-only status never acquires a preference or forced-input writer.
-	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
-	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	providers["number_row_policy"] = function()
 		local NumberRowLive = require("modules.keymap.number_row_live")
 		local available, reason = NumberRowLive.available()
@@ -325,7 +325,7 @@ local function _build_layouts(ctx)
 		end
 		local function choose(id, letter)
 			if not Accented.set(id, letter) then
-				require("config_save_failure").present(i18n_safe, function(message)
+				require("settings.engine.publication.save_failure").present(i18n_safe, function(message)
 					show_error(message, i18n_safe("common.error_title"))
 				end)
 			end
@@ -341,7 +341,7 @@ local function _build_layouts(ctx)
 					action = function() choose(id, letter) end }
 			end
 			local letters = ManifestMenu.template_rows("accented_letter_picker_frame", {
-				[require("config_keys").COMMAND.ACCENTED_LETTER_OFF] = function() choose(id, nil) end,
+				[require("settings.engine.keys").COMMAND.ACCENTED_LETTER_OFF] = function() choose(id, nil) end,
 			}, {
 				["accented_letter_off_checked"] = function() return not entry.enabled end,
 			}, { ["accented_letter_choices"] = function() return choices end }) or {}

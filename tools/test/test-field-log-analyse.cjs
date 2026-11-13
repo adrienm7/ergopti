@@ -157,7 +157,7 @@ check('the lifecycle categories without a driver vector still read their lines',
 
 check('every budget is the value its declaration holds', () => {
 	const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
-	const toml = read('static/ergopti_plus/_shared/modules/timings/constants.toml');
+	const toml = read('static/ergopti_plus/_shared/core/timing/data/constants.toml');
 	const logger = toml.slice(toml.indexOf('\n[logger]'));
 	const hotpath = Number(logger.match(/^hotpath_slow_ms = (\d+)/m)[1]);
 	assert.equal(described.budgets['hotpath:'], hotpath);
@@ -214,7 +214,7 @@ try {
 				edit(fs.readFileSync(path.join(ROOT, relative), 'utf8'))
 			);
 		};
-		copy('static/ergopti_plus/_shared/modules/timings/constants.toml');
+		copy('static/ergopti_plus/_shared/core/timing/data/constants.toml');
 		copy('static/ergopti_plus/macos/infra/main_thread_hold.lua');
 		copy('static/ergopti_plus/macos/infra/preferences.lua', (text) =>
 			text.replace(/^local SLOW_SAVE_REPORT_MS = /m, 'local SAVE_REPORT_MS = ')

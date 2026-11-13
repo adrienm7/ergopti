@@ -231,13 +231,13 @@ end)
 --- ============================================================
 --- ============================================================
 
--- Regression: the shared scalar defaults must come from _shared/modules/llm/defaults.json
+-- Regression: the shared scalar defaults must come from _shared/ai/data/defaults.json
 -- (the single source) and never from a hardcoded base table re-declared in
 -- init.lua. If a divergent hardcoded value is reintroduced, these comparisons
 -- against the JSON fail.
 helpers.describe("Core.DEFAULT_STATE single source (defaults.json)", function()
-	local json = require("json")
-	local path = helpers.shared("modules/llm/defaults.json")
+	local json = require("core.text.engine.json")
+	local path = helpers.shared("ai/data/defaults.json")
 	local fh   = io.open(path, "r")
 	local shared = fh and json.decode(fh:read("*a")) or nil
 	if fh then fh:close() end
@@ -401,4 +401,4 @@ helpers.describe("Core.set_backend / get_backend", function()
 	end)
 end)
 
-require("test.pred_indent_default_contract")(helpers, Core.DEFAULT_STATE.llm_pred_indent)
+require("tests.lua.pred_indent_default_contract")(helpers, Core.DEFAULT_STATE.llm_pred_indent)

@@ -11,7 +11,7 @@
 --- WHY A BINDING, NOT THE LOGIC:
 --- The detection itself (walk to the .git dir, probe index.lock and the
 --- merge/rebase markers, follow a linked-worktree pointer) lives in
---- _shared/lua/reload_gate.lua so the macOS and Linux drivers share ONE
+--- _shared/core/lifecycle/engine/reload/gate.lua so the macOS and Linux drivers share ONE
 --- implementation that can never drift. This file only supplies the OS-specific
 --- filesystem access, keeping every hs.*/io call inside the adapter layer
 --- (macos-reload-during-git-pull).
@@ -19,7 +19,7 @@
 
 local M = {}
 
-local reload_gate = require("reload_gate")
+local reload_gate = require("core.lifecycle.engine.reload.gate")
 local FileSystem  = require("adapters.file_system")
 
 --- Reports whether a git write-operation is rewriting the working tree of the

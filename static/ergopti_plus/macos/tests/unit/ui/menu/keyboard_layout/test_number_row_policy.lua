@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("test.number_row_policy_contract").run(helpers,
+require("tests.lua.layouts.number_row_policy_contract").run(helpers,
 	helpers.shared("tests/corpus/layouts/number_row_policy.json"))
 
 return true

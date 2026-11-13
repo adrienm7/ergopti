@@ -17,9 +17,9 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 for _, level in ipairs({ "error", "warn", "info" }) do
 	local original = Logger[level]
 	Logger[level] = function(tag, format, ...)

@@ -4,13 +4,13 @@
 ; MODULE: Updater / Automatic-Check Schedule
 ; DESCRIPTION:
 ; Decides when an automatic update check is due from the wall clock, the
-; persisted check record and the shared timing (_shared/modules/updater/
+; persisted check record and the shared timing (_shared/updater/data/
 ; defaults.json, generated as UpdateScheduleData() in _generated/update_schedule.ahk).
 ;
 ; FEATURES & RATIONALE:
-; 1. Port of the canonical JavaScript (_shared/modules/updater/schedule.js).
+; 1. Port of the canonical JavaScript (_shared/updater/data/schedule.js).
 ;    tests/unit/modules/updater/test_updater_schedule_vectors.ahk replays the shared
-;    _shared/modules/updater/schedule_vectors.json with the Lua port, so the
+;    _shared/updater/data/schedule_vectors.json with the Lua port, so the
 ;    three drivers agree on catch-up after a power-off, a clock moved back,
 ;    failure backoff, jitter and the snap of a retired interval.
 ; 2. Integer arithmetic only: the jitter fold stays below 2^36, so JavaScript,

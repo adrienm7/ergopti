@@ -43,7 +43,7 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 				if emitted.key_code == "f20" then seen[#seen + 1] = emitted end
 			end
 			helpers.assert_eq(#seen, 1, "Karabiner activation must notify Hammerspoon without a CLI read")
-			local signal = require("keymap.control_signals").decode(quartz_flags(seen[1].flags))
+			local signal = require("layouts.engine.layers.control_signals").decode(quartz_flags(seen[1].flags))
 			helpers.assert_eq(signal, "capsword_activated")
 			engine:up("caps_lock")
 			engine:up("right_option")
@@ -61,7 +61,7 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 				if emitted.key_code == "f20" then exits[#exits + 1] = emitted end
 			end
 			helpers.assert_eq(#exits, 1, "native deactivation must invalidate earlier LED ownership")
-			helpers.assert_eq(require("keymap.control_signals").decode(quartz_flags(exits[1].flags)), "capsword_deactivated")
+			helpers.assert_eq(require("layouts.engine.layers.control_signals").decode(quartz_flags(exits[1].flags)), "capsword_deactivated")
 		end)
 	end)
 

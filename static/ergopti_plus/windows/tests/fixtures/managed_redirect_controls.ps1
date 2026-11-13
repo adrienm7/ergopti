@@ -41,8 +41,8 @@ function Invoke-Worker([string]$Url, [string]$Method, [string]$Body) {
         budget_ms = 30000; deadline_ms = 30000; started_tick = [ErgoptiWinHttpTransport]::CurrentTick()
         max_response_bytes = 1048576; max_header_bytes = 65536; connect_timeout_ms = 2000
         revocation_best_effort = $true; fixed_proxy = ''; user_agent = 'ErgoptiPlus-Redirect-Controls/1.0'
-        policy_path = (Join-Path $SharedPath 'modules/network/proxy_policy.json')
-        defaults_path = (Join-Path $SharedPath 'modules/updater/defaults.json')
+        policy_path = (Join-Path $SharedPath 'core/network/data/proxy_policy.json')
+        defaults_path = (Join-Path $SharedPath 'updater/data/defaults.json')
         route_path = (Join-Path $VendorPath 'ergopti_network_routes.ps1')
         response_path = (Join-Path $Directory 'response.bin'); header_path = (Join-Path $Directory 'headers.txt')
     }

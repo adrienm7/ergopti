@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Nothing of the source is copied or patched, as on macOS: the profile goes
 ;    through the program's own options, chosen by its family in
-;    _shared/data/app_cloner/families.json (Chromium and Electron
+;    _shared/apps/data/app_cloner/families.json (Chromium and Electron
 ;    --user-data-dir, Firefox -profile, VS Code with the shared extensions).
 ; 2. A program of no family cannot be isolated on Windows: a shortcut cannot
 ;    give one process its own %APPDATA%, and redirecting it through a wrapper
@@ -37,7 +37,7 @@
  * @returns {Map}
  */
 AppCloner_LoadFamilies(SharedDir) {
-	Catalogue := JsonParse(FileRead(SharedDir . "\data\app_cloner\families.json", "UTF-8"))
+	Catalogue := JsonParse(FileRead(SharedDir . "\apps\data\app_cloner\families.json", "UTF-8"))
 	for Key in ["detection_order", "families", "profile_folder", "window_class_prefix"] {
 		if !Catalogue.Has(Key)
 			throw ValueError("The shared App Cloner families lack " . Key . ".")

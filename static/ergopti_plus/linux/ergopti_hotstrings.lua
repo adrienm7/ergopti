@@ -61,7 +61,7 @@ local SCRIPT_DIR = (function()
 end)()
 
 -- Prepend the script directory and the shared Lua library to the search path.
-local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
+local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared"
 local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
 local literal_direct = false
 if literal_driver and literal_driver ~= "" then
@@ -102,9 +102,9 @@ if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
 		SCRIPT_DIR = ffi.string(cwd) .. "/" .. SCRIPT_DIR
 		ffi.C.free(cwd)
 	end
-	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
-	local probe = io.open(SHARED_LUA_DIR .. "/toml_codec/source_open.lua", "rb")
-	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared/lua" end
+	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared"
+	local probe = io.open(SHARED_LUA_DIR .. "/core/text/engine/toml_codec/source_open.lua", "rb")
+	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared" end
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DRIVER_ROOT", SCRIPT_DIR, 1) == 0, "cannot export driver root")
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_SHARED_ROOT", SHARED_LUA_DIR, 1) == 0, "cannot export shared root")
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DIRECT", "1", 1) == 0, "cannot export source mode")
@@ -204,12 +204,12 @@ local legacy_folder_report = LegacyFolderMigration.run()
 
 -- Install the pure-Lua utf8 compatibility shim BEFORE any shared module require.
 -- LuaJIT 2.x does not bundle Lua 5.3's utf8 library.
-local utf8_compat = require("compat.utf8")
+local utf8_compat = require("core.lifecycle.engine.compat.utf8")
 if utf8_compat.install() then
 	-- Installed — shared modules will now get real utf8 support.
 end
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local RuntimeGuard = require("infra.runtime_guard")
 
 -- The shared logger core only writes to an injected sink, so install ours before
@@ -674,7 +674,7 @@ local shutdown = ShutdownCoordinator.new({
 -- Default hotstring data location (XDG-compliant user config).
 -- How many periodic ticks between metric flushes. The periodic callback runs
 -- four times a second (periodSec = 0.25 below), and the cross-driver ingest
--- cadence is _shared/modules/timings/constants.toml [keystats] ingest_tick_ms —
+-- cadence is _shared/core/timing/data/constants.toml [keystats] ingest_tick_ms —
 -- what Windows uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. Derived
 -- rather than written as a literal so a change to the canon moves all three.
 local PERIODIC_TICK_MS   = 250
@@ -685,10 +685,10 @@ local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
-	local ok, mod = pcall(require, "keymap.terminators")
+	local ok, mod = pcall(require, "layouts.engine.layers.terminators")
 	if ok and mod then return mod end
-	Logger.error(LOG, "shared keymap.terminators failed to load (%s).", tostring(mod))
-	error("ergopti_plus: shared keymap.terminators is required but failed to load")
+	Logger.error(LOG, "shared layouts.engine.layers.terminators failed to load (%s).", tostring(mod))
+	error("ergopti_plus: shared layouts.engine.layers.terminators is required but failed to load")
 end)()
 
 
@@ -996,9 +996,9 @@ local function main()
 	end
 
 	BootProfiler.stage("config")
-	require("toml_codec.writer").set_sparse_defaults(
+	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
 		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
-	require("toml_codec.writer").set_case_twin_reporter(function(message, admission)
+	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message, admission)
 		local notifier = require("adapters.notifier")
 		if admission ~= nil then
 			local called, current = pcall(admission)
@@ -1014,22 +1014,22 @@ local function main()
 	-- and shortcut managers below load the migrated file, and a file the wizard
 	-- creates carries this build's version. A file this build cannot version (a
 	-- newer schema, a failed migration) stays untouched and every write to it is
-	-- refused for the session (_shared/lua/config_migrate.lua,
+	-- refused for the session (_shared/settings/engine/migration/migrate.lua,
 	-- docs/adr/009-config-versioning.md). Required here, not at the top: main()
 	-- sits near LuaJIT's upvalue limit.
 	do
-		local migration = require("config_migrate").boot({
+		local migration = require("settings.engine.migration.migrate").boot({
 			path          = require("infra.config_paths").config("config.toml"),
 			driver        = "linux",
-			registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+			registry_path = require("infra.paths").shared(require("settings.engine.migration.migrate").REGISTRY_PATH),
 			-- The v22 step moves the switch, the timings and [mod_combos] out of the
 			-- tap_hold.toml beside config.toml, once (maintainer decision 2026-11-11).
-			companions    = { [require("tap_hold.shared_file").FILE_NAME] =
-				require("infra.config_paths").config(require("tap_hold.shared_file").FILE_NAME) },
+			companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] =
+				require("infra.config_paths").config(require("tap_hold.engine.shared_file").FILE_NAME) },
 		})
 		-- A newer file stays read-only for the session: tell the user why their
 		-- changes do not stick. Block-local, as main() is near the upvalue limit.
-		local notice = require("config_migrate").read_only_notice_key(migration)
+		local notice = require("settings.engine.migration.migrate").read_only_notice_key(migration)
 		local notice_i18n = notice and RuntimeGuard.optional_require("infra.i18n")
 		if notice and notifier and notice_i18n then
 			notifier.send(notice_i18n.get(notice), { level = "warning" })
@@ -1258,7 +1258,7 @@ local function main()
 			_undoable = nil
 			engine:reset(false)
 		end,
-		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 		-- The switch and the timings are config.toml rows on every OS.
 		config_path = require("infra.config_paths").config("config.toml"),
@@ -1475,10 +1475,10 @@ local function main()
 		end
 		local user_preferences = require("infra.hotstring_preferences")
 		if dyn_hotstrings.set_user_code_time_activation(
-			user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
+			user_preferences.get(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
 			error("canonical programmable-hotstring interval did not commit before hook startup")
 		end
-		if dyn_hotstrings.set_user_code_enabled(user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
+		if dyn_hotstrings.set_user_code_enabled(user_preferences.get(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
 			Logger.error(LOG, "Programmable hotstrings remain closed after source admission refusal.")
 		end
 	end
@@ -1661,7 +1661,7 @@ local function main()
 					typed_trigger   = MagicKey.get(),
 					replacement     = repeated.replacement,
 					backspace_count = repeated.backspace_count,
-					group           = require("config_keys").COMMAND.REPEAT_KEY,
+					group           = require("settings.engine.keys").COMMAND.REPEAT_KEY,
 					-- The repeated word stays in the matcher (a second repeat, a
 					-- shipped correction), as on Windows and macOS.
 					final_result    = false,
@@ -1741,7 +1741,7 @@ local function main()
 					_undoable = nil
 					engine:reset(false)
 					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
-						and delivery_error == require("adapter_errors").PROGRAMMABLE_PUBLICATION_STALE and Logger.warn or Logger.error
+						and delivery_error == require("diagnostics.engine.adapter_errors").PROGRAMMABLE_PUBLICATION_STALE and Logger.warn or Logger.error
 					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
 						tostring(delivery_error))
 				end
@@ -2317,7 +2317,7 @@ local function main()
 		local key = key_name
 		if key_name == "shortcut" then key = keyboard_shortcuts.collision_identity(detail.key) end
 		-- Required here, not at the top: main() is at LuaJIT's 60-upvalue limit.
-		local action = require("keystats.clipboard_events").classify_chord(key, {
+		local action = require("metrics.engine.capture.clipboard_events").classify_chord(key, {
 			primary = mods.ctrl == true, shift = mods.shift == true, alt = mods.alt == true,
 			other = mods.meta == true or mods.altgr == true,
 		})
@@ -2810,7 +2810,7 @@ local function main()
 			local function xdg_open_log_target(target)
 				Logger.info(LOG, "Opening %s", target)
 				local started = os.execute(string.format("xdg-open %s 2>/dev/null &",
-					require("text_utils").shell_quote(target)))
+					require("core.text.engine.utils_core").shell_quote(target)))
 				return started == true or started == 0
 			end
 			return {
@@ -2909,7 +2909,7 @@ local function main()
 			-- so an install row appears for a found release.
 			on_update_checked = function(result)
 				if notifier and ok_i18n and i18n_mod then
-					local body = require("updater.check_notice").body(result, i18n_mod.get, function(id)
+					local body = require("updater.engine.check_notice").body(result, i18n_mod.get, function(id)
 						local channel = updater.CHANNELS.channel(id)
 						return channel and i18n_mod.get(channel.label_key) or tostring(id)
 					end)
@@ -2945,7 +2945,7 @@ local function main()
 					-- "hotstrings_config": that name has a bridge in BRIDGE_MODULES but
 					-- no page on disk, so the window opened and rendered
 					-- "Error: app 'hotstrings_config' not found".
-					webview_manager.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
+					webview_manager.show(require("settings.engine.keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
 				else
 					Logger.warn(LOG, "No settings window available — a custom delimiter cannot be added.")
 				end
@@ -2956,7 +2956,7 @@ local function main()
 				-- The shared quote closes, escapes and reopens an apostrophe: a pack
 				-- under "/home/me/l'ergopti" once reached xdg-open as two broken
 				-- words and silently opened nothing.
-				os.execute(string.format("xdg-open %s 2>/dev/null &", require("text_utils").shell_quote(path)))
+				os.execute(string.format("xdg-open %s 2>/dev/null &", require("core.text.engine.utils_core").shell_quote(path)))
 			end,
 			-- The three log rows open through ui/log_openers, shared with the
 			-- gesture actions: every path comes from the sink that writes it, and
@@ -3283,7 +3283,7 @@ local function main()
 			-- A release read from the public feed says it cannot be installed yet.
 			local accepted = false
 			if notifier and ok_i18n and i18n_mod then
-				local body = require("updater.check_notice").release_body(release, i18n_mod.get)
+				local body = require("updater.engine.check_notice").release_body(release, i18n_mod.get)
 				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",

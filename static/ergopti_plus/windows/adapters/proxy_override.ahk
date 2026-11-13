@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; The user's proxy override (Issue #101 point 2): automatic (the system settings,
 ; a company PAC included), direct, or one relay every download uses. The twin of
-; _shared/lua/network/proxy_override.lua over the canonical declaration
-; _shared/modules/network/proxy_override.json, stored under the same key in
+; _shared/core/network/engine/proxy_override.lua over the canonical declaration
+; _shared/core/network/data/proxy_override.json, stored under the same key in
 ; config.toml, the Windows settings store.
 ;
 ; FEATURES & RATIONALE:
@@ -40,7 +40,7 @@
 global PROXY_OVERRIDE_ENVIRONMENT := "ERGOPTI_PROXY_OVERRIDE"
 ; Published for a stored value that cannot be used; no route owner accepts it
 global PROXY_OVERRIDE_REFUSED_TOKEN := "invalid"
-; The relay schemes of network/route_plan.lua
+; The relay schemes of core/network/engine/route_plan.lua
 global PROXY_OVERRIDE_RELAY_SCHEMES := Map("http", true, "https", true, "socks5", true, "socks5h", true)
 
 global _ProxyOverrideDeclaration := 0
@@ -72,7 +72,7 @@ ProxyOverride_Declaration() {
 	global _ProxyOverrideDeclaration, _SharedDir
 	if _ProxyOverrideDeclaration is Map
 		return _ProxyOverrideDeclaration
-	Data := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_override.json", "UTF-8"))
+	Data := JsonParse(FileRead(_SharedDir . "\core\network\data\proxy_override.json", "UTF-8"))
 	if !(Data is Map) || Data.Get("schema_version", 0) != 1 || Data.Get("default", 0) !== ""
 			|| !(Data.Get("storage_key", 0) is String) || !(Data.Get("direct", 0) is String)
 			|| !RegExMatch(Data["storage_key"], "^([a-z][a-z_]*)\.([a-z][a-z_]*)$", &Parts)

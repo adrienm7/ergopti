@@ -212,7 +212,7 @@ fi
 
 # The installed wrapper's own LUA_PATH, replayed rather than re-typed, so a
 # check here cannot pass against a path the launcher does not set.
-INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/lua/?.lua;${LIB_ROOT}/_shared/lua/?/init.lua;;"
+INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/?.lua;${LIB_ROOT}/_shared/?/init.lua;;"
 
 
 section "Runtime dependencies"

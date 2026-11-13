@@ -53,9 +53,9 @@ _KLPFWF_SchemaRefusalIsNamed() {
 	Root := A_Temp . "\ergopti_schema_refusal_" . A_TickCount . "_" . Random(1000, 999999)
 	Db := 0
 	try {
-		DirCreate(Root . "\data\db")
+		DirCreate(Root . "\metrics\data\db")
 		for Name in ["schema.sql", "media_schema.sql"]
-			FileCopy(Saved . "\data\db\" . Name, Root . "\data\db\" . Name)
+			FileCopy(Saved . "\metrics\data\db\" . Name, Root . "\metrics\data\db\" . Name)
 		_SharedDir := Root
 		Db := _KLRSQL_OpenMemory()
 		AssertFalse(KLR_LoadSchema(Db), "a store without purge_schema.sql cannot load")

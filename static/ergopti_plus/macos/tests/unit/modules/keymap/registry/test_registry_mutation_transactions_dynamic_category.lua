@@ -49,7 +49,7 @@ helpers.describe("Dynamic category admits its real personal-info module owner", 
 				helpers.assert_eq({ starts, updates, saves }, { 0, expected and 1 or 0, 1 })
 				if expected then
 					helpers.assert_eq(f.preferences.load("config").personal_info, enabled)
-					local decoded = assert(require("toml_codec").decode(f.files.config))
+					local decoded = assert(require("core.text.engine.toml_codec").decode(f.files.config))
 					helpers.assert_eq(decoded.hotstrings.modules.future_module, { retained = 17 })
 				else
 					helpers.assert_eq(f.files.config, f.original, "refusal preserves exact canonical source bytes")
@@ -76,7 +76,7 @@ helpers.describe("Dynamic category admits its real personal-info module owner", 
 		helpers.assert_eq(f.files.config, external, "a stale save never overwrites the external writer")
 		helpers.assert_eq(f.action(), true)
 		assert_dynamic_personal_scope(f, true)
-		helpers.assert_eq(assert(require("toml_codec").decode(f.files.config)).future.external, 23)
+		helpers.assert_eq(assert(require("core.text.engine.toml_codec").decode(f.files.config)).future.external, 23)
 	end)
 end)
 

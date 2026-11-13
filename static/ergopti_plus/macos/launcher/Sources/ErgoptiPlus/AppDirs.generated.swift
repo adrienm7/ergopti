@@ -1,5 +1,5 @@
 // Sources/ErgoptiPlus/AppDirs.generated.swift
-// AUTO-GENERATED from _shared/modules/paths/app_dirs.toml.
+// AUTO-GENERATED from _shared/core/fs/data/paths/app_dirs.toml.
 // DO NOT EDIT BY HAND -- run `npm run codegen:app-dirs` to refresh.
 
 // ==============================================================================

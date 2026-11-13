@@ -13,7 +13,7 @@
 ; 1. An icon, not a label: the Windows notification area shows icons only, so
 ;    the number is painted into the icon, as on Linux.
 ; 2. The same decisions as the other two drivers, from the same canon
-;    (_shared/modules/wpm_widget/constants.toml [menubar]): shown while the
+;    (_shared/metrics/data/wpm_widget/constants.toml [menubar]): shown while the
 ;    speed is above zero, a preview is up or a source still colours it; the
 ;    source colour at the canon's background_alpha, the neutral fill otherwise.
 ; 3. One icon, added once and then hidden or shown, so it keeps its place.

@@ -3,13 +3,13 @@
 --- ==============================================================================
 --- TEST: Shared Logger Core Conformance
 --- DESCRIPTION:
---- Validates that the shared logger core in _shared/lua/logger/init.lua
+--- Validates that the shared logger core in _shared/core/logger/engine/init.lua
 --- produces lines that conform to the format contract in SPEC.md § 3.
 --- Exercises all 8 variants, the ring buffer and severity filtering, against
 --- expectations written inline in this file.
 ---
 --- This does NOT replay the shared corpus. It used to claim it did — "and the
---- test vectors from _shared/modules/logger/test_vectors.json" — while never
+--- test vectors from _shared/core/logger/data/test_vectors.json" — while never
 --- opening the file; the only occurrence of that path was the sentence itself.
 --- The corpus replay lives in test_logger_contract.lua (macOS),
 --- test_logger_contract.ahk (Windows) and tests/unit/infra/logger/test_logger_contract.lua
@@ -27,8 +27,8 @@
 
 local helpers = require("tests.helpers")
 
--- Load the shared logger (resolved via _shared/lua on package.path)
-local Logger = require("logger")
+-- Load the shared logger (resolved via _shared on package.path)
+local Logger = require("core.logger.engine")
 
 
 
@@ -382,7 +382,7 @@ helpers.describe("SharedLogger: sink API", function()
 	end)
 
 	helpers.it("capacity eviction publishes before a reentrant sink (logger-repeat-atomic)", function()
-		local fresh = dofile(helpers.shared("lua/logger/init.lua"))
+		local fresh = dofile(helpers.shared("core/logger/engine/init.lua"))
 		dofile(helpers.shared("tests/corpus/logger/capacity_reentry.lua"))(fresh)
 	end)
 end)

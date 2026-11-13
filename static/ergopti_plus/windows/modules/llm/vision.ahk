@@ -3,14 +3,14 @@
 ; ==============================================================================
 ; MODULE: Screen Reading (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/vision.lua: the pure logic behind the
+; AutoHotkey port of _shared/ai/engine/prediction/vision.lua: the pure logic behind the
 ; llm_screen_region, llm_screen_full and llm_screen_error actions. A vision
 ; model transcribes a screenshot, then the AI menu's text backend drafts the
 ; answers offered in the prediction tooltip.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The binding names the vision backend: "local" (the local Ollama server)
-;    or a provider of _shared/modules/llm/api_providers.json, optionally
+;    or a provider of _shared/ai/data/api_providers.json, optionally
 ;    followed by |model. Without a model the default of vision.json applies;
 ;    a backend without one needs the model in the binding, never a guess.
 ; 2. Each API dialect carries an image differently; LLM_Vision_BuildRequest
@@ -270,7 +270,7 @@ LLM_Vision_Config() {
 	static Config := ""
 	if (Config is Map)
 		return Config
-	Path := _SharedDir . "\modules\llm\vision.json"
+	Path := _SharedDir . "\ai\data\vision.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Vision_ValidateConfig(Candidate, Path)
 	Config := Candidate

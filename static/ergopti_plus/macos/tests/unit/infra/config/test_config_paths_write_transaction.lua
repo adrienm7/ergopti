@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Creates a private real directory and returns it with a trailing separator.
 --- @return string

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Update Channel Registry Vectors (Linux)
 --- DESCRIPTION:
---- Replays _shared/modules/updater/channel_vectors.json through the shared Lua
+--- Replays _shared/updater/data/channel_vectors.json through the shared Lua
 --- port (updater.channels) loaded with the real channels.json, decoded by the
 --- decoder this driver uses in production. The JavaScript matcher and the AHK
 --- port replay the same file, so the three interpreters of the registry cannot
@@ -11,9 +11,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local SHARED = helpers.driver_root() .. "/../_shared/modules/updater/"
+local SHARED = helpers.driver_root() .. "/../_shared/updater/data/"
 
 local function read_json(name)
 	local handle = assert(io.open(SHARED .. name, "rb"))
@@ -30,12 +30,12 @@ local function none(value)
 end
 
 local function load_registry()
-	package.loaded["updater.channels"] = nil
-	local Channels = require("updater.channels")
+	package.loaded["updater.engine.channels"] = nil
+	local Channels = require("updater.engine.channels")
 	return Channels, Channels.load(read_json("channels.json"))
 end
 
-helpers.describe("updater.channels — shared vectors (Linux)", function()
+helpers.describe("updater.engine.channels — shared vectors (Linux)", function()
 	local vectors = read_json("channel_vectors.json")
 	local Channels, registry, load_err = load_registry()
 

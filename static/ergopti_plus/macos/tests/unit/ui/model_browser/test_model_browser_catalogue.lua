@@ -172,7 +172,7 @@ end)
 -- drift apart into "active but not installed" with nothing failing
 -- (llm-model-identity-single-normaliser).
 helpers.describe("model_catalogue — normalise_name", function()
-	local ModelCatalogue = require("llm.model_catalogue")
+	local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 
 	helpers.it("is exported, because two callers must share one rule", function()
 		helpers.assert_eq(type(ModelCatalogue.normalise_name), "function",

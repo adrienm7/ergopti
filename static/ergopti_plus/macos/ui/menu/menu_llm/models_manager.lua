@@ -30,13 +30,13 @@ local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_regi
 
 local LOG = "menu_llm.models"
 
---- Loads _shared/modules/llm/models.json via lib.paths (configdir + script-relative walk).
+--- Loads _shared/ai/data/models.json via lib.paths (configdir + script-relative walk).
 --- Missing or invalid file → error (fail fast).
 --- @return table Provider list parsed from models.json.
 local function load_models_presets()
 	local path = Paths.shared_llm_path("models.json")
 	if not path then
-		error("[menu_llm.models] static/ergopti_plus/_shared/modules/llm/models.json not found")
+		error("[menu_llm.models] static/ergopti_plus/_shared/ai/data/models.json not found")
 	end
 	local fh = io.open(path, "r")
 	if not fh then
@@ -83,7 +83,7 @@ local function extract_mlx_name(url)
 end
 
 --- Resolves the actual backend-specific model name.
---- @param display_name string The display name from _shared/modules/llm/models.json.
+--- @param display_name string The display name from _shared/ai/data/models.json.
 --- @param presets table The global models configuration.
 --- @param is_mlx boolean True for MLX, false for Ollama.
 --- @return string The actual model name for the backend.
@@ -170,7 +170,7 @@ local function get_model_info_logic(model_name, presets)
 
 	local tag_list = {}
 	for em, _ in pairs(seen_emojis) do table.insert(tag_list, em) end
-	table.sort(tag_list, require("menu.row_order").comparator("model_tag_emoji"))
+	table.sort(tag_list, require("menu.engine.row_order").comparator("model_tag_emoji"))
 
 	local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
 	return {
@@ -796,7 +796,7 @@ function M.new(deps)
 	function obj.get_model_emojis(name) return get_model_info_logic(name, presets).emojis end
 	
 	--- Gets the actual backend-specific model name.
-	--- @param display_name string The display name from _shared/modules/llm/models.json.
+	--- @param display_name string The display name from _shared/ai/data/models.json.
 	--- @return string The real model name for the active backend.
 	function obj.get_actual_model_name(display_name)
 		local active_backend = llm_mod.get_backend()
@@ -804,7 +804,7 @@ function M.new(deps)
 	end
 	
 	--- Checks if a display model name is installed, by converting to real backend name.
-	--- @param display_name string The display name from _shared/modules/llm/models.json.
+	--- @param display_name string The display name from _shared/ai/data/models.json.
 	--- @return boolean True if installed, false otherwise.
 	function obj.is_model_installed(display_name)
 		local installed = obj.get_installed_models()
@@ -1002,7 +1002,7 @@ function M.new(deps)
 	--- Downloads a catalogue model through the MLX download window, whatever
 	--- backend the AI menu uses. Its owner starts the model's server once the
 	--- download completes, as selecting the model does.
-	--- @param display_name string Display name from _shared/modules/llm/models.json.
+	--- @param display_name string Display name from _shared/ai/data/models.json.
 	--- @param on_success function|nil Called once the model is downloaded and served.
 	--- @param on_cancel function|nil Receives the reason of a failed or cancelled download.
 	--- @param opts table|nil Freshness and ownership options.

@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
 local Clock = require("infra.monotonic")
 local Calendar = require("modules.keystats.calendar")
 local original_now = Clock.now_ms

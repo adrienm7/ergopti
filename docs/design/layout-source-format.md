@@ -398,7 +398,7 @@ needing a sided modifier other than `alt_right` (no driver reports sides), keys
 the physical-key registry does not have (`ScrollLock`, `F13`, `Pause`) and
 modifier keys (`CapsLock`, which the drivers see as a lock or a flag).
 
-One engine performs it: `_shared/lua/layouts/source_emulation.lua` on macOS
+One engine performs it: `_shared/layouts/engine/composer/source_emulation.lua` on macOS
 and Linux, its twin `_shared/ui/layout_composer/source_emulation.js` for the
 web. A press goes first to it, then (when it leaves the key alone) to the
 keylayout emulation or the OS. Selection is TN2056's: the first layer whose
@@ -426,7 +426,7 @@ having no installed layout). The fixture
 `_shared/tests/corpus/layouts/source/emulation_source.toml`, its golden
 `emulation.json` and the typing vectors `emulation_vectors.json` pin the
 compiler and both engines (`npm run test:layout-source-emulation`, and the Lua
-contract `_shared/lua/test/source_emulation_contract.lua` on both drivers).
+contract `_shared/tests/lua/source_emulation_contract.lua` on both drivers).
 
 ### Drivers: the source through the layout composer host
 
@@ -435,9 +435,9 @@ of a composition: it sends the TOML and the `.keylayout` the shared compiler
 built from it (`composer_save` with `source` instead of `declaration`), and,
 when the source has records no `.keylayout` holds, the emulation table the
 compiler wrote for that driver's platform (`emulation`, JSON text).
-`_shared/lua/layouts/composer.lua` checks the bounds (`source_file`,
+`_shared/layouts/engine/composer/composer.lua` checks the bounds (`source_file`,
 `max_source_bytes`, `emulation_file`, `max_emulation_bytes` in
-`_shared/modules/layouts/defaults.json`), the format and version, the display
+`_shared/layouts/data/defaults.json`), the format and version, the display
 name, and that the layout carries the source's internal name (a preserved
 import must send its own XML); a table must compile in the shared engine and be
 this source's (`layout`) for this driver (`platform`). It stores the TOML and

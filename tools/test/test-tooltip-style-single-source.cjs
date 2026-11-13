@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Tooltip Style Single Source
  * DESCRIPTION:
- * Pins the LLM prediction tooltip's look to _shared/modules/tooltip/constants.toml
+ * Pins the LLM prediction tooltip's look to _shared/core/ui/data/tooltip/constants.toml
  * on both the Windows and the macOS driver, so the two cannot drift apart again.
  *
  * WHY:
@@ -30,7 +30,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const TOML = fs.readFileSync(
-	path.join(SP, '_shared', 'modules', 'tooltip', 'constants.toml'),
+	path.join(SP, '_shared', 'core', 'ui', 'data', 'tooltip', 'constants.toml'),
 	'utf8'
 );
 const AHK = fs.readFileSync(path.join(SP, 'windows', 'infra', 'ui_style.ahk'), 'utf8');

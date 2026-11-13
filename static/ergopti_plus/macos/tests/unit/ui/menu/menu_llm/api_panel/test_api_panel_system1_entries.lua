@@ -19,10 +19,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CATALOGUE = (function()
-	local fh = assert(io.open(helpers.shared("modules/llm/api_providers.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/api_providers.json"), "r"))
 	local raw = fh:read("*a")
 	fh:close()
 	return assert(json.decode(raw))
@@ -98,9 +98,9 @@ local function install(args)
 			return true
 		end,
 	}
-	local command_renderer = assert(require("menu.renderer").new({
+	local command_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = require("adapters.json_codec").decode,
 		i18n = {
 			get = package.loaded["infra.i18n"].get,

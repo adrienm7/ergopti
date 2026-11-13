@@ -23,7 +23,7 @@ local LIMITS = { max_heap_bytes = 67108864, max_native_queries = 128, max_output
 --- The shared helper source the Windows worker embeds too.
 --- @return string
 local function shared_helpers()
-	local file = assert(io.open(assert(Paths.shared("modules/network/pac_helpers.js")), "rb"))
+	local file = assert(io.open(assert(Paths.shared("core/network/data/pac_helpers.js")), "rb"))
 	local text = file:read("*a")
 	assert(file:close())
 	return text

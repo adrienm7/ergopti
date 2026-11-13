@@ -8,14 +8,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger label", function()
 		local original = package.loaded["infra.i18n"]
 		local manager_before = package.loaded["modules.gestures.manager"]
 		local ok, failure = xpcall(function()
-			local file = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/fr.json", "rb"))
+			local file = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/fr.json", "rb"))
 			local strings = json.decode(file:read("*a"))
 			file:close()
 			package.loaded["infra.i18n"] = { get = function(key) return strings[key] or key end }

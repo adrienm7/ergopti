@@ -7,7 +7,7 @@
 --- engine's word buffer as macOS keeps `llm_buffer` apart from `buffer`. The
 --- hotstring engine reports each edit it applies (typed text, Backspace, an
 --- expansion, a reset, a navigation) to this observer, which mirrors the edits
---- into the shared rolling window (_shared/lua/llm/context_buffer.lua).
+--- into the shared rolling window (_shared/ai/engine/policy/context_buffer.lua).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Independent lifetime: the hotstring buffer forgets a word on a pause,
@@ -30,10 +30,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ContextBuffer = require("llm.context_buffer")
+local Logger = require("core.logger.engine.shim")
+local ContextBuffer = require("ai.engine.policy.context_buffer")
 local Settings = require("modules.llm.settings")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.llm.context"
 local RESET_ON_NAV = ConfigKeys.LEAF.RESET_ON_NAV

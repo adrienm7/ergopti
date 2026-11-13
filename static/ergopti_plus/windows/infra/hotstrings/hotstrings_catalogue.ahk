@@ -26,7 +26,7 @@
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 ; The shared matcher between a runtime category and its manifest rows, which the
 ; delay a built-in section declares is read through.
-#Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\scope_overrides.ahk
+#Include %A_LineFile%\..\..\..\..\_shared\hotstrings\data\catalogue\scope_overrides.ahk
 
 
 
@@ -49,7 +49,7 @@
 ;   4. toml.section
 ;   5. toml.file
 ;   6. the base expansion delay (delay only); color stays empty.
-; The order is the shared cascade's (_shared/lua/hotstrings/delay_resolver.lua).
+; The order is the shared cascade's (_shared/hotstrings/engine/delay_resolver.lua).
 HotstringsResolve(CategoryName, SectionName := "") {
 		if IsSet(PersonalFileControls) && PersonalFileControls.owners.Has(CategoryName)
 				return PersonalFileControls.owners[CategoryName].Resolve(SectionName)

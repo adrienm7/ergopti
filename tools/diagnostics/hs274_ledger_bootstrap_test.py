@@ -97,7 +97,7 @@ class LedgerBootstrapTests(unittest.TestCase):
             self.assertTrue(receipt["outbox_empty"])
             with BRIDGE.sqlite3.connect(":memory:") as database:
                 database.executescript(
-                    (ROOT / "static/ergopti_plus/_shared/data/db/schema.sql").read_text()
+                    (ROOT / "static/ergopti_plus/_shared/metrics/data/db/schema.sql").read_text()
                 )
                 database.executescript((Path(temporary) / "data.sql").read_text())
                 self.assertEqual(

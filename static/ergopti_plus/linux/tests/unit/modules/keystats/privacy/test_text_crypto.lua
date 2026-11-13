@@ -24,8 +24,8 @@
 
 local helpers = require("tests.helpers")
 
-local TextCrypto = require("keystats.text_crypto")
-local Heredoc    = require("shell.heredoc")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
+local Heredoc    = require("core.process.shell_heredoc")
 
 --- Resolves the shell adapter at CALL time, never once at file scope. Another
 --- test file reloads adapters.shell_runner through helpers.load_module, which
@@ -57,7 +57,7 @@ local function load_cipher(provider)
 		encrypt = function(_, _, data) return data:reverse() end,
 		decrypt = function(_, _, data) return data:reverse() end,
 	}
-	local codec = require("compat.base64")
+	local codec = require("core.lifecycle.engine.compat.base64")
 	provider.encode_base64, provider.decode_base64 = codec.encode, codec.decode
 	local previous = package.loaded["infra.openssl_cipher"]
 	package.loaded["infra.openssl_cipher"] = provider
@@ -437,7 +437,7 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 			helpers.assert_eq(received.key, KEY)
 			helpers.assert_eq(#received.iv, 32)
 			local _, payload = TextCrypto.unwrap(result)
-			helpers.assert_eq(require("compat.base64").decode(payload), "\0ciphertext\255")
+			helpers.assert_eq(require("core.lifecycle.engine.compat.base64").decode(payload), "\0ciphertext\255")
 			for _, command in ipairs(seen) do
 				helpers.assert_true(not command:find("-K", 1, true), "no per-value command may expose key arguments")
 			end
@@ -699,7 +699,7 @@ helpers.describe("sqlite_writer — encryption is not optional once enabled", fu
 		helpers.assert_contains(code, 'local json_id = MigrationPlan.iv_event_id(event_id, "events_json")')
 		helpers.assert_contains(code, "TextCipher.encrypt(device_id, json_id, raw_json)",
 			"events_json holds the same characters and must be encrypted too")
-		local Plan = require("keystats.text_migration")
+		local Plan = require("metrics.engine.privacy.text_migration_core")
 		helpers.assert_eq(Plan.iv_event_id(7, "text"), "7", "the text column keeps its historical IV id")
 		helpers.assert_eq(Plan.iv_event_id(7, "events_json"), "7j", "the JSON column keeps a distinct IV id")
 	end)

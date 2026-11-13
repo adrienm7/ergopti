@@ -2298,7 +2298,7 @@ def admit_brew(children, source, host):
     children.environment["PATH"] = str(prefix / "bin") + os.pathsep + children.environment["PATH"]
     probe = root / "brew-paths.rb"
     probe.write_text(
-        'require "json"\nrequire "tap"\nrequire "cask/config"\nrequire "cask/caskroom"\n'
+        'require "core.text.engine.json"\nrequire "tap"\nrequire "cask/config"\nrequire "cask/caskroom"\n'
         "puts JSON.generate({prefix: HOMEBREW_PREFIX.to_s, repository: HOMEBREW_REPOSITORY.to_s, "
         "library: HOMEBREW_LIBRARY.to_s, caskroom: Cask::Caskroom.path.to_s, appdir: Cask::Config.new.appdir.to_s, "
         "cache: HOMEBREW_CACHE.to_s, temp: HOMEBREW_TEMP.to_s, home: Dir.home, "

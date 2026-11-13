@@ -16,8 +16,8 @@
 ---
 --- WHERE THE PIECES LIVE:
 ---   the anchor        — this file's cascade, below
----   where it goes     — _shared/lua/tooltip/layout.lua, shared with macOS
----   what colour it is — _shared/lua/tooltip/tint.lua, same
+---   where it goes     — _shared/core/ui/engine/tooltip/layout.lua, shared with macOS
+---   what colour it is — _shared/core/ui/engine/tooltip/tint.lua, same
 ---   how it is drawn   — adapters/graphics_renderer.lua
 ---   whether to show   — the four preview toggles, and the per-category
 ---                       show_tooltip the delay cascade resolves
@@ -25,12 +25,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Renderer = require("adapters.graphics_renderer")
 local Scheduler = require("adapters.timer_scheduler")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
-local HexColor = require("color.hex")
+local HexColor = require("core.ui.engine.color_hex")
 
 local LOG = "ui.tooltip.preview"
 
@@ -416,7 +416,7 @@ function M.build_rows(candidates, opts)
 			-- injector reads `result.replacement` from a different call, so a
 			-- masked row cannot corrupt what gets typed — and a test at the
 			-- injection seam pins that. Which fields are secrets, and how much of
-			-- one stays visible, is _shared/modules/personal_info/fields.toml; the
+			-- one stays visible, is _shared/hotstrings/data/personal_info/fields.toml; the
 			-- phone number is deliberately not among them.
 			text   = masked_for_preview(candidate),
 			label  = (kind == "star") and magic_key or TERMINATOR_LABEL,

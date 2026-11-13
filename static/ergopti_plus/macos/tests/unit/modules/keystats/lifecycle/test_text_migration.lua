@@ -30,8 +30,8 @@
 
 local helpers = require("tests.helpers")
 
-local Plan       = require("keystats.text_migration")
-local TextCrypto = require("keystats.text_crypto")
+local Plan       = require("metrics.engine.privacy.text_migration_core")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local CipherDouble = require("tests.support.keystats.cipher_shell_double")
 
@@ -209,7 +209,7 @@ end
 -- =========================================
 -- =========================================
 
-helpers.describe("keystats.text_migration: enabling encrypts the rows already stored", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: enabling encrypts the rows already stored", function()
 	helpers.it("wraps every pre-existing row and round-trips it byte for byte", migration_case(function()
 		local originals = {
 			{ id = 1, text = "hello world",            events_json = "[1,2]" },
@@ -303,7 +303,7 @@ end)
 -- =========================================
 -- =========================================
 
-helpers.describe("keystats.text_migration: disabling decrypts the rows in place", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: disabling decrypts the rows in place", function()
 	helpers.it("returns every row to the exact bytes it started from", migration_case(function()
 		local originals = {
 			{ id = 1, text = "secret sentence",       events_json = "[1]" },
@@ -342,7 +342,7 @@ end)
 -- ==========================================
 -- ==========================================
 
-helpers.describe("keystats.text_migration: an interrupted pass converges", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: an interrupted pass converges", function()
 	helpers.it("finishes a half-migrated table without double-wrapping", migration_case(function()
 		local store = make_store({
 			{ id = 1, text = "one",   events_json = "[1]" },
@@ -446,7 +446,7 @@ end)
 -- =========================================
 -- =========================================
 
-helpers.describe("keystats.text_migration: the pass is sliced, not looped", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: the pass is sliced, not looped", function()
 	helpers.it("schedules the next batch instead of converting the table in one go", migration_case(function()
 		local rows = {}
 		for id = 1, 6 do rows[id] = { id = id, text = "row " .. id, events_json = "[]" } end
@@ -539,10 +539,10 @@ helpers.describe("Migration fixture native identity ownership", function()
 	end)
 end)
 
-require("test.text_migration_durability").register(helpers, {
+require("tests.lua.core.text_migration_durability").register(helpers, {
 	make_store = make_store, load = load_runner, install = install_shell,
 	restore = restore_shell, drain = drain,
 	logger = function() return require("infra.logger") end,
-	log_tag = "keystats.text_migration", device = DEVICE,
+	log_tag = "metrics.engine.privacy.text_migration_core", device = DEVICE,
 	resume = function(migration, mode) return migration.resume_for_posture(mode == Plan.MODE_ENCRYPT, DEVICE) end,
 })

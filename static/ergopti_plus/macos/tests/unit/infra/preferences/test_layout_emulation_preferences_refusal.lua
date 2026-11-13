@@ -10,14 +10,14 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.layout_emulation_preferences", "infra.preferences", "infra.logger", "logger.shim" }
+local MODULES = { "infra.layout_emulation_preferences", "infra.preferences", "infra.logger", "core.logger.engine.shim" }
 
 --- Runs `body` with a fresh writer module and a silent logger.
 --- @param body function Receives the writer and the flat key resolver.
 local function with_writer(body)
 	helpers.with_stub_scope(MODULES, function()
 		local logger = helpers.make_logger_stub()
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		package.loaded["infra.layout_emulation_preferences"] = nil
 		local writer = require("infra.layout_emulation_preferences")
 		local Preferences = require("infra.preferences")
@@ -25,7 +25,7 @@ local function with_writer(body)
 	end)
 end
 
-local KEY = require("config_keys").KEY
+local KEY = require("settings.engine.keys").KEY
 
 helpers.describe("layout emulation preferences fail closed", function()
 	for _, answer in ipairs({ false, "nil", "true" }) do

@@ -30,12 +30,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
-local Terminators = require("keymap.terminators")
-local ConfigOutdated = require("config_outdated")
-local ConfigKeys = require("config_keys")
+local Terminators = require("layouts.engine.layers.terminators")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "magic_key"
 

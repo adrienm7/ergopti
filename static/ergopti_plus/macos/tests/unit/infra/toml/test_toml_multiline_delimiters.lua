@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec.codec")
-local scanner = require("toml_codec.record_scanner")
+local codec = require("core.text.engine.toml_codec.codec")
+local scanner = require("core.text.engine.toml_codec.record_scanner")
 
 helpers.describe("toml_codec: multiline delimiter boundaries", function()
 	for _, char in ipairs({ '"', "'" }) do

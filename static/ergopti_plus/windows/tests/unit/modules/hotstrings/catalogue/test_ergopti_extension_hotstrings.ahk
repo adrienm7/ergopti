@@ -73,7 +73,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 		AssertEqual(0, CountTomlSection("magickey", "replace"), "the native feature owns no fabricated mapping")
 		AssertEqual("", HotstringsBoundTomlPath("magickey", "text_expansion_symbols"),
 			"the other magic key sections stay bundled")
-		Assert(InStr(HotstringsBundledTomlPath("magickey"), "\modules\hotstrings\magickey.toml"))
+		Assert(InStr(HotstringsBundledTomlPath("magickey"), "\hotstrings\data\catalogue\magickey.toml"))
 		AssertEqual(34, CountTomlHotstrings("sfbsreduction"))
 		AssertEqual(35, CountTomlHotstrings("rolls"))
 		AssertEqual(14, CountTomlSection("magickey", "repeat_corrections"))
@@ -278,7 +278,7 @@ _EHX_DistanceReferenceLoadsNatively() {
 		AssertEqual(101, Reference["entries"].Length)
 		AssertEqual(101, CountTomlHotstrings("distancesreduction"))
 		AssertEqual("ergopti", _HotstringBoundSources["distancesreduction"]["extension"])
-		Assert(!FileExist(_SharedDir . "\modules\hotstrings\distancesreduction.toml"),
+		Assert(!FileExist(_SharedDir . "\hotstrings\data\catalogue\distancesreduction.toml"),
 			"the common folder must not duplicate the extension's file")
 		HSE_TestReset()
 		try {

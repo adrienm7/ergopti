@@ -4,7 +4,7 @@
 ; MODULE: Tap-Hold Picker Catalogue Path Guard
 ; DESCRIPTION:
 ; Guards the shared hold-picker path against a literal tab replacing the
-; leading `\t` of `\tap_hold`. That typo makes every modifier/layer read return
+; leading `\t` of `\tap_hold\data`. That typo makes every modifier/layer read return
 ; an empty array, leaving only the "none" row in the user-visible picker.
 ; ==============================================================================
 
@@ -25,13 +25,13 @@ _THPCP_SharedCataloguePathIsExact() {
 	Assert(Body != "",
 		"_TH_ReadHoldPickerArray must remain source-visible")
 	Body := _StripFullLineComments(Body)
-	AssertContains(Body, '_SharedDir . "\tap_hold\defaults.toml"',
+	AssertContains(Body, '_SharedDir . "\tap_hold\data\defaults.toml"',
 		"the Windows hold picker must read the real shared tap_hold catalogue")
 	Assert(InStr(Body, Chr(9) . 'ap_hold\defaults.toml') == 0,
 		"a literal tab in the catalogue suffix silently empties every hold option")
 
 	global _SharedDir
-	CataloguePath := _SharedDir . "\tap_hold\defaults.toml"
+	CataloguePath := _SharedDir . "\tap_hold\data\defaults.toml"
 	Assert(FileExist(CataloguePath) != 0,
 		"the exact production catalogue path must resolve to the shared defaults")
 	Content := FileRead(CataloguePath, "UTF-8")

@@ -5,7 +5,7 @@
  * MODULE: Go Proxy Sign-In Relay Gate
  * DESCRIPTION:
  * Runs the Go tests of the local NTLM/Negotiate relay
- * (_shared/go/native_http/proxyrelay and cmd/ergopti-proxy-relay,
+ * (_shared/core/network/native/go/native_http/proxyrelay and cmd/ergopti-proxy-relay,
  * docs/design/proxy-auth-relay.md) offline, with the race detector and the
  * installed toolchain only. A missing toolchain or a run in which a required
  * test did not pass is a failure: "no test files" is never green. The real
@@ -19,7 +19,17 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MODULE = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'go', 'native_http');
+const MODULE = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'network',
+	'native',
+	'go',
+	'native_http'
+);
 // The relay packages only: the module's other files are spliced into Ollama
 // and need its dependencies (golang.org/x/sys), which this gate never fetches.
 const PACKAGES = ['./proxyrelay/', './cmd/ergopti-proxy-relay/'];

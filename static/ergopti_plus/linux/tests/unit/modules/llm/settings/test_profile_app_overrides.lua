@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local Overrides = require("llm.app_profile_overrides")
+local Overrides = require("ai.engine.policy.app_profile_overrides")
 
 local held = {}
 
@@ -120,7 +120,7 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 	end)
 
 	helpers.it("app-profile: preserves a wrong-typed saved override", function()
-		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		for _, source in ipairs({
 			'[llm]\napp_profile_overrides = 42\n',
 			'[llm]\napp_profile_overrides = false\n',
@@ -145,7 +145,7 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 	end)
 
 	helpers.it("app-profile: refuses a stale cached map after an external edit", function()
-		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		local first = Overrides.encode({ firefox = "basic" })
 		local external = Overrides.encode({ firefox = "advanced", kate = "basic" })
 		local source = '[llm]\napp_profile_overrides = "' .. first .. '"\n'
@@ -177,8 +177,8 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 
 	for _, first_cache in ipairs({ "overrides", "registry", "overrides before reference" }) do
 		helpers.it("app-profile: refuses deletion across separate cache snapshots (" .. first_cache .. " first)", function()
-			local Sandbox = require("test.config_unused_keys_contract").sandbox
-			local Registry = require("llm.profile_registry_codec")
+			local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+			local Registry = require("ai.engine.settings.profile_registry_codec")
 			local external_profile = { id = "user_external", label = "External", system_single = "Keep external prompt",
 				system_multi = "", system_multi_template = "", batch = false }
 			local function document(registry, overrides)
@@ -212,7 +212,7 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 						"registry and override candidates must come from the same source")
 					helpers.assert_eq(Sandbox.read_bytes(path), successor, "refusal preserves every external byte")
 					helpers.assert_true(settings.delete_user_profile(USER.id), "a retry reads one current source")
-					local actual = assert(require("toml_codec").decode(Sandbox.read_bytes(path)))
+					local actual = assert(require("core.text.engine.toml_codec").decode(Sandbox.read_bytes(path)))
 					helpers.assert_eq(Overrides.decode(actual.llm.app_profile_overrides), { kate = "advanced", terminal = "basic" })
 					helpers.assert_eq(Registry.decode(actual.llm.user_profiles), { external_profile })
 					helpers.assert_eq(actual.external.marker, "keep external setting")
@@ -226,8 +226,8 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 	end
 
 	helpers.it("app-profile: deleting a profile preserves unreadable overrides", function()
-		local Sandbox = require("test.config_unused_keys_contract").sandbox
-		local Registry = require("llm.profile_registry_codec")
+		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+		local Registry = require("ai.engine.settings.profile_registry_codec")
 		local damaged = "v1:***not-base64***"
 		local source = '[llm]\nuser_profiles = "' .. Registry.encode({ USER })
 			.. '"\napp_profile_overrides = "' .. damaged .. '"\n\n[external]\nmarker = "keep external setting"\n'
@@ -239,7 +239,7 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 				package.loaded["infra.config_paths"] = { config = function() return path end }
 				local settings = require("modules.llm.profile_settings")
 				helpers.assert_true(settings.delete_user_profile(USER.id))
-				local actual = assert(require("toml_codec").decode(Sandbox.read_bytes(path)))
+				local actual = assert(require("core.text.engine.toml_codec").decode(Sandbox.read_bytes(path)))
 				helpers.assert_eq(actual.llm.app_profile_overrides, damaged)
 				helpers.assert_eq(Registry.decode(actual.llm.user_profiles or ""), {})
 				helpers.assert_eq(actual.external.marker, "keep external setting")

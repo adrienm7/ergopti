@@ -5,7 +5,7 @@
  * MODULE: Windows Keyboard Layout Model and Sources
  * DESCRIPTION:
  * Turns the canonical form of a macOS .keylayout (the shared Lua reader,
- * _shared/lua/layouts/keylayout.lua) into a Windows keyboard layout: one model
+ * _shared/layouts/engine/composer/keylayout.lua) into a Windows keyboard layout: one model
  * of scan codes, virtual keys, characters, dead keys and ligatures, written as
  * the C, header, resource and module-definition sources a keyboard DLL is
  * compiled from, and as the MSKLC .klc source of the same layout.
@@ -268,7 +268,7 @@ function units(text) {
 
 /**
  * The physical keys of a layout, from the shared keycode table.
- * @param {object} table - Decoded _shared/modules/layouts/mac_keycodes.json.
+ * @param {object} table - Decoded _shared/layouts/data/mac_keycodes.json.
  * @param {string} convention - "iso" or "ansi".
  * @returns {{code: string, scanCode: number, mac: number}[]}
  */
@@ -643,7 +643,7 @@ const FIXED_KEYS = [
  * The names Windows shows for keys that type no character (GetKeyNameText),
  * from the shared physical key registry: the W3C code with its words split
  * ("ArrowUp" → "Arrow Up"). Plain and E0-extended keys are separate tables.
- * @param {object} registry - Decoded _shared/data/keycodes/physical_keys.json.
+ * @param {object} registry - Decoded _shared/layouts/data/keycodes/physical_keys.json.
  * @returns {{plain: Array<[number, string]>, extended: Array<[number, string]>}}
  */
 function keyNames(registry) {

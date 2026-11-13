@@ -22,7 +22,7 @@
  * someone adds a hard requirement the installer does not satisfy.
  *
  * ROOT CAUSE 2 — AN EXPORTED PATH TO A DIRECTORY THAT DOES NOT EXIST.
- * The launcher exported LUA_PATH over `${ERGOPTI_ROOT}/shared/lua`. The tree is
+ * The launcher exported LUA_PATH over `${ERGOPTI_ROOT}/shared/`. The tree is
  * `_shared`, with an underscore, everywhere else — install.sh, the package
  * builder, the repo. It went unnoticed for so long because the daemon rebuilds
  * package.path from its own location before requiring anything, so the broken
@@ -65,7 +65,9 @@ const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 const MESSAGES_READER = require('./lib/shell-messages-fixture.cjs').readerSource();
 // The installer sources the shared hosts before its functions; so do the fixtures.
 const IDENTIFIERS_READER = `. ${JSON.stringify(
-	bashPath(path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'identifiers.sh'))
+	bashPath(
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'core', 'text', 'data', 'identifiers.sh')
+	)
 )}\n`;
 const LAUNCHER = path.join(DRIVER, 'bin', 'ergopti-hotstrings');
 const INSTALLER = path.join(DRIVER, 'install.sh');

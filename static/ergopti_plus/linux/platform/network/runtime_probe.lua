@@ -25,15 +25,15 @@ if not root or type(shared) ~= "string" or shared:sub(1, 1) ~= "/" or arg[2] ~= 
 end
 if literal_driver then
 	local resolver = assert(package.loaded["infra.literal_module_loader"])
-	resolver.prepend({ { root, ".lua" }, { shared .. "/lua", ".lua" } })
+	resolver.prepend({ { root, ".lua" }, { shared .. "", ".lua" } })
 else
-	package.path = root .. "/?.lua;" .. shared .. "/lua/?.lua;" .. package.path
+	package.path = root .. "/?.lua;" .. shared .. "/?.lua;" .. package.path
 end
 local loaded, receipt = pcall(function()
 	return require("platform.network.native_proxy_runtime").inspect()
 end)
 if not loaded then receipt = { ok = false, error = "proxy-native-unavailable" } end
-local json_loaded, Json = pcall(require, "json")
+local json_loaded, Json = pcall(require, "core.text.engine.json")
 if not json_loaded then
 	io.stdout:write('{"ok":false,"error":"proxy-runtime-unavailable"}\n')
 	os.exit(1)

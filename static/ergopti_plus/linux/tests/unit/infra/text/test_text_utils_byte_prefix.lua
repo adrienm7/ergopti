@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local TextUtils = require("text_utils")
-local Utf8 = require("compat.utf8")
+local TextUtils = require("core.text.engine.utils_core")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 helpers.describe("Shared UTF-8 byte prefix", function()
 	helpers.it("retains ASCII short empty and exact-boundary bytes", function()

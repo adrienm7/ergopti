@@ -53,7 +53,7 @@ _SRII_EveryInsertIsIgnoreOnConflict() {
 	; reads "routes it into events_system", which a naive scan counts as a bare
 	; INSERT and fails against perfectly correct code — the comment-mention trap.
 	global _DriverDir
-	; The rendered catalogue statements (_shared/data/db/queries.sql) are
+	; The rendered catalogue statements (_shared/metrics/data/db/queries.sql) are
 	; generated, so the authored-source census leaves them out; they are half of
 	; the event writers and are read here explicitly.
 	Src := _DriverSourceNoComments() . "`n"

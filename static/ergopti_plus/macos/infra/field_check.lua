@@ -40,9 +40,9 @@ local LOG = "field_check"
 -- =================================
 -- =================================
 
--- The model is shared with the Linux checks (_shared/lua/field_check_report.lua):
+-- The model is shared with the Linux checks (_shared/diagnostics/engine/field_check/report.lua):
 -- one grammar for every record the maintainer pastes back.
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 
 --- Step states. A run passes when no step failed; info and skip never fail it.
 M.STATE_PASS = Report.STATE_PASS

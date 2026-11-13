@@ -4,18 +4,18 @@
 --- MODULE: Hotstring Catalogue Discovery Skips Metadata (macOS)
 --- DESCRIPTION:
 --- The packaged app showed an empty « défauts (0) » row among the common
---- hotstrings. The boot scan of _shared/modules/hotstrings/ skipped only
+--- hotstrings. The boot scan of _shared/hotstrings/data/catalogue/ skipped only
 --- "_"-prefixed files, so defaults.toml — the resolver's fallback delays and
 --- colours, not a category — loaded as a hotstring group with no entry. Linux
 --- already excluded it with its own copy of the rule. Both scans now go through
---- _shared/lua/hotstrings/catalogue_files.lua; these cases pin the rule and that
+--- _shared/hotstrings/engine/catalogue/files.lua; these cases pin the rule and that
 --- this driver's scan uses it.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local CatalogueFiles = require("hotstrings.catalogue_files")
-local TomlCodec = require("toml_codec.codec")
+local AppDirs = require("core.fs.engine.app_dirs")
+local CatalogueFiles = require("hotstrings.engine.catalogue.files")
+local TomlCodec = require("core.text.engine.toml_codec.codec")
 
 helpers.describe("hotstring catalogue (macos): metadata is never a category", function()
 	helpers.it("catalogue files: defaults.toml and _index.toml are not categories", function()
@@ -42,7 +42,7 @@ helpers.describe("hotstring catalogue (macos): metadata is never a category", fu
 	end)
 
 	helpers.it("catalogue files: every category the shared index orders is accepted", function()
-		local fh = assert(io.open(helpers.shared("modules/hotstrings/_index.toml"), "r"))
+		local fh = assert(io.open(helpers.shared("hotstrings/data/catalogue/_index.toml"), "r"))
 		local index = TomlCodec.decode(fh:read("*a"))
 		fh:close()
 		local order = index.menu and index.menu.categories_order or {}

@@ -9,9 +9,9 @@
 --- continuation-aware scanner instead of growing another line-based patcher.
 --- ==============================================================================
 
-local Scanner = require("toml_codec.record_scanner")
-local KeyPath = require("toml_codec.key_path")
-local TextUtils = require("text_utils")
+local Scanner = require("core.text.engine.toml_codec.record_scanner")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local TextUtils = require("core.text.engine.utils_core")
 
 local M = {}
 

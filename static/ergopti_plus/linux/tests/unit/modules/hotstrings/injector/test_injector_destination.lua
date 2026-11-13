@@ -16,15 +16,15 @@ local fixture = require("tests.support.text_owner_fixture")
 local function injection(boundary, body)
 	fixture.with(function(guard, state)
 		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
-			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "logger.shim" }
+			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local rows, writes, commands, held, stopped = {}, {}, {}, {}, 0
 		local errors = {}
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end)
 		logger.set_error_observer(function(_, template) errors[#errors + 1] = template end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local transitioned = false
 		local restoration_recovered = false
 		local function transition(point)

@@ -16,7 +16,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const SCAN = String.raw`
 import ast, pathlib, re, sys
 root = pathlib.Path(sys.argv[1])
-roots = [root / "static/ergopti_plus/macos", root / "static/ergopti_plus/_shared/python"]
+roots = [root / "static/ergopti_plus/macos", root / "static/ergopti_plus/_shared"]
 problems, count = [], 0
 for base in roots:
     for path in sorted(base.rglob("*.py")):

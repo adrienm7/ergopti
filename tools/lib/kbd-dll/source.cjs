@@ -55,13 +55,15 @@ const fail = (code, path) => {
 };
 
 /**
- * The physical-key registry (_shared/data/keycodes/physical_keys.json) read from
+ * The physical-key registry (_shared/layouts/data/keycodes/physical_keys.json) read from
  * the repository; a page passes the table it already holds instead.
  */
 function repositoryPhysicalKeys() {
 	const fs = require('node:fs');
 	const { shared } = require('../paths.cjs');
-	return JSON.parse(fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8'));
+	return JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
+	);
 }
 
 /** Physical key name <-> extended scan code (0x1nn for an E0 key), from the registry. */

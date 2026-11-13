@@ -266,7 +266,7 @@ end)
 --- @return string
 local function injector_log(is_private)
 	local injector = helpers.load_module("modules.hotstrings.injector")
-	local logger   = require("logger.shim")
+	local logger   = require("core.logger.engine.shim")
 
 	local lines = {}
 	local originals = {}
@@ -301,7 +301,7 @@ helpers.describe("private mapping: the 14-day log", function()
 
 	helpers.it("names the type, not the value, when the arguments are wrong", function()
 		local injector = helpers.load_module("modules.hotstrings.injector")
-		local logger   = require("logger.shim")
+		local logger   = require("core.logger.engine.shim")
 		local original = logger.error
 		local lines = {}
 		logger.error = function(_tag, fmt, ...)

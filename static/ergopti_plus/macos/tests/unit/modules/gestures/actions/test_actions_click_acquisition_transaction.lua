@@ -18,8 +18,8 @@ local DEPENDENCIES = {
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"adapters.timer_scheduler",
-	"error_description",
-	"number_policy",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 	"modules.gestures.actions_click",
 	"modules.gestures",
 	"modules.gestures.actions",
@@ -290,8 +290,8 @@ local function with_fixture(config, body)
 		end,
 	}
 	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["error_description"] = nil
-	package.loaded["number_policy"] = nil
+	package.loaded["diagnostics.engine.reports.error_description"] = nil
+	package.loaded["core.text.engine.number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil
 	package.loaded["modules.gestures"] = nil
 	package.loaded["modules.gestures.actions"] = nil
@@ -444,7 +444,7 @@ helpers.describe("click-hold acquisition transaction", function()
 	helpers.it("observes a real logger failure after the direct rollback already restores the slot", function()
 		with_fixture({ real_gestures = true }, function(Click)
 			package.loaded["infra.logger"] = nil
-			package.loaded["logger"] = nil
+			package.loaded["core.logger.engine"] = nil
 			local Logger = require("infra.logger")
 			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
 			assert(Gestures.set_action("tap_3", "left_click_toggle"))

@@ -6,7 +6,7 @@ const path = require('node:path');
 const { runPage } = require('./support/changelog-page-dom.cjs');
 const strings = JSON.parse(
 	fs.readFileSync(
-		path.join(__dirname, '../../static/ergopti_plus/_shared/data/locales/en.json'),
+		path.join(__dirname, '../../static/ergopti_plus/_shared/core/i18n/data/locales/en.json'),
 		'utf8'
 	)
 );

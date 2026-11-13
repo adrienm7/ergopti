@@ -25,11 +25,11 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 SHARED_ROOT = DRIVER_ROOT.parent / "_shared"
-REDIRECT_POLICY = SHARED_ROOT / "data/http/redirect_policy.json"
-PROXY_POLICY = SHARED_ROOT / "python/network_proxy_policy.py"
-PYTHON_RELEASE = SHARED_ROOT / "modules/llm/managed_python_release.json"
+REDIRECT_POLICY = SHARED_ROOT / "core/network/data/http/redirect_policy.json"
+PROXY_POLICY = SHARED_ROOT / "core/network/adapters/python_network_proxy_policy.py"
+PYTHON_RELEASE = SHARED_ROOT / "ai/data/managed_python_release.json"
 NATIVE_ENGINE = DRIVER_ROOT / "platform/network/native_http.py"
-IDENTIFIERS = SHARED_ROOT / "data/identifiers.py"
+IDENTIFIERS = SHARED_ROOT / "core/text/data/identifiers.py"
 
 
 class BootstrapFailure(Exception):
@@ -145,7 +145,7 @@ def _url(value, maximum):
 
 
 def _github_host():
-    """The GitHub host declared once in _shared/data/identifiers.json."""
+    """The GitHub host declared once in _shared/core/text/data/identifiers.json."""
     specification = importlib.util.spec_from_file_location(
         "_ergopti_bootstrap_identifiers", IDENTIFIERS
     )

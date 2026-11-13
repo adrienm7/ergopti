@@ -67,7 +67,7 @@ end
 --- @return string|nil directory Native owned location, not a trust statement.
 function M.native_managed_install_dir()
 	local home = home_directory()
-	return home and home .. "/" .. require("app_dirs").macos.support_relative .. "/ollama-native-http" or nil
+	return home and home .. "/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/ollama-native-http" or nil
 end
 
 --- Receives only a provisional installed-receipt hint for the native runtime.
@@ -106,9 +106,9 @@ function M.pinned_version()
 	local source = debug.getinfo(1, "S").source:sub(2)
 	local driver = assert(source:match("^(.*)/modules/llm/ollama_binary%.lua$"), "driver root unavailable")
 	local text, status = require("adapters.file_system").read_with_status(
-		driver .. "/../_shared/modules/llm/managed_ollama_runtime.json")
+		driver .. "/../_shared/ai/data/managed_ollama_runtime.json")
 	assert(status == "ok" and type(text) == "string", "managed Ollama runtime contract is unreadable")
-	local decoded = require("json").decode(text)
+	local decoded = require("core.text.engine.json").decode(text)
 	assert(type(decoded) == "table" and type(decoded.version) == "string"
 		and decoded.version:match("^%d+%.%d+%.%d+$"), "managed Ollama runtime contract names no version")
 	return decoded.version

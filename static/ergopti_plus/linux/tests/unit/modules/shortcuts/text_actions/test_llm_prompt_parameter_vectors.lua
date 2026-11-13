@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/llm_prompt_vectors.json"
@@ -32,7 +32,7 @@ local function read_corpus()
 end
 
 local Gestures = helpers.load_module("modules.gestures.manager")
-local PromptAction = require("llm.prompt_action")
+local PromptAction = require("ai.engine.prediction.prompt_action")
 
 --- Runs body over a fresh profile registry on isolated AI preferences.
 --- @param body function
@@ -135,7 +135,7 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 				"the page fills the default count itself")
 		end, {
 			["llm.profiles.num_predictions"] = 3,
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_mine", label = "Mine", system_single = "Continue.", batch = false },
 			}),
 		})
@@ -175,7 +175,7 @@ helpers.describe("llm_prompt_prediction parameter: the dispatcher hands the stor
 			initialize()
 			helpers.assert_true(G.set_action_parameter("keyboard__primary_p", ACTION, "user_private_notes|2"))
 			local saved = assert(io.open(path, "rb"))
-			local document = require("toml_codec").decode(saved:read("*a"))
+			local document = require("core.text.engine.toml_codec").decode(saved:read("*a"))
 			assert(saved:close())
 			helpers.assert_eq(document.gesture_parameters.keyboard__primary_p__llm_prompt_prediction,
 				"user_private_notes|2", "the keyboard binding owns its custom profile parameter")

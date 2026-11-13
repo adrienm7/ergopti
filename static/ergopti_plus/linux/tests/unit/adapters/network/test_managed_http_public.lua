@@ -124,7 +124,7 @@ end
 
 local Paths = require("infra.paths")
 local driver_root = helpers.driver_root()
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Provides independent timer events and close acknowledgements to real owners.
 --- @param state table
@@ -176,8 +176,8 @@ local function fresh_client(config)
   for _, name in ipairs(names) do package.loaded[name] = nil end
  package.loaded.luv = fake
  package.loaded["infra.monotonic"] = { now_ms = function() return state.time end }
- local policy_module = helpers.fresh_module("network.proxy_policy")
- local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
+ local policy_module = helpers.fresh_module("core.network.engine.proxy_policy_core")
+ local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
  local data = Json.decode(file:read("*a")); file:close()
  local policy = assert(policy_module.new(data))
  package.loaded["infra.proxy_policy"] = { load = function()

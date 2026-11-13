@@ -78,7 +78,7 @@ helpers.with_fresh_modules({
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
+	"core.text.engine.toml_codec",
 	"modules.keymap.control_sentinels",
 	"adapters.synthetic_input",
 }, function()
@@ -97,7 +97,7 @@ helpers.with_fresh_modules({
 	-- The native TOML codec is absent from the headless runner; the catalogues
 	-- read here are JSON and the shared defaults use the pure-Lua reader.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
 	package.loaded["infra.toml.codec"] = toml_stub
 	-- Every build re-reads the three static rule files, and the adapter's safe
 	-- read cost more than the rest of a build: serve each file's real content,
@@ -131,7 +131,7 @@ helpers.with_fresh_modules({
 		end,
 	}
 	local ControlOwner = require("modules.keymap.control_sentinels")
-	local NativeKeycodes = require("keycodes")
+	local NativeKeycodes = require("platform.input.keycodes.core")
 	local control_codes = {
 		key_90 = NativeKeycodes.F20_LAYER_NAV_ENTERED,
 		key_80 = NativeKeycodes.F19_LAYER_NAV_EXITED,

@@ -45,15 +45,15 @@ local discovery = {
 
 local ports = {
 	["tests.helpers"] = reporter,
-	["text_utils"] = { shell_quote = function(value) return value end },
+	["core.text.engine.utils_core"] = { shell_quote = function(value) return value end },
 	["tests.support.module_isolation"] = { purge = function() end },
 	["tests.support.only_selector"] = selector,
 	["tests.support.module_groups"] = groups,
 	["tests.support.command_lines"] = {},
 	["tests.stubs.hs"] = {},
-	["test.runner_home"] = { isolate = function() end },
+	["tests.lua.core.runner_home"] = { isolate = function() end },
 	["luv"] = actual_require("luv"),
-	["test.runner_discovery"] = discovery,
+	["tests.lua.core.runner_discovery"] = discovery,
 }
 local cases = {
 	["tests.meta.test_cli_alpha"] = "alpha sentinel",

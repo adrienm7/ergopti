@@ -43,7 +43,7 @@ LuaJIT instead of Rust.
 
 | Layer                    | Technology                      | Rationale                                                                              |
 | ------------------------ | ------------------------------- | -------------------------------------------------------------------------------------- |
-| Runtime                  | **LuaJIT 2.x**                  | Same language as the Hammerspoon driver; reuses all `_shared/lua/` modules directly.   |
+| Runtime                  | **LuaJIT 2.x**                  | Same language as the Hammerspoon driver; reuses all `_shared/` modules directly.       |
 | Keyboard input           | **/dev/input/eventN** (evdev)   | Raw 24-byte `input_event` structs; works on X11, Wayland, and TTY identically.         |
 | Text injection           | **ydotool** (uinput backend)    | Works on both X11 and Wayland; no display-server coupling.                             |
 | Key remapping + tap-hold | **platform/remap/** (in-daemon) | Tap-hold engine in the keyboard hook; same evdev grab and `uinput` output as the rest. |
@@ -112,7 +112,7 @@ luajit ergopti_hotstrings.lua --dry-run --verbose
 runs this tree through `install/launch.sh`, the packages' entry point, with the
 tray, the same config folder and the native archive backend built into `bin/`.
 It stops an installed `ergopti-hotstrings` user unit first. A saved `.lua` of
-the driver or of `_shared/lua` restarts the daemon, and so does the tray's
+the driver or of `_shared` restarts the daemon, and so does the tray's
 Reload; the updater stays off. See `docs/design/developer-mode.md`.
 
 ## Running the tests
@@ -247,7 +247,7 @@ launched on the oldest supported glibc (Ubuntu 22.04), a symbol-version check
 refuses anything newer, and a closure check refuses any other library an ELF
 file needs that the image does not carry. The list of what the recipient
 supplies, with the reason for each group, is
-`_shared/data/linux_appimage_recipient_libraries.json`.
+`_shared/updater/data/linux_appimage_recipient_libraries.json`.
 
 Requirements:
 

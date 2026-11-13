@@ -13,13 +13,13 @@ local helpers = require("tests.helpers")
 --- @param original string Independently handwritten TOML fixture.
 --- @param body function Assertions receiving the owner and recorded boundary ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-		require("config_outdated").reset_for_tests()
+		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
@@ -61,7 +61,7 @@ local function with_file(original, body)
 end
 
 --- How a warning names a model leaf: both leaves audited here are config.toml
---- rows (`_shared/tap_hold/SCHEMA.md`), spelled as the model spells them.
+--- rows (`_shared/tap_hold/data/SCHEMA.md`), spelled as the model spells them.
 --- @param leaf table `{ section, key }` in the Karabiner model.
 --- @return string
 local function file_leaf(leaf)

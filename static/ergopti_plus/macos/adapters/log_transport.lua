@@ -41,7 +41,7 @@ local LOG_PUMP_INTERVAL_SEC = 0.01
 -- every half second. Only a batch left unacknowledged for the whole stall
 -- budget is a failure: a Finder copy, a sync tool or App Nap can hold the
 -- worker for seconds, and a four-send limit (about 1.5 s) turned each of those
--- into a fatal exit. Registry: _shared/modules/timings/constants.toml [logger]
+-- into a fatal exit. Registry: _shared/core/timing/data/constants.toml [logger]
 -- ack_retry_ms, ack_retry_cap_ms and stall_fatal_ms. The logger cannot read the
 -- registry at runtime (infra.timings logs through this transport), so
 -- tools/test/test-logger-scalars-single-source.cjs pins these copies instead.

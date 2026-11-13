@@ -8,12 +8,12 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
-local Logger = require("logger.shim")
-local NumberPolicy = require("number_policy")
-local Extensions = require("hotstrings.extensions")
+local Logger = require("core.logger.engine.shim")
+local NumberPolicy = require("core.text.engine.number_policy")
+local Extensions = require("hotstrings.engine.extensions")
 local LOG = "bridge.hotstrings_config"
 
 -- The page's directory under _shared/ui/, which is both where its HTML is read
@@ -23,7 +23,7 @@ local APP_NAME = "hotstrings_config_window"
 -- The category id holding the user's own hotstrings, which the window puts in a
 -- group of its own rather than among the shipped packs.
 local PERSONAL_CATEGORY = "personal"
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local _rendered_personal
 
 --- Checks the trusted native page epoch, which is recreated in each route context.
@@ -37,9 +37,9 @@ local function window_current(context, manager)
 end
 
 -- The colour palette the window offers, generated from
--- _shared/data/native_theme.toml like the macOS window's (same colours, same
+-- _shared/core/ui/data/native_theme.toml like the macOS window's (same colours, same
 -- order). A palette typed here again would be the second source rule 5.2 forbids.
-local COLOR_PRESETS = require("native_theme_data").hotstring_palette
+local COLOR_PRESETS = require("core.ui.engine.native_theme_data").hotstring_palette
 
 --- Translates a key, falling back to the key itself.
 ---
@@ -73,7 +73,7 @@ local MS_PER_SEC = 1000
 local _writer = nil
 local function _get_writer()
 	if _writer then return _writer end
-	local ok, mod = pcall(require, "toml_codec.writer")
+	local ok, mod = pcall(require, "core.text.engine.toml_codec.writer")
 	if ok and type(mod) == "table" and type(mod.write) == "function" then _writer = mod end
 	return _writer
 end
@@ -82,7 +82,7 @@ end
 local _reader = nil
 local function _get_reader()
 	if _reader then return _reader end
-	local ok, mod = pcall(require, "toml_codec.reader")
+	local ok, mod = pcall(require, "core.text.engine.toml_codec.reader")
 	if ok and type(mod) == "table" and type(mod.parse) == "function" then _reader = mod end
 	return _reader
 end
@@ -305,7 +305,7 @@ end
 --- @param context table|nil Trusted native page owner.
 --- @return boolean
 local function push_state(state, context)
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push setData(): the shared json module is unavailable.")
 		return false
@@ -445,7 +445,7 @@ function M.on_message(payload, state, context)
 		-- Guarded like both references: an empty select is the page's "no choice",
 		-- and writing it as an override would pin the category to nothing.
 		local hex = payload.hex
-		if type(hex) ~= "string" or not require("hotstrings.personal_metadata").valid("color", hex) then
+		if type(hex) ~= "string" or not require("hotstrings.engine.catalogue.personal_metadata").valid("color", hex) then
 			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
 				tostring(hex), tostring(payload.category))
 			return push_state(state, context)
@@ -536,7 +536,7 @@ function M.on_message(payload, state, context)
 				return { grey = false }
 			end
 			local neutral = config.get_neutral_color()
-			if not owned() or not require("hotstrings.personal_metadata").valid("color", neutral) then return refused() end
+			if not owned() or not require("hotstrings.engine.catalogue.personal_metadata").valid("color", neutral) then return refused() end
 			local categories = config.get_categories()
 			if not owned() or type(categories) ~= "table" then return refused() end
 			for id, category in pairs(categories) do

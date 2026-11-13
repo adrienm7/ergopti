@@ -17,7 +17,7 @@
 ---    categories, never a shortcut name.
 --- ==============================================================================
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 
 local M = {}
 

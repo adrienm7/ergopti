@@ -10,7 +10,7 @@ package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
 local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local helpers, build_mock_state = Fixture.helpers, Fixture.build_mock_state
 
 
@@ -270,7 +270,7 @@ helpers.describe("ui.bridge_handlers", function()
     local handler = helpers.load_module("ui.personal_info_editor.bridge")
 
 		helpers.it("(personal-save-private-error) never logs a persistence exception containing a field", function()
-			local logger, lines = require("logger.shim"), {}
+			local logger, lines = require("core.logger.engine.shim"), {}
 			local original = logger.error
 			logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
 			local ok, err = pcall(function()
@@ -514,7 +514,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		write(path, original);write(choices, '[future]\nlabel = "unchanged"\n');write(empty, '# deliberately empty valid hotstring catalogue\n[raw]\n')
 		local prior = {};for name, value in pairs(package.loaded) do prior[name] = value end
 		local called, failure = pcall(function()
-			for _, name in ipairs({ "modules.dynamic_hotstrings.manager", "dynamic_hotstrings", "infra.hotstring_preferences",
+			for _, name in ipairs({ "modules.dynamic_hotstrings.manager", "hotstrings.engine.dynamic.core", "infra.hotstring_preferences",
 				"modules.hotstrings.hotstrings_config" }) do package.loaded[name] = nil end
 			local preferences = require("infra.hotstring_preferences")
 			assert(preferences._set_file_for_test(choices))
@@ -610,7 +610,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 					state.config.reload = function() return 0, true end
 					if scenario == "retained-foreign" then write(c.path, winner) end
 				end
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local native_batch = writer.batch_write
 				if scenario == "publication" then
 					writer.batch_write = function(...)
@@ -685,7 +685,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	for _, outcome in ipairs({ "committed", "uninitialized", "false", "nil", "number", "throw" }) do
 		helpers.it("consumes the actual canonical catalogue receipt after a real personal save " .. outcome, function()
 			with_native_owners(function(c)
-				local engine = require("hotstring_engine").new()
+				local engine = require("hotstrings.engine.matcher").new()
 				local native_load = engine.load_mappings
 				if outcome ~= "uninitialized" then assert(c.config.init(engine, c.empty)) end
 				local calls = 0
@@ -809,7 +809,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 				end
 			end
 			if options.missing_owner then i18n.persist_locale = nil end
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local state = {
 				i18n = i18n,
 				manifest = require("infra.manifest_reader"),
@@ -878,7 +878,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			local observed = with_real_locale({ code = code })
 			helpers.assert_eq(observed.result, { done = true, restarted = true })
 			helpers.assert_eq(observed.after, code)
-			helpers.assert_eq(require("json").decode(observed.storage_raw),
+			helpers.assert_eq(require("core.text.engine.json").decode(observed.storage_raw),
 				{ locale = code, future = { retained = true } })
 			helpers.assert_contains(observed.config_raw, "enabled = true")
 			helpers.assert_contains(observed.config_raw, 'value = "retained"')
@@ -912,7 +912,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			helpers.assert_eq(observed.captured.restarts, 0)
 			helpers.assert_eq(observed.captured.errors, { "onboarding.error.write_failed" })
 			helpers.assert_true(observed.config_original)
-			helpers.assert_eq(require("json").decode(observed.storage_raw),
+			helpers.assert_eq(require("core.text.engine.json").decode(observed.storage_raw),
 				{ locale = "fr", future = { retained = true } },
 				"the existing runtime rollback persists its runtime snapshot, not an invented raw-source transaction")
 		end)

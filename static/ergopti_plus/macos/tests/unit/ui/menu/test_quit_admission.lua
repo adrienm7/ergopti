@@ -8,4 +8,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.quit_admission_contract")(helpers)
+require("tests.lua.core_lifecycle.quit_admission_contract")(helpers)

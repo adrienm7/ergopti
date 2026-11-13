@@ -27,7 +27,7 @@ local driver_root = self_path:match("^(.*)/tests/bench/bench_boot_stages%.lua$")
 -- The harness derives the repository from an absolute driver path.
 if driver_root == "." then driver_root = assert(os.getenv("PWD"), "run from the driver root")
 elseif driver_root:sub(1, 1) ~= "/" then driver_root = assert(os.getenv("PWD")) .. "/" .. driver_root:gsub("^%./", "") end
-package.path = driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = driver_root .. "/../_shared/?.lua;" .. driver_root .. "/../_shared/?/init.lua;" .. package.path
 
 
 

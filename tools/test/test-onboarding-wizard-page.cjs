@@ -49,9 +49,9 @@ const catalogueScript = fs.readFileSync(
 	'utf8'
 );
 const html = fs.readFileSync(path.join(SHARED, 'ui/onboarding/index.html'), 'utf8');
-const LOCALE_DIR = path.join(SHARED, 'data/locales');
+const LOCALE_DIR = path.join(SHARED, 'core/i18n/data/locales');
 const TAP_HOLD_DEFAULTS = TOML.parse(
-	fs.readFileSync(path.join(SHARED, 'tap_hold/defaults.toml'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'tap_hold/data/defaults.toml'), 'utf8')
 );
 const PRODUCT = 'ErgoptiPlus';
 
@@ -113,7 +113,7 @@ function occurrences(haystack, needle) {
 
 const manifestToml = TOML.parse(
 	fs
-		.readFileSync(path.join(SHARED, 'modules/features/manifest.toml'), 'utf8')
+		.readFileSync(path.join(SHARED, 'settings/data/features/manifest.toml'), 'utf8')
 		.replace(
 			/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 			(_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
@@ -1120,7 +1120,7 @@ function expectedTapHold(driver, key) {
 	const en = locale('en');
 	if (driver === 'macos') {
 		const aliases = TOML.parse(
-			fs.readFileSync(path.join(SHARED, 'modules/actions/actions.toml'), 'utf8')
+			fs.readFileSync(path.join(SHARED, 'shortcuts/data/actions/actions.toml'), 'utf8')
 		).karabiner_aliases;
 		const karabiner = JSON.parse(
 			fs.readFileSync(path.join(SP, 'macos/platform/remap/data/actions.json'), 'utf8')
@@ -1451,7 +1451,7 @@ function assertSeparated(row, where) {
 	// config.schema.json is what the Windows boot validator enforces: a longer
 	// wizard answer is saved, then stops the driver at every start.
 	const schema = JSON.parse(
-		fs.readFileSync(path.join(SHARED, 'core/config_schema/config.schema.json'), 'utf8')
+		fs.readFileSync(path.join(SHARED, 'settings/data/config_schema/config.schema.json'), 'utf8')
 	);
 	const limit = schema.$defs.hotstrings.properties.trigger_char.maxLength;
 	assert.ok(Number.isInteger(limit) && limit >= 1, 'the schema bounds the trigger character');
@@ -1703,7 +1703,7 @@ function assertSeparated(row, where) {
 	const generatorPath = path.join(ROOT, 'tools/codegen/codegen-onboarding-catalogue.cjs');
 	const generatorSource = fs.readFileSync(generatorPath, 'utf8');
 	const originalRequire = require('node:module').createRequire(generatorPath);
-	const manifestPath = path.join(SHARED, 'modules/features/manifest.toml');
+	const manifestPath = path.join(SHARED, 'settings/data/features/manifest.toml');
 	const original = fs.readFileSync(manifestPath, 'utf8');
 	function buildWith(choice) {
 		const declaration = TOML.stringify({
@@ -2719,7 +2719,7 @@ function pick(page, id, value) {
 		assert.ok(!written.includes(path), path + ' stays as configured');
 })();
 
-// macOS and Linux emulate a layout as Windows does (_shared/lua/layouts/emulation_settings.lua):
+// macOS and Linux emulate a layout as Windows does (_shared/layouts/engine/emulation/settings.lua):
 // the three emulation controls apply there and draw no reason. A wrong platform list in
 // the manifest would grey them again.
 (function macosAndLinuxOfferTheEmulationControls() {

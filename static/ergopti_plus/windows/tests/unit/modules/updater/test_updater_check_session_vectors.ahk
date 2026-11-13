@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/updater/check_session_vectors.json on the Windows
 ; host of the update-check window and on its rate-limit sentence, as the Lua
-; session of macOS and Linux does (_shared/lua/test/check_session_contract.lua).
+; session of macOS and Linux does (_shared/tests/lua/check_session_contract.lua).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

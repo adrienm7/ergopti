@@ -23,10 +23,10 @@ local DRAFT = { sections_order = { "s" }, sections = { s = { description = "S", 
 --- @param write function Fake writer.write.
 --- @param body function fn(handler, state, context, closes).
 local function with_editor(write, body)
-	local saved_writer = package.loaded["toml_codec.writer"]
+	local saved_writer = package.loaded["core.text.engine.toml_codec.writer"]
 	local saved_manager = package.loaded["ui.webview_manager"]
-	local real_writer = require("toml_codec.writer")
-	package.loaded["toml_codec.writer"] = {
+	local real_writer = require("core.text.engine.toml_codec.writer")
+	package.loaded["core.text.engine.toml_codec.writer"] = {
 		read_classified = function() return nil, "absent" end,
 		write = write,
 		batch_write = real_writer.batch_write,
@@ -49,7 +49,7 @@ local function with_editor(write, body)
 		helpers.assert_true(handler.push_init(state, context), "the test needs an accepted opening")
 		body(handler, state, context, closes)
 	end)
-	package.loaded["toml_codec.writer"] = saved_writer
+	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	package.loaded["ui.webview_manager"] = saved_manager
 	package.loaded["ui.hotstring_editor.bridge"] = nil
 	if not ok then error(err, 0) end

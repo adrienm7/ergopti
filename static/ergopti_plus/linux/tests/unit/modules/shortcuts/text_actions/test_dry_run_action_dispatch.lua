@@ -32,7 +32,7 @@ local function with_action(route, mode, action, body)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	for name in pairs(saved) do
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
+			or name:match("^config_binding") or name == "core.logger.engine.shim" then package.loaded[name] = nil end
 	end
 	local path = os.tmpname()
 	local injector
@@ -63,10 +63,10 @@ local function with_action(route, mode, action, body)
 		routes.config = function(name) return name == "config.toml" and path or config_route(name) end
 		require("tests.support.text_owner_fixture").with(function(guard)
 			local world = { keys = {}, held = {}, reads = 0, writes = 0, lifecycle = 0, errors = {} }
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_sink(function() end)
 			logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
-			package.loaded["logger.shim"], environment.Logger = logger, logger
+			package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger
 			local pending, clipboard = nil, "ok"
 			local quote = require("adapters.shell_runner").quote
 			package.loaded["adapters.shell_runner"] = {

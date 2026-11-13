@@ -21,8 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Rewrite = require("llm.rewrite")
+local json = require("core.text.engine.json")
+local Rewrite = require("ai.engine.prediction.rewrite")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local ENTRY_ID = "e2e-cerebras"
@@ -33,7 +33,7 @@ local MENU_MIN_WORDS = 9
 --- Reads live.json the way a reviewer would, to compare the engine against it.
 --- @return table { debounce_sec, min_words }
 local function live_config()
-	local fh = assert(io.open(helpers.shared("modules/llm/live.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/live.json"), "r"))
 	local decoded = json.decode(fh:read("*a"))
 	fh:close()
 	return { debounce_sec = decoded.debounce_ms / 1000, min_words = decoded.min_words }
@@ -591,7 +591,7 @@ helpers.describe("retained live shortcut stop", function()
 		local keymap, calls = package.loaded["modules.keymap"], 0
 		local ok, err = xpcall(function()
 			for _, code in ipairs(spec.locales) do
-				local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
+				local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 				local catalog = json.decode(file:read("*a")); file:close()
 				i18n.get = function(key) return catalog[key] or key end
 				helpers.assert_true(toggle(world, "translate_en"))
@@ -637,7 +637,7 @@ local function with_live_boundary_owner(scenario)
 	local world, native, owner, receipt, acquired
 	local ok, detail = xpcall(function()
 		world = build_world()
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+		for _, name in ipairs({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
 			"ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
 		native = require("infra.i18n")
 		local backend = require("infra.locale")
@@ -693,8 +693,8 @@ helpers.describe("llm-control-boundaries: actual live prompt owner", function()
 		with_live_boundary_owner(function(_, _, _, native)
 			local expected = control_boundary_corpus()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])

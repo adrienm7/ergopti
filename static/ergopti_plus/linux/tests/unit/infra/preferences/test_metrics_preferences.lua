@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)

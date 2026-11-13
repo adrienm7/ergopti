@@ -41,7 +41,7 @@ def main():
         retained = b"Synthetic retained output bytes"
         env = dict(os.environ)
         env["CURL_HOME"] = str(root)
-        env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+        env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 
         def check(name, test):
             nonlocal checks, failures

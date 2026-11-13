@@ -35,7 +35,7 @@ local function with_stack(scenario)
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-				or name:match("^ui%.") or name:match("^logger%.") or name == "dynamic_hotstrings" then
+				or name:match("^ui%.") or name:match("^logger%.") or name == "hotstrings.engine.dynamic.core" then
 				package.loaded[name] = nil
 			end
 		end

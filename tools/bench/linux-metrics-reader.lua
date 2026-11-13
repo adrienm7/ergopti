@@ -3,8 +3,8 @@
 local root, database = assert(arg[1]), assert(arg[2])
 local days, apps, events = assert(tonumber(arg[3])), assert(tonumber(arg[4])), assert(tonumber(arg[5]))
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;' .. package.path
-package.loaded['logger.shim'] = {
+	.. root .. '/static/ergopti_plus/_shared/?.lua;' .. package.path
+package.loaded['core.logger.engine.shim'] = {
 	debug = function() end, info = function() end,
 	warn = function(_, message) io.stderr:write(tostring(message), '\n') end,
 	error = function(_, message) error(tostring(message)) end,
@@ -18,7 +18,7 @@ local function now()
 end
 local reader = require('modules.keystats.sqlite_reader')
 local bridge = require('ui.metrics_typing.bridge')
-local json = require('json')
+local json = require('core.text.engine.json')
 local phases, calls = {}, 0
 local native_popen = io.popen
 io.popen = function(...)

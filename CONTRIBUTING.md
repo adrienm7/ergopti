@@ -89,7 +89,7 @@ single test by a distinctive slug.
 ## 🧱 Hotstrings & the shared source of truth
 
 Hotstrings are authored as **TOML** under
-`static/ergopti_plus/_shared/modules/hotstrings/` — this is the cross-driver
+`static/ergopti_plus/_shared/hotstrings/data/catalogue/` — this is the cross-driver
 single source of truth, read directly by both the AutoHotkey and Hammerspoon
 drivers so a tweak applies to both with no risk of drift:
 
@@ -145,7 +145,7 @@ npm run watch:ahk
 > **Note:** the sync is **not** run by the pre-commit hook — the public file is
 > committed as-is unless you run `npm run sync:ahk` (or the watcher) first.
 > Hotstrings are no longer generated from the AHK; the TOML catalogues under
-> `_shared/modules/hotstrings/` are the source of truth.
+> `_shared/hotstrings/data/catalogue/` are the source of truth.
 
 ---
 

@@ -226,7 +226,7 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		process.arguments = [script.path] + arguments
 		var environment = NativeFixtureChildEnvironment.make()
 		environment["ERGOPTI_LOCALE"] = locale
-		environment["ERGOPTI_LOCALES_DIR"] = Self.payloadURL.appendingPathComponent("_shared/data/locales").path
+		environment["ERGOPTI_LOCALES_DIR"] = Self.payloadURL.appendingPathComponent("_shared/core/i18n/data/locales").path
 		environment["ERGOPTI_APPCLONER_LOG"] = root.appendingPathComponent("appcloner.log").path
 		process.environment = environment
 		process.standardInput = FileHandle.nullDevice
@@ -249,7 +249,7 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 	}
 
 	private func catalogue(_ locale: String) throws -> [String: String] {
-		let file = Self.payloadURL.appendingPathComponent("_shared/data/locales/\(locale).json")
+		let file = Self.payloadURL.appendingPathComponent("_shared/core/i18n/data/locales/\(locale).json")
 		return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: String])
 	}
 

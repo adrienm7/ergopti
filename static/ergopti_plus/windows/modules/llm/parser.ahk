@@ -156,7 +156,7 @@ _LLM_Parser_DiffWithinLimits(Original, Corrected) {
 	global _SharedDir
 	static Limits := 0
 	if !(Limits is Map) {
-		Candidate := JsonParse(FSReadStrict(_SharedDir . "\modules\llm\parser_limits.json"))
+		Candidate := JsonParse(FSReadStrict(_SharedDir . "\ai\data\parser_limits.json"))
 		for Name in ["max_operand_bytes", "max_grid_cells"] {
 			if !(Candidate is Map) || !Candidate.Has(Name) || !(Candidate[Name] is Integer) || Candidate[Name] < 1
 				throw ValueError("Invalid shared parser limit: " . Name)
@@ -210,7 +210,7 @@ _LLM_Parser_CharLev(a, b) {
 ; ===============================================
 ; ===============================================
 ; Faithful AHK port of the shared Lua parser's token-level diff
-; (_shared/lua/llm/parser.lua: get_chars / tokenize / token_sub_cost /
+; (_shared/ai/engine/api/parser_core.lua: get_chars / tokenize / token_sub_cost /
 ; token_diff_ops). These drive the intra-word physical injection so the AHK
 ; driver deletes only the changed characters instead of retyping whole words.
 ; UTF-8 chars are iterated one codepoint at a time (BMP — French accents — only).

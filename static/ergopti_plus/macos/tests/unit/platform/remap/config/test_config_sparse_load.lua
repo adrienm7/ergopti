@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger",
-	"infra.toml.codec", "toml_codec" }
+	"infra.toml.codec", "core.text.engine.toml_codec" }
 
 --- Loads one remap configuration source through the real codec.
 --- @param source string The source in the Karabiner model layout; the file
@@ -74,7 +74,7 @@ helpers.describe("Remap configuration sparse loading", function()
 	end)
 
 	helpers.it("uses safe defaults for invalid stored timings (remap-timing-load-invalid)", function()
-		require("config_outdated").reset_for_tests()
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local state, status, _, config = load('[tap_holds]\ntimeout_ms = 0\nsticky_timeout_ms = 0.5\n'
 			.. '[mod_combos]\nsimultaneous_threshold_ms = -2\n')
 		local neutral = config.build_default_state({ { id = "escape" }, { id = "tab" } }, { { id = "esc_tab" } })
@@ -82,7 +82,7 @@ helpers.describe("Remap configuration sparse loading", function()
 		helpers.assert_eq(state.tap_hold_timeout_ms, neutral.tap_hold_timeout_ms)
 		helpers.assert_eq(state.sticky_timeout_ms, neutral.sticky_timeout_ms)
 		helpers.assert_eq(state.simultaneous_threshold_ms, neutral.simultaneous_threshold_ms)
-		require("config_outdated").reset_for_tests()
+		require("settings.engine.migration.outdated").reset_for_tests()
 	end)
 
 	helpers.it("still warns about a present value of the wrong type", function()
@@ -102,13 +102,13 @@ helpers.describe("Remap configuration sparse loading", function()
 			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
 		local config_source = '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
 		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system",
-			"infra.logger", "logger.shim", "infra.toml.codec", "toml_codec" }, function()
+			"infra.logger", "core.logger.engine.shim", "infra.toml.codec", "core.text.engine.toml_codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-			require("config_outdated").reset_for_tests()
+			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local config = helpers.load_with_stubs("platform.remap.config")
 			local files = require("adapters.file_system")
 			local old_read, old_write = files.read_with_status, files.write_if_unchanged
@@ -185,13 +185,13 @@ helpers.describe("Remap obsolete scalar leaves", function()
 	--- `f.original`), or the raw bytes when `raw` is set.
 	local function with_file(original, body, raw)
 		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system",
-			"infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
+			"infra.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-			require("config_outdated").reset_for_tests()
+			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local config = helpers.load_with_stubs("platform.remap.config")
 			local path = require("tests.support.tap_hold_file_text").private_path()
 			local function write(text)

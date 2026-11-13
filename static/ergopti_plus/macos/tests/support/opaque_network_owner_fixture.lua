@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local M = {}
 
 -- Admit only the captured real receiver file to the virtual MLX file system.
@@ -61,10 +61,10 @@ end
 --- @return table result Shared message publication and report-call inventory.
 function M.receive(network, bytes, code, mode, receiver, owner)
 	assert(owner == nil or owner == "mlx", "only the explicit MLX receiver may omit Ollama")
-	local file = assert(io.open(helpers.shared("modules/network/managed_network.json"), "rb"))
+	local file = assert(io.open(helpers.shared("core/network/data/managed_network.json"), "rb"))
 	local policy = json.decode(file:read("*a"))
 	assert(file:close())
-	local contract = require("network.failure").new(policy)
+	local contract = require("core.network.engine.failure").new(policy)
 	local admission = require("modules.llm.opaque_network_admission")
 	local calls = 0
 	local revoke

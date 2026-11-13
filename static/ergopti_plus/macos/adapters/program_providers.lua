@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Shared = require("program_providers")
+local Shared = require("apps.engine.program_providers")
 local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local FsDir = require("infra.fs_dir")
@@ -164,7 +164,7 @@ function M.create()
 		or type(hs.fs.pathToAbsolute) ~= "function" or type(FsDir.collect_private) ~= "function" then
 		return nil, "ports_unavailable"
 	end
-	local resolved, path = pcall(Paths.shared, "modules/actions/program_providers.json")
+	local resolved, path = pcall(Paths.shared, "shortcuts/data/actions/program_providers.json")
 	if not resolved or not absolute(path) then return nil, "invalid_catalogue" end
 	-- Bundled code/data loading is a separate trusted boundary from user files;
 	-- this regular-file preflight is not an atomic pathname lease across open.

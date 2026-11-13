@@ -68,7 +68,7 @@ jobs:
         id: runtime
         shell: pwsh
         run: |
-          $contract = Get-Content -Raw static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json | ConvertFrom-Json
+          $contract = Get-Content -Raw static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json | ConvertFrom-Json
           $archive = Join-Path $env:RUNNER_TEMP 'ahk-replay-runtime.zip'
           Invoke-WebRequest -Uri $contract.runtime.url -OutFile $archive
           $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -106,7 +106,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           $sourceSha = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $sourceSha -cne $env:GITHUB_SHA) { throw 'The full-entry source SHA differs from the workflow.' }
-          $contractPath = 'static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json'
+          $contractPath = 'static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json'
           $contract = Get-Content -Raw -LiteralPath $contractPath | ConvertFrom-Json
           $runtimeArchive = Join-Path $env:RUNNER_TEMP 'ahk-replay-runtime.zip'
           $compilerArchive = Join-Path $env:RUNNER_TEMP $contract.compiler.asset
@@ -282,7 +282,7 @@ jobs:
           $selected = $null -ne $option -and $option.Value
           "selected=$($selected.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           if ($selected) {
-              $contract = Get-Content -Raw static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json | ConvertFrom-Json
+              $contract = Get-Content -Raw static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json | ConvertFrom-Json
               if ($contract.go_version -notmatch '^go\d+\.\d+\.\d+$') { throw 'The managed Go version is invalid.' }
               "go_version=$($contract.go_version.Substring(2))" >> $env:GITHUB_OUTPUT
           }

@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Writer = require("toml_codec.writer")
-local Json = require("json")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Json = require("core.text.engine.json")
 local SHARED = helpers.driver_root() .. "/../_shared"
 
 local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
@@ -123,7 +123,7 @@ helpers.describe("Layer editor source ownership (layer-editor-source-owner)", fu
 	helpers.it("(layer-save-owner) clears the busy guard after an unexpected save error", function()
 		with_editor(function(f)
 			f.open()
-			local editor = require("keymap.layer_editor")
+			local editor = require("layouts.engine.layers.editor")
 			local original = editor.save
 			editor.save = function() error("controlled save failure") end
 			local called = pcall(f.save)
@@ -259,7 +259,7 @@ helpers.describe("Layer editor source ownership (layer-editor-source-owner)", fu
 		with_editor(function(f)
 			local a, b = f.read("a"), f.read("b")
 			f.open()
-			local logger = require("logger.shim")
+			local logger = require("core.logger.engine.shim")
 			local start = logger.start
 			logger.start = function(...)
 				logger.start = start

@@ -25,7 +25,7 @@
 
 local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = self_path:match("^(.*)/tests/bench/bench_lua_paths%.lua$") or "."
-local shared_lua = driver_root .. "/../_shared/lua"
+local shared_lua = driver_root .. "/../_shared"
 package.path = table.concat({
 	driver_root .. "/?.lua", driver_root .. "/?/init.lua",
 	shared_lua .. "/?.lua", shared_lua .. "/?/init.lua",
@@ -51,7 +51,7 @@ local PROFILE_PERIOD = 200
 local PROFILE_ROWS = 20
 local MS_PER_SECOND = 1000
 local NS_PER_MS = 1e6
-local HOTSTRINGS_DIR = driver_root .. "/../_shared/modules/hotstrings/"
+local HOTSTRINGS_DIR = driver_root .. "/../_shared/hotstrings/data/catalogue/"
 local CONFIG_TEMPLATE = driver_root .. "/_generated/config_template.toml"
 local HOTSTRING_PACKS = {
 	{ "magickey", "magickey.toml" },
@@ -236,7 +236,7 @@ local function workload(name, setup)
 end
 
 workload("toml_parse_magickey", function()
-	local Reader = require("toml_codec.reader")
+	local Reader = require("core.text.engine.toml_codec.reader")
 	return function() end, function() assert(Reader.parse(HOTSTRINGS_DIR .. "magickey.toml")) end
 end)
 
@@ -263,7 +263,7 @@ workload("preferences_save", function()
 end)
 
 workload("inline_parents_300_rows", function()
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local content = read_file(CONFIG_TEMPLATE)
 	local rows = {}
 	for index = 1, INLINE_ROWS do rows[index] = { section = "bench_" .. index, key = "key", value = true } end
@@ -271,7 +271,7 @@ workload("inline_parents_300_rows", function()
 end)
 
 workload("trig_lower_100k", function()
-	local TextUtils = require("text_utils")
+	local TextUtils = require("core.text.engine.utils_core")
 	local words = { "btw", "pr", "jsp", "magickey", "ADN", "cad", "comme", "école", "ça" }
 	return function() end, function()
 		for index = 1, FOLD_CALLS do TextUtils.trig_lower(words[index % #words + 1]) end

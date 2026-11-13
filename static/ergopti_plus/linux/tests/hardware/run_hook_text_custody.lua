@@ -11,7 +11,7 @@
 --- Run from the Linux driver root with LuaJIT, a live X11 keymap and /dev/uinput.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 
 local Names = require("infra.device_names")
 local Input = require("infra.input_event")

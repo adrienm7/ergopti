@@ -40,8 +40,8 @@ const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const SOURCE = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 // The generated manifests, and the shape each one spells the table in.
 const GENERATED = [
@@ -74,7 +74,10 @@ const MIN_UNAVAILABLE = 40;
 // The files that must consume the table. A generator emitting a section nobody
 // reads is how `description_key` came to be dead weight in both manifests.
 const READERS = [
-	{ file: path.join(SP, '_shared', 'lua', 'manifest_reader.lua'), token: 'unavailable' },
+	{
+		file: path.join(SP, '_shared', 'menu', 'engine', 'manifest_reader_core.lua'),
+		token: 'unavailable'
+	},
 	{
 		file: path.join(SP, 'macos', 'ui', 'healthcheck', 'helpers.lua'),
 		token: 'healthcheck.unavailable'
@@ -84,7 +87,7 @@ const READERS = [
 		token: 'healthcheck.unavailable'
 	},
 	{
-		file: path.join(SP, '_shared', 'lua', 'healthcheck', 'unavailable.lua'),
+		file: path.join(SP, '_shared', 'diagnostics', 'engine', 'healthcheck', 'unavailable.lua'),
 		token: 'coverage_gaps'
 	},
 	{ file: path.join(SP, 'macos', 'ui', 'healthcheck', 'core.lua'), token: 'platform_coverage' }

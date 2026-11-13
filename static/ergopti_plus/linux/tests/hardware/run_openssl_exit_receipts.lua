@@ -23,8 +23,8 @@ end
 
 local uv = require("luv")
 local Shell = require("adapters.shell_runner")
-local Codec = require("keystats.text_crypto")
-local Base64 = require("compat.base64")
+local Codec = require("metrics.engine.privacy.text_crypto")
+local Base64 = require("core.lifecycle.engine.compat.base64")
 local OpenSSL = require("infra.openssl_command")
 assert(uv.getuid() ~= 0, "native at-rest tests require an ordinary user")
 local real = assert(Shell.exec_line("command -v openssl"))
@@ -237,7 +237,7 @@ check("actual SQLite refuses failed EVP and admits exactly one healthy encrypted
 	assert(#rows == 1 and Codec.is_encrypted(rows[1]) and cipher.decrypt(rows[1]) == "Synthetic\0receipt text")
 end)
 check("saved ON without EVP keeps real collector SQL closed and recovers retained input once", function()
-	require("compat.utf8").install()
+	require("core.lifecycle.engine.compat.utf8").install()
 	writer.close_db() -- The next owner opens a distinct database and schema.
 	local preferences = require("tests.support.metrics_preferences_fixture").new({ initial = {
 		["metrics.encrypt"] = true, ["metrics.enabled"] = true,

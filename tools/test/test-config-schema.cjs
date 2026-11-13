@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Validates the generated `config_template.toml` (the default config copied into
  * the user profile on first boot, for EVERY driver) against the strict JSON
- * Schema at `_shared/core/config_schema/config.schema.json`. Until now that schema was
+ * Schema at `_shared/settings/data/config_schema/config.schema.json`. Until now that schema was
  * consumed by zero tests, so it silently drifted from the manifest-generated
  * template. This gate keeps the two in lock-step: a manifest change that the
  * schema does not allow (or a schema that forbids a real key) fails CI.
@@ -40,7 +40,7 @@ const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SCHEMA_PATH = shared('core/config_schema/config.schema.json');
+const SCHEMA_PATH = shared('settings/data/config_schema/config.schema.json');
 
 // A driver is a directory with an adapters/ tree — the hexagonal marker. Naming
 // the drivers by hand is what let Linux be missed; listing every subdirectory
@@ -71,7 +71,7 @@ const KNOWN_GAPS = {};
 
 // The manifest is the single source of truth for which driver has which
 // top-level section.
-const MANIFEST_PATH = shared('modules/features/manifest.toml');
+const MANIFEST_PATH = shared('settings/data/features/manifest.toml');
 // The manifest names drivers as ahk / hs / linux; the trees are named windows /
 // macos / linux. One mapping, here, rather than a token in either vocabulary
 // that means "the other one".

@@ -8,4 +8,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.check_session_contract")(helpers, require("json"), helpers.driver_root() .. "/../_shared")
+require("tests.lua.check_session_contract")(helpers, require("core.text.engine.json"), helpers.driver_root() .. "/../_shared")

@@ -104,7 +104,7 @@ helpers.describe("private injection failure receipts", function()
 	helpers.it("(private-injection-errors) never exposes payloads from a failing layout planner", function()
 		local clip, restore = stub_clipboard(false)
 		local layout_before = package.loaded["adapters.keyboard_layout"]
-		local logger, lines = require("logger.shim"), {}
+		local logger, lines = require("core.logger.engine.shim"), {}
 		local original = logger.error
 		logger.error = function(_, format, ...) lines[#lines + 1] = string.format(format, ...) end
 		local ok, err = pcall(function()
@@ -131,7 +131,7 @@ helpers.describe("private injection failure receipts", function()
 
 	helpers.it("(private-injection-errors) withholds native and observer exception details", function()
 		local clip, restore = stub_clipboard(false)
-		local logger, lines = require("logger.shim"), {}
+		local logger, lines = require("core.logger.engine.shim"), {}
 		local original = logger.error
 		local previous_hook = package.loaded["adapters.keyboard_hook"]
 		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function(reason) lines[#lines + 1] = reason end }
@@ -652,8 +652,8 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 		logger.error = function(_, fmt, ...)
 			said[#said + 1] = select("#", ...) > 0 and string.format(fmt, ...) or fmt
 		end
-		local previous_logger = package.loaded["logger.shim"]
-		package.loaded["logger.shim"] = logger
+		local previous_logger = package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = logger
 
 		local _, restore = stub_clipboard(false)
 		local ch = fake_channel(true)
@@ -669,7 +669,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 			"a replacement refused before erasure must still explain its unavailable route")
 
 		restore()
-		package.loaded["logger.shim"] = previous_logger
+		package.loaded["core.logger.engine.shim"] = previous_logger
 	end)
 
 end)

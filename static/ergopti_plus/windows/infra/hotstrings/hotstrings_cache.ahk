@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. No generated CODE in the repo: the bundled-category hotstrings (distances,
 ;    SFBs, rolls, autocorrection, magic-key) are no longer emitted as AHK source.
-;    The TOML files under ``_shared/modules/hotstrings/`` stay the single source of truth.
+;    The TOML files under ``_shared/hotstrings/data/catalogue/`` stay the single source of truth.
 ; 2. Faster time-to-icon: AHK no longer parses ~1 MB of generated source during
 ;    the load phase that precedes tray-icon creation. The cache is DATA read at
 ;    registration time (after the icon), not code parsed before it.
@@ -106,7 +106,7 @@ HotstringsBoundSections(Category) {
 ; read-only install (compiled bundle) and a dev checkout resolve it identically.
 _HotstringsCacheTsvPath() {
 	global _SharedDir
-	return _SharedDir . "\modules\hotstrings\generated_hotstrings.tsv"
+	return _SharedDir . "\hotstrings\data\catalogue\generated_hotstrings.tsv"
 }
 
 ; Absolute path to one bundled category's source TOML.
@@ -114,7 +114,7 @@ _HotstringsCacheTomlPath(Category) {
 	return _HotstringsPhysicalBundledTomlPath(Category)
 }
 
-; Language packs declared by _shared/modules/hotstrings/_index.toml [languages],
+; Language packs declared by _shared/hotstrings/data/catalogue/_index.toml [languages],
 ; in declared order. Each item is Map("id", folder, "locale", locale code,
 ; "categories", Array of file stems). The index is the only place a language is
 ; declared, so adding one is data: its folder, its [languages.<id>] table and its
@@ -124,7 +124,7 @@ _HotstringsCacheTomlPath(Category) {
 ; A later physical read may verify this receipt, but cannot replace its content.
 _HotstringsIndexSource() {
 	global _SharedDir
-	Path := _SharedDir . "\modules\hotstrings\_index.toml"
+	Path := _SharedDir . "\hotstrings\data\catalogue\_index.toml"
 	Content := ReadTomlFile(Path)
 	if Content == ""
 		throw Error("Hotstring index is unreadable: " . Path)
@@ -297,7 +297,7 @@ HotstringsSeedLanguageCategoryGates(GateTarget) {
 }
 
 ; Native display name of a language pack's locale, from the generated locale
-; table (itself built from _shared/data/locale_names.json). A pack naming a
+; table (itself built from _shared/core/i18n/data/locale_names.json). A pack naming a
 ; locale the table lacks is a broken index, not a row to label with a raw code.
 HotstringsLanguageName(Locale) {
 	for _, Row in LocaleTableData() {
@@ -334,10 +334,10 @@ _HotstringsPhysicalBundledTomlPath(Category, IndexSource := 0) {
 	for _, Pack in _HotstringsLanguagePacksFrom(Source) {
 		for _, Stem in Pack["categories"] {
 			if (Wanted == StrLower(Pack["id"] . StrReplace(Stem, "_")))
-				return _SharedDir . "\modules\hotstrings\" . Pack["id"] . "\" . Stem . ".toml"
+				return _SharedDir . "\hotstrings\data\catalogue\" . Pack["id"] . "\" . Stem . ".toml"
 		}
 	}
-	return _SharedDir . "\modules\hotstrings\" . StrLower(Category) . ".toml"
+	return _SharedDir . "\hotstrings\data\catalogue\" . StrLower(Category) . ".toml"
 }
 
 ; Derive the full physical inventory from one canonical index input. Every

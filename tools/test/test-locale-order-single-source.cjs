@@ -4,10 +4,10 @@
  * MODULE: Locale Display-Order Single-Source Guard
  * DESCRIPTION:
  * Verifies that the language-menu display order is single-sourced from
- * _shared/data/locale_order.json and can never desync across the surfaces that
+ * _shared/core/i18n/data/locale_order.json and can never desync across the surfaces that
  * list locales:
  *   - The order array covers EXACTLY the locale JSON files shipped in
- *     _shared/data/locales/ (no missing, no extra, no duplicates) — so adding
+ *     _shared/core/i18n/data/locales/ (no missing, no extra, no duplicates) — so adding
  *     or removing a locale forces a matching order edit.
  *   - The macOS locale table (macos/_generated/locale_table.lua) is emitted in
  *     that order. It used to be hand-written in infra/i18n.lua, with the native
@@ -32,8 +32,8 @@ const p = require('path');
 
 const ROOT = p.resolve(__dirname, '..', '..');
 const SHARED = p.join(ROOT, 'static/ergopti_plus/_shared');
-const ORDER_PATH = p.join(SHARED, 'data/locale_order.json');
-const LOCALES_DIR = p.join(SHARED, 'data/locales');
+const ORDER_PATH = p.join(SHARED, 'core/i18n/data/locale_order.json');
+const LOCALES_DIR = p.join(SHARED, 'core/i18n/data/locales');
 
 const errors = [];
 const read = (rel) => fs.readFileSync(p.isAbsolute(rel) ? rel : p.join(ROOT, rel), 'utf-8');
