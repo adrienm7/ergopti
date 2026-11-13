@@ -86,7 +86,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/bench/macos-metrics/init.lua` — S01, S04, S07, S30
 - `tools/ci/dev-release-qualification.cjs` — S01, S38
 - `tools/ci/managed-ollama-handoff.cjs` — S01
-- `tools/ci/native_http_clock_evidence.cjs` — S01
+- `tools/ci/native_http_clock_evidence.cjs` — S01, S08, S38
 - `tools/ci/prepare_windows_key_combination_cohort_inputs.py` — S01
 - `tools/ci/run-windows-key-combination-cohorts.cjs` — S01, S33
 - `tools/ci/seal-windows-updater-original-source.cjs` — S10, S18, S35
@@ -538,7 +538,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-layouts-defaults-single-source.cjs` — S01, S29
 - `tools/test/test-layouts-registry.cjs` — S01, unknown
 - `tools/test/test-legacy-folder-names.cjs` — S01, S04, S18
-- `tools/test/test-lint-banner-marker-safety.cjs` — S01, S19, S35, S38, unknown
+- `tools/test/test-lint-banner-marker-safety.cjs` — S01, S19, S35, unknown
 - `tools/test/test-linux-appimage-portability.cjs` — S01, S35
 - `tools/test/test-linux-arch-package.cjs` — S01, S04, S12, S35
 - `tools/test/test-linux-archive-native-lifecycle.py` — S35
@@ -690,7 +690,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-native-menu-census-admission.cjs` — S01, S19, S21, S33
 - `tools/test/test-native-menu-flags.cjs` — S05
 - `tools/test/test-native-menu-rows.cjs` — S01, S19, S20, S21, S33, S35
-- `tools/test/test-native-pac-source-contract.cjs` — S01
+- `tools/test/test-native-pac-source-contract.cjs` — S01, S38
 - `tools/test/test-nav-layer-recommended-golden.cjs` — S01, S28
 - `tools/test/test-network-field-check-parity.cjs` — S01, S08, S19, S24
 - `tools/test/test-network-pac-helpers.cjs` — S01
@@ -840,7 +840,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/timer-literal-baseline.json` — S03, S06, S09, S12, S21, S24, S26, S29, S30, S33
 - `tools/test/verify-change.cjs` — S01, S04, S06, S07, S08, S09, S11, S15, S21, S25, S26, S29, S30, S33, S35, S37, S38
 
-## other (361 files)
+## other (362 files)
 
 - `.github/ISSUE_TEMPLATE/bug_report.yml` — S01
 - `.github/ISSUE_TEMPLATE/feature_request.yml` — S01
@@ -878,6 +878,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `static/ergopti_plus/_shared/core/features.json` — S01
 - `static/ergopti_plus/_shared/core/ports/HotkeyRegistrar.spec.js` — S01, S28
 - `static/ergopti_plus/_shared/core/ports/TooltipRenderer.spec.js` — S01
+- `static/ergopti_plus/_shared/core/ports/adapters.json` — S02, S03, S04, S08, S09, S12, S14, S15, S17, S20, S22, S23, S33
 - `static/ergopti_plus/_shared/core/ports/contracts.json` — S01
 - `static/ergopti_plus/_shared/data/db/media_schema.sql` — S01
 - `static/ergopti_plus/_shared/data/db/migrations/0001_initial.sql` — S01
