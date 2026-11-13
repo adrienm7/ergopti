@@ -49,9 +49,7 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
 
 ### Reds `dev` already has (2026-11-12 evening), the baseline a change is compared with
 
-Windows Unit tests (meta, `desktop-ci-evidence`); Windows Build (AV-surface ceilings, item below); Windows
-Integration Driver startup (`toml.flat_values` over its ceiling on the realistic fixture, red since run
-43306862276; worker I fixes it); Linux E2E
+Windows Unit tests (meta, `desktop-ci-evidence`); Linux E2E
 desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
 Packaging and boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver. Known
 flakes: macOS Intel Managed Ollama Go test `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (passes on
@@ -350,12 +348,18 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       coordinator on 2026-11-12, to review by the maintainer); its commit body lists every old→new pin with the
       move that justifies it under « Requalification ». Run both cohorts natively on the Windows PC once the
       migration has landed, and confirm the re-pinned frames.
-- [ ] **Windows AV-surface ceilings (found 2026-11-12).** The first Windows / Build of the current tree, run
+- [x] **Windows AV-surface ceilings (found 2026-11-12).** The first Windows / Build of the current tree, run
       43291765266 (artifact `ergoptiplus-av-surface-43291765266-1`), exceeds four ceilings of
       `tools/ci/windows-exe-av-surface.json`: elevated_run 4/3, elevation_wording 4/3, injection_wording 13/11,
       key_state_polling 69/58. The excess is already on `dev` (Build was skipped on every earlier run), at most +2
       key_state_polling from ILD-2 `_KLE_RealCtrlHeld`. The maintainer sets the new ceilings; they guard the antivirus
       surface, so no agent raises them alone.
+      Done 2026-11-13 by worker I without raising a ceiling (d5f80fcff3): the new key-state reads of the
+      physical-shortcut capture and ILD-2 go through `adapters/key_state.ahk`, the gesture menu and onboarding share
+      one elevated launch (`GestureRestartRunElevated`), and the touchpad reader loads `hid.dll` with `#DllLoad`.
+      Same landing: Windows Integration Driver startup, red on `dev` since run 43306862276 (realistic-hotstrings
+      `toml.flat_values` 1212/1201), follows its new owners: every boot reads the shared tap-hold `shared_file.toml`
+      (Mac thumb positions, macOS-only modifiers), the schema v22 migration step and `tap_hold.max_activation_ms`.
 - [ ] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
       `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
       and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
@@ -445,7 +449,9 @@ between workers) green alone. All live checks pass, typed by the harness.
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
 - **Older findings.** The seven "Remaining findings" of
   [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
-  first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
+  first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed
+  and is not on the remote; not redone: every Windows unit shard now ends within 9 minutes (run 43291765266), so the
+  split no longer shortens the critical path (decided by the agent on 2026-11-13, to review by the maintainer).
 - **TakeNote and the Windows 11 tabbed Notepad.** The Store Notepad titles a window « Notes.txt – Bloc-notes » with
   an en dash; the matcher read only « - » and never found the window (fixed, `takenote-title-separator`). Left: by
   default it opens a second file as a tab of the open window, so a same-named note of another folder shares one
