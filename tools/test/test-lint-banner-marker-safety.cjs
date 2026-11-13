@@ -41,7 +41,10 @@ const FIXTURE_DIR = path.join(FIXTURE_ROOT, 'static/ergopti_plus/macos/infra');
 const FIXTURE_PATH = path.join(FIXTURE_DIR, '_zzz_lint_banner_marker_safety_fixture.lua');
 const FIXTURE_LINT = path.join(FIXTURE_ROOT, 'tools/lint/lint-conventions.js');
 
-/** Runs the unchanged CLI against small, explicit language scan roots. */
+/**
+ * Prepares the unchanged CLI against small, explicit language scan roots.
+ * @returns {number} The driver Lua folders the lint scans, one fixture each.
+ */
 function prepareLintFixture() {
 	for (const relative of [
 		'tools/lint/lint-conventions.js',
@@ -56,18 +59,18 @@ function prepareLintFixture() {
 	// The hex-colour rule lists the tracked sources of the tree it lints, so the
 	// miniature tree is a repository with an empty baseline.
 	fs.writeFileSync(path.join(FIXTURE_ROOT, 'tools/lint/hex-literal-baseline.json'), '{}\n');
-	for (const driver of ['macos', 'linux']) {
-		for (const directory of ['adapters', 'infra', 'modules', 'ui', 'tests', 'platform']) {
-			const target = path.join(
-				FIXTURE_ROOT,
-				'static/ergopti_plus',
-				driver,
-				directory,
-				'fixture.lua'
-			);
-			fs.mkdirSync(path.dirname(target), { recursive: true });
-			fs.writeFileSync(target, `-- ${directory}/fixture.lua\nreturn {}\n`);
-		}
+	// Every Lua folder of a driver the lint scans holds one file, read from the
+	// lint itself: a fixed list here fell behind the first folder the structure
+	// plan added to the lint's scan.
+	const lint = fs.readFileSync(path.join(REPO_ROOT, 'tools/lint/lint-conventions.js'), 'utf8');
+	const scanned = [
+		...lint.matchAll(/join\(REPO_ROOT, 'static\/ergopti_plus\/(macos|linux)\/([\w/]+)'\)/g)
+	];
+	assert.ok(scanned.length >= 2, 'the lint names the Lua folders of the drivers it scans');
+	for (const [, driver, directory] of scanned) {
+		const target = path.join(FIXTURE_ROOT, 'static/ergopti_plus', driver, directory, 'fixture.lua');
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.writeFileSync(target, `-- ${directory}/fixture.lua\nreturn {}\n`);
 	}
 	const shared = path.join(FIXTURE_ROOT, 'static/ergopti_plus/_shared');
 	fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
@@ -80,6 +83,7 @@ function prepareLintFixture() {
 		const result = spawnSync('git', args, { cwd: FIXTURE_ROOT, encoding: 'utf8' });
 		assert.equal(result.status, 0, result.stderr);
 	}
+	return scanned.length;
 }
 
 /**
@@ -208,7 +212,7 @@ function checkPublishedCommitBoundaries() {
 
 try {
 	checkPublishedCommitBoundaries();
-	prepareLintFixture();
+	const driverFolders = prepareLintFixture();
 	fs.writeFileSync(FIXTURE_PATH, FIXTURE_CONTENT, 'utf8');
 
 	// 1) The checker must not flag an already-aligned "--"-marker banner.
@@ -217,7 +221,8 @@ try {
 	assert.equal(checkResult.status, 0, checkResult.stderr);
 	assert.match(
 		checkResult.stdout,
-		/Lua files\s*:\s*14/,
+		// One file per driver folder, the shared one and the banner fixture.
+		new RegExp(`Lua files\\s*:\\s*${driverFolders + 2}\\b`),
 		'every declared Lua scan root was exercised'
 	);
 	const flaggedThisFixture = (checkResult.stdout + checkResult.stderr)
