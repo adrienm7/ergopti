@@ -186,10 +186,10 @@ function M.start(ports, options, callback)
 	end
 
 	local prerequisites = {
-		{ "sha256sum", { "--help" }, { "--zero", "GNU coreutils" } },
+		{ "sha256sum", { "--help" }, { "--zero" } },
 		{ "tar", { "--version" }, { "GNU tar" } },
 		{ "tar", { "--help" }, { "--zstd", "--no-same-owner", "--no-same-permissions" } },
-		{ "mv", { "--help" }, { "--no-clobber", "--no-target-directory", "GNU coreutils" } },
+		{ "mv", { "--help" }, { "--no-clobber", "--no-target-directory" } },
 		{ "zstd", { "--version" }, { "Zstandard CLI" } },
 	}
 	local steps = {}

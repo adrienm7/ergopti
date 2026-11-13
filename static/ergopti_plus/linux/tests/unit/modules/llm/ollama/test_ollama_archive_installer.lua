@@ -197,12 +197,31 @@ test("stale source suppresses archive callback and successors", function()
 	expect(#f.calls == 6 and #f.completions == 0, "no hash or activation")
 end)
 
+-- Ubuntu 26.04 ships uutils: the same options with no « GNU coreutils » banner
+-- in sha256sum --help. The options are the contract, not the vendor (CI run
+-- 43457007087, platform-metrics).
+test("uutils coreutils with the required options can install", function()
+	local f = fixture()
+	local op = f.start()
+	local uutils = {
+		[1] = "Usage: sha256sum [OPTIONS] [FILE]...\n  -z, --zero  end each output line with NUL, not newline\n",
+		[4] = "Usage: mv [OPTION]... SOURCE DEST\n  -n, --no-clobber\n  -T, --no-target-directory\n",
+	}
+	for index = 1, 9 do
+		local call = f.calls[index]
+		expect(call and call.program == sequence[index].program, "independent expected step " .. index)
+		call.deliver(uutils[index] and { ok = true, exit_code = 0, stdout = uutils[index] } or nil)
+		call.retire()
+	end
+	expect(op:is_settled() and #f.completions == 1 and f.completions[1].installed, "uutils options admitted")
+end)
+
 test("unsupported native prerequisite cannot download", function()
 	local f = fixture()
 	local op = f.start()
 	f.calls[1].deliver({ ok = true, exit_code = 0, stdout = "foreign checksum utility" })
 	f.calls[1].retire()
-	expect(op:is_settled() and op.result.error == "install_prerequisite_unsupported", "GNU semantics required")
+	expect(op:is_settled() and op.result.error == "install_prerequisite_unsupported", "the required options are refused when absent")
 	expect(f.prepare_count == 0 and #f.calls == 1, "no staging or archive")
 end)
 
