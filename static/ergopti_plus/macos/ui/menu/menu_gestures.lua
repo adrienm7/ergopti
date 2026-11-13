@@ -182,16 +182,27 @@ function M.build(ctx)
 	--- never sends for an item that opens a submenu, so Gestures could not be
 	--- switched on from the menu bar at all.
 	---
-	--- Refused while the script is paused. The gesture engine's only gate is the
-	--- shared CoreState.enabled flag, which pause_all() drives via disable_all().
-	--- Toggling the feature during pause would write that SAME flag: enabling it
-	--- makes gestures fire while « tout est éteint », and disabling it desyncs the
-	--- pre-pause snapshot so resume_all() re-enables against the user's intent.
-	--- Pause owns the gesture state until resume restores it.
+	--- While the script is paused the switch records the user's choice and the
+	--- gesture runtime applies it on resume (EDD-1: a pause stops typing, not
+	--- configuration). The engine fires only when the feature flag is on AND
+	--- ScriptControl suspension is off, so the paused path goes through
+	--- gestures.set_enabled_under_suspension(), which never starts the runtime:
+	--- resume() does, from the flag this switch wrote.
 	--- @return boolean|nil committed
 	local function toggle_gestures()
-		if paused then
-			Logger.warn(LOG, "Gestures switch refused: the script is paused.")
+		local under_pause = paused == true
+			or (type(gestures.is_suspended) == "function" and gestures.is_suspended() == true)
+		if under_pause and type(gestures.set_enabled_under_suspension) ~= "function" then
+			Logger.error(LOG, "Gestures switch refused: the pause contract is incomplete.")
+			return false
+		end
+		local function apply(enabled, label)
+			if not under_pause then return apply_gesture_posture(enabled, label) end
+			local apply_ok, result_or_err = xpcall(
+				gestures.set_enabled_under_suspension, debug.traceback, enabled)
+			if apply_ok and result_or_err == true then return true end
+			Logger.error(LOG, "Gesture switch under pause %s did not commit: %s.",
+				tostring(label), tostring(result_or_err))
 			return false
 		end
 		if settle_gesture_toggle_debt() ~= true then return false end
@@ -203,12 +214,21 @@ function M.build(ctx)
 			local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
 			if res ~= i18n.get("button.activate") then return end
 		end
-		if commit_gestures_runtime(desired, previous) ~= true then return false end
+		if under_pause then
+			if apply(desired, "toggle") ~= true then
+				if apply(previous, "rollback") ~= true then
+					Logger.error(LOG, "Gesture switch under pause left its previous posture unrestored.")
+				end
+				return false
+			end
+		elseif commit_gestures_runtime(desired, previous) ~= true then
+			return false
+		end
 		state.gestures = desired
 		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
 		if not save_ok or save_result ~= true then
 			state.gestures = previous
-			if apply_gesture_posture(previous, "preference rollback") ~= true then
+			if apply(previous, "preference rollback") ~= true and not under_pause then
 				gesture_toggle_debt = { restore_enabled = previous }
 			end
 			Logger.error(LOG, "Gesture preference publication did not commit: %s.",
@@ -362,7 +382,7 @@ function M.build(ctx)
 			or nil
 		local rowLabel = LabelValue.compose(i18n.get, slotLbl, actionLbl)
 			.. (held_suffix and (" — " .. held_suffix) or "")
-		local rowDisabled = not state.gestures or paused or held_suffix ~= nil or nil
+		local rowDisabled = not state.gestures or held_suffix ~= nil or nil
 
 		-- Provider data from here down: `label` / `action` / `items`, which the
 		-- renderer materialises. These rows used to be built in this driver's own
@@ -417,7 +437,7 @@ function M.build(ctx)
 			end,
 		}
 		local slot_getters = {
-			["gesture_slot_choice_ready"] = function() return state.gestures and not paused end,
+			["gesture_slot_choice_ready"] = function() return state.gestures == true end,
 			["gesture_mode_current_label"] = function() return mode_display end,
 			["gesture_sensitivity_current_label"] = function() return string.format("%.1f", currentSens) end,
 			["gesture_mode_incremental_ready"] = function() return currentMode == "incremental" end,
@@ -577,8 +597,8 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.state_getters = {
-		-- The switch's tick answers the stored preference. The switch refuses
-		-- while paused, since it starts the gesture engine at once.
+		-- The switch's tick answers the stored preference. While paused the
+		-- switch records it and the runtime applies it on resume.
 		gestures_enabled = function() return state.gestures == true end,
 	}
 

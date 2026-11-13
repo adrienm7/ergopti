@@ -517,24 +517,27 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 			helpers.assert_eq(f.conflicts, 0)
 		end)
 	end)
-	for _, refusal in ipairs({ "paused", "disabled" }) do
-		helpers.it("initial choice preserves the native disabled UI: " .. refusal, function()
-			with_gesture_controls({}, function(f)
-				if refusal == "paused" then f.control_paused = true else f.control_state.gestures = false end
-				local slot = assert(f.control_slot())
-				helpers.assert_true(slot.disabled)
-				if refusal == "disabled" then
-					-- Category-off rule: an off Gestures menu greys the slot and opens nothing.
-					helpers.assert_nil(slot.menu)
-					helpers.assert_nil(slot.fn)
-				else
-					helpers.assert_true(slot.menu[1].disabled)
-					helpers.assert_eq(false, slot.menu[1].fn())
-				end
-				helpers.assert_eq(f.queue, {})
-			end)
+	helpers.it("initial choice preserves the native disabled UI: disabled", function()
+		with_gesture_controls({}, function(f)
+			f.control_state.gestures = false
+			local slot = assert(f.control_slot())
+			helpers.assert_true(slot.disabled)
+			-- Category-off rule: an off Gestures menu greys the slot and opens nothing.
+			helpers.assert_nil(slot.menu)
+			helpers.assert_nil(slot.fn)
+			helpers.assert_eq(f.queue, {})
 		end)
-	end
+	end)
+	-- A pause stops typing, not configuration (EDD-1): the slot's picker opens.
+	helpers.it("a paused slot reaches the picker (edd1-paused-writes)", function()
+		with_gesture_controls({}, function(f)
+			f.control_paused = true
+			local slot = assert(f.control_slot())
+			helpers.assert_true(not slot.disabled)
+			slot.menu[1].fn(); f.drain()
+			helpers.assert_eq(f.control_writes, { { "swipe_2_left", "copy" } })
+		end)
+	end)
 	for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
 		"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("retains decorated heading, inert hint, numeric choices and action caption: " .. locale, function()

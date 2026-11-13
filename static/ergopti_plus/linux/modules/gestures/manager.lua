@@ -2036,7 +2036,8 @@ function M.apply_scope(mode, deferred)
 	if _parameter_configuration_owner ~= nil then return false end
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
 	if not retire_window_operation() then return false, "native window retirement remains pending" end
-	if _is_paused() then return false, "gesture configuration is paused" end
+	-- A pause stops typing, not configuration (EDD-1): the reader may restart
+	-- under a pause, and dispatch keeps refusing every gesture until resume.
 	if not _persist or type(_config_path) ~= "string" then return false, "gesture persistence is not initialized" end
 	if _scope_owner and _scope_owner.pending() then
 		if not _scope_owner.retry_restore() then return false, "gesture runtime rollback remains pending" end

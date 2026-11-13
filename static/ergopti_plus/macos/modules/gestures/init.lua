@@ -959,6 +959,32 @@ function M.resume()
 end
 function M.is_suspended() return CoreState.suspended end
 
+--- Records the feature switch while ScriptControl suspension is active. A pause
+--- stops typing, not configuration (EDD-1): OFF releases the native runtime at
+--- once (nothing fires under suspension either way), ON publishes only the
+--- feature flag and the start intent, so resume() acquires the runtime.
+--- @param desired boolean Requested feature posture.
+--- @return boolean committed
+function M.set_enabled_under_suspension(desired)
+	if type(desired) ~= "boolean" then
+		Logger.error(LOG, "Gesture switch under pause refused: the posture must be a boolean.")
+		return false
+	end
+	if CoreState.suspended ~= true then
+		Logger.error(LOG, "Gesture switch under pause refused: no suspension is active.")
+		return false
+	end
+	if desired == false then return M.disable_all() end
+	-- The same condition enable_all() uses to rebuild: a runtime that is not
+	-- live is started by resume(), never here.
+	if gesture_resume_start_required == true or (touchdevice and runtime_live ~= true) then
+		gesture_resume_start_required = true
+	end
+	CoreState.enabled = true
+	Logger.info(LOG, "Gestures switched on during the pause; they start on resume.")
+	return true
+end
+
 -- Startup-phase timing.
 --
 -- DESIGN NOTE (definitive, after deep reverse-engineering audit of every

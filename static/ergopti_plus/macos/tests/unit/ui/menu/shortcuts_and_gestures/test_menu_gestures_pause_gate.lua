@@ -1,22 +1,18 @@
 --- tests/unit/ui/menu/shortcuts_and_gestures/test_menu_gestures_pause_gate.lua
 
 --- ==============================================================================
---- MODULE: Regression — gestures master toggle is pause-gated (F-MED-5)
+--- MODULE: Regression — the gestures master toggle under a pause (F-MED-5, EDD-1)
 --- DESCRIPTION:
---- The gesture engine's only fire gate is the shared CoreState.enabled flag, which
---- script_control.pause_all() drives via gestures.disable_all(). The menu's
---- gestures master toggle wrote that SAME flag with no pause guard, so two states
---- conflated:
----   (a) toggling gestures ON during pause set enabled=true → a swipe fired while
----       the script was paused (« pause = tout éteint » violated);
----   (b) toggling gestures OFF during pause desynced the _gestures_were_enabled
----       snapshot, so resume_all() re-enabled gestures against the user's intent.
+--- F-MED-5: the toggle wrote the engine's feature flag with no pause guard, so a
+--- swipe could fire while paused, or resume re-enabled gestures against the
+--- user's intent. The first fix refused the switch while paused.
 ---
---- Fix: pause-gate the master toggle, so pause owns the gesture state until
---- resume restores it. The switch is the command registered for the manifest's
---- gestures_toggle row (a row that opens a submenu is never clicked), so the
---- guard is on what that command does while paused: it refuses and touches
---- neither the engine nor the preference, and the parent row is greyed.
+--- EDD-1 (maintainer decision 2026-11-12, a pause stops typing, not
+--- configuration): the switch now records the choice while paused through
+--- gestures.set_enabled_under_suspension(), never through enable_all() or
+--- disable_all() (which act at once), and the runtime applies it on resume.
+--- The switch is the command registered for the manifest's gestures_toggle row
+--- (a row that opens a submenu is never clicked).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -58,6 +54,10 @@ local function with_toggle_fixture(previous, options, body)
 		DEFAULT_STATE = { gestures = false },
 		enable_all = function() return lifecycle("enable", true) end,
 		disable_all = function() return lifecycle("disable", false) end,
+		is_suspended = function() return options.suspended == true end,
+		set_enabled_under_suspension = function(desired)
+			return lifecycle(desired and "record_on" or "record_off", desired)
+		end,
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
 	package.loaded["infra.dialog_util"] = {
@@ -104,16 +104,41 @@ local function with_toggle_fixture(previous, options, body)
 	if not ok then error(err, 0) end
 end
 
-helpers.describe("menu_gestures: master toggle is pause-gated (F-MED-5)", function()
+helpers.describe("menu_gestures: master toggle under a pause (edd1-paused-writes)", function()
 	for _, previous in ipairs({ false, true }) do
-		helpers.it("refuses the switch while paused (gestures " .. tostring(previous) .. ")", function()
-			with_toggle_fixture(previous, { paused = true }, function(switch, state, runtime)
-				helpers.assert_eq(switch.action(), false, "the switch must refuse while paused")
-				helpers.assert_eq(state.gestures, previous, "the preference must not move during a pause")
-				helpers.assert_eq(runtime.calls, {}, "the gesture engine must not be touched during a pause")
-				helpers.assert_eq(runtime.saves, 0, "nothing may be persisted during a pause")
+		helpers.it("records the switch while paused (gestures " .. tostring(previous) .. ")", function()
+			with_toggle_fixture(previous, { paused = true, suspended = true }, function(switch, state, runtime)
+				helpers.assert_eq(switch.action(), true, "the switch commits while paused")
+				helpers.assert_eq(state.gestures, not previous, "the preference follows the click")
+				helpers.assert_eq(runtime.calls, { previous and "record_off" or "record_on" },
+					"only the suspension-safe recorder runs, never enable_all or disable_all")
+				helpers.assert_eq(runtime.saves, 1, "the preference is persisted once")
+				helpers.assert_eq(runtime.notifications, 1)
 			end)
 		end)
+
+		helpers.it("takes the paused path from the engine's suspension too (gestures "
+			.. tostring(previous) .. ")", function()
+			with_toggle_fixture(previous, { paused = false, suspended = true }, function(switch, _, runtime)
+				helpers.assert_eq(switch.action(), true)
+				helpers.assert_eq(runtime.calls, { previous and "record_off" or "record_on" })
+			end)
+		end)
+
+		for _, save_mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("restores the recorded posture when the paused save returns "
+				.. save_mode .. " (gestures " .. tostring(previous) .. ")", function()
+				with_toggle_fixture(previous, { paused = true, suspended = true, save_mode = save_mode },
+					function(switch, state, runtime)
+						helpers.assert_eq(switch.action(), false)
+						helpers.assert_eq(state.gestures, previous)
+						helpers.assert_eq(runtime.enabled, previous)
+						helpers.assert_eq(runtime.calls, previous and { "record_off", "record_on" }
+							or { "record_on", "record_off" })
+						helpers.assert_eq(runtime.notifications, 0)
+					end)
+			end)
+		end
 	end
 
 	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
