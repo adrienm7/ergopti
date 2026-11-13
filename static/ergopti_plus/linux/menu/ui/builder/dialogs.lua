@@ -133,7 +133,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		value = ctx.prompt_action_parameter(binding, action, spec, prior)
 	elseif spec == "app" then
 		-- An application is picked among the desktop entries, never typed.
-		local chosen, why = require("ui.app_chooser").pick(require("core.process.adapters.shell_runner"),
+		local chosen, why = require("apps.ui.chooser").pick(require("core.process.adapters.shell_runner"),
 			gestures.get_action_parameter_prompt(action))
 		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
 		value = chosen

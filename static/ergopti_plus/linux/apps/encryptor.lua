@@ -66,7 +66,7 @@ function M.main(argv)
 		return 64
 	end
 	local Core = require("apps.encryptor_core")
-	local t = require("apps.app_strings").load(options.locales_dir, options.locale)
+	local t = require("apps.strings").load(options.locales_dir, options.locale)
 	local dialogs = require("apps.dialogs").new()
 	-- The private runtime's openssl, never a host copy (resolve: a child logs nothing).
 	local openssl = require("settings.engine.preferences.owned_programs").resolve("openssl")

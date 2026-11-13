@@ -143,7 +143,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 	-- llm_generate_prediction action in a keyboard slot (Ctrl+Space recommended),
 	-- so the trigger submenu opens on its debounce row and prompts for no chord.
 	helpers.it("the trigger submenu draws no dedicated shortcut row (llm-trigger-shortcut-retired)", function()
-		local saved_app_picker = package.loaded["infra.app_picker"]
+		local saved_app_picker = package.loaded["apps.engine.picker"]
 		local saved_i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_logger = package.loaded["core.logger.engine.logger"]
 		local saved_manifest = package.loaded["menu.engine.manifest_menu"]
@@ -152,7 +152,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		local saved_panel = package.loaded["ai.ui.menu.panels.trigger_panel"]
 		local prompts = 0
 		local ok, err = xpcall(function()
-			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
+			package.loaded["apps.engine.picker"] = {build_menu = function() return {} end}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["menu.engine.manifest_menu"] = assert(require("menu.engine.renderer").new({
@@ -187,7 +187,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			end
 			helpers.assert_eq(prompts, 0, "no row may open the shortcut prompt")
 		end, debug.traceback)
-		package.loaded["infra.app_picker"] = saved_app_picker
+		package.loaded["apps.engine.picker"] = saved_app_picker
 		package.loaded["core.i18n.engine.i18n"] = saved_i18n
 		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["menu.engine.manifest_menu"] = saved_manifest

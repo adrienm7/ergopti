@@ -103,7 +103,7 @@
 		"windows": {
 			"sourceFiles": [
 				"windows/ErgoptiPlus.ahk",
-				"windows/adapters/app_launcher.ahk",
+				"windows/apps/adapters/launcher.ahk",
 				"windows/core/events/boot_clock.ahk",
 				"windows/adapters/clipboard.ahk",
 				"windows/adapters/console_window.ahk",
@@ -141,7 +141,7 @@
 				"windows/platform/focus/window_info.ahk",
 				"windows/platform/focus/window_manager.ahk",
 				"windows/infra/altgr_family.ahk",
-				"windows/infra/app_picker.ahk",
+				"windows/apps/engine/picker.ahk",
 				"windows/core/lifecycle/engine/app_state.ahk",
 				"windows/core/lifecycle/engine/boot.ahk",
 				"windows/core/logger/engine/boot_profiler.ahk",
@@ -701,7 +701,7 @@
 				"macos/ai/ui/menu/scope.lua",
 				"macos/ui/menu/magic_key_source_menu.lua",
 				"macos/ui/menu/menu_about.lua",
-				"macos/ui/menu/menu_apps.lua",
+				"macos/apps/ui/menu/apps.lua",
 				"macos/ui/menu/menu_gestures.lua",
 				"macos/ui/menu/menu_hotstrings.lua",
 				"macos/ui/menu/menu_hotstrings_custom.lua",

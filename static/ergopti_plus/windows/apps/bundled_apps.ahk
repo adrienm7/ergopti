@@ -6,7 +6,7 @@
 ; The Windows App Cloner and Encryptor programs: their dialog flows (ports of
 ; macOS's ShortcutBuilder and Encryptor main.applescript), the Encryptor drop
 ; window and the entry that reads the command line. They run in a process of
-; their own, started by the tray (ui/menu/menu_apps.ahk) with
+; their own, started by the tray (apps/ui/menu/apps.ahk) with
 ; `--bundled-app <id>`: the key derivation and the dialogs never hold the
 ; driver's keyboard hook.
 ;

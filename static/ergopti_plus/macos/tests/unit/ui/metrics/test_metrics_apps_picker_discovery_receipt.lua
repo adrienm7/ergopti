@@ -54,10 +54,10 @@ helpers.describe("metrics_apps: discovery outcome", function()
 	for _, mode in ipairs({ "failed_nil", "failed_table", "empty_success" }) do
 		helpers.it("distinguishes " .. mode .. " from an empty successful scan", function()
 			with_picker_window(function(dashboard, state)
-				helpers.with_fresh_modules({ "infra.app_picker" }, function()
+				helpers.with_fresh_modules({ "apps.engine.picker" }, function()
 					local pending, logs = {}, {}
 					local complete
-					package.loaded["infra.app_picker"] = { discover_apps = function(callback) complete = callback end }
+					package.loaded["apps.engine.picker"] = { discover_apps = function(callback) complete = callback end }
 					local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 					package.loaded["core.logger.engine.logger"].debug = function(_, message, ...)
 						logs[#logs + 1] = string.format(message, ...)

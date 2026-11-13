@@ -695,7 +695,7 @@ end
 
 local function prompt_pick_app(generation, webview)
 	if not is_current_window(generation, webview) then return false end
-	local ok_mod, app_picker = pcall(require, "infra.app_picker")
+	local ok_mod, app_picker = pcall(require, "apps.engine.picker")
 	if not ok_mod then
 		Logger.error(LOG, "lib.app_picker module unavailable.")
 		return

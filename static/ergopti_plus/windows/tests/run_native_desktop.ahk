@@ -50,7 +50,7 @@ _TestResultsBeginRun()
 #Include ../core/logger/engine/wall_clock.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
-#Include ../infra/app_folders.ahk
+#Include ../apps/engine/folders.ahk
 #Include ../settings/engine/migration/legacy_folder_migration.ahk
 global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir

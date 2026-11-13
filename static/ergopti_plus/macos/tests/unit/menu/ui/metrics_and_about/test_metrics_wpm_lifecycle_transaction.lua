@@ -43,7 +43,7 @@ local function load_menu(options)
 		keystats_module.DEFAULT_STATE = keystats_module.DEFAULT_STATE or defaults
 	end
 	package.loaded["modules.keystats"] = keystats_module
-	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
+	package.loaded["apps.engine.picker"] = { build_menu = function() return {} end }
 	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}

@@ -92,9 +92,9 @@ if mode == "normal" or mode == "deadline" or mode == "enoent" then
 		print(Json.encode({ mode = mode, requested_timeout_ms = 30000, observed_elapsed_ms = elapsed }))
 	end
 end
-local opener = package.loaded["adapters.desktop_opener"]
+local opener = package.loaded["apps.adapters.desktop_opener"]
 local shutdown, observed = Scenario.shutdown({
-	loaded = { ["adapters.desktop_opener"] = opener },
+	loaded = { ["apps.adapters.desktop_opener"] = opener },
 	webview_shutdown = function() live = false; request.cancel(); return true end,
 	loop_stop = Loop.stop,
 })

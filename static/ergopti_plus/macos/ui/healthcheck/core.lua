@@ -454,7 +454,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.app_launcher",
+		id       = "apps.adapters.launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
 		wired    = true,
 	},

@@ -17,7 +17,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 	helpers.it("relabels a cached app after a language change", function()
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
-			helpers.with_fresh_modules({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths",
+			helpers.with_fresh_modules({ "apps.ui.menu.apps", "core.logger.engine.logger", "core.fs.engine.paths",
 				"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.process.adapters.task_lifecycle", "core.text.engine.utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
@@ -36,7 +36,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 					scans = scans + 1
 					return { "App Cloner.app" }, true
 				end }
-				local module = helpers.load_with_stubs("ui.menu.menu_apps", {
+				local module = helpers.load_with_stubs("apps.ui.menu.apps", {
 					fs = { attributes = function() return { mode = "directory" } end },
 					application = { infoForBundlePath = function() return {} end },
 					image = { imageFromPath = function() return nil end },

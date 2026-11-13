@@ -31,7 +31,7 @@ local function fake_shell(answer)
 end
 
 helpers.describe("open_app application chooser (Linux)", function()
-	local Chooser = helpers.load_module("ui.app_chooser")
+	local Chooser = helpers.load_module("apps.ui.chooser")
 
 	helpers.it("the owned dialog lists the desktop entries and the choice becomes its desktop id", function()
 		local shell, commands = fake_shell("/usr/share/applications/org.gnome.Nautilus.desktop")
@@ -139,7 +139,7 @@ helpers.describe("application chooser preserves installed desktop ids", function
 		helpers.it("(linux-desktop-id) " .. row[1], function()
 			with_desktop_environment({ HOME = "/account", XDG_DATA_HOME = row[2], XDG_DATA_DIRS = row[3] }, function()
 				local expected = row[5] ~= false and row[5] or nil
-				local Chooser = require("ui.app_chooser")
+				local Chooser = require("apps.ui.chooser")
 				helpers.assert_eq(Chooser.desktop_id(row[4]), expected)
 				local shell = fake_shell(row[4] .. "\n")
 				local selected, reason = Chooser.pick(shell, "Applications", { resolve = function() return row[4], "found" end })
@@ -175,7 +175,7 @@ local function native_dialog_receipt(status, output)
 			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked}\n"
 			-- The private executable stands in for the owned dialog host.
 			.. "package.loaded['core.ui.ui.native_dialog']={command=function()return S.quote(" .. string.format("%q", executable) .. ")end}\n"
-			.. "local id=require('ui.app_chooser').pick(shell,'Applications',{resolve=function() return "
+			.. "local id=require('apps.ui.chooser').pick(shell,'Applications',{resolve=function() return "
 			.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
 			.. "io.write(id==nil and 'refused' or 'accepted|'..id);io.write('|modal:'..calls)\n")
 		local executed, result, reason = Shell.exec_checked("env PATH="
@@ -207,7 +207,7 @@ helpers.describe("application chooser follows the actual XDG resolution owner", 
 		write(worker, "package.path=" .. string.format("%q", package.path) .. "\n"
 			.. "package.loaded['core.ui.ui.modal']={run=function(fn)return fn()end}\n"
 			.. "package.loaded['core.ui.ui.native_dialog']={command=function()return 'dialog' end}\n"
-			.. "local chooser=require('ui.app_chooser'); local resolver=require('ui.desktop_application_resolution'); local notices=0\n"
+			.. "local chooser=require('apps.ui.chooser'); local resolver=require('apps.ui.desktop_application_resolution'); local notices=0\n"
 			.. "local function pick(path) local shell={quote=function(s)return s end,exec_checked=function()return true,path..'\\n' end}; "
 			.. "return chooser.pick(shell,'T',{notify=function()notices=notices+1;return true end}) end\n"
 			.. "local before=resolver.resolve('ergopti-choice-witness')\n"
@@ -242,7 +242,7 @@ end)
 
 helpers.describe("application lookup owns its bounded native worker", function()
 	helpers.it("refuses failed or malformed bounded lookup receipts", function()
-		local names = { "ui.desktop_application_resolution", "core.process.adapters.shell_runner", "core.ui.ui.modal" }
+		local names = { "apps.ui.desktop_application_resolution", "core.process.adapters.shell_runner", "core.ui.ui.modal" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local command, modal_calls, answer, output = nil, 0, false, ""
 		local real_shell = require("core.process.adapters.shell_runner")
@@ -251,9 +251,9 @@ helpers.describe("application lookup owns its bounded native worker", function()
 			return answer, output
 		end }
 		package.loaded["core.ui.ui.modal"] = { run = function(fn) modal_calls = modal_calls + 1; return fn() end }
-		package.loaded["ui.desktop_application_resolution"] = nil
+		package.loaded["apps.ui.desktop_application_resolution"] = nil
 		local ok, detail = pcall(function()
-			local resolver = require("ui.desktop_application_resolution")
+			local resolver = require("apps.ui.desktop_application_resolution")
 			local path, status = resolver.resolve("example")
 			helpers.assert_nil(path); helpers.assert_eq(status, "unavailable")
 			helpers.assert_true(command:find("timeout --foreground --kill-after=1s 2s ", 1, true) == 1)
@@ -277,7 +277,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 		assert(Shell.run("mkdir -p " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
 			.. " " .. Shell.quote(user .. "/applications")))
 		-- The sources are resolved by module name, never by a path pinned to the tree.
-		local modules = { "ui.desktop_application_resolution", "ui.desktop_application_resolution_worker",
+		local modules = { "apps.ui.desktop_application_resolution", "apps.ui.desktop_application_resolution_worker",
 			"_generated.native_runtime" }
 		local function relative(module_name) return (module_name:gsub("%.", "/")) .. ".lua" end
 		for _, module_name in ipairs(modules) do
@@ -319,7 +319,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 			.. "require('core.process.adapters.shell_runner')\n"
 			.. "package.loaded['core.ui.ui.modal']={run=function(fn)return fn()end}\n"
 			.. "package.loaded.luv={exepath=function()return " .. string.format("%q", interpreter) .. " end}\n"
-			.. "local path,status=require('ui.desktop_application_resolution').resolve('witness'); io.write(tostring(path),'|',status)\n")
+			.. "local path,status=require('apps.ui.desktop_application_resolution').resolve('witness'); io.write(tostring(path),'|',status)\n")
 		local start = uv.hrtime()
 		local ran, output = Shell.exec_checked("timeout --foreground --kill-after=1s 8s "
 			.. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(parent))
@@ -346,7 +346,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 		local f = assert(io.open(worker, "wb"))
 		assert(f:write("package.path=" .. string.format("%q", package.path) .. "\n"
 			.. "package.loaded['core.ui.ui.modal']={run=function(fn)return fn()end}\n"
-			.. "local path,status=require('ui.desktop_application_resolution').resolve(" .. string.format("%q", id) .. ")\n"
+			.. "local path,status=require('apps.ui.desktop_application_resolution').resolve(" .. string.format("%q", id) .. ")\n"
 			.. "io.write(tostring(path),'|',status)\n")); assert(f:close())
 		local command = "timeout --foreground --kill-after=1s 8s env XDG_DATA_HOME=" .. Shell.quote(user) .. " XDG_DATA_DIRS=" .. Shell.quote(system)
 			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)

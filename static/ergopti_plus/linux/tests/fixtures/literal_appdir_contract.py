@@ -246,7 +246,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         run(
             [
                 usr / "bin/luajit",
-                driver / "adapters/desktop_opener_worker.lua",
+                driver / "apps/adapters/desktop_opener_worker.lua",
                 "https://example.invalid/",
                 "1000",
             ],

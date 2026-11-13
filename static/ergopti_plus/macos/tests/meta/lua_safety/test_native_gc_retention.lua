@@ -218,7 +218,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 	helpers.it("requires every native chooser construction to publish and release a strong owner", function()
 		local chooser_contracts = {
-			[module_source("infra.app_picker")] = {
+			[module_source("apps.engine.picker")] = {
 				"_active_chooser%s*=%s*chooser",
 				"_active_chooser%s*==%s*chooser%s+then%s+_active_chooser%s*=%s*nil",
 			},
@@ -228,7 +228,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			},
 		}
 		local paths = ui_sources()
-		paths[#paths + 1] = module_source("infra.app_picker")
+		paths[#paths + 1] = module_source("apps.engine.picker")
 		local constructions = 0
 		for _, relative in ipairs(paths) do
 			local code = strip_lua_comments(SourceFile.read(DRIVER_ROOT .. relative))
@@ -295,7 +295,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 	end)
 
 	helpers.it("retains the application chooser until its terminal callback", function()
-		helpers.with_fresh_modules({ "infra.app_picker" }, function()
+		helpers.with_fresh_modules({ "apps.engine.picker" }, function()
 			local previous_chooser = hs.chooser
 			local previous_absolute_time = hs.timer.absoluteTime
 			local weak_choosers = setmetatable({}, { __mode = "v" })
@@ -325,7 +325,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				},
 				}, function()
 				local changed = 0
-				local AppPicker = require("infra.app_picker")
+				local AppPicker = require("apps.engine.picker")
 				AppPicker.discover_apps = function(on_ready)
 					on_ready({ { text = "Example", appPath = "/Applications/Example.app" } }, true)
 				end

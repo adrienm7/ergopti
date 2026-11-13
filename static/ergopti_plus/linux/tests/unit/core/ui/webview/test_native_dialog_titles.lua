@@ -16,7 +16,7 @@ local DIALOG = require("core.ui.ui.native_dialog").command()
 --- Owns module replacements and pipe restoration for one completed scenario.
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
-	local names = { "core.ui.ui.text_prompt", "ui.app_chooser", "settings.ui.dir_picker", "ui.gesture_conflicts",
+	local names = { "core.ui.ui.text_prompt", "apps.ui.chooser", "settings.ui.dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "menu.engine.manifest_menu" }
@@ -99,7 +99,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	h.it("(linux-native-titles) the application chooser keeps its filter and id", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/usr/share/applications/org.example.Native.desktop", 0
-			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application", { resolve = function()
+			h.assert_eq(require("apps.ui.chooser").pick(shell, "Choose application", { resolve = function()
 				return observed.answer, "found"
 			end }), "org.example.Native")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --title='ErgoptiPlus — Choose application'"
@@ -334,7 +334,7 @@ h.describe("native caption consumer inventory", function()
 			["core.ui.ui.text_prompt"] = 1,
 			-- The picker, its verification error and the open_path picker retain
 			-- their composed caption; test_app_chooser proves the error dialog.
-			["ui.app_chooser"] = 3,
+			["apps.ui.chooser"] = 3,
 			["settings.ui.dir_picker"] = 1,
 			["ui.gesture_conflicts"] = 1,
 			["modules.gestures.system_actions"] = 1,
@@ -403,7 +403,7 @@ local function picker_exit_receipt(status, output, application_root)
 			.. "local modals = 0\n"
 			.. "package.loaded['core.ui.ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
-			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application', {resolve=function() return "
+			.. (application_root and "local value = require('apps.ui.chooser').pick(shell, 'Choose application', {resolve=function() return "
 				.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
 				or "local value = require('settings.ui.dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"

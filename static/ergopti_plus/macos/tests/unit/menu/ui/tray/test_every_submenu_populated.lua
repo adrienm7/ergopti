@@ -29,7 +29,7 @@ local MENU_MODULES = {
 	shortcuts       = "ui.menu.menu_shortcuts",
 	tap_holds       = "ui.menu.menu_tap_holds",
 	gestures        = "ui.menu.menu_gestures",
-	apps            = "ui.menu.menu_apps",
+	apps            = "apps.ui.menu.apps",
 	about           = "ui.menu.menu_about",
 }
 

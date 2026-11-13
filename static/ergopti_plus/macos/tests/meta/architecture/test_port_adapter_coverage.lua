@@ -474,7 +474,7 @@ helpers.describe("meta: lua module OS-API purity baseline", function()
 	local macos_root = DRIVER_ROOT
 
 	local all_lua_files = {}
-	for _, dir in ipairs({ "modules", "infra", "platform", "core", "settings", "menu", "tray", "ai" }) do
+	for _, dir in ipairs({ "modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps" }) do
 		for _, f in ipairs(list_files(macos_root .. dir, "lua")) do
 			all_lua_files[#all_lua_files + 1] = f
 		end

@@ -39,8 +39,6 @@ graph TD
         LINUX_clipboard["Clipboard.lua"]
         LINUX_clipboard_owner["ClipboardOwner.lua"]
         LINUX_clipboard_owner_worker["ClipboardOwnerWorker.lua"]
-        LINUX_desktop_opener["DesktopOpener.lua"]
-        LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
@@ -58,7 +56,6 @@ graph TD
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
         MACOS_accessibility_copies["AccessibilityCopies.lua"]
         MACOS_accessibility_permission["AccessibilityPermission.lua"]
-        MACOS_app_launcher["AppLauncher.lua"]
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
         MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
@@ -96,8 +93,6 @@ graph TD
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
-        WINDOWS_app_launcher["AppLauncher.ahk"]
-        WINDOWS_bundled_apps_native["BundledAppsNative.ahk"]
         WINDOWS_clipboard["Clipboard.ahk"]
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
@@ -124,12 +119,10 @@ graph TD
     P_Clipboard -->|implements| LINUX_clipboard
 
     %% Port implementations: macOS (Hammerspoon)
-    P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
     P_MouseControl -->|implements| MACOS_mouse_control
 
     %% Port implementations: Windows (AutoHotkey)
-    P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
     P_MouseControl -->|implements| WINDOWS_mouse_control
 

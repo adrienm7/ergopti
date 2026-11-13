@@ -373,7 +373,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include _generated/app_dirs.ahk
 ; The Ergopti root and its purpose folders, and the one-time move of the folders
 ; of the builds before the single folder name (run by core/lifecycle/engine/boot.ahk).
-#Include infra/app_folders.ahk
+#Include apps/engine/folders.ahk
 #Include settings/engine/migration/legacy_folder_migration.ahk
 #Include core/logger/engine/tick_count.ahk
 #Include core/logger/engine/wall_clock.ahk
@@ -422,7 +422,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/process/adapters/lifecycle.ahk
 #Include platform/input/key_state.ahk
 #Include adapters/keyboard_layout_switch.ahk
-#Include adapters/app_launcher.ahk
+#Include apps/adapters/launcher.ahk
 #Include core/network/adapters/info.ahk
 #Include platform/input/keyboard_hook.ahk
 #Include ai/adapters/nav_event_owner.ahk
@@ -585,7 +585,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/keylayout/layout_registry.ahk
 #Include modules/keymap/keylayout/layout_catalogue.ahk
 #Include modules/keymap/keylayout/layout_extension.ahk
-#Include infra/app_picker.ahk
+#Include apps/engine/picker.ahk
 #Include settings/engine/shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
 #Include infra/metrics/metrics_filters.ahk
@@ -641,10 +641,10 @@ if KLPF_IsWorkerInvocation()
 ; A bundled app (App Cloner, Encryptor, windows/apps/) reuses this executable in
 ; a compiled release, as the workers above do; a source run starts
 ; apps/bundled_app_entry.ahk instead. It never returns into the driver's boot.
-#Include adapters/bundled_apps_native.ahk
-#Include apps/app_strings.ahk
+#Include apps/adapters/bundled_apps_native.ahk
+#Include apps/strings.ahk
 #Include apps/encryptor_core.ahk
-#Include apps/app_cloner_core.ahk
+#Include apps/cloner_core.ahk
 #Include apps/bundled_apps.ahk
 if BundledApp_IsInvocation()
 	BundledApp_Main(_SharedDir)

@@ -180,7 +180,7 @@ OnError(_FatalErrorHandler)
 #Include ../core/ui/engine/style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
-#Include ../infra/app_folders.ahk
+#Include ../apps/engine/folders.ahk
 #Include ../settings/engine/migration/legacy_folder_migration.ahk
 #Include ../core/logger/engine/logger.ahk
 ; The logs folder every logger test writes to: a private temp folder, never the
@@ -376,13 +376,13 @@ InstallHotstringHooks()
 #Include ../core/process/adapters/lifecycle.ahk
 #Include ../platform/input/key_state.ahk
 #Include ../adapters/keyboard_layout_switch.ahk
-#Include ../adapters/app_launcher.ahk
+#Include ../apps/adapters/launcher.ahk
 #Include ../core/crypto/crypto.ahk
 ; The bundled App Cloner and Encryptor: definitions only (their entry runs nothing at load).
-#Include ../adapters/bundled_apps_native.ahk
-#Include ../apps/app_strings.ahk
+#Include ../apps/adapters/bundled_apps_native.ahk
+#Include ../apps/strings.ahk
 #Include ../apps/encryptor_core.ahk
-#Include ../apps/app_cloner_core.ahk
+#Include ../apps/cloner_core.ahk
 #Include ../apps/bundled_apps.ahk
 #Include ../core/network/adapters/info.ahk
 #Include ../platform/focus/window_manager.ahk
@@ -443,7 +443,7 @@ InstallSendNoOps()
 #Include unit/core/ui/windows/test_native_file_filter_diagnostics.ahk
 #Include unit/adapters/test_console_window.ahk
 #Include unit/adapters/test_keyboard_layout_switch.ahk
-#Include unit/adapters/test_app_launcher_native_targets.ahk
+#Include unit/apps/test_launcher_native_targets.ahk
 #Include unit/core/ui/windows/test_spotlight_ownership.ahk
 #Include unit/modules/gestures/test_take_note_async_job.ahk
 #Include unit/modules/gestures/test_take_note_counted_nul.ahk
@@ -703,7 +703,7 @@ InstallSendNoOps()
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
 ; chord syntax tests use the shared parser and registrar without binding hotkeys.
-#Include ../infra/app_picker.ahk
+#Include ../apps/engine/picker.ahk
 #Include ../settings/engine/shortcuts.ahk
 #Include ../infra/metrics/metrics_filters.ahk
 #Include ../infra/metrics/metrics_shortcuts.ahk
@@ -1648,9 +1648,9 @@ _LogBootProgress("keystats modules + tests included")
 ; Function definitions only, and the table names only its own _MI_ builders,
 ; so pulling it in stages nothing and resolves no menu dependency at load.
 ; The Applications stage the root builder table names.
-#Include ../ui/menu/menu_apps.ahk
+#Include ../apps/ui/menu/apps.ahk
 #Include ../menu/ui/builder/menu_init.ahk
-#Include unit/ui/bundled_apps/test_bundled_apps.ahk
+#Include unit/apps/test_bundled_apps.ahk
 ; Drift gate: the staged tray root follows the manifest's top level, separators included.
 #Include meta/menu/test_top_level_drift_gate.ahk
 ; Regression: no separator doubles up in any manifest menu.

@@ -9,13 +9,13 @@
 local helpers = require("tests.helpers")
 
 local function with_launcher(scenario)
-	helpers.with_stub_scope({ "adapters.app_launcher", "core.process.adapters.shell_runner" }, function()
+	helpers.with_stub_scope({ "apps.adapters.launcher", "core.process.adapters.shell_runner" }, function()
 		local received
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(path, args)
 			received = { path = path, args = args }
 			return { start = function() return true end }
 		end }
-		local launcher = helpers.load_with_stubs("adapters.app_launcher")
+		local launcher = helpers.load_with_stubs("apps.adapters.launcher")
 		scenario(launcher, function() return received end)
 	end)
 end

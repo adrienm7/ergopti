@@ -3624,7 +3624,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	const appsEmptyNative = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_apps.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/apps/ui/menu/apps.lua')
 	);
 	function appsEmptyOwns(source) {
 		const tokens = scriptTokens(source, '.lua').map((token) => ({
@@ -9192,7 +9192,7 @@ console.log(
 		);
 	}
 
-	const source = readSourceFile(path.join(base, 'macos/ui/menu/menu_apps.lua'));
+	const source = readSourceFile(path.join(base, 'macos/apps/ui/menu/apps.lua'));
 	const signature = 'function M.build(ctx)';
 	const actual = ownerBody(source, signature);
 	const statements = [

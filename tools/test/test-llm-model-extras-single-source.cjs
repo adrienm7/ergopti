@@ -251,6 +251,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/ai/engine',
 	'static/ergopti_plus/macos/settings/engine',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/apps/ui',
 	'static/ergopti_plus/macos/ai/ui',
 	'static/ergopti_plus/macos/menu/ui',
 	'static/ergopti_plus/macos/settings/ui',

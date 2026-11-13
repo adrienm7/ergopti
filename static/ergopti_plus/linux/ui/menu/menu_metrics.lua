@@ -354,7 +354,7 @@ local function _manifest_metrics_rows(ctx, k)
 		-- The applications whose typing is never recorded: the same submenu the
 		-- other two drivers draw, over this driver's own keystats list.
 		["exclude_apps"] = function()
-			local AppRows = require("ui.menu.app_exclusion_rows")
+			local AppRows = require("apps.ui.menu.exclusion_rows")
 			local count = #k.get_disabled_apps()
 			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
 			-- The add-application prompt's caption, not a row label.

@@ -237,7 +237,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"ui.menu.menu_hotstrings",
 			"ui.menu.menu_metrics",
 			"ui.menu.menu_tap_holds",
-			"ui.menu.menu_apps",
+			"apps.ui.menu.apps",
 			"ui.menu.menu_about",
 		}) do
 			package.loaded[module_name] = {}

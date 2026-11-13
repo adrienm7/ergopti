@@ -56,7 +56,7 @@ local EEXIST = 17 -- Linux exclusive-create collision receipt.
 --- @param current function Exact page/action authority.
 --- @return table|nil cancellable native request
 local function xdg_open(target, done, current)
-	return require("adapters.desktop_opener").open(target, done, current)
+	return require("apps.adapters.desktop_opener").open(target, done, current)
 end
 
 --- The production side effects; a test replaces any of them.

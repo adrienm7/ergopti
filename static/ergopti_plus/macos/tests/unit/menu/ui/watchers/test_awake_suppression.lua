@@ -110,7 +110,7 @@ local OWNED_MODULES = {
 	"ui.menu.init",
 	"menu.ui.keyboard.keymap_lifecycle",
 	"ui.menu.menu_about",
-	"ui.menu.menu_apps",
+	"apps.ui.menu.apps",
 	"ui.menu.menu_gestures",
 	"ui.menu.menu_hotstrings",
 	"ui.menu.menu_keyboard_layout",

@@ -25,7 +25,7 @@ local fs = require("hs.fs")
 local text_utils = require("core.text.engine.utils")
 local MetricsState = require("infra.metrics_state_keys")
 
-local AppPickerLib  = require("infra.app_picker")
+local AppPickerLib  = require("apps.engine.picker")
 local dialog        = require("core.ui.engine.dialog_util")
 local kl_mod        = require("modules.keystats")
 local i18n          = require("core.i18n.engine.i18n")

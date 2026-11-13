@@ -2,8 +2,8 @@
 	"description": "Where each driver adapter of a shared port lives, by repository path. The port × driver matrix (tools/test/test-port-adapter-matrix.cjs) and the macOS port coverage test read it; a driver absent from a port has no adapter for it, and the matrix holds the reason.",
 	"adapters": {
 		"AppLauncher": {
-			"windows": "static/ergopti_plus/windows/adapters/app_launcher.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/app_launcher.lua"
+			"windows": "static/ergopti_plus/windows/apps/adapters/launcher.ahk",
+			"macos": "static/ergopti_plus/macos/apps/adapters/launcher.lua"
 		},
 		"Clipboard": {
 			"windows": "static/ergopti_plus/windows/adapters/clipboard.ahk",

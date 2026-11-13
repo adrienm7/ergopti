@@ -160,13 +160,13 @@ end)
 
 helpers.describe("menu_apps discovery cache", function()
 	helpers.it("scans the apps/ directory at most once across repeated menu opens", function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.fs.engine.dir" }, function()
+		helpers.with_stub_scope({ "apps.ui.menu.apps", "core.fs.engine.dir" }, function()
 			local scans = 0
 			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function()
 				scans = scans + 1
 				return {}, true
 			end }
-			local apps = helpers.load_with_stubs("ui.menu.menu_apps", {
+			local apps = helpers.load_with_stubs("apps.ui.menu.apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
 			})
 			local ctx = { base_dir = "/tmp/ergopti-no-apps/", paused = false }

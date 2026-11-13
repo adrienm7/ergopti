@@ -320,7 +320,7 @@ try:
                         + (
                             "local value=require('core.ui.ui.text_prompt').ask('Native entry','Preserved native body',' Exact café ')\n"
                             if mode == "prompt"
-                            else "local value=require('ui.app_chooser').pick(shell,'Native application')\n"
+                            else "local value=require('apps.ui.chooser').pick(shell,'Native application')\n"
                             if mode == "application"
                             else "local value=require('settings.ui.dir_picker').pick(shell,{default_config_dir=function() return '/tmp' end},{get=function() return 'Select configuration folder' end},'/tmp')\n"
                             if mode == "directory"

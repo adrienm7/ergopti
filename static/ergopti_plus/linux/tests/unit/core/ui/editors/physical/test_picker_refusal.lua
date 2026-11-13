@@ -10,7 +10,7 @@ require("ui.action_picker.bridge")
 local function with_editor(body)
 	local names = { "ui.physical_shortcuts.bridge", "ui.action_picker.bridge", "core.ui.ui.webview_manager",
 		"modules.gestures.manager", "platform.input.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
-		"core.ui.ui.text_prompt", "ui.app_chooser", "core.logger.engine.shim" }
+		"core.ui.ui.text_prompt", "apps.ui.chooser", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local path = os.tmpname()
@@ -83,7 +83,7 @@ local function with_editor(body)
 			if state.on_prompt then state.on_prompt() end
 			return state.parameter
 		end }
-		package.loaded["ui.app_chooser"] = { pick = package.loaded["core.ui.ui.text_prompt"].ask }
+		package.loaded["apps.ui.chooser"] = { pick = package.loaded["core.ui.ui.text_prompt"].ask }
 		host = helpers.load_module("ui.physical_shortcuts.bridge")
 		local picker = helpers.load_module("ui.action_picker.bridge")
 		function state.open()

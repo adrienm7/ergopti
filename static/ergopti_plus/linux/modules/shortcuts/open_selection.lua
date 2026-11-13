@@ -47,7 +47,7 @@ local REPORT_KEYS = {
 }
 
 local DEFAULT_DEPS = {
-	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
+	open = function(target, on_done) return require("apps.adapters.desktop_opener").open(target, on_done) end,
 	exists = function(path) return require("core.fs.adapters.file_system").exists(path) end,
 	path_status = function(path) return require("core.fs.adapters.file_system").path_status(path) end,
 	notify = function(message) return require("platform.system.notifier").send(message, { level = "error" }) end,

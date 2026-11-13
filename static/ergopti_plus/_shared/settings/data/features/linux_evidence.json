@@ -1213,7 +1213,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/keystats/keystats.lua",
-				"static/ergopti_plus/linux/ui/menu/app_exclusion_rows.lua",
+				"static/ergopti_plus/linux/apps/ui/menu/exclusion_rows.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_metrics_preferences.lua"
 			]

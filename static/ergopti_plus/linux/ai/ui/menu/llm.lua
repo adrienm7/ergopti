@@ -381,7 +381,7 @@ local function _build_llm(ctx)
 			},
 		}
 		-- The applications the trigger never runs in: the submenu the other two drivers draw.
-		local AppRows = require("ui.menu.app_exclusion_rows")
+		local AppRows = require("apps.ui.menu.exclusion_rows")
 		local exclusion_title = i18n_safe("menu.llm.exclude_from_ai")
 		rows[#rows + 1] = {
 			label = AppRows.caption(#TriggerSettings.disabled_apps(),
