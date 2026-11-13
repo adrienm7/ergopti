@@ -817,6 +817,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-scope-overlap.cjs"],
 			"repro": "npm run test:structure-scope-overlap"
+		},
+		{
+			"id": "js-0529",
+			"ordinal": 648,
+			"name": "structure plan keeps a join onto a scattered folder from widening to the driver root",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-widened-join.cjs"],
+			"repro": "npm run test:structure-widened-join"
 		}
 	]
 }
