@@ -73,12 +73,13 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/build/verify-macos-managed-ollama-publication.py` — S01
 - `tools/build/write_build_stamp.sh` — S01
 
-## tooling (206 files)
+## tooling (207 files)
 
 - `tools/audit/census-log-vocabulary.cjs` — S01
 - `tools/audit/keystats-sql-census.cjs` — S01, S30
 - `tools/audit/shared-literal-inventory.cjs` — S01
 - `tools/audit/structure/rules.cjs` — S01, S07, S18, S19, S21, S34, S38
+- `tools/audit/workflow.cjs` — S01
 - `tools/bench/linux-hot-path.lua` — S01, S03, S15, S34
 - `tools/bench/linux-metrics-reader.lua` — S01, S30
 - `tools/bench/linux-metrics-reader.py` — S01
@@ -282,7 +283,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/locale/report-identical-to-english.cjs` — S01
 - `tools/maintainer/windows-live-checks-list.cjs` — S01
 
-## repo-test (553 files)
+## repo-test (556 files)
 
 - `tools/lint/audit-file-headers.cjs` — S01, S27, S33, S34, S35
 - `tools/lint/audit-gui-titles.cjs` — S01, S12
@@ -409,6 +410,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-action-picker-bridge.cjs` — S01, S25, S33
 - `tools/test/test-action-picker-disabled-rows.cjs` — S01
 - `tools/test/test-action-picker-parameter-editor.cjs` — S01
+- `tools/test/test-adapter-reachability.cjs` — S01
 - `tools/test/test-ahk-format-placeholders.cjs` — S01
 - `tools/test/test-ahk-full-startup-smoke.cjs` — S01, S36
 - `tools/test/test-ahk-local-same-as-global.cjs` — S12, S24
@@ -459,7 +461,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-driver-scoped-features-stay-scoped.cjs` — S01
 - `tools/test/test-driver-tree-parity.cjs` — S01, S13, S29, S33, S34, S35
 - `tools/test/test-dynamic-hotstrings-menu-labels.cjs` — S01, S19
-- `tools/test/test-e2e-gate-symmetry.cjs` — S26
+- `tools/test/test-e2e-gate-symmetry.cjs` — S01, S26
 - `tools/test/test-encryptor-shared-vectors.cjs` — S01
 - `tools/test/test-error-dialog-page.cjs` — S01
 - `tools/test/test-extensions-path-resolves.cjs` — S04, S26, S33
@@ -484,7 +486,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-hammerspoon-integrity.cjs` — S25, S26, S33
 - `tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs` — S01, S19, S32
 - `tools/test/test-hardening-c-ahk-scan-code-precedence.cjs` — S01, S28, S29
-- `tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs` — S12, S21, S28
+- `tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs` — S01, S12, S21, S28
 - `tools/test/test-healthcheck-model.cjs` — S01
 - `tools/test/test-healthcheck-page.cjs` — S01, S16, S24
 - `tools/test/test-homebrew-cask.cjs` — S38
@@ -698,7 +700,8 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-new-driver-scaffold.cjs` — S01
 - `tools/test/test-no-fallback-literals.cjs` — S21
 - `tools/test/test-no-hardcoded-ui-strings.cjs` — S06, S24, S27, S35
-- `tools/test/test-no-plan-refs-in-source.cjs` — S21, S26, S28, S30
+- `tools/test/test-no-pinned-source-reads.cjs` — S01
+- `tools/test/test-no-plan-refs-in-source.cjs` — S01, S21, S26, S28, S30
 - `tools/test/test-number-row-full-capture.cjs` — S01, S25, S33
 - `tools/test/test-ollama-port-single-source.cjs` — S01, S21
 - `tools/test/test-ollama-release-pin-parity.cjs` — S01, S21
@@ -756,6 +759,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-showcase-action-platforms.cjs` — S01
 - `tools/test/test-slot-roles-single-source.cjs` — S01
 - `tools/test/test-source-run-single-owner.cjs` — S01, S09, S19, S24, S35
+- `tools/test/test-source-trees-are-scanned.cjs` — S01
 - `tools/test/test-space-wrap-toggle-retired.cjs` — S01
 - `tools/test/test-sqlite-event-id-single-source.cjs` — S01
 - `tools/test/test-stubs-intercept-something.cjs` — S01
