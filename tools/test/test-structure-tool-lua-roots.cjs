@@ -16,6 +16,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const Plan = require('../audit/structure/plan.cjs');
 const Apply = require('../audit/structure/apply-step.cjs');
 
@@ -87,6 +89,28 @@ function run() {
 	const rxRows = Plan.scanFile(RX, rx, Plan.referenceContext(jsMap));
 	const rxOut = Apply.rewriteText(rx, rxRows, new Map(), RX);
 	assert.ok(rxOut.includes('/require\\("core\\.fs\\.adapters\\.file_system"\\)/'), rxOut);
+
+	// path.join(DRIVERS, drv.name, 'infra', 'paths.lua'): literal pieces after
+	// the driver as a variable. They name the file under each driver that has
+	// one there; the shared-root resolver test lost both resolvers after S04.
+	const REPO = path.resolve(__dirname, '..', '..');
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus/linux/infra/paths.lua'))) {
+		const { map } = Plan.moveMap();
+		const step = Plan.steps(map).find((s) => s.moves.some(([o]) => o === 'linux/infra/paths.lua'));
+		const stepMap = new Map(
+			[...map].map(([o, t]) => [o, step.moves.some(([so]) => so === o) ? t : o])
+		);
+		const fresh = map.get('linux/infra/paths.lua').slice('linux/'.length);
+		const VAR = 'tools/test/zz_probe_resolvers.cjs';
+		const join = "const resolver = path.join(DRIVERS, drv.name, 'infra', 'paths.lua');\n";
+		const varRows = Plan.scanFile(VAR, join, Plan.referenceContext(stepMap));
+		const varOut = Apply.rewriteText(join, varRows, new Map(), VAR);
+		const pieces = fresh
+			.split('/')
+			.map((p) => `'${p}'`)
+			.join(', ');
+		assert.ok(varOut.includes(`path.join(DRIVERS, drv.name, ${pieces})`), varOut);
+	}
 
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
