@@ -15,7 +15,7 @@ local OWNED = {
 	"modules.gestures.action_confirm", "modules.gestures.system_actions",
 	"infra.dialog_util", "adapters.mouse_control", "adapters.window_info",
 	"adapters.window_manager", "adapters.running_application", "adapters.tcc_grant",
-	"adapters.shell_runner", "adapters.task_environment", "infra.launcher_environment",
+	"adapters.shell_runner", "adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"infra.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",
 }
 

@@ -27,8 +27,8 @@ local EXPECTED_INODE = "987654321"
 local function resolve_candidate(override, options)
 	options = options or {}
 	package.loaded["platform.remap.lease_helper"] = nil
-	local previous_dev_source = package.loaded["infra.dev_source"]
-	if options.dev_source then package.loaded["infra.dev_source"] = options.dev_source end
+	local previous_dev_source = package.loaded["core.lifecycle.engine.dev_source"]
+	if options.dev_source then package.loaded["core.lifecycle.engine.dev_source"] = options.dev_source end
 	local helper = helpers.load_with_stubs("platform.remap.lease_helper", {
 		processInfo = options.process_info,
 		fs = {
@@ -73,7 +73,7 @@ local function resolve_candidate(override, options)
 	local call_ok, resolved, resolve_err, environment = pcall(helper.resolve, options.no_override_root ~= true
 		and DRIVER_ROOT or nil)
 	os.getenv = original_getenv
-	package.loaded["infra.dev_source"] = previous_dev_source
+	package.loaded["core.lifecycle.engine.dev_source"] = previous_dev_source
 	if not call_ok then error(resolved) end
 	return resolved, resolve_err, environment
 end

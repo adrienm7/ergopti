@@ -981,14 +981,14 @@ const cases = [
 		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(6) + '}',
 		1,
 		'all six former bootstrap exceptions now require shared policy',
-		'static/ergopti_plus/windows/infra/bundle.ahk'
+		'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk'
 	],
 	[
 		'windows',
 		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(7) + '}',
 		1,
 		'additional bootstrap native calls cannot bypass shared policy',
-		'static/ergopti_plus/windows/infra/bundle.ahk'
+		'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk'
 	],
 	[
 		'windows',
@@ -1002,7 +1002,7 @@ const cases = [
 		'Bundle_Init() {\n' + 'Ui_MsgBox("Fatal", "")\n'.repeat(6) + '}',
 		0,
 		'all six bundle startup calls use the shared owner',
-		'static/ergopti_plus/windows/infra/bundle.ahk'
+		'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk'
 	],
 	[
 		'windows',

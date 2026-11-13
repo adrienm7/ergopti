@@ -189,7 +189,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - Logger scalar gate red on dev since the PC batch of 2026-10-31 evening:
   `tools/test/test-logger-scalars-single-source.cjs` reports 3 free-form reason
-  literals in `windows/infra/lifecycle.ahk` against a baseline of 2. Use a
+  literals in `windows/core/lifecycle/engine/lifecycle.ahk` against a baseline of 2. Use a
   closed `reason` from `_shared/core/logger/data/vocabulary.json` (add it there
   deliberately, then `npm run codegen:contracts`) and put the detail in the
   message.

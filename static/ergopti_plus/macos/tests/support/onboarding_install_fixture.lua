@@ -22,7 +22,7 @@ local MODULE_NAMES = {
 	"hs",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.launcher_environment",
+	"core.lifecycle.engine.launcher_environment",
 	"infra.logger",
 	"infra.notifications",
 	"infra.text_utils",

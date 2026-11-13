@@ -10,7 +10,7 @@ const { app } = require('../lib/identifiers.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const ENTRY = `static/ergopti_plus/windows/${app.ahk}`;
-const BUNDLE = 'static/ergopti_plus/windows/infra/bundle.ahk';
+const BUNDLE = 'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk';
 const UNSTAMPED_VERSION = '0.0.0-dev';
 
 // Ahk2Exe directive -> Windows FileVersionInfo property.

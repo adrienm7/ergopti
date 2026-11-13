@@ -517,7 +517,7 @@ package.preload["core.events.loop"] = function()
 		record("FACT", "nav_layer_keys=" .. layer_keys)
 	end
 	adapter.run = function(loop)
-		local uv, signals = require("luv"), require("infra.signal_handlers")
+		local uv, signals = require("luv"), require("core.lifecycle.engine.shutdown.signal_handlers")
 		local active_signals = 0
 		uv.walk(function(handle)
 			if uv.handle_get_type(handle) == "signal" and uv.is_active(handle) then

@@ -112,7 +112,7 @@ local function updater_fixture(replace)
 	local world = { state = "available", starts = {}, completions = {}, installs = 0, channel = "dev" }
 	world.release = { tag = "v0.0.0-dev.150", download_url = "https://example.invalid/archive",
 		checksum_url = "https://example.invalid/checksum" }
-	replace("infra.installation", { is_source_run = function() return false end })
+	replace("core.lifecycle.engine.installation", { is_source_run = function() return false end })
 	replace("ui.download_window.bridge", {
 		show = function(opts) world.options = opts; return 53 end,
 		complete = function(...)

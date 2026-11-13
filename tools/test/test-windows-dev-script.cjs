@@ -63,7 +63,7 @@ check('asks a running ErgoptiPlus to close and never forces it', () => {
 
 check('the driver reads the same variable name it is handed', () => {
 	const driver = fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/windows/infra/dev_source.ahk'),
+		path.join(ROOT, 'static/ergopti_plus/windows/core/lifecycle/engine/dev_source.ahk'),
 		'utf8'
 	);
 	assert.match(driver, /Data\["dev_source"\]\["environment"\]/);

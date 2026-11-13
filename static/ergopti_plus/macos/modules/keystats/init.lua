@@ -31,7 +31,7 @@ local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local i18n     = require("core.i18n.engine.i18n")
 local dialog   = require("infra.dialog_util")
-local TeardownTransaction = require("infra.teardown_transaction")
+local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
 local InputSourceBroker = require("adapters.input_source_broker")
 
 local LogManager     = require("modules.keystats.log_manager")

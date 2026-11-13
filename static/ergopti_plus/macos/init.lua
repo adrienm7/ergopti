@@ -56,13 +56,13 @@ do
 		end)
 	end
 
-	-- A developer app (infra/dev_source.lua) runs this clone, which holds no
+	-- A developer app (core/lifecycle/engine/dev_source.lua) runs this clone, which holds no
 	-- LuaSocket: the build stages it into the app payload only. A root that does
 	-- not name this driver is left to the instance admission below, which
 	-- refuses the process.
-	local dev_ok, dev_root = pcall(function() return require("infra.dev_source").root() end)
+	local dev_ok, dev_root = pcall(function() return require("core.lifecycle.engine.dev_source").root() end)
 	if dev_ok and dev_root and searchers then
-		local DevSource = require("infra.dev_source")
+		local DevSource = require("core.lifecycle.engine.dev_source")
 		local payload = DevSource.payload_driver_dir(hs.processInfo and hs.processInfo.bundlePath)
 		table.insert(searchers, 2, DevSource.payload_searcher(payload, loadfile, package.loadlib))
 	end
@@ -70,7 +70,7 @@ end
 
 -- Before the first module load: every later `require`, lazy ones included, then
 -- skips Hammerspoon's wrapper, which costs 300 us per call on the main thread.
-local direct_require_installed = require("infra.direct_require").install(_G)
+local direct_require_installed = require("core.lifecycle.engine.direct_require").install(_G)
 
 
 
@@ -118,9 +118,9 @@ end
 
 -- Instance admission comes before every settings write, timer, watcher and
 -- path resolution: a process that may not run the driver must leave no trace
--- beyond its refusal line (see infra/instance_admission.lua).
+-- beyond its refusal line (see core/lifecycle/engine/reload/instance_admission.lua).
 do
-	local InstanceAdmission = require("infra.instance_admission")
+	local InstanceAdmission = require("core.lifecycle.engine.reload.instance_admission")
 	local process_info = type(hs.processInfo) == "table" and hs.processInfo or {}
 	local admission_mode = Logger.classify_async_sink_boot_environment()
 	-- An unanswerable identity is treated as foreign: refusing never quits a process
@@ -266,7 +266,7 @@ local function boot_note(fmt, ...)
 end
 
 do
-	local present, missing = require("infra.launcher_environment").presence()
+	local present, missing = require("core.lifecycle.engine.launcher_environment").presence()
 	boot_note("Launcher environment keys present: %s; missing: %s.",
 		#present > 0 and table.concat(present, ", ") or "none",
 		#missing > 0 and table.concat(missing, ", ") or "none")
@@ -276,11 +276,11 @@ Boot.stage("Core module requires")
 local i18n               = require("core.i18n.engine.i18n")
 local locale_mod         = require("core.i18n.engine.locale")
 local crash_reporter     = require("modules.diagnostics.crash_reporter")
-local reload_guard       = require("infra.reload_guard")
-local EmergencyExit      = require("infra.emergency_exit")
-local TerminationCoordinator = require("infra.termination_coordinator")
-local TeardownTransaction = require("infra.teardown_transaction")
-local StartupTransaction = require("infra.startup_transaction")
+local reload_guard       = require("core.lifecycle.engine.reload.guard")
+local EmergencyExit      = require("core.lifecycle.engine.shutdown.emergency_exit")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
+local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
+local StartupTransaction = require("core.lifecycle.engine.startup_transaction")
 local BootFatal          = require("adapters.boot_fatal")
 
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
@@ -1013,7 +1013,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	steps[#steps + 1] = {
 		name = "driver-control",
 		run = function()
-			local module = package.loaded["infra.driver_control"]
+			local module = package.loaded["core.lifecycle.engine.driver_control"]
 			if module == nil then return true end
 			return module.stop()
 		end,
@@ -1206,7 +1206,7 @@ local function emergency_exit_after_launcher_loss(reason)
 end
 
 do
-	local guard_ok, loaded_guard = pcall(require, "infra.launcher_guard")
+	local guard_ok, loaded_guard = pcall(require, "core.lifecycle.engine.launcher_guard")
 	LauncherGuard = guard_ok and loaded_guard or nil
 	if not guard_ok or type(LauncherGuard) ~= "table" or type(LauncherGuard.init) ~= "function" then
 		Logger.error(LOG, "Swift launcher liveness guard failed to load — managed launch is fail-closed: %s",
@@ -2427,7 +2427,7 @@ local file_watchers_committed = require("core.fs.engine.file_watchers").start({
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	-- A developer app also reloads on shared Lua edits; a packaged tree never changes.
-	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "") or nil,
+	shared_source_dir       = require("core.lifecycle.engine.dev_source").is_active() and (logger_shared_root .. "") or nil,
 	git_roots               = {
 		base_dir,
 		require("core.fs.engine.native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
@@ -2510,7 +2510,7 @@ Storage.set(HS_BOOT_READY_SETTING_KEY, true)
 -- The local reload command, once boot is complete: a reload it requested is
 -- completed here by this reloaded state. Optional, so a control that cannot
 -- start is logged and the driver runs on.
-require("infra.driver_control").start({
+require("core.lifecycle.engine.driver_control").start({
 	pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
 	request_reload = function(reason, on_aborted)
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
@@ -2521,7 +2521,7 @@ require("infra.driver_control").start({
 -- opened it with that clone (the launcher admits ERGOPTI_FIELD_RUN_ROOT only
 -- for a folder of this user holding the declaration); otherwise a packaged
 -- runtime never even loads the module.
-local field_run_root = require("infra.dev_source").is_active() and require("infra.dev_source").root()
+local field_run_root = require("core.lifecycle.engine.dev_source").is_active() and require("core.lifecycle.engine.dev_source").root()
 	or os.getenv(require("core.text.engine.identifiers").field_report.environment)
 if type(field_run_root) == "string" and field_run_root ~= "" then
 	require("infra.field_run").start({

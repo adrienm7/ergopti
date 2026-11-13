@@ -9,7 +9,7 @@
 ; _Onboarding_Commit() in infra/onboarding.ahk previously set
 ; AppState["toml_strict_canon_in_progress"] as its first statement. AppState
 ; is never defined in production (the Map was deliberately removed from
-; infra/app_state.ahk). This throws UnsetError immediately, aborting the entire
+; core/lifecycle/engine/app_state.ahk). This throws UnsetError immediately, aborting the entire
 ; first-run wizard commit: config is never written and the script never
 ; reloads.
 ;
@@ -66,7 +66,7 @@ _ONA_CommitDoesNotUseAppState() {
 	Seg := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in the driver source")
 	; Any AppState[...] index-assign in this function throws UnsetError in production
-	; because the Map was removed from infra/app_state.ahk
+	; because the Map was removed from core/lifecycle/engine/app_state.ahk
 	Assert(InStr(Seg, "AppState[") = 0,
 		"_Onboarding_Commit must NOT use AppState[...] — AppState is not defined in production and throws UnsetError")
 }

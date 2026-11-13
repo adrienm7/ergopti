@@ -336,7 +336,7 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 ; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
-; Mirrors the pruning thresholds of infra/boot.ahk: AppState_TouchLastSentKey
+; Mirrors the pruning thresholds of core/lifecycle/engine/boot.ahk: AppState_TouchLastSentKey
 ; (infra/hotstrings/hotstring_send.ahk) reads them on every timestamp write.
 global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
 global LAST_SENT_KEY_TIME_PRUNE_AT := 150
@@ -478,7 +478,7 @@ ToggleSuspend() {
     _Stub_SentText.Push({ kind: "toggle_suspend" })
 }
 
-; The pause-preserving reload. The real one lives in infra/lifecycle.ahk, which
+; The pause-preserving reload. The real one lives in core/lifecycle/engine/lifecycle.ahk, which
 ; this runner cannot include: it defines ToggleSuspend, colliding with the stub
 ; above, and loading the genuine article would let a test actually Suspend(1) the
 ; runner and arm its watchdog timers. Stubbed rather than IsSet-guarded at the

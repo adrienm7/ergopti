@@ -284,11 +284,11 @@ function M.openssl_stdout_receipt(command, output, status)
 end
 
 --- The staging path the native TOML writer and the store use for a destination:
---- named after this process (CFD-1, infra/stage_owner.lua).
+--- named after this process (CFD-1, core/lifecycle/engine/stage_owner.lua).
 --- @param path string Destination path.
 --- @return string stage
 function M.stage_path(path)
-	return require("infra.stage_owner").stage_path(path)
+	return require("core.lifecycle.engine.stage_owner").stage_path(path)
 end
 
 --- Hands one admitted regular source to stdio on its own path name.

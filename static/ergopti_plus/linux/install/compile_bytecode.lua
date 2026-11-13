@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Compiles every application module of an installed tree (linux/ and
 --- _shared/, their test trees excepted) into <root>/.bytecode with the luajit that runs this script,
---- which must be the one the daemon runs (infra/bytecode_package.lua). The
+--- which must be the one the daemon runs (core/lifecycle/engine/bytecode_package.lua). The
 --- installer runs it after writing the ownership receipt, the updater after a
 --- verified activation. A failure leaves no package, never a stale one: the
 --- daemon then loads from source and says so once.
@@ -36,7 +36,7 @@ ffi.C.free(resolved)
 package.path = root .. "/linux/?.lua;" .. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;"
 	.. package.path
 local quote = require("core.text.engine.utils_core").shell_quote
-local package_owner = loadfile(root .. "/linux/infra/bytecode_package.lua")
+local package_owner = loadfile(root .. "/linux/core/lifecycle/engine/bytecode_package.lua")
 if not package_owner then refuse("owner_missing") end
 local BytecodePackage = package_owner()
 

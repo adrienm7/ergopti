@@ -56,7 +56,7 @@ M.GROUPS = {
 		"tests/unit/ui/menu/shortcuts_and_gestures/",
 		"tests/unit/ui/menu/keyboard_layout/",
 	} },
-	{ name = "ui", prefixes = { "tests/unit/ui/" } },
+	{ name = "ui", prefixes = { "tests/unit/" } },
 	{ name = "other", prefixes = {} },
 }
 

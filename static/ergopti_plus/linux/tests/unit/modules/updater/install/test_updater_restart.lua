@@ -322,7 +322,7 @@ helpers.describe("updater restart: starting the installed version", function()
 				run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(how)
 			helpers.assert_eq(calls, 0, "unreadable cgroup must not dispatch a guessed relay")
-			local daemon = helpers.load_module("infra.daemon_restart")
+			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {},
 				installation = function() return { kind = "standalone", wrapper = "/x" } end,
 				run = function() calls = calls + 1; return true end })
@@ -340,7 +340,7 @@ helpers.describe("updater restart: starting the installed version", function()
 			local how = Restarter.restart({ wrapper = "/x", args = {}, cgroup = cgroup, pid = 4242,
 				start_tick = "1337", run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(how)
-			local daemon = helpers.load_module("infra.daemon_restart")
+			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {}, cgroup = cgroup,
 				installation = function() return { kind = "standalone", wrapper = "/x" } end,
 				run = function() calls = calls + 1; return true end })
@@ -401,7 +401,7 @@ local function bind_action_owners(items, source_run)
 		if type(item.fn) == "function" then
 			local action = item.fn
 			item.fn = function(...)
-				local Installation = require("infra.installation")
+				local Installation = require("core.lifecycle.engine.installation")
 				local original_owner = Installation.is_source_run
 				local original_progress = package.loaded["ui.download_window.bridge"]
 				Installation.is_source_run = function() return source_run == true end
@@ -422,7 +422,7 @@ end
 	--- @param source_run boolean|nil What the installed-build owner answers
 	---   (an installed build by default; the suite itself runs from a checkout).
 	local function updates_rows(fake, ctx_extra, source_run)
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return source_run == true end
 		local mb = helpers.load_module("ui.menu.builder")
@@ -597,7 +597,7 @@ helpers.describe("Main restart pause wiring", function()
 					installed_root = function() return "/installed" end },
 				shutdown = { request = function() shutdowns = true end },
 				require = function(module)
-					helpers.assert_true(module == "infra.daemon_restart" or module == "modules.updater.restarter")
+					helpers.assert_true(module == "core.lifecycle.engine.reload.daemon_restart" or module == "modules.updater.restarter")
 					return { restart = function(opts) received = opts; return "relay" end }
 				end }, { __index = _G })
 			local chunk

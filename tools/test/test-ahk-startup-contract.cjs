@@ -20,8 +20,15 @@ const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const ENTRY = path.join(WINDOWS, 'ErgoptiPlus.ahk');
 const CONFIG_IO = path.join(WINDOWS, 'infra', 'config_io.ahk');
 const ERROR_NET = path.join(WINDOWS, 'infra', 'error_net.ahk');
-const LIFECYCLE = path.join(WINDOWS, 'infra', 'lifecycle.ahk');
-const SUSPEND_HANDOFF = path.join(WINDOWS, 'infra', 'suspend_handoff.ahk');
+const LIFECYCLE = path.join(WINDOWS, 'core', 'lifecycle', 'engine', 'lifecycle.ahk');
+const SUSPEND_HANDOFF = path.join(
+	WINDOWS,
+	'core',
+	'lifecycle',
+	'engine',
+	'reload',
+	'suspend_handoff.ahk'
+);
 
 const errors = [];
 const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');

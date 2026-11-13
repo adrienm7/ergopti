@@ -151,7 +151,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		if after_recovery then after_recovery(kh) end
 		if quit_on_recovery then
 			assert(kh.isRecovering(), "expected last keyboard loss")
-			local shutdown = require("infra.shutdown_coordinator").new({ pre_wait = {}, keyboard_hook = kh,
+			local shutdown = require("core.lifecycle.engine.shutdown.coordinator").new({ pre_wait = {}, keyboard_hook = kh,
 				event_loop = { stop = function() end } })
 			shutdown.request("controlled quit")
 		end

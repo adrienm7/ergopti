@@ -121,8 +121,8 @@ helpers.describe("native task environment: launcher authority never reaches chil
 	end)
 
 	helpers.it("owns one exact launcher-only key list and preserves ordinary variables", function()
-		package.loaded["infra.launcher_environment"] = nil
-		local policy = require("infra.launcher_environment")
+		package.loaded["core.lifecycle.engine.launcher_environment"] = nil
+		local policy = require("core.lifecycle.engine.launcher_environment")
 		local sanitized, detail = policy.child_copy({
 			HOME = "/Users/tester",
 			ERGOPTI_LAUNCHER_PID = "321",

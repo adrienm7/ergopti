@@ -24,8 +24,8 @@ local _ = helpers.load_with_stubs("infra.logger")
 --- Loads a fresh reload_guard with a clean stubbed persistent store.
 local function fresh()
 	package.loaded["core.fs.adapters.storage"] = nil
-	package.loaded["infra.reload_guard"] = nil
-	return helpers.load_with_stubs("infra.reload_guard")
+	package.loaded["core.lifecycle.engine.reload.guard"] = nil
+	return helpers.load_with_stubs("core.lifecycle.engine.reload.guard")
 end
 
 helpers.describe("reload_guard: reload-vs-quit signal", function()
@@ -127,8 +127,8 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		local function count() debug_calls = debug_calls + 1 end
 		package.loaded["infra.logger"] = { debug = count, info = count, warn = count, error = count }
 		package.loaded["core.fs.adapters.storage"] = nil
-		package.loaded["infra.reload_guard"] = nil
-		local rg = require("infra.reload_guard")
+		package.loaded["core.lifecycle.engine.reload.guard"] = nil
+		local rg = require("core.lifecycle.engine.reload.guard")
 		rg.mark_reload()
 		debug_calls = 0
 
@@ -137,7 +137,7 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		helpers.assert_eq(rg.is_reloading(), false)
 		helpers.assert_eq(debug_calls, 0,
 			"post-finalizer sentinel cleanup must not reopen the synchronous logger")
-		package.loaded["infra.reload_guard"] = nil
+		package.loaded["core.lifecycle.engine.reload.guard"] = nil
 		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["infra.logger"] = previous_logger
 	end)

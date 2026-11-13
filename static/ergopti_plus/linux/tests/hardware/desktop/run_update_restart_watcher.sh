@@ -13,7 +13,7 @@
 #            <root>.failed-<pid>, <root>.old is back and the previous daemon
 #            runs (the elapsed time is printed);
 #   quit     the user quits the UPDATED daemon during the watcher's wait,
-#            before its ready report, through the real infra/quit_request.lua
+#            before its ready report, through the real core/lifecycle/engine/shutdown/quit_request.lua
 #            handler: the update stays installed and no daemon is started.
 #
 # Why the Quit is in the updated daemon: once the old daemon asks for the
@@ -178,7 +178,7 @@ scenario() {
 		kill -USR1 "${old_pid}"
 		check "the restarter took the ${mode} route" "wait_for 10 'grep -qx \"restart ${mode}\" \"${RUNS}\"'"
 		check "the updated daemon started under the watcher" "wait_for 20 '[ -n \"\$(pid_of new)\" ]'"
-		check "its tray Quit was admitted by infra/quit_request.lua" "wait_for 10 'grep -qx \"quit true\" \"${RUNS}\" && grep -qx \"shutdown tray quit\" \"${RUNS}\"'"
+		check "its tray Quit was admitted by core/lifecycle/engine/shutdown/quit_request.lua" "wait_for 10 'grep -qx \"quit true\" \"${RUNS}\" && grep -qx \"shutdown tray quit\" \"${RUNS}\"'"
 		check "the watch log reads « quit before it reported ready »" "wait_for 20 'grep -q \"quit before it reported ready: the update stays installed\" \"${LOG}\"'"
 		echo "  info watcher settled $((SECONDS - started)) s after the restart"
 		sleep 3

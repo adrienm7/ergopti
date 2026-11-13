@@ -22,7 +22,7 @@
 ; corrects the LED) is pinned by behaviour in
 ; unit/modules/shortcuts/test_capsword_state.ahk.
 ;
-; SCOPE: source introspection of infra/lifecycle.ahk.
+; SCOPE: source introspection of core/lifecycle/engine/lifecycle.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -56,7 +56,7 @@ _CWRS_SuspendEnterCallsDisableCapsWord() {
 	Assert(Src != "", "infra/ source must be readable")
 
 	Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
-	Assert(Body != "", "Ergopti_OnSuspendEnter must be defined in infra/lifecycle.ahk")
+	Assert(Body != "", "Ergopti_OnSuspendEnter must be defined in core/lifecycle/engine/lifecycle.ahk")
 
 	Assert(InStr(Body, "DisableCapsWord()") > 0,
 		"Ergopti_OnSuspendEnter must call DisableCapsWord() — CapsWord must be deactivated on every suspend to correct the LED and unregister the mouse listeners that bypass native Suspend (AHK-16)")

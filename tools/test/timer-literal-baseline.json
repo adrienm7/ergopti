@@ -14,7 +14,7 @@
 	"windows/core/events/timer_scheduler.ahk": 1,
 	"windows/adapters/uia_worker.ahk": 1,
 	"windows/infra/hotpath_profiler.ahk": 1,
-	"windows/infra/lifecycle.ahk": 1,
+	"windows/core/lifecycle/engine/lifecycle.ahk": 1,
 	"windows/modules/dynamic_hotstrings/user_code.ahk": 1,
 	"windows/modules/keymap/layout.ahk": 1,
 	"windows/modules/keystats/keystats.ahk": 1,

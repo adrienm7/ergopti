@@ -13,7 +13,7 @@
 ---
 --- Behaviour "quit" plays the user who quits the UPDATED daemon during the
 --- watcher's wait, before its ready report: the click reaches the real
---- infra/quit_request.lua handler with the ports ergopti_hotstrings.lua gives
+--- core/lifecycle/engine/shutdown/quit_request.lua handler with the ports ergopti_hotstrings.lua gives
 --- it (report_update_quit through infra/updater_boot_ready.lua), the admitted
 --- Quit requests the shutdown and the process exits without reporting ready.
 --- Arguments: tree name, installation root, runs file, watch log, behaviour
@@ -40,7 +40,7 @@ append(runs, tree .. " " .. tostring(pid))
 
 if behaviour == "quit" then
 	local requested = false
-	local on_quit = require("infra.quit_request").new({
+	local on_quit = require("core.lifecycle.engine.shutdown.quit_request").new({
 		shutdown = {
 			is_requested = function() return requested end,
 			request = function(reason)

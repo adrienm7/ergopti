@@ -189,7 +189,9 @@ if (
 			'and its poll [launcher] stale_runtime_poll_ms, both from LauncherTimings (MLC-004).'
 	);
 }
-const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');
+const admission = read(
+	'static/ergopti_plus/macos/core/lifecycle/engine/reload/instance_admission.lua'
+);
 // Both Lua sites read the ids from identifiers.json (generated into identifiers.lua);
 // the ids below are what that file declares, compared with the build script's.
 const identifiers = JSON.parse(read('static/ergopti_plus/_shared/core/text/data/identifiers.json'));

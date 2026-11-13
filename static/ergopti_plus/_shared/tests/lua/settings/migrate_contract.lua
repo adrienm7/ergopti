@@ -80,7 +80,7 @@ local function with_config(content, body)
 	if content then write_bytes(path, content) end
 	local ok, err = pcall(body, path)
 	-- Linux stages under this process's name (CFD-1), macOS under `.tmp`.
-	local has_owner, StageOwner = pcall(require, "infra.stage_owner")
+	local has_owner, StageOwner = pcall(require, "core.lifecycle.engine.stage_owner")
 	local files = { path }
 	for _, version in ipairs({ 2, 3 }) do files[#files + 1] = Engine.backup_path(path, version, STAMP) end
 	for _, file in ipairs(files) do

@@ -2171,7 +2171,7 @@ function M.init(opts)
 	-- A local version run from source has no installation to update: it
 	-- checks for nothing on its own, as on the other two drivers, and the
 	-- tray greys its check and frequency rows.
-	if require("infra.installation").is_source_run() then
+	if require("core.lifecycle.engine.installation").is_source_run() then
 		Logger.info(LOG, "Local version run from source: no automatic update check.")
 		return
 	end

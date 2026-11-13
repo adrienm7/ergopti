@@ -79,7 +79,7 @@ _KLSD_LifecycleFailsClosedAndLogsCentrally() {
 	InitBody := _DriverFuncBody("KL_Init")
 	StopBody := _DriverFuncBody("KL_Stop")
 	Main := _KLSD_ReadSource("ErgoptiPlus.ahk")
-	Lifecycle := _KLSD_ReadSource("infra/lifecycle.ahk")
+	Lifecycle := _KLSD_ReadSource("core/lifecycle/engine/lifecycle.ahk")
 	Module := _KLSD_ReadSource("modules/keystats/keystats.ahk")
 	BootstrapAt := InStr(InitBody, "KL_BootstrapDataSql()")
 	PublishAt := InStr(InitBody, "Keystats.initialized := true")

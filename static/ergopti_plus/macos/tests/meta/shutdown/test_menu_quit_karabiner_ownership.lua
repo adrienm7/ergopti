@@ -132,7 +132,7 @@ local function load_menu_quit_action()
 		publication_pending = function() return stock_calls.publication_blocked == true end,
 		terminal_admission_blocked = function() return stock_calls.publication_blocked == true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		is_pending = function() return exit_mode.kind ~= nil end,
 		pending_kind = function() return exit_mode.kind end,
 		request_user_exit = function(reason)

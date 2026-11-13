@@ -737,10 +737,12 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
@@ -773,6 +775,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
@@ -783,6 +786,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/lifecycle/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/i18n/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),

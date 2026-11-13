@@ -27,7 +27,7 @@ local T0 = 1700000000
 --- says otherwise: the suite itself runs from a checkout, which checks for
 --- nothing on its own.
 local function with_manager(opts, body)
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local previous = {}

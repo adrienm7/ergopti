@@ -445,7 +445,7 @@ local function default_deps(settings)
 	local etag_capture = local_dir .. ".index.etag.download"
 	return {
 		settings = settings,
-		local_source = require("infra.installation").is_source_run(),
+		local_source = require("core.lifecycle.engine.installation").is_source_run(),
 		-- Re-applies a layout loaded live on X11 when the desktop replaces it.
 		keep_x11_layout = function(id) require("modules.keymap.x11_layout_reapply").arm(id) end,
 		-- The asynchronous runner: the refresh shares the daemon's loop with the

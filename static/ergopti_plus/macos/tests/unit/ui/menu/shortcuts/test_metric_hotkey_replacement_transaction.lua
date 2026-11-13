@@ -155,7 +155,7 @@ local function load_fixture(legacy)
 			return true
 		end,
 	}
-	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 
 	for _, module_name in ipairs({
 		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",

@@ -42,7 +42,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PORTS = path.join(ROOT, 'static/ergopti_plus/_shared/core/ports');
 // The Lua mirror is split by port family into test_adapter_contract_vectors_*.lua.
-const MIRROR_DIR = path.join(ROOT, 'static/ergopti_plus/macos/tests/unit/adapters/contracts');
+const MIRROR_DIR = path.join(ROOT, 'static/ergopti_plus/macos/tests/unit/core/lifecycle/adapters');
 const MIRROR_FILES = fs.existsSync(MIRROR_DIR)
 	? fs
 			.readdirSync(MIRROR_DIR)

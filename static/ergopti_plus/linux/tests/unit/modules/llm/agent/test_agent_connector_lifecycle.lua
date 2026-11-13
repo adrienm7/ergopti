@@ -360,7 +360,7 @@ local function with_main(connector, body)
 	local capture = assert(text:match("(local shutdown_runtime = prediction_engine and prediction_engine%.shutdown_runtime.-)\nlocal shutdown = ShutdownCoordinator"))
 	local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 	local observed = { stops = 0, flushes = 0, imports = 0, loaded = { ["modules.llm.agent_connectors"] = connector } }
-	local env = setmetatable({ ShutdownCoordinator = require("infra.shutdown_coordinator"), package = { loaded = observed.loaded },
+	local env = setmetatable({ ShutdownCoordinator = require("core.lifecycle.engine.shutdown.coordinator"), package = { loaded = observed.loaded },
 		keystats = { stop = function() return true end }, privacy_owners = {}, prediction_engine = false,
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 		webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,

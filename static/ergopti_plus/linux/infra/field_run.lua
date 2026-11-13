@@ -14,7 +14,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. A request file in the declared folder, noticed by an inotify watcher: the
----    clone's build/field-run for a developer run (infra/dev_source.lua), else
+---    clone's build/field-run for a developer run (core/lifecycle/engine/dev_source.lua), else
 ---    $XDG_RUNTIME_DIR/ergopti/field-run, a folder only this user can
 ---    write. The work runs on a later turn, never inside the watcher callback,
 ---    and a request is consumed before it runs so it never runs twice.
@@ -29,7 +29,7 @@
 ---    the config_guard result, which then fails.
 --- 5. A "reload" step restarts the daemon on purpose, as macOS reloads its
 ---    driver: it writes the run's state to the resume file and asks the reload
----    owner (infra/reload_restart.lua) for the restart. The stop of a run whose
+---    owner (core/lifecycle/engine/reload/restart.lua) for the restart. The stop of a run whose
 ---    restart was accepted suspends it instead of closing it; the successor's
 ---    start reads the resume file once, records the step with the reload's
 ---    duration (infra/reload_timing.lua, request to boot complete), takes a
@@ -227,7 +227,7 @@ end
 --- @param steps_file any The shared declaration's steps_file.linux, relative to the clone root.
 --- @return string relative
 function M.steps_relative(steps_file)
-	local prefix = require("infra.dev_source").DRIVER_SUBPATH:sub(2) .. "/"
+	local prefix = require("core.lifecycle.engine.dev_source").DRIVER_SUBPATH:sub(2) .. "/"
 	if type(steps_file) ~= "string" or steps_file:sub(1, #prefix) ~= prefix then
 		error("field run: steps_file.linux is not inside " .. prefix, 2)
 	end
@@ -876,7 +876,7 @@ end
 
 --- Starts the daemon's field run session; a failure is logged and the daemon runs on.
 --- @param opts table { pid, reload?, reload_ms?, spec?, ports?, folder? }; reload is the daemon's
----   reload owner (infra/reload_restart.lua perform), reload_ms the reload its boot completed.
+---   reload owner (core/lifecycle/engine/reload/restart.lua perform), reload_ms the reload its boot completed.
 --- @return table|nil session, string|nil error
 function M.start(opts)
 	Logger.start(LOG, "Starting the field run session…")
@@ -891,7 +891,7 @@ function M.start(opts)
 		local folder = opts.folder
 		if folder == nil then
 			local why
-			folder, why = M.folder(spec, os.getenv, require("infra.dev_source").root())
+			folder, why = M.folder(spec, os.getenv, require("core.lifecycle.engine.dev_source").root())
 			if not folder then error(why, 0) end
 		end
 		local ports = opts.ports

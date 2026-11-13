@@ -196,12 +196,12 @@ mustNotDeclare(
 				'unguarded purge before LoggerLoadTimings deletes every dated log file.'
 		);
 	}
-	const boot = read('windows/infra/boot.ahk');
+	const boot = read('windows/core/lifecycle/engine/boot.ahk');
 	const loadAt = boot.indexOf('\nTimingsLoadShared()\n');
 	const loaderAt = boot.indexOf('\nLoggerLoadTimings()\n');
 	if (loadAt < 0 || loaderAt < 0 || loaderAt < loadAt) {
 		errors.push(
-			'windows/infra/boot.ahk: LoggerLoadTimings() must be called after TimingsLoadShared(), ' +
+			'windows/core/lifecycle/engine/boot.ahk: LoggerLoadTimings() must be called after TimingsLoadShared(), ' +
 				'before LoggerInit purges.'
 		);
 	}

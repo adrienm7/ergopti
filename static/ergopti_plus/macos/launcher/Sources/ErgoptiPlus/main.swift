@@ -586,7 +586,7 @@ func seedEmbeddedHammerspoonConfig(initLuaPath: String) {
 }
 
 /// Asks the embedded runtime with this process id for its controlled exit
-/// (infra/launcher_guard.lua listens for it); the object names the runtime so
+/// (core/lifecycle/engine/launcher_guard.lua listens for it); the object names the runtime so
 /// another copy's runtime ignores it.
 /// - Parameter runtimePid: Process id of this launcher's embedded runtime.
 func postEmbeddedRuntimeQuitRequest(_ runtimePid: pid_t) {

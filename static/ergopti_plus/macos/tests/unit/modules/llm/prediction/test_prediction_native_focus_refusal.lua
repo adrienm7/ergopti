@@ -23,7 +23,7 @@ local OWNED = {
 	"core.fs.engine.dir",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
-	"infra.launcher_environment",
+	"core.lifecycle.engine.launcher_environment",
 	"core.i18n.engine.locale",
 	"infra.log_folders",
 	"infra.logger",

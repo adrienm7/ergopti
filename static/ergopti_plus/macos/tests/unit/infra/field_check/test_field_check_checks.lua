@@ -152,7 +152,7 @@ helpers.describe("lease check", function()
 	end)
 
 	helpers.it("decides whether karabiner.json must shrink from its write time (lease-deploy-verdict)", function()
-		local hold = require("infra.main_thread_hold").COUNT_MS
+		local hold = require("core.lifecycle.engine.main_thread_hold").COUNT_MS
 		local function verdict(write_ms)
 			local ports, world = make_ports({ deploy_facts = function() return { bytes = 760832, write_ms = write_ms } end })
 			world.existing[CLI] = true

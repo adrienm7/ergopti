@@ -18,7 +18,7 @@ local function with_windows(scenario)
 	helpers.with_stub_scope({
 		"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "core.events.timer_scheduler", "infra.deferred_work",
 		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
-		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
+		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "adapters.log_transport",
 		"core.fs.engine.app_dirs", "infra.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"tests.support.native_webview_close_fixture",
 	}, function()

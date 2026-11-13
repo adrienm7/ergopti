@@ -335,7 +335,7 @@ end
 function DEFAULT_OPS.compile_bytecode(root)
 	local interpreter = running_interpreter()
 	if not interpreter then return false end
-	-- The compiler the activated release ships (infra/bytecode_package.lua).
+	-- The compiler the activated release ships (core/lifecycle/engine/bytecode_package.lua).
 	local compiler = root .. "/" .. require("core.text.engine.identifiers").bytecode_package.compiler
 	return run_command(shell_quote(interpreter) .. " " .. shell_quote(compiler)
 		.. " " .. shell_quote(root) .. " >/dev/null 2>&1")

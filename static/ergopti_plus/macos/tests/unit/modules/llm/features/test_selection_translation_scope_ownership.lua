@@ -14,13 +14,13 @@ local helpers = require("tests.helpers")
 require("settings.engine.keys")
 require("diagnostics.engine.adapter_errors") -- the adapters compare its ids
 require("core.fs.engine.ports") -- the file-system owner checks itself against it when it loads
-require("infra.dev_source") -- the updater identity reads it; it only caches this process's mode
+require("core.lifecycle.engine.dev_source") -- the updater identity reads it; it only caches this process's mode
 require("ai.engine.api.url_template") -- pure: the remote backend fills per-account addresses with it
 require("ai.engine.api.token_exchange") -- pure: the remote backend reads auth blocks with it
 require("ai.engine.policy.failure_class") -- pure: every LLM backend asks it whether a refused key failed the call
 require("ai.engine.settings.request_settings") -- pure: the prediction engine compares a request's settings with it
 require("core.logger.engine.perf_budget") -- pure: the remote backend judges its request time with it
-require("infra.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
+require("core.lifecycle.engine.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
 require("ai.engine.local_servers.fingerprint") -- pure: the local server rows identify a server by its models answer
 require("ai.engine.local_servers.menu") -- pure: the remote backend names the local server rows with it
 require("platform.input.keycodes.key_names") -- pure, with its data: the gesture actions name their chord keys with it

@@ -340,7 +340,7 @@ ST_PrivateHeader() {
 ; The file that stands for HKCU\Software\Ergopti\Storage in an isolated profile,
 ; or "" for a real one. ERGOPTI_STARTUP_SMOKE_DIR already moves the paths, logs
 ; and configuration of a startup smoke or a live check into its scratch folder
-; (infra/boot.ahk); the store follows, so the harness can read it there.
+; (core/lifecycle/engine/boot.ahk); the store follows, so the harness can read it there.
 ; @return {String} Absolute path, or "" when the driver owns the real profile.
 ST_PrivatePath() {
 	global _DriverStartupSmokeDir
