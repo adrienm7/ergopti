@@ -113,6 +113,17 @@ function run() {
 		);
 	}
 
+	// A module name a test helper builds at run time, helpers.load_with_stubs(
+	// "modules.llm." .. name): unlisted, it refuses the step that moves the
+	// modules under it, like require("modules.llm." .. name) does.
+	{
+		const { rows } = scan('local m = helpers.load_with_stubs("modules.llm." .. name)\n');
+		assert.ok(
+			rows.some((r) => r.kind === 'lua-prefix-split' && r.old === 'modules.llm.'),
+			JSON.stringify(rows)
+		);
+	}
+
 	console.log('Lua prefix sweeps: OK');
 }
 
