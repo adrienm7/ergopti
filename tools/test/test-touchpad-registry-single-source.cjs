@@ -180,7 +180,7 @@ function functionBody(source, name) {
 	const launch = functionBody(wizard, '_Onboarding_StartGestureAuto');
 	const applyAt = launch.indexOf('TouchpadRegistryApply()');
 	check(
-		applyAt > 0 && applyAt < launch.indexOf('Run('),
+		applyAt > 0 && applyAt < launch.indexOf('GestureRestartRunElevated('),
 		'the wizard must write the values in process, through the owner, before elevating'
 	);
 	const restart = functionBody(config, '_GestureRestartBuildPsScript');
