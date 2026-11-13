@@ -1,4 +1,4 @@
---- adapters/crypto.lua
+--- core/crypto/crypto.lua
 
 --- ==============================================================================
 --- MODULE: Crypto Adapter (Hammerspoon)
@@ -23,7 +23,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 
-local LOG = "adapters.crypto"
+local LOG = "core.crypto.crypto"
 
 
 

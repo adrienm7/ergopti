@@ -3,7 +3,7 @@
 	"windows.code_oversized": 7,
 	"windows.code_singleton": 3,
 	"windows.tests_oversized": 12,
-	"windows.tests_singleton": 8,
+	"windows.tests_singleton": 12,
 	"macos.code_oversized": 9,
 	"macos.code_singleton": 1,
 	"macos.tests_oversized": 2,

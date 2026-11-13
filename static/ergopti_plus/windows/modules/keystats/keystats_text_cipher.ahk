@@ -11,7 +11,7 @@
 ; WHY CNG RATHER THAN A SUBPROCESS:
 ; The other two drivers shell out to openssl. Windows has no openssl by default,
 ; so the AES and PBKDF2 primitives come from bcrypt.dll — wrapped in
-; adapters/crypto.ahk, since the OS-purity ratchet keeps every DllCall inside
+; core/crypto/crypto.ahk, since the OS-purity ratchet keeps every DllCall inside
 ; adapters/. That spawns no process at all, which makes this the fastest of the
 ; three — and it produces the SAME bytes: PBKDF2 with a 32-byte output is exactly
 ; the first block openssl derives, so the same machine id yields the same key,
