@@ -2248,13 +2248,28 @@ function scanFile(file, text, ctx) {
 	}
 	// A Lua file outside the trees (a tool's fixture) loads the modules of the
 	// drivers it names, shared ones first.
+	// A tool that names no driver but requires a module only one driver has
+	// (tools/diagnostics/hs_karabiner_config_native.lua: adapters.json_codec)
+	// runs on that driver's package.path.
+	const required = [...text.matchAll(/\brequire\s*\(?\s*["']([A-Za-z_][\w.]*)["']/g)].map(
+		(m) => m[1]
+	);
+	const ownsAlone = (d) =>
+		required.some(
+			(n) =>
+				presentNames.has(`${d}|${n}`) &&
+				!['macos', 'linux'].some((o) => o !== d && presentNames.has(`${o}|${n}`))
+		);
 	const luaRoots = Census.DRIVERS.includes(inTree)
 		? [inTree, '_shared']
 		: inTree === '_shared'
 			? ['_shared', 'macos', 'linux']
 			: [
 					'_shared',
-					...['macos', 'linux'].filter((d) => file.includes(d) || text.includes(`/${d}`))
+					...['macos', 'linux'].filter(
+						(d) =>
+							file.includes(d) || text.includes(`/${d}`) || (file.endsWith('.lua') && ownsAlone(d))
+					)
 				];
 	if (file.endsWith('.lua') && /\bpackage\.loaded\b/.test(text)) {
 		// A module-name prefix as a Lua pattern, name:match("^modules%.llm%."):

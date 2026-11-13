@@ -1,0 +1,51 @@
+// tools/test/test-structure-tool-lua-roots.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Structure Plan Lua Roots Of A Tool
+ * DESCRIPTION:
+ * A Lua tool outside the trees runs on the package.path its caller sets.
+ * tools/diagnostics/hs_karabiner_config_native.lua names no driver, so the
+ * plan read its requires against the shared tree only and left
+ * require("adapters.json_codec") behind when S04 moved the macOS adapters;
+ * the macOS Karabiner config fixture then failed to load the tool. A tool
+ * that requires a module only one driver has now loads that driver's names.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const assert = require('node:assert/strict');
+const Plan = require('../audit/structure/plan.cjs');
+const Apply = require('../audit/structure/apply-step.cjs');
+
+const FILE = 'tools/diagnostics/zz_probe_tool.lua';
+const MAP = new Map([
+	['macos/adapters/json_codec.lua', 'macos/core/fs/adapters/json_codec.lua'],
+	['macos/adapters/file_system.lua', 'macos/core/fs/adapters/file_system.lua'],
+	['linux/adapters/file_system.lua', 'linux/core/fs/adapters/file_system.lua'],
+	['linux/adapters/clipboard.lua', 'linux/core/ui/adapters/clipboard.lua']
+]);
+
+/** Scans `text` as the probe tool under MAP and applies its rows. */
+function rewrite(text) {
+	const rows = Plan.scanFile(FILE, text, Plan.referenceContext(MAP));
+	return Apply.rewriteText(text, rows, new Map(), FILE);
+}
+
+function run() {
+	// adapters.json_codec exists in macOS only: the tool runs there, and its
+	// file_system is macOS's too.
+	const out = rewrite(
+		'local Codec = require("adapters.json_codec")\nlocal FS = require("adapters.file_system")\n'
+	);
+	assert.ok(out.includes('require("core.fs.adapters.json_codec")'), out);
+	assert.ok(out.includes('require("core.fs.adapters.file_system")'), out);
+
+	// A module both drivers have proves no driver: the tool keeps its names.
+	const both = 'local FS = require("adapters.file_system")\n';
+	assert.equal(rewrite(both), both);
+	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
+}
+
+run();
