@@ -127,6 +127,17 @@
 				}
 			],
 			"condition": "The Bépo registry layout installed."
+		},
+		{
+			"id": "one_shot_modifiers",
+			"title": "One-shot modifiers: no time limit, sticky actions, AltGr tap-hold pair",
+			"checks": [
+				{
+					"step": "linux_input_policies"
+				}
+			],
+			"condition": "A real keyboard; a GTK and a Qt application.",
+			"not_testable": "Which modifiers the application received after a `sticky_*` action is a person's reading of the typed result: the report proves only the sticky delay row."
 		}
 	]
 }

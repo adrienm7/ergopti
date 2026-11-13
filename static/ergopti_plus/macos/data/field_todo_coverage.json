@@ -776,6 +776,12 @@
 			"title": "Start at login from the developer app (ad hoc signed)",
 			"checks": [],
 			"not_testable": "Changes the user's own Login Items and needs a logout: in the developer app, tick About > Start at login, approve it in System Settings > General > Login Items if asked, log out and in, then untick it."
+		},
+		{
+			"id": "one_shot_modifiers",
+			"title": "One-shot modifiers: no time limit, sticky actions, AltGr tap-hold pair",
+			"checks": [],
+			"not_testable": "Whether a `sticky_*` arm or a Karabiner one-shot AltGr tap stays armed and types the right level is a person's reading of the typed result: no log line decides it."
 		}
 	]
 }
