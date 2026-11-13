@@ -203,8 +203,14 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 [Focused audit](docs/audits/platform-parity/2026-11-05-dead-keys/report.md), pinned source `f2c3ea43542c985fb20e5f0887976f1c02525341`: five new roots, [generated comparison](docs/audits/platform-parity/2026-11-05-dead-keys/capabilities.md). Evidence boundaries remain explicit; these are follow-ups, not implemented fixes.
 
-- [ ] **Pause and a pending dead key (macOS, Linux).** A pending composition is native state there and Ergopti's pause
+- [x] **Pause and a pending dead key (macOS, Linux).** A pending composition is native state there and Ergopti's pause
       does not cancel it (both Windows engines do); decide whether the pause must clear it, and how.
+      Done 2026-11-13 (worker C): a dead key pending in Ergopti's layout emulation no longer survives a pause on macOS
+      and Linux, as on Windows: the pause listener resets the emulation, and a key pressed while paused ends it too
+      (`dead-key-pause` in both drivers' `test_layout_emulation.lua`). Decided by the agent on 2026-11-13, to review
+      by the maintainer: a dead key pending in an installed layout (the macOS input source, the Linux client's
+      Compose state) stays the system's; clearing it would mean typing a key during the pause, which the real pause
+      forbids.
 
 ## Cross-platform feature inventory
 

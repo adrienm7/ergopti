@@ -950,6 +950,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				-- osascript subprocesses that would otherwise stall the tap long enough for
 				-- macOS to disable it (killing AltGr+Enter). schedule_pause_layout_switch
 				-- owns that deferral and the « do nothing » defaults — see its docstring.
+				-- An emulated dead key pending at the pause does not compose after it.
+				if is_paused then pcall(require("modules.keymap.layout_emulation").reset) end
 				local kbd_layout_mod = menu_mods.keyboard_layout
 				if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
 					pcall(kbd_layout_mod.schedule_pause_layout_switch, is_paused, state)
