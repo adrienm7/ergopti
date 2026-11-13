@@ -108,24 +108,6 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_eq(record.typed, { "è" })
 	end)
 
-	-- Dead-key parity follow-up (2026-11-13): both Windows engines cancel a pending
-	-- dead key at a pause; the emulation did not, so the first key after the
-	-- resume composed with a dead key typed before the pause.
-	helpers.it("ends a pending dead key at a pause (dead-key-pause)", function()
-		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
-		M.reload()
-		helpers.assert_true(press(M, KEY_BACKSLASH), "the dead key is consumed")
-		record.paused = true
-		helpers.assert_true(not press(M, KEY_Q, {}, "q"), "a paused daemon lets the key through")
-		record.paused = false
-		helpers.assert_true(press(M, KEY_D), "e after the resume")
-		helpers.assert_eq(record.typed, { "e" }, "no circumflex survives the pause")
-		helpers.assert_true(press(M, KEY_BACKSLASH), "a dead key again")
-		M.reset()
-		helpers.assert_true(press(M, KEY_D), "e after the pause listener's reset")
-		helpers.assert_eq(record.typed, { "e", "e" }, "the listener's reset drops it too")
-	end)
-
 	helpers.it("waits on a dead key and composes the next key", function()
 		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
 		M.reload()

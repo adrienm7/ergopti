@@ -340,13 +340,7 @@ function M.key_down(e, key_code)
 	local session = _session
 	if session == nil then return false end
 	local code = physical(e, key_code)
-	if code == nil then return false end
-	-- A key pressed during a pause ends a pending dead key and the held source
-	-- state, as the pause listener's reset does: the composition never spans it.
-	if _deps.is_active() ~= true then
-		M.reset()
-		return false
-	end
+	if code == nil or _deps.is_active() ~= true then return false end
 	local prefix = {}
 	if _extras ~= nil then
 		local consumed

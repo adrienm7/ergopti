@@ -115,26 +115,6 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_eq(after.unicode, "e", "Delete dropped the dead key")
 	end)
 
-	-- Dead-key parity follow-up (2026-11-13): both Windows engines cancel a pending
-	-- dead key at a pause; the emulation did not, so the first key after the
-	-- resume composed with a dead key typed before the pause.
-	helpers.it("ends a pending dead key at a pause (dead-key-pause)", function()
-		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
-		M.reload()
-		helpers.assert_true(M.key_down(event(), KC_BACKSLASH), "the dead key is deleted")
-		record.paused = true
-		M.key_down(event({}, "q"), KC_Q)
-		record.paused = false
-		local after = event({}, "d")
-		M.key_down(after, KC_D)
-		helpers.assert_eq(after.unicode, "e", "no circumflex survives the pause")
-		helpers.assert_true(M.key_down(event(), KC_BACKSLASH), "a dead key again")
-		M.reset()
-		local reset = event({}, "d")
-		M.key_down(reset, KC_D)
-		helpers.assert_eq(reset.unicode, "e", "the pause listener's reset drops it too")
-	end)
-
 	helpers.it("moves a Cmd chord to the system layout's key of the Command-level character", function()
 		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
 		M.reload()
