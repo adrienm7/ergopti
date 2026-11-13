@@ -1461,7 +1461,9 @@ _LLMRemoteResolveEntry(Entry) {
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteStoredKey(Entry)
-    if !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
+    ; A key DPAPI could not decrypt here is no key (LLM_ApiToken_Unusable).
+    if LLM_ApiToken_Unusable(Token)
+            || !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
         return ""
     Model := LLM_RemoteEntryModel(Entry)
     if (Model == "")
@@ -1706,6 +1708,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     Token    := _LLMRemoteStoredKey(Entry)
     if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
             || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
+            || LLM_ApiToken_Unusable(Token)
             || !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
             || !_LLMRemote_ConfigScalarIsSafe(Token) {
         _LLMRemote_CompleteReady(Owner, on_result, false)

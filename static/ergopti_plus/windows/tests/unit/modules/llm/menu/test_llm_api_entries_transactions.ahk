@@ -792,3 +792,19 @@ _LMT_ApiPhysicalFaultWithdrawalAllowsBothTargets() {
 }
 Test("LLM API entries: physical second-target fault withdrawal preserves native publication",
 	_LMT_ApiPhysicalFaultWithdrawalAllowsBothTargets)
+
+; A restored entry whose DPAPI key this Windows identity cannot decrypt keeps
+; its envelope (so a save does not wipe it), and that envelope is no key: the
+; entry asks for its key again instead of sending the envelope (as macOS and
+; Linux do for a key their store lost).
+_LLMAET_UndecryptableKeyIsUnusable() {
+	global LLM_API_TOKEN_DPAPI_PREFIX
+	AssertFalse(LLM_ApiToken_Unusable("sk-plain"), "a plaintext key is usable")
+	AssertFalse(LLM_ApiToken_Unusable(""), "no key is not an undecryptable key")
+	Foreign := LLM_API_TOKEN_DPAPI_PREFIX . "QUJD"
+	AssertEqual(Foreign, LLM_ApiToken_Decrypt(Foreign), "a blob DPAPI refuses keeps its envelope")
+	AssertTrue(LLM_ApiToken_Unusable(LLM_ApiToken_Decrypt(Foreign)), "and that envelope is not a usable key")
+}
+Test("LLM API entries: a restored key DPAPI cannot decrypt asks for the key again (api-entry-restored-key)",
+	_LLMAET_UndecryptableKeyIsUnusable)
+

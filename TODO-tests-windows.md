@@ -136,6 +136,9 @@ Account and tester actions (maintainer, from the PC):
       the editor in its own window; a second request brings it to the front with its unsaved work; « Close » closes
       it; an install from it refreshes an open layout manager.
 
+- [ ] Restored API entry under another account (2026-11-13): restore a configuration backup holding a DPAPI API key
+      under a second Windows account; the entry is greyed with « Edit » only, and a new key makes it work.
+
 - [ ] Metrics export and purge on Windows (`KL_RunMetricsMaintenance`): only source contracts check that path.
 
 - [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the

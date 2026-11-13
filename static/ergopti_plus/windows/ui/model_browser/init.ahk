@@ -1028,6 +1028,7 @@ _LLM_MBW_StartListings(ExpectedEpoch) {
 			break
 		Id := _LLM_MenuApiEntryGet(Entry, "Id", ""), ProviderId := _LLM_MenuApiEntryGet(Entry, "Provider", "")
 		if (Id == "" || !LLM_ApiListingSupported(LLM_RemoteProviderFormat(ProviderId))
+				|| LLM_ApiToken_Unusable(_LLM_MenuApiEntryGet(Entry, "Token", ""))
 				|| !LocalServerAuthEntryTokenAllowed(ProviderId, _LLM_MenuApiEntryGet(Entry, "Token", ""),
 					_LLM_MenuApiEntryGet(Entry, "BaseUrl", ""), LLM_LOCAL_API_SERVERS))
 			continue
