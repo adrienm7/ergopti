@@ -78,23 +78,32 @@ end
 
 test("real native prerequisite receipts", function()
 	local definitions = {
-		{ "sha256sum", { "--help" }, { "GNU coreutils", "--zero" } },
+		{ "sha256sum", { "--help" }, { "--zero" } },
 		{ "tar", { "--version" }, { "GNU tar" } },
 		{ "tar", { "--help" }, { "--use-compress-program", "--no-same-owner", "--no-same-permissions" } },
-		{ "mv", { "--help" }, { "GNU coreutils", "--no-clobber", "--no-target-directory" } },
+		{ "mv", { "--help" }, { "--no-clobber", "--no-target-directory" } },
 		{ "zstd", { "--version" }, { "Zstandard CLI" } },
 	}
 	for _, definition in ipairs(definitions) do
 		local result = process(definition[1], definition[2])
 		for _, expected in ipairs(definition[3]) do expect(result.stdout:find(expected, 1, true), "actual required native semantics") end
 	end
-	local version = process("mv", { "--version" }).stdout
-	local major, minor = version:match("^mv %(GNU coreutils%) (%d+)%.(%d+)")
-	expect(major ~= nil and minor ~= nil, "actual unambiguous GNU move version")
-	major, minor = tonumber(major), tonumber(minor)
-	-- GNU 9.5 NEWS pins the 9.2--9.4 nonzero skip interval; earlier/later releases
-	-- silently skip. A negative move must match its independently observed version.
-	no_clobber_skip_exit = major == 9 and minor >= 2 and minor <= 4 and 1 or 0
+	-- The skip status is observed on a throwaway pair, outside the product code:
+	-- uutils (Ubuntu 26.04's coreutils) has no GNU version to look it up by.
+	local probe = root .. "/mv-skip-probe"
+	assert(uv.fs_mkdir(probe, 448) and uv.fs_mkdir(probe .. "/a", 448) and uv.fs_mkdir(probe .. "/b", 448))
+	local skipped = process_capture("mv", { "--no-clobber", "--no-target-directory", "--", probe .. "/a", probe .. "/b" })
+	expect((skipped.exit_code == 0 or skipped.exit_code == 1) and uv.fs_lstat(probe .. "/a"),
+		"actual no-clobber skip leaves its source")
+	no_clobber_skip_exit = skipped.exit_code
+	local major, minor = process("mv", { "--version" }).stdout:match("^mv %(GNU coreutils%) (%d+)%.(%d+)")
+	if major then
+		major, minor = tonumber(major), tonumber(minor)
+		-- GNU 9.5 NEWS pins the 9.2--9.4 nonzero skip interval; earlier/later releases
+		-- silently skip.
+		expect(no_clobber_skip_exit == (major == 9 and minor >= 2 and minor <= 4 and 1 or 0),
+			"observed GNU skip status matches its NEWS")
+	end
 end)
 
 test("tiny independently hashed archive extracts and publishes full tree", function()
@@ -146,7 +155,7 @@ test("actual raced empty foreign destination survives mv no-clobber", function()
 	local binary_bytes, library_bytes = read_bytes(binary_path), read_bytes(library_path)
 	local program, args = f.owner.publish_command()
 	local actual = process_capture(program, args)
-	expect(actual.exit_code == no_clobber_skip_exit and actual.ok == (no_clobber_skip_exit == 0), "actual no-clobber receipt matches independently observed GNU version")
+	expect(actual.exit_code == no_clobber_skip_exit and actual.ok == (no_clobber_skip_exit == 0), "actual no-clobber receipt matches the independently observed skip status")
 	expect(unchanged(before, assert(uv.fs_lstat(f.owner.directory))) and unchanged(stage, assert(uv.fs_lstat(f.paths.stage))), "no-clobber preserves foreign and owned stage inode/mode/size")
 	expect(unchanged(binary, assert(uv.fs_lstat(binary_path))) and unchanged(library, assert(uv.fs_lstat(library_path))), "complete staged executable/library identities unchanged")
 	expect(read_bytes(binary_path) == binary_bytes and read_bytes(library_path) == library_bytes, "complete staged executable/library bytes unchanged")
