@@ -292,6 +292,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '# The structure migration moved the bundled proxy policy into the network\n# feature; every historical pin names its first place.\nSTRUCTURE_MOVE_INVERSE = (\n    (\n        "Contents/Resources/static/ergopti_plus/_shared/core/network/data/proxy_policy.json",\n        "Contents/Resources/static/ergopti_plus/_shared/modules/network/proxy_policy.json",\n    ),\n)\n\n\ndef structure_move_projection(source):\n    """Spell each moved resource at its historical place, exactly once."""\n    for new, old in STRUCTURE_MOVE_INVERSE:\n        if source.count(new) != 1 or old in source:\n            raise ValueError("Structure move projection refused")\n        source = source.replace(new, old, 1)\n    return source\n\n\ndef worker_source():\n    """Read the worker with the newest reviewed layer peeled, as every historical pin expects."""\n    return managed_lookup_stage_projection(\n        route_kind_observation_projection(\n            structure_move_projection(WORKER.read_text(encoding="utf-8"))\n        )\n    )\n'
 	},
 	{
+		// The installed network fixture stages two shared modules under _shared/lua;
+		// S01 sends them to folders of different depths, which it must create.
+		file: 'tools/test/test-linux-network-runtime.cjs',
+		moves: '_shared/lua/json.lua',
+		from: "\t\tfs.mkdirSync(path.join(shared, 'lua'), { recursive: true });\n\t\tfs.mkdirSync(cwd);\n\t\tfor (const name of ['runtime_probe.lua', 'native_proxy_runtime.lua'])\n\t\t\tfs.copyFileSync(\n\t\t\t\tpath.join(ROOT, DRIVER, 'platform/network', name),\n\t\t\t\tpath.join(driver, 'platform/network', name)\n\t\t\t);\n\t\tfs.copyFileSync(path.join(ROOT, SHARED, 'lua/json.lua'), path.join(shared, 'lua/json.lua'));\n\t\tfs.mkdirSync(path.join(shared, 'lua/compat'));\n\t\tfs.copyFileSync(\n\t\t\tpath.join(ROOT, SHARED, 'lua/compat/utf8.lua'),\n\t\t\tpath.join(shared, 'lua/compat/utf8.lua')\n\t\t);",
+		to: "\t\tfs.mkdirSync(shared, { recursive: true });\n\t\tfs.mkdirSync(cwd);\n\t\tfor (const name of ['runtime_probe.lua', 'native_proxy_runtime.lua'])\n\t\t\tfs.copyFileSync(\n\t\t\t\tpath.join(ROOT, DRIVER, 'platform/network', name),\n\t\t\t\tpath.join(driver, 'platform/network', name)\n\t\t\t);\n\t\t// Each shared module is staged under its own folder, whatever its depth.\n\t\tfor (const name of ['core/text/engine/json.lua', 'core/lifecycle/engine/compat/utf8.lua']) {\n\t\t\tfs.mkdirSync(path.dirname(path.join(shared, name)), { recursive: true });\n\t\t\tfs.copyFileSync(path.join(ROOT, SHARED, name), path.join(shared, name));\n\t\t}"
+	},
+	{
 		// The XI2 receiver derives the shared Lua root from the logger shim's
 		// path; S01 moves the shim to core/logger/engine under _shared itself.
 		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
