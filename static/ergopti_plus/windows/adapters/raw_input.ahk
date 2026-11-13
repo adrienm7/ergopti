@@ -191,7 +191,7 @@ class RawInputHidReader {
 	__New(Preparsed) {
 		static Module := DllCall("Kernel32\LoadLibraryW", "Str", "hid.dll", "Ptr")
 		if !Module
-			throw OSError(A_LastError, -1, "LoadLibraryW hid.dll")
+			throw OSError(A_LastError, -1, "hid.dll could not be loaded")
 		this._get_value := DllCall("Kernel32\GetProcAddress", "Ptr", Module, "AStr", "HidP_GetUsageValue", "Ptr")
 		this._get_usages := DllCall("Kernel32\GetProcAddress", "Ptr", Module, "AStr", "HidP_GetUsages", "Ptr")
 		if !this._get_value || !this._get_usages

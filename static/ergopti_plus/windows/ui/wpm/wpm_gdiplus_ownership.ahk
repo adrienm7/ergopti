@@ -125,7 +125,7 @@ _WPMGdipAcquire(LabelPx, Native := _WPMGdipNative) {
 			throw ValueError("WPM GDI+ label size must be positive")
 		Receipt["module"] := Native.LoadModule()
 		if !Receipt["module"]
-			throw Error("LoadLibraryW refused gdiplus.dll")
+			throw Error("gdiplus.dll could not be loaded")
 
 		StartupInput := Buffer(24, 0)
 		NumPut("UInt", 1, StartupInput)

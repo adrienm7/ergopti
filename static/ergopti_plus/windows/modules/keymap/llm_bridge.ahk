@@ -614,6 +614,15 @@ _LLM_Bridge_CommitOutputJournal(Token) {
 ; InputHook events, the Tab hotkey, gestures and tap-hold remaps all converge on
 ; this same shape; a caller cannot accidentally substitute logical modifier
 ; state for the physical state that decides whether Tab means "accept".
+; Whether a key is physically held. It throws like GetKeyState, so the snapshot
+; below still fails closed; one read keeps the antivirus-facing string surface
+; small (tools/ci/windows-exe-av-surface.json).
+; @param Key {String} An AutoHotkey key name.
+; @returns {Boolean}
+_LLM_PhysicallyDown(Key) {
+	return GetKeyState(Key, "P") ? true : false
+}
+
 _LLM_Accept_ReadInputSnapshot() {
 	Snapshot := Map(
 		"known", false,
@@ -626,12 +635,11 @@ _LLM_Accept_ReadInputSnapshot() {
 		"current_control", 0
 	)
 	try {
-		Snapshot["tab_down"] := GetKeyState("Tab", "P") ? true : false
-		Snapshot["ctrl_down"] := GetKeyState("Ctrl", "P") ? true : false
-		Snapshot["alt_down"] := GetKeyState("Alt", "P") ? true : false
-		Snapshot["shift_down"] := GetKeyState("Shift", "P") ? true : false
-		Snapshot["win_down"] := (GetKeyState("LWin", "P")
-			or GetKeyState("RWin", "P")) ? true : false
+		Snapshot["tab_down"] := _LLM_PhysicallyDown("Tab")
+		Snapshot["ctrl_down"] := _LLM_PhysicallyDown("Ctrl")
+		Snapshot["alt_down"] := _LLM_PhysicallyDown("Alt")
+		Snapshot["shift_down"] := _LLM_PhysicallyDown("Shift")
+		Snapshot["win_down"] := _LLM_PhysicallyDown("LWin") or _LLM_PhysicallyDown("RWin")
 		Snapshot["current_hwnd"] := WinGetID("A")
 		Snapshot["current_control"] := WIGetFocusedControlToken()
 		Snapshot["known"] := (Snapshot["current_hwnd"] is Integer

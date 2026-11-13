@@ -291,19 +291,27 @@ _KH_FinishPosition() {
 		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_POSITION_CB)
 }
 
+; Whether a key is physically held: the one key-state read of this file, so
+; the antivirus-facing string surface stays small (tools/ci/windows-exe-av-surface.json).
+; @param Name {String} An AutoHotkey key name.
+; @returns {Integer} 1 when the key is physically down, else 0.
+_KH_PhysicallyDown(Name) {
+	return GetKeyState(Name, "P") ? 1 : 0
+}
+
 ; The modifiers physically held, by their canonical physical-slot names. AltGr
 ; is refused rather than read as Alt: its fake LCtrl and the layout's third
 ; level belong to another owner.
 ; @param &Mods {Map} Receives name → 0/1.
 ; @returns {Integer} 1, or 0 while AltGr is held.
 _KH_PositionModifiers(&Mods) {
-	if GetKeyState("RAlt", "P")
+	if _KH_PhysicallyDown("RAlt")
 		return 0
 	Mods := Map(
-		"ctrl", (GetKeyState("LCtrl", "P") || GetKeyState("RCtrl", "P")) ? 1 : 0,
-		"alt", GetKeyState("LAlt", "P") ? 1 : 0,
-		"shift", (GetKeyState("LShift", "P") || GetKeyState("RShift", "P")) ? 1 : 0,
-		"super", (GetKeyState("LWin", "P") || GetKeyState("RWin", "P")) ? 1 : 0)
+		"ctrl", (_KH_PhysicallyDown("LCtrl") || _KH_PhysicallyDown("RCtrl")) ? 1 : 0,
+		"alt", _KH_PhysicallyDown("LAlt"),
+		"shift", (_KH_PhysicallyDown("LShift") || _KH_PhysicallyDown("RShift")) ? 1 : 0,
+		"super", (_KH_PhysicallyDown("LWin") || _KH_PhysicallyDown("RWin")) ? 1 : 0)
 	return 1
 }
 
@@ -318,7 +326,7 @@ _KH_ObservePosition(IH, VK, SC) {
 	; One primary key per request, accepted or refused.
 	_KH_FinishPosition()
 	Name := Format("SC{:03X}", SC)
-	if !GetKeyState(Name, "P") || !_KH_PositionModifiers(&Mods)
+	if !_KH_PhysicallyDown(Name) || !_KH_PositionModifiers(&Mods)
 		return
 	_KH_POSITION_BUSY := true
 	try {

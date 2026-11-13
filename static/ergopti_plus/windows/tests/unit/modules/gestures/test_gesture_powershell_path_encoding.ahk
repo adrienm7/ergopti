@@ -30,12 +30,13 @@ _GPSE_Source() {
 	; restart the device; the child has no isolated profile, as a real one.
 	for Name in ["_Onboarding_StartGestureAuto", "_Onboarding_ReserveGestureAuto", "_Onboarding_AbortGestureAutoReservation",
 		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult",
-		"GestureRestartTouchpadDevice", "_GestureRestartReserve", "_GestureRestartAbortReservation",
+		"GestureRestartTouchpadDevice", "GestureRestartElevatedRun", "_GestureRestartReserve", "_GestureRestartAbortReservation",
 		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript",
 		"TouchpadRegistrySkipsDeviceRestart", "TouchpadRegistryPrivatePath", "TouchpadRegistryLogTag"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "the child needs the entire actual function: " . Name)
-		if Name == "_Onboarding_StartGestureAuto" || Name == "GestureRestartTouchpadDevice"
+		; Both callers cross the one elevated launch, where the native Run is ported.
+		if Name == "GestureRestartElevatedRun"
 			Body := _GPSE_Port(Body, "Run", "_GPSE_Run")
 		if Name == "_Onboarding_ReserveGestureAuto" || Name == "_GestureRestartReserve"
 			Body := _GPSE_Port(Body, "SetTimer", "_GPSE_Timer")

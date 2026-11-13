@@ -30,7 +30,8 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 	StartPidPos := InStr(Body, "ProcessExist(_GestureRestartJob")
 	Assert(StartReceiptPos > 0 && StartPidPos > StartReceiptPos,
 		"a second restart must consume the prior receipt before consulting its recyclable PID")
-    Assert(InStr(Body, "*RunAs powershell.exe") > 0,
+    Assert(InStr(Body, "GestureRestartElevatedRun(ScriptPath, &RestartPid)") > 0
+			&& InStr(_DriverFuncBody("GestureRestartElevatedRun"), "*RunAs powershell.exe") > 0,
         "GestureRestartTouchpadDevice must preserve elevation for the PnP operation")
 	Assert(InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_GestureRestartReadResult") > 0,
 		"completion must wait across Suspend and consume only the worker-authored result")

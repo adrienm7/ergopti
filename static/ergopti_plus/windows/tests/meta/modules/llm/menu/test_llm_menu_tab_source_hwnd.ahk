@@ -111,9 +111,9 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 		Assert(InStr(FocusBody, Needle) > 0,
 			"canonical rendered-focus policy is missing required term: " . Needle)
 	}
-	for Needle in ['GetKeyState("Tab", "P")', 'GetKeyState("Ctrl", "P")',
-			'GetKeyState("Alt", "P")', 'GetKeyState("Shift", "P")',
-			'GetKeyState("LWin", "P")', 'GetKeyState("RWin", "P")',
+	for Needle in ['_LLM_PhysicallyDown("Tab")', '_LLM_PhysicallyDown("Ctrl")',
+			'_LLM_PhysicallyDown("Alt")', '_LLM_PhysicallyDown("Shift")',
+			'_LLM_PhysicallyDown("LWin")', '_LLM_PhysicallyDown("RWin")',
 			"WIGetFocusedControlToken()"] {
 		Assert(InStr(ProbeBody, Needle) > 0,
 			"physical/focus snapshot must fail closed through the canonical probe: " . Needle)

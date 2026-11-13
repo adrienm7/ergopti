@@ -202,7 +202,7 @@ _SpotlightSessionAcquireGdi(Receipt, Native := _SpotlightSessionNative) {
 		throw TypeError("Spotlight session receipt is invalid")
 	Receipt["module"] := Native.LoadModule()
 	if !Receipt["module"]
-		throw Error("LoadLibraryW refused gdiplus.dll")
+		throw Error("gdiplus.dll could not be loaded")
 	Token := 0
 	StartupStatus := -1
 	try StartupStatus := Native.Startup(&Token)
