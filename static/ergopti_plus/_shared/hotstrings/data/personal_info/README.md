@@ -102,6 +102,10 @@ direct-registered tags (`@iban★`, `@cb★`, `@ss★`) carry their field names 
 `PreviewFields`, so the same mask reaches them. The algorithm is pinned by
 `preview_vectors.toml`, replayed by every driver's suite.
 
+The named tags (`@bic★ @cb★ @cc★ @iban★ @rib★ @ss★ @tel★ @tél★`) type one field each on
+every system: macOS and Linux read `engine/personal_info/tags.lua` before the letter aliases, and the
+Windows map is pinned to it by `tools/test/test-personal-info-tags-single-source.cjs`.
+
 A missing localization key that exists only in metadata is audited separately
 from the working, translated tray caption; it does not affect the mask.
 

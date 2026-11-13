@@ -100,6 +100,7 @@
 		"test:healthcheck-page": "node ./tools/test/test-healthcheck-page.cjs",
 		"test:issue-templates": "node ./tools/test/test-issue-templates.cjs",
 		"test:repo-url-single-source": "node ./tools/test/test-repo-url-single-source.cjs",
+		"test:personal-info-tags-single-source": "node ./tools/test/test-personal-info-tags-single-source.cjs",
 		"test:manifest-equivalence": "node ./tools/test/test-manifest-equivalence.cjs",
 		"test:feature-read-sites": "node ./tools/test/test-feature-read-sites.js",
 		"test:architecture": "node ./tools/test/test-architecture-diagram.cjs",

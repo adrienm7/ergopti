@@ -98,6 +98,26 @@ helpers.describe("personal_info @-combo: all or nothing", function()
 		helpers.assert_eq(#values, 0, "and a nil combo must not throw on the keystroke path")
 	end)
 
+	helpers.it("a named tag types its one field, never its letters' aliases (hcd-3-named-tags)", function()
+		local info = { iban = "FR7630006000011234567890189", bic = "AGRIFRPP", street_address = "1 Rue",
+			last_name = "Dupont", social_security_number = "1 85 05 78 006 084 36", phone_number = "0612345678" }
+		local letters = { i = "iban", b = "bic", a = "street_address", n = "last_name", s = "social_security_number" }
+		local function resolved(combo)
+			return table.concat(PersonalInfo._resolve_combo_for_test(info, letters, combo), "|")
+		end
+		helpers.assert_eq(resolved("iban"), info.iban, "@iban once typed IBAN, BIC, street and surname")
+		helpers.assert_eq(resolved("IBAN"), info.iban, "case-insensitive, as on Windows")
+		helpers.assert_eq(resolved("rib"), info.iban)
+		helpers.assert_eq(resolved("ss"), info.social_security_number, "@ss once typed the number twice")
+		helpers.assert_eq(resolved("tel"), info.phone_number, "@tel once typed nothing")
+		helpers.assert_eq(resolved("tél"), info.phone_number)
+		local _, fields = PersonalInfo._resolve_combo_for_test(info, letters, "iban")
+		helpers.assert_eq(fields, { "iban" }, "the preview masks it as the IBAN")
+		info.credit_card = ""
+		helpers.assert_eq(resolved("cb"), "", "a blank named field types nothing")
+		helpers.assert_eq(resolved("ni"), "Dupont|" .. info.iban, "an ordinary combo still reads its letters")
+	end)
+
 	helpers.it("personal-unicode-alias: case expansion never turns one alias into two fields", function()
 		local aliases = { ["İ"] = "first_name", i = "last_name", ["ß"] = "first_name", s = "last_name" }
 		local function resolved(combo)
