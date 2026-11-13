@@ -88,6 +88,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '\t\t\tlocal source = "@" .. case.prefix .. separator .. "linux" .. separator .. "core" .. separator .. "fs"\n\t\t\t\t.. separator .. "engine" .. separator .. "paths.lua"'
 	},
 	{
+		// The hs.fs.dir guard exempts the one wrapper by its file stem; S04
+		// renames macos/infra/fs_dir.lua to core/fs/engine/dir.lua.
+		file: 'static/ergopti_plus/macos/tests/meta/lua_safety/test_fs_dir_iterator_contract.lua',
+		moves: 'macos/infra/fs_dir.lua',
+		from: '\t\t\tif not path:find("fs_dir", 1, true) then',
+		to: '\t\t\tif not path:find("/core/fs/engine/dir.lua", 1, true) then'
+	},
+	{
 		// The staged driver root's folders, one argument per folder, for the
 		// resolver copy S04 moves to core/fs/engine.
 		file: 'static/ergopti_plus/linux/tests/unit/infra/config/test_paths_shared_root_layouts.lua',
