@@ -114,6 +114,22 @@ function run() {
 		() => deriveAll({ root: derivedRepo.root, entries: [{ ...entry, derive: sha }], pinned: true }),
 		/no longer reproduces its pin/
 	);
+	// An entry names its files as the tree had them before the migration: in a
+	// later step, a source an earlier step moved is read at its new place.
+	const Plan = require('../audit/structure/plan.cjs');
+	const [movedBase, movedFinal] = [...Plan.moveMap().map].find(([o, t]) => t && t !== o);
+	const laterRepo = scratch({
+		[Plan.PREFIX + movedFinal]: 'beta\n',
+		'holder.txt': `${upper('beta\n')}\n`
+	});
+	assert.deepEqual(
+		deriveAll({
+			root: laterRepo.root,
+			entries: [{ ...entry, source: Plan.PREFIX + movedBase }],
+			pinned: true
+		}),
+		{ 'holder.txt': upper('beta\n') }
+	);
 	// An immutable receipt is re-pinned only as a named requalification: each
 	// old→new pin with the move that justifies it, for the step's commit body.
 	const frame = scratch({ 'w/a.txt': 'a\n', 'frame.json': `{ "w/a.txt": "${sha('a\n')}" }\n` });

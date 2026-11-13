@@ -125,16 +125,29 @@ function deriveAll({
 } = {}) {
 	const lib = (rel) => require(path.join(root, rel));
 	const values = {};
+	const at = (f) => path.join(root, moves.get(f) || f);
+	// An entry names its files as the tree had them before the migration; an
+	// earlier step may have moved them already. The plan moves each file once,
+	// so the file is at its first place or at its last.
+	let finals = null;
+	const located = (f) => {
+		if (fs.existsSync(at(f))) return f;
+		if (!finals) finals = Plan.moveMap().map;
+		const target = f.startsWith(Plan.PREFIX) ? finals.get(f.slice(Plan.PREFIX.length)) : null;
+		const moved = target ? Plan.PREFIX + target : null;
+		if (moved && fs.existsSync(at(moved))) return moved;
+		throw new Error(`repin: derived pin names a missing file ${f}`);
+	};
 	for (const e of entries) {
-		const at = (f) => path.join(root, moves.get(f) || f);
-		if (!fs.existsSync(at(e.file)) || !fs.existsSync(at(e.source)))
-			throw new Error(`repin: derived pin ${e.file} names a missing file`);
-		const holder = fs.readFileSync(at(e.file), 'utf8');
-		const value = e.derive(fs.readFileSync(at(e.source), 'utf8'), holder, lib, at(e.source));
-		if (!value) throw new Error(`repin: ${e.file} cannot be derived from ${e.source}`);
+		const file = located(e.file);
+		const source = located(e.source);
+		const holder = fs.readFileSync(at(file), 'utf8');
+		const value = e.derive(fs.readFileSync(at(source), 'utf8'), holder, lib, at(source));
+		if (!value) throw new Error(`repin: ${file} cannot be derived from ${source}`);
 		if (pinned && !holder.includes(value))
-			throw new Error(`repin: the derivation of ${e.file} no longer reproduces its pin`);
-		values[e.file] = value;
+			throw new Error(`repin: the derivation of ${file} no longer reproduces its pin`);
+		// Keyed by the holder's place before the step, as the re-pin reads it.
+		values[file] = value;
 	}
 	return values;
 }
