@@ -266,8 +266,55 @@ function rewriteText(text, rows, movedRepo, file) {
 		}
 	}
 	text = text.replace(/\u0000(\d+)\u0000/g, (_, i) => slots[Number(i)]);
+	text = dropCoveredScopeLines(text, rows);
 	if (rootSwitch) text = Plan.sharedRootRewrite(text);
 	return text === original ? text : repairCoupled(original, text);
+}
+
+/**
+ * Drops a scope line a split added when its list already scans that folder.
+ * Two scattered elements of one list can each gain a new home, and one home
+ * can hold the other (ui gained core/network while adapters gained
+ * core/network/adapters): a recursive scan of both reads its files twice, as
+ * the convention lint's Lua roots did after S08. A line is dropped when the
+ * same list holds the same line, or the same line naming a parent folder.
+ * @param {string} text The rewritten text.
+ * @param {object[]} rows The rows applied to it.
+ * @returns {string}
+ */
+function dropCoveredScopeLines(text, rows) {
+	const added = new Set();
+	for (const row of rows) {
+		if (row.kind !== 'scope-split') continue;
+		const old = new Set(row.old.split('\n').map((l) => l.trim()));
+		for (const line of row.new.split('\n')) if (!old.has(line.trim())) added.add(line.trim());
+	}
+	if (added.size === 0) return text;
+	const lines = text.split('\n');
+	const folderOf = (line) => line.trim().match(/^(.*?)(["'`])([\w./-]+?)\/?\2(.*)$/);
+	const drop = new Set();
+	for (let i = 0; i < lines.length; i++) {
+		if (!added.has(lines[i].trim())) continue;
+		const own = folderOf(lines[i]);
+		if (!own) continue;
+		// The list around the line: contiguous elements up to its brackets.
+		let a = i;
+		while (a > 0 && !/[[]\s*$/.test(lines[a - 1]) && !/^\s*]/.test(lines[a - 1])) a--;
+		let b = i;
+		while (b < lines.length - 1 && !/^\s*]/.test(lines[b + 1]) && !/[[]\s*$/.test(lines[b + 1]))
+			b++;
+		for (let j = a; j <= b; j++) {
+			if (j === i || drop.has(j)) continue;
+			const other = folderOf(lines[j]);
+			if (!other || other[1] !== own[1] || other[4] !== own[4]) continue;
+			const same = other[3] === own[3];
+			if (same ? j < i || !added.has(lines[j].trim()) : own[3].startsWith(`${other[3]}/`)) {
+				drop.add(i);
+				break;
+			}
+		}
+	}
+	return lines.filter((_, i) => !drop.has(i)).join('\n');
 }
 
 // x:sub(1, 12) == "_shared/lua/": a length written beside the literal it measures.
