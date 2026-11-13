@@ -88,3 +88,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] <!-- field-point: layout_editor_window --> Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open
       the editor in its own WebKitGTK window; a second request brings it to the front with its unsaved work; « Close »
       closes it.
+- [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler (2026-11-13, `claude/ergopti-todo-compilers`): the XKB export of
+      `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,
+      α (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl). Proven in a container with xkbcomp and
+      libxkbcommon on the same files; left: a real GNOME or KDE session.
