@@ -75,7 +75,6 @@ S01	dir	\modules\menu	static/ergopti_plus/_shared/menu/data	2	driver-test:2
 S01	dir	\modules\personal_info	static/ergopti_plus/_shared/hotstrings/data/personal_info	1	driver-test:1
 S01	dir	\modules\timings	static/ergopti_plus/_shared/core/timing/data	1	driver-test:1
 S01	dir	\shared\modules\hotstrings	static/ergopti_plus/_shared/hotstrings/data/catalogue	1	driver-test:1
-S01	dir	\shared\tap_hold	static/ergopti_plus/_shared/tap_hold/data	1	driver-test:1
 S01	dir	\tap_hold	static/ergopti_plus/_shared/tap_hold/data	1	driver-test:1
 S01	dir	_shared/assets	static/ergopti_plus/_shared/tray/data	1	docs:1
 S01	dir	_shared/core/config_schema	static/ergopti_plus/_shared/settings/data/config_schema	1	docs:1
@@ -150,7 +149,6 @@ S01	dir	modules/updater	static/ergopti_plus/_shared/updater/data	3	driver-test:3
 S01	dir	modules\layouts\composer_check	static/ergopti_plus/_shared/layouts/data/composer_check	1	ahk-include:1
 S01	dir	native/network	static/ergopti_plus/_shared/core/network/native	1	tooling:1
 S01	dir	out/lib/ergopti/_shared/lua	static/ergopti_plus/_shared	1	build:1
-S01	dir	product/_shared/modules/updater	static/ergopti_plus/_shared/updater/data	1	driver-test:1
 S01	dir	root/_shared/lua	static/ergopti_plus/_shared	1	ci-workflow:1
 S01	dir	static/ergopti_plus/_shared/assets	static/ergopti_plus/_shared/tray/data	1	packaging-manifest:1
 S01	dir	static/ergopti_plus/_shared/core/domain	static/ergopti_plus/_shared/core/text/data/domain	5	docs:4,tooling:1
@@ -194,7 +192,6 @@ S01	dir-successor	_shared/lua/test	static/ergopti_plus/_shared/tests/lua	3	lua-r
 S01	dir-successor	_shared/modules	static/ergopti_plus/_shared	3	repo-test:2,tooling:1
 S01	dir-successor	ergopti_plus/_shared/lua/test	static/ergopti_plus/_shared/tests/lua	1	packaging-manifest:1
 S01	dir-successor	ergopti_plus/_shared/native	static/ergopti_plus/_shared/core/network/native	1	packaging-manifest:1
-S01	dir-successor	product/_shared/modules	static/ergopti_plus/_shared	1	driver-test:1
 S01	dir-successor	static/ergopti_plus/_shared/core	static/ergopti_plus/_shared	3	repo-test:2,packaging-manifest:1
 S01	dir-successor	static/ergopti_plus/_shared/data	static/ergopti_plus/_shared	3	build:1,tooling:1,repo-test:1
 S01	dir-successor	static/ergopti_plus/_shared/lua/llm	static/ergopti_plus/_shared/ai/engine	1	repo-test:1
@@ -202,7 +199,6 @@ S01	dir-successor	static/ergopti_plus/_shared/lua/test	static/ergopti_plus/_shar
 S01	dir-successor	static/ergopti_plus/_shared/modules	static/ergopti_plus/_shared	5	repo-test:2,driver-test:1,packaging-manifest:1,tooling:1
 S01	dir-successor	static/ergopti_plus/_shared/native	static/ergopti_plus/_shared/core/network/native	1	packaging-manifest:1
 S01	dir-successor	static/ergopti_plus/_shared/python	static/ergopti_plus/_shared	4	tooling:2,packaging-manifest:1,repo-test:1
-S01	dir-successor	static\ergopti_plus\_shared\data	static/ergopti_plus/_shared	1	repo-test:1
 S01	folder-edit			f.startsWith('static/ergopti_plus/_shared/core/') ||
 			f === 'static/ergopti_plus/_shared/core/features.json' ||
 		f.startsWith('static/ergopti_plus/_shared/core/ports/') ||
@@ -233,6 +229,8 @@ S01	folder-edit	"static/ergopti_plus/_shared/python/**",	"static/ergopti_plus/_s
 S01	folder-edit	'. "$SCRIPT_DIR/../../../data/identifiers.sh"',	'. "$SCRIPT_DIR/../../../core/text/data/identifiers.sh"',	1	repo-test:1
 S01	folder-edit	'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py"'	'Path(__file__).absolute().parents[2]\n    / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"'	1	repo-test:1
 S01	folder-edit	/ACTIONS_ROOT[\s\S]*?modules[/\\]actions/.test(SITE_LOADER)	/ACTIONS_ROOT[\s\S]*?shortcuts[/\\]data[/\\]actions/.test(SITE_LOADER)	1	repo-test:1
+S01	folder-edit	AssertTrue(SubStr(Neutral, -StrLen("\hotstrings\autocorrection.toml")) == "\hotstrings\autocorrection.toml",	AssertTrue(SubStr(Neutral, -StrLen("\catalogue\autocorrection.toml")) == "\catalogue\autocorrection.toml",	1	driver-test:1
+S01	folder-edit	Wanted := "\modules\hotstrings\" . (Vector	Wanted := "\hotstrings\data\catalogue\" . (Vector	1	driver-test:1
 S01	folder-edit	[...requested.keys()].sort(), [
 		'missing-runtime.txt',
 		'modules/llm/fixture.json',	[...requested.keys()].sort(), [
@@ -249,6 +247,7 @@ const SHARED_FILES = ['data/keycodes/physical_keys.json'];	const SHARED_TREES = 
 const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];	1	repo-test:1
 S01	folder-edit	for (const tree of ['core', 'tests']) {	for (const tree of ['core/ports', 'tests']) {	1	repo-test:1
 S01	folder-edit	fs.mkdirSync(path.join(bundle, '_shared/data'), { recursive: true });	fs.mkdirSync(path.join(bundle, '_shared/core/text/data'), { recursive: true });	1	repo-test:1
+S01	folder-edit	logger_source:match("^(.*)/logger/shim%.lua$")	logger_source:match("^(.*)/core/logger/engine/shim%.lua$")	1	driver-test:1
 S01	folder-edit	m[1] === 'shared_llm_path' ? `modules/llm/${arg}` : arg	m[1] === 'shared_llm_path' ? `ai/data/${arg}` : arg	1	repo-test:1
 S01	folder-edit	path.resolve(path.dirname(page), '../../data/locales/fr.json')	path.resolve(path.dirname(page), '../../core/i18n/data/locales/fr.json')	1	repo-test:1
 S01	folder-edit	{ dir: '_shared/lua', excluded: '_shared/lua/test/', minFiles: 200 }	{ dir: '_shared', excluded: '_shared/tests/', minFiles: 200 }	1	repo-test:1
@@ -1233,7 +1232,7 @@ S01	lua-module	hotstrings.section_order	hotstrings.engine.section_order	10	lua-r
 S01	lua-module	hotstrings.terminator_scope	hotstrings.engine.matcher.terminator_scope	3	lua-require:2,driver-test:1
 S01	lua-module	identifiers	core.text.engine.identifiers	33	lua-require:27,driver-test:5,repo-test:1
 S01	lua-module	input.modifier_custody	platform.input.modifier_custody	5	driver-test:4,lua-require:1
-S01	lua-module	json	core.text.engine.json	1005	driver-test:799,lua-require:174,repo-test:22,tooling:9,other:1
+S01	lua-module	json	core.text.engine.json	1006	driver-test:800,lua-require:174,repo-test:22,tooling:9,other:1
 S01	lua-module	keycodes	platform.input.keycodes.core	18	driver-test:12,lua-require:6
 S01	lua-module	keycodes.evdev	platform.input.keycodes.evdev	5	driver-test:4,lua-require:1
 S01	lua-module	keycodes.key_names	platform.input.keycodes.key_names	27	lua-require:17,driver-test:9,tooling:1
@@ -5305,6 +5304,8 @@ S01	lua-module-member	'menu.programmable_hotstrings.build_entry_rows'	'menu.engi
 S01	lua-module-quoted	'native_path").basename'	'core.fs.engine.native_path").basename'	1	repo-test:1
 S01	lua-module-quoted	'string:layout.number_row_policy'	'string:layouts.engine.layout.number_row_policy'	1	repo-test:1
 S01	lua-module-quoted	'text_utils").trim'	'core.text.engine.utils_core").trim'	1	repo-test:1
+S01	lua-module-quoted	Join-Path $shared 'modules\control\driver_control.json'	Join-Path $shared 'diagnostics\data\control\driver_control.json'	1	tooling:1
+S01	lua-module-quoted	Join-Path $shared 'modules\paths\app_dirs.toml'	Join-Path $shared 'core\fs\data\paths\app_dirs.toml'	1	tooling:1
 S01	lua-module-quoted	Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_bootstrap.py"	Path(__file__).absolute().parents[3] / "_shared/ai/adapters/python/managed_ollama_bootstrap.py"	1	other:1
 S01	lua-module-quoted	Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py"	Path(__file__).absolute().parents[3] / "_shared/ai/adapters/python/managed_ollama_daemon_authority.py"	1	other:1
 S01	lua-module-quoted	Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_sessions.py"	Path(__file__).absolute().parents[3] / "_shared/ai/adapters/python/managed_ollama_sessions.py"	1	other:1
@@ -5314,6 +5315,10 @@ S01	lua-module-quoted	Path(__file__).resolve().parents[2] / "_shared/python/mana
 S01	lua-module-quoted	Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml"	Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"	4	driver-test:4
 S01	lua-module-quoted	Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml"	Path(__file__).resolve().parents[4] / "_shared/core/fs/data/paths/app_dirs.toml"	8	driver-test:8
 S01	lua-module-quoted	Path(__file__).resolve().parents[3] / "_shared/python/managed_source_alias.py"	Path(__file__).resolve().parents[4] / "_shared/ai/adapters/python/managed_source_alias.py"	1	other:1
+S01	lua-module-quoted	[IO.Path]::Combine($SharedRoot, 'data', 'field_run_protocol.json')	[IO.Path]::Combine($SharedRoot, 'diagnostics', 'data', 'field_run_protocol.json')	1	tooling:1
+S01	lua-module-quoted	[IO.Path]::Combine($SharedRoot, 'data', 'identifiers.json')	[IO.Path]::Combine($SharedRoot, 'core', 'text', 'data', 'identifiers.json')	1	tooling:1
+S01	lua-module-quoted	[IO.Path]::Combine($SharedRoot, 'modules', 'hotstrings')	[IO.Path]::Combine($SharedRoot, 'hotstrings', 'data', 'catalogue')	1	tooling:1
+S01	lua-module-quoted	[IO.Path]::Combine($SharedRoot, 'modules', 'paths', 'app_dirs.toml')	[IO.Path]::Combine($SharedRoot, 'core', 'fs', 'data', 'paths', 'app_dirs.toml')	1	tooling:1
 S01	lua-module-quoted	\'keycodes.evdev\'	\'platform.input.keycodes.evdev\'	1	repo-test:1
 S01	lua-module-quoted	require [[layouts.registry]]	require [[layouts.engine.registry.registry_core]]	1	repo-test:1
 S01	lua-module-quoted	require%(\"config_migrate\"	require%(\"settings.engine.migration.migrate\"	1	driver-test:1
@@ -5415,7 +5420,6 @@ S01	path	..\_shared\modules\llm\local_server_menu.ahk	static/ergopti_plus/_share
 S01	path	..\_shared\modules\llm\local_server_ports.ahk	static/ergopti_plus/_shared/ai/data/local_server_ports.ahk	1	ahk-include:1
 S01	path	..\_shared\modules\llm\model_capabilities.ahk	static/ergopti_plus/_shared/ai/data/model_capabilities.ahk	1	ahk-include:1
 S01	path	..\_shared\modules\llm\thinking_off.ahk	static/ergopti_plus/_shared/ai/data/thinking_off.ahk	1	ahk-include:1
-S01	path	..\static\ergopti_plus\_shared\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	1	repo-test:1
 S01	path	./Expander.spec.js	static/ergopti_plus/_shared/core/text/data/domain/Expander.spec.js	1	docs:1
 S01	path	./GestureRecognizer.spec.js	static/ergopti_plus/_shared/core/text/data/domain/GestureRecognizer.spec.js	1	docs:1
 S01	path	./ProfileSelector.js	static/ergopti_plus/_shared/core/text/data/domain/ProfileSelector.js	1	docs:1
@@ -5642,18 +5646,18 @@ S01	path	\modules\diagnostics\day_log.json	static/ergopti_plus/_shared/diagnosti
 S01	path	\modules\diagnostics\error_policy.json	static/ergopti_plus/_shared/diagnostics/data/error_policy.json	1	ahk-include:1
 S01	path	\modules\diagnostics\issue_templates.json	static/ergopti_plus/_shared/diagnostics/data/issue_templates.json	1	ahk-include:1
 S01	path	\modules\diagnostics\recent_issues.json	static/ergopti_plus/_shared/diagnostics/data/recent_issues.json	1	ahk-include:1
-S01	path	\modules\diagnostics\redaction.json	static/ergopti_plus/_shared/diagnostics/data/redaction.json	7	driver-test:4,ahk-include:3
+S01	path	\modules\diagnostics\redaction.json	static/ergopti_plus/_shared/diagnostics/data/redaction.json	6	ahk-include:3,driver-test:3
 S01	path	\modules\diagnostics\schema.json	static/ergopti_plus/_shared/diagnostics/data/schema.json	1	ahk-include:1
 S01	path	\modules\features\layout_rows_policy.ahk	static/ergopti_plus/_shared/settings/data/features/layout_rows_policy.ahk	1	driver-test:1
 S01	path	\modules\features\number_row_policy.ahk	static/ergopti_plus/_shared/settings/data/features/number_row_policy.ahk	1	driver-test:1
-S01	path	\modules\hotstrings\_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	8	driver-test:7,ahk-include:1
+S01	path	\modules\hotstrings\_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	7	driver-test:6,ahk-include:1
 S01	path	\modules\hotstrings\autocorrection.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/autocorrection.toml	1	driver-test:1
 S01	path	\modules\hotstrings\defaults.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/defaults.toml	3	driver-test:2,ahk-include:1
 S01	path	\modules\hotstrings\distancesreduction.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/distancesreduction.toml	1	driver-test:1
 S01	path	\modules\hotstrings\generated_hotstrings.tsv	static/ergopti_plus/_shared/hotstrings/data/catalogue/generated_hotstrings.tsv	1	ahk-include:1
 S01	path	\modules\hotstrings\magickey.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml	2	driver-test:2
 S01	path	\modules\hotstrings\priority.json	static/ergopti_plus/_shared/hotstrings/data/catalogue/priority.json	1	ahk-include:1
-S01	path	\modules\hotstrings\user_code.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk	3	driver-test:2,ahk-include:1
+S01	path	\modules\hotstrings\user_code.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk	2	ahk-include:1,driver-test:1
 S01	path	\modules\layouts\mac_keycodes.json	static/ergopti_plus/_shared/layouts/data/mac_keycodes.json	2	ahk-include:1,driver-test:1
 S01	path	\modules\layouts\windows_system_layout.json	static/ergopti_plus/_shared/layouts/data/windows_system_layout.json	1	ahk-include:1
 S01	path	\modules\llm\agent.json	static/ergopti_plus/_shared/ai/data/agent.json	1	ahk-include:1
@@ -5689,13 +5693,9 @@ S01	path	\modules\updater\defaults.json	static/ergopti_plus/_shared/updater/data
 S01	path	\modules\wpm_widget\constants.toml	static/ergopti_plus/_shared/metrics/data/wpm_widget/constants.toml	3	driver-test:2,ahk-include:1
 S01	path	\modules\wrap_symbols\wrap_symbols.json	static/ergopti_plus/_shared/keyboard/data/wrap_symbols/wrap_symbols.json	4	ahk-include:2,driver-test:2
 S01	path	\shared\modules\diagnostics\collection.json	static/ergopti_plus/_shared/diagnostics/data/collection.json	1	driver-test:1
-S01	path	\shared\modules\diagnostics\redaction.json	static/ergopti_plus/_shared/diagnostics/data/redaction.json	1	driver-test:1
-S01	path	\shared\modules\hotstrings\_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	1	driver-test:1
-S01	path	\shared\modules\hotstrings\user_code.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk	1	driver-test:1
-S01	path	\shared\tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	1	driver-test:1
 S01	path	\static\ergopti_plus\_shared\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	2	ahk-include:1,driver-test:1
 S01	path	\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json	static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json	1	ci-workflow:1
-S01	path	\tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	25	driver-test:18,ahk-include:7
+S01	path	\tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	24	driver-test:17,ahk-include:7
 S01	path	\tap_hold\migrations.toml	static/ergopti_plus/_shared/tap_hold/data/migrations.toml	1	ahk-include:1
 S01	path	\tap_hold\one_shot_shift.json	static/ergopti_plus/_shared/tap_hold/data/one_shot_shift.json	2	ahk-include:1,driver-test:1
 S01	path	\tap_hold\shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	1	ahk-include:1
@@ -6792,9 +6792,10 @@ S01	path	modules\diagnostics\day_log.json	static/ergopti_plus/_shared/diagnostic
 S01	path	modules\diagnostics\error_policy.json	static/ergopti_plus/_shared/diagnostics/data/error_policy.json	2	driver-test:2
 S01	path	modules\diagnostics\issue_templates.json	static/ergopti_plus/_shared/diagnostics/data/issue_templates.json	1	driver-test:1
 S01	path	modules\diagnostics\recent_issues.json	static/ergopti_plus/_shared/diagnostics/data/recent_issues.json	1	driver-test:1
-S01	path	modules\diagnostics\redaction.json	static/ergopti_plus/_shared/diagnostics/data/redaction.json	4	driver-test:4
+S01	path	modules\diagnostics\redaction.json	static/ergopti_plus/_shared/diagnostics/data/redaction.json	5	driver-test:5
 S01	path	modules\diagnostics\schema.json	static/ergopti_plus/_shared/diagnostics/data/schema.json	1	driver-test:1
-S01	path	modules\hotstrings\_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	1	driver-test:1
+S01	path	modules\hotstrings\_index.toml	static/ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml	2	driver-test:2
+S01	path	modules\hotstrings\user_code.ahk	static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk	1	driver-test:1
 S01	path	modules\layouts\defaults.json	static/ergopti_plus/_shared/layouts/data/defaults.json	2	ahk-include:2
 S01	path	modules\llm\api_providers.json	static/ergopti_plus/_shared/ai/data/api_providers.json	1	driver-test:1
 S01	path	modules\llm\backends.json	static/ergopti_plus/_shared/ai/data/backends.json	1	driver-test:1
@@ -7163,7 +7164,7 @@ S01	path	static/ergopti_plus/_shared/python/managed_source_alias.py	static/ergop
 S01	path	static/ergopti_plus/_shared/python/network_proxy_policy.py	static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py	8	tooling:4,repo-test:3,driver-test:1
 S01	path	static/ergopti_plus/_shared/tap_hold/defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	7	docs:2,repo-test:2,other:1,packaging-manifest:1,tooling:1
 S01	path	static/ergopti_plus/macos/_shared/data/identifiers.sh	static/ergopti_plus/_shared/core/text/data/identifiers.sh	1	repo-test:1
-S01	path	static\ergopti_plus\_shared\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	2	docs:1,tooling:1
+S01	path	static\ergopti_plus\_shared\data\identifiers.json	static/ergopti_plus/_shared/core/text/data/identifiers.json	3	docs:1,tooling:1,repo-test:1
 S01	path	static\ergopti_plus\_shared\data\linux_native_runtime.json	static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json	1	build:1
 S01	path	static\ergopti_plus\_shared\modules\layouts\windows_system_layout.json	static/ergopti_plus/_shared/layouts/data/windows_system_layout.json	2	build:1,repo-test:1
 S01	path	static\ergopti_plus\_shared\modules\network\pac_helpers.js	static/ergopti_plus/_shared/core/network/data/pac_helpers.js	1	build:1
@@ -7175,6 +7176,7 @@ S01	path	tap_hold/defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaul
 S01	path	tap_hold/migrations.toml	static/ergopti_plus/_shared/tap_hold/data/migrations.toml	3	lua-require:2,repo-test:1
 S01	path	tap_hold/one_shot_shift.json	static/ergopti_plus/_shared/tap_hold/data/one_shot_shift.json	7	driver-test:5,lua-require:2
 S01	path	tap_hold/shared_file.toml	static/ergopti_plus/_shared/tap_hold/data/shared_file.toml	2	lua-require:2
+S01	path	tap_hold\defaults.toml	static/ergopti_plus/_shared/tap_hold/data/defaults.toml	1	driver-test:1
 S01	path	test/hotpath_segments_contract.lua	static/ergopti_plus/_shared/tests/lua/core/hotpath_segments_contract.lua	1	lua-require:1
 S01	path	test_vectors.json	static/ergopti_plus/_shared/core/logger/data/test_vectors.json	2	docs:2
 S01	path	text_crypto.lua	static/ergopti_plus/_shared/metrics/engine/privacy/text_crypto.lua	1	lua-require:1
@@ -7194,6 +7196,7 @@ S01	path	version_label_vectors.json	static/ergopti_plus/_shared/updater/data/ver
 S01	path	version_vectors.json	static/ergopti_plus/_shared/updater/data/version_vectors.json	2	docs:1,other:1
 S01	path	wrap_symbols.json	static/ergopti_plus/_shared/keyboard/data/wrap_symbols/wrap_symbols.json	1	docs:1
 S01	path	xkb_converter.lua	static/ergopti_plus/_shared/layouts/engine/composer/xkb_converter.lua	1	lua-require:1
+S01	path-regex	\.\./_shared/modules/features/layout_rows_policy\.ahk	\.\./_shared/settings/data/features/layout_rows_policy\.ahk	1	driver-test:1
 S01	path-regex	\\data\\field_run_protocol\.json	\\diagnostics\\data\\field_run_protocol\.json	1	repo-test:1
 S01	path-regex	\\modules\\llm\\managed_ollama_environment\.json	\\ai\\data\\managed_ollama_environment\.json	1	repo-test:1
 S01	path-regex	\\modules\\llm\\ollama_release\.json	\\ai\\data\\ollama_release\.json	1	repo-test:1
@@ -7373,7 +7376,9 @@ S02	path	adapters/crypto.ahk	static/ergopti_plus/windows/core/crypto/crypto.ahk	
 S02	path	adapters/crypto.lua	static/ergopti_plus/linux/core/crypto/crypto.lua	1	lua-require:1
 S02	path	adapters/crypto.lua	static/ergopti_plus/macos/core/crypto/crypto.lua	1	lua-require:1
 S02	path	meta/adapters/test_crypto_djb2_fallback_logged.ahk	static/ergopti_plus/windows/tests/meta/core/crypto/test_djb2_fallback_logged.ahk	1	driver-test:1
-S02	path	static/ergopti_plus/windows/adapters/crypto.ahk	static/ergopti_plus/windows/core/crypto/crypto.ahk	1	tooling:1
+S02	path	static/ergopti_plus/linux/adapters/crypto.lua	static/ergopti_plus/linux/core/crypto/crypto.lua	1	other:1
+S02	path	static/ergopti_plus/macos/adapters/crypto.lua	static/ergopti_plus/macos/core/crypto/crypto.lua	1	other:1
+S02	path	static/ergopti_plus/windows/adapters/crypto.ahk	static/ergopti_plus/windows/core/crypto/crypto.ahk	2	other:1,tooling:1
 S02	path	tests/meta/adapters/test_crypto_djb2_fallback_logged.ahk	static/ergopti_plus/windows/tests/meta/core/crypto/test_djb2_fallback_logged.ahk	1	driver-test:1
 S02	path	tests/unit/adapters/test_crypto_sha256_is_real.ahk	static/ergopti_plus/windows/tests/unit/core/crypto/test_sha256_is_real.ahk	1	driver-test:1
 S02	path	unit/adapters/test_crypto_sha256_is_real.ahk	static/ergopti_plus/windows/tests/unit/core/crypto/test_sha256_is_real.ahk	1	driver-test:1
@@ -7395,9 +7400,10 @@ S03	path	adapters/timer_scheduler.lua	static/ergopti_plus/macos/core/events/time
 S03	path	adapters/wake_watcher.lua	static/ergopti_plus/macos/core/events/wake_watcher.lua	1	lua-require:1
 S03	path	ergopti_plus/macos/adapters/timer_scheduler.lua	static/ergopti_plus/macos/core/events/timer_scheduler.lua	1	repo-test:1
 S03	path	macos/adapters/event_clock.lua	static/ergopti_plus/macos/core/events/clock.lua	1	repo-test:1
-S03	path	static/ergopti_plus/macos/adapters/timer_scheduler.lua	static/ergopti_plus/macos/core/events/timer_scheduler.lua	5	tooling:5
+S03	path	static/ergopti_plus/linux/adapters/timer_scheduler.lua	static/ergopti_plus/linux/core/events/timer_scheduler.lua	1	other:1
+S03	path	static/ergopti_plus/macos/adapters/timer_scheduler.lua	static/ergopti_plus/macos/core/events/timer_scheduler.lua	6	tooling:5,other:1
 S03	path	static/ergopti_plus/windows/adapters/boot_clock.ahk	static/ergopti_plus/windows/core/events/boot_clock.ahk	1	tooling:1
-S03	path	static/ergopti_plus/windows/adapters/timer_scheduler.ahk	static/ergopti_plus/windows/core/events/timer_scheduler.ahk	1	tooling:1
+S03	path	static/ergopti_plus/windows/adapters/timer_scheduler.ahk	static/ergopti_plus/windows/core/events/timer_scheduler.ahk	2	other:1,tooling:1
 S03	path	windows/adapters/boot_clock.ahk	static/ergopti_plus/windows/core/events/boot_clock.ahk	1	repo-test:1
 S03	path	windows/adapters/timer_scheduler.ahk	static/ergopti_plus/windows/core/events/timer_scheduler.ahk	2	repo-test:2
 S04	dir	tests/unit/infra/file_watchers	static/ergopti_plus/macos/tests/unit/core/fs/engine	1	driver-test:1
@@ -7518,15 +7524,18 @@ S04	path	linux/infra/paths.lua	static/ergopti_plus/linux/core/fs/engine/paths.lu
 S04	path	macos/adapters/file_system.lua	static/ergopti_plus/macos/core/fs/adapters/file_system.lua	3	docs:1,other:1,driver-test:1
 S04	path	macos/infra/file_watchers.lua	static/ergopti_plus/macos/core/fs/engine/file_watchers.lua	2	repo-test:2
 S04	path	meta/adapters/sqlite/test_sqlite_progress_yield.ahk	static/ergopti_plus/windows/tests/meta/core/fs/test_sqlite_progress_yield.ahk	1	driver-test:1
+S04	path	static/ergopti_plus/linux/adapters/file_system.lua	static/ergopti_plus/linux/core/fs/adapters/file_system.lua	1	other:1
+S04	path	static/ergopti_plus/linux/adapters/storage.lua	static/ergopti_plus/linux/core/fs/adapters/storage.lua	1	other:1
 S04	path	static/ergopti_plus/linux/infra/file_watchers.lua	static/ergopti_plus/linux/core/fs/engine/file_watchers.lua	1	repo-test:1
 S04	path	static/ergopti_plus/linux/infra/paths.lua	static/ergopti_plus/linux/core/fs/engine/paths.lua	3	repo-test:3
-S04	path	static/ergopti_plus/macos/adapters/file_system.lua	static/ergopti_plus/macos/core/fs/adapters/file_system.lua	1	repo-test:1
+S04	path	static/ergopti_plus/macos/adapters/file_system.lua	static/ergopti_plus/macos/core/fs/adapters/file_system.lua	2	other:1,repo-test:1
 S04	path	static/ergopti_plus/macos/adapters/legacy_folder_migration.lua	static/ergopti_plus/macos/core/fs/adapters/legacy_folder_migration.lua	1	repo-test:1
+S04	path	static/ergopti_plus/macos/adapters/storage.lua	static/ergopti_plus/macos/core/fs/adapters/storage.lua	1	other:1
 S04	path	static/ergopti_plus/macos/infra/file_watchers.lua	static/ergopti_plus/macos/core/fs/engine/file_watchers.lua	1	repo-test:1
 S04	path	static/ergopti_plus/macos/infra/fs_dir.lua	static/ergopti_plus/macos/core/fs/engine/dir.lua	2	tooling:2
 S04	path	static/ergopti_plus/macos/tests/unit/adapters/test_legacy_folder_migration.lua	static/ergopti_plus/macos/tests/unit/core/fs/adapters/test_legacy_folder_migration.lua	1	repo-test:1
-S04	path	static/ergopti_plus/windows/adapters/file_system.ahk	static/ergopti_plus/windows/core/fs/adapters/file_system.ahk	1	tooling:1
-S04	path	static/ergopti_plus/windows/adapters/storage.ahk	static/ergopti_plus/windows/core/fs/adapters/storage.ahk	1	tooling:1
+S04	path	static/ergopti_plus/windows/adapters/file_system.ahk	static/ergopti_plus/windows/core/fs/adapters/file_system.ahk	2	other:1,tooling:1
+S04	path	static/ergopti_plus/windows/adapters/storage.ahk	static/ergopti_plus/windows/core/fs/adapters/storage.ahk	2	other:1,tooling:1
 S04	path	static/ergopti_plus/windows/infra/sqlite3.ahk	static/ergopti_plus/windows/core/fs/engine/sqlite3.ahk	1	tooling:1
 S04	path	test_file_system_staging_isolation.lua	static/ergopti_plus/macos/tests/unit/core/fs/adapters/test_staging_isolation.lua	1	driver-test:1
 S04	path	tests/meta/adapters/sqlite/test_sqlite_progress_yield.ahk	static/ergopti_plus/windows/tests/meta/core/fs/test_sqlite_progress_yield.ahk	1	driver-test:1
@@ -8360,6 +8369,9 @@ S08	lua-module	ui.proxy_override	core.network.proxy_override	6	lua-require:4,dri
 S08	lua-module-inline	adapters.http_client	core.network.adapters.http_client	1	driver-test:1
 S08	lua-module-inline	adapters.network_info	core.network.adapters.info	1	driver-test:1
 S08	lua-module-inline	infra.vscode_bridge	core.network.engine.vscode_bridge	2	driver-test:2
+S08	lua-module-quoted	MAC + 'platform/network'	MAC + 'core/network/adapters'	1	tooling:1
+S08	lua-module-quoted	MAC + 'platform/network/managed_http.py'	MAC + 'core/network/adapters/managed_http.py'	1	tooling:1
+S08	lua-module-quoted	MAC + 'platform/network/native_http.py'	MAC + 'core/network/adapters/native_http.py'	1	tooling:1
 S08	lua-module-quoted	Path(__file__).parent / "network/native_http.py"	Path(__file__).parent.parent.parent / "core/network/adapters/native_http.py"	1	other:1
 S08	lua-tail	/platform/network/runtime_probe%.lua$	/core/network/adapters/runtime_probe%.lua$	1	lua-require:1
 S08	lua-tail	/platform/network/system_proxy_probe%.lua$	/core/network/adapters/system_proxy_probe%.lua$	1	lua-require:1
@@ -8449,7 +8461,7 @@ S08	path	platform/network/pac_runtime.lua	static/ergopti_plus/linux/core/network
 S08	path	platform/network/runtime_probe.lua	static/ergopti_plus/linux/core/network/adapters/runtime_probe.lua	2	lua-require:1,driver-test:1
 S08	path	platform/network/system_proxy_probe.lua	static/ergopti_plus/linux/core/network/adapters/system_proxy_probe.lua	3	lua-require:2,driver-test:1
 S08	path	static/ergopti_plus/linux/adapters/curl_http_client.lua	static/ergopti_plus/linux/core/network/adapters/curl_http_client.lua	4	repo-test:4
-S08	path	static/ergopti_plus/linux/adapters/http_client.lua	static/ergopti_plus/linux/core/network/adapters/http_client.lua	4	repo-test:4
+S08	path	static/ergopti_plus/linux/adapters/http_client.lua	static/ergopti_plus/linux/core/network/adapters/http_client.lua	5	repo-test:4,other:1
 S08	path	static/ergopti_plus/linux/adapters/system_proxy.lua	static/ergopti_plus/linux/core/network/adapters/system_proxy.lua	2	repo-test:2
 S08	path	static/ergopti_plus/linux/infra/curl_identity.lua	static/ergopti_plus/linux/core/network/engine/curl_identity.lua	2	repo-test:2
 S08	path	static/ergopti_plus/linux/infra/fd_sha256.lua	static/ergopti_plus/linux/core/network/engine/fd_sha256.lua	4	repo-test:4
@@ -8474,13 +8486,14 @@ S08	path	static/ergopti_plus/linux/tests/unit/adapters/network/test_http_client_
 S08	path	static/ergopti_plus/linux/tests/unit/adapters/network/test_http_client_curl_native_private_managed.lua	static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_client_curl_native_private_managed.lua	2	repo-test:2
 S08	path	static/ergopti_plus/linux/tests/unit/adapters/network/test_http_get_operation.lua	static/ergopti_plus/linux/tests/unit/core/network/adapters/test_http_get_operation.lua	1	driver-test:1
 S08	path	static/ergopti_plus/linux/tests/unit/infra/network/test_release_check_physical_join.lua	static/ergopti_plus/linux/tests/unit/core/network/engine/test_release_check_physical_join.lua	1	driver-test:1
-S08	path	static/ergopti_plus/macos/adapters/http_client.lua	static/ergopti_plus/macos/core/network/adapters/http_client.lua	1	repo-test:1
+S08	path	static/ergopti_plus/macos/adapters/http_client.lua	static/ergopti_plus/macos/core/network/adapters/http_client.lua	2	other:1,repo-test:1
+S08	path	static/ergopti_plus/macos/adapters/network_info.lua	static/ergopti_plus/macos/core/network/adapters/info.lua	1	other:1
 S08	path	static/ergopti_plus/macos/platform/network/managed_http.py	static/ergopti_plus/macos/core/network/adapters/managed_http.py	2	tooling:1,repo-test:1
 S08	path	static/ergopti_plus/macos/platform/network/native_http.py	static/ergopti_plus/macos/core/network/adapters/native_http.py	9	repo-test:5,tooling:3,build:1
 S08	path	static/ergopti_plus/macos/platform/network/native_ollama_api.py	static/ergopti_plus/macos/core/network/adapters/native_ollama_api.py	2	repo-test:2
-S08	path	static/ergopti_plus/windows/adapters/http_client.ahk	static/ergopti_plus/windows/core/network/adapters/http_client.ahk	3	repo-test:2,tooling:1
+S08	path	static/ergopti_plus/windows/adapters/http_client.ahk	static/ergopti_plus/windows/core/network/adapters/http_client.ahk	4	repo-test:2,other:1,tooling:1
 S08	path	static/ergopti_plus/windows/adapters/network_failure_host.ahk	static/ergopti_plus/windows/core/network/adapters/failure_host.ahk	1	tooling:1
-S08	path	static/ergopti_plus/windows/adapters/network_info.ahk	static/ergopti_plus/windows/core/network/adapters/info.ahk	1	tooling:1
+S08	path	static/ergopti_plus/windows/adapters/network_info.ahk	static/ergopti_plus/windows/core/network/adapters/info.ahk	2	other:1,tooling:1
 S08	path	static/ergopti_plus/windows/adapters/proxy_override.ahk	static/ergopti_plus/windows/core/network/adapters/proxy_override.ahk	1	repo-test:1
 S08	path	static/ergopti_plus/windows/infra/external_url_policy.ahk	static/ergopti_plus/windows/core/network/engine/external_url_policy.ahk	1	tooling:1
 S08	path	static/ergopti_plus/windows/tests/unit/platform/network/test_managed_remote_transport.ahk	static/ergopti_plus/windows/tests/unit/core/network/adapters/test_managed_remote_transport.ahk	1	driver-test:1
@@ -8706,11 +8719,13 @@ S09	path	meta/adapters/shell_runner/test_shell_runner_poll_suspend_guard.ahk	sta
 S09	path	meta/adapters/test_processentry32w_size.ahk	static/ergopti_plus/windows/tests/meta/core/process/test_processentry32w_size.ahk	1	driver-test:1
 S09	path	process_lifecycle.ahk	static/ergopti_plus/windows/core/process/lifecycle.ahk	1	ahk-include:1
 S09	path	static/ergopti_plus/linux/adapters/owned_process.lua	static/ergopti_plus/linux/core/process/owned_process.lua	3	repo-test:3
+S09	path	static/ergopti_plus/linux/adapters/process_lifecycle.lua	static/ergopti_plus/linux/core/process/lifecycle.lua	1	other:1
 S09	path	static/ergopti_plus/linux/adapters/program_runner.lua	static/ergopti_plus/linux/core/process/program_runner.lua	2	repo-test:2
 S09	path	static/ergopti_plus/linux/adapters/shell_runner.lua	static/ergopti_plus/linux/core/process/shell_runner.lua	1	repo-test:1
+S09	path	static/ergopti_plus/macos/adapters/process_lifecycle.lua	static/ergopti_plus/macos/core/process/lifecycle.lua	1	other:1
 S09	path	static/ergopti_plus/macos/adapters/program_providers.lua	static/ergopti_plus/macos/core/process/program_providers.lua	2	tooling:2
 S09	path	static/ergopti_plus/macos/tests/unit/adapters/processes/test_app_launcher_bundle_id.lua	static/ergopti_plus/macos/tests/unit/core/process/test_app_launcher_bundle_id.lua	1	driver-test:1
-S09	path	static/ergopti_plus/windows/adapters/process_lifecycle.ahk	static/ergopti_plus/windows/core/process/lifecycle.ahk	1	tooling:1
+S09	path	static/ergopti_plus/windows/adapters/process_lifecycle.ahk	static/ergopti_plus/windows/core/process/lifecycle.ahk	2	other:1,tooling:1
 S09	path	static/ergopti_plus/windows/adapters/program_providers.ahk	static/ergopti_plus/windows/core/process/program_providers.ahk	1	tooling:1
 S09	path	static/ergopti_plus/windows/adapters/shell_runner.ahk	static/ergopti_plus/windows/core/process/shell_runner.ahk	1	tooling:1
 S09	path	static/ergopti_plus/windows/adapters/uia_worker.ahk	static/ergopti_plus/windows/core/process/uia_worker.ahk	1	tooling:1
@@ -9329,6 +9344,7 @@ S12	path	ownership.ahk	static/ergopti_plus/windows/core/ui/ui/spotlight/ownershi
 S12	path	position_receipt.ahk	static/ergopti_plus/windows/core/ui/ui/tooltip/position_receipt.ahk	1	ahk-include:1
 S12	path	position_refinement.ahk	static/ergopti_plus/windows/core/ui/ui/tooltip/position_refinement.ahk	1	ahk-include:1
 S12	path	renderer.lua	static/ergopti_plus/macos/core/ui/ui/tooltip/renderer.lua	1	docs:1
+S12	path	static/ergopti_plus/linux/adapters/graphics_renderer.lua	static/ergopti_plus/linux/core/ui/adapters/graphics_renderer.lua	1	other:1
 S12	path	static/ergopti_plus/linux/infra/display_server.lua	static/ergopti_plus/linux/core/ui/engine/display_server.lua	1	driver-test:1
 S12	path	static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers_webview_manager.lua	static/ergopti_plus/linux/tests/unit/core/ui/editors/test_bridge_handlers_webview_manager.lua	1	other:1
 S12	path	static/ergopti_plus/linux/tests/unit/ui/tooltip/test_llm_overlay_shared_stack.lua	static/ergopti_plus/linux/tests/unit/core/ui/tooltip/test_llm_overlay_shared_stack.lua	1	other:1
@@ -9338,17 +9354,19 @@ S12	path	static/ergopti_plus/linux/ui/tooltip/llm.lua	static/ergopti_plus/linux/
 S12	path	static/ergopti_plus/linux/ui/tooltip/preview.lua	static/ergopti_plus/linux/core/ui/ui/tooltip/preview.lua	2	other:1,repo-test:1
 S12	path	static/ergopti_plus/linux/ui/webkit_host.lua	static/ergopti_plus/linux/core/ui/ui/webkit_host.lua	1	repo-test:1
 S12	path	static/ergopti_plus/linux/ui/webview_manager.lua	static/ergopti_plus/linux/core/ui/ui/webview_manager.lua	1	repo-test:1
+S12	path	static/ergopti_plus/macos/adapters/graphics_renderer.lua	static/ergopti_plus/macos/core/ui/adapters/graphics_renderer.lua	1	other:1
+S12	path	static/ergopti_plus/macos/adapters/tooltip_renderer.lua	static/ergopti_plus/macos/core/ui/adapters/tooltip_renderer.lua	1	other:1
 S12	path	static/ergopti_plus/macos/adapters/webview_result.lua	static/ergopti_plus/macos/core/ui/adapters/webview_result.lua	3	tooling:3
 S12	path	static/ergopti_plus/macos/infra/dialog_util.lua	static/ergopti_plus/macos/core/ui/engine/dialog_util.lua	2	other:1,repo-test:1
 S12	path	static/ergopti_plus/macos/ui/tooltip/tooltip_llm.lua	static/ergopti_plus/macos/core/ui/ui/tooltip/llm.lua	1	repo-test:1
 S12	path	static/ergopti_plus/macos/ui/ui_builder.lua	static/ergopti_plus/macos/core/ui/ui/builder.lua	8	tooling:5,repo-test:2,driver-test:1
 S12	path	static/ergopti_plus/macos/ui/webview_close_owner.lua	static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua	5	tooling:5
 S12	path	static/ergopti_plus/macos/ui/webview_controller_pool.lua	static/ergopti_plus/macos/core/ui/ui/webview_controller_pool.lua	3	tooling:3
-S12	path	static/ergopti_plus/windows/adapters/graphics_renderer.ahk	static/ergopti_plus/windows/core/ui/adapters/graphics_renderer.ahk	1	tooling:1
+S12	path	static/ergopti_plus/windows/adapters/graphics_renderer.ahk	static/ergopti_plus/windows/core/ui/adapters/graphics_renderer.ahk	2	other:1,tooling:1
 S12	path	static/ergopti_plus/windows/adapters/native_folder_picker.ahk	static/ergopti_plus/windows/core/ui/adapters/native_folder_picker.ahk	1	tooling:1
 S12	path	static/ergopti_plus/windows/adapters/native_number.ahk	static/ergopti_plus/windows/core/ui/adapters/native_number.ahk	1	tooling:1
 S12	path	static/ergopti_plus/windows/adapters/terminal_output_custody.ahk	static/ergopti_plus/windows/core/ui/adapters/terminal_output_custody.ahk	1	repo-test:1
-S12	path	static/ergopti_plus/windows/adapters/tooltip_renderer.ahk	static/ergopti_plus/windows/core/ui/adapters/tooltip_renderer.ahk	1	tooling:1
+S12	path	static/ergopti_plus/windows/adapters/tooltip_renderer.ahk	static/ergopti_plus/windows/core/ui/adapters/tooltip_renderer.ahk	2	other:1,tooling:1
 S12	path	static/ergopti_plus/windows/adapters/webview_profiles.ahk	static/ergopti_plus/windows/core/ui/adapters/webview_profiles.ahk	1	tooling:1
 S12	path	static/ergopti_plus/windows/infra/native_dialogs.ahk	static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk	2	tooling:1,repo-test:1
 S12	path	static/ergopti_plus/windows/infra/native_folder_picker.ahk	static/ergopti_plus/windows/core/ui/engine/native_folder_picker.ahk	1	tooling:1
@@ -9842,12 +9860,16 @@ S14	path	meta/adapters/uia/test_uia_poll_segment_bounded.ahk	static/ergopti_plus
 S14	path	meta/adapters/uia/test_uia_probe_bounded.ahk	static/ergopti_plus/windows/tests/meta/platform/focus/uia/test_probe_bounded.ahk	1	driver-test:1
 S14	path	meta/adapters/uia/test_uia_selection_withholds_capped_text.ahk	static/ergopti_plus/windows/tests/meta/platform/focus/uia/test_selection_withholds_capped_text.ahk	1	driver-test:1
 S14	path	meta/adapters/uia/test_uia_wrap_suppress_latch.ahk	static/ergopti_plus/windows/tests/meta/platform/focus/uia/test_wrap_suppress_latch.ahk	1	driver-test:1
-S14	path	static/ergopti_plus/linux/adapters/secure_field_detector.lua	static/ergopti_plus/linux/platform/focus/secure_field_detector.lua	1	other:1
+S14	path	static/ergopti_plus/linux/adapters/secure_field_detector.lua	static/ergopti_plus/linux/platform/focus/secure_field_detector.lua	2	other:2
+S14	path	static/ergopti_plus/linux/adapters/window_info.lua	static/ergopti_plus/linux/platform/focus/window_info.lua	1	other:1
 S14	path	static/ergopti_plus/linux/tests/unit/adapters/atspi/test_secure_field_detector.lua	static/ergopti_plus/linux/tests/unit/platform/focus/atspi/test_secure_field_detector.lua	1	other:1
 S14	path	static/ergopti_plus/macos/adapters/application_notifier.lua	static/ergopti_plus/macos/platform/focus/application_notifier.lua	1	tooling:1
-S14	path	static/ergopti_plus/windows/adapters/secure_field_detector.ahk	static/ergopti_plus/windows/platform/focus/secure_field_detector.ahk	1	tooling:1
-S14	path	static/ergopti_plus/windows/adapters/window_info.ahk	static/ergopti_plus/windows/platform/focus/window_info.ahk	1	tooling:1
-S14	path	static/ergopti_plus/windows/adapters/window_manager.ahk	static/ergopti_plus/windows/platform/focus/window_manager.ahk	1	tooling:1
+S14	path	static/ergopti_plus/macos/adapters/secure_field_detector.lua	static/ergopti_plus/macos/platform/focus/secure_field_detector.lua	1	other:1
+S14	path	static/ergopti_plus/macos/adapters/window_info.lua	static/ergopti_plus/macos/platform/focus/window_info.lua	1	other:1
+S14	path	static/ergopti_plus/macos/adapters/window_manager.lua	static/ergopti_plus/macos/platform/focus/window_manager.lua	1	other:1
+S14	path	static/ergopti_plus/windows/adapters/secure_field_detector.ahk	static/ergopti_plus/windows/platform/focus/secure_field_detector.ahk	2	other:1,tooling:1
+S14	path	static/ergopti_plus/windows/adapters/window_info.ahk	static/ergopti_plus/windows/platform/focus/window_info.ahk	2	other:1,tooling:1
+S14	path	static/ergopti_plus/windows/adapters/window_manager.ahk	static/ergopti_plus/windows/platform/focus/window_manager.ahk	2	other:1,tooling:1
 S14	path	static/ergopti_plus/windows/tests/unit/adapters/test_window_utils.ahk	static/ergopti_plus/windows/tests/unit/platform/focus/test_window_utils.ahk	1	driver-test:1
 S14	path	tests/meta/adapters/test_window_adapters_catch.ahk	static/ergopti_plus/windows/tests/meta/platform/focus/test_window_adapters_catch.ahk	1	driver-test:1
 S14	path	tests/meta/adapters/uia/test_disable_password_fields_gate.ahk	static/ergopti_plus/windows/tests/meta/platform/focus/uia/test_disable_password_fields_gate.ahk	1	driver-test:1
@@ -10049,14 +10071,18 @@ S15	path	meta/infra/dispatch/test_tickcount_wrap_safe.ahk	static/ergopti_plus/wi
 S15	path	meta/infra/dispatch/test_timer_scheduler_ms_guard.ahk	static/ergopti_plus/windows/tests/meta/platform/input/dispatch/test_timer_scheduler_ms_guard.ahk	1	driver-test:1
 S15	path	meta/infra/dispatch/test_timer_scheduler_oneshot_suspend.ahk	static/ergopti_plus/windows/tests/meta/platform/input/dispatch/test_timer_scheduler_oneshot_suspend.ahk	1	driver-test:1
 S15	path	meta/infra/dispatch/test_timer_scheduler_registration_transaction.ahk	static/ergopti_plus/windows/tests/meta/platform/input/dispatch/test_timer_scheduler_registration_transaction.ahk	1	driver-test:1
-S15	path	static/ergopti_plus/linux/adapters/keyboard_hook.lua	static/ergopti_plus/linux/platform/input/keyboard_hook.lua	5	other:3,docs:1,repo-test:1
+S15	path	static/ergopti_plus/linux/adapters/keyboard_hook.lua	static/ergopti_plus/linux/platform/input/keyboard_hook.lua	6	other:4,docs:1,repo-test:1
 S15	path	static/ergopti_plus/linux/tests/unit/adapters/synthetic_input/test_clipboard_snapshot_restorability.lua	static/ergopti_plus/linux/tests/unit/platform/input/synthetic_input/test_clipboard_snapshot_restorability.lua	1	driver-test:1
 S15	path	static/ergopti_plus/linux/tests/unit/adapters/synthetic_input/test_user_hotstring_destination.lua	static/ergopti_plus/linux/tests/unit/platform/input/synthetic_input/test_user_hotstring_destination.lua	1	other:1
+S15	path	static/ergopti_plus/macos/adapters/hotkey_registrar.lua	static/ergopti_plus/macos/platform/input/hotkey_registrar.lua	1	other:1
+S15	path	static/ergopti_plus/macos/adapters/key_state.lua	static/ergopti_plus/macos/platform/input/key_state.lua	1	other:1
+S15	path	static/ergopti_plus/macos/adapters/keyboard_hook.lua	static/ergopti_plus/macos/platform/input/keyboard_hook.lua	1	other:1
+S15	path	static/ergopti_plus/macos/adapters/text_sender.lua	static/ergopti_plus/macos/platform/input/text_sender.lua	1	other:1
 S15	path	static/ergopti_plus/macos/tests/unit/adapters/keyboard/test_capslock_set_contract.lua	static/ergopti_plus/macos/tests/unit/platform/input/keyboard/test_capslock_set_contract.lua	1	driver-test:1
-S15	path	static/ergopti_plus/windows/adapters/hotkey_registrar.ahk	static/ergopti_plus/windows/platform/input/hotkey_registrar.ahk	2	tooling:1,repo-test:1
-S15	path	static/ergopti_plus/windows/adapters/key_state.ahk	static/ergopti_plus/windows/platform/input/key_state.ahk	1	tooling:1
-S15	path	static/ergopti_plus/windows/adapters/keyboard_hook.ahk	static/ergopti_plus/windows/platform/input/keyboard_hook.ahk	1	tooling:1
-S15	path	static/ergopti_plus/windows/adapters/text_sender.ahk	static/ergopti_plus/windows/platform/input/text_sender.ahk	1	tooling:1
+S15	path	static/ergopti_plus/windows/adapters/hotkey_registrar.ahk	static/ergopti_plus/windows/platform/input/hotkey_registrar.ahk	3	other:1,tooling:1,repo-test:1
+S15	path	static/ergopti_plus/windows/adapters/key_state.ahk	static/ergopti_plus/windows/platform/input/key_state.ahk	2	other:1,tooling:1
+S15	path	static/ergopti_plus/windows/adapters/keyboard_hook.ahk	static/ergopti_plus/windows/platform/input/keyboard_hook.ahk	2	other:1,tooling:1
+S15	path	static/ergopti_plus/windows/adapters/text_sender.ahk	static/ergopti_plus/windows/platform/input/text_sender.ahk	2	other:1,tooling:1
 S15	path	static/ergopti_plus/windows/infra/hook_dispatcher.ahk	static/ergopti_plus/windows/platform/input/hook_dispatcher.ahk	2	tooling:1,repo-test:1
 S15	path	static/ergopti_plus/windows/tests/unit/adapters/input/test_inline_autotype_not_synthetic.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_inline_autotype_not_synthetic.ahk	1	driver-test:1
 S15	path	static/ergopti_plus/windows/tests/unit/adapters/input/test_text_sender_modifiers.ahk	static/ergopti_plus/windows/tests/unit/platform/input/test_text_sender_modifiers.ahk	1	driver-test:1
@@ -10383,8 +10409,10 @@ S17	path	meta/adapters/test_port_adapter_coverage.ahk	static/ergopti_plus/window
 S17	path	meta/adapters/test_reg_keyexists_value_only.ahk	static/ergopti_plus/windows/tests/meta/platform/system/test_reg_keyexists_value_only.ahk	1	driver-test:1
 S17	path	meta/adapters/test_regread_no_type_arg.ahk	static/ergopti_plus/windows/tests/meta/platform/system/test_regread_no_type_arg.ahk	1	driver-test:1
 S17	path	meta/adapters/test_wmexists_is_not_a_handle.ahk	static/ergopti_plus/windows/tests/meta/platform/system/test_wmexists_is_not_a_handle.ahk	1	driver-test:1
+S17	path	static/ergopti_plus/linux/adapters/notifier.lua	static/ergopti_plus/linux/platform/system/notifier.lua	1	other:1
+S17	path	static/ergopti_plus/macos/adapters/notifier.lua	static/ergopti_plus/macos/platform/system/notifier.lua	1	other:1
 S17	path	static/ergopti_plus/macos/tests/unit/adapters/system/test_visible_window_inventory.lua	static/ergopti_plus/macos/tests/unit/platform/system/test_visible_window_inventory.lua	1	driver-test:1
-S17	path	static/ergopti_plus/windows/adapters/notifier.ahk	static/ergopti_plus/windows/platform/system/notifier.ahk	1	tooling:1
+S17	path	static/ergopti_plus/windows/adapters/notifier.ahk	static/ergopti_plus/windows/platform/system/notifier.ahk	2	other:1,tooling:1
 S17	path	static/ergopti_plus/windows/adapters/system_control.ahk	static/ergopti_plus/windows/platform/system/control.ahk	1	tooling:1
 S17	path	static/ergopti_plus/windows/tests/unit/adapters/test_adapter_compliance.ahk	static/ergopti_plus/windows/tests/unit/platform/system/test_adapter_compliance.ahk	1	driver-test:1
 S17	path	test_classified_publisher_stage_custody.ahk	static/ergopti_plus/windows/tests/unit/platform/system/test_classified_publisher_stage_custody.ahk	1	driver-test:1
@@ -11804,7 +11832,9 @@ S20	path	infra/tray_bootstrap.ahk	static/ergopti_plus/windows/tray/bootstrap.ahk
 S20	path	linux/adapters/tray_menu.lua	static/ergopti_plus/linux/tray/adapters/menu.lua	1	build:1
 S20	path	linux/platform/tray/appindicator.lua	static/ergopti_plus/linux/tray/adapters/appindicator.lua	3	docs:2,lua-require:1
 S20	path	platform/tray/appindicator.lua	static/ergopti_plus/linux/tray/adapters/appindicator.lua	6	driver-test:3,lua-require:2,other:1
-S20	path	static/ergopti_plus/windows/adapters/tray_menu.ahk	static/ergopti_plus/windows/tray/adapters/menu.ahk	1	tooling:1
+S20	path	static/ergopti_plus/linux/adapters/tray_menu.lua	static/ergopti_plus/linux/tray/adapters/menu.lua	1	other:1
+S20	path	static/ergopti_plus/macos/adapters/tray_menu.lua	static/ergopti_plus/macos/tray/adapters/menu.lua	1	other:1
+S20	path	static/ergopti_plus/windows/adapters/tray_menu.ahk	static/ergopti_plus/windows/tray/adapters/menu.ahk	2	other:1,tooling:1
 S20	path	static/ergopti_plus/windows/adapters/tray_startup_click.ahk	static/ergopti_plus/windows/tray/adapters/startup_click.ahk	1	tooling:1
 S20	path	static/ergopti_plus/windows/adapters/tray_startup_commands.ahk	static/ergopti_plus/windows/tray/adapters/startup_commands.ahk	1	tooling:1
 S20	path	static/ergopti_plus/windows/infra/tray_bootstrap.ahk	static/ergopti_plus/windows/tray/bootstrap.ahk	1	tooling:1
@@ -14219,9 +14249,10 @@ S22	path	linux/ui/bundled_apps.lua	static/ergopti_plus/linux/apps/ui/bundled_app
 S22	path	macos/ui/menu/menu_apps.lua	static/ergopti_plus/macos/apps/ui/menu/apps.lua	3	repo-test:3
 S22	path	menu/menu_apps.ahk	static/ergopti_plus/windows/apps/ui/menu/apps.ahk	1	ahk-include:1
 S22	path	static/ergopti_plus/linux/ui/menu/app_exclusion_rows.lua	static/ergopti_plus/linux/apps/ui/menu/exclusion_rows.lua	1	other:1
+S22	path	static/ergopti_plus/macos/adapters/app_launcher.lua	static/ergopti_plus/macos/apps/adapters/launcher.lua	1	other:1
 S22	path	static/ergopti_plus/macos/infra/app_picker.lua	static/ergopti_plus/macos/apps/engine/picker.lua	1	repo-test:1
 S22	path	static/ergopti_plus/macos/ui/menu/menu_apps.lua	static/ergopti_plus/macos/apps/ui/menu/apps.lua	1	repo-test:1
-S22	path	static/ergopti_plus/windows/adapters/app_launcher.ahk	static/ergopti_plus/windows/apps/adapters/launcher.ahk	1	tooling:1
+S22	path	static/ergopti_plus/windows/adapters/app_launcher.ahk	static/ergopti_plus/windows/apps/adapters/launcher.ahk	2	other:1,tooling:1
 S22	path	static/ergopti_plus/windows/infra/app_picker.ahk	static/ergopti_plus/windows/apps/engine/picker.ahk	1	tooling:1
 S22	path	static/ergopti_plus/windows/tests/unit/ui/bundled_apps/test_bundled_apps.ahk	static/ergopti_plus/windows/tests/unit/apps/test_bundled_apps.ahk	1	driver-test:1
 S22	path	tests/unit/adapters/test_app_launcher_native_targets.ahk	static/ergopti_plus/windows/tests/unit/apps/test_launcher_native_targets.ahk	1	driver-test:1
@@ -14283,7 +14314,9 @@ S23	path	clipboard_owner_worker.lua	static/ergopti_plus/linux/clipboard/adapters
 S23	path	infra/clipboard_borrowers.lua	static/ergopti_plus/macos/clipboard/borrowers.lua	1	lua-require:1
 S23	path	linux/adapters/clipboard_owner_worker.lua	static/ergopti_plus/linux/clipboard/adapters/owner_worker.lua	1	repo-test:1
 S23	path	macos/adapters/accessibility_copies.lua	static/ergopti_plus/macos/clipboard/adapters/accessibility_copies.lua	2	docs:1,other:1
-S23	path	static/ergopti_plus/windows/adapters/clipboard.ahk	static/ergopti_plus/windows/clipboard/adapters/clipboard.ahk	1	tooling:1
+S23	path	static/ergopti_plus/linux/adapters/clipboard.lua	static/ergopti_plus/linux/clipboard/adapters/clipboard.lua	1	other:1
+S23	path	static/ergopti_plus/macos/adapters/clipboard.lua	static/ergopti_plus/macos/clipboard/adapters/clipboard.lua	1	other:1
+S23	path	static/ergopti_plus/windows/adapters/clipboard.ahk	static/ergopti_plus/windows/clipboard/adapters/clipboard.ahk	2	other:1,tooling:1
 S23	path	static/ergopti_plus/windows/adapters/editor_replace.ahk	static/ergopti_plus/windows/clipboard/adapters/editor_replace.ahk	1	tooling:1
 S23	path	windows/adapters/clipboard.ahk	static/ergopti_plus/windows/clipboard/adapters/clipboard.ahk	1	repo-test:1
 S23	path	windows/adapters/editor_replace.ahk	static/ergopti_plus/windows/clipboard/adapters/editor_replace.ahk	1	repo-test:1
@@ -16838,6 +16871,25 @@ S28	dir	unit/platform	static/ergopti_plus/macos/tests/unit/keyboard/engine	1	doc
 S28	dir-successor	tests/unit/infra	static/ergopti_plus/macos/tests/unit	1	driver-test:1
 S28	dir-successor	tests/unit/platform	static/ergopti_plus/linux/tests/unit/keyboard	1	driver-test:1
 S28	dir-successor	tests/unit/platform	static/ergopti_plus/macos/tests/unit/keyboard/engine	1	driver-test:1
+S28	folder-edit	#Requires AutoHotkey v2.0
+; ====	#Requires AutoHotkey v2.0
+
+
+
+
+
+; ====	1	ahk-include:1
+S28	folder-edit	; ==============================================
+; ==============================================
+; ======= 1/ AltGr tap-hold owner criteria =====
+; ==============================================
+; ==============================================
+	; ================================================
+; ================================================
+; ======= 1/ AltGr tap-hold owner criteria =======
+; ================================================
+; ================================================
+	1	ahk-include:1
 S28	join	path.join(
 		root,
 		'static/ergopti_plus/windows/tests/unit/platform/remap/key_combinations/test_key_combinations.ahk'	path.join(
@@ -19884,16 +19936,13 @@ S32	path	windows/ui/onboarding/gesture_registration.ahk	static/ergopti_plus/wind
 S32	path	windows/ui/onboarding/init.ahk	static/ergopti_plus/windows/onboarding/ui/init.ahk	1	repo-test:1
 S32	path	windows/ui/onboarding/webview.ahk	static/ergopti_plus/windows/onboarding/ui/webview.ahk	1	repo-test:1
 S32	path-regex	static\/ergopti_plus\/macos\/data\/privacy_panes\.json	static\/ergopti_plus\/macos\/onboarding\/privacy_panes\.json	1	repo-test:1
-S32	scope-split			'ergopti_plus/macos/data',			'ergopti_plus/macos/ai/data',
-		'ergopti_plus/macos/diagnostics/data',
-		'ergopti_plus/macos/onboarding',	1	repo-test:1
+S32	scope-split			'ergopti_plus/macos/data',			'ergopti_plus/macos/ai/data',	1	repo-test:1
 S33	dir	ergopti_plus/macos/native	static/ergopti_plus/macos/shortcuts/native	1	packaging-manifest:1
 S33	dir	modules/shortcuts	static/ergopti_plus/windows/shortcuts/engine	10	driver-test:9,ahk-include:1
 S33	dir	modules/shortcuts/actions	static/ergopti_plus/macos/shortcuts/engine/actions	1	driver-test:1
 S33	dir	tests/unit/modules/shortcuts	static/ergopti_plus/linux/tests/unit/shortcuts	1	driver-test:1
 S33	dir	ui/action_picker	static/ergopti_plus/windows/shortcuts/ui/action_picker	2	docs:1,driver-test:1
 S33	dir	windows/ui/physical_shortcuts	static/ergopti_plus/windows/shortcuts/ui/physical_shortcuts	1	docs:1
-S33	dir-split	/static/ergopti_plus/linux/adapters	(split)	2	driver-test:2
 S33	dir-split	adapters/	(split)	1	other:1
 S33	dir-split	static/ergopti_plus/windows/infra	(split)	1	repo-test:1
 S33	dir-split	static/ergopti_plus/windows/native	(split)	1	ci-workflow:1
@@ -20239,6 +20288,7 @@ S33	path	static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua	static/ergopti_plu
 S33	path	static/ergopti_plus/macos/adapters/apple_shortcuts.lua	static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts.lua	4	tooling:3,repo-test:1
 S33	path	static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua	static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_native.lua	4	tooling:2,repo-test:2
 S33	path	static/ergopti_plus/macos/adapters/apple_shortcuts_query.js	static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_query.js	2	tooling:2
+S33	path	static/ergopti_plus/macos/adapters/mouse_control.lua	static/ergopti_plus/macos/shortcuts/adapters/mouse_control.lua	1	other:1
 S33	path	static/ergopti_plus/macos/modules/shortcuts/init.lua	static/ergopti_plus/macos/shortcuts/engine/init.lua	1	repo-test:1
 S33	path	static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua	static/ergopti_plus/macos/shortcuts/engine/keyboard_shortcuts.lua	2	repo-test:2
 S33	path	static/ergopti_plus/macos/modules/shortcuts/script_control.lua	static/ergopti_plus/macos/shortcuts/engine/script_control.lua	2	repo-test:2
@@ -20248,7 +20298,7 @@ S33	path	static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua	static/ergopti_plu
 S33	path	static/ergopti_plus/macos/ui/menu/shortcut_utils.lua	static/ergopti_plus/macos/shortcuts/ui/menu/utils.lua	1	repo-test:1
 S33	path	static/ergopti_plus/macos/ui/menu/shortcuts_scope.lua	static/ergopti_plus/macos/shortcuts/ui/menu/scope.lua	1	repo-test:1
 S33	path	static/ergopti_plus/macos/ui/physical_shortcuts/init.lua	static/ergopti_plus/macos/shortcuts/ui/physical_shortcuts/init.lua	1	tooling:1
-S33	path	static/ergopti_plus/windows/adapters/mouse_control.ahk	static/ergopti_plus/windows/shortcuts/adapters/mouse_control.ahk	1	tooling:1
+S33	path	static/ergopti_plus/windows/adapters/mouse_control.ahk	static/ergopti_plus/windows/shortcuts/adapters/mouse_control.ahk	2	other:1,tooling:1
 S33	path	static/ergopti_plus/windows/adapters/screen_brightness.ahk	static/ergopti_plus/windows/shortcuts/adapters/screen_brightness.ahk	1	tooling:1
 S33	path	static/ergopti_plus/windows/infra/program_actions.ahk	static/ergopti_plus/windows/shortcuts/engine/program_actions.ahk	1	tooling:1
 S33	path	static/ergopti_plus/windows/modules/shortcuts.ahk	static/ergopti_plus/windows/shortcuts/shortcuts.ahk	1	tooling:1
@@ -20647,6 +20697,31 @@ S34	dir-split-prose	modules/keymap	(split)	5	docs:2,lua-require:2,driver-test:1
 S34	dir-split-prose	platform/remap	(split)	16	driver-test:8,lua-require:4,docs:3,ahk-include:1
 S34	dir-split-prose	ui/menu	(split)	1	driver-test:1
 S34	dir-split-prose	windows/platform/remap	(split)	1	lua-require:1
+S34	folder-edit		return Resolved
+}
+
+
+
+
+; =========================================		return Resolved
+}
+
+
+
+
+
+; =========================================	1	ahk-include:1
+S34	folder-edit	native_number.ahk
+
+; ===========================
+; ======	native_number.ahk
+
+
+
+
+
+; ===========================
+; ======	1	ahk-include:1
 S34	join	path.join(DRIVERS, 'linux', 'platform', 'remap', 'tap_hold_engine.lua'	path.join(DRIVERS, 'linux', 'tap_hold', 'engine', 'engine.lua'	1	repo-test:1
 S34	join	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'modules', 'keymap'	path.join(ROOT, 'static', 'ergopti_plus', 'macos'	1	repo-test:1
 S34	join	path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua'	path.join(SP, 'linux', 'tap_hold', 'engine', 'engine.lua'	2	repo-test:2
@@ -20741,31 +20816,23 @@ S34	scope-split		'macos/platform',		'macos/ai/adapters',
 	'macos/core/network/adapters',
 	'macos/keyboard/adapters/karabiner',
 	'macos/keyboard/adapters/runtime',
-	'macos/keyboard/data',
 	'macos/keyboard/engine',
-	'macos/tap_hold/engine',
-	'macos/tray/adapters',	1	repo-test:1
-S34	scope-split		'windows/platform',		'windows/core/network/adapters',
-	'windows/keyboard/adapters',
+	'macos/tap_hold/engine',	1	repo-test:1
+S34	scope-split		'windows/platform',		'windows/keyboard/adapters',
 	'windows/keyboard/engine',
-	'windows/tap_hold/engine',
-	'windows/tray/adapters',	1	repo-test:1
+	'windows/tap_hold/engine',	1	repo-test:1
 S34	scope-split		join(REPO_ROOT, 'static/ergopti_plus/macos/platform'),		join(REPO_ROOT, 'static/ergopti_plus/macos/ai/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/adapters/karabiner'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/adapters/runtime'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/data'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/keyboard/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold/engine'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/tray/adapters'),	1	repo-test:1
+	join(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold/engine'),	1	repo-test:1
 S34	scope-split	                "static/ergopti_plus/macos/platform",	                "static/ergopti_plus/macos/ai/adapters",
                 "static/ergopti_plus/macos/core/network/adapters",
                 "static/ergopti_plus/macos/keyboard/adapters/karabiner",
                 "static/ergopti_plus/macos/keyboard/adapters/runtime",
-                "static/ergopti_plus/macos/keyboard/data",
                 "static/ergopti_plus/macos/keyboard/engine",
-                "static/ergopti_plus/macos/tap_hold/engine",
-                "static/ergopti_plus/macos/tray/adapters",	1	tooling:1
+                "static/ergopti_plus/macos/tap_hold/engine",	1	tooling:1
 S35	dir	/native/archive_output	static/ergopti_plus/linux/updater/native	1	other:1
 S35	dir	/static/ergopti_plus/linux/native/archive_output	static/ergopti_plus/linux/updater/native	2	build:1,repo-test:1
 S35	dir	/tests/unit/modules/updater/install	static/ergopti_plus/linux/tests/unit/updater/engine/install	2	driver-test:2
@@ -20787,9 +20854,7 @@ S35	dir	windows/modules/updater	static/ergopti_plus/windows/updater/engine	1	rep
 S35	dir-split	/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/infra	(split)	1	driver-test:1
 S35	dir-split	/install/linux/infra	(split)	1	driver-test:1
 S35	dir-split	/linux/infra	(split)	3	driver-test:3
-S35	dir-split	/static/ergopti_plus/macos/adapters	(split)	2	driver-test:2
 S35	dir-split	/static/ergopti_plus/macos/infra	(split)	1	driver-test:1
-S35	dir-split	/static/ergopti_plus/windows/adapters	(split)	2	driver-test:2
 S35	dir-split	/ui/menu	(split)	1	driver-test:1
 S35	dir-split	linux/infra	(split)	1	driver-test:1
 S35	dir-split	linux/ui	(split)	1	repo-test:1
@@ -20809,8 +20874,6 @@ S35	dir-split-prose	macos/adapters	(split)	2	docs:1,repo-test:1
 S35	dir-split-prose	macos/infra	(split)	2	driver-test:1,ahk-include:1
 S35	dir-split-prose	macos/modules	(split)	3	docs:2,driver-test:1
 S35	dir-split-prose	macos/ui	(split)	3	docs:1,driver-test:1,lua-require:1
-S35	dir-split-prose	static/ergopti_plus/macos/adapters	(split)	2	driver-test:2
-S35	dir-split-prose	static/ergopti_plus/windows/adapters	(split)	2	driver-test:2
 S35	dir-split-prose	ui/menu	(split)	7	lua-require:3,driver-test:3,docs:1
 S35	dir-split-prose	windows/adapters	(split)	4	docs:1,ahk-include:1,driver-test:1,repo-test:1
 S35	dir-split-prose	windows/ui	(split)	2	docs:2
@@ -22737,6 +22800,7 @@ S37	path-regex	static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.s
 S37	source-check	.includes('tests/hardware/run_native_fixture_family_receipts.py'	.includes('tests/hardware/core/run_native_fixture_family_receipts.py'	1	repo-test:1
 S37	source-check	.includes('tests/hardware/run_window_switch_receipts.py'	.includes('tests/hardware/core/run_window_switch_receipts.py'	1	repo-test:1
 S38	dir	adapters/keyboard_hook	static/ergopti_plus/linux/tests/support/platform/input/keyboard_hook	1	driver-test:1
+S38	folder-edit	(MAC + 'tests/support/native_http_fixture_main.swift',)	(MAC + 'tests/support/core/native_http_fixture_main.swift',)	1	repo-test:1
 S38	join	path.join(MACOS, 'tests/support/mlx_truststore_receiving.py'	path.join(MACOS, 'tests/support/ai/mlx_truststore_receiving.py'	1	repo-test:1
 S38	lua-module	tests.support.adapters.contracts.adapter_contract_vectors_fixture	tests.support.core.lifecycle.adapter_contract_vectors_fixture	3	driver-test:3
 S38	lua-module	tests.support.adapters.file_system.cooperative_writer_lock_fixture	tests.support.core.fs.cooperative_writer_lock_fixture	3	driver-test:3
@@ -22944,6 +23008,10 @@ S38	lua-module	tests.support.webview_focus_fixture	tests.support.core.webview_fo
 S38	lua-module	tests.support.webview_recursive_close_fixture	tests.support.core.webview_recursive_close_fixture	5	driver-test:5
 S38	lua-module	tests.support.wpm_menubar_fixture	tests.support.metrics.wpm_menubar_fixture	4	driver-test:4
 S38	lua-module	tests.support.wpm_widget_fixture	tests.support.metrics.wpm_widget_fixture	2	driver-test:2
+S38	lua-module-quoted	MAC + 'tests/support/native_http_fixture_builder.py'	MAC + 'tests/support/core/native_http_fixture_builder.py'	1	tooling:1
+S38	lua-module-quoted	MAC + 'tests/support/native_http_fixture_main.swift'	MAC + 'tests/support/core/native_http_fixture_main.swift'	1	tooling:1
+S38	lua-module-quoted	MAC + 'tests/support/native_http_wire_client_receiving.py'	MAC + 'tests/support/core/native_http_wire_client_receiving.py'	1	tooling:1
+S38	lua-module-quoted	MAC + 'tests/support/native_http_wire_fixture.py'	MAC + 'tests/support/core/native_http_wire_fixture.py'	1	tooling:1
 S38	lua-tail	/tests/support/layout_cohort_fixture%.lua$	/tests/support/layouts/cohort_fixture%.lua$	1	driver-test:1
 S38	path	../../../../support/config_journal_fixtures.ahk	static/ergopti_plus/windows/tests/support/settings/journal_fixtures.ahk	1	driver-test:1
 S38	path	../../../../support/llm_menu_fixture_state.ahk	static/ergopti_plus/windows/tests/support/ai/menu_fixture_state.ahk	1	driver-test:1
@@ -23244,7 +23312,6 @@ S38	tree-list	["infra", "ui", "modules", "platform", "adapters"]	["infra", "ui",
 S38	tree-list	["modules", "infra", "platform", "adapters", "ui"]	["modules", "infra", "platform", "adapters", "ui", "clipboard", "core", "apps", "layouts", "tray", "hotstrings", "shortcuts", "metrics", "gestures", "updater", "settings", "diagnostics", "keyboard", "ai", "menu", "tap_hold", "onboarding"]	1	driver-test:1
 S38	tree-list	["modules", "infra", "platform"]	["modules", "infra", "platform", "gestures", "core", "updater", "settings", "diagnostics", "hotstrings", "keyboard", "layouts", "ai", "menu", "metrics", "shortcuts", "tap_hold", "tray", "onboarding", "apps", "clipboard"]	1	driver-test:1
 S38	tree-list	['adapters', 'infra', 'modules', 'platform', 'ui']	['adapters', 'infra', 'modules', 'platform', 'ui', 'clipboard', 'core', 'apps', 'layouts', 'tray', 'hotstrings', 'shortcuts', 'metrics', 'gestures', 'updater', 'settings', 'diagnostics', 'keyboard', 'ai', 'menu', 'tap_hold', 'onboarding']	1	repo-test:1
-S38	tree-list	['adapters', 'infra', 'modules', 'ui', 'tests', 'platform']	['adapters', 'infra', 'modules', 'ui', 'tests', 'platform', 'clipboard', 'core', 'apps', 'layouts', 'tray', 'hotstrings', 'shortcuts', 'metrics', 'gestures', 'updater', 'settings', 'diagnostics', 'keyboard', 'ai', 'menu', 'tap_hold', 'onboarding']	1	repo-test:1
 S38	tree-list	['modules', 'infra']	['modules', 'infra', 'gestures', 'core', 'updater', 'settings', 'platform', 'diagnostics', 'hotstrings', 'keyboard', 'layouts', 'ai', 'menu', 'metrics', 'shortcuts', 'tap_hold', 'onboarding', 'apps', 'clipboard', 'tray']	1	repo-test:1
 S38	tree-list	['tests', '__pycache__', 'bin', 'vendor']	['tests', '__pycache__', 'bin', 'vendor', 'install']	1	repo-test:1
 S38	tree-list	{ "adapters", "infra", "modules", "platform", "ui" }	{ "adapters", "infra", "modules", "platform", "ui", "clipboard", "core", "apps", "layouts", "tray", "hotstrings", "shortcuts", "metrics", "gestures", "updater", "settings", "diagnostics", "keyboard", "ai", "menu", "tap_hold", "onboarding" }	11	driver-test:11
