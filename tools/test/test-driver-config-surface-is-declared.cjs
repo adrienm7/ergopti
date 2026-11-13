@@ -42,6 +42,7 @@
 'use strict';
 
 require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+const { driverNames } = require('../lib/driver-roots.cjs');
 
 const fs = require('fs');
 const assert = require('node:assert/strict');
@@ -1254,9 +1255,7 @@ for (const quote of ["'", '"']) {
 	);
 }
 
-const DRIVERS = Object.keys(PLATFORM_OF_DRIVER).filter((d) =>
-	fs.existsSync(path.join(DRIVERS_DIR, d, 'adapters'))
-);
+const DRIVERS = Object.keys(PLATFORM_OF_DRIVER).filter((d) => driverNames(DRIVERS_DIR).includes(d));
 
 const undeclared = [];
 for (const driver of DRIVERS) {
