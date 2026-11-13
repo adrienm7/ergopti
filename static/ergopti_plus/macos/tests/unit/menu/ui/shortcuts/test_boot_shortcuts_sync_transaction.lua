@@ -126,7 +126,7 @@ local function load_fixture(opts)
 	}
 
 	for _, module_name in ipairs({
-		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
+		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
@@ -153,10 +153,10 @@ local function load_fixture(opts)
 			return opts.rollback_result ~= false
 		end,
 	}
-	package.loaded["modules.shortcuts"] = shortcuts
+	package.loaded["shortcuts.engine"] = shortcuts
 	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["gestures.engine"] = { SINGLE_SLOTS = { "swipe_left" } }
-	package.loaded["infra.personal_shortcuts"] = { load = noop }
+	package.loaded["shortcuts.engine.personal_shortcuts"] = { load = noop }
 	package.loaded["menu.ui.builder.state"] = {
 		sync_state_to_modules = function(live, _saved, _absent, deps)
 			sync_states[#sync_states + 1] = live.shortcuts

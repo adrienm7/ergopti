@@ -152,7 +152,7 @@ const input = {
 		ahk: read('windows/_generated/features_manifest.ahk')
 	},
 	hs: read('macos/gestures/engine/actions.lua'),
-	hsSave: read('macos/modules/shortcuts/actions/screenshot_save.lua'),
+	hsSave: read('macos/shortcuts/engine/actions/screenshot_save.lua'),
 	ahk: read('windows/gestures/adapters/screenshots.ahk'),
 	ahkActions: read('windows/gestures/engine/actions.ahk'),
 	linux: read('linux/gestures/engine/manager.lua')

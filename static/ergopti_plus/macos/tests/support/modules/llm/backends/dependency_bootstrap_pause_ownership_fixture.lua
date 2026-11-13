@@ -336,8 +336,8 @@ local function load_fixture(options)
 			resync_context = function() return true end,
 			log_shortcut = function() return true end,
 		}
-		package.loaded["modules.shortcuts.script_control"] = nil
-		control = require("modules.shortcuts.script_control")
+		package.loaded["shortcuts.engine.script_control"] = nil
+		control = require("shortcuts.engine.script_control")
 		helpers.assert_true(control.start({
 			pause_processing = function() return true end,
 			resume_processing = function() return true end,

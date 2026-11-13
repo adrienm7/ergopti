@@ -400,7 +400,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding" }) do walk(d .. "/", d .. "/") end
+		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts" }) do walk(d .. "/", d .. "/") end
 		-- Root-level sources are NOT inside those four directories, and init.lua is
 		-- the largest of them. The shell fallback below scans the whole tree, so
 		-- coverage silently depended on which of the two paths ran — green on a

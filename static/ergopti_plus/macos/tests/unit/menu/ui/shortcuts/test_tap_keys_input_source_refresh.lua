@@ -12,9 +12,9 @@
 
 local helpers = require("tests.helpers")
 local names = {
-	"ui.menu.menu_tap_keys", "modules.shortcuts.tap_keys", "core.logger.engine.logger",
-	"layouts.adapters.input_source_broker", "layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils",
-	"ui.action_picker", "modules.shortcuts.bindings", "core.timing.engine.deferred_work",
+	"ui.menu.menu_tap_keys", "shortcuts.engine.tap_keys", "core.logger.engine.logger",
+	"layouts.adapters.input_source_broker", "layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils",
+	"shortcuts.ui.action_picker", "shortcuts.engine.bindings", "core.timing.engine.deferred_work",
 }
 
 helpers.describe("tap-key rows follow the input source", function()
@@ -27,7 +27,7 @@ helpers.describe("tap-key rows follow the input source", function()
 			package.loaded["layouts.adapters.input_source_broker"] = {
 				subscribe = function(_, fn) callback = fn; return true end,
 			}
-			package.loaded["modules.shortcuts.tap_keys"] = {
+			package.loaded["shortcuts.engine.tap_keys"] = {
 				ensure_loaded = function() end, keys = function() return { { id = "number_row_left" } } end,
 				get_action = function() return "none" end, display_name = function() return key_name end,
 				binding_id = function(id) return "tap." .. id end,

@@ -56,7 +56,7 @@ local function with_manager(route, body)
 			local layout = require("layouts.adapters.keyboard_layout")
 			layout._set_table_for_test({ a = { keycode = 30, mods = {} }, A = { keycode = 30, mods = { "shift" } } })
 			s.reloads, s.chars = 0, chars
-			local scripts = require("modules.shortcuts.script_actions").new({
+			local scripts = require("shortcuts.engine.script_actions").new({
 				reset = function() error("unexpected pause") end,
 				reload = function() s.reloads = s.reloads + 1 end,
 				quit = function() error("unexpected quit") end,

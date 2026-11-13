@@ -17,7 +17,7 @@ CONTRACT = "native.physical-shortcuts-close"
 GC_SCOPE = "unmeasured; actual controllers deliberately retained"
 INPUT_SCOPE = "not attempted; no physical capture, eventtap, synthetic key or AppleEvent"
 DEPENDENCIES = (
-    "static/ergopti_plus/macos/ui/physical_shortcuts/init.lua",
+    "static/ergopti_plus/macos/shortcuts/ui/physical_shortcuts/init.lua",
     "static/ergopti_plus/macos/core/ui/ui/builder.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/core/events/timer_scheduler.lua",

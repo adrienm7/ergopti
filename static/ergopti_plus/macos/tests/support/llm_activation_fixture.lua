@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"ai.engine",
 	"ai.ui.menu.models.manager",
 	"ai.ui.menu.profiles_manager",
@@ -56,7 +56,7 @@ local OWNED_MODULES = {
 	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"ai.ui.menu",
 	"ai.ui.menu.prediction_lock_registry",
 	"ai.ui.menu.profile_label",
@@ -249,7 +249,7 @@ local function build_fixture(backend, save_results, options)
 			return true
 		end,
 	}
-	package.loaded["ui.menu.shortcut_utils"] = {}
+	package.loaded["shortcuts.ui.menu.utils"] = {}
 	package.loaded["ai.engine"] = {
 		api_remote = {
 			detect_local_servers = function(on_done)
@@ -645,8 +645,8 @@ local function build_fixture(backend, save_results, options)
 		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
-		package.loaded["modules.shortcuts.script_control"] = nil
-		script_control = require("modules.shortcuts.script_control")
+		package.loaded["shortcuts.engine.script_control"] = nil
+		script_control = require("shortcuts.engine.script_control")
 	else
 		script_control = {
 			is_paused = function() return paused end,

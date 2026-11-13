@@ -30,8 +30,8 @@ def main():
         Path(__file__).resolve(),
         Path(__file__).with_name("chosen_id_backend.py").resolve(),
         root / "tools/diagnostics/macos_owned_process.py",
-        root / "static/ergopti_plus/macos/adapters/apple_shortcuts.lua",
-        root / "static/ergopti_plus/macos/adapters/apple_shortcuts_query.js",
+        root / "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts.lua",
+        root / "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_query.js",
     ]
     hashes = {}
     for path in sources:

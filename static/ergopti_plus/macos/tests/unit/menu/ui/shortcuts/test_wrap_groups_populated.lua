@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("Shortcuts wrap-symbol groups are populated", function()
 	helpers.it("every group under the wrap-symbols row has rows", function()
-		local shortcuts = helpers.load_with_stubs("ui.menu.menu_shortcuts")
+		local shortcuts = helpers.load_with_stubs("shortcuts.ui.menu.shortcuts")
 		local ManifestMenu = require("menu.engine.manifest_menu")
 		local item = shortcuts.build({
 			state      = { shortcuts = true },
@@ -58,9 +58,9 @@ wrap_file:close()
 local function with_wrap_controls(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
-		"core.logger.engine.logger", "core.ui.engine.dialog_util", "modules.shortcuts.actions.text",
-		"menu.ui.builder.utils", "layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils",
+		"shortcuts.ui.menu.shortcuts", "menu.engine.wrap_mutation", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
+		"core.logger.engine.logger", "core.ui.engine.dialog_util", "shortcuts.engine.actions.text",
+		"menu.ui.builder.utils", "layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils",
 		"ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
 	}, function()
 		local renderer = helpers.load_with_stubs("menu.engine.manifest_menu")
@@ -77,9 +77,9 @@ local function with_wrap_controls(options, callback)
 			end,
 			block_alert = function() return true end,
 		}
-		local text = require("modules.shortcuts.actions.text")
+		local text = require("shortcuts.engine.actions.text")
 		if options.empty_catalogue then text.WRAP_GROUPS = {} end
-		local menu = require("ui.menu.menu_shortcuts")
+		local menu = require("shortcuts.ui.menu.shortcuts")
 		local state = {
 			shortcuts = true, chatgpt_url = "https://example.test", wrap_symbol_states = { ["("] = false },
 			custom_wrap_symbols = options.custom or {},
@@ -577,10 +577,10 @@ end)
 --- Runs the real outer Shortcuts renderer with the actual localized shared source.
 local function with_shortcut_presentation(language, scenario)
 	local names = {
-		"ui.menu.menu_shortcuts", "menu.engine.manifest_menu", "menu.ui.builder.utils",
-		"layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
+		"shortcuts.ui.menu.shortcuts", "menu.engine.manifest_menu", "menu.ui.builder.utils",
+		"layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils", "ui.menu.menu_tap_keys",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.renderer", "core.logger.engine.logger",
-		"core.ui.engine.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
+		"core.ui.engine.dialog_util", "core.fs.engine.paths", "shortcuts.engine", "menu.engine.row_dialect",
 	}
 	return helpers.with_fresh_modules(names, function()
 		helpers.load_with_stubs("menu.engine.manifest_menu")
@@ -605,7 +605,7 @@ local function with_shortcut_presentation(language, scenario)
 			end,
 			block_alert = function() return true end,
 		}
-		local menu = require("ui.menu.menu_shortcuts")
+		local menu = require("shortcuts.ui.menu.shortcuts")
 		local active_url = "https://hand.original/"
 		local context = {
 			state = { shortcuts = true, chatgpt_url = "https://hand.original/", wrap_symbol_states = {}, custom_wrap_symbols = {} },

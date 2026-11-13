@@ -835,7 +835,7 @@ _GSWO_AllEntryPointsShareOwnership() {
 	; The physical SC029 entry point is the number_row_left tap key: it runs its
 	; assigned catalogue action through the gesture action table, whose instant
 	; capture is GestureScreenshotInstant, so it cannot spawn a worker of its own.
-	ShortcutSource := _StripFullLineComments(_DriverDirConcatFn.Call("modules/shortcuts"))
+	ShortcutSource := _StripFullLineComments(_DriverDirConcatFn.Call("shortcuts/engine"))
 	TapFireBody := _DriverFuncBody("TapKeyFire")
 	Assert(InStr(ShortcutSource, 'SC029:: TapKeyFire("number_row_left")') > 0
 		&& InStr(TapFireBody, "GestureInvokeAction(") > 0

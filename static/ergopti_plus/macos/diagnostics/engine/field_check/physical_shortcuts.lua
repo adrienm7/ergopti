@@ -11,7 +11,7 @@
 --- action through the hook alone.
 ---
 --- FEATURES & RATIONALE:
---- 1. Counts from the hook itself (adapters/physical_shortcut_hook.lua), never
+--- 1. Counts from the hook itself (shortcuts/adapters/physical_shortcut_hook.lua), never
 ---    from the log: a suppressed key is delivered, unacknowledged or dropped
 ---    by a later fence, exactly once.
 --- 2. A suppressed key that is not delivered fails by name: unacknowledged

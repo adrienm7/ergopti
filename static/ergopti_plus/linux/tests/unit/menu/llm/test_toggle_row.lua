@@ -164,7 +164,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 	--- row of its submenu (category-off rule), slot groups included.
 	local function shortcuts_on()
 		return setmetatable({ is_enabled = function() return true end },
-			{ __index = require("modules.shortcuts.manager") })
+			{ __index = require("shortcuts.engine.manager") })
 	end
 
 	--- Menu inventory stays editable when its native source is unavailable.
@@ -188,7 +188,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 	-- in the wrong submenu.
 	helpers.it("draws every slot group when the catalogue is readable", function()
 		with_unavailable_source(function()
-			local kbd = helpers.load_module("modules.shortcuts.keyboard_shortcuts")
+			local kbd = helpers.load_module("shortcuts.engine.keyboard_shortcuts")
 			kbd._reset()
 			local mb = helpers.load_module("menu.ui.builder.builder")
 			local rows = submenu_of(mb.build({
@@ -210,12 +210,12 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 	helpers.it("draws no empty slot group when the catalogue cannot be read", function()
 		with_unavailable_source(function()
 			local saved_paths = package.loaded["core.fs.engine.paths"]
-			local saved_kbd = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+			local saved_kbd = package.loaded["shortcuts.engine.keyboard_shortcuts"]
 			local real_paths = require("core.fs.engine.paths")
 			local blind = setmetatable({ shared = function() return nil end }, { __index = real_paths })
 			package.loaded["core.fs.engine.paths"] = blind
-			package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-			local ok_kbd, kbd = pcall(require, "modules.shortcuts.keyboard_shortcuts")
+			package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
+			local ok_kbd, kbd = pcall(require, "shortcuts.engine.keyboard_shortcuts")
 			package.loaded["core.fs.engine.paths"] = saved_paths
 			local ok, err = pcall(function()
 				helpers.assert_true(ok_kbd, tostring(kbd))
@@ -243,7 +243,7 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 					end
 				end
 		end)
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = saved_kbd
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = saved_kbd
 		if not ok then error(err, 0) end
 		end)
 	end)
@@ -308,7 +308,7 @@ local function with_slot_frame(locale, mutation, body)
 					edit_current_label = "Controlled native editor label" }
 			end,
 		}
-		package.loaded["ui.action_picker.bridge"] = {
+		package.loaded["shortcuts.ui.action_picker.bridge"] = {
 			open = function(options, confirm)
 				state.opened[#state.opened + 1] = options
 				state.confirm = confirm

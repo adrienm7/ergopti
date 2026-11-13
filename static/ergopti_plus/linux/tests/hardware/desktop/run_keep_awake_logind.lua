@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Keep Awake Against a Real logind
 --- DESCRIPTION:
---- Drives the real modules/keep_awake.lua and the gesture manager's pause and
+--- Drives the real shortcuts/engine/keep_awake.lua and the gesture manager's pause and
 --- stop paths against a real systemd-logind on the system bus: each phase reads
 --- logind's own inhibitor list (`systemd-inhibit --list`), never a stand-in.
 --- Phases: toggle on then off, on then pause, on then quit (stop_programs), and
@@ -47,7 +47,7 @@ local function wait_for(predicate)
 	return met
 end
 
-local KeepAwake = require("modules.keep_awake")
+local KeepAwake = require("shortcuts.engine.keep_awake")
 
 if CHILD then
 	assert(KeepAwake.toggle(), "the child inhibitor must start")

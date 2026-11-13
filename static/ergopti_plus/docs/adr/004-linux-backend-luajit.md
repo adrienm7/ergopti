@@ -80,7 +80,7 @@ utilities) are the canonical implementations for the Linux driver — no rewrite
 
 ## Evidence in the codebase
 
-- Linux adapter implementations (9 adapters): `static/ergopti_plus/linux/adapters/`
+- Linux adapter implementations (9 adapters): `static/ergopti_plus/linux/shortcuts/adapters/`
 - Shared portable Lua modules: `static/ergopti_plus/_shared/core/text/engine/toml_codec/`, `static/ergopti_plus/_shared/ai/engine/`
 - Port contracts: `static/ergopti_plus/_shared/core/ports/KeyboardHook.spec.js`, `TextSender.spec.js`, etc.
 - Linux tests: `static/ergopti_plus/linux/tests/`

@@ -345,9 +345,9 @@ helpers.describe("physical history explicit observed permission policy", functio
 end)
 
 local function with_native_session(callback)
-	local names = { "metrics.engine.capture.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "metrics.engine.capture.physical_capture", "metrics.engine",
-		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "modules.shortcuts.script_control",
+	local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
+		"shortcuts.adapters.physical_observation_clock", "metrics.engine.capture.physical_capture", "metrics.engine",
+		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "shortcuts.engine.script_control",
 		"core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity", "metrics.engine.journal.log_manager" }
 	helpers.with_fresh_modules(names, function()
 		local c, time, subscriber = { calls = {}, stops = 0, releases = 0, refusals = 0 }, 0, nil
@@ -409,7 +409,7 @@ local function with_native_session(callback)
 		local may_persist = function() return true end
 		local spawn, keycode, emit, emit_release = function() end, function() end, function() end, function() end
 		local decode, encode = hs.json.decode, hs.json.encode
-		package.loaded["adapters.physical_history_context"] = { new = function(owner, history)
+		package.loaded["shortcuts.adapters.physical_history_context"] = { new = function(owner, history)
 			c.history, c.projected_owner = history, owner
 			local Accepted = require("metrics.engine.capture.physical_accepted_context")
 			return Accepted.new(owner, { current = function() return true end, revision = history.retained_count,
@@ -417,13 +417,13 @@ local function with_native_session(callback)
 				resolve_interval = function(first, last) return history.resolve_interval(capture_token, clock_token, first, last) end,
 				on_refused = function() history.stop(capture_token) end })
 		end }
-		package.loaded["adapters.physical_observation_clock"] = clock
+		package.loaded["shortcuts.adapters.physical_observation_clock"] = clock
 		package.loaded["metrics.engine.capture.physical_capture"] = capture
 		package.loaded["metrics.engine"] = { bind_physical_configuration_observer = binder("configuration", true),
 			bind_physical_lifecycle_observer = binder("engine"), may_persist = may_persist }
 		package.loaded["metrics.engine.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 		package.loaded["metrics.engine.system.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
-		package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
+		package.loaded["shortcuts.engine.script_control"] = { bind_physical_pause_observer = binder("pause") }
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = spawn }
 		package.loaded["metrics.engine.capture.physical_key_identity"] = { resolve = keycode }
 		package.loaded["metrics.engine.journal.log_manager"] = { log_physical_press = emit, log_physical_release = emit_release }
@@ -548,9 +548,9 @@ helpers.describe("physical history consumption by the actual capture owner", fun
 	helpers.it("retains actual scope in clock-ready before ACK and releases only after actual task settlement", function()
 		local Fixture = require("tests.support.physical_capture_fixture")
 		Fixture.run(function(capture, observed, controls)
-			local names = { "metrics.engine.capture.physical_history_session", "adapters.physical_history_context",
-				"adapters.physical_observation_clock", "metrics.engine", "metrics.engine.context_tracker",
-				"metrics.engine.system.watchers", "modules.shortcuts.script_control", "core.process.adapters.shell_runner",
+			local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
+				"shortcuts.adapters.physical_observation_clock", "metrics.engine", "metrics.engine.context_tracker",
+				"metrics.engine.system.watchers", "shortcuts.engine.script_control", "core.process.adapters.shell_runner",
 				"metrics.engine.capture.physical_key_identity", "metrics.engine.journal.log_manager" }
 			helpers.with_fresh_modules(names, function()
 				local native, sample, ns = hs, nil, 0
@@ -558,7 +558,7 @@ helpers.describe("physical history consumption by the actual capture owner", fun
 				hs = { json = { decode = controls.dependencies.decode, encode = controls.dependencies.encode },
 					timer = { absoluteTime = sample } }
 				local ok, error_reason = pcall(function()
-					local Clock = require("adapters.physical_observation_clock")
+					local Clock = require("shortcuts.adapters.physical_observation_clock")
 					local before_ack, exact_scope
 					local function binder(name, boolean_result)
 						return function(owner, _, receive)
@@ -584,12 +584,12 @@ helpers.describe("physical history consumption by the actual capture owner", fun
 						bind_physical_lifecycle_observer = binder("engine"), may_persist = function() return true end }
 					package.loaded["metrics.engine.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 					package.loaded["metrics.engine.system.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
-					package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
+					package.loaded["shortcuts.engine.script_control"] = { bind_physical_pause_observer = binder("pause") }
 					package.loaded["core.process.adapters.shell_runner"] = { spawn = controls.dependencies.spawn }
 					package.loaded["metrics.engine.capture.physical_key_identity"] = { resolve = controls.dependencies.keycode }
 					package.loaded["metrics.engine.journal.log_manager"] = {
 						log_physical_press = controls.dependencies.emit, log_physical_release = controls.dependencies.emit_release }
-					package.loaded["adapters.physical_history_context"] = { new = function(owner, history, scopes)
+					package.loaded["shortcuts.adapters.physical_history_context"] = { new = function(owner, history, scopes)
 						exact_scope = scopes.capture
 						local token, clock_token = exact_scope.identity(), scopes.clock.identity(owner)
 						before_ack = exact_scope.clock(token)
@@ -1078,7 +1078,7 @@ helpers.describe("physical history native initial snapshot opt-in", function()
 				{ "context", "metrics.engine.context_tracker", "bind_physical_correlated_context_observer" },
 				{ "engine", "metrics.engine", "bind_physical_lifecycle_observer" },
 				{ "system", "metrics.engine.system.watchers", "bind_physical_lifecycle_observer" },
-				{ "pause", "modules.shortcuts.script_control", "bind_physical_pause_observer" },
+				{ "pause", "shortcuts.engine.script_control", "bind_physical_pause_observer" },
 			}) do
 				local original = package.loaded[row[2]][row[3]]
 				package.loaded[row[2]][row[3]] = function(...)
@@ -1207,9 +1207,9 @@ end
 
 
 local function with_native_session(callback)
-	local names = { "metrics.engine.capture.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "metrics.engine.capture.physical_capture", "metrics.engine",
-		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "modules.shortcuts.script_control",
+	local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
+		"shortcuts.adapters.physical_observation_clock", "metrics.engine.capture.physical_capture", "metrics.engine",
+		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "shortcuts.engine.script_control",
 		"core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity", "metrics.engine.journal.log_manager" }
 	helpers.with_fresh_modules(names, function()
 		local c, time, subscriber = { calls = {}, stops = 0, releases = 0, refusals = 0, counts = {}, fifth = {} }, 0, nil
@@ -1273,7 +1273,7 @@ local function with_native_session(callback)
 		local may_persist = function() return true end
 		local spawn, keycode, emit, emit_release = function() end, function() end, function() end, function() end
 		local decode, encode = hs.json.decode, hs.json.encode
-		package.loaded["adapters.physical_history_context"] = { new = function(owner, history)
+		package.loaded["shortcuts.adapters.physical_history_context"] = { new = function(owner, history)
 			c.history, c.projected_owner = history, owner
 			local Accepted = require("metrics.engine.capture.physical_accepted_context")
 			return Accepted.new(owner, { current = function() return true end, revision = history.retained_count,
@@ -1281,13 +1281,13 @@ local function with_native_session(callback)
 				resolve_interval = function(first, last) return history.resolve_interval(capture_token, clock_token, first, last) end,
 				on_refused = function() history.stop(capture_token) end })
 		end }
-		package.loaded["adapters.physical_observation_clock"] = clock
+		package.loaded["shortcuts.adapters.physical_observation_clock"] = clock
 		package.loaded["metrics.engine.capture.physical_capture"] = capture
 		package.loaded["metrics.engine"] = { bind_physical_configuration_observer = binder("configuration", true),
 			bind_physical_lifecycle_observer = binder("engine"), may_persist = may_persist }
 		package.loaded["metrics.engine.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 		package.loaded["metrics.engine.system.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
-		package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
+		package.loaded["shortcuts.engine.script_control"] = { bind_physical_pause_observer = binder("pause") }
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = spawn }
 		package.loaded["metrics.engine.capture.physical_key_identity"] = { resolve = keycode }
 		package.loaded["metrics.engine.journal.log_manager"] = { log_physical_press = emit, log_physical_release = emit_release }
@@ -1459,10 +1459,10 @@ end)
 --- This software fixture proves no Mach clock or installed native authority.
 local function with_managed_session(options, callback)
 	options = options or {}
-	local names = { "metrics.engine.capture.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
+	local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
+		"shortcuts.adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
 		"metrics.engine", "metrics.engine.context_tracker", "metrics.engine.system.watchers",
-		"modules.shortcuts.script_control", "core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity",
+		"shortcuts.engine.script_control", "core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity",
 		"metrics.engine.journal.log_manager", "metrics.engine.capture.physical_protocol", "metrics.engine.capture.physical_transport",
 		"metrics.engine.capture.physical_delivery" }
 	helpers.with_fresh_modules(names, function()
@@ -1545,7 +1545,7 @@ local function with_managed_session(options, callback)
 					return binding ~= nil and binding.scope.current(owner, token) == true
 				end }
 			package.loaded["metrics.engine.system.watchers"] = { bind_physical_lifecycle_observer = actor_source("system") }
-			package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
+			package.loaded["shortcuts.engine.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
 			package.loaded["core.process.adapters.shell_runner"] = { spawn = native.dependencies.spawn }
 			package.loaded["metrics.engine.capture.physical_key_identity"] = { resolve = native.dependencies.keycode }
 			package.loaded["metrics.engine.journal.log_manager"] = { log_physical_press = native.dependencies.emit,
@@ -1559,7 +1559,7 @@ local function with_managed_session(options, callback)
 				end
 				return original_init(ports)
 			end
-			package.loaded["adapters.physical_history_context"] = { new = function(owner, history, scopes)
+			package.loaded["shortcuts.adapters.physical_history_context"] = { new = function(owner, history, scopes)
 				local capture_token, clock_token = scopes.capture.identity(), scopes.clock.identity(owner)
 				local cap_current, clk_current = scopes.capture.current, scopes.clock.current
 				local Accepted = require("metrics.engine.capture.physical_accepted_context")
@@ -1948,9 +1948,9 @@ end
 
 
 local function with_native_session(callback)
-	local names = { "metrics.engine.capture.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "metrics.engine.capture.physical_capture", "metrics.engine",
-		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "modules.shortcuts.script_control",
+	local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
+		"shortcuts.adapters.physical_observation_clock", "metrics.engine.capture.physical_capture", "metrics.engine",
+		"metrics.engine.context_tracker", "metrics.engine.system.watchers", "shortcuts.engine.script_control",
 		"core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity", "metrics.engine.journal.log_manager" }
 	helpers.with_fresh_modules(names, function()
 		local c, time, subscriber = { calls = {}, stops = 0, releases = 0, refusals = 0, counts = {}, fifth = {} }, 0, nil
@@ -2014,7 +2014,7 @@ local function with_native_session(callback)
 		local may_persist = function() return true end
 		local spawn, keycode, emit, emit_release = function() end, function() end, function() end, function() end
 		local decode, encode = hs.json.decode, hs.json.encode
-		package.loaded["adapters.physical_history_context"] = { new = function(owner, history)
+		package.loaded["shortcuts.adapters.physical_history_context"] = { new = function(owner, history)
 			c.history, c.projected_owner = history, owner
 			local Accepted = require("metrics.engine.capture.physical_accepted_context")
 			return Accepted.new(owner, { current = function() return true end, revision = history.retained_count,
@@ -2022,13 +2022,13 @@ local function with_native_session(callback)
 				resolve_interval = function(first, last) return history.resolve_interval(capture_token, clock_token, first, last) end,
 				on_refused = function() history.stop(capture_token) end })
 		end }
-		package.loaded["adapters.physical_observation_clock"] = clock
+		package.loaded["shortcuts.adapters.physical_observation_clock"] = clock
 		package.loaded["metrics.engine.capture.physical_capture"] = capture
 		package.loaded["metrics.engine"] = { bind_physical_configuration_observer = binder("configuration", true),
 			bind_physical_lifecycle_observer = binder("engine"), may_persist = may_persist }
 		package.loaded["metrics.engine.context_tracker"] = { bind_physical_correlated_context_observer = binder("context", true) }
 		package.loaded["metrics.engine.system.watchers"] = { bind_physical_lifecycle_observer = binder("system") }
-		package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = binder("pause") }
+		package.loaded["shortcuts.engine.script_control"] = { bind_physical_pause_observer = binder("pause") }
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = spawn }
 		package.loaded["metrics.engine.capture.physical_key_identity"] = { resolve = keycode }
 		package.loaded["metrics.engine.journal.log_manager"] = { log_physical_press = emit, log_physical_release = emit_release }
@@ -2079,10 +2079,10 @@ local Lifetime = require("metrics.engine.capture.physical_subscription_lifetime"
 --- This software fixture proves no Mach clock or installed native authority.
 local function with_managed_session(options, callback)
 	options = options or {}
-	local names = { "metrics.engine.capture.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
+	local names = { "metrics.engine.capture.physical_history_session", "shortcuts.adapters.physical_history_context",
+		"shortcuts.adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
 		"metrics.engine", "metrics.engine.context_tracker", "metrics.engine.system.watchers",
-		"modules.shortcuts.script_control", "core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity",
+		"shortcuts.engine.script_control", "core.process.adapters.shell_runner", "metrics.engine.capture.physical_key_identity",
 		"metrics.engine.journal.log_manager", "metrics.engine.capture.physical_protocol", "metrics.engine.capture.physical_transport",
 		"metrics.engine.capture.physical_delivery" }
 	helpers.with_fresh_modules(names, function()
@@ -2165,7 +2165,7 @@ local function with_managed_session(options, callback)
 					return binding ~= nil and binding.scope.current(owner, token) == true
 				end }
 			package.loaded["metrics.engine.system.watchers"] = { bind_physical_lifecycle_observer = actor_source("system") }
-			package.loaded["modules.shortcuts.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
+			package.loaded["shortcuts.engine.script_control"] = { bind_physical_pause_observer = actor_source("pause") }
 			package.loaded["core.process.adapters.shell_runner"] = { spawn = native.dependencies.spawn }
 			package.loaded["metrics.engine.capture.physical_key_identity"] = { resolve = native.dependencies.keycode }
 			package.loaded["metrics.engine.journal.log_manager"] = { log_physical_press = native.dependencies.emit,
@@ -2179,7 +2179,7 @@ local function with_managed_session(options, callback)
 				end
 				return original_init(ports)
 			end
-			package.loaded["adapters.physical_history_context"] = { new = function(owner, history, scopes)
+			package.loaded["shortcuts.adapters.physical_history_context"] = { new = function(owner, history, scopes)
 				local capture_token, clock_token = scopes.capture.identity(), scopes.clock.identity(owner)
 				local cap_current, clk_current = scopes.capture.current, scopes.clock.current
 				local Accepted = require("metrics.engine.capture.physical_accepted_context")

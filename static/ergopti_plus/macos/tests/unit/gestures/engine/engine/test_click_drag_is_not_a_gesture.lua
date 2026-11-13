@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local INJECTED = { "gestures.engine.engine", "adapters.mouse_control", "core.timing.engine.timings", "core.logger.engine.logger", "core.events.timer_scheduler" }
+local INJECTED = { "gestures.engine.engine", "shortcuts.adapters.mouse_control", "core.timing.engine.timings", "core.logger.engine.logger", "core.events.timer_scheduler" }
 
 local current_time = 0
 
@@ -52,7 +52,7 @@ local function with_engine(body)
 			return 0.05
 		end,
 	}
-	package.loaded["adapters.mouse_control"] = {
+	package.loaded["shortcuts.adapters.mouse_control"] = {
 		any_button_down = function() return buttons.down end,
 	}
 	local ok, err = xpcall(function()
@@ -186,10 +186,10 @@ end)
 
 helpers.describe("the mouse button read (click-drag-selection)", function()
 	helpers.it("(click-drag-selection) any held button reads as down, none as up", function()
-		local saved = package.loaded["adapters.mouse_control"]
-		package.loaded["adapters.mouse_control"] = nil
+		local saved = package.loaded["shortcuts.adapters.mouse_control"]
+		package.loaded["shortcuts.adapters.mouse_control"] = nil
 		local ok, err = xpcall(function()
-			local MouseControl = helpers.load_with_stubs("adapters.mouse_control")
+			local MouseControl = helpers.load_with_stubs("shortcuts.adapters.mouse_control")
 			_G.hs.eventtap.checkMouseButtons = function() return {} end
 			helpers.assert_eq(MouseControl.any_button_down(), false)
 			_G.hs.eventtap.checkMouseButtons = function() return { left = true, [1] = true } end
@@ -201,7 +201,7 @@ helpers.describe("the mouse button read (click-drag-selection)", function()
 			_G.hs.eventtap.checkMouseButtons = function() return {} end
 			helpers.assert_eq(MouseControl.any_button_down(), false, "a later healthy read restores gestures")
 		end, debug.traceback)
-		package.loaded["adapters.mouse_control"] = saved
+		package.loaded["shortcuts.adapters.mouse_control"] = saved
 		if not ok then error(err, 0) end
 	end)
 end)

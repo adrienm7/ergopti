@@ -304,7 +304,7 @@ local function run_hold(transition, expected, options)
 		local reset = source_callback(reset_body, environment)
 		state.pause_callbacks = {}
 		local controller
-		controller = require("modules.shortcuts.script_actions").new({
+		controller = require("shortcuts.engine.script_actions").new({
 			reset = reset, reload = noop, quit = noop,
 			on_pause_change = function(paused)
 				state.pause_callbacks[#state.pause_callbacks + 1] = tostring(paused)

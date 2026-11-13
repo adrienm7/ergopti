@@ -17,7 +17,7 @@ local function with_program(callback, program_admission)
 		"core.process.adapters.owned_program_runner", "keyboard.adapters.karabiner.lease_helper", "core.crypto.crypto",
 		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "settings.engine.preferences.preferences",
 		"settings.engine.paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.timing.engine.timings",
-		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
+		"shortcuts.engine.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
 	local ok, failure = xpcall(function()
 		local native = require("tests.stubs.hs")
@@ -90,8 +90,8 @@ local function with_program(callback, program_admission)
 	end, debug.traceback)
 	for _, task in ipairs(tasks) do if task.running then task:complete(15) end end
 	if auxiliary then auxiliary.stop_programs("gestures"); auxiliary.stop_programs("shortcut_bindings") end
-	local acquired_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-	if type(acquired_keyboard) == "table" and acquired_keyboard ~= saved["modules.shortcuts.keyboard_shortcuts"] then
+	local acquired_keyboard = package.loaded["shortcuts.engine.keyboard_shortcuts"]
+	if type(acquired_keyboard) == "table" and acquired_keyboard ~= saved["shortcuts.engine.keyboard_shortcuts"] then
 		pcall(acquired_keyboard.stop)
 	end
 	os.remove(path)
@@ -501,7 +501,7 @@ helpers.describe("private run_program real keyboard port", function()
 		with_program(function(actions, _, preferences, native, tasks, path, scalar, _, gesture_port)
 			helpers.assert_eq(actions.set_action_parameter("keyboard__primary_1", "run_program", scalar), true)
 			helpers.assert_eq(preferences.save(path, {}, {}, { gestures = gesture_port }), true)
-			local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+			local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 			helpers.assert_eq(keyboard.set_action("primary_1", "run_program"), true)
 			helpers.assert_eq(keyboard.start(), true)
 			local count, registered = 0, nil
@@ -544,7 +544,7 @@ end)
 local CHOSEN = '{"version":1,"executable":"/usr/bin/shortcuts","arguments":["run","11111111-1111-1111-1111-111111111111"]}'
 
 local function native_query_fixture(native)
-	package.loaded["adapters.apple_shortcuts_native"] = nil
+	package.loaded["shortcuts.adapters.apple_shortcuts_native"] = nil
 	local attributes = { mode = "file", permissions = "rwxr-xr-x", dev = 42, ino = 73,
 		uid = 0, gid = 0, size = 100, modification = 1, change = 1 }
 	local stat, lstat, absolute = native.fs.attributes, native.fs.symlinkAttributes, native.fs.pathToAbsolute
@@ -599,7 +599,7 @@ helpers.describe("private persisted chosen-ID native action chain", function()
 		with_program(function(actions, auxiliary, preferences, native, tasks, path, _, _, gesture_port)
 			native_query_fixture(native)
 			persist_chosen(actions, preferences, path, gesture_port, "keyboard__primary_1")
-			local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+			local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 			helpers.assert_eq(keyboard.set_action("primary_1", "run_program"), true)
 			helpers.assert_eq(keyboard.start(), true)
 			local registered
@@ -668,11 +668,11 @@ helpers.describe("private chosen-ID remaining native consumer assignments", func
 	helpers.it("uses the actual tap-key assignment and decision through the same UUID guard", function()
 		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
 			native_query_fixture(native)
-			package.loaded["modules.shortcuts.tap_keys"] = nil
+			package.loaded["shortcuts.engine.tap_keys"] = nil
 			package.loaded["platform.input.keyboard_geometry"] = nil
 			local geometry = require("platform.input.keyboard_geometry")
 			require("tests.support.keyboard_geometry").initialize(geometry)
-			local tap = require("modules.shortcuts.tap_keys")
+			local tap = require("shortcuts.engine.tap_keys")
 			helpers.assert_eq(tap.set_action("number_row_left", "run_program", function() return true end), true)
 			persist_chosen(actions, preferences, path, gesture_port, "tap_key__number_row_left")
 			helpers.assert_eq(tap.decide(50), nil, "A model-free event cannot claim the ambiguous physical key")
@@ -690,8 +690,8 @@ helpers.describe("private chosen-ID remaining native consumer assignments", func
 	helpers.it("uses the actual script-control assignment through the same UUID guard", function()
 		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
 			native_query_fixture(native)
-			package.loaded["modules.shortcuts.script_control"] = nil
-			local control = require("modules.shortcuts.script_control")
+			package.loaded["shortcuts.engine.script_control"] = nil
+			local control = require("shortcuts.engine.script_control")
 			helpers.assert_eq(control.set_shortcut_action("script_altgr_enter", "run_program"), true)
 			helpers.assert_eq(actions.set_action_parameter("script__script_altgr_enter", "run_program", CHOSEN), true)
 			helpers.assert_eq(preferences.save(path, { script_control_shortcuts = control.get_shortcut_actions() }, {}, { gestures = gesture_port }), true)

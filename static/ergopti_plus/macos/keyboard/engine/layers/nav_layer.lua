@@ -33,7 +33,7 @@
 ---    an absent layers.toml means the keys behave natively.
 --- 6. The wheel stays out of the Karabiner rule, which cannot take wheel input:
 ---    load() turns the wheel bindings into the strokes Hammerspoon posts while
----    the layer is held (wheel_slots, run by modules/shortcuts/actions/system.lua
+---    the layer is held (wheel_slots, run by shortcuts/engine/actions/system.lua
 ---    bind_layer_wheel between the F20 and F19 sentinels).
 --- 7. The layer comes with its key: importing the recommended key whose hold
 ---    enters the layer (the first-run wizard, the Tap-Holds « Restore
@@ -783,7 +783,7 @@ end
 --- @param label string For the logs.
 function M.reconcile_wheel(label)
 	local reconciled, committed = pcall(function()
-		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+		return require("shortcuts.engine.bindings").reconcile_layer_wheel()
 	end)
 	if not reconciled or committed ~= true then
 		Logger.warn(LOG, "%s: the layer's wheel bindings apply with the next Shortcuts start (%s).",

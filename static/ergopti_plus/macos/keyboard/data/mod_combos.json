@@ -2344,7 +2344,7 @@
 		"label": "Option droit + Échap",
 		"group": "Option droit",
 		"menu_hidden": true,
-		"menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
+		"menu_hidden_reason": "Handled by shortcuts/engine/script_control.lua — always active even when the script is paused",
 		"from": {
 			"simultaneous": [
 				{
@@ -2544,7 +2544,7 @@
 		"label": "Option droit + Entrée",
 		"group": "Option droit",
 		"menu_hidden": true,
-		"menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
+		"menu_hidden_reason": "Handled by shortcuts/engine/script_control.lua — always active even when the script is paused",
 		"from": {
 			"simultaneous": [
 				{
@@ -2564,7 +2564,7 @@
 		"label": "Option droit + BackSpace",
 		"group": "Option droit",
 		"menu_hidden": true,
-		"menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
+		"menu_hidden_reason": "Handled by shortcuts/engine/script_control.lua — always active even when the script is paused",
 		"from": {
 			"simultaneous": [
 				{

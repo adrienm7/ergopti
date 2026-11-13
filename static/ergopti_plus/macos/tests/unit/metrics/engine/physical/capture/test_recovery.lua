@@ -85,7 +85,7 @@ do
 local helpers = require("tests.helpers")
 helpers.describe("independent clock retirement hint", function()
  helpers.it("keeps successor acquisition denied through actual getter and terminal hint frames", function()
-  helpers.with_fresh_modules({ "adapters.physical_observation_clock" }, function()
+  helpers.with_fresh_modules({ "shortcuts.adapters.physical_observation_clock" }, function()
    local previous, native = hs, { timer = {} }
    local owner, cap, token, clock = {}, nil, nil, nil
    local hints, during_getter, during_hint, hint_retired, getter_detach = 0, nil, nil, nil, nil
@@ -96,7 +96,7 @@ helpers.describe("independent clock retirement hint", function()
    end
    native.timer.absoluteTime = getter; hs = native
    local ok, error_value = pcall(function()
-    clock = require("adapters.physical_observation_clock")
+    clock = require("shortcuts.adapters.physical_observation_clock")
     cap = assert(clock.bind_history_scope(owner)); token = cap.identity(owner)
     helpers.assert_eq(cap.on_retired(owner, token, function()
      hints = hints + 1; hint_retired = cap.retired(owner, token)

@@ -197,7 +197,7 @@ local function build_world(selection, ui_locale, options)
 		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
 		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
 		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
-		"ai.engine.prediction.selection_translation", "modules.shortcuts.actions.text",
+		"ai.engine.prediction.selection_translation", "shortcuts.engine.actions.text",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -210,7 +210,7 @@ local function build_world(selection, ui_locale, options)
 		getAll = function() return {} end,
 	}
 	require("tests.support.modules.llm.selection_translation_destination").attach(world)
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,

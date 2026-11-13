@@ -53,7 +53,7 @@ function M.participants(ctx)
 		registry.global = require("settings.engine.scope.script_scope").participant()
 	end
 	if ctx.tap_holds then registry.tap_holds = require("infra.tap_hold_scope").participant() end
-	if ctx.shortcuts then registry.shortcuts = require("infra.shortcuts_scope").participant() end
+	if ctx.shortcuts then registry.shortcuts = require("shortcuts.engine.scope").participant() end
 	-- Without a touchpad the gestures are skipped and reported: their
 	-- « recommended » reader could never start, which would refuse every row.
 	if ctx.gestures and type(ctx.gestures.scope_participant) == "function"

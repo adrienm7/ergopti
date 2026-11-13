@@ -20,7 +20,7 @@ require("settings.engine.scope.registry").register("key_combinations_scope", fun
 --- @return table owner Edit, inverse and retained-debt controls.
 function M.new(options)
 	assert(type(options) == "table")
-	local combinations = options.combinations or require("modules.shortcuts.key_combinations")
+	local combinations = options.combinations or require("shortcuts.engine.key_combinations")
 	local parameters = options.parameters or require("gestures.engine.manager")
 	for _,name in ipairs({"acquire_configuration","release_configuration","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","owns_configuration","configuration_domain","validate_slot","configuration_snapshot","configuration_source","configuration_source_matches","capture_edit_source","configuration_candidate","apply_configuration"}) do
 		assert(type(combinations[name]) == "function", "combination configuration owner is incomplete")

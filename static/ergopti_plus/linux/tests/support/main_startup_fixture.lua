@@ -225,7 +225,7 @@ function M.run(options)
 		elseif name == "metrics.engine.system.topology_metrics" then
 			-- Window topology binds its X11 source at startup and closes its capture interval at stop.
 			return { bind_topology_source = noop, daemon_tick = noop, daemon_stop = noop }
-		elseif name == "infra.personal_shortcuts" then
+		elseif name == "shortcuts.engine.personal_shortcuts" then
 			-- The user's personal source runs once, at the end of the services.
 			return { load = function() record("personal_shortcuts"); return true end }
 		elseif name == "gestures.adapters.workspace_switcher" then

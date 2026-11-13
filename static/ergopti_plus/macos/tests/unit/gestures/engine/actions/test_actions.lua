@@ -609,7 +609,7 @@ helpers.describe("gestures.actions: published parameter binding identity", funct
 	helpers.it("leaves the other qualified binding owners unjudged", function()
 		with_actions(function(actions)
 			for _, binding in ipairs({ "keyboard__primary_k", "tap_key__a", "script__reload", "tap_hold__caps_lock", "combination__caps_lock_then_space" }) do
-				local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+				local owner = package.loaded["shortcuts.engine.keyboard_shortcuts"]
 				local published = require("settings.engine.publication.keyboard_publication").current(owner) ~= nil
 				if binding == "keyboard__primary_k" and published then
 					helpers.assert_eq(actions.action_parameter_binding_fits(binding), true, "the actual published Mac Cmd+K is current")

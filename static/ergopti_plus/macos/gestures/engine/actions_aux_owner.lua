@@ -626,7 +626,7 @@ end
 --- @param parent string Stable action consumer identity.
 --- @return boolean started Readonly query accepted; automation remains unavailable.
 function M.revalidate_automation(executable, arguments, admitted, parent)
-	local Native = require("adapters.apple_shortcuts_native")
+	local Native = require("shortcuts.adapters.apple_shortcuts_native")
 	return start_shell(function(payload, terminal)
 		local handle = Native.revalidate_program(payload.executable, payload.arguments, terminal, admitted)
 		if type(handle) ~= "table" then return false, nil end

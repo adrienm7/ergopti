@@ -376,7 +376,7 @@ const PARITY_SLUG = '(action-catalogue-parity)';
 const PARITY_TESTS = [
 	'windows/tests/unit/gestures/engine/test_gestures.ahk',
 	'macos/tests/unit/gestures/engine/actions/test_catalogue_parity.lua',
-	'linux/tests/unit/modules/shortcuts/actions/test_action_catalogue_parity.lua'
+	'linux/tests/unit/shortcuts/actions/test_catalogue_parity.lua'
 ];
 for (const rel of PARITY_TESTS) {
 	const abs = path.join(SP, rel);

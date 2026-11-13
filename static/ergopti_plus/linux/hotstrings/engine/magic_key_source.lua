@@ -150,7 +150,7 @@ function M.choice_reason(value)
 	local resolver = M.resolver()
 	if value == resolver.automatic then return nil end
 	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
-	local TapKeys = require("modules.shortcuts.tap_keys")
+	local TapKeys = require("shortcuts.engine.tap_keys")
 	if Shared.tap_conflict(resolver, value, TapKeys.keys(), "linux", TapKeys.get_action) then
 		return Shared.TAP_CONFLICT_REASON
 	end

@@ -60,7 +60,7 @@ const SLOT_ROLES = path.join(
 const LUA_CHORD = path.join(ROOT, 'static/ergopti_plus/_shared/keyboard/engine/chord/init.lua');
 const HS_SLOTS = path.join(
 	ROOT,
-	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua'
+	'static/ergopti_plus/macos/shortcuts/engine/keyboard_shortcuts.lua'
 );
 
 // The catalogue's Windows vocabulary calls the Windows key "win"; the shared

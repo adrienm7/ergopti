@@ -22,10 +22,10 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["core.ui.engine.dialog_util"] = {}
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 	}
-	package.loaded["modules.shortcuts.actions.text"] = {
+	package.loaded["shortcuts.engine.actions.text"] = {
 		WRAP_GROUPS = {},
 		build_active_wrap_pairs = function() return {} end,
 	}
@@ -42,11 +42,11 @@ local function load_menu_fixture(shortcuts, enabled, options)
 		render_ctx = ctx
 		return {}
 	end)
-	package.loaded["ui.menu.shortcut_utils"] = {}
+	package.loaded["shortcuts.ui.menu.utils"] = {}
 	package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
-	package.loaded["ui.menu.menu_shortcuts"] = nil
-	local MenuShortcuts = require("ui.menu.menu_shortcuts")
+	package.loaded["shortcuts.ui.menu.shortcuts"] = nil
+	local MenuShortcuts = require("shortcuts.ui.menu.shortcuts")
 
 	local state = {
 		shortcuts = enabled,
@@ -362,9 +362,9 @@ end)
 local function with_chord_fixture(mode, body)
 	return helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
 		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.fs.engine.dir", "core.ui.engine.notifications",
-		"ui.menu.menu_shortcuts", "menu.ui.transactions.script_chords_transaction", "settings.ui.menu.preferences_transaction",
-		"menu.ui.transactions.global_actions_transaction", "menu.ui.builder.state", "modules.shortcuts",
-		"modules.shortcuts.actions.text", "menu.ui.builder.utils", "ui.menu.shortcut_utils",
+		"shortcuts.ui.menu.shortcuts", "menu.ui.transactions.script_chords_transaction", "settings.ui.menu.preferences_transaction",
+		"menu.ui.transactions.global_actions_transaction", "menu.ui.builder.state", "shortcuts.engine",
+		"shortcuts.engine.actions.text", "menu.ui.builder.utils", "shortcuts.ui.menu.utils",
 		"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
 		"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
@@ -455,12 +455,12 @@ local function with_chord_fixture(mode, body)
 				owner = Chords.new({ state = state, script_control = facade, admission = global.run_exclusive,
 					paused = function() return paused end, save_prefs = raw_save })
 				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end, decorate_section = function(value) return value end }
-				package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
-				package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
+				package.loaded["shortcuts.engine"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
+				package.loaded["shortcuts.engine.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
 				package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 				package.loaded["core.ui.engine.dialog_util"] = {}
 				package.loaded["menu.ui.builder.utils"] = {}
-				package.loaded["ui.menu.shortcut_utils"] = {}
+				package.loaded["shortcuts.ui.menu.utils"] = {}
 				package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
@@ -477,7 +477,7 @@ local function with_chord_fixture(mode, body)
 						if nested then return nested end
 					end
 				end
-				local menu = require("ui.menu.menu_shortcuts").build(context)
+				local menu = require("shortcuts.ui.menu.shortcuts").build(context)
 				local action = assert(find(menu.submenu), "actual shared script-chord row missing")
 				local function read()
 					local input = assert(io.open(path, "rb")); local data = input:read("*a"); input:close(); return data

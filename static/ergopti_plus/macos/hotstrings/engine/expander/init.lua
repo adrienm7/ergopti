@@ -743,7 +743,7 @@ function M.arm_one_shot_shift()
 end
 
 local function notify_editor_source_changed()
-	local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+	local owner = package.loaded["shortcuts.engine.keyboard_shortcuts"]
 	if type(owner) ~= "table" or type(owner.refresh_magic_editor) ~= "function" then return true end
 	local called, accepted = xpcall(owner.refresh_magic_editor, debug.traceback)
 	if called and accepted == true then return true end

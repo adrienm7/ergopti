@@ -166,9 +166,9 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 
 	helpers.it("refuses while paused, and without an API entry or key for System 2", function()
 		local world = build_world()
-		package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+		package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end }
 		trigger(world, "llm_agent_selection")
-		package.loaded["modules.shortcuts.script_control"] = nil
+		package.loaded["shortcuts.engine.script_control"] = nil
 		helpers.assert_eq(#world.posts, 0)
 		helpers.assert_nil(world.reads, "nothing is read while paused")
 		helpers.assert_eq(world.notices[1], world.i18n.get("llm.manual_prediction.paused"))

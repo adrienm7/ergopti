@@ -26,7 +26,7 @@ local OWNED = {
 	"gestures.engine.system_actions",
 	"gestures.engine.actions_aux_owner",
 	"clipboard.adapters.clipboard",
-	"adapters.mouse_control",
+	"shortcuts.adapters.mouse_control",
 	"core.fs.adapters.file_system",
 	"onboarding.adapters.tcc_grant",
 	"platform.focus.window_info",
@@ -70,7 +70,7 @@ local function with_system(body, options)
 				return true
 			end,
 		}
-		package.loaded["adapters.mouse_control"] = options.mouse_adapter or {
+		package.loaded["shortcuts.adapters.mouse_control"] = options.mouse_adapter or {
 			screen_frame_under_cursor = function() return options.frame end,
 			setPos = function(x, y)
 				record.moved[#record.moved + 1] = { x = x, y = y }
@@ -275,7 +275,7 @@ helpers.describe("macOS system actions start their exact native command", functi
 	helpers.it("center_mouse reports a refused native warp and accepts a real move", function()
 		local position = { x = 110, y = 60 }
 		local refuses = true
-		local mouse = helpers.load_with_stubs("adapters.mouse_control", {
+		local mouse = helpers.load_with_stubs("shortcuts.adapters.mouse_control", {
 			mouse = { absolutePosition = function(point)
 			if point and not refuses then position = { x = point.x, y = point.y } end
 			return { x = position.x, y = position.y }

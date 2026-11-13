@@ -3155,10 +3155,10 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	const sources = {
 		windows: readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk')
+			resolve(REPO_ROOT, 'static/ergopti_plus/windows/shortcuts/ui/menu/shortcuts.ahk')
 		),
 		macos: readSourceFile(
-			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua')
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/shortcuts/ui/menu/shortcuts.lua')
 		)
 	};
 	const helper = readSourceFile(resolve(SHARED, 'menu/engine/wrap_mutation.lua'));
@@ -3306,7 +3306,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	const linuxWrap = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/shortcuts/ui/menu/shortcuts.lua')
 	);
 	assertLinuxWrapProvider(linuxWrap);
 	assert.throws(
@@ -4083,7 +4083,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		},
 		(g) => {
 			g.gesture_slots_3.find((e) => e?.menu === corpus.section).native_sources.hs =
-				'macos/ui/menu/menu_shortcuts.lua';
+				'macos/shortcuts/ui/menu/shortcuts.lua';
 		},
 		(g) => {
 			g.gesture_slots_4.find((e) => e?.menu === corpus.section).platforms = ['linux'];
@@ -7259,8 +7259,8 @@ console.log(
 	);
 	const current = JSON.parse(readSourceFile(MENU_PATH));
 	const files = {
-		ahk: resolve(SHARED, '../windows/ui/menu/menu_shortcuts.ahk'),
-		hs: resolve(SHARED, '../macos/ui/menu/menu_shortcuts.lua'),
+		ahk: resolve(SHARED, '../windows/shortcuts/ui/menu/shortcuts.ahk'),
+		hs: resolve(SHARED, '../macos/shortcuts/ui/menu/shortcuts.lua'),
 		linux: resolve(SHARED, '../linux/menu/ui/builder/builder.lua')
 	};
 	const frames = {
@@ -9919,7 +9919,10 @@ console.log(
 		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua')
 	);
 	assert(!source.includes('build_action_picker'), 'no native action submenu builder remains');
-	assert(source.includes('require("ui.action_picker").open('), 'the slots open the shared picker');
+	assert(
+		source.includes('require("shortcuts.ui.action_picker").open('),
+		'the slots open the shared picker'
+	);
 	console.log('[OK] macOS remap slots: shared action picker, no action submenu declaration.');
 }
 

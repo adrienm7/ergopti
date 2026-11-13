@@ -145,13 +145,13 @@ helpers.describe("prompt prediction request (llm-prompt-prediction)", function()
 
 	helpers.it("keeps the manual refusals: paused outranks an unknown prompt", function()
 		local fixture = load_fixture()
-		package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+		package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end }
 		local ok, err = pcall(function()
 			helpers.assert_eq(fixture.engine.request_prompt_prediction("custom_deleted"), false)
 			helpers.assert_eq(fixture.notices[1],
 				package.loaded["core.i18n.engine.i18n"].get("llm.manual_prediction.paused"))
 		end)
-		package.loaded["modules.shortcuts.script_control"] = nil
+		package.loaded["shortcuts.engine.script_control"] = nil
 		if not ok then error(err, 0) end
 	end)
 

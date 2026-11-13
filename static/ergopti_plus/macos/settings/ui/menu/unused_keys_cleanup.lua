@@ -44,8 +44,8 @@ local ConfigOutdated = require("settings.engine.migration.outdated")
 function M.collect(decoded, mark, shapes)
 	require("settings.engine.overrides").mark_config_reads(decoded, mark)
 	require("settings.engine.preferences.preferences").mark_config_reads(decoded, mark, shapes)
-	require("modules.shortcuts.tap_keys").mark_config_reads(decoded, mark)
-	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
+	require("shortcuts.engine.tap_keys").mark_config_reads(decoded, mark)
+	require("shortcuts.engine.keyboard_shortcuts").mark_config_reads(decoded, mark)
 	require("onboarding.ui").config_values(decoded, mark)
 end
 

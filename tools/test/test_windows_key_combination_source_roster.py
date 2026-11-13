@@ -18,8 +18,8 @@ import sys
 import tempfile
 import types
 
-OLD = "355e56788ba65af8c9870c420f3abf70c78cf79f24195d1b924df949f2725268"
-HELPER = "3e13e82b3129557edfbe04cc7c7f1a7d51a8bfc5dcc4ccbd736dc15463c8fada"
+OLD = "e60b86211189cbad6f671fa750950044470f1a3567d68fbb9bb352af2d119cb9"
+HELPER = "b660751effd5f75309d9d0544e01c33677b8ee6ec5c1e3ebf8ef618cb0f2efbd"
 CHILD = "dc40081e96f631447d71678a7def720b19f34986ba7a57d759e25cdd6df87aec"
 CONTROL = "7adf645a1a2b79b9358d7e793dd12ccb0b113f25d49b50ef991a37079b4a470a"
 W = "static/ergopti_plus/windows/"

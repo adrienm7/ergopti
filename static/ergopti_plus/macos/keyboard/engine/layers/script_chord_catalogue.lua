@@ -11,7 +11,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One reader for the two owners of the chords: the script-control eventtap
----    (modules/shortcuts/script_control.lua) and the Karabiner rules that turn
+---    (shortcuts/engine/script_control.lua) and the Karabiner rules that turn
 ---    each chord into its sentinel (keyboard/engine/layers/script_chord_rules.lua).
 --- 2. Read once and kept: an eventtap callback may only do bounded in-memory
 ---    work, and a malformed catalogue raises at the first read instead of

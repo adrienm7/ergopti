@@ -75,7 +75,7 @@ assert.ok(
 	luaEngine.includes(`M.CASCADE_MAX_ARROWS = ${high}`),
 	'the shared Lua engine upper bound'
 );
-const windows = path.join(REPO_ROOT, 'static/ergopti_plus/windows/infra');
+const windows = path.join(REPO_ROOT, 'static/ergopti_plus/windows/shortcuts/engine');
 const ahkEngine = read(path.join(windows, 'hotstrings/hotstring_engine_main.ahk'));
 assert.ok(ahkEngine.includes(`global HSE_CASCADE_MIN_ARROWS := ${low}`), 'the Windows lower bound');
 assert.ok(

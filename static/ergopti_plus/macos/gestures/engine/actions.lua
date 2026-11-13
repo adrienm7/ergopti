@@ -30,7 +30,7 @@ local TerminationCoordinator = require("core.lifecycle.engine.shutdown.terminati
 local Click         = require("gestures.engine.actions_click")
 local Sticky        = require("gestures.engine.sticky_modifiers")
 local AuxOwner      = require("gestures.engine.actions_aux_owner")
-local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
+local ScreenshotSave = require("shortcuts.engine.actions.screenshot_save")
 local WrapPair      = require("keyboard.engine.wrap_pair")
 local DesktopNavigation = require("keyboard.engine.desktop_navigation")
 local SendInput     = require("platform.input.send_input")
@@ -828,8 +828,8 @@ local function native_switcher_publication(binding)
 	local assignment, assignment_owner, assignment_method, assignment_name
 	if binding:sub(1, 10) == "keyboard__" or binding:sub(1, 9) == "tap_key__" or binding:sub(1, 8) == "script__" then
 		local name = binding:sub(1, 10) == "keyboard__"
-			and "modules.shortcuts.keyboard_shortcuts"
-			or (binding:sub(1, 9) == "tap_key__" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_control")
+			and "shortcuts.engine.keyboard_shortcuts"
+			or (binding:sub(1, 9) == "tap_key__" and "shortcuts.engine.tap_keys" or "shortcuts.engine.script_control")
 		assignment_name = name
 		assignment_owner = rawget(package.loaded, name)
 		assignment_method = assignment_owner and assignment_owner.capture_action_delivery_guard
@@ -1184,7 +1184,7 @@ end
 --- @param method string Public function of modules.shortcuts.actions.text.
 --- @return function
 local function text_action(method)
-	return owner_action("modules.shortcuts.actions.text", method)
+	return owner_action("shortcuts.engine.actions.text", method)
 end
 
 sg("select_line", text_action("select_line"))
@@ -1208,7 +1208,7 @@ sg("wrap_selection", function(binding)
 			tostring(binding), tostring(value))
 		return false
 	end
-	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	local ok, Text = pcall(require, "shortcuts.engine.actions.text")
 	if not ok or type(Text.wrap_copied_selection) ~= "function" then
 		Logger.error(LOG, "Text action 'wrap_copied_selection' is unavailable: %s.", tostring(Text))
 		return false
@@ -1420,28 +1420,28 @@ for _, agent_action in ipairs(AGENT_ACTIONS) do
 	end)
 end
 sg("teleport_mouse", function()
-	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	local ok, Mouse = pcall(require, "shortcuts.engine.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
 		return Mouse.teleport_mouse(current_action_parent())
 	end
 	return false
 end)
 sg("spotlight_mouse", function()
-	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	local ok, Mouse = pcall(require, "shortcuts.engine.actions.system_mouse")
 	if ok and type(Mouse.spotlight_mouse) == "function" then
 		return Mouse.spotlight_mouse(nil, current_action_parent())
 	end
 	return false
 end)
 sg("toggle_capslock", function()
-	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
+	local ok, Sys = pcall(require, "shortcuts.engine.actions.system")
 	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
 end)
 
 --- @param method string Public function of modules.shortcuts.actions.system_mouse.
 --- @return function
 local function mouse_action(method)
-	return owner_action("modules.shortcuts.actions.system_mouse", method)
+	return owner_action("shortcuts.engine.actions.system_mouse", method)
 end
 
 -- Formerly fixed hotkeys only (Ctrl+., Ctrl+P): no gesture or slot could bind them.
@@ -1452,34 +1452,34 @@ sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
 -- ones, and joined to this module's lifecycle in scoped_action_children().
 -- The frontmost window saved to the screenshots folder, under the dispatching
 -- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
-sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
+sg("screen_capture_instant", owner_action("shortcuts.engine.actions.system", "capture_frontmost_window"))
 -- Formerly the fixed Ctrl+G hotkey (schema v20 made it the secondary_g slot).
 -- The URL is read from its owner at each run, so a changed
 -- shortcuts.chatgpt_url applies at once to every binding.
 sg("open_chatgpt", function()
-	local ok_bindings, Bindings = pcall(require, "modules.shortcuts.bindings")
+	local ok_bindings, Bindings = pcall(require, "shortcuts.engine.bindings")
 	if not ok_bindings or type(Bindings) ~= "table" or type(Bindings.get_chatgpt_url) ~= "function" then
 		Logger.error(LOG, "open_chatgpt: the ChatGPT URL owner is unavailable: %s.", tostring(Bindings))
 		return false
 	end
-	local ok_apps, Apps = pcall(require, "modules.shortcuts.actions.apps")
+	local ok_apps, Apps = pcall(require, "shortcuts.engine.actions.apps")
 	if not ok_apps or type(Apps) ~= "table" or type(Apps.open_chatgpt) ~= "function" then
 		Logger.error(LOG, "open_chatgpt: the application owner is unavailable: %s.", tostring(Apps))
 		return false
 	end
 	return Apps.open_chatgpt(Bindings.get_chatgpt_url(), current_action_parent())
 end)
-sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downloads"))
-sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
-sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))
-sg("copy_selected_path", owner_action("modules.shortcuts.actions.apps", "copy_or_open_path"))
-sg("pick_color", owner_action("modules.shortcuts.actions.system_pixel", "copy_pixel_color"))
+sg("open_downloads", owner_action("shortcuts.engine.actions.apps", "open_downloads"))
+sg("open_file_manager", owner_action("shortcuts.engine.actions.apps", "open_finder"))
+sg("open_system_settings", owner_action("shortcuts.engine.actions.apps", "open_settings"))
+sg("copy_selected_path", owner_action("shortcuts.engine.actions.apps", "copy_or_open_path"))
+sg("pick_color", owner_action("shortcuts.engine.actions.system_pixel", "copy_pixel_color"))
 -- Keep-awake is one session for the machine, whoever starts it: the shortcut
 -- layer owns it (its Bindings lifecycle pauses and resumes it) and it stops by
 -- itself at the first physical input, so a gesture leaves nothing that outlives
 -- the user's next action.
 sg("activity_simulation", function()
-	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
+	local ok, Sys = pcall(require, "shortcuts.engine.actions.system")
 	if not ok or type(Sys.toggle_awake) ~= "function" then
 		Logger.error(LOG, "Keep-awake is unavailable: %s.", tostring(Sys))
 		return false
@@ -1488,7 +1488,7 @@ sg("activity_simulation", function()
 end)
 
 sg("lock_screen", function()
-	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	local ok, Mouse = pcall(require, "shortcuts.engine.actions.system_mouse")
 	if ok and type(Mouse.lock_screen) == "function" then
 		return Mouse.lock_screen(current_action_parent())
 	end
@@ -2129,10 +2129,10 @@ end)
 --- Builds the exact lifecycle inventory shared by both action parents.
 --- @return table|nil children
 local function scoped_action_children()
-	local text_ok, Text = pcall(require, "modules.shortcuts.actions.text")
-	local mouse_ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
-	local apps_ok, Apps = pcall(require, "modules.shortcuts.actions.apps")
-	local pixel_ok, Pixel = pcall(require, "modules.shortcuts.actions.system_pixel")
+	local text_ok, Text = pcall(require, "shortcuts.engine.actions.text")
+	local mouse_ok, Mouse = pcall(require, "shortcuts.engine.actions.system_mouse")
+	local apps_ok, Apps = pcall(require, "shortcuts.engine.actions.apps")
+	local pixel_ok, Pixel = pcall(require, "shortcuts.engine.actions.system_pixel")
 	if not text_ok or type(Text) ~= "table"
 		or not mouse_ok or type(Mouse) ~= "table"
 		or not apps_ok or type(Apps) ~= "table"
@@ -2312,7 +2312,7 @@ end
 
 -- Script management
 sg("script_pause_toggle",     function()
-	local ok, sc = pcall(require, "modules.shortcuts.script_control")
+	local ok, sc = pcall(require, "shortcuts.engine.script_control")
 	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
 end)
 sg("script_reload",                       function() pcall(hs.reload) end)
@@ -2462,12 +2462,12 @@ end
 --- @return boolean|nil fits
 function M.action_parameter_binding_fits(binding)
 	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
-		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
+		local catalogue = KeyboardPublication.current(rawget(package.loaded, "shortcuts.engine.keyboard_shortcuts"))
 		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD
 	end
 	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
-		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
-		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
+		local taps = rawget(package.loaded, "shortcuts.engine.tap_keys")
+		local catalogue = BindingPublication.current("tap", "shortcuts.engine.tap_keys", taps)
 		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
 	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
@@ -2488,7 +2488,7 @@ end
 --- _shared/keyboard/data/wrap_symbols/wrap_symbols.json.
 --- @return table Array of { left, right }.
 local function wrap_pair_list()
-	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	local ok, Text = pcall(require, "shortcuts.engine.actions.text")
 	if not ok or type(Text) ~= "table" or type(Text.wrap_pair_list) ~= "function" then
 		Logger.error(LOG, "The wrap-pair catalogue is unavailable: %s.", tostring(Text))
 		return {}
@@ -2776,11 +2776,11 @@ function M.run_program(binding)
 			end
 			if binding:match("^script__") then
 				local id = binding:sub(9)
-				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], ConfigKeys.LEAF.SCRIPT_CONTROL, id
+				return require("shortcuts.engine.script_control").get_shortcut_actions()[id], ConfigKeys.LEAF.SCRIPT_CONTROL, id
 			end
 			local descriptors = {
-				{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
-				{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
+				{ "keyboard__", "shortcuts.engine.keyboard_shortcuts", "keyboard" },
+				{ "tap_key__", "shortcuts.engine.tap_keys", "tap_keys" },
 			}
 			for _, descriptor in ipairs(descriptors) do
 				if binding:sub(1, #descriptor[1]) == descriptor[1] then
@@ -2821,7 +2821,7 @@ function M.run_program(binding)
 		end)
 		if type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$") then return false end
 		_program_parameters_owned = true
-		local NativeAutomation = require("adapters.apple_shortcuts_native")
+		local NativeAutomation = require("shortcuts.adapters.apple_shortcuts_native")
 		if NativeAutomation.is_chosen_program(parsed.executable, parsed.arguments) then
 			AuxOwner.revalidate_automation(parsed.executable, parsed.arguments, admitted, parent)
 			-- Query acceptance is not automation invocation. A persisted chosen ID

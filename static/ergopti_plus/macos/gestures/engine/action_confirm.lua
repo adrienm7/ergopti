@@ -29,7 +29,7 @@ local M = {}
 local Logger = require("core.logger.engine.logger")
 local i18n = require("core.i18n.engine.i18n")
 local Dialog = require("core.ui.engine.dialog_util")
-local MouseControl = require("adapters.mouse_control")
+local MouseControl = require("shortcuts.adapters.mouse_control")
 local WindowInfo = require("platform.focus.window_info")
 local WindowManager = require("platform.focus.window_manager")
 

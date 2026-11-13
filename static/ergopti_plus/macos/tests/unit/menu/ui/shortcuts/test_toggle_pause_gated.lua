@@ -42,10 +42,10 @@ local function build_paused()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["core.ui.engine.dialog_util"] = {}
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 	}
-	package.loaded["modules.shortcuts.actions.text"] = {
+	package.loaded["shortcuts.engine.actions.text"] = {
 		WRAP_GROUPS = {},
 		build_active_wrap_pairs = function() return {} end,
 	}
@@ -59,11 +59,11 @@ local function build_paused()
 		render_ctx = ctx
 		return {}
 	end)
-	package.loaded["ui.menu.shortcut_utils"] = {}
+	package.loaded["shortcuts.ui.menu.utils"] = {}
 	package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
-	package.loaded["ui.menu.menu_shortcuts"] = nil
-	local MenuShortcuts = require("ui.menu.menu_shortcuts")
+	package.loaded["shortcuts.ui.menu.shortcuts"] = nil
+	local MenuShortcuts = require("shortcuts.ui.menu.shortcuts")
 	local state = {
 		shortcuts = true,
 		chatgpt_url = "https://example.test",

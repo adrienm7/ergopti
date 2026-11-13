@@ -114,7 +114,7 @@ helpers.describe("magic key source: the keyboard hook decision", function()
 	helpers.it("(magic-key-source) the magic key typed over a selection ends wrap-on-type's window", function()
 		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
 			local primary, wrapped = "", {}
-			local wrap = helpers.load_module("modules.shortcuts.wrap_on_type").new({
+			local wrap = helpers.load_module("shortcuts.engine.wrap_on_type").new({
 				is_active = function() return true end,
 				get_pair = function(char) return char == "(" and { left = "(", right = ")" } or nil end,
 				read_primary = function() return true, primary end,
@@ -669,11 +669,11 @@ helpers.describe("magic key source: tap assignment admission", function()
 	helpers.it("(magic-key-source) configured claims refuse choice and capture without changing any bytes", function()
 		with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n[shortcuts.tap_keys]\nnumber_row_left = "send_text" # owned choice\n[action_parameters]\nfuture = "preserved"\n', function(Source, Preferences, path)
 			local Paths = require("settings.engine.paths")
-			local get_path, saved = Paths.config, package.loaded["modules.shortcuts.tap_keys"]
+			local get_path, saved = Paths.config, package.loaded["shortcuts.engine.tap_keys"]
 			local called, detail = pcall(function()
 				Paths.config = function(name) if name == "config.toml" then return path end return get_path(name) end
-				package.loaded["modules.shortcuts.tap_keys"] = nil
-				local Tap = require("modules.shortcuts.tap_keys")
+				package.loaded["shortcuts.engine.tap_keys"] = nil
+				local Tap = require("shortcuts.engine.tap_keys")
 				helpers.assert_eq(Tap.get_action("number_row_left"), "send_text")
 				local file = assert(io.open(path, "rb")); local before = file:read("*a"); file:close()
 				local state = { active = false, replace = false, typed_ok = true }
@@ -697,7 +697,7 @@ helpers.describe("magic key source: tap assignment admission", function()
 				helpers.assert_true(Source.set("Backquote"), "none explicitly gives the key back")
 			end)
 			Paths.config = get_path
-			package.loaded["modules.shortcuts.tap_keys"] = saved
+			package.loaded["shortcuts.engine.tap_keys"] = saved
 			if not called then error(detail, 0) end
 		end)
 	end)

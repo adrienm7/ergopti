@@ -25,7 +25,7 @@ local SOURCE = '[shortcuts]\nenabled = true\n'
 
 --- A scope owner narrowed to the Ctrl group, on the fixture's file.
 local function ctrl_group(controls, path, backup)
-	return require("infra.shortcuts_scope").new({ path = path, backup_path = backup .. ".ctrl",
+	return require("shortcuts.engine.scope").new({ path = path, backup_path = backup .. ".ctrl",
 		files = controls.files, is_paused = function() return controls.paused end, only = "keyboard_group:primary_" })
 end
 
@@ -67,7 +67,7 @@ helpers.describe("Linux keyboard group scope", function()
 	helpers.it("refuses a narrowing that names no bindable group", function()
 		with_scope(function(_, _, controls, path, backup)
 			for _, only in ipairs({ "keyboard_group:contextual", "keyboard_group:nope_", "keyboard" }) do
-				local built = pcall(require("infra.shortcuts_scope").new, { path = path, backup_path = backup,
+				local built = pcall(require("shortcuts.engine.scope").new, { path = path, backup_path = backup,
 					files = controls.files, is_paused = function() return false end, only = only })
 				helpers.assert_eq(built, false, only)
 			end
@@ -98,7 +98,7 @@ helpers.describe("Linux keyboard group scope", function()
 				end
 				local i18n = require("core.i18n.engine.i18n")
 				local function groups()
-					local menu = require("menu.ui.builder.builder").build({ shortcuts = require("modules.shortcuts.manager"),
+					local menu = require("menu.ui.builder.builder").build({ shortcuts = require("shortcuts.engine.manager"),
 						paused = false, is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					local found = {}
@@ -111,7 +111,7 @@ helpers.describe("Linux keyboard group scope", function()
 				end
 				-- A modifier group is titled by its template filled with its modifiers.
 				local function heading(key)
-					local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+					local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 					for _, group in ipairs(keyboard.SLOT_GROUPS) do
 						if group.group_key == key then return keyboard.get_group_label(group) end
 					end

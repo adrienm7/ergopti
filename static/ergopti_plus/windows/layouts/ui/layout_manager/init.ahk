@@ -190,7 +190,7 @@ LayoutManager_PageState(LocalDir := unset) {
 	global _LayMgrWeb_RuntimeRefresh
 	Busy := (_LayMgrWeb_RuntimeRefresh is Map) ? _LayMgrWeb_RuntimeRefresh : LayoutCatalogue_Busy()
 	; shortcut_menu_path: the extension file this driver loads as a layout's
-	; shortcut menu (ui/menu/menu_shortcuts.ahk); the page counts it and never
+	; shortcut menu (shortcuts/ui/menu/shortcuts.ahk); the page counts it and never
 	; derives it from the platform.
 	return Map(
 		"platform", LAYOUT_CATALOGUE_PLATFORM,

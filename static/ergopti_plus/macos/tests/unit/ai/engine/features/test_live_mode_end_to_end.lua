@@ -107,7 +107,7 @@ local function build_world()
 		package.loaded[name] = nil
 	end
 	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		is_paused = function() return world.paused end,
 	}
 	package.loaded["metrics.engine"] = {

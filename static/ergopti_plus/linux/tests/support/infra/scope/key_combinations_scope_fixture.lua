@@ -37,8 +37,8 @@ local function with_owner(body, managed, public_chords)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = pcall(function()
 		if public_chords~=true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
-		package.loaded["modules.shortcuts.key_combinations"] = nil
-		local PairOwner = require("modules.shortcuts.key_combinations")
+		package.loaded["shortcuts.engine.key_combinations"] = nil
+		local PairOwner = require("shortcuts.engine.key_combinations")
 		package.loaded["gestures.engine.manager"] = nil
 		local gestures = require("gestures.engine.manager")
 		local state = { bytes = { [path] = source }, paused = false, publications = 0, changes = 0 }
@@ -76,10 +76,10 @@ local function with_owner(body, managed, public_chords)
 				state.native,state.on_tap=engine,callback;return true
 			end}
 			for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
-			package.loaded["modules.shortcuts.key_combinations"]=nil
+			package.loaded["shortcuts.engine.key_combinations"]=nil
 			state.manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
-			state.pairs=require("modules.shortcuts.key_combinations")
+			state.pairs=require("shortcuts.engine.key_combinations")
 		else
 		local keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} }
 		if public_chords==true then
@@ -137,7 +137,7 @@ local function with_menu(body, public_chords)
 			keys=require("tap_hold.engine.key_catalog").for_platform(defaults,"linux")
 		end
 		local holds=Holds.build({modifiers={"shift","alt"},layers={"nav"}})
-		local PairOwner=require("modules.shortcuts.key_combinations")
+		local PairOwner=require("shortcuts.engine.key_combinations")
 		s.pairs=PairOwner.new({keys=keys,hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,
 			route=function() return path end,is_paused=function() return s.paused end,actions=s.gestures,changed=function() return true end})
 		helpers.assert_true(PairOwner.set_instance(s.pairs))

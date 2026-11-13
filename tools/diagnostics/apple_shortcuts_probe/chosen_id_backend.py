@@ -42,7 +42,7 @@ class NativeShortcuts:
     def __init__(self, root, ownership=None, native=None):
         self.root = Path(root).resolve()
         self.query_source = (
-            self.root / "static/ergopti_plus/macos/adapters/apple_shortcuts_query.js"
+            self.root / "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_query.js"
         )
         if ownership is None:
             require(sys.platform == "darwin" and sys.version_info >= (3, 13), "native_unavailable")

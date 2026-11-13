@@ -32,7 +32,7 @@ const RETIRED_SOURCES = new Set([
 	RETIRED,
 	'macos/ui/menu/menu_llm/models_selector.lua',
 	'macos/ui/menu/remap_switch.lua',
-	'windows/modules/shortcuts/ctrl.ahk'
+	'windows/shortcuts/engine/ctrl.ahk'
 ]);
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
 const CORPUS = 'tools/test/fixtures/native-menu-census-legacy.json';
@@ -221,7 +221,8 @@ try {
 						'keyboard',
 						'layouts',
 						'metrics',
-						'onboarding'
+						'onboarding',
+						'shortcuts'
 					])
 		);
 		reset();

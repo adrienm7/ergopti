@@ -88,7 +88,7 @@ function macosKeys() {
  * @returns {string[]}
  */
 function windowsKeys() {
-	const source = read('windows/modules/shortcuts/capsword_auto_off.ahk');
+	const source = read('windows/shortcuts/engine/capsword_auto_off.ahk');
 	const match = source.match(/CAPSWORD_FIXED_EXIT_VKS := Map\(([^)]*)\)/);
 	if (!match)
 		throw new Error('CAPSWORD_FIXED_EXIT_VKS is missing from the Windows CapsWord auto-off');
@@ -104,7 +104,7 @@ function linuxKeys() {
 	const table = codes.match(/M\.CONTROL_NAME_OF = \{([\s\S]*?)\n\}/);
 	if (!table) throw new Error('CONTROL_NAME_OF is missing from the Linux evdev codes');
 	const names = [...table[1].matchAll(/= "([a-z0-9_]+)"/g)].map((m) => m[1]);
-	const manager = read('linux/modules/shortcuts/manager.lua');
+	const manager = read('linux/shortcuts/engine/manager.lua');
 	const spelling = manager.match(/CAPS_WORD_HOOK_KEY_NAMES = \{([^}]*)\}/);
 	if (!spelling)
 		throw new Error('CAPS_WORD_HOOK_KEY_NAMES is missing from the Linux shortcuts manager');

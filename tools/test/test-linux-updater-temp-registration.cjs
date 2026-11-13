@@ -48,7 +48,7 @@ const inputs = [
 	'static/ergopti_plus/linux/infra/archive_output.lua',
 	'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 	'static/ergopti_plus/linux/core/network/engine/fd_sha256.lua',
-	'static/ergopti_plus/linux/modules/shortcuts/script_actions.lua',
+	'static/ergopti_plus/linux/shortcuts/engine/script_actions.lua',
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
 	'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
 	'.github/workflows/ci-linux.yml',

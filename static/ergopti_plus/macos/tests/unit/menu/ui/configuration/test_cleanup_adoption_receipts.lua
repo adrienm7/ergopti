@@ -22,13 +22,13 @@ local function with_cleanup(callback)
 	helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "settings.engine.preferences.preferences", "settings.engine.migration.cleanup_session",
 		"settings.engine.migration.unused_keys", "core.logger.engine.logger", "settings.ui.menu.unused_keys_cleanup",
-		"settings.engine.overrides", "onboarding.ui", "modules.shortcuts.tap_keys",
-		"modules.shortcuts.keyboard_shortcuts",
+		"settings.engine.overrides", "onboarding.ui", "shortcuts.engine.tap_keys",
+		"shortcuts.engine.keyboard_shortcuts",
 		"platform.input.hotkey_registrar", "core.fs.adapters.json_codec", "platform.input.keyboard_geometry",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "settings.engine.migration.migrate", "settings.engine.paths",
 		"core.timing.engine.deferred_work", "hotstrings.engine.matcher.choice_catalogue", "menu.engine.manifest_reader",
 		"core.ui.engine.notifications", "settings.engine.preferences.personal_file_adoption", "core.text.engine.toml.writer",
-		"modules.shortcuts.ai_actions", "core.text.engine.toml_codec.reader",
+		"shortcuts.engine.ai_actions", "core.text.engine.toml_codec.reader",
 		"core.text.engine.toml_codec.writer", "hotstrings.engine.catalogue.personal_adoption",
 	}, function()
 		local files, errors, writes = { [PATH] = INITIAL }, {}, {}

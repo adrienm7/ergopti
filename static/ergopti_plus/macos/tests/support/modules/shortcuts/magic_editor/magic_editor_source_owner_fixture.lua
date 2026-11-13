@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "menu.engine.manifest_reader",
 	"core.fs.adapters.file_system", "layouts.adapters.input_source_broker", "layouts.adapters.keyboard_source_probe",
-	"platform.input.hotkey_registrar", "hotstrings.engine.expander.magic_key_source", "modules.shortcuts.magic_editor",
+	"platform.input.hotkey_registrar", "hotstrings.engine.expander.magic_key_source", "shortcuts.engine.magic_editor",
 	"platform.input.keyboard_geometry", "shortcuts.engine.magic_editor_core",
 }
 
@@ -69,7 +69,7 @@ local function with_fixture(callback)
 			return policy.resolve(options)
 		end }, { __index = policy })
 		local registrar = require("platform.input.hotkey_registrar")
-		local subject = require("modules.shortcuts.magic_editor")
+		local subject = require("shortcuts.engine.magic_editor")
 		local spec = {
 			configuration_generation = 1,
 			is_action = function(action)

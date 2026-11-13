@@ -139,8 +139,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 				"positive control must own a real warmup POST before pause")
 
 			install_script_control_dependencies()
-			package.loaded["modules.shortcuts.script_control"] = nil
-			local script_control = require("modules.shortcuts.script_control")
+			package.loaded["shortcuts.engine.script_control"] = nil
+			local script_control = require("shortcuts.engine.script_control")
 			helpers.assert_true(script_control.pause_all())
 			helpers.assert_true(script_control.is_paused())
 			helpers.assert_true(script_control.resume_all())
@@ -178,8 +178,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 						return native_result(mode, "later resume owner exploded", true)
 					end,
 				})
-				package.loaded["modules.shortcuts.script_control"] = nil
-				local script_control = require("modules.shortcuts.script_control")
+				package.loaded["shortcuts.engine.script_control"] = nil
+				local script_control = require("shortcuts.engine.script_control")
 				helpers.assert_true(script_control.pause_all())
 				env.state.timer_stop_mode = mode
 				helpers.assert_eq(script_control.resume_all(), false,
@@ -214,8 +214,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 				helpers.assert_eq(#requests_matching(env.state, "/v1/completions"), 1)
 
 				install_script_control_dependencies()
-				package.loaded["modules.shortcuts.script_control"] = nil
-				local script_control = require("modules.shortcuts.script_control")
+				package.loaded["shortcuts.engine.script_control"] = nil
+				local script_control = require("shortcuts.engine.script_control")
 				helpers.assert_true(script_control.pause_all())
 				helpers.assert_true(script_control.resume_all())
 				helpers.assert_eq(script_control.is_paused(), false,
@@ -270,8 +270,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 				install_script_control_dependencies({
 					warmup_controller = real_controller,
 				})
-				package.loaded["modules.shortcuts.script_control"] = nil
-				local script_control = require("modules.shortcuts.script_control")
+				package.loaded["shortcuts.engine.script_control"] = nil
+				local script_control = require("shortcuts.engine.script_control")
 				helpers.assert_true(script_control.pause_all())
 				local timer_count = #env.state.timers
 				helpers.assert_true(script_control.resume_all())
@@ -328,8 +328,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 
 				local real_controller = init_idle_real_warmup_controller(env)
 				install_script_control_dependencies({ warmup_controller = real_controller })
-				package.loaded["modules.shortcuts.script_control"] = nil
-				local script_control = require("modules.shortcuts.script_control")
+				package.loaded["shortcuts.engine.script_control"] = nil
+				local script_control = require("shortcuts.engine.script_control")
 				helpers.assert_true(script_control.pause_all())
 				local timer_count = #env.state.timers
 				helpers.assert_true(script_control.resume_all())
@@ -383,8 +383,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 
 				local real_controller = init_idle_real_warmup_controller(env)
 				install_script_control_dependencies({ warmup_controller = real_controller })
-				package.loaded["modules.shortcuts.script_control"] = nil
-				local script_control = require("modules.shortcuts.script_control")
+				package.loaded["shortcuts.engine.script_control"] = nil
+				local script_control = require("shortcuts.engine.script_control")
 				helpers.assert_true(script_control.pause_all())
 				local timer_count = #env.state.timers
 				helpers.assert_true(script_control.resume_all())
@@ -436,8 +436,8 @@ helpers.describe("HS-012 real MLX warmup HTTP ownership", function()
 
 				local real_controller = init_idle_real_warmup_controller(env)
 				install_script_control_dependencies({ warmup_controller = real_controller })
-				package.loaded["modules.shortcuts.script_control"] = nil
-				local script_control = require("modules.shortcuts.script_control")
+				package.loaded["shortcuts.engine.script_control"] = nil
+				local script_control = require("shortcuts.engine.script_control")
 				helpers.assert_true(script_control.pause_all())
 				local timer_count = #env.state.timers
 				helpers.assert_true(script_control.resume_all())

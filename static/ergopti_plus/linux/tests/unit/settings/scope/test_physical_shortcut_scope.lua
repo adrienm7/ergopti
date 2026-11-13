@@ -30,10 +30,10 @@ local function with_scope(body, source, chord_j_identity)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
-			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "gestures.engine.manager",
-				"infra.shortcuts_scope", "menu.ui.builder.builder", "modules.shortcuts.key_combinations",
-				"platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+			for _, name in ipairs({ "shortcuts.engine.manager", "shortcuts.engine.keyboard_shortcuts", "shortcuts.engine.tap_keys",
+				"shortcuts.engine.chatgpt", "shortcuts.engine.script_chords", "gestures.engine.manager",
+				"shortcuts.engine.scope", "menu.ui.builder.builder", "shortcuts.engine.key_combinations",
+				"platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "shortcuts.engine.physical_collisions",
 				"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }) do
 				package.loaded[name] = nil
 			end
@@ -87,9 +87,9 @@ local function with_scope(body, source, chord_j_identity)
 			gestures.execute_action = function(action, binding)
 				controls.executed[#controls.executed + 1] = action .. "@" .. binding
 			end
-			local manager = require("modules.shortcuts.manager")
+			local manager = require("shortcuts.engine.manager")
 			manager.init({ persist = true, config_path = path })
-			local keyboard, taps = require("modules.shortcuts.keyboard_shortcuts"), require("modules.shortcuts.tap_keys")
+			local keyboard, taps = require("shortcuts.engine.keyboard_shortcuts"), require("shortcuts.engine.tap_keys")
 			-- This fixture exercises the acknowledged software model, not native readiness.
 			controls.native_delivery_available = keyboard.physical_delivery_available
 			controls.delivery_available = true
@@ -98,7 +98,7 @@ local function with_scope(body, source, chord_j_identity)
 			taps.init({ is_active = function() return manager.is_enabled() and not controls.paused end,
 				defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
 			taps.get_action("number_row_left")
-			local url = require("modules.shortcuts.chatgpt")
+			local url = require("shortcuts.engine.chatgpt")
 			local files = {
 				read_with_status = function(target) return Writer.read_classified(target) end,
 				write = function() error("unconditional configuration publication") end,
@@ -127,7 +127,7 @@ local function with_scope(body, source, chord_j_identity)
 				if controls.refuse_restore and state.keyboard__primary_j__open_url then return false end
 				return apply_parameters(token, state)
 			end
-			local chords = require("modules.shortcuts.script_chords")
+			local chords = require("shortcuts.engine.script_chords")
 			chords.init({ is_paused = function() return controls.paused end,
 				defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
 			-- The actual Manager issues the same-source Pair catalogue and disabled
@@ -146,7 +146,7 @@ local function with_scope(body, source, chord_j_identity)
 				action_names = gestures.get_executable_action_names,
 				on_text_injected = function() error("no text during edit admission") end,
 				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
-			local Pair = require("modules.shortcuts.key_combinations")
+			local Pair = require("shortcuts.engine.key_combinations")
 			local pair_owner = tap_manager.configuration_snapshot().combinations
 			assert(Pair.set_instance(pair_owner))
 			controls.source_reads = 0
@@ -173,7 +173,7 @@ local function with_scope(body, source, chord_j_identity)
 			}
 			package.loaded["layouts.adapters.xkb_capture"] = controls.capture
 			local backup = path .. ".shortcuts-test-backup"
-			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = backup,
+			local scope = require("shortcuts.engine.scope").new({ path = path, backup_path = backup,
 				files = files })
 			controls.files = files
 			local owners = { manager = manager, keyboard = keyboard, taps = taps, url = url, gestures = gestures,
@@ -439,7 +439,7 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
  end)
  helpers.it('(physical-editor-ui) same native issuer survives window reopen and canonical edits',function()
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope')
+   local Scope=require('shortcuts.engine.scope')
    local owner=Scope.editor_owner();helpers.assert_true(type(owner)=='table')
    helpers.assert_eq(Scope.editor_owner(),owner,'Reopen retains exact receipt issuer')
    local inventory,receipt=owner.capture_editor_inventory();helpers.assert_true(type(inventory)=='table')
@@ -457,7 +457,7 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
  -- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
  helpers.it('(edd1-paused-writes) an open physical shortcuts editor commits its edit after a pause',function()
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope')
+   local Scope=require('shortcuts.engine.scope')
    local owner=Scope.editor_owner();helpers.assert_true(type(owner)=='table')
    local _,receipt=owner.capture_editor_inventory()
    controls.paused=true
@@ -470,7 +470,7 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
   local scalar='{"version":1,"executable":"/bin/sh","arguments":[]}'
   local initial='[shortcuts]\nenabled=true\n[shortcuts.keyboard]\nphysical_none_KeyJ="run_program"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__run_program=\''..scalar..'\'\n'
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope');local owner=Scope.editor_owner()
+   local Scope=require('shortcuts.engine.scope');local owner=Scope.editor_owner()
    helpers.assert_eq(owners.gestures.run_program('keyboard__physical_none_KeyJ'),true)
    local _,receipt=owner.capture_editor_inventory();helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}},receipt),false)
    helpers.assert_eq(owner.pending(),true);helpers.assert_eq(Scope.editor_owner(),nil);helpers.assert_eq(owner.pending(),true);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),initial)
@@ -479,7 +479,7 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
  end)
  helpers.it('(physical-editor-ui) a route changed during the owner check cannot return a stale owner',function()
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope');local owner=Scope.editor_owner()
+   local Scope=require('shortcuts.engine.scope');local owner=Scope.editor_owner()
    local route,reads=path,0;package.loaded['settings.engine.paths'].config=function()reads=reads+1;local current=route;if reads==1 then route=path..'.foreign' end;return current end
    local result=Scope.editor_owner()
    helpers.assert_eq(reads,2);helpers.assert_eq(result,nil);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),SOURCE)
@@ -617,8 +617,8 @@ helpers.describe("Physical native host and menu capability admission", function(
 			controls.delivery_available=false
 			local native_queries, opened, captures=0,0,0
 			package.loaded["core.ui.ui.webview_manager"]={native_available=function() native_queries=native_queries+1;return true end}
-			package.loaded["ui.physical_shortcuts.bridge"]=nil
-			local host=require("ui.physical_shortcuts.bridge")
+			package.loaded["shortcuts.ui.physical_shortcuts.bridge"]=nil
+			local host=require("shortcuts.ui.physical_shortcuts.bridge")
 			helpers.assert_eq(host.physical_delivery_available(),false)
 			helpers.assert_eq(host.available(scope),false)
 			local menu=require("shortcuts.engine.physical_editor_menu").new({host=function()return host end,

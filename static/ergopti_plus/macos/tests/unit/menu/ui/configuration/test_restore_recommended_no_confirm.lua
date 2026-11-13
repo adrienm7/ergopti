@@ -259,7 +259,7 @@ end
 
 helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS)", function()
 	helpers.it("no restore or clear row asks, and no owner is handed a question port", function()
-		local owners = { "gestures.ui.menu.scope", "ui.menu.shortcuts_scope", "ai.ui.menu.scope",
+		local owners = { "gestures.ui.menu.scope", "shortcuts.ui.menu.scope", "ai.ui.menu.scope",
 			"metrics.ui.menu.scope", "hotstrings.ui.menu.scope", "settings.ui.menu.scoped_preferences",
 			"menu.ui.transactions.global_scope" }
 		local names = { "core.ui.engine.dialog_util", "hotstrings.engine.catalogue.config" }
@@ -280,7 +280,7 @@ helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS
 			for _, name in ipairs(owners) do capture_owner(captured, applied, name) end
 			local ctx = fixture.ctx
 			-- The Shortcuts and AI owners need runtimes this boot does not start.
-			package.loaded["ui.menu.menu_shortcuts"].scope_idle = function() return true end
+			package.loaded["shortcuts.ui.menu.shortcuts"].scope_idle = function() return true end
 			ctx.llm_handler.scope_runtime = {}
 			for _, mode in ipairs({ "recommended", "clear" }) do
 				helpers.assert_eq(ctx.apply_gesture_scope(mode), true)

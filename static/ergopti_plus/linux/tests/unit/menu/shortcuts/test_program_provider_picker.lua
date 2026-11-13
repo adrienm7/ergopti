@@ -147,7 +147,7 @@ local function bridge_fixture(body)
 	isolated(function()
 		local f = { owners = {}, calls = {}, scripts = {}, visible = false, hide_refused = false }
 		package.loaded["apps.engine.program_provider_picker"] = nil
-		package.loaded["ui.action_picker.bridge"] = nil
+		package.loaded["shortcuts.ui.action_picker.bridge"] = nil
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.process.adapters.program_providers"] = { create = function()
@@ -159,7 +159,7 @@ local function bridge_fixture(body)
 			is_visible = function() return f.visible end,
 			eval_js = function(_, script) f.scripts[#f.scripts + 1] = script; return true end,
 		}
-		f.bridge = require("ui.action_picker.bridge")
+		f.bridge = require("shortcuts.ui.action_picker.bridge")
 		function f.open(callback)
 			return f.bridge.open({ items = {} }, callback or function(id, _, parameter)
 				f.calls[#f.calls + 1] = { id, parameter }; return true
@@ -252,7 +252,7 @@ end)
 -- They prove Source receiving behavior in unit execution, not live desktop GTK.
 local function contextual_native_fixture(body)
 	isolated(function()
-		for _, name in ipairs({ "core.ui.ui.webview_manager", "ui.action_picker.bridge", "core.ui.ui.webkit_host",
+		for _, name in ipairs({ "core.ui.ui.webview_manager", "shortcuts.ui.action_picker.bridge", "core.ui.ui.webkit_host",
 			"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.window_titles", "core.ui.engine.webview.presentation",
 			"apps.engine.program_provider_picker" }) do package.loaded[name] = nil end
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
@@ -314,7 +314,7 @@ local function contextual_native_fixture(body)
 			if state.html_hook then state.html_hook() end
 			return "<html>inert boundary fixture</html>"
 		end
-		local picker = require("ui.action_picker.bridge")
+		local picker = require("shortcuts.ui.action_picker.bridge")
 		local titles = require("core.ui.engine.window_titles")
 		function state.open(suffix, id)
 			return picker.open({ presentation_id = id or "tap_hold_action", presentation_suffix = suffix,

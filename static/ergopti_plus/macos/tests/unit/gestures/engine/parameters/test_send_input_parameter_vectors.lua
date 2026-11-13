@@ -30,7 +30,7 @@ end
 
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
-package.loaded["modules.shortcuts.actions.text"] = nil
+package.loaded["shortcuts.engine.actions.text"] = nil
 package.loaded["gestures.engine.engine"] = nil
 package.loaded["gestures.engine.actions"] = nil
 package.loaded["gestures.engine.conflicts"] = nil

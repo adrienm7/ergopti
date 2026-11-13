@@ -95,8 +95,8 @@ const RETIRED_KEYS = [
 
 // Wrapping-symbol restore callbacks must reach their shared declaration.
 const WRAP_RESET_CONSUMERS = [
-	'macos/ui/menu/menu_shortcuts.lua',
-	'windows/ui/menu/menu_shortcuts.ahk'
+	'macos/shortcuts/ui/menu/shortcuts.lua',
+	'windows/shortcuts/ui/menu/shortcuts.ahk'
 ];
 
 const errors = [];

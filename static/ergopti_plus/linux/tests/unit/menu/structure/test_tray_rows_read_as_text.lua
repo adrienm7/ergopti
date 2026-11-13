@@ -134,7 +134,7 @@ helpers.describe("the real Linux tray reads as text", function()
 	-- Should the getter answer false (the safety refusal is kept), the row says
 	-- so instead of « Try reopening it ».
 	helpers.it("a getter answering false makes the editor row name its real cause", function()
-		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+		local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 		local original = keyboard.physical_delivery_available
 		keyboard.physical_delivery_available = function() return false end
 		local ok, err = pcall(function()

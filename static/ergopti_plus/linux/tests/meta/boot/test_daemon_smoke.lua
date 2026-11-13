@@ -181,12 +181,12 @@ local function with_paths_restart(mode, body)
         .. tostring(id == "a") .. "\n[shortcuts.keyboard]\nprimary_j = \""
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
-    for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.manager",
-      "modules.shortcuts.keyboard_shortcuts", "hotstrings.engine.catalogue.config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
+    for _, name in ipairs({ "gestures.engine.manager", "shortcuts.engine.manager",
+      "shortcuts.engine.keyboard_shortcuts", "hotstrings.engine.catalogue.config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
     local gestures = require("gestures.engine.manager")
     gestures.init({ persist = true, enabled = false })
-    local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
-    local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+    local shortcuts = require("shortcuts.engine.manager"); shortcuts.init({ persist = true })
+    local keyboard = require("shortcuts.engine.keyboard_shortcuts")
     helpers.assert_eq(keyboard.get_action("primary_j"), "copy")
     helpers.assert_true(shortcuts.is_enabled())
     local hotstrings = require("hotstrings.engine.catalogue.config")
@@ -197,7 +197,7 @@ local function with_paths_restart(mode, body)
     local prior = { f.bytes("a"), f.bytes("b") }
     local state = { mode = mode, commands = {}, restart_calls = 0, shutdowns = 0, engine = engine,
       args = { "--tray", "--layout", "value with ' spaces" }, resolved = 0 }
-    state.controller = require("modules.shortcuts.script_actions").new({ reset = function() end,
+    state.controller = require("shortcuts.engine.script_actions").new({ reset = function() end,
       reload = function() end, quit = function() end })
     local actual_require = require
     local restart = require("core.lifecycle.engine.reload.daemon_restart")

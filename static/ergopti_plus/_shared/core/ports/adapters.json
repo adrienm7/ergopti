@@ -44,8 +44,8 @@
 			"linux": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua"
 		},
 		"MouseControl": {
-			"windows": "static/ergopti_plus/windows/adapters/mouse_control.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/mouse_control.lua"
+			"windows": "static/ergopti_plus/windows/shortcuts/adapters/mouse_control.ahk",
+			"macos": "static/ergopti_plus/macos/shortcuts/adapters/mouse_control.lua"
 		},
 		"NetworkInfo": {
 			"windows": "static/ergopti_plus/windows/core/network/adapters/info.ahk",

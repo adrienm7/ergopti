@@ -881,7 +881,7 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 			"tests.stubs.hs", "keyboard.engine.runtime.watchers", "hotstrings.engine.expander.control_sentinels",
 			"platform.input.synthetic_input", "layouts.adapters.input_source_broker", "core.logger.engine.logger",
 			"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.input.hotkey_registrar",
-			"platform.input.key_state", "adapters.mouse_control", "core.process.adapters.task_lifecycle",
+			"platform.input.key_state", "shortcuts.adapters.mouse_control", "core.process.adapters.task_lifecycle",
 			"keyboard.adapters.karabiner.ke_paths", "keyboard.adapters.karabiner.lease_contract", "keyboard.adapters.karabiner.ke_variables",
 		}, function()
 			local h = fresh_harness()

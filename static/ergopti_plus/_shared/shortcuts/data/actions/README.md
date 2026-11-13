@@ -79,7 +79,7 @@ replays the corpus against the page.
 `_shared/tests/corpus/action_parameters/user_action_vectors.json`. They run in
 `modules/gestures/user_actions.lua` on macOS and Linux and in
 `modules/gestures/apple_shortcut_action.lua` on macOS. On Windows the first two
-run in `windows/infra/user_actions.ahk`, which owns the Windows path spelling
+run in `windows/shortcuts/engine/user_actions.ahk`, which owns the Windows path spelling
 (`windows_path_vectors` of the same corpus); `run_apple_shortcut` declares `hs`.
 
 - `run_command` runs `/bin/sh -l -c <command>`: a login shell's environment

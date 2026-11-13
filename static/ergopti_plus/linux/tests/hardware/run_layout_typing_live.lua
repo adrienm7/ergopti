@@ -12,7 +12,7 @@
 --- shipped .keylayout files, layouts/adapters/keyboard_layout.lua and
 --- layouts/adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
 --- hotstrings/engine/injector.lua, platform/input/modifier_broker.lua,
---- platform/input/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
+--- platform/input/uinput_writer.lua, shortcuts/engine/accented_shortcuts.lua,
 --- gestures/engine/combo_emitter.lua, and layouts/engine/registry/registry.lua
 --- with the real Python installer for the Bépo user-tree install.
 ---
@@ -267,7 +267,7 @@ local Injector = require("hotstrings.engine.injector")
 local KeyboardLayout = require("layouts.adapters.keyboard_layout")
 local XkbCapture = require("layouts.adapters.xkb_capture")
 local Emulation = require("layouts.engine.registry.emulation")
-local Accented = require("modules.shortcuts.accented_shortcuts")
+local Accented = require("shortcuts.engine.accented_shortcuts")
 local ComboEmitter = require("gestures.engine.combo_emitter")
 local NumberRow = require("layouts.engine.emulation.number_row_preferences")
 local EvdevCodes = require("platform.input.evdev_codes")

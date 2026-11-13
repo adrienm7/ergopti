@@ -40,7 +40,7 @@ local MODULES = {
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.ui.engine.dialog_util",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"apps.engine.picker",
 	"menu.engine.manifest_menu",
 	"settings.engine.preferences.preferences",
@@ -324,7 +324,7 @@ local function with_fixture(options, callback)
 			return "button.ok", prompt_value
 		end,
 	}
-	package.loaded["ui.menu.shortcut_utils"] = {
+	package.loaded["shortcuts.ui.menu.utils"] = {
 		shortcut_to_label = function() return "common.none" end,
 		prompt_shortcut = function() return true end,
 	}

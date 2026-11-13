@@ -171,7 +171,7 @@ end
 helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)", function()
 	local function with_policy_ports(body)
 		helpers.with_stub_scope({ "metrics.engine.privacy.text_cipher", "metrics.engine.privacy.text_migration",
-			"adapters.physical_observation_clock", "metrics.engine.capture.physical_configuration_observation" }, function()
+			"shortcuts.adapters.physical_observation_clock", "metrics.engine.capture.physical_configuration_observation" }, function()
 			local ports = { encrypted = false, available = true, migrating = false, accept_cipher = true }
 			package.loaded["metrics.engine.privacy.text_cipher"] = {
 				is_available = function() return ports.available end,
@@ -181,7 +181,7 @@ helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)"
 				abandon_roi_encryption = function() return true end,
 			}
 			package.loaded["metrics.engine.privacy.text_migration"] = { is_running = function() return ports.migrating end }
-			package.loaded["adapters.physical_observation_clock"] = nil
+			package.loaded["shortcuts.adapters.physical_observation_clock"] = nil
 			package.loaded["metrics.engine.capture.physical_configuration_observation"] = nil
 			body(ports)
 		end)

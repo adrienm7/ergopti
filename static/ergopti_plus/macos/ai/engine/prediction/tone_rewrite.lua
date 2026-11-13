@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The selection is read and replaced through the clipboard pipeline of the
----    wrap_selection and case actions (modules/shortcuts/actions/text.lua), so
+---    wrap_selection and case actions (shortcuts/engine/actions/text.lua), so
 ---    Electron apps, which expose no AXSelectedText, work too.
 --- 2. Every step rewrites the ORIGINAL text: the memory of the last rewrite ties
 ---    the selected rewrite back to what the user wrote, so going back and forth
@@ -105,7 +105,7 @@ local function apply_answer(generation, plan, selection, focus, block, parent, p
 			tostring(focus), tostring(current_focus))
 		return
 	end
-	local Text = dependency("modules.shortcuts.actions.text", "replace_copied_selection")
+	local Text = dependency("shortcuts.engine.actions.text", "replace_copied_selection")
 	if not Text then return end
 	local started = Text.replace_copied_selection(selection, text, parent, function(matched)
 		if not matched then
@@ -184,7 +184,7 @@ function M.step(direction, cycle, parent)
 		return false
 	end
 	local request_revision = engine.current_request_revision()
-	local Text = dependency("modules.shortcuts.actions.text", "read_copied_selection")
+	local Text = dependency("shortcuts.engine.actions.text", "read_copied_selection")
 	if not Text then return false end
 	local previous = _generation
 	_generation = previous + 1

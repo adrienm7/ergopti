@@ -179,7 +179,7 @@ local function load_remap(initially_enabled, options)
 		end,
 	}
 	package.loaded["gestures.engine.engine"] = {}
-	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
+	package.loaded["shortcuts.engine"] = { is_paused = function() return false end }
 	package.loaded["keyboard.engine"] = nil
 
 	local remap = helpers.load_with_stubs("keyboard.engine", {

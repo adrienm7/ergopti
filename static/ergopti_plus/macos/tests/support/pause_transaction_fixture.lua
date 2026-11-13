@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"platform.input.keycodes",
@@ -228,7 +228,7 @@ local function load_context(options)
 		admission_open = function() return ctx.admission_fence == nil end,
 	}
 
-	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
+	local script_control = helpers.load_with_stubs("shortcuts.engine.script_control")
 	local keymap = {
 		pause_processing = record("keymap_pause"),
 		resume_processing = inverse("keymap_resume"),

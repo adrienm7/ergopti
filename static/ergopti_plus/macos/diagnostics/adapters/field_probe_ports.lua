@@ -1001,7 +1001,7 @@ function M.new()
 		end,
 		gesture_frame_counts = function() return require("gestures.engine.frame_evidence").counts() end,
 		capslock_chord_facts = function()
-			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local Shortcuts = require("shortcuts.engine.keyboard_shortcuts")
 			local counts = require("keyboard.engine.keys.capslock_chord_evidence").counts()
 			return {
 				action = Shortcuts.get_action("secondary_capslock"),
@@ -1011,13 +1011,13 @@ function M.new()
 			}
 		end,
 		physical_shortcut_facts = function()
-			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local Shortcuts = require("shortcuts.engine.keyboard_shortcuts")
 			local bound = 0
 			for _, entry in ipairs(Shortcuts.physical_assignments()) do
 				if entry.action ~= nil and entry.action ~= "none" then bound = bound + 1 end
 			end
 			-- The hook module holds the process counts even before its first owner starts
-			local counts = require("adapters.physical_shortcut_hook").counts()
+			local counts = require("shortcuts.adapters.physical_shortcut_hook").counts()
 			return { available = Shortcuts.physical_delivery_available() == true, bound = bound,
 				suppressed = counts.suppressed, delivered = counts.delivered,
 				unacknowledged = counts.unacknowledged, dropped = counts.dropped }

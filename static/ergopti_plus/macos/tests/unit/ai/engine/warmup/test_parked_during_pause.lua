@@ -35,7 +35,7 @@ local helpers = require("tests.helpers")
 -- ================================================================
 
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
@@ -149,7 +149,7 @@ local function exercise_committed_backend_pause()
 		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["metrics.engine"] = { resync_context = function() return true end }
 
-		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
+		local ScriptControl = helpers.load_with_stubs("shortcuts.engine.script_control")
 		local pause_accepted = ScriptControl.pause_all()
 		local calls_before_drain = backend_pause_calls()
 		local pending_before_drain = ScriptControl.is_pause_transition_pending()
@@ -238,7 +238,7 @@ local function load_llm(paused, warmup_mode)
 
 	-- The pause owner is read through package.loaded, so installing a stand-in
 	-- there is exactly how the production lookup sees it.
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		is_paused = function() return paused end,
 	}
 
@@ -249,7 +249,7 @@ end
 local function unload_stubs()
 	for _, name in ipairs({
 		"ai.engine.api.ollama", "ai.engine.api.mlx", "ai.engine.api.remote",
-		"modules.shortcuts.script_control", "ai.engine",
+		"shortcuts.engine.script_control", "ai.engine",
 	}) do
 		package.loaded[name] = nil
 	end

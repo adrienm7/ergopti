@@ -248,7 +248,7 @@ check(
 		new Set(sentinelCodes).size === SLOT_IDS.length,
 	`each script chord must have a sentinel keycode of its own, found [${sentinelCodes}]`
 );
-const macControl = read('macos', 'modules', 'shortcuts', 'script_control.lua');
+const macControl = read('macos', 'shortcuts', 'engine', 'script_control.lua');
 check(
 	/ScriptChords\.runs\(ChordCatalogue\.get\(\), actions\[slot_id\], chords_on, paused\)/.test(
 		macControl
@@ -261,7 +261,7 @@ check(
 		/for _, slot in ipairs\(ordered\(plan\.paused\)\)/.test(macRules),
 	'the Karabiner rules must give a sentinel only to the slots the plan runs, running and paused'
 );
-const linuxChords = read('linux', 'modules', 'shortcuts', 'script_chords.lua');
+const linuxChords = read('linux', 'shortcuts', 'engine', 'script_chords.lua');
 check(
 	/ScriptChords\.runs\(M\.catalogue\(\), _assignments\[slot_id\], _chords_on, paused\)/.test(
 		linuxChords
@@ -337,10 +337,10 @@ for (const [driver, file, builder] of [
 	);
 }
 check(
-	!/dyn_script_control/.test(read('macos', 'ui', 'menu', 'menu_shortcuts.lua')),
+	!/dyn_script_control/.test(read('macos', 'shortcuts', 'ui', 'menu', 'shortcuts.lua')),
 	"macOS's dead script-control provider must be gone"
 );
-const menuShortcuts = read('windows', 'ui', 'menu', 'menu_shortcuts.ahk');
+const menuShortcuts = read('windows', 'shortcuts', 'ui', 'menu', 'shortcuts.ahk');
 check(
 	/"script_control",\s*\(\) => _SC_ScriptControlSubmenu\(\)/.test(menuShortcuts) &&
 		/MenuRenderer_Build\("script_control_group"/.test(menuShortcuts),

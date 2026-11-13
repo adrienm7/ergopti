@@ -123,7 +123,7 @@ local function load_fixture(streaming)
 		MIN_CALL_INTERVAL_SEC = 0,
 		get_retry_policy = function() return 1, 0, 1 end,
 	}
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 
 	local tooltip = {
 		set_navigate_callback = function() end,

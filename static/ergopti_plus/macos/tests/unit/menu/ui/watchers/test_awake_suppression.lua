@@ -57,7 +57,7 @@ local OWNED_MODULES = {
 	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
-	"infra.personal_shortcuts",
+	"shortcuts.engine.personal_shortcuts",
 	"settings.engine.preferences.preferences",
 	"core.lifecycle.engine.reload.guard",
 	"keyboard.engine.layers.script_chord_catalogue",
@@ -78,7 +78,7 @@ local OWNED_MODULES = {
 	"metrics.engine",
 	"metrics.engine.privacy.text_cipher",
 	"ai.engine",
-	"modules.shortcuts",
+	"shortcuts.engine",
 	"modules.updater",
 	"modules.updater.channel",
 	"core.fs.engine.native_path",
@@ -117,7 +117,7 @@ local OWNED_MODULES = {
 	"ai.ui.menu",
 	"metrics.ui.menu.metrics",
 	"settings.ui.menu.paths",
-	"ui.menu.menu_shortcuts",
+	"shortcuts.ui.menu.shortcuts",
 	"menu.ui.builder.state",
 	"ui.menu.menu_tap_holds",
 	"menu.ui.builder.watchers",
@@ -215,7 +215,7 @@ local function with_menu(body)
 						world.reloads = world.reloads + 1
 						return world.reload_accepts
 					end
-					package.loaded["modules.shortcuts"].set_extras = function(extras)
+					package.loaded["shortcuts.engine"].set_extras = function(extras)
 						helpers.assert_nil(world.extras, "the real menu must publish one extras table")
 						world.extras = extras
 						return true

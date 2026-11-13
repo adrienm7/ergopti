@@ -118,7 +118,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			"clipboard.adapters.clipboard",
 			"settings.engine.paths",
 			"core.ui.engine.dialog_util",
-			"modules.shortcuts.actions.apps",
+			"shortcuts.engine.actions.apps",
 		}
 		local saved = {}
 		for _, slot in ipairs(slots) do saved[slot] = package.loaded[slot] end
@@ -144,7 +144,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			}
 			package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
-			local actions = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
+			local actions = helpers.load_with_stubs("shortcuts.engine.actions.apps", {
 				application = {
 					runningApplications = function()
 						return {

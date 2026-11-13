@@ -125,7 +125,7 @@ helpers.describe("context is re-synchronised on resume", function()
 			end,
 			admission_open = function() return admission_fence == nil end,
 		}
-		local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
+		local script_control = helpers.load_with_stubs("shortcuts.engine.script_control")
 		package.loaded["ai.engine.api.mlx"] = {
 			stop_warmup = function() return true end,
 			resume_warmup = function() return true end,
@@ -168,6 +168,6 @@ helpers.describe("context is re-synchronised on resume", function()
 		helpers.assert_eq(admission_fence, nil)
 		helpers.assert_eq(exact_fence.active, false)
 		package.loaded["platform.input.synthetic_input"] = saved_synthetic_input
-		package.loaded["modules.shortcuts.script_control"] = nil
+		package.loaded["shortcuts.engine.script_control"] = nil
 	end)
 end)

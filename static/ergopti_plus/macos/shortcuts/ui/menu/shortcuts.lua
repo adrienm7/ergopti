@@ -1,0 +1,961 @@
+--- shortcuts/ui/menu/shortcuts.lua
+
+--- ==============================================================================
+--- MODULE: Menu Shortcuts
+--- DESCRIPTION:
+--- Builds the shortcuts sub-menu for the Hammerspoon tray menu.
+---
+--- FEATURES & RATIONALE:
+--- 1. Manifest-Driven: Structure (order, separators, groups) is read from
+---    ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.  Dynamic
+---    blocks (ctrl group, cmd group, script control, extensions, edit action)
+---    are supplied as handlers so platform-specific logic stays in Lua.
+--- ==============================================================================
+
+local M = {}
+local Errors = require("diagnostics.engine.adapter_errors")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local hs = hs
+local Logger        = require("core.logger.engine.logger")
+local PhaseStats    = require("metrics.engine.perf.phase_stats")
+local DeferredWork  = require("core.timing.engine.deferred_work")
+local dialog        = require("core.ui.engine.dialog_util")
+local shortcuts_mod = require("shortcuts.engine")
+local text_acts     = require("shortcuts.engine.actions.text")
+local i18n          = require("core.i18n.engine.i18n")
+local LabelValue = require("core.i18n.engine.label_value")
+local MenuUtils     = require("menu.ui.builder.utils")
+local ManifestMenu  = require("menu.engine.manifest_menu")
+local WrapMutation  = require("menu.engine.wrap_mutation")
+local ShortcutUtils = require("shortcuts.ui.menu.utils")
+local KeyboardSlots = require("layouts.ui.menu.keyboard_slots")
+local ActionPicker  = require("shortcuts.ui.action_picker")
+local TapKeysMenu   = require("ui.menu.menu_tap_keys")
+local ManifestReader = require("menu.engine.manifest_reader")
+local TextUtils = require("core.text.engine.utils_core")
+local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
+	and utf8 or require("core.lifecycle.engine.compat.utf8")
+local LOG           = "menu_shortcuts"
+-- The label of each script chord slot: this driver's AltGr is the right
+-- Option key.
+local SCRIPT_CHORD_LABELS = {
+	script_altgr_enter     = "sg_labels.script_ropt_return",
+	script_altgr_backspace = "sg_labels.script_ropt_backspace",
+	script_altgr_delete    = "sg_labels.script_ropt_delete",
+	script_altgr_escape    = "sg_labels.script_ropt_escape",
+}
+local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
+local shortcut_toggle_debt = nil
+local shortcut_row_debt = {}
+
+--- Reports whether previous menu mutations have no retained inverse.
+--- @return boolean idle
+function M.scope_idle()
+	return shortcut_toggle_debt == nil and next(shortcut_row_debt) == nil
+end
+
+
+
+
+
+-- ================================
+-- ================================
+-- ======= 1/ Default State =======
+-- ================================
+-- ================================
+
+M.DEFAULT_STATE = {
+	chatgpt_url          = shortcuts_mod.DEFAULT_STATE.chatgpt_url,
+	shortcuts            = shortcuts_mod.DEFAULT_STATE.shortcuts,
+	-- symbol_states: map from opening symbol → boolean (nil / true = enabled, false = disabled).
+	-- custom_wrap_symbols: array of {left, right} pairs added by the user.
+	wrap_symbol_states   = {},
+	custom_wrap_symbols  = {},
+}
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 2/ Menu Construction =======
+-- ====================================
+-- ====================================
+
+--- Translates a shortcut identifier into a human-readable trigger label.
+--- @param id string The shortcut identifier (e.g. "ctrl_a", "wrap_text_if_selected").
+--- @param state table The current state table (used for trigger_char substitution).
+--- @return string Display label for the trigger key(s).
+local function pretty_key(id, state)
+	-- Any symbol the layout types wraps the selection, AltGr or not: Ergopti puts
+	-- them on AltGr, other layouts elsewhere, so the trigger names no key.
+	if id == require("settings.engine.keys").LEAF.WRAP_TEXT_IF_SELECTED then return i18n.get("menu.shortcuts.selection_symbol") end
+
+	local parts = {}
+	for p in id:gmatch("[^_]+") do table.insert(parts, p) end
+	if #parts == 0 then return id end
+
+	local key = parts[#parts]
+	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR) end
+	if key == "period"   then key = "." end
+	if key == "quote"    then key = "'" end
+	if key == "capslock" then key = "CapsLock" end
+
+	local mods = {}
+	for i = 1, #parts - 1 do
+		local p   = parts[i]
+		local lbl = ({ ctrl = "Ctrl", cmd = "Cmd", alt = "Alt", option = "Alt", shift = "Shift" })[p]
+		table.insert(mods, lbl or (p:sub(1, 1):upper() .. p:sub(2)))
+	end
+	return (#mods > 0 and table.concat(mods, " + ") .. " + " or "") .. key:upper()
+end
+
+--- Returns a candidate only when it is one exact Unicode scalar.
+--- @param value any User-provided symbol candidate.
+--- @return string|nil scalar
+local function exact_unicode_scalar(value)
+	if type(value) ~= "string" or value == "" then return nil end
+	local ok, length = pcall(utf8_lib.len, value)
+	if not ok or length ~= 1 then return nil end
+	return value
+end
+
+--- Reads one shortcut's current preference without trusting the menu snapshot.
+--- `is_enabled` is the preference, not the native binding, so a row toggle
+--- flips what the user chose even while the layer holds no hotkey.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param fallback boolean|nil Descriptor posture for legacy providers.
+--- @return boolean|nil enabled
+local function read_shortcut_posture(shortcuts, id, fallback)
+	if type(shortcuts.is_enabled) ~= "function" then
+		return type(fallback) == "boolean" and fallback or nil
+	end
+	local ok, enabled = xpcall(shortcuts.is_enabled, debug.traceback, id)
+	if ok and type(enabled) == "boolean" then return enabled end
+	Logger.error(LOG, "Shortcut '%s' posture could not be read: %s.",
+		tostring(id), tostring(enabled))
+	return nil
+end
+
+--- Applies one per-shortcut lifecycle edge under the exact-true contract.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param enabled boolean Desired posture.
+--- @param phase string Diagnostic phase.
+--- @return boolean committed
+local function apply_shortcut_row_posture(shortcuts, id, enabled, phase)
+	local lifecycle = enabled and shortcuts.enable or shortcuts.disable
+	if type(lifecycle) ~= "function" then
+		Logger.error(LOG, "Shortcut '%s' %s refused because its lifecycle is unavailable.",
+			tostring(id), tostring(phase))
+		return false
+	end
+	local ok, result = xpcall(lifecycle, debug.traceback, id)
+	if ok and result == true then return true end
+	Logger.error(LOG, "Shortcut '%s' %s did not commit: %s.",
+		tostring(id), tostring(phase), tostring(result))
+	return false
+end
+
+--- Retries an exact rollback debt before allowing a new row mutation.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @return boolean settled
+local function settle_shortcut_row_debt(shortcuts, id)
+	local debt = shortcut_row_debt[id]
+	if not debt then return true end
+	if apply_shortcut_row_posture(shortcuts, id, debt.enabled, "rollback retry") ~= true then
+		return false
+	end
+	if shortcut_row_debt[id] == debt then shortcut_row_debt[id] = nil end
+	return true
+end
+
+--- Restores the previously committed posture after an ambiguous refusal.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param enabled boolean Previously committed posture.
+--- @return boolean restored
+local function rollback_shortcut_row(shortcuts, id, enabled)
+	if apply_shortcut_row_posture(shortcuts, id, enabled, "rollback") == true then
+		return true
+	end
+	shortcut_row_debt[id] = { enabled = enabled }
+	return false
+end
+
+--- Builds a toggle menu item for a named shortcut.
+--- @param s table Shortcut descriptor {id, label, enabled, bound}.
+--- @param shortcuts table The shortcuts module reference.
+--- @param ctx table The menu context.
+--- @return table hs.menubar-compatible item table.
+local function make_shortcut_item(s, shortcuts, ctx)
+	local state  = ctx.state
+	local paused = ctx.paused
+	-- The checkmark is the preference: with the layer off or paused no hotkey is
+	-- bound, and a binding-based mark hid which shortcuts will come back.
+	local is_on  = s.enabled == true
+	local desc   = ctx.applyTriggerChar(TextUtils.trim(s.label or ""))
+	local pk     = pretty_key(s.id, state)
+	-- The wrap row reads as its behaviour alone, « Taper un symbole encadre la
+	-- sélection », as on Windows and Linux: its trigger is any typed symbol, so
+	-- a trigger prefix only repeated it (the maintainer's wording, 2026-09-30).
+	if s.id == require("settings.engine.keys").LEAF.WRAP_TEXT_IF_SELECTED and desc ~= "" then pk, desc = desc, "" end
+	-- Provider data since 2026-08-07: the shared renderer's `group` branch
+	-- materialises `items` the same way a `list` row's provider rows are, so a
+	-- group builder no longer has to assemble the driver's own tree.
+	return {
+		label    = desc ~= "" and LabelValue.compose(i18n.get, pk, desc) or pk,
+		checked  = is_on or nil,
+		disabled = not state.shortcuts or paused or nil,
+		action   = (state.shortcuts and not paused) and (function(id)
+			return function()
+				if settle_shortcut_row_debt(shortcuts, id) ~= true then return false end
+				local previous = read_shortcut_posture(shortcuts, id, s.enabled)
+				if previous == nil then return false end
+				local desired = not previous
+				if apply_shortcut_row_posture(shortcuts, id, desired, "toggle") ~= true then
+					rollback_shortcut_row(shortcuts, id, previous)
+					return false
+				end
+				local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+				if not save_ok or save_result ~= true then
+					rollback_shortcut_row(shortcuts, id, previous)
+					Logger.error(LOG, "Shortcut '%s' preference publication did not commit: %s.",
+						tostring(id), tostring(save_result))
+					return false
+				end
+				ctx.notify_feature(pretty_key(id, state), desired)
+				ctx.updateMenu()
+				return true
+			end
+		end)(s.id) or nil,
+	}
+end
+
+-- Flattened, order-preserving list of unique opening symbols, derived from the
+-- shared catalogue's groups (text_acts.WRAP_GROUPS). Used by the bulk check/
+-- uncheck-all actions; the per-symbol menu rows iterate the groups directly so
+-- the shared grouping and order are mirrored without being hardcoded here.
+local _BUILTIN_SYMBOLS = (function()
+	local seen, out = {}, {}
+	for _, group in ipairs(text_acts.WRAP_GROUPS or {}) do
+		for _, pair in ipairs(group.pairs or {}) do
+			if not seen[pair.left] then
+				seen[pair.left] = true
+				table.insert(out, pair)
+			end
+		end
+	end
+	return out
+end)()
+
+--- Builds the "Symboles encadrant la sélection" submenu and wires the live getter.
+--- @param ctx table Menu context.
+--- @param state table Mutable state table (uses state.wrap_symbol_states, state.custom_wrap_symbols).
+--- @param paused boolean Whether the script is currently paused.
+--- @param shortcuts table The shortcuts module (for set_wrap_pairs_getter).
+--- @return table hs.menubar submenu items list.
+local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+	local sym_states   = type(state.wrap_symbol_states)  == "table" and state.wrap_symbol_states  or {}
+	local custom_syms  = type(state.custom_wrap_symbols) == "table" and state.custom_wrap_symbols or {}
+
+	-- Wire the live getter so the eventtap always reflects current state
+	if type(shortcuts.set_wrap_pairs_getter) == "function" then
+		pcall(shortcuts.set_wrap_pairs_getter, function()
+			local view = WrapMutation.view(state)
+			return text_acts.build_active_wrap_pairs(
+				view.wrap_symbol_states  or {},
+				view.custom_wrap_symbols or {}
+			)
+		end)
+	end
+
+	local function mutate_wrap(mutate)
+		local committed, reason = WrapMutation.commit(state, mutate, ctx.save_prefs)
+		if committed ~= true then
+			if reason ~= Errors.WRAP_MUTATION_CANCELLED then
+				Logger.error(LOG, "Wrap preference mutation did not commit: %s.", reason)
+			end
+			return false
+		end
+		ctx.updateMenu()
+		return true
+	end
+	local getters = { wrap_symbols_ready = function()
+		return not paused and not WrapMutation.pending(state)
+	end }
+	local sub = ManifestMenu.template_rows("wrap_symbols_global_controls", {
+		[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_ENABLE_ALL] = function()
+			return mutate_wrap(function(candidate)
+				for _, pair in ipairs(_BUILTIN_SYMBOLS) do candidate.wrap_symbol_states[pair.left] = true end
+				return true
+			end)
+		end,
+		[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_DISABLE_ALL] = function()
+			return mutate_wrap(function(candidate)
+				for _, pair in ipairs(_BUILTIN_SYMBOLS) do candidate.wrap_symbol_states[pair.left] = false end
+				return true
+			end)
+		end,
+		[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_RESTORE] = function()
+			return mutate_wrap(function(candidate)
+				candidate.wrap_symbol_states, candidate.custom_wrap_symbols = {}, {}
+				return true
+			end)
+		end,
+	}, getters)
+	if not sub then return {} end
+
+	-- Built-in symbols — each shared-catalogue group becomes its own named nested
+	-- sub-submenu so the top-level list stays short. Every group sub-submenu also
+	-- carries its own « check all / uncheck all » so a whole family can be flipped
+	-- at once. Order, grouping and labels all come from the shared catalogue.
+	for _, group in ipairs(text_acts.WRAP_GROUPS or {}) do
+		local group_pairs = group.pairs or {}
+		local group_lefts = {}
+		local group_all_on = true
+		for _, pair in ipairs(group_pairs) do
+			group_lefts[#group_lefts + 1] = pair.left
+			if sym_states[pair.left] == false then group_all_on = false end
+		end
+
+		local group_items = ManifestMenu.template_rows("wrap_symbols_group_controls", {
+			[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_ENABLE_GROUP] = (function(lefts)
+				return function()
+					return mutate_wrap(function(candidate)
+						for _, k in ipairs(lefts) do candidate.wrap_symbol_states[k] = true end
+						return true
+					end)
+				end
+			end)(group_lefts),
+			[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_DISABLE_GROUP] = (function(lefts)
+				return function()
+					return mutate_wrap(function(candidate)
+						for _, k in ipairs(lefts) do candidate.wrap_symbol_states[k] = false end
+						return true
+					end)
+				end
+			end)(group_lefts),
+		}, getters)
+		if not group_items then return {} end
+
+		-- One toggle per opening symbol in the group
+		for _, pair in ipairs(group_pairs) do
+			local enabled = (sym_states[pair.left] ~= false)
+			local lbl = (pair.left == pair.right)
+					and pair.left
+					or  (pair.left .. " … " .. pair.right)
+			group_items[#group_items + 1] = {
+				label    = lbl,
+				checked  = enabled or nil,
+				disabled = paused or nil,
+				action       = not paused and (function(k)
+					return function()
+						return mutate_wrap(function(candidate)
+							candidate.wrap_symbol_states[k] = not (candidate.wrap_symbol_states[k] ~= false)
+							return true
+						end)
+					end
+				end)(pair.left) or nil,
+			}
+		end
+
+		local group_title = (type(group.i18n) == "string" and group.i18n ~= "")
+				and i18n.get(group.i18n)
+				or i18n.get("menu.shortcuts.wrap_symbols_title")
+		-- Check the parent group item when all of its symbols are enabled.
+		-- `items`: the renderer never reads `menu` on a provider row, so the
+		-- group used to open empty.
+		sub[#sub + 1] = {
+			label   = group_title,
+			items   = group_items,
+			checked = group_all_on or nil,
+		}
+	end
+
+	-- Custom symbols — individual entries with a delete submenu
+	if #custom_syms > 0 then
+		local custom_separator = ManifestMenu.template_rows("wrap_symbols_custom_separator", {}, getters)
+		if not custom_separator then return {} end
+		for _, row in ipairs(custom_separator) do sub[#sub + 1] = row end
+		for idx, cs in ipairs(custom_syms) do
+			if type(cs) == "table" and type(cs.left) == "string" and cs.left ~= "" then
+				local right   = (type(cs.right) == "string" and cs.right ~= "") and cs.right or cs.left
+				local cs_lbl  = (cs.left == right) and cs.left or (cs.left .. " … " .. right)
+				cs_lbl = LabelValue.compose(i18n.get, cs_lbl, i18n.get("menu.shortcuts.wrap_symbols_custom_label"))
+				local del_sub = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
+					[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_DELETE_CUSTOM] = (function(i) return function()
+						return mutate_wrap(function(candidate)
+							if i > #candidate.custom_wrap_symbols then return false end
+							table.remove(candidate.custom_wrap_symbols, i)
+							return true
+						end)
+					end end)(idx),
+				}, getters)
+				if not del_sub then return {} end
+				sub[#sub + 1] = { label = cs_lbl, items = del_sub }
+			end
+		end
+	end
+
+	-- Add custom symbol button
+	local add_controls = ManifestMenu.template_rows("wrap_symbols_add_controls", {
+		[require("settings.engine.keys").COMMAND.WRAP_SYMBOLS_ADD_CUSTOM] = function()
+			return mutate_wrap(function(candidate)
+				-- 1. Ask for opening symbol
+				local left_char
+				while true do
+					local ok_p, btn, raw = pcall(dialog.text_prompt,
+						i18n.get("dialog.shortcuts.wrap_symbol_title"),
+						i18n.get("dialog.shortcuts.wrap_symbol_prompt"),
+						"", i18n.get("button.ok"), i18n.get("button.cancel")
+					)
+					if not ok_p or btn ~= i18n.get("button.ok") or type(raw) ~= "string" then return end
+					local scalar = exact_unicode_scalar(raw)
+					if scalar then left_char = scalar; break end
+					dialog.block_alert(
+						i18n.get("dialog.shortcuts.wrap_symbol_title"),
+						i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
+						i18n.get("button.retry")
+					)
+				end
+				-- 2. Ask for closing symbol (optional — empty = symmetric)
+				local right_char
+				while true do
+					local ok_r, btn_r, raw_r = pcall(dialog.text_prompt,
+						i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+						i18n.get("dialog.shortcuts.wrap_symbol_close_prompt"),
+						"", i18n.get("button.ok"), i18n.get("button.cancel")
+					)
+					if not ok_r or btn_r ~= i18n.get("button.ok") then return end
+					if raw_r == "" then right_char = left_char; break end
+					local scalar = exact_unicode_scalar(raw_r)
+					if scalar then right_char = scalar; break end
+					dialog.block_alert(
+						i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+						i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
+						i18n.get("button.retry")
+					)
+				end
+				-- 3. Persist
+				table.insert(candidate.custom_wrap_symbols, { left = left_char, right = right_char })
+				return true
+			end)
+		end,
+	}, getters)
+	if not add_controls then return {} end
+	for _, row in ipairs(add_controls) do sub[#sub + 1] = row end
+
+	return sub
+end
+
+--- Builds the shortcuts sub-menu.
+--- @param ctx table Context.
+--- @return table|nil
+function M.build(ctx)
+	local shortcuts = ctx.shortcuts
+	if not shortcuts then return nil end
+	local receive = ManifestMenu.group_receiver("top_level", "shortcuts")
+	if not receive then return nil end
+
+	local state  = ctx.state
+	local paused = ctx.paused
+
+	--- Applies the requested binding posture and restores the old one on refusal.
+	--- @param enabled boolean Desired binding state.
+	--- @param previous boolean Previously committed binding state.
+	--- @return boolean committed True only after exact runtime commitment.
+	local function apply_shortcut_posture(enabled, label)
+		local lifecycle = enabled and shortcuts.resume_bindings or shortcuts.pause_bindings
+		if type(lifecycle) ~= "function" then
+			Logger.error(LOG, "Shortcuts toggle refused because its lifecycle contract is incomplete.")
+			return false
+		end
+		local apply_ok, result_or_err = xpcall(
+			lifecycle, debug.traceback, SHORTCUT_TOGGLE_CLAIM)
+		if apply_ok and result_or_err == true then return true end
+		Logger.error(LOG, "Shortcuts runtime %s did not commit: %s.",
+			tostring(label), tostring(result_or_err))
+		return false
+	end
+
+	local function commit_shortcuts_runtime(enabled, previous)
+		if apply_shortcut_posture(enabled, "toggle") == true then return true end
+		if apply_shortcut_posture(previous, "rollback") ~= true then
+			shortcut_toggle_debt = { restore_enabled = previous }
+		end
+		return false
+	end
+
+	local function settle_shortcut_toggle_debt()
+		local debt = shortcut_toggle_debt
+		if not debt then return true end
+		if apply_shortcut_posture(debt.restore_enabled, "rollback retry") ~= true then
+			return false
+		end
+		if shortcut_toggle_debt == debt then shortcut_toggle_debt = nil end
+		return true
+	end
+
+	--- The category switch: the shortcuts submenu's first row (the manifest's
+	--- shortcuts_toggle). It used to be the parent row's action, which AppKit
+	--- never sends for an item that opens a submenu, so Shortcuts could not be
+	--- switched on from the menu bar at all.
+	---
+	--- Refused while the script is paused. Pause owns the bindings axis until
+	--- resume: pause_all() snapshots is_bindings_started() and resume_all()
+	--- restores from that snapshot, so a toggle made mid-pause is silently
+	--- discarded at resume — and enabling would bind every hotkey while « tout est
+	--- éteint ».
+	--- @return boolean committed
+	local function toggle_shortcuts()
+		if paused then
+			Logger.warn(LOG, "Shortcuts switch refused: the script is paused.")
+			return false
+		end
+		if settle_shortcut_toggle_debt() ~= true then return false end
+		local previous = state.shortcuts == true
+		local desired = not previous
+		-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
+		-- call shortcuts.start/stop here: stop() also tears down the script-control
+		-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
+		-- Bindings-only proxy that never revives it, so the feature toggle would
+		-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
+		-- the symmetric pair that leave the script-control tap untouched.
+		if commit_shortcuts_runtime(desired, previous) ~= true then return false end
+		state.shortcuts = desired
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			state.shortcuts = previous
+			if apply_shortcut_posture(previous, "preference rollback") ~= true then
+				shortcut_toggle_debt = { restore_enabled = previous }
+			end
+			Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
+				tostring(save_result))
+			return false
+		end
+		ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
+		ctx.updateMenu()
+		return true
+	end
+
+	-- The parent carries the stored preference as its tick and is greyed while
+	-- paused; it has no action, since a row that opens a submenu is never clicked.
+
+
+	-- ==============================================
+	-- ===== 2.1) Shortcut Item Factory Helpers =====
+	-- ==============================================
+
+	-- Build shortcut item buckets by iterating the shortcuts module list once.
+	-- The navigation layer's wheel is no shortcut: it is edited with the layer
+	-- (Tap-Holds › Edit the layer) and never listed here.
+	local wrap_item = nil
+	local ctrl_items = {}
+	local cmd_items  = {}
+
+	if type(shortcuts.list_shortcuts) == "function" then
+		local ok, list = pcall(shortcuts.list_shortcuts)
+		if ok and type(list) == "table" then
+			for _, s in ipairs(list) do
+				if type(s) == "table" and s.id then
+					local mi = make_shortcut_item(s, shortcuts, ctx)
+					if s.id == require("settings.engine.keys").LEAF.WRAP_TEXT_IF_SELECTED then
+						wrap_item = mi
+					elseif s.id:sub(1, 4) == "cmd_" then
+						table.insert(cmd_items, mi)
+					end
+				end
+			end
+		end
+	end
+
+	-- The ChatGPT URL editor heads the Ctrl group: the URL belongs to the
+	-- open_chatgpt action, which the Ctrl+G slot runs by default (schema v20).
+	local chatgpt_action = not paused and function()
+			local ok_p, clicked, url = pcall(dialog.text_prompt,
+				i18n.get("dialog.shortcuts.chatgpt_title"),
+				i18n.get("dialog.shortcuts.chatgpt_prompt"),
+				state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
+			if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
+				if type(ctx.commit_chatgpt_url) ~= "function"
+					or ctx.commit_chatgpt_url(url) ~= true then return false end
+				ctx.updateMenu()
+			end
+		end or nil
+	local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
+		[require("settings.engine.keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
+			if type(chatgpt_action) ~= "function" then return false end
+			return chatgpt_action(...)
+		end,
+	}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
+	if not editor_rows then return nil end
+	if paused then editor_rows[1].action = nil end
+	for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
+
+
+	-- =====================================================
+	-- ===== 2.2) Dynamic Handlers for Manifest Items =====
+	-- =====================================================
+
+	-- Each handler appends its items into the ``items`` list it receives.
+
+	--- « Raccourcis de gestion du script », declared by script_control_group
+	--- as on every driver: the chords' switch, the restore of their preset,
+	--- the clear to the system's behaviour, then one row per slot. The restore
+	--- and the clear apply at once, without a question, through the Shortcuts
+	--- scope owner and its backup. The title is ticked from the switch.
+	--- @return table|nil rows Rendered rows for the group, nil without the module.
+	local function script_control_group()
+		local script_control = ctx.script_control
+		if type(script_control) ~= "table" or type(script_control.script_chord_slots) ~= "function" then
+			Logger.warn(LOG, "Script control absent from the menu context — its submenu is skipped.")
+			return nil
+		end
+		local prefix = script_control.SCRIPT_BINDING_PREFIX
+
+		local function get_label(act, slot_id)
+			if not act then return "-" end
+			if act:match("^#") then return act:sub(2) end
+			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
+				local binding = slot_id and act ~= "none" and type(prefix) == "string"
+					and type(ctx.gestures.get_action_parameter) == "function"
+					and prefix .. slot_id or nil
+				return ParameterLabel.for_binding(ctx.gestures.get_action_label(act), ctx.gestures, binding, act)
+			end
+			return act
+		end
+
+		--- Opens the shared action picker for one slot, as Windows does and as
+		--- this driver's keyboard slots and tap keys do. The slot row used to
+		--- open a submenu holding the whole action catalogue, 840 rows for each
+		--- of the four slots: 3,368 of the Shortcuts submenu's 3,537 rows, about
+		--- 30 ms and 4.5 MB of every tray rebuild and as many NSMenu items in
+		--- every push (2026-11-06 field report, menu_item.shortcuts up to 342 ms).
+		--- @param slot_id string Script chord slot id.
+		--- @param slot_label string Localized slot name, the picker's title.
+		local function choose_script_action(slot_id, slot_label)
+			local gestures = ctx.gestures
+			local items = KeyboardSlots.build_action_items(gestures)
+			local binding = type(prefix) == "string" and prefix .. slot_id or nil
+			local editor = ShortcutUtils.picker_parameter_fields(gestures, items, binding)
+			ActionPicker.open({
+				title   = slot_label,
+				current = state.script_control_shortcuts[slot_id] or "none",
+				items   = items,
+				send_vocabulary   = editor.send_vocabulary,
+				parameter_strings = editor.parameter_strings,
+				prompt_choices    = editor.prompt_choices,
+				default_count     = editor.default_count,
+				vision_choices    = editor.vision_choices,
+				language_choices  = editor.language_choices,
+				edit_current_label = editor.edit_current_label,
+			}, function(a, picked)
+				if type(a) ~= "string" then return end
+				local function assign()
+					if a == "run_program" then ctx.updateMenu(); return true end
+					if type(ctx.commit_script_action) ~= "function"
+						or ctx.commit_script_action(slot_id, a) ~= true then return false end
+					ctx.updateMenu()
+					return true
+				end
+
+				-- open_url / search_web do nothing without their parameter:
+				-- prompting under the PREFIXED binding dispatch reads
+				-- (script__<slot>) keeps the configured key from staying
+				-- silently inert. Deferred so the modal opens after the
+				-- picker has closed; a value its editor collected is stored
+				-- without asking.
+				local spec = gestures and type(gestures.get_action_parameter_spec) == "function"
+					and gestures.get_action_parameter_spec(a) or nil
+				if spec then
+					if type(prefix) ~= "string" then
+						Logger.error(LOG, "The script binding prefix is missing — refusing to "
+							.. "store '%s' under a binding key dispatch will not read.", tostring(a))
+						return false
+					end
+					return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
+						local mutation = {
+							section = require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
+							read = function()
+								if type(script_control.get_shortcut_actions) ~= "function" then return nil end
+								local actions = script_control.get_shortcut_actions()
+								return type(actions) == "table" and (actions[slot_id] or "none") or nil
+							end,
+							read_menu = function() return state.script_control_shortcuts[slot_id] or "none" end,
+							apply = function()
+								if type(script_control.set_shortcut_action) ~= "function"
+									or script_control.set_shortcut_action(slot_id, a) ~= true then return false end
+								state.script_control_shortcuts[slot_id] = a
+								return true
+							end,
+							restore = function(previous)
+								state.script_control_shortcuts[slot_id] = previous
+								return script_control.set_shortcut_action(slot_id, previous) == true
+							end,
+						}
+						local transaction = ctx.commit_program_parameter
+						if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec, picked, mutation, transaction) then
+							ctx.updateMenu()
+						end
+					end, "menu_shortcuts.action_parameter")
+				end
+
+				return assign()
+			end)
+		end
+
+		local providers = {
+			["script_control_shortcuts"] = function()
+				local rows = {}
+				for _, slot in ipairs(script_control.script_chord_slots()) do
+					local current = state.script_control_shortcuts[slot.id] or "none"
+					local slot_label = i18n.get(SCRIPT_CHORD_LABELS[slot.id])
+					rows[#rows + 1] = {
+						label    = string.format("%s → %s", slot_label, get_label(current, slot.id)),
+						disabled = paused or nil,
+						action   = (not paused) and function() choose_script_action(slot.id, slot_label) end or nil,
+					}
+				end
+				return rows
+			end,
+		}
+
+		local chords_on = state.script_control_enabled == true
+		local render_ctx = {}
+		for key, value in pairs(ctx) do render_ctx[key] = value end
+		render_ctx.commands = {
+			[require("settings.engine.keys").COMMAND.SCRIPT_CONTROL_TOGGLE] = function()
+				if type(ctx.commit_script_chords) ~= "function"
+					or ctx.commit_script_chords() ~= true then return false end
+				ctx.updateMenu()
+				return true
+			end,
+			[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()
+				return type(ctx.apply_script_chords_scope) == "function"
+					and ctx.apply_script_chords_scope("recommended") == true
+			end,
+			[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function()
+				return type(ctx.apply_script_chords_scope) == "function"
+					and ctx.apply_script_chords_scope("clear") == true
+			end,
+		}
+		render_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+		render_ctx.state_getters["script_control_enabled"] = function() return chords_on end
+		return ManifestMenu.build("script_control_group", "Shortcuts", nil, nil, render_ctx, providers)
+	end
+
+	-- `list` since 2026-08-07: the separator, the header and one row per
+	-- extension are the renderer's now, and only the submenu each extension
+	-- declares for itself stays this driver's.
+	local function extension_shortcut_rows()
+		local items = {}
+		local ext_menu_items = {}
+		-- The packs this boot discovered — the bundled ones, installed layouts and
+		-- the user's folder — so an extension's shortcuts come from the same roots
+		-- as its hotstrings, named by the shared manifest reader. A context without
+		-- the catalogue is a partial test fixture and lists none.
+		local packs = type(ctx.extension_packs) == "table" and ctx.extension_packs or {}
+		for _, pack in ipairs(packs) do
+			local menu_lua = pack.dir .. "/shortcuts/menu.lua"
+			local ok_ml, aml = pcall(hs.fs.attributes, menu_lua)
+			if ok_ml and type(aml) == "table" and aml.mode == "file" then
+				local collected = {}
+				local sandbox = {
+					add_item = function(it) if type(it) == "table" then table.insert(collected, it) end end,
+					t        = function(k) return i18n.get(k) end,
+					ext_name = pack.name,
+					hs       = hs,
+				}
+				-- Fall through to the real global environment for standard builtins
+				-- (string, math, table, pairs, …) not explicitly listed above.
+				setmetatable(sandbox, { __index = _G })
+				sandbox._G = sandbox
+
+				-- Lua 5.4 receives a chunk environment at compile time; setfenv was
+				-- removed after Lua 5.1 and cannot safely retrofit this sandbox.
+				local ok_load, chunk_or_err = pcall(loadfile, menu_lua, "t", sandbox)
+				if ok_load and type(chunk_or_err) == "function" then
+					local ok_run, run_err = pcall(chunk_or_err)
+					if not ok_run then
+						Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", pack.id, tostring(run_err))
+					end
+				else
+					Logger.warn(LOG, "Could not load '%s': %s.", menu_lua, tostring(chunk_or_err))
+				end
+
+				if #collected > 0 then
+					table.insert(ext_menu_items, { label = pack.name, items = collected })
+				end
+			end
+		end
+
+		if #ext_menu_items > 0 then
+			local boundary_rows = ManifestMenu.template_rows("shortcut_extension_boundary", {}, {}, {})
+			if not boundary_rows then return {} end
+			for _, row in ipairs(boundary_rows) do items[#items + 1] = row end
+			local external_rows = MenuUtils.rows_from_menu(ext_menu_items)
+			if not external_rows then return {} end
+			for _, row in ipairs(external_rows) do items[#items + 1] = row end
+		end
+		return items
+	end
+
+	--- Opens the personal-shortcuts file. The ROW is the manifest's — a `command`
+	--- since 2026-08-08, because a static label and a click is exactly what a
+	--- declaration carries — so this is only the behaviour behind it.
+	local function cmd_edit_shortcuts()
+		local acts = ctx.actions
+		if type(acts) == "table" and type(acts.open_personal_shortcuts) == "function" then
+			pcall(acts.open_personal_shortcuts)
+		end
+	end
+
+	-- The feature toggle (the wrap-text toggle) opens the submenu. It is row
+	-- DATA handed over by the wrap-symbols list provider, which the manifest
+	-- places first, so the renderer draws it like every other row: prepended
+	-- after rendering, the wrap-text toggle reached the tray with no title and
+	-- hs.menubar drew nothing.
+	local top_items = {}
+	if wrap_item then
+		-- The symbols submenu USED to hang off this toggle. It is a manifest row of
+		-- its own now (`list:wrap_symbols_menu`), which is where Windows and Linux
+		-- have always shown it — the same feature was sitting in two different
+		-- places depending on the OS.
+		table.insert(top_items, wrap_item)
+	end
+
+
+	-- =============================================
+	-- ===== 2.3) Manifest-Driven Menu Assembly =====
+	-- =============================================
+
+	local dyn_handlers = {
+	}
+
+	-- « Combinaisons de touches »: the Karabiner chords moved here from the
+	-- Tap-Holds submenu, with their own first-row switch. The remap menu owns
+	-- their rows, as it owns the engine they configure.
+	local group_builders = {
+		["key_combinations"] = function()
+			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
+		end,
+		[require("settings.engine.keys").LEAF.SCRIPT_CONTROL] = script_control_group,
+		-- « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.
+		["caps_word_auto_off"] = function() return require("keyboard.ui.menu_caps_word").build(ctx) end,
+	}
+
+	-- The keyboard slots are a list, not a group: their rows are the user's own
+	-- assignments, so the manifest can name the section but not enumerate it. The
+	-- provider returns row DATA and the renderer draws it.
+	local list_providers = {
+		-- Its rows are the user's own symbol pairs, so no static entry can
+		-- enumerate them — and the manifest called this Windows-only until
+		-- 2026-08-06 while this driver had been building it all along.
+		-- The wrap toggle and its symbols form one group, with no line between
+		-- them (the maintainer's request of 2026-09-30), as the manifest declares
+		-- the same pair for Windows and Linux.
+		["wrap_symbols_menu"] = function()
+			local rows = {}
+			for _, row in ipairs(top_items) do rows[#rows + 1] = row end
+			local frame = ManifestMenu.template_rows("shortcut_wrap_frame", {}, {
+				shortcut_wrap_hs_ready = function() return state.shortcuts and not paused or false end,
+			}, { shortcut_wrap_symbols_hs = function()
+				return build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+			end })
+			if not frame then return nil end
+			-- The native outer row historically retains a truthy pause payload.
+			if state.shortcuts and paused then frame[1].disabled = paused end
+			for _, row in ipairs(frame) do rows[#rows + 1] = row end
+			return rows
+		end,
+		keyboard_slots = function(_ctx)
+			-- The built-in Ctrl and Cmd shortcuts open the group of their own
+			-- modifier: as groups of their own they drew a second "Ctrl" and
+			-- "Cmd" submenu beside the configurable one.
+			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil, {
+				secondary_ = ctrl_items,
+				primary_   = cmd_items,
+			})
+		end,
+		-- The number-row tap keys, named by what each types under the current
+		-- input source. Greyed only by a pause: with the category off they stay
+		-- editable, so a key can be set up before shortcuts are switched on.
+		tap_keys = function(_ctx)
+			return TapKeysMenu.provide_rows(ctx, paused or nil)
+		end,
+		["extensions_shortcuts"] = extension_shortcut_rows,
+	}
+
+	-- The category switch is the manifest's first row, drawn by the renderer from
+	-- this command and the state getter below. A tray parent cannot carry it:
+	-- AppKit never sends the action of an item that opens a submenu.
+	local sc_ctx = {}
+	for key, value in pairs(ctx) do sc_ctx[key] = value end
+	sc_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.SHORTCUTS_TOGGLE] = toggle_shortcuts
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_SHORTCUTS] = cmd_edit_shortcuts
+	sc_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	local physical_editor = require("shortcuts.engine.physical_editor_menu").new({
+		scope = function()
+			if type(ctx.physical_shortcuts_scope) == "function" then return ctx.physical_shortcuts_scope() end
+		end,
+		gestures = ctx.gestures,
+		host = function() return require("shortcuts.ui.physical_shortcuts") end,
+		refused = function()
+			dialog.block_alert(i18n.get("physical_shortcuts.window_title"),
+				i18n.get("physical_shortcuts.window_unavailable"), i18n.get("button.ok"))
+		end,
+	})
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
+	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
+	-- The editor's honest cause while physical delivery is unqualified.
+	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()
+		local ok, host = pcall(require, "shortcuts.ui.physical_shortcuts")
+		return not (ok and type(host) == "table" and type(host.physical_delivery_available) == "function"
+			and host.physical_delivery_available() == true)
+	end
+	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
+	-- Ticks « Raccourcis de gestion du script » while its switch is on.
+	sc_ctx.state_getters["script_control_enabled"] = function() return state.script_control_enabled == true end
+	-- Ticks the « Combinaisons de touches » title while its own switch is on.
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		local karabiner = ctx.karabiner
+		return type(karabiner) == "table" and type(karabiner.get_mod_combos_enabled) == "function"
+			and karabiner.get_mod_combos_enabled() == true
+	end
+
+	-- Each stage is a named phase, as the keyboard layout row's are: one rebuild
+	-- after a layout switch spent 341.9 ms here against 30 to 47 ms in every
+	-- other (2026-11-06 field report), and only a phase inside the hold report
+	-- can say which stage. A raising stage is timed too, then re-raised.
+	local function timed_stages(stages)
+		for name, stage in pairs(stages) do
+			local stage_stat = "menu_shortcuts." .. tostring(name)
+			stages[name] = function(...)
+				local started = PhaseStats.now()
+				local results = table.pack(pcall(stage, ...))
+				PhaseStats.stop(stage_stat, started)
+				if not results[1] then error(results[2], 0) end
+				return table.unpack(results, 2, results.n)
+			end
+		end
+	end
+	timed_stages(group_builders)
+	timed_stages(list_providers)
+
+	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
+
+	local item = receive(s_menu, { shortcuts_enabled = function() return state.shortcuts or nil end })
+	-- A pause does not grey the parent: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
+	return item
+end
+
+return M

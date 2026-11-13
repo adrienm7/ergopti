@@ -25,7 +25,7 @@ local SOURCE = '[shortcuts]\nenabled = true\n'
 local function ctrl_group(keyboard)
 	local ids = {}
 	for _, slot in ipairs(keyboard.available_slots("secondary_")) do ids[#ids + 1] = slot.id end
-	return require("ui.menu.shortcuts_scope").keyboard_group_rows(ids, keyboard.binding_id)
+	return require("shortcuts.ui.menu.scope").keyboard_group_rows(ids, keyboard.binding_id)
 end
 
 helpers.describe("macOS keyboard group scope", function()
@@ -63,7 +63,7 @@ end)
 --- @param calls table Receives { prefix, mode } per click.
 --- @return table rows
 local function render_shortcuts_submenu(calls)
-	local shortcuts = helpers.load_with_stubs("ui.menu.menu_shortcuts")
+	local shortcuts = helpers.load_with_stubs("shortcuts.ui.menu.shortcuts")
 	local ManifestMenu = require("menu.engine.manifest_menu")
 	local item = shortcuts.build({
 		state      = { shortcuts = true },

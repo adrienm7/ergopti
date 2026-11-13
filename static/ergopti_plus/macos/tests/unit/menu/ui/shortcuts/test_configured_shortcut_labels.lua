@@ -8,13 +8,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local keyboard_binding = require("modules.shortcuts.keyboard_shortcuts").binding_id
-local tap_binding = require("modules.shortcuts.tap_keys").binding_id
-local script_prefix = require("modules.shortcuts.script_control").BINDING_PREFIX
+local keyboard_binding = require("shortcuts.engine.keyboard_shortcuts").binding_id
+local tap_binding = require("shortcuts.engine.tap_keys").binding_id
+local script_prefix = require("shortcuts.engine.script_control").BINDING_PREFIX
 local names = {
-	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
-	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
-	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
+	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "shortcuts.ui.menu.shortcuts",
+	"shortcuts.engine", "shortcuts.engine.tap_keys", "shortcuts.engine.bindings",
+	"shortcuts.engine.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 	"core.timing.engine.deferred_work", "layouts.adapters.input_source_broker", "menu.ui.builder.utils",
 	"core.fs.engine.paths", "menu.engine.renderer",
 }
@@ -47,14 +47,14 @@ helpers.describe("configured shortcut row labels", function()
 					get_keyboard_group_modifiers_label = function() return "Ctrl" end,
 					keyboard_binding_id = keyboard_binding,
 				}
-				package.loaded["modules.shortcuts"] = shortcuts
-				package.loaded["modules.shortcuts.tap_keys"] = {
+				package.loaded["shortcuts.engine"] = shortcuts
+				package.loaded["shortcuts.engine.tap_keys"] = {
 					ensure_loaded = function() end, keys = function() return { { id = "number_row_left" } } end,
 					get_action = function() return "open_url" end, display_name = function() return "Left" end,
 					binding_id = tap_binding,
 				}
-				package.loaded["modules.shortcuts.bindings"] = {}
-				package.loaded["modules.shortcuts.actions.text"] = {}
+				package.loaded["shortcuts.engine.bindings"] = {}
+				package.loaded["shortcuts.engine.actions.text"] = {}
 				package.loaded["core.i18n.engine.i18n"] = {
 					get = function(key)
 						return key:find("right_opt", 1, true) and "%s"
@@ -98,7 +98,7 @@ helpers.describe("configured shortcut row labels", function()
 					label = require("ui.menu.menu_tap_keys").provide_rows(ctx)[1].label
 					expected = parameters[tap_binding("number_row_left")]
 				else
-					local menu = require("ui.menu.menu_shortcuts").build(ctx)
+					local menu = require("shortcuts.ui.menu.shortcuts").build(ctx)
 					label = menu.submenu[1].label
 					expected = parameters[script_prefix .. "script_altgr_enter"]
 				end
@@ -134,9 +134,9 @@ helpers.describe("real script-action catalogue projection", function()
 				return result
 			end
 			translator.section = function(key) return translator.decorate_section(translator.get(key)) end
-			package.loaded["gestures.engine.actions"], package.loaded["modules.shortcuts.script_control"] = nil, nil
+			package.loaded["gestures.engine.actions"], package.loaded["shortcuts.engine.script_control"] = nil, nil
 			local actions = require("gestures.engine.actions")
-			local script = require("modules.shortcuts.script_control")
+			local script = require("shortcuts.engine.script_control")
 			helpers.assert_eq(script.ACTIONS, actions.SG_NAMES)
 			helpers.assert_eq(#script.ACTIONS, 840)
 			for index, row in ipairs(expected) do
@@ -178,11 +178,11 @@ helpers.describe("real script-action catalogue projection", function()
 			-- The slot row opens the shared picker, as on Windows: the catalogue
 			-- reaches the picker, not 840 inline rows per slot (menu-script-slots-picker).
 			local opened = {}
-			package.loaded["ui.action_picker"] = {
+			package.loaded["shortcuts.ui.action_picker"] = {
 				open = function(options, on_pick) opened[#opened + 1] = { options = options, on_pick = on_pick } end,
 			}
-			package.loaded["ui.menu.menu_shortcuts"] = nil
-			local owner = require("ui.menu.menu_shortcuts")
+			package.loaded["shortcuts.ui.menu.shortcuts"] = nil
+			local owner = require("shortcuts.ui.menu.shortcuts")
 			for _, paused in ipairs({ false, true }) do
 				context.paused = paused
 				helpers.assert_true(owner.build(context) ~= nil, "actual canonical parent receives its finished frame")

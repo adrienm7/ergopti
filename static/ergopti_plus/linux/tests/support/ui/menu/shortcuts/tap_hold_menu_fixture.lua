@@ -14,7 +14,7 @@ local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.
 
 local WRITER = "platform.remap.tap_hold_writer"
 
-local PICKER = "ui.action_picker.bridge"
+local PICKER = "shortcuts.ui.action_picker.bridge"
 
 local SCOPE = "infra.tap_hold_scope"
 

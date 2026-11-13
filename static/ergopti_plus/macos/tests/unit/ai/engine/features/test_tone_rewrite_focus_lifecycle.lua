@@ -272,7 +272,7 @@ helpers.describe("tone rewrite retains its original native destination", functio
 	helpers.it("does not revive an old response after text pause and engine reset (tone-focus-pause-resume)", function()
 		with_world(function(world)
 			requested(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			helpers.assert_true(text.pause_text_actions())
 			helpers.assert_true(world.engine.reset())
 			helpers.assert_true(text.resume_text_actions())

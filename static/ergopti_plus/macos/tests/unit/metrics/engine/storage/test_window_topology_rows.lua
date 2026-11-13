@@ -92,7 +92,7 @@ helpers.describe("macOS window topology: the watcher", function()
 		helpers.with_stub_scope({ "metrics.engine.system.watchers", "metrics.engine.journal.log_manager", "core.logger.engine.logger",
 			"metrics.engine.privacy.context", "metrics.adapters.topology_watcher", "metrics.adapters.network_watcher",
 			"platform.focus.window_info", "core.network.adapters.info", "core.events.timer_scheduler",
-			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
+			"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local rows, refused, now, window, ids, reach = {}, true, 0, nil, {}, nil
 			package.loaded["metrics.engine.journal.log_manager"] = { append_log = function(entry) rows[#rows + 1] = entry end }

@@ -406,7 +406,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			package.loaded["settings.engine.paths"] = { config = function(name) return dir .. "/" .. name end }
 			package.loaded["keyboard.engine.layers.nav_layer"] = nil
 			package.loaded["platform.remap.tap_hold_manager"] = nil
-			package.loaded["modules.shortcuts.key_combinations"] = nil
+			package.loaded["shortcuts.engine.key_combinations"] = nil
 			local Nav = require("keyboard.engine.layers.nav_layer")
 			Manager = require("platform.remap.tap_hold_manager")
 			write_source(dir .. "/layers.toml", nav_text)

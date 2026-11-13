@@ -85,7 +85,7 @@ end)
 -- receiving hook double only. No hardware or installed-daemon claim is made.
 helpers.describe("complete original-issuer combination binding publication", function()
 	local owner_name = "platform.remap.tap_hold_manager"
-	local combination_name = "modules.shortcuts.key_combinations"
+	local combination_name = "shortcuts.engine.key_combinations"
 	local function owned(body, delayed)
 		local saved, undo = {}, {}
 		for name, value in pairs(package.loaded) do saved[name] = value end

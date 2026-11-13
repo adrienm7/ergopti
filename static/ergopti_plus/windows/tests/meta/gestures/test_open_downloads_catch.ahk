@@ -9,7 +9,7 @@
 ; catches around the scan. The hotkey now resolves the known Downloads folder
 ; and lets Explorer reuse/open it asynchronously, while failures are logged.
 ;
-; SCOPE: source introspection of modules/shortcuts/win.ahk.
+; SCOPE: source introspection of shortcuts/engine/win.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -25,7 +25,7 @@
 
 _ODC_CheckHotkeyAvoidsExplorerCom() {
 	Body := _DriverFuncBody("OpenDownloads")
-	Assert(Body != "", "OpenDownloads must exist in modules/shortcuts/win.ahk")
+	Assert(Body != "", "OpenDownloads must exist in shortcuts/engine/win.ahk")
 
 	LaunchBody := _DriverFuncBody("_OpenDownloadsWith")
 	Assert(LaunchBody != "", "the resolved-folder launcher must exist")

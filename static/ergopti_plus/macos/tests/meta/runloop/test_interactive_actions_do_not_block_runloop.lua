@@ -32,7 +32,7 @@ local CommandLines = require("tests.support.command_lines")
 
 -- Directories whose code runs in direct response to a live user input event.
 local INTERACTIVE_DIRS = {
-	"modules/shortcuts/actions",
+	"shortcuts/engine/actions",
 	"gestures",
 }
 

@@ -67,7 +67,7 @@ function M.prefer_all(bindings)
 		return true
 	end
 	local ok, detail = xpcall(function()
-		local tap_keys = require("modules.shortcuts.tap_keys")
+		local tap_keys = require("shortcuts.engine.tap_keys")
 		helpers.assert_eq(tap_keys.set_action("number_row_left", "screen_capture",
 			function(id) return id == "screen_capture" end), true)
 		helpers.assert_eq(bindings.pause_hotkeys_only(), true)
@@ -208,23 +208,23 @@ function M.with_bindings(callback)
 	local ctx = { created = 0, live = {}, children = {}, refuse = {}, errors = {}, tap_assignments = {},
 		factory_args = {}, wheel = { vertical = {}, horizontal = {} } }
 	return helpers.with_stub_scope({
-		"modules.shortcuts.bindings",
+		"shortcuts.engine.bindings",
 		"platform.input.hotkey_registrar",
 		"keyboard.engine.layers.nav_layer",
-		"modules.shortcuts.actions.text",
-		"modules.shortcuts.actions.apps",
-		"modules.shortcuts.actions.system",
-		"modules.shortcuts.tap_keys",
+		"shortcuts.engine.actions.text",
+		"shortcuts.engine.actions.apps",
+		"shortcuts.engine.actions.system",
+		"shortcuts.engine.tap_keys",
 		"gestures.engine.actions",
 		"core.i18n.engine.i18n",
 		"core.logger.engine.logger",
 	}, function()
 		package.loaded["platform.input.hotkey_registrar"] = nil
 		local facades = build_facades(ctx)
-		package.loaded["modules.shortcuts.actions.text"] = facades.text
-		package.loaded["modules.shortcuts.actions.apps"] = facades.apps
-		package.loaded["modules.shortcuts.actions.system"] = facades.system
-		package.loaded["modules.shortcuts.tap_keys"] = {
+		package.loaded["shortcuts.engine.actions.text"] = facades.text
+		package.loaded["shortcuts.engine.actions.apps"] = facades.apps
+		package.loaded["shortcuts.engine.actions.system"] = facades.system
+		package.loaded["shortcuts.engine.tap_keys"] = {
 			ensure_loaded = function() return true end,
 			decide = function() return nil end,
 			has_assignments = function() return next(ctx.tap_assignments) ~= nil end,
@@ -252,7 +252,7 @@ function M.with_bindings(callback)
 			ctx.errors[#ctx.errors + 1] = string.format(message, ...)
 		end
 		package.loaded["core.logger.engine.logger"] = logger
-		local bindings = helpers.load_with_stubs("modules.shortcuts.bindings", {
+		local bindings = helpers.load_with_stubs("shortcuts.engine.bindings", {
 			hotkey = {
 				bind = function(mods, key)
 					return native_handle(ctx, table.concat(mods, "+") .. "+" .. key)

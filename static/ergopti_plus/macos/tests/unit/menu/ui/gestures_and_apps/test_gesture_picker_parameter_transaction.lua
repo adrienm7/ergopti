@@ -84,9 +84,9 @@ local function with_picker(options, callback)
 			get_root = function() return { gesture_slots = { ["3"] = { "tap_3" } } } end,
 			build = function(_, _, _, _, _, providers) provider = providers.gesture_slots_3; return {} end,
 		}
-		package.loaded["ui.action_picker"] = { open = function(_, picked) picker_callback = picked end }
+		package.loaded["shortcuts.ui.action_picker"] = { open = function(_, picked) picker_callback = picked end }
 		package.loaded["gestures.ui.menu.gestures"] = nil
-		package.loaded["ui.menu.shortcut_utils"] = nil
+		package.loaded["shortcuts.ui.menu.utils"] = nil
 		runtime.is_assignable = function() return true end
 		local owner = require("tests.support.program_parameter_fixture")(runtime, { gestures = true }, "gesture",
 			function() return fixture.assigned end,

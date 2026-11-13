@@ -443,10 +443,10 @@ local function owned_activation()
 		selected = function()
 			return type(Remap().owned_runtime_selected) == "function" and Remap().owned_runtime_selected() == true
 		end,
-		paused = function() return require("modules.shortcuts.script_control").is_paused() == true end,
+		paused = function() return require("shortcuts.engine.script_control").is_paused() == true end,
 		-- The same transactional pause and resume as the pause key.
-		pause = function() return require("modules.shortcuts.script_control").pause_all() end,
-		resume = function() return require("modules.shortcuts.script_control").resume_all() end,
+		pause = function() return require("shortcuts.engine.script_control").pause_all() end,
+		resume = function() return require("shortcuts.engine.script_control").resume_all() end,
 		owner_state = function() return owner_status().state end,
 		owner_reason = function() return owner_status().reason end,
 		fetch = function(callback) require("diagnostics.adapters.runtime_owner_ports").fetch_artifact(callback) end,

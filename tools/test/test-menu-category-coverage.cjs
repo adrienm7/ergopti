@@ -580,7 +580,7 @@ function reachedInertTemplateRows(nativeSources, extension, definitions, platfor
 			? shortcutConstructionReaderEvidence(
 					definitions,
 					nativeSources.find(
-						(native) => native.rel === path.join(SP, 'windows/ui/menu/menu_shortcuts.ahk')
+						(native) => native.rel === path.join(SP, 'windows/shortcuts/ui/menu/shortcuts.ahk')
 					)?.src,
 					nativeSources.find(
 						(native) => native.rel === path.join(SP, 'windows/menu/engine/manifest_menu.ahk')
@@ -1760,7 +1760,7 @@ for (const mutate of [
 	);
 }
 for (const ownerPath of [
-	'windows/ui/menu/menu_shortcuts.ahk',
+	'windows/shortcuts/ui/menu/shortcuts.ahk',
 	'windows/menu/engine/manifest_menu.ahk'
 ]) {
 	const target = path.join(SP, ownerPath);

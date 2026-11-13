@@ -41,7 +41,7 @@ _CWRS_ReadLifecycleSrc() {
 }
 
 _CWRS_ReadCapswordSrc() {
-	return _DriverDirConcat("modules/shortcuts")
+	return _DriverDirConcat("shortcuts/engine")
 }
 
 

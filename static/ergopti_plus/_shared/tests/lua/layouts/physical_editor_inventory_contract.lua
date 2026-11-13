@@ -29,7 +29,7 @@ return function(h)
    local o,s,r=fixture();s.on_read=function() s.route='/controlled/foreign.toml' end
    h.assert_eq(o.current(r),false);h.assert_eq(o.expected_source(r),nil)
   end)
-  for _,field in ipairs({'keyboard','parameters','native', 'layouts'}) do
+  for _,field in ipairs({'keyboard','parameters','native', 'layouts', 'shortcuts'}) do
    h.it('refuses '..field..' private currency changed inside final route callback',function()
     local o,s,r=fixture();local calls=0
     s.on_route=function() calls=calls+1;if calls==2 then s[field]=false end end

@@ -3,7 +3,7 @@
 --- Controlled asynchronous native ports; no Hammerspoon/ScriptingBridge qualification.
 local H = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Adapter = require("adapters.apple_shortcuts")
+local Adapter = require("shortcuts.adapters.apple_shortcuts")
 local function assert_false(value) H.assert_eq(value, false) end
 local ID1 = "11111111-1111-1111-1111-111111111111"
 local ID2 = "22222222-2222-2222-2222-222222222222"

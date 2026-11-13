@@ -62,7 +62,7 @@ local function with_foreground(port, callback)
 		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"ai.engine.api.common", "ai.engine.api.parser", "ai.engine.settings.profiles",
 		"ai.engine.prediction.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
-		"modules.shortcuts.script_control", "ai.ui.menu.models.manager_ollama",
+		"shortcuts.engine.script_control", "ai.ui.menu.models.manager_ollama",
 		"ai.ui.menu.requirement_operation_registry",
 	}, function()
 		local fixture = { tasks = {}, builds = {} }

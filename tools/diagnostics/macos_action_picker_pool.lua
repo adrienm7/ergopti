@@ -15,7 +15,7 @@ function M.run(config, done)
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
-	assert(package.loaded["ui.action_picker"] == nil, "ActionPicker was already loaded")
+	assert(package.loaded["shortcuts.ui.action_picker"] == nil, "ActionPicker was already loaded")
 	assert(package.loaded["core.ui.ui.webview_controller_pool"] == nil, "ControllerPool was already loaded")
 	assert(rawequal(require("hs.webview"), hs.webview), "native WebView module identity differs")
 	assert(hs.screen.mainScreen(), "native GUI unavailable")
@@ -28,7 +28,7 @@ function M.run(config, done)
 		native[name] = assert(view_methods[name])
 	end
 	native.setCallback = assert(controller_methods.setCallback)
-	local ports = { "core.process.adapters.program_providers", "adapters.apple_shortcuts_native" }
+	local ports = { "core.process.adapters.program_providers", "shortcuts.adapters.apple_shortcuts_native" }
 	local saved = {}
 	for _, name in ipairs(ports) do saved[name] = package.loaded[name] end
 	package.loaded[ports[1]] = { create = function()
@@ -40,13 +40,13 @@ function M.run(config, done)
 		return { discover = function(callback) callback({ choices = {}, truncated = false }); return true end,
 			invalidate = function() return true end }
 	end }
-	local Picker = require("ui.action_picker")
+	local Picker = require("shortcuts.ui.action_picker")
 	local UI = require("core.ui.ui.builder")
 	local Pool = require("core.ui.ui.webview_controller_pool")
 	local Scheduler = require("core.events.timer_scheduler")
 	local I18n = require("core.i18n.engine.i18n")
 	I18n.init()
-	for fn, suffix in pairs({ [Picker.open] = "/macos/ui/action_picker/init.lua",
+	for fn, suffix in pairs({ [Picker.open] = "/macos/shortcuts/ui/action_picker/init.lua",
 		[Pool.new] = "/macos/core/ui/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/core/ui/ui/builder.lua",
 		[Scheduler.activeCount] = "/macos/core/events/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")
@@ -132,7 +132,7 @@ function M.run(config, done)
 				items = { { type = "action", id = entry.id, label = entry.id } } }, callback) == true,
 				"actual ActionPicker open refused")
 		end
-		local observed = Observer.snapshot(Picker, "@" .. root .. "/macos/ui/action_picker/init.lua")
+		local observed = Observer.snapshot(Picker, "@" .. root .. "/macos/shortcuts/ui/action_picker/init.lua")
 		entry.view, entry.controller = observed.view, observed.controller
 		local window = assert(entry.view:hswindow())
 		entry.host_pid, entry.window_id = window:application():pid(), window:id()

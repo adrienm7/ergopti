@@ -16,9 +16,9 @@
 local helpers = require("tests.helpers")
 
 local names = {
-	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
-	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
-	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
+	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "shortcuts.ui.menu.shortcuts",
+	"shortcuts.engine", "shortcuts.engine.tap_keys", "shortcuts.engine.bindings",
+	"shortcuts.engine.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 	"core.timing.engine.deferred_work", "layouts.adapters.input_source_broker", "menu.ui.builder.utils",
 	"core.fs.engine.paths", "menu.engine.renderer", "metrics.engine.perf.phase_stats",
 }
@@ -33,10 +33,10 @@ helpers.describe("menu_shortcuts: each provider records a named phase (menu-shor
 				count = function() end,
 			}
 			local shortcuts = { DEFAULT_STATE = { shortcuts = true } }
-			package.loaded["modules.shortcuts"] = shortcuts
-			package.loaded["modules.shortcuts.tap_keys"] = {}
-			package.loaded["modules.shortcuts.bindings"] = {}
-			package.loaded["modules.shortcuts.actions.text"] = {}
+			package.loaded["shortcuts.engine"] = shortcuts
+			package.loaded["shortcuts.engine.tap_keys"] = {}
+			package.loaded["shortcuts.engine.bindings"] = {}
+			package.loaded["shortcuts.engine.actions.text"] = {}
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.timing.engine.deferred_work"] = {}
 			package.loaded["layouts.adapters.input_source_broker"] = { subscribe = function() return true end }
@@ -57,7 +57,7 @@ helpers.describe("menu_shortcuts: each provider records a named phase (menu-shor
 			}
 			local ctx = { gestures = {}, shortcuts = shortcuts, updateMenu = function() end,
 				state = { shortcuts = true } }
-			pcall(require("ui.menu.menu_shortcuts").build, ctx)
+			pcall(require("shortcuts.ui.menu.shortcuts").build, ctx)
 			helpers.assert_true(#invoked >= 5, "the stub invoked too few stages to prove anything")
 			for _, name in ipairs(invoked) do
 				helpers.assert_eq(recorded["menu_shortcuts." .. name], 1, "stage '" .. name .. "' recorded no phase")

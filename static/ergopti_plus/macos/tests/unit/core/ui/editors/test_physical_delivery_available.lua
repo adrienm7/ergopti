@@ -20,10 +20,10 @@ local function with_host(window_ready, fn)
 	local loaded, original_hs = {}, _G.hs
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
-		local keyboard = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = keyboard
-		package.loaded["ui.physical_shortcuts"] = nil
-		local host = require("ui.physical_shortcuts")
+		local keyboard = helpers.load_with_stubs("shortcuts.engine.keyboard_shortcuts")
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = keyboard
+		package.loaded["shortcuts.ui.physical_shortcuts"] = nil
+		local host = require("shortcuts.ui.physical_shortcuts")
 		host.native_available = function() return window_ready end
 		fn(keyboard, host)
 	end)

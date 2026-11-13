@@ -165,7 +165,7 @@ local function pause_handoff_fixture(body)
 end
 
 local function pause_controller(listener)
-	return require("modules.shortcuts.script_actions").new({ reset = function() end,
+	return require("shortcuts.engine.script_actions").new({ reset = function() end,
 		reload = function() end, quit = function() end, on_pause_change = listener })
 end
 
@@ -317,7 +317,7 @@ helpers.describe("Main early pause restoration", function()
 				local last = assert(source:find("\t-- A control can change", first, true))
 				local before_watch = source:sub(first, last - 1)
 				local applications, pause_steps = 0, {}
-				local environment = setmetatable({ ScriptActions = require("modules.shortcuts.script_actions"),
+				local environment = setmetatable({ ScriptActions = require("shortcuts.engine.script_actions"),
 					Logger = require("core.logger.engine.shim"), LOG = "Main early pause test", privacy_owners = {},
 					keystats = {
 						cancel_hold_intervals = function() end,

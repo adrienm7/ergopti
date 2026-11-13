@@ -14,7 +14,7 @@
 ---    that is not ready refuse before the selection is read, with the notices
 ---    of llm_generate_prediction.
 --- 2. The selection is read and replaced through the clipboard pipeline of the
----    tone actions (modules/shortcuts/actions/text.lua), so Electron apps,
+---    tone actions (shortcuts/engine/actions/text.lua), so Electron apps,
 ---    which expose no AXSelectedText, work too. The translation replaces the
 ---    selection only while it is still the text that was translated, in the
 ---    window it was read from.
@@ -186,7 +186,7 @@ local function replace_selection(selection, translation, focus, parent, continua
 			tostring(focus), tostring(current_focus))
 		return false
 	end
-	local Text = dependency("modules.shortcuts.actions.text", "replace_copied_selection")
+	local Text = dependency("shortcuts.engine.actions.text", "replace_copied_selection")
 	if not Text then return false end
 	local started = Text.replace_copied_selection(selection, translation, parent, function(matched)
 		if not matched then
@@ -324,7 +324,7 @@ function M.run(value, parent)
 		Logger.error(LOG, "Translation refused: locale '%s' has no native name.", tostring(code))
 		return false
 	end
-	local Text = dependency("modules.shortcuts.actions.text", "read_copied_selection")
+	local Text = dependency("shortcuts.engine.actions.text", "read_copied_selection")
 	if not Text then return false end
 	local request_owner = { engine = engine, revision = engine.current_request_revision() }
 	local previous = _generation
@@ -373,7 +373,7 @@ end
 
 -- Accepted replacements outlive the consumed answer surface. Retire their
 -- generation on the canonical off edge so re-enabling cannot revive old work.
-local AiActions = require("modules.shortcuts.ai_actions")
+local AiActions = require("shortcuts.engine.ai_actions")
 AiActions.subscribe("selection_translation", function()
 	if AiActions.off() then _generation = _generation + 1 end
 end)

@@ -367,21 +367,21 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- only the facade would retain their pause claims, exact native debt, and the
 	-- previous test's native contracts as an impossible fresh-parent/stale-child
 	-- composition.
-	if module_name == "modules.shortcuts.actions.system" then
-		loaded["modules.shortcuts.actions.system_pixel"] = nil
-		loaded["modules.shortcuts.actions.system_mouse"] = nil
-		loaded["modules.shortcuts.actions.screenshot_save"] = nil
+	if module_name == "shortcuts.engine.actions.system" then
+		loaded["shortcuts.engine.actions.system_pixel"] = nil
+		loaded["shortcuts.engine.actions.system_mouse"] = nil
+		loaded["shortcuts.engine.actions.screenshot_save"] = nil
 	end
-	if module_name == "modules.shortcuts.actions.text" or module_name == "hotstrings.engine.expander.utils" then
+	if module_name == "shortcuts.engine.actions.text" or module_name == "hotstrings.engine.expander.utils" then
 		loaded["clipboard.adapters.clipboard"] = nil
 	end
 	-- Every screen-capture owner shares the flow's once-per-process permission
 	-- prompt. A fresh owner must not inherit the previous fixture's prompt.
-	if module_name == "modules.shortcuts.actions.system"
-		or module_name == "modules.shortcuts.actions.system_pixel"
-		or module_name == "modules.shortcuts.actions.screenshot_save"
+	if module_name == "shortcuts.engine.actions.system"
+		or module_name == "shortcuts.engine.actions.system_pixel"
+		or module_name == "shortcuts.engine.actions.screenshot_save"
 		or module_name == "gestures.engine.actions" then
-		loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
+		loaded["shortcuts.engine.actions.screen_capture_flow"] = nil
 	end
 	-- Dependency checkers and their backend-local pause controller form one
 	-- stateful ownership unit. A fresh checker must never inherit the previous

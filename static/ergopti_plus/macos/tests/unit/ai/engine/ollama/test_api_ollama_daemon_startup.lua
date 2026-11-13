@@ -32,7 +32,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 			"ai.engine.api.common", "ai.engine.api.parser", "ai.engine.settings.profiles",
 			"ai.engine.prediction.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
-			"modules.shortcuts.script_control", "ai.engine.prediction.engine",
+			"shortcuts.engine.script_control", "ai.engine.prediction.engine",
 		}, function()
 			local fixture = { tasks = {}, paused = false, nonce_index = 0 }
 			local nonces = { "0000000000000000000000000000f001", "0000000000000000000000000000f002" }
@@ -64,7 +64,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			package.loaded["ai.engine.prediction.progressive_reveal"] = {}
 			package.loaded["ai.engine.api.common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
 				OLLAMA_KEEP_ALIVE = "5m", get_retry_policy = function() return 1, 0, 0 end }
-			package.loaded["modules.shortcuts.script_control"] = {
+			package.loaded["shortcuts.engine.script_control"] = {
 				is_paused = function() return fixture.paused end, get_pause_epoch = function() return 1 end,
 			}
 			local api = helpers.load_with_stubs("ai.engine.api.ollama", {

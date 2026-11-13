@@ -140,15 +140,15 @@ for (const needed of ['élève', "l'", '-', 'ß', 'Σ']) {
 // Each suite replays the corpus, and each replay is wired into its runner.
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/shortcuts/text_actions/test_text_case_vectors.lua',
+		file: 'macos/tests/unit/shortcuts/engine/text_actions/test_text_case_vectors.lua',
 		path: 'tests/corpus/text_case/vectors.json'
 	},
 	{
-		file: 'linux/tests/unit/modules/shortcuts/text_actions/test_text_case_vectors.lua',
+		file: 'linux/tests/unit/shortcuts/text_actions/test_text_case_vectors.lua',
 		path: '_shared/tests/corpus/text_case/vectors.json'
 	},
 	{
-		file: 'windows/tests/unit/modules/shortcuts/test_text_case_vectors.ahk',
+		file: 'windows/tests/unit/shortcuts/engine/test_text_case_vectors.ahk',
 		path: '\\tests\\corpus\\text_case\\vectors.json'
 	}
 ];

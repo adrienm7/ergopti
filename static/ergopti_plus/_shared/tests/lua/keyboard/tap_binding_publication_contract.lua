@@ -33,7 +33,7 @@ end
 --- @param helpers table Native registered test API.
 --- @param driver string macos or linux.
 function M.register(helpers, driver)
-	local native = "modules.shortcuts.tap_keys"
+	local native = "shortcuts.engine.tap_keys"
 	local policy = require("settings.engine.publication.binding_identity")
 	local function fresh_catalogue()
 		package.loaded[native] = nil

@@ -11,9 +11,9 @@ local PRIOR = Json.encode({ version = 1, executable = "/private/prior-program", 
 local NEXT = Json.encode({ version = 1, executable = "/private/next-program", arguments = { "private-next" } })
 local CASES = {
 	{ binding = "tap_3", section = "gestures", slot = "tap_3", module = "gestures.engine.manager" },
-	{ binding = "keyboard__primary_j", section = "shortcuts.keyboard", slot = "primary_j", module = "modules.shortcuts.keyboard_shortcuts" },
-	{ binding = "tap_key__number_row_left", section = "shortcuts.tap_keys", slot = "number_row_left", module = "modules.shortcuts.tap_keys" },
-	{ binding = "script__script_altgr_enter", section = "shortcuts.script_control", slot = "script_altgr_enter", module = "modules.shortcuts.script_chords" },
+	{ binding = "keyboard__primary_j", section = "shortcuts.keyboard", slot = "primary_j", module = "shortcuts.engine.keyboard_shortcuts" },
+	{ binding = "tap_key__number_row_left", section = "shortcuts.tap_keys", slot = "number_row_left", module = "shortcuts.engine.tap_keys" },
+	{ binding = "script__script_altgr_enter", section = "shortcuts.script_control", slot = "script_altgr_enter", module = "shortcuts.engine.script_chords" },
 }
 
 --- Loads the exact production helper without booting unrelated tray providers.
@@ -27,8 +27,8 @@ end
 --- Renders the real binding providers while omitting unrelated top-level menus.
 --- @param extra table|nil Further menu context owners, such as the physical magic key.
 local function menu_rows(gestures, path, extra)
-	package.loaded["modules.shortcuts.manager"] = nil
-	local shortcuts = require("modules.shortcuts.manager")
+	package.loaded["shortcuts.engine.manager"] = nil
+	local shortcuts = require("shortcuts.engine.manager")
 	-- Both categories read on: an off one greys every row of its submenu
 	-- (category-off rule), and these scenarios click the binding rows.
 	shortcuts.init({ persist = true, config_path = path, enabled = true })
@@ -75,8 +75,8 @@ local function with_case(spec, body)
 			-- The actual contextual keyboard row reads the trigger owner too. A
 			-- previous missing-default fixture may have cached it against a stubbed
 			-- manifest; load this dependency against the restored production owner.
-			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.script_chords", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction" }) do package.loaded[name] = nil end
+			for _, name in ipairs({ "gestures.engine.manager", "shortcuts.engine.keyboard_shortcuts", "shortcuts.engine.tap_keys",
+				"shortcuts.engine.script_chords", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction" }) do package.loaded[name] = nil end
 			local controls = { changed = 0, backups = {}, logs = {}, publications = 0 }
 			local logger = {}
 			for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
@@ -169,9 +169,9 @@ local function with_configuration_picker(body)
 		for _, id in ipairs({ "a", "b" }) do
 			Sandbox.write_bytes(f.dirs[id] .. "/config.toml", f.bytes(id) .. suffix)
 		end
-		for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-			"modules.shortcuts.script_chords", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
-			"ui.action_picker.bridge" }) do package.loaded[name] = nil end
+		for _, name in ipairs({ "gestures.engine.manager", "shortcuts.engine.keyboard_shortcuts", "shortcuts.engine.tap_keys",
+			"shortcuts.engine.script_chords", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
+			"shortcuts.ui.action_picker.bridge" }) do package.loaded[name] = nil end
 		local seen = { logs = {}, changed = 0 }
 		local logger = {}
 		for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
@@ -183,8 +183,8 @@ local function with_configuration_picker(body)
 		package.loaded["core.process.adapters.program_providers"] = {}
 		local gestures = require("gestures.engine.manager")
 		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })
-		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
-		local bridge = require("ui.action_picker.bridge")
+		local keyboard = require("shortcuts.engine.keyboard_shortcuts")
+		local bridge = require("shortcuts.ui.action_picker.bridge")
 		local function find(rows, predicate)
 			for _, row in ipairs(rows or {}) do
 				if predicate(row) then return row end
@@ -277,7 +277,7 @@ helpers.describe("Linux program picker transaction", function()
 			end
 			package.loaded["menu.engine.manifest_menu"] = foreign
 			local selected
-			package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+			package.loaded["shortcuts.ui.action_picker.bridge"] = { open = function(options, confirm)
 				if options.current == "run_program" then selected = confirm end
 				return true
 			end }
@@ -382,7 +382,7 @@ helpers.describe("Linux program picker transaction", function()
 		helpers.it("(program-picker) propagates " .. spec.binding .. " refusal through its actual provider callback", function()
 			with_case(spec, function(_, gestures, _, controls, path, source)
 				local selected
-				package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+				package.loaded["shortcuts.ui.action_picker.bridge"] = { open = function(options, confirm)
 					if options.current == "run_program" then selected = confirm end
 					return true
 				end }
@@ -642,7 +642,7 @@ local function parameterized_confirmation(gestures, path)
 		return true
 	end
 	local selected, opened = nil, 0
-	package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+	package.loaded["shortcuts.ui.action_picker.bridge"] = { open = function(options, confirm)
 		if options.current == "run_program" then selected, opened = confirm, opened + 1 end
 		return true
 	end }
@@ -731,7 +731,7 @@ helpers.describe("parameter transaction physical boundary", function()
 	}) do
 		helpers.it("(parameterized-physical-boundary) refuses recognized physical " .. selected.label .. " before acquiring logical leases", function()
 			local spec = { binding = "keyboard__physical_none_KeyJ", section = "shortcuts.keyboard",
-				slot = "physical_none_KeyJ", module = "modules.shortcuts.keyboard_shortcuts" }
+				slot = "physical_none_KeyJ", module = "shortcuts.engine.keyboard_shortcuts" }
 			with_case(spec, function(_, gestures, provider, controls, path, source)
 				helpers.assert_eq(provider.configuration_domain(spec.binding), "keyboard", "the genuine provider recognizes this physical registry slot")
 				helpers.assert_type(gestures.action_parameter_update(spec.binding, selected.action or "run_program", selected.scalar), "table",
@@ -790,7 +790,7 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 				local reason = " — " .. require("core.i18n.engine.i18n").get(Source.TAP_OVERRIDE_REASON)
 				helpers.assert_true(reason ~= " — " .. Source.TAP_OVERRIDE_REASON, "the reason is translated")
 				local selected
-				package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+				package.loaded["shortcuts.ui.action_picker.bridge"] = { open = function(options, confirm)
 					if options.current == "run_program" then selected = confirm end
 					return true
 				end }

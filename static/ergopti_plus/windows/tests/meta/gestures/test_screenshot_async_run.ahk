@@ -4,8 +4,8 @@
 ; MODULE: Screenshot Async Run Meta-Test
 ; DESCRIPTION:
 ; Structural regression for the screenshot hotkey fix. The key left of 1 (SC029)
-; was once a hard-wired screenshot key in modules/shortcuts/win.ahk; it is now
-; the number_row_left tap key (modules/shortcuts/tap_keys.ahk), whose assigned
+; was once a hard-wired screenshot key in shortcuts/engine/win.ahk; it is now
+; the number_row_left tap key (shortcuts/engine/tap_keys.ahk), whose assigned
 ; catalogue action can be the same instant capture.
 ;
 ; Before the fix the SC029 hotkey called RunWait() to invoke the PowerShell
@@ -18,7 +18,7 @@
 ; The hotkey contains no process launch at all, and success is emitted only after
 ; the current generation publishes its private stage.
 ;
-; This test inspects the modules/shortcuts source and asserts:
+; This test inspects the shortcuts/engine source and asserts:
 ;   1. RunWait is NOT used in the SC029 block.
 ;   2. The hotkey delegates through TapKeyFire and the gesture action table, whose
 ;      instant capture is GestureScreenshotInstant, without a sibling worker.
@@ -36,7 +36,7 @@
 ; ==========================================================
 
 ; Move-resilient: scan the shortcuts module dir via the framework helper instead
-; of a pinned file path. SC029:: is unique within modules/shortcuts (only the tap
+; of a pinned file path. SC029:: is unique within shortcuts/engine (only the tap
 ; key lives here; layout.ahk's SC029:: is in layouts/engine, out of scope), so the
 ; first-match extraction below targets the tap key block, which ends at the
 ; next #HotIf of the same file.
@@ -59,7 +59,7 @@ _SAR_FindScreenshotBlock(src) {
 ; hotkey must not be taken for the hotkey itself.
 _SAR_ShortcutsSource() {
 	global _DriverDirConcatFn
-	return _StripFullLineComments(_DriverDirConcatFn.Call("modules/shortcuts"))
+	return _StripFullLineComments(_DriverDirConcatFn.Call("shortcuts/engine"))
 }
 
 
@@ -74,9 +74,9 @@ _SAR_ShortcutsSource() {
 _SAR_NoRunWait() {
 	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
 	Assert(block != "",
-		"modules/shortcuts: SC029 tap key hotkey block must be present")
+		"shortcuts/engine: SC029 tap key hotkey block must be present")
 	Assert(InStr(block, "RunWait") = 0,
-		"modules/shortcuts: SC029 must not use RunWait — it blocks the keyboard hook thread during screen capture")
+		"shortcuts/engine: SC029 must not use RunWait — it blocks the keyboard hook thread during screen capture")
 }
 Test("Screenshot hotkey: RunWait not used in SC029 block (screenshot-async-run)", _SAR_NoRunWait)
 
@@ -98,9 +98,9 @@ _SAR_TapKeyReachesTheSharedOwner() {
 _SAR_SharedWorkerDelegatePresent() {
 	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
 	Assert(_SAR_TapKeyReachesTheSharedOwner(),
-		"modules/shortcuts: SC029 must delegate through TapKeyFire and the gesture action table to the shared screenshot worker owner")
+		"shortcuts/engine: SC029 must delegate through TapKeyFire and the gesture action table to the shared screenshot worker owner")
 	Assert(InStr(block, "Run(") = 0 && InStr(block, "powershell") = 0,
-		"modules/shortcuts: SC029 must not retain an unowned sibling worker process")
+		"shortcuts/engine: SC029 must not retain an unowned sibling worker process")
 }
 Test("Screenshot hotkey: shared worker delegate owns SC029 (screenshot-async-run)", _SAR_SharedWorkerDelegatePresent)
 

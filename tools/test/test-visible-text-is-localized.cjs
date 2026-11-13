@@ -79,7 +79,7 @@ assert.deepEqual(literalLabels, [], `field labels must use i18n.get: ${literalLa
 
 // 3. Linux shortcut labels.
 const shortcuts = fs.readFileSync(
-	path.join(DRIVERS, 'linux', 'modules', 'shortcuts', 'keyboard_shortcuts.lua'),
+	path.join(DRIVERS, 'linux', 'shortcuts', 'engine', 'keyboard_shortcuts.lua'),
 	'utf8'
 );
 for (const french of ['"Espace"', '"Entrée"']) {

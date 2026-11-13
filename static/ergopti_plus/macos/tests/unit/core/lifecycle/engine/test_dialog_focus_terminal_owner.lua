@@ -13,7 +13,7 @@ local OWNERS = { "hs", "tests.stubs.hs", "core.ui.engine.dialog_util", "core.log
 	"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.focus.running_application",
 	"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "gestures.engine.action_confirm",
-	"adapters.mouse_control", "platform.focus.window_info", "platform.focus.window_manager", "core.i18n.engine.i18n" }
+	"shortcuts.adapters.mouse_control", "platform.focus.window_info", "platform.focus.window_manager", "core.i18n.engine.i18n" }
 
 
 
@@ -252,7 +252,7 @@ helpers.describe("dialog alert: a call without hs.dialog.alert's shape fails fas
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
 			}
-			package.loaded["adapters.mouse_control"] = {
+			package.loaded["shortcuts.adapters.mouse_control"] = {
 				screen_frame_under_cursor = function() return { x = 0, y = 0, w = 1200, h = 900 } end,
 			}
 			package.loaded["platform.focus.window_info"] = { frontmost_application = function() return nil end }

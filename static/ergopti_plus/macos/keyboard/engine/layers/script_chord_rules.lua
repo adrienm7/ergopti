@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Builds the Karabiner rules that turn each script-management chord into its
 --- sentinel (infra/keycodes SCRIPT_CHORD_SENTINELS), which the script-control
---- eventtap (modules/shortcuts/script_control.lua) dispatches. Only a slot that
+--- eventtap (shortcuts/engine/script_control.lua) dispatches. Only a slot that
 --- runs an action gets a rule: an unassigned slot, every slot while the
 --- submenu's switch is off, and while paused every slot outside the
 --- script-management actions keep the key combination native.

@@ -69,7 +69,7 @@ local function load_engine(paused)
 		stop = function() return true end,
 		schedule_warmup_with_retry = function() calls.scheduled = calls.scheduled + 1; return true end,
 	}
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		is_paused = function() return paused end,
 	}
 

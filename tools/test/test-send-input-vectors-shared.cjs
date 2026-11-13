@@ -216,11 +216,11 @@ const CONSUMERS = [
 		path: 'tests/corpus/action_parameters/send_input_vectors.json'
 	},
 	{
-		file: 'linux/tests/unit/modules/shortcuts/text_actions/test_send_input_parameter_vectors.lua',
+		file: 'linux/tests/unit/shortcuts/text_actions/test_send_input_parameter_vectors.lua',
 		path: '_shared/tests/corpus/action_parameters/send_input_vectors.json'
 	},
 	{
-		file: 'windows/tests/unit/modules/shortcuts/test_send_input_actions.ahk',
+		file: 'windows/tests/unit/shortcuts/engine/test_send_input_actions.ahk',
 		path: '\\tests\\corpus\\action_parameters\\send_input_vectors.json'
 	}
 ];

@@ -147,7 +147,7 @@ helpers.describe("ui.bridge_handlers", function()
       wm.show("action_picker", "fr")
       wm.set_daemon_state(build_mock_state())
       local confirmed = nil
-      local handler = require("ui.action_picker.bridge")
+      local handler = require("shortcuts.ui.action_picker.bridge")
       handler.on_confirm = function(id) confirmed = id end
       wm.route_message("action_picker", "action_picker_bridge",
         { action = "confirm", id = "tab_new" })
@@ -255,7 +255,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("action_picker_bridge", function()
-    local handler = helpers.load_module("ui.action_picker.bridge")
+    local handler = helpers.load_module("shortcuts.ui.action_picker.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()

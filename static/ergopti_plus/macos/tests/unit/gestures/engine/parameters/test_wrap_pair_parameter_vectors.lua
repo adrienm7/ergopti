@@ -31,13 +31,13 @@ end
 
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
-package.loaded["modules.shortcuts.actions.text"] = nil
+package.loaded["shortcuts.engine.actions.text"] = nil
 package.loaded["gestures.engine.engine"] = nil
 package.loaded["gestures.engine.actions"] = nil
 package.loaded["gestures.engine.conflicts"] = nil
 local _gestures = helpers.load_with_stubs("gestures.engine")
 local Actions = require("gestures.engine.actions")
-local Text = require("modules.shortcuts.actions.text")
+local Text = require("shortcuts.engine.actions.text")
 
 helpers.describe("wrap_selection parameter replays the shared wrap-pair corpus", function()
 	local corpus = read_corpus()

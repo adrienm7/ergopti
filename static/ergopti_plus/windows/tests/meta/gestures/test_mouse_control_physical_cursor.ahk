@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: MouseControl Physical Cursor API Meta-Test
 ; DESCRIPTION:
-; Structural regression for the DPI-correctness fix in adapters/mouse_control.ahk.
+; Structural regression for the DPI-correctness fix in shortcuts/adapters/mouse_control.ahk.
 ;
 ; Before the fix, MCSetPos() called DllCall("SetCursorPos") and MCGetPos()
 ; called DllCall("GetCursorPos"). Both Win32 functions operate in logical

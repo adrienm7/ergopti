@@ -284,7 +284,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 		local file = assert(io.open("ergopti_hotstrings.lua", "r"))
 		local source = file:read("*a")
 		file:close()
-		local block = assert(source:match('local wrap_on_type = require%("modules.shortcuts.wrap_on_type"%).new%({(.-)get_pair%s*='))
+		local block = assert(source:match('local wrap_on_type = require%("shortcuts.engine.wrap_on_type"%).new%({(.-)get_pair%s*='))
 		local getter = assert(block:match("is_active%s*=%s*(function%(%).-end),"))
 		local admitted, captured = true, false
 		local factory = assert((loadstring or load)("return function(shortcuts, script_actions, secure_focus_guard, input_capture_gate) return " .. getter .. " end"))()
@@ -494,7 +494,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 				owners.chords._reset()
 				owners.chords.init({ is_paused = function() return controls.paused end,
 					defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
-				local narrowed = require("infra.shortcuts_scope").new({ path = path, backup_path = backup .. ".chords",
+				local narrowed = require("shortcuts.engine.scope").new({ path = path, backup_path = backup .. ".chords",
 					files = controls.files, is_paused = function() return controls.paused end, only = "script_chords" })
 				helpers.assert_true(narrowed.apply(mode))
 				local config = Codec.decode(Sandbox.read_bytes(path))

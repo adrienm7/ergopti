@@ -16,17 +16,17 @@ local helpers = require("tests.helpers")
 local function run_action(responses)
 	local result
 	helpers.with_fresh_modules({
-		"ui.menu.menu_shortcuts",
+		"shortcuts.ui.menu.shortcuts",
 		"core.logger.engine.logger",
 		"core.timing.engine.deferred_work",
 		"core.fs.engine.dir",
 		"core.ui.engine.dialog_util",
-		"modules.shortcuts",
-		"modules.shortcuts.actions.text",
+		"shortcuts.engine",
+		"shortcuts.engine.actions.text",
 		"core.i18n.engine.i18n",
 		"menu.ui.builder.utils",
 		"menu.engine.manifest_menu",
-		"ui.menu.shortcut_utils",
+		"shortcuts.ui.menu.utils",
 		"layouts.ui.menu.keyboard_slots",
 		"menu.engine.manifest_reader",
 	}, function()
@@ -49,10 +49,10 @@ local function run_action(responses)
 				return true
 			end,
 		}
-		package.loaded["modules.shortcuts"] = {
+		package.loaded["shortcuts.engine"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
-		package.loaded["modules.shortcuts.actions.text"] = {
+		package.loaded["shortcuts.engine.actions.text"] = {
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
@@ -70,7 +70,7 @@ local function run_action(responses)
 				return providers.wrap_symbols_menu()
 			end,
 		}
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["layouts.ui.menu.keyboard_slots"] = {
 			provide_rows = function() return {} end,
 		}
@@ -84,7 +84,7 @@ local function run_action(responses)
 			wrap_symbol_states = {},
 			custom_wrap_symbols = {},
 		}
-		local MenuShortcuts = require("ui.menu.menu_shortcuts")
+		local MenuShortcuts = require("shortcuts.ui.menu.shortcuts")
 		local item = MenuShortcuts.build({
 			base_dir = "/fixture/driver/",
 			shortcuts = {

@@ -50,9 +50,9 @@ local function with_scope(body, source, options)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
-			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "gestures.engine.manager",
-				"infra.shortcuts_scope", "menu.ui.builder.builder" }) do
+			for _, name in ipairs({ "shortcuts.engine.manager", "shortcuts.engine.keyboard_shortcuts", "shortcuts.engine.tap_keys",
+				"shortcuts.engine.chatgpt", "shortcuts.engine.script_chords", "shortcuts.engine.key_combinations", "gestures.engine.manager",
+				"shortcuts.engine.scope", "menu.ui.builder.builder" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }
@@ -76,14 +76,14 @@ local function with_scope(body, source, options)
 			gestures.execute_action = function(action, binding)
 				controls.executed[#controls.executed + 1] = action .. "@" .. binding
 			end
-			local manager = require("modules.shortcuts.manager")
+			local manager = require("shortcuts.engine.manager")
 			manager.init({ persist = true, config_path = path })
-			local keyboard, taps = require("modules.shortcuts.keyboard_shortcuts"), require("modules.shortcuts.tap_keys")
+			local keyboard, taps = require("shortcuts.engine.keyboard_shortcuts"), require("shortcuts.engine.tap_keys")
 			keyboard.get_assignments()
 			taps.init({ is_active = function() return manager.is_enabled() and not controls.paused end,
 				defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
 			taps.get_action("number_row_left")
-			local url = require("modules.shortcuts.chatgpt")
+			local url = require("shortcuts.engine.chatgpt")
 			local files = {
 				read_with_status = function(target) return Writer.read_classified(target) end,
 				write = function() error("unconditional configuration publication") end,
@@ -98,7 +98,7 @@ local function with_scope(body, source, options)
 			-- The global shortcut scope now includes the daemon's canonical pair
 			-- owner. Build its actual policy from the physical catalogue; only
 			-- native retirement/installation acknowledgements are controlled here.
-			local combinations = require("modules.shortcuts.key_combinations")
+			local combinations = require("shortcuts.engine.key_combinations")
 			if not options or options.initialize_pairs ~= false then
 				local Loader = require("platform.remap.tap_hold_loader")
 				local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
@@ -123,11 +123,11 @@ local function with_scope(body, source, options)
 				if controls.refuse_restore and state.keyboard__primary_j__open_url then return false end
 				return apply_parameters(token, state)
 			end
-			local chords = require("modules.shortcuts.script_chords")
+			local chords = require("shortcuts.engine.script_chords")
 			chords.init({ is_paused = function() return controls.paused end,
 				defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
 			local backup = path .. ".shortcuts-test-backup"
-			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = backup,
+			local scope = require("shortcuts.engine.scope").new({ path = path, backup_path = backup,
 				files = files, is_paused = function() return controls.paused end })
 			controls.files = files
 			local owners = { manager = manager, keyboard = keyboard, taps = taps, url = url, gestures = gestures,
@@ -156,7 +156,7 @@ local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 --- Real configuration/claim owners; only the native map observation is modeled.
 local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
-		local names = { "platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+		local names = { "platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "shortcuts.engine.physical_collisions",
 			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook, navigation_dir, navigation_made

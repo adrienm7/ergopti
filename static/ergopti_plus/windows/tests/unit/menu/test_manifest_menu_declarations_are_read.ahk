@@ -13,7 +13,7 @@
 ;     four paths.
 ;   * ``modifier_combos_group`` (now key_combinations_group) listed three
 ;     feature-section paths, while the same builder read them from a
-;     _SHORTCUTS_SUBMAP_V1V2 Map in ui/menu/menu_shortcuts.ahk.
+;     _SHORTCUTS_SUBMAP_V1V2 Map in shortcuts/ui/menu/shortcuts.ahk.
 ;
 ; None of this was visible as a bug: the menus rendered correctly, because the
 ; code copy was in sync. The failure mode is the next edit — adding a fourth

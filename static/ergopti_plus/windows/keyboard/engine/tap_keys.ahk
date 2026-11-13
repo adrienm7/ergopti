@@ -6,7 +6,7 @@
 ; The three keys at the edges of the number row, the key left of 1 (SC029) and
 ; the two right of 0 (SC00C, SC00D), each assignable to any catalogue action:
 ; their assignments, the predicate and the handler of their hotkeys
-; (modules/shortcuts/tap_keys.ahk), and the live label the menu shows for each.
+; (shortcuts/engine/tap_keys.ahk), and the live label the menu shows for each.
 ; A plain tap runs the action and the key is swallowed. With a modifier held, on
 ; the AltGr layer, or while the key is unassigned, the key keeps its normal
 ; behaviour: the layout emulation's character when that emulation remaps it,

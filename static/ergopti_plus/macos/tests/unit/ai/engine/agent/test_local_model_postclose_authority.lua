@@ -16,7 +16,7 @@ require("core.logger.engine")
 local OWNED = {
 	"ai.engine.agent.runner", "ai.engine.agent.learning", "ai.engine.agent.connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
-	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
+	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "core.i18n.engine.core", "shortcuts.engine.script_control",
 }
 
 --- Keeps the complete real requester and every native callback in one scope.

@@ -21,8 +21,8 @@ local function with_menu(body)
 		local keys,holds=KeyCatalog.for_platform(defaults,"linux"),HoldOptions.build(defaults.tap_hold.hold_picker)
 		package.loaded["gestures.engine.manager"]=nil
 		local gestures=require("gestures.engine.manager")
-		package.loaded["modules.shortcuts.key_combinations"]=nil
-		local Pair=require("modules.shortcuts.key_combinations")
+		package.loaded["shortcuts.engine.key_combinations"]=nil
+		local Pair=require("shortcuts.engine.key_combinations")
 		local owner=Pair.new({keys=keys,hold_picker=defaults.tap_hold.hold_picker,route=function() return "/controlled/config.toml" end,
 			files={read_with_status=function() return state.source,"ok" end},is_paused=function() return state.paused end,
 			actions=gestures,changed=function() return true end});Pair.set_instance(owner)
@@ -75,7 +75,7 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			local notices={}
 			package.loaded["menu.ui.builder.feature_notice"]={feature=function(label,enabled) notices[#notices+1]={label,enabled} end}
 			local row=assert(state.find(state.translate("menu.shortcuts.key_combinations_enable")),"the switch row must exist")
-			local before=require("modules.shortcuts.key_combinations").is_enabled()==true
+			local before=require("shortcuts.engine.key_combinations").is_enabled()==true
 			helpers.assert_eq(state.click(row),true)
 			helpers.assert_eq(#notices,1)
 			helpers.assert_eq(notices[1][1],state.translate("menu.shortcuts.key_combinations"))
@@ -156,7 +156,7 @@ end
 local function with_controlled_probes(callback)
 	local targets = {
 		{ require("core.process.adapters.shell_runner"), "has_command", function() return true end },
-		{ require("adapters.window_switch"), "available", function() return true, nil, nil end },
+		{ require("shortcuts.adapters.window_switch"), "available", function() return true, nil, nil end },
 		{ require("gestures.engine.program_owner"), "available", function() return true end },
 		{ require("gestures.adapters.workspace_switcher"), "detect", function() return {}, nil end },
 	}

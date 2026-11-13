@@ -213,7 +213,7 @@ local _build_agent = require("ai.ui.menu.agent").build
 
 local _build_metrics = require("metrics.ui.menu.metrics").build
 
-local _build_shortcuts = require("ui.menu.menu_shortcuts").build
+local _build_shortcuts = require("shortcuts.ui.menu.shortcuts").build
 
 local _build_tap_holds = require("ui.menu.menu_tap_holds").build
 

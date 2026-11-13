@@ -7,7 +7,7 @@ local OWNED_MODULES = {
 	"ai.engine",
 	"keyboard.engine.chord",
 	"platform.input.hotkey_registrar",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"ai.ui.menu.trigger_orchestrator",
 }
 
@@ -42,7 +42,7 @@ local function with_fixture(body)
 		}
 		package.loaded["keyboard.engine.chord"] = {}
 		package.loaded["platform.input.hotkey_registrar"] = {}
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["ai.ui.menu.trigger_orchestrator"] = nil
 
 		local orchestrator = require("ai.ui.menu.trigger_orchestrator").new({

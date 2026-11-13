@@ -27,8 +27,8 @@ local Logger = require("core.logger.engine.shim")
 local NativePath = require("core.fs.engine.native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
-local Combinations = require("modules.shortcuts.key_combinations")
-local AiActions = require("modules.shortcuts.ai_actions")
+local Combinations = require("shortcuts.engine.key_combinations")
+local AiActions = require("shortcuts.engine.ai_actions")
 local original_combination_constructor = Combinations.new
 local original_combination_instance_current = Combinations.instance_is_current
 local BindingIdentity = require("settings.engine.publication.binding_identity")
@@ -44,7 +44,7 @@ local original_pair_constructor = CombinationEngine.new
 local Timings = require("core.timing.engine.timings")
 local HoldOptions = require("tap_hold.engine.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
-local ScriptActions = require("modules.shortcuts.script_actions")
+local ScriptActions = require("shortcuts.engine.script_actions")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
 local NavLayer = require("keyboard.engine.layers.nav_layer")
@@ -361,7 +361,7 @@ function M.managed_combination_catalogue_current(owner)
 		and rawequal(owner, _combinations) and type(owner) == "table"
 		and getmetatable(M) == nil and rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
 		and getmetatable(Combinations) == nil
-		and rawequal(package.loaded["modules.shortcuts.key_combinations"], Combinations)
+		and rawequal(package.loaded["shortcuts.engine.key_combinations"], Combinations)
 		and rawget(Combinations, "new") == original_combination_constructor
 		and rawget(Combinations, "instance_is_current") == original_combination_instance_current
 		and original_combination_instance_current(owner, issuer.catalogue) == true
@@ -425,7 +425,7 @@ function M.managed_pair_options_current(owner,configured)
   and record~=nil and rawequal(record.owner,owner) and rawequal(_combinations,owner) and rawequal(record.loaded,_loaded)
   and rawequal(record.engine,_engine) and rawequal(_installed_engine,_engine) and record.generation==_generation
   and _initialized and not _paused and rawequal(_hook,_native_hook) and type(_native_hook)=="table"
-  and rawequal(package.loaded["modules.shortcuts.key_combinations"],Combinations)
+  and rawequal(package.loaded["shortcuts.engine.key_combinations"],Combinations)
   and rawget(Combinations,"new")==original_combination_constructor
   and rawget(Engine,"new")==original_engine_constructor
   and rawequal(package.loaded["platform.remap.tap_hold_engine"],Engine)

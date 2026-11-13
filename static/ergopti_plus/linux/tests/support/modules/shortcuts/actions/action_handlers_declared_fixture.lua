@@ -75,11 +75,11 @@ local function run_every_action(Gestures, ids, configure)
 		debug = Logger.debug, warn = Logger.warn,
 		emitter = package.loaded["gestures.engine.combo_emitter"],
 		manager = package.loaded["gestures.engine.manager"],
-		shortcuts = package.loaded["modules.shortcuts.manager"],
+		shortcuts = package.loaded["shortcuts.engine.manager"],
 		webview = package.loaded["core.ui.ui.webview_manager"], popen = io.popen,
 	}
 	-- Loaded again under the recording emitter below, since it keeps its own.
-	package.loaded["modules.shortcuts.manager"] = nil
+	package.loaded["shortcuts.engine.manager"] = nil
 	local unknown, pressed, current = {}, {}, nil
 	local function spy(fmt)
 		if type(fmt) == "string" and fmt:find("Unknown action", 1, true) then unknown[#unknown + 1] = current end
@@ -104,7 +104,7 @@ local function run_every_action(Gestures, ids, configure)
 	Logger.debug, Logger.warn = saved.debug, saved.warn
 	package.loaded["gestures.engine.combo_emitter"] = saved.emitter
 	package.loaded["gestures.engine.manager"] = saved.manager
-	package.loaded["modules.shortcuts.manager"] = saved.shortcuts
+	package.loaded["shortcuts.engine.manager"] = saved.shortcuts
 	package.loaded["core.ui.ui.webview_manager"] = saved.webview
 	io.popen = saved.popen
 	if not ok then error(err, 0) end

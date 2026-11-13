@@ -152,7 +152,7 @@ end
 --- Reads ScriptControl's exact public pause state and epoch without requiring it
 --- through the LLM dependency cycle.
 local function read_script_pause_state()
-	local control = package.loaded["modules.shortcuts.script_control"]
+	local control = package.loaded["shortcuts.engine.script_control"]
 	if type(control) ~= "table" then return false, 0, true end
 	local epoch = 0
 	if type(control.get_pause_epoch) == "function" then

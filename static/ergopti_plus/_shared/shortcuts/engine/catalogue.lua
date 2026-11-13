@@ -31,7 +31,7 @@ M.TAP_BINDING_PREFIX = "tap_key__"
 
 -- The registry owner name and module the tap keys publish under.
 M.TAP_OWNER = "tap"
-M.TAP_MODULE = "modules.shortcuts.tap_keys"
+M.TAP_MODULE = "shortcuts.engine.tap_keys"
 
 local ACTION_CATALOGUE_MODULE = "gestures.engine.manager"
 

@@ -54,7 +54,7 @@ local function load_menu_quit_action()
 	}
 	-- Menu startup loads optional user code; the quit contract must never acquire
 	-- a real personal configuration file or its persistent cooperative lock.
-	package.loaded["infra.personal_shortcuts"] = { load = function() return true end }
+	package.loaded["shortcuts.engine.personal_shortcuts"] = { load = function() return true end }
 	package.loaded["menu.ui.transactions.global_actions_transaction"] = {
 		create = function(deps)
 			return {
@@ -145,7 +145,7 @@ local function load_menu_quit_action()
 	}
 
 	for _, module_name in ipairs({
-		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
+		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "ai.ui.menu", "metrics.ui.menu.metrics",
 		"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about",
 		"ai.engine", "metrics.engine", "hotstrings.engine.dynamic", "gestures.engine",
@@ -153,7 +153,7 @@ local function load_menu_quit_action()
 		package.loaded[module_name] = {}
 	end
 	local captured_actions = nil
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		is_paused = function() return false end,
 		set_extras = function(actions) captured_actions = actions end,
 	}

@@ -13,7 +13,7 @@ local function with_api(kind, callback)
 		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"ai.engine.api.common", "ai.engine.api.parser", "ai.engine.settings.profiles",
 		"ai.engine.prediction.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
-		"modules.shortcuts.script_control" }, function()
+		"shortcuts.engine.script_control" }, function()
 		local shell = { tasks = {}, mode = "true", clients = {} }
 		function shell.spawn(executable, args, done, chunk, environment, private, owned)
 			local task = { settled = false, attempted = false, cancel_calls = 0, observers = {},
@@ -70,7 +70,7 @@ local function with_api(kind, callback)
 		package.loaded["ai.engine.prediction.progressive_reveal"] = {}
 		package.loaded["ai.engine.api.common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
 			OLLAMA_KEEP_ALIVE = "5m", get_retry_policy = function() return 1, 0, 0 end }
-		package.loaded["modules.shortcuts.script_control"] = nil
+		package.loaded["shortcuts.engine.script_control"] = nil
 		callback(helpers.load_with_stubs("ai.engine.api.ollama", {
 			host = { uuid = function() return nonce:sub(1, 8) .. "-" .. nonce:sub(9, 12) .. "-"
 				.. nonce:sub(13, 16) .. "-" .. nonce:sub(17, 20) .. "-" .. nonce:sub(21, 32) end },

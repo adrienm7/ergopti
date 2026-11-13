@@ -155,7 +155,7 @@ end
 -- forever-active source for the native transfer/installation.
 local probe_active = true
 local function retire_probe() probe_active = false end
-local script_actions = require("modules.shortcuts.script_actions").new({
+local script_actions = require("shortcuts.engine.script_actions").new({
 	reset = retire_probe, reload = retire_probe, quit = retire_probe,
 })
 local is_paused = script_actions.is_paused

@@ -35,7 +35,7 @@ function M.with_sentinel(callback)
 		"gestures.engine.engine", "gestures.engine.actions", "metrics.engine",
 		"diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "platform.input.key_state",
-		"modules.shortcuts.script_control",
+		"shortcuts.engine.script_control",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
@@ -80,9 +80,9 @@ function M.with_sentinel(callback)
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "none" end,
 		}
-		package.loaded["modules.shortcuts.script_control"] = nil
+		package.loaded["shortcuts.engine.script_control"] = nil
 
-		local subject = helpers.load_with_stubs("modules.shortcuts.script_control", {
+		local subject = helpers.load_with_stubs("shortcuts.engine.script_control", {
 			application = {
 				frontmostApplication = function()
 					return {title = function() return "CallbackTest" end}
@@ -124,7 +124,7 @@ function M.with_configurable(callback)
 	local names = {
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
 		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "gestures.engine.actions",
-		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "settings.engine.paths", "settings.engine.preferences.preferences",
+		"shortcuts.engine.keyboard_shortcuts", "keyboard.engine.chord", "settings.engine.paths", "settings.engine.preferences.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
@@ -157,9 +157,9 @@ function M.with_configurable(callback)
 		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["settings.engine.paths"] = { get = function() return "callback-fixture-config" end }
 		package.loaded["settings.engine.preferences.preferences"] = nil
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
 
-		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")
+		local subject = helpers.load_with_stubs("shortcuts.engine.keyboard_shortcuts")
 		return callback({
 			subject = subject, failures = failures,
 			get_bound_callback = function() return bound_callback end,

@@ -8,7 +8,7 @@
 --- then listing every slot the user has assigned, plus a row that offers the
 --- unassigned ones.
 ---
---- The module underneath (modules/shortcuts/keyboard_shortcuts.lua) has always
+--- The module underneath (shortcuts/engine/keyboard_shortcuts.lua) has always
 --- bound, persisted and released these shortcuts; what it never had was a way to
 --- create one. Its whole configuration surface — get_action, get_slot_label,
 --- get_assignments — had zero readers, and its only writer was a reset routine
@@ -33,10 +33,10 @@ local i18n         = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
 local Logger       = require("core.logger.engine.logger")
 local DeferredWork = require("core.timing.engine.deferred_work")
-local ActionPicker = require("ui.action_picker")
-local ShortcutUtils = require("ui.menu.shortcut_utils")
-local KbShortcuts  = require("modules.shortcuts")
-local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
+local ActionPicker = require("shortcuts.ui.action_picker")
+local ShortcutUtils = require("shortcuts.ui.menu.utils")
+local KbShortcuts  = require("shortcuts.engine")
+local InputSourceConflict = require("shortcuts.engine.input_source_conflict")
 local ManifestMenu = require("menu.engine.manifest_menu")
 local ShellRunner  = require("core.process.adapters.shell_runner")
 local dialog       = require("core.ui.engine.dialog_util")

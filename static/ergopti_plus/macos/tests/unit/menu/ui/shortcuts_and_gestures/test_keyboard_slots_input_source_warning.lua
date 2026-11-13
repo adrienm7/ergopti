@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 local DISPLACED = {
 	"core.timing.engine.deferred_work",
 	"core.ui.engine.dialog_util",
-	"modules.shortcuts.input_source_conflict",
+	"shortcuts.engine.input_source_conflict",
 	"layouts.ui.menu.keyboard_slots",
 }
 
@@ -40,7 +40,7 @@ local function with_menu(ids, answer, body)
 	package.loaded["core.process.adapters.shell_runner"] = {
 		open = function(target) seen.opened[#seen.opened + 1] = target return true end,
 	}
-	package.loaded["modules.shortcuts.input_source_conflict"] = {
+	package.loaded["shortcuts.engine.input_source_conflict"] = {
 		SETTINGS_URL = "x-apple.systempreferences:test",
 		check = function(_, _, on_result) on_result(ids) return true end,
 	}

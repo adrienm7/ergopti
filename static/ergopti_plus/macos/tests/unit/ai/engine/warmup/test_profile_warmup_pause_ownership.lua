@@ -60,7 +60,7 @@ local function load_fixture()
 	end
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		get_pause_epoch = function()
 			local reentrant_profile = fixture.reenter_on_pause_epoch
 			if type(reentrant_profile) == "string" then

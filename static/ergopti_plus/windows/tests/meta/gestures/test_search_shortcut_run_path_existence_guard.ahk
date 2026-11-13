@@ -39,7 +39,7 @@
 
 _TSSRPEG_CheckSearchPathRunGuard() {
 	Body := _DriverFuncBody("SearchPath")
-	Assert(Body != "", "SearchPath must exist in modules/shortcuts/win.ahk")
+	Assert(Body != "", "SearchPath must exist in shortcuts/engine/win.ahk")
 
 	; (a) The old bare FilePath+Run pattern must be gone
 	; The bug was: if FilePath { Run(SelectedText, ...  with no FileExist check.

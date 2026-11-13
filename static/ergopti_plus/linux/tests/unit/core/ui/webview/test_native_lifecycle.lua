@@ -571,7 +571,7 @@ local run_contract = function(helpers,load_manager,load_host)
         return false
        end
       end
-      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
+      local host=load_host();package.loaded['shortcuts.ui.physical_shortcuts.bridge']=host
       helpers.assert_eq(m.native_available(),true,'Controlled GUI exists independently of physical delivery')
       helpers.assert_eq(host.available(scope),false,'Only literal acknowledged physical authority may admit a host')
       helpers.assert_eq(host.open({scope=scope,is_paused=function()return false end}),false)
@@ -595,7 +595,7 @@ local run_contract = function(helpers,load_manager,load_host)
        local closed=false
        return{retire=function()closed=true;retired=retired+1;return true end,receive=function()if closed or options.page_current()~=true then return false end;received=received+1;return true end}
       end}
-      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
+      local host=load_host();package.loaded['shortcuts.ui.physical_shortcuts.bridge']=host
       local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
       c.present=function()error('private acquisition detail')end
       if mode=='destroy'then c.destroy='false'else c.release=false end
@@ -618,7 +618,7 @@ local run_contract = function(helpers,load_manager,load_host)
      package.loaded['core.fs.engine.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
      package.loaded['gestures.engine.manager']={}
      package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)return{retire=function()return true end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
-     local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
+     local host=load_host();package.loaded['shortcuts.ui.physical_shortcuts.bridge']=host
      local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
      c.present=function()
       helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
@@ -652,4 +652,4 @@ local run_contract = function(helpers,load_manager,load_host)
  end)
 end
 
-run_contract(helpers,function()package.loaded['core.ui.ui.webview_manager']=nil;return require('core.ui.ui.webview_manager')end,function()package.loaded['ui.physical_shortcuts.bridge']=nil;return require('ui.physical_shortcuts.bridge')end)
+run_contract(helpers,function()package.loaded['core.ui.ui.webview_manager']=nil;return require('core.ui.ui.webview_manager')end,function()package.loaded['shortcuts.ui.physical_shortcuts.bridge']=nil;return require('shortcuts.ui.physical_shortcuts.bridge')end)

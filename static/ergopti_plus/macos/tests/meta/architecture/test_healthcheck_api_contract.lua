@@ -39,7 +39,7 @@ local CONTRACT = {
 	{ mod = "modules.updater",                  fns = { "current_version", "installed_channel" } },
 	{ mod = "keyboard.adapters.karabiner.ke_paths",          constants = { "CLI" } },
 	{ mod = "core.fs.adapters.file_system",             fns = { "exists" } },
-	{ mod = "modules.shortcuts.script_control", fns = { "is_paused" } },
+	{ mod = "shortcuts.engine.script_control", fns = { "is_paused" } },
 	{ mod = "platform.input.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
 	{ mod = "keyboard.adapters.karabiner.lease_controller",  fns = { "status" } },
 	{ mod = "ai.engine",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",

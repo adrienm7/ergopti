@@ -158,7 +158,7 @@ local function load_fixture(legacy)
 	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 
 	for _, module_name in ipairs({
-		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
+		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
@@ -167,7 +167,7 @@ local function load_fixture(legacy)
 	package.loaded["ai.ui.menu"] = { create = function() return {} end }
 	package.loaded["ai.engine"] = { set_backend = noop }
 	package.loaded["metrics.engine"] = {}
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		is_paused = function() return false end,
 		set_on_pause_change = noop,
 		set_shortcut_action = noop,
@@ -176,7 +176,7 @@ local function load_fixture(legacy)
 	}
 	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["gestures.engine"] = { SINGLE_SLOTS = { "swipe_left" } }
-	package.loaded["infra.personal_shortcuts"] = { load = noop }
+	package.loaded["shortcuts.engine.personal_shortcuts"] = { load = noop }
 
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["ui.menu.init"] = nil

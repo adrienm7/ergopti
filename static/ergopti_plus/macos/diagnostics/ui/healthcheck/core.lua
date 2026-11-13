@@ -263,17 +263,17 @@ end
 local ADAPTER_SPECS = {
 	-- Reachable interfaces only; native execution and consent are checked separately.
 	{
-		id       = "adapters.apple_shortcuts",
+		id       = "shortcuts.adapters.apple_shortcuts",
 		contract = { "valid_identifier", "validate_reply", "new" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.apple_shortcuts_native",
+		id       = "shortcuts.adapters.apple_shortcuts_native",
 		contract = { "available", "create", "is_chosen_program", "revalidate_program", "cli_identity" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.apple_shortcuts_cli",
+		id       = "shortcuts.adapters.apple_shortcuts_cli",
 		contract = { "parse_list", "reply", "observed_rows", "bounded_list_command", "list_blocking", "ports" },
 		-- The run_apple_shortcut action and its editor list and run through it.
 		wired    = true,
@@ -336,24 +336,24 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.physical_history_context",
+		id       = "shortcuts.adapters.physical_history_context",
 		contract = { "new" },
 		-- Explicit retained history uses this factory; loading never enables capture.
 		wired    = true,
 	},
 	{
-		id       = "adapters.physical_lifecycle_event",
+		id       = "shortcuts.adapters.physical_lifecycle_event",
 		contract = { "classify" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.physical_context_probe",
+		id       = "shortcuts.adapters.physical_context_probe",
 		contract = { "snapshot" },
 		-- Reached by the explicit fenced sampler; loading performs no native read.
 		wired    = true,
 	},
 	{
-		id       = "adapters.physical_observation_clock",
+		id       = "shortcuts.adapters.physical_observation_clock",
 		contract = { "now" },
 		-- Reached by explicit configuration binding; loading never samples time.
 		wired    = true,
@@ -391,7 +391,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.physical_shortcut_hook",
+		id       = "shortcuts.adapters.physical_shortcut_hook",
 		contract = { "new" },
 		-- Structural require reachability; runtime native delivery stays unavailable.
 		wired    = true,
@@ -602,7 +602,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.mouse_control",
+		id       = "shortcuts.adapters.mouse_control",
 		contract = { "setPos", "getPos" },
 		wired    = true,
 	},

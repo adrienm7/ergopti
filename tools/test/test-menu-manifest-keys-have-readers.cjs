@@ -264,7 +264,7 @@ const { shortcutConstructionReaderEvidence } = require('../lib/menu-row-availabi
 const shortcutConstructionReaderSections = (...args) =>
 	shortcutConstructionReaderEvidence(...args)?.sections || [];
 const shortcutWindowsSource = sources.find(
-	({ rel }) => rel === 'windows/ui/menu/menu_shortcuts.ahk'
+	({ rel }) => rel === 'windows/shortcuts/ui/menu/shortcuts.ahk'
 )?.src;
 const shortcutRendererSource = sources.find(
 	({ rel }) => rel === 'windows/menu/engine/manifest_menu.ahk'

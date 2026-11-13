@@ -10,7 +10,7 @@ helpers.describe("Physical shortcut native host ownership", function()
 		local called, detail = pcall(function()
 			require("tests.lua.layouts.physical_editor_host_contract")(helpers, Json,
 				function(relative) return helpers.shared(relative) end,
-				function() package.loaded["ui.physical_shortcuts"] = nil; return require("ui.physical_shortcuts") end, "macos")
+				function() package.loaded["shortcuts.ui.physical_shortcuts"] = nil; return require("shortcuts.ui.physical_shortcuts") end, "macos")
 		end)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end

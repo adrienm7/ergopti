@@ -158,7 +158,7 @@ local function load_fixture(options)
 		end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 
 	-- These internal modules must be real: the regression guards their transitive
 	-- callback contract, not a test-local reproduction of either half.

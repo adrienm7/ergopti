@@ -22,7 +22,7 @@ local OWNED_MODULES = {
 	"settings.engine.paths",
 	"metrics.adapters.kc_bridge",
 	"gestures.engine.engine",
-	"modules.shortcuts",
+	"shortcuts.engine",
 	"keyboard.engine.runtime.onboarding",
 	"keyboard.engine",
 	"core.logger.engine.logger",
@@ -43,7 +43,7 @@ local OWNED_MODULES = {
 	"core.ui.ui.tooltip",
 	"metrics.engine",
 	"platform.input.synthetic_input",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"keyboard.adapters.karabiner.ke_variables",
 	"core.fs.adapters.json_codec",
 	"core.process.adapters.shell_runner",
@@ -508,7 +508,7 @@ return function(run, dependencies)
 				end,
 			}
 			package.loaded["gestures.engine.engine"] = {}
-			package.loaded["modules.shortcuts"] = {
+			package.loaded["shortcuts.engine"] = {
 				is_paused = function() return paused_now end,
 			}
 			if options.onboarding_module then
@@ -832,9 +832,9 @@ return function(run, dependencies)
 			-- cached adapters would retain prior timers or an obsolete commitment contract.
 			package.loaded["platform.input.synthetic_input"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
-			local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
+			local script_control = helpers.load_with_stubs("shortcuts.engine.script_control")
 			local script_hs = hs
-			package.loaded["modules.shortcuts"] = {
+			package.loaded["shortcuts.engine"] = {
 				is_paused = function() return script_control.is_paused() end,
 			}
 			local keymap = {

@@ -24,11 +24,11 @@ local LabelValue = require("core.i18n.engine.label_value")
 local Logger            = require("core.logger.engine.logger")
 local DeferredWork      = require("core.timing.engine.deferred_work")
 local InputSourceBroker = require("layouts.adapters.input_source_broker")
-local ActionPicker      = require("ui.action_picker")
-local ShortcutUtils     = require("ui.menu.shortcut_utils")
+local ActionPicker      = require("shortcuts.ui.action_picker")
+local ShortcutUtils     = require("shortcuts.ui.menu.utils")
 local KeyboardSlots     = require("layouts.ui.menu.keyboard_slots")
-local TapKeys           = require("modules.shortcuts.tap_keys")
-local Bindings          = require("modules.shortcuts.bindings")
+local TapKeys           = require("shortcuts.engine.tap_keys")
+local Bindings          = require("shortcuts.engine.bindings")
 
 local LOG = "menu.tap_keys"
 

@@ -147,7 +147,7 @@ const ALLOWLIST = [
 			'never activates the app (focus is unavailable while untrusted) and closes itself on grant'
 	},
 	{
-		file: 'macos/modules/shortcuts/actions/system_mouse.lua',
+		file: 'macos/shortcuts/engine/actions/system_mouse.lua',
 		kinds: { 'mac.level': 1 },
 		reason: 'mouse spotlight: a transient locator overlay dismissed on mouse move'
 	},

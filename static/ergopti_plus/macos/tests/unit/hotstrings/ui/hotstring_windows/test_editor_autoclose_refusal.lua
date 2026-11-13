@@ -105,8 +105,8 @@ helpers.describe("hotstring editor: shortcut auto-close keeps a refused draft (m
 
 	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
 	helpers.it("commits a save while the driver is paused (edd1-paused-writes)", function()
-	local paused_control = package.loaded["modules.shortcuts.script_control"]
-	package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+	local paused_control = package.loaded["shortcuts.engine.script_control"]
+	package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end }
 		local ok, failure = pcall(function()
 			local saves = 0
 			local editor, dispatch, state = load_editor(function() saves = saves + 1; return true, nil, "committed" end)
@@ -117,7 +117,7 @@ helpers.describe("hotstring editor: shortcut auto-close keeps a refused draft (m
 			helpers.assert_eq(state.reloads, 1)
 			package.loaded["hotstrings.ui.hotstring_editor"] = nil
 		end)
-	package.loaded["modules.shortcuts.script_control"] = paused_control
+	package.loaded["shortcuts.engine.script_control"] = paused_control
 		assert(ok, failure)
 	end)
 

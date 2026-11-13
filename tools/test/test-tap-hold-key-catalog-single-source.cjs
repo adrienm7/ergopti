@@ -362,7 +362,7 @@ const linuxPairs = stripLineComments(
 	'.lua'
 );
 const linuxOwner = stripLineComments(
-	read(path.join(SP, 'linux/modules/shortcuts/key_combinations.lua')),
+	read(path.join(SP, 'linux/shortcuts/engine/key_combinations.lua')),
 	'.lua'
 );
 const linuxMenu = stripLineComments(

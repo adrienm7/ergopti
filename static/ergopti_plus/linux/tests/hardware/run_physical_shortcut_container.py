@@ -46,7 +46,7 @@ fh:close()
 # The daemon, unchanged, with only the delivery getter answering true in its
 # own process: the evidence LIN-004 asks for before the production getter may.
 LAUNCH = (
-    'require("modules.shortcuts.keyboard_shortcuts").physical_delivery_available = function() return true end; '
+    'require("shortcuts.engine.keyboard_shortcuts").physical_delivery_available = function() return true end; '
     'arg = {[0] = "ergopti_hotstrings.lua", "--verbose", "--config", "tests/e2e/fixtures/daemon_keys.toml"}; '
     'dofile("ergopti_hotstrings.lua")'
 )

@@ -41,7 +41,7 @@ local i18n         = require("core.i18n.engine.i18n")
 local Paths        = require("core.fs.engine.paths")
 local FileSystem   = require("core.fs.adapters.file_system")
 local JsonCodec    = require("core.fs.adapters.json_codec")
-local MouseControl = require("adapters.mouse_control")
+local MouseControl = require("shortcuts.adapters.mouse_control")
 
 local LOG = "llm.screen_answer"
 
@@ -351,7 +351,7 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 			local consent_revision = engine.close_answer_surface(session)
 			if consent_revision == nil then return end
 			Offer.offer(detail.model, { current = function()
-				local script = package.loaded["modules.shortcuts.script_control"]
+				local script = package.loaded["shortcuts.engine.script_control"]
 				if script and type(script.is_paused) == "function" and script.is_paused() then return false end
 				return is_current(generation, "model consent") and engine.get_llm_enabled() == true
 					and engine.current_request_revision() == consent_revision
@@ -459,7 +459,7 @@ function M.run(value, mode, parent, answers)
 		show_notice("llm.vision.capture_failed")
 		return false
 	end
-	local Capture = dependency("modules.shortcuts.actions.screenshot_save", "capture_image")
+	local Capture = dependency("shortcuts.engine.actions.screenshot_save", "capture_image")
 	if not Capture then return false end
 	_generation = _generation + 1
 	local generation = _generation

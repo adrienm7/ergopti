@@ -85,6 +85,6 @@ The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 
 - Port contracts: `static/ergopti_plus/_shared/core/ports/*.spec.js` (20 files: `FileSystem.spec.js`, `HttpClient.spec.js`, `KeyboardHook.spec.js`, `Notifier.spec.js`, `TextSender.spec.js`, `TimerScheduler.spec.js`, `TooltipRenderer.spec.js`, `TrayMenu.spec.js`, `SecureFieldDetector.spec.js`, `Clipboard.spec.js`, `Storage.spec.js`, `ProcessLifecycle.spec.js`, `KeyState.spec.js`, `MouseControl.spec.js`, `NetworkInfo.spec.js`, `WindowInfo.spec.js`, `WindowManager.spec.js`, `AppLauncher.spec.js`, `Crypto.spec.js`, `GraphicsRenderer.spec.js`)
 - Port spec documentation: `static/ergopti_plus/_shared/core/ports/SPEC.md`
-- Linux adapter implementations: `static/ergopti_plus/linux/adapters/`
+- Linux adapter implementations: `static/ergopti_plus/linux/shortcuts/adapters/`
 - Compliance enforcement script: `tools/test/test-port-compliance.cjs` (`npm run test:port-compliance`)
 - Domain module specs: `static/ergopti_plus/_shared/core/text/data/domain/SPEC.md`

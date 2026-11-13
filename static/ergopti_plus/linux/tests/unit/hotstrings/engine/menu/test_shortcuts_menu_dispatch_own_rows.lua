@@ -277,7 +277,7 @@ end)
 helpers.describe("shortcuts menu: configured binding labels", function()
 	for _, surface in ipairs({ "keyboard", "tap" }) do
 		helpers.it("shows the saved value in the real " .. surface .. " provider", function()
-			local owned = { "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys", "gestures.engine.manager" }
+			local owned = { "shortcuts.engine.keyboard_shortcuts", "shortcuts.engine.tap_keys", "gestures.engine.manager" }
 			local saved = {}
 			for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
 			local ok, failure = xpcall(function()
@@ -457,12 +457,12 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 			if row.id == "script_control_toggle" then key = row.i18n; declared = declared + 1 end
 		end
 		helpers.assert_eq(declared, 1)
-		local prior = package.loaded["modules.shortcuts.script_chords"]
-		package.loaded["modules.shortcuts.script_chords"] = chords
+		local prior = package.loaded["shortcuts.engine.script_chords"]
+		package.loaded["shortcuts.engine.script_chords"] = chords
 		local called, row = pcall(function()
 			return find_row(shortcuts_menu({ on_menu_changed = changed }), require("core.i18n.engine.i18n").get(key))
 		end)
-		package.loaded["modules.shortcuts.script_chords"] = prior
+		package.loaded["shortcuts.engine.script_chords"] = prior
 		helpers.assert_true(called, tostring(row))
 		helpers.assert_not_nil(row)
 		helpers.assert_eq(type(row.fn), "function")
@@ -546,7 +546,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 			.. tostring(initial) .. '\nscript_altgr_enter = "script_reload"\nfuture_mode = "kept" # independent comment\n[future]\nvalues = ["a", "b"]\n'
 		local file = assert(io.open(path, "wb"));assert(file:write(source));assert(file:close())
 		local paths, loaded = require("settings.engine.paths"), {}
-		for _, name in ipairs({ "settings.engine.paths", "modules.shortcuts.script_chords" }) do
+		for _, name in ipairs({ "settings.engine.paths", "shortcuts.engine.script_chords" }) do
 			loaded[#loaded + 1] = { name = name, value = package.loaded[name] }
 		end
 		local port = {}
@@ -555,8 +555,8 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		local rename = os.rename
 		local called, failure = pcall(function()
 			package.loaded["settings.engine.paths"] = port
-			package.loaded["modules.shortcuts.script_chords"] = nil
-			local chords = require("modules.shortcuts.script_chords")
+			package.loaded["shortcuts.engine.script_chords"] = nil
+			local chords = require("shortcuts.engine.script_chords")
 			chords.init({ is_paused = function() return false end, defer = function() return true end })
 			helpers.assert_eq(chords.chords_enabled(), initial)
 			body(chords, path, source)
@@ -604,8 +604,8 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 						helpers.assert_eq(read(path), expected, "only the owned sparse switch leaf changes")
 						local decoded = require("core.text.engine.toml_codec").decode(read(path))
 						if not initial then helpers.assert_nil(decoded.shortcuts.script_control.chords_enabled, "the true default is a deletion") end
-						package.loaded["modules.shortcuts.script_chords"] = nil
-						local reloaded = require("modules.shortcuts.script_chords")
+						package.loaded["shortcuts.engine.script_chords"] = nil
+						local reloaded = require("shortcuts.engine.script_chords")
 						helpers.assert_eq(reloaded.chords_enabled(), not initial, "a native reload reads the acknowledged target")
 					else
 						helpers.assert_eq(read(path), source, "all slot assignments/comments/future fields survive refusal")
@@ -636,8 +636,8 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 				local observed = read(path):gsub("\nchords_enabled = %a+\n", "\n")
 				local retained = source:gsub("\nchords_enabled = %a+\n", "\n")
 				helpers.assert_eq(observed, retained, "all independent slot/comment/future bytes remain exact")
-				package.loaded["modules.shortcuts.script_chords"] = nil
-				helpers.assert_eq(require("modules.shortcuts.script_chords").chords_enabled(), initial)
+				package.loaded["shortcuts.engine.script_chords"] = nil
+				helpers.assert_eq(require("shortcuts.engine.script_chords").chords_enabled(), initial)
 			end)
 		end)
 		helpers.it("respects the native chord configuration reservation from " .. tostring(initial), function()

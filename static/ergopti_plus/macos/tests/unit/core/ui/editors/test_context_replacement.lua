@@ -25,7 +25,7 @@ local function with_editor(module_name, callback)
 			"tests.stubs.hs",
 			"core.ui.adapters.webview_result", "core.fs.engine.dir", "core.text.engine.utils", "keyboard.adapters.karabiner.lease_helper",
 			"program_providers", "core.process.adapters.task_environment", "core.lifecycle.engine.compat.utf8", "diagnostics.engine.runtime_log",
-			"adapters.apple_shortcuts", "core.process.adapters.shell_runner", "adapters.apple_shortcuts_native",
+			"shortcuts.adapters.apple_shortcuts", "core.process.adapters.shell_runner", "shortcuts.adapters.apple_shortcuts_native",
 			"core.timing.engine.deferred_work", "core.lifecycle.engine.launcher_environment", "core.events.timer_scheduler", "app_dirs",
 			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "settings.engine.paths",
 			"core.logger.engine.log_folders", "program_parameter", "user_action_parameter", "text_utils", "core.process.adapters.program_providers",
@@ -134,7 +134,7 @@ end
 
 helpers.describe("action picker: a second open supersedes the first context", function()
 	helpers.it("drops a late confirmation from A and invokes only callback B", function()
-		with_editor("ui.action_picker", function(picker, state)
+		with_editor("shortcuts.ui.action_picker", function(picker, state)
 			local confirmed_a, confirmed_b = {}, {}
 			picker.open({ title = "Target A", items = {} }, function(id)
 				confirmed_a[#confirmed_a + 1] = id
@@ -177,7 +177,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 	-- the vocabulary and its strings, and the value it collected must reach the
 	-- caller with the pick, or the user's value is thrown away.
 	helpers.it("sends the page's editor its fields and forwards the value it collected", function()
-		with_editor("ui.action_picker", function(picker, state, hs_stub)
+		with_editor("shortcuts.ui.action_picker", function(picker, state, hs_stub)
 			local received = nil
 			picker.open({
 				title = "Editor",
@@ -205,7 +205,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 	end)
 
 	helpers.it("keeps a rejected confirmation open so the same choice can be retried", function()
-		with_editor("ui.action_picker", function(picker, state)
+		with_editor("shortcuts.ui.action_picker", function(picker, state)
 			local attempts = 0
 			picker.open({ title = "Retry target", items = {} }, function()
 				attempts = attempts + 1
@@ -228,7 +228,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 	end)
 
 	helpers.it("retains an accepted picker until its exact native close succeeds", function()
-		with_editor("ui.action_picker", function(picker, state)
+		with_editor("shortcuts.ui.action_picker", function(picker, state)
 			local confirmations = 0
 			picker.open({title = "Native retry", items = {}}, function()
 				confirmations = confirmations + 1
@@ -261,7 +261,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 	end)
 
 	helpers.it("retains a reentrant picker candidate whose rollback raises", function()
-		with_editor("ui.action_picker", function(picker, state)
+		with_editor("shortcuts.ui.action_picker", function(picker, state)
 			state.close_during_create = true
 			state.delete_throws = true
 			helpers.assert_eq(picker.open({title = "Reentrant A", items = {}}, function() end), false)

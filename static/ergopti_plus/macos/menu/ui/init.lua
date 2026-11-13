@@ -105,7 +105,7 @@ local _branch_rows = BranchRows.new()
 -- Load isolated sub-menu builders safely
 local menu_mods = _branch_rows.wrap({
 	gestures        = safe_require("gestures.ui.menu.gestures",        "gestures menu"),
-	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
+	shortcuts       = safe_require("shortcuts.ui.menu.shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("layouts.ui.menu.keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("hotstrings.ui.menu.hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ai.ui.menu",             "AI menu"),
@@ -119,7 +119,7 @@ local menu_mods = _branch_rows.wrap({
 local core_mods = {
 	llm           = safe_require("ai.engine", "AI engine"),
 	keystats     = safe_require("metrics.engine", "metrics engine"),
-	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
+	shortcuts_mod = safe_require("shortcuts.engine", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("hotstrings.engine.dynamic", "dynamic hotstrings engine"),
 	capsword_auto_off = safe_require("keyboard.engine.capsword_auto_off", "CapsWord auto-off settings"),
 }
@@ -1030,7 +1030,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- The menu re-installs an identical closure when first built, so this is purely
 		-- a startup head-start, not a competing source of truth.
 		if type(core_mods.shortcuts_mod.set_wrap_pairs_getter) == "function" then
-			local ok_txt, text_acts_mod = pcall(require, "modules.shortcuts.actions.text")
+			local ok_txt, text_acts_mod = pcall(require, "shortcuts.engine.actions.text")
 			if ok_txt and type(text_acts_mod.build_active_wrap_pairs) == "function" then
 				pcall(core_mods.shortcuts_mod.set_wrap_pairs_getter, function()
 					local wrap = WrapMutation.view(state)
@@ -1190,7 +1190,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		open_script_source        = function() return open_async(base_dir .. "init.lua") end,
 		open_personal_shortcuts   = function()
-			local ok, ps = pcall(require, "infra.personal_shortcuts")
+			local ok, ps = pcall(require, "shortcuts.engine.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end
 		end,
 		open_personal_hotstrings  = function() return open_path_via_menu("PersonalTomlPath") end,
@@ -1316,14 +1316,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				or type(menu_mods.shortcuts) ~= "table"
 				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return nil end
 			if not shortcuts_scope then
-				shortcuts_scope = require("ui.menu.shortcuts_scope").new({
+				shortcuts_scope = require("shortcuts.ui.menu.scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, shortcuts = core_mods.shortcuts_mod, gestures = gestures,
-					bindings = require("modules.shortcuts.bindings"),
-					keyboard = require("modules.shortcuts.keyboard_shortcuts"),
-					tap_keys = require("modules.shortcuts.tap_keys"),
-					script_control = require("modules.shortcuts.script_control"),
+					bindings = require("shortcuts.engine.bindings"),
+					keyboard = require("shortcuts.engine.keyboard_shortcuts"),
+					tap_keys = require("shortcuts.engine.tap_keys"),
+					script_control = require("shortcuts.engine.script_control"),
 					idle = menu_mods.shortcuts.scope_idle,
 					start_script_control = function()
 						return core_mods.shortcuts_mod.start_script_control(keymap, core_mods.shortcuts_mod, gestures, karabiner)
@@ -1476,7 +1476,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function apply_script_chords_scope(mode)
 		local owner = preference_scope_owner("shortcuts")
 		if not owner then return false end
-		local committed = owner.apply(mode, require("ui.menu.shortcuts_scope").script_chord_rows)
+		local committed = owner.apply(mode, require("shortcuts.ui.menu.scope").script_chord_rows)
 		if committed == true then
 			Logger.info(LOG, "Scope shortcuts.script_chords %s committed.", tostring(mode))
 			Builder.invalidate_cache()
@@ -1493,7 +1493,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function apply_keyboard_group_scope(prefix, mode)
 		local owner = preference_scope_owner("shortcuts")
 		if not owner then return false end
-		local Shortcuts = require("modules.shortcuts")
+		local Shortcuts = require("shortcuts.engine")
 		local slot_ids = {}
 		for _, slot in ipairs(Shortcuts.available_keyboard_slots(prefix)) do slot_ids[#slot_ids + 1] = slot.id end
 		if #slot_ids == 0 then
@@ -1501,7 +1501,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return false
 		end
 		local committed = owner.apply(mode,
-			require("ui.menu.shortcuts_scope").keyboard_group_rows(slot_ids, Shortcuts.keyboard_binding_id))
+			require("shortcuts.ui.menu.scope").keyboard_group_rows(slot_ids, Shortcuts.keyboard_binding_id))
 		if committed == true then
 			Logger.info(LOG, "Scope shortcuts.%s %s committed.", tostring(prefix), tostring(mode))
 			Builder.invalidate_cache()
@@ -1917,7 +1917,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- driver fully wired. Errors are caught inside the module so a broken
 	-- user file logs to the console without preventing boot.
 	pcall(function()
-		local ok, ps = pcall(require, "infra.personal_shortcuts")
+		local ok, ps = pcall(require, "shortcuts.engine.personal_shortcuts")
 		if ok and type(ps.load) == "function" then ps.load() end
 	end)
 

@@ -31,9 +31,9 @@ function M.new(options)
 	local binding, slot, section, provider = options.binding
 	local action = options.action == nil and "run_program" or options.action
 	local families = {
-		{ "keyboard__", ConfigKeys.KEY.SHORTCUTS_KEYBOARD, "modules.shortcuts.keyboard_shortcuts" },
-		{ "tap_key__", ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, "modules.shortcuts.tap_keys" },
-		{ "script__", ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL, "modules.shortcuts.script_chords" },
+		{ "keyboard__", ConfigKeys.KEY.SHORTCUTS_KEYBOARD, "shortcuts.engine.keyboard_shortcuts" },
+		{ "tap_key__", ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, "shortcuts.engine.tap_keys" },
+		{ "script__", ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL, "shortcuts.engine.script_chords" },
 	}
 	if type(binding) == "string" and parameters.DEFAULT_GESTURES[binding] ~= nil then
 		slot, section = binding, "gestures"

@@ -1352,7 +1352,7 @@ function M.warmup_model(model_name, profile)
 	-- such flag at all by design. Read through package.loaded rather than
 	-- require() to avoid a circular dependency, exactly as the prediction engine
 	-- does for the same question.
-	local sc = package.loaded["modules.shortcuts.script_control"]
+	local sc = package.loaded["shortcuts.engine.script_control"]
 	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
 		Logger.debug(LOG, "warmup_model: paused — '%s' stays cold until resume.", tostring(model_name))
 		return true
@@ -1422,7 +1422,7 @@ end
 --- the core module's bootstrap cycle.
 --- @return number epoch Monotonic pause generation, or zero when unavailable.
 local function profile_warmup_pause_epoch()
-	local control = package.loaded["modules.shortcuts.script_control"]
+	local control = package.loaded["shortcuts.engine.script_control"]
 	if type(control) ~= "table" or type(control.get_pause_epoch) ~= "function" then
 		return 0
 	end
@@ -1435,7 +1435,7 @@ end
 --- @param epoch number Pause epoch captured before acquisition.
 --- @return boolean current
 local function profile_warmup_runtime_current(epoch)
-	local control = package.loaded["modules.shortcuts.script_control"]
+	local control = package.loaded["shortcuts.engine.script_control"]
 	if profile_warmup_pause_epoch() ~= epoch then return false end
 	if type(control) ~= "table" then return true end
 	if type(control.is_paused) == "function" then

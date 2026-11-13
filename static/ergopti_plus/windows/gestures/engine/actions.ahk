@@ -239,7 +239,7 @@ global GESTURE_ACTIONS := Map(
 		"send_shortcut", {
 				Fn: (BindingId := "") => GestureSendInput("send_shortcut", BindingId),
 		},
-		; The Win+D and Win+S shortcuts' own functions (modules/shortcuts/win.ahk),
+		; The Win+D and Win+S shortcuts' own functions (shortcuts/engine/win.ahk),
 		; so a gesture and the fixed shortcut cannot drift apart.
 		"open_downloads", {
 				Fn: (*) => OpenDownloads(),
@@ -726,7 +726,7 @@ GestureDisplayMirrorToggle(Sys := 0) {
 
 ; Case action id -> the pure transform it applies to the selection
 ; (hotstrings/engine/text_case.ahk). The registry below and the shared-corpus replay
-; (tests/unit/modules/shortcuts/test_text_case_vectors.ahk) both read this map, so an id cannot be
+; (tests/unit/shortcuts/engine/test_text_case_vectors.ahk) both read this map, so an id cannot be
 ; tested against one transform and run another.
 ; @returns {Map}
 GestureCaseTransforms() {

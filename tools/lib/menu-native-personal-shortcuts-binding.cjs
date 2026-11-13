@@ -1074,7 +1074,7 @@ function personalAuthority(unit) {
 function personalFrameDataPublication(sources, definition, owningEntry) {
 	try {
 		const files = [
-			'windows/ui/menu/menu_shortcuts.ahk',
+			'windows/shortcuts/ui/menu/shortcuts.ahk',
 			'windows/menu/ui/builder/menu_init.ahk',
 			'windows/menu/engine/manifest_menu.ahk',
 			'windows/tray/adapters/menu.ahk'

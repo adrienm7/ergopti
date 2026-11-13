@@ -11,7 +11,7 @@
 --- that deals with CapsWord quotes a delimiter key beyond the three physical
 --- keys a driver may name natively (space, tab, enter; "star" is the magic
 --- key's historical key, used by unrelated hotstring code), or quotes a pointer
---- kind outside the one evdev map in modules/shortcuts/caps_word_auto_off.lua.
+--- kind outside the one evdev map in shortcuts/engine/caps_word_auto_off.lua.
 --- The delay presets have no Linux spelling at all; the JS gate
 --- tools/test/test-caps-word-auto-off-single-source.cjs holds every driver to
 --- that.
@@ -20,10 +20,10 @@
 local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()
-local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding" }
+local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts" }
 local NATIVE_KEYS = { space = true, tab = true, enter = true, star = true }
 -- The one file allowed to spell the pointer kinds, resolved from its module name.
-local POINTER_MAP = assert(package.searchpath("modules.shortcuts.caps_word_auto_off", package.path))
+local POINTER_MAP = assert(package.searchpath("shortcuts.engine.caps_word_auto_off", package.path))
 
 --- Lists every .lua file under a directory, recursively (lfs or the shell).
 --- @param abs string Absolute directory path.
@@ -76,7 +76,7 @@ helpers.describe("CapsWord auto-off single source (Linux)", function()
 			if def.key and not NATIVE_KEYS[def.key] then forbidden_keys[#forbidden_keys + 1] = def.key end
 		end
 		helpers.assert_true(#forbidden_keys > 10, "the catalogue must provide the delimiter keys")
-		local kinds = require("modules.shortcuts.caps_word_auto_off").pointer_kinds()
+		local kinds = require("shortcuts.engine.caps_word_auto_off").pointer_kinds()
 		helpers.assert_true(#kinds > 0, "the manifest must declare the pointer kinds")
 
 		local scanned, offenders = 0, {}

@@ -428,7 +428,7 @@ helpers.describe("exact configuration route after native callbacks",function()
 	helpers.it("refuses a route handoff after parameter application before publishing the old source",function()
 		with_owner(function(s)
 			local route=path;local other="/controlled/other.toml";s.bytes[other]=source
-			local Pair=require("modules.shortcuts.key_combinations")
+			local Pair=require("shortcuts.engine.key_combinations")
 			local owned=Pair.new({keys={{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},
 				hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,route=function() return route end,
 				is_paused=function() return s.paused end,actions=s.gestures,changed=function() return true end})
@@ -454,7 +454,7 @@ helpers.describe("final ordered-pair publication route ownership",function()
 		helpers.it("retains the exact inverse when "..phase.." hands off the canonical route",function()
 			with_owner(function(s)
 				local route,other=path,"/controlled/other.toml"
-				local Pair=require("modules.shortcuts.key_combinations")
+				local Pair=require("shortcuts.engine.key_combinations")
 				local handed=false
 				local owned
 				local function handoff()
@@ -616,7 +616,7 @@ helpers.describe("staged publication source after the final native source read",
 	helpers.it("retains exact inverse and fenced delivery after the final source read changes canonical route",function()
 		with_owner(function(s)
 			local route,other=path,"/controlled/final-pause.toml";local armed,handed=false,false
-			local Pair=require("modules.shortcuts.key_combinations")
+			local Pair=require("shortcuts.engine.key_combinations")
 			local reads=setmetatable({read_with_status=function(...)
 				local bytes,status=s.files.read_with_status(...)
 				if armed and not handed then handed=true;route=other;s.bytes[other]=s.bytes[path] end

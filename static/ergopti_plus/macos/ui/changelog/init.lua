@@ -233,17 +233,17 @@ end
 --- Pending pause/resume inverse debt is distinct from a committed paused flag.
 local function pause_allows_install()
 	local ok, control, pending, paused = pcall(function()
-		local native = require("modules.shortcuts.script_control")
+		local native = require("shortcuts.engine.script_control")
 		return native, native.is_pause_transition_pending, native.is_paused
 	end)
 	if not ok or type(control) ~= "table" or type(pending) ~= "function"
 		or type(paused) ~= "function" then return false end
 	local pending_ok, transitioning = pcall(pending)
 	if not pending_ok or transitioning ~= false
-		or package.loaded["modules.shortcuts.script_control"] ~= control then return false end
+		or package.loaded["shortcuts.engine.script_control"] ~= control then return false end
 	local paused_ok, suspended = pcall(paused)
 	return paused_ok and suspended == false
-		and package.loaded["modules.shortcuts.script_control"] == control
+		and package.loaded["shortcuts.engine.script_control"] == control
 end
 
 --- Fresh native action admission; accepted install execution uses a separate owner.

@@ -57,7 +57,7 @@ function exists(rel) {
 check(
 	'windows/core/text/engine/utils.ahk exists',
 	exists('windows/core/text/engine/utils.ahk'),
-	'Rename windows/infra/string_utils.ahk -> text_utils.ahk may have been reverted.'
+	'Rename windows/shortcuts/engine/string_utils.ahk -> text_utils.ahk may have been reverted.'
 );
 
 check(
@@ -67,8 +67,8 @@ check(
 );
 
 check(
-	'windows/infra/string_utils.ahk is absent (old name, §5.6)',
-	!exists('windows/infra/string_utils.ahk'),
+	'windows/shortcuts/engine/string_utils.ahk is absent (old name, §5.6)',
+	!exists('windows/shortcuts/engine/string_utils.ahk'),
 	'Old name re-introduced — remove it and ensure infra/text_utils.ahk is the only copy.'
 );
 
@@ -79,15 +79,15 @@ check(
 // =====================================================================
 
 check(
-	'windows/ui/action_picker/init.ahk exists',
-	exists('windows/ui/action_picker/init.ahk'),
+	'windows/shortcuts/ui/action_picker/init.ahk exists',
+	exists('windows/shortcuts/ui/action_picker/init.ahk'),
 	'Move windows/ui/action_picker.ahk -> ui/action_picker/init.ahk may have been reverted.'
 );
 
 check(
-	'macos/ui/action_picker/init.lua exists',
-	exists('macos/ui/action_picker/init.lua'),
-	'macos/ui/action_picker/init.lua is the macOS peer — must not be renamed or removed.'
+	'macos/shortcuts/ui/action_picker/init.lua exists',
+	exists('macos/shortcuts/ui/action_picker/init.lua'),
+	'macos/shortcuts/ui/action_picker/init.lua is the macOS peer — must not be renamed or removed.'
 );
 
 check(

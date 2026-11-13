@@ -29,7 +29,7 @@ local function fixture(body, secondary)
 			"menu.engine.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "core.i18n.engine.i18n",
 			"core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.logger.engine.logger", "core.fs.adapters.json_codec",
 			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.process.adapters.shell_runner", "core.ui.engine.dialog_util",
-			"ui.menu.shortcut_utils", "core.text.engine.utils", "platform.input.send_input", "hs", "tests.stubs.hs",
+			"shortcuts.ui.menu.utils", "core.text.engine.utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()
 			local policy, lookup, dialog, prompt, scheduler
 			local state = { calls = {}, applies = {}, raw = "ctrl+k", focus_calls = 0 }
@@ -50,7 +50,7 @@ local function fixture(body, secondary)
 				local factory = require("menu.engine.native_presentation")
 				dialog = require("core.ui.engine.dialog_util")
 				prompt = dialog.text_prompt
-				local shortcuts = require("ui.menu.shortcut_utils")
+				local shortcuts = require("shortcuts.ui.menu.utils")
 				function state.options(declared, apply)
 					local options = {
 						message = "Original shortcut body",

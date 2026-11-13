@@ -18,7 +18,7 @@ function M.build(ctx,ui)
 	local declaration = Features.find_entry_by_path("category_enabled.key_combinations")
 	if type(declaration) ~= "table" or declaration.type ~= "boolean" or declaration.default ~= true then return {} end
 	local th,actions = ctx.tap_holds,ctx.gestures
-	local pairs = require("modules.shortcuts.key_combinations")
+	local pairs = require("shortcuts.engine.key_combinations")
 	local Scope = require("keyboard.engine.keys.combinations_scope")
 	local t,renderer = ui.get,ui.manifest
 	if type(th)~="table" or type(actions)~="table" then return {} end

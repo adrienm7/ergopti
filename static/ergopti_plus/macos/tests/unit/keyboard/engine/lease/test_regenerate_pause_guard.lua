@@ -46,7 +46,7 @@ local helpers = require("tests.helpers")
 --- @param paused boolean What shortcuts.is_paused() reports.
 --- @return table karabiner, table deploys
 local function load_karabiner(paused)
-	package.loaded["modules.shortcuts"] = { is_paused = function() return paused end }
+	package.loaded["shortcuts.engine"] = { is_paused = function() return paused end }
 	package.loaded["keyboard.engine.runtime.config"] = {
 		load_available_actions = function() return { { id = "none" } } end,
 		load_tap_hold_keys = function() return { { id = "left_shift" } } end,

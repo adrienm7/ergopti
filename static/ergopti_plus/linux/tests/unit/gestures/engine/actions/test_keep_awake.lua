@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local KeepAwake = require("modules.keep_awake")
+local KeepAwake = require("shortcuts.engine.keep_awake")
 
 --- A controlled process and scheduler with independently delivered settlement.
 --- @return table fixture
@@ -168,18 +168,18 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		local row = require("_generated.action_catalogue").actions.activity_simulation
 		helpers.assert_true(row ~= nil)
 		helpers.assert_eq(row.requires, { "tool:systemd-inhibit" })
-		local previous, calls = package.loaded["modules.keep_awake"], 0
-		package.loaded["modules.keep_awake"] = { toggle = function() calls = calls + 1; return true end }
+		local previous, calls = package.loaded["shortcuts.engine.keep_awake"], 0
+		package.loaded["shortcuts.engine.keep_awake"] = { toggle = function() calls = calls + 1; return true end }
 		local ok, err = pcall(require("gestures.engine.system_actions").HANDLERS.activity_simulation)
-		package.loaded["modules.keep_awake"] = previous
+		package.loaded["shortcuts.engine.keep_awake"] = previous
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(calls, 1)
 	end)
 
 	helpers.it("linux-keep-awake: shutdown waits for inhibitor settlement and pause releases it", function()
 		local manager = helpers.load_module("gestures.engine.manager")
-		local previous, stopped, listener = package.loaded["modules.keep_awake"], 0, nil
-		package.loaded["modules.keep_awake"] = {
+		local previous, stopped, listener = package.loaded["shortcuts.engine.keep_awake"], 0, nil
+		package.loaded["shortcuts.engine.keep_awake"] = {
 			stop = function() stopped = stopped + 1; return false end,
 			when_settled = function(fn) listener = fn; return true end,
 		}
@@ -193,7 +193,7 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 			listener()
 			helpers.assert_true(done)
 		end)
-		package.loaded["modules.keep_awake"] = previous
+		package.loaded["shortcuts.engine.keep_awake"] = previous
 		manager.set_program_paused(false)
 		if not ok then error(err, 0) end
 	end)

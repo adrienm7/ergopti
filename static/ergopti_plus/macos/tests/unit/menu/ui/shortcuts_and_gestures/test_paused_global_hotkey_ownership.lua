@@ -45,7 +45,7 @@ helpers.describe("audit pause fence: global hotkey ownership", function()
 		function native_hotkey:delete() self.enabled = false end
 
 		local paused = true
-		package.loaded["modules.shortcuts.script_control"] = {
+		package.loaded["shortcuts.engine.script_control"] = {
 			is_paused = function() return paused end,
 		}
 

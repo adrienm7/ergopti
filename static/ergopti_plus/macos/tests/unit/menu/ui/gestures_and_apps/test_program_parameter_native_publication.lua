@@ -66,7 +66,7 @@ local function with_subject(stage, body, options)
 				return renamed, detail
 			end
 			local ran, problem = xpcall(function()
-				for _, name in ipairs({ "settings.engine.preferences.preferences", "core.text.engine.toml_codec.writer", "settings.ui.menu.preferences_transaction", "menu.ui.transactions.program_parameter_transaction", "menu.ui.transactions.global_actions_transaction", "modules.shortcuts.keyboard_shortcuts" }) do package.loaded[name] = nil end
+				for _, name in ipairs({ "settings.engine.preferences.preferences", "core.text.engine.toml_codec.writer", "settings.ui.menu.preferences_transaction", "menu.ui.transactions.program_parameter_transaction", "menu.ui.transactions.global_actions_transaction", "shortcuts.engine.keyboard_shortcuts" }) do package.loaded[name] = nil end
 				local logs, logger = {}, helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do logger[level] = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end end
 				package.loaded["core.logger.engine.logger"] = logger
@@ -74,7 +74,7 @@ local function with_subject(stage, body, options)
 				package.loaded["settings.engine.paths"] = { get = function() return path end }
 				package.loaded["gestures.engine.actions"] = { is_assignable = function() return true end }
 				local preferences = require("settings.engine.preferences.preferences"); preferences.load(path)
-				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+				local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 				helpers.assert_eq(keyboard.get_action("primary_1"), "none")
 				local parameters, state = { retained = "unrelated" }, {}
 				local gestures = {
@@ -239,7 +239,7 @@ helpers.describe("actual private native publication ownership", function()
 	helpers.it("does not release its native owner over a foreign runtime assignment", function()
 		with_subject("fullsave", function(owner, apply, _, control)
 			helpers.assert_eq(apply(), false)
-			local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+			local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 			helpers.assert_eq(keyboard.apply_configuration({ shortcuts = { keyboard = { primary_1 = "copy_selection" } } }), true)
 			local before = control.unlocks
 			control.refusal = false

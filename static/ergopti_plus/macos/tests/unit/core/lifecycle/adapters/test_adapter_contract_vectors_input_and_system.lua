@@ -572,7 +572,7 @@ end)
 -- test saves getPos() first and restores it after (hs.mouse is stubbed on macOS,
 -- but the save/restore keeps the AHK twin honest).
 helpers.describe("Adapter contract vectors: MouseControl", function()
-	local adapter = helpers.load_with_stubs("adapters.mouse_control")
+	local adapter = helpers.load_with_stubs("shortcuts.adapters.mouse_control")
 
 	helpers.it("getPos returns {x, y} numbers, never throws (get_pos_returns_object / fields_are_numbers)", function()
 		local ok, p = pcall(function() return adapter.getPos() end)

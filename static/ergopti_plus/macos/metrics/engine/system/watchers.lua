@@ -913,7 +913,7 @@ end
 --- A bound actor observes existing writers; binding does not activate sensors.
 local PhysicalLifecycle = require("metrics.engine.capture.physical_lifecycle_observation")
 local _physical_lifecycle = PhysicalLifecycle.new("system", function()
-	return require("adapters.physical_observation_clock").now()
+	return require("shortcuts.adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
 
 local function physical_lifecycle_snapshot(initial)
@@ -951,7 +951,7 @@ local function physical_lifecycle_snapshot(initial)
 		context_refresh_generation = refresh_generation }
 end
 local function physical_system_source(event)
-	return require("adapters.physical_lifecycle_event").classify(event)
+	return require("shortcuts.adapters.physical_lifecycle_event").classify(event)
 end
 
 --- Binds a dormant lifecycle consumer; no hardware handle or state is acquired.

@@ -12,7 +12,7 @@
 
 _ODNB_KeyboardPathHasNoExplorerWait() {
 	Body := _DriverFuncBody("OpenDownloads")
-	Assert(Body != "", "OpenDownloads must exist in modules/shortcuts/win.ahk")
+	Assert(Body != "", "OpenDownloads must exist in shortcuts/engine/win.ahk")
 	LaunchBody := _DriverFuncBody("_OpenDownloadsWith")
 	Assert(LaunchBody != "", "the resolved-folder launcher must exist")
 	Assert(InStr(Body, "_OpenDownloadsWith(GetKnownFolderDownloads, Run)") > 0,

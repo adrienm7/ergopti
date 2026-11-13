@@ -37,7 +37,7 @@ end
 helpers.describe("shortcuts/script_control.lua: double-start guard (shortcuts-watcher-leak)", function()
 
 	helpers.it("M.start() requires the complete committed native pair before reusing it", function()
-		local src = read_source("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
+		local src = read_source("local function log_shortcut_if_available") -- shortcuts/engine/script_control.lua
 		helpers.assert_true(
 			src:find("if _tap and _tap_committed and _tap_watchdog and _tap_watchdog_committed then", 1, true) ~= nil,
 			"script_control M.start() may reuse only one fully committed tap/watchdog pair (shortcuts-watcher-leak)")
@@ -55,7 +55,7 @@ end)
 helpers.describe("shortcuts/keyboard_shortcuts.lua: double-start guard (shortcuts-watcher-leak)", function()
 
 	helpers.it("M.start() checks _started before rebinding hotkeys", function()
-		local src = read_source("local function load_assignments") -- modules/shortcuts/keyboard_shortcuts.lua
+		local src = read_source("local function load_assignments") -- shortcuts/engine/keyboard_shortcuts.lua
 		local start_pos = src:find("function%s+M%.start%s*%(")
 		local stop_pos = start_pos and src:find("\nfunction%s+M%.stop%s*%(", start_pos) or nil
 		helpers.assert_true(start_pos ~= nil and stop_pos ~= nil,

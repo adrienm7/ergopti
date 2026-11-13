@@ -12,7 +12,7 @@
 ; capsword.ahk arms `#HotIf CapsWordEnabled` → SC039 to unlatch, and space.ahk
 ; arms the tap-hold variant. Both criteria are true simultaneously, and this
 ; repo's own pinned precedence is that the most-recently-DEFINED variant wins.
-; keyboard/adapters/remap.ahk is included AFTER modules/shortcuts.ahk, so the tap-hold
+; keyboard/adapters/remap.ahk is included AFTER shortcuts/shortcuts.ahk, so the tap-hold
 ; variant fires and the unlatch hotkey is dead code whenever a space tap-hold is
 ; configured. Enter is shadowed identically.
 ;
@@ -135,7 +135,7 @@ _CTU_TapHoldsAreIncludedAfterShortcuts() {
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 	Code := _StripFullLineComments(Src)
 
-	ShortcutsPos := InStr(Code, "#Include modules/shortcuts.ahk")
+	ShortcutsPos := InStr(Code, "#Include shortcuts/shortcuts.ahk")
 	TapHoldsPos  := InStr(Code, "#Include keyboard/adapters/remap.ahk")
 	Assert(ShortcutsPos > 0 and TapHoldsPos > 0,
 		"both module groups must still be included from the entry")
@@ -146,7 +146,7 @@ _CTU_TapHoldsAreIncludedAfterShortcuts() {
 ; And capsword must keep its own unlatch hotkeys: they are the ones that run
 ; when NO tap-hold is configured for those keys, which is the default.
 _CTU_CapsWordKeepsItsOwnUnlatch() {
-	Src := _StripFullLineComments(_DriverDirConcat("modules/shortcuts"))
+	Src := _StripFullLineComments(_DriverDirConcat("shortcuts/engine"))
 	Assert(InStr(Src, "#HotIf CapsWordEnabled") > 0,
 		"capsword.ahk must keep its own CapsWordEnabled hotkey context — with no tap-hold configured on Space or Enter, those variants are the only unlatch path there is")
 	Assert(InStr(Src, "DisableCapsWord()") > 0,

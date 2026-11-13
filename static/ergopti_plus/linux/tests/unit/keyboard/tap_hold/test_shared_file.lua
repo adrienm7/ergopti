@@ -132,7 +132,7 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 		helpers.it("the Linux key combinations read the " .. name .. " pair as expected.toml says (tap-hold-shared-file)", function()
 			local want = expected.reads[name].linux.mod_combos
 			local defaults = Loader.load(DEFAULTS, nil)
-			local owner = require("modules.shortcuts.key_combinations").new({ keys = defaults.catalog,
+			local owner = require("shortcuts.engine.key_combinations").new({ keys = defaults.catalog,
 				hold_picker = defaults.hold_picker, files = require("core.fs.adapters.file_system"),
 				route = function() return CORPUS .. name .. ".config.toml" end,
 				is_paused = function() return false end, changed = function() return true end,

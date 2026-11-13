@@ -121,13 +121,13 @@ function M.build_world(options)
 	}
 	package.loaded["platform.system.info"] = { time_zone = function() return "Europe/Paris" end }
 	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end, log_llm_failed = function() end,
 		log_llm_suggested = function() end, log_llm_dismissed = function() end,
 	}
-	package.loaded["modules.shortcuts.actions.text"] = {
+	package.loaded["shortcuts.engine.actions.text"] = {
 		read_copied_selection = function(_, on_selection, on_empty)
 			world.reads = (world.reads or 0) + 1
 			if world.selection == "" then on_empty() else on_selection(world.selection) end

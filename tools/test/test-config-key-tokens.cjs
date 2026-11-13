@@ -126,7 +126,7 @@ assert.equal(
 	const path = require('node:path');
 	const root = path.resolve(__dirname, '..', '..');
 	const raw = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/ui/menu/shortcuts_scope.lua'),
+		path.join(root, 'static/ergopti_plus/macos/shortcuts/ui/menu/scope.lua'),
 		'utf8'
 	);
 	assert.ok(
@@ -135,7 +135,7 @@ assert.equal(
 	);
 	require('../lib/config-key-source-view.cjs').install();
 	const viewed = fs.readFileSync(
-		path.join(root, 'static/ergopti_plus/macos/ui/menu/shortcuts_scope.lua'),
+		path.join(root, 'static/ergopti_plus/macos/shortcuts/ui/menu/scope.lua'),
 		'utf8'
 	);
 	assert.ok(

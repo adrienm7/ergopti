@@ -144,7 +144,7 @@ local function find(fn, key)
 	error("Missing actual writer upvalue: "..key)
 end
 package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
-helpers.load_with_stubs("adapters.physical_observation_clock")
+helpers.load_with_stubs("shortcuts.adapters.physical_observation_clock")
 helpers.with_fresh_modules({ "core.process.adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
 	native.frames.clock={version=1,domain="mach_absolute_time",numer=1,denom=1}
@@ -194,13 +194,13 @@ shell.run(function(capture, observed, native)
 		local o={}; function o:addWatcher() return self end; function o:removeWatcher() return self end; function o:callback(fn) observations.ax=fn;return self end;function o:start() return self end;function o:stop() return self end;return o end}}
 	-- The same declared native projection leaf model as existing managed-session controls.
 	local Accepted=require("metrics.engine.capture.physical_accepted_context")
-	package.loaded["adapters.physical_history_context"]={new=function(owner,history,borrowed)
+	package.loaded["shortcuts.adapters.physical_history_context"]={new=function(owner,history,borrowed)
 		local c,k=borrowed.capture,borrowed.clock
 		local ct,kt=c.identity(),k.identity(owner)
 		return Accepted.new(owner,{current=function() return c.current(ct)==true and c.admitted(ct)~=nil and k.current(owner,kt)==true end,revision=history.retained_count,convert=tonumber,resolve_interval=function(first,last) return history.resolve_interval(ct,kt,first,last) end,calendar=function() return calendar end,on_refused=function() history.stop(ct) end})
 	end}
 	package.loaded["core.process.adapters.shell_runner"]={spawn=native.dependencies.spawn}
-	control=require("modules.shortcuts.script_control")
+	control=require("shortcuts.engine.script_control")
 	manager=require("metrics.engine.journal.log_manager")
 	local keystats=require("metrics.engine")
 	tracker=require("metrics.engine.context_tracker")
@@ -491,7 +491,7 @@ local function find(fn, key)
 	error("Missing actual writer upvalue: "..key)
 end
 package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
-helpers.load_with_stubs("adapters.physical_observation_clock")
+helpers.load_with_stubs("shortcuts.adapters.physical_observation_clock")
 helpers.with_fresh_modules({ "core.process.adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
 	native.frames.clock={version=1,domain="mach_absolute_time",numer=1,denom=1}
@@ -541,13 +541,13 @@ shell.run(function(capture, observed, native)
 		local o={}; function o:addWatcher() return self end; function o:removeWatcher() return self end; function o:callback(fn) observations.ax=fn;return self end;function o:start() return self end;function o:stop() return self end;return o end}}
 	-- The same declared native projection leaf model as existing managed-session controls.
 	local Accepted=require("metrics.engine.capture.physical_accepted_context")
-	package.loaded["adapters.physical_history_context"]={new=function(owner,history,borrowed)
+	package.loaded["shortcuts.adapters.physical_history_context"]={new=function(owner,history,borrowed)
 		local c,k=borrowed.capture,borrowed.clock
 		local ct,kt=c.identity(),k.identity(owner)
 		return Accepted.new(owner,{current=function() return c.current(ct)==true and c.admitted(ct)~=nil and k.current(owner,kt)==true end,revision=history.retained_count,convert=tonumber,resolve_interval=function(first,last) return history.resolve_interval(ct,kt,first,last) end,calendar=function() return calendar end,on_refused=function() history.stop(ct) end})
 	end}
 	package.loaded["core.process.adapters.shell_runner"]={spawn=native.dependencies.spawn}
-	control=require("modules.shortcuts.script_control")
+	control=require("shortcuts.engine.script_control")
 	manager=require("metrics.engine.journal.log_manager")
 	local keystats=require("metrics.engine")
 	tracker=require("metrics.engine.context_tracker")

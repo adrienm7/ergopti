@@ -6,7 +6,7 @@
 ; The state machine of CapsWord and of the CapsLock LED it shares with the
 ; user's genuine CapsLock intent: what a toggle arms, what a deactivation
 ; disarms, which pointer kinds let go of a held gesture click, and when the LED
-; is lit. modules/shortcuts/capsword.ahk keeps only the two native delimiter
+; is lit. shortcuts/engine/capsword.ahk keeps only the two native delimiter
 ; hotkeys and thin entry points over these functions, so the unit suite drives
 ; the behaviour here without registering a hotkey or touching the real LED.
 ;

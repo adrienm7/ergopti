@@ -4,7 +4,7 @@
 ; MODULE: MouseControl Error Logging Meta Test
 ; DESCRIPTION:
 ; Regression guard for the bare-try-no-catch anti-pattern in MCSetPos/MCGetPos
-; (adapters/mouse_control.ahk). Both functions wrapped their DllCall in a bare
+; (shortcuts/adapters/mouse_control.ahk). Both functions wrapped their DllCall in a bare
 ; `try {}` with zero `catch` clause and zero Logger calls anywhere in the file —
 ; worse than the file's own MCGetMonitorCount/MCGetMonitorBounds, which at
 ; least return a documented zero-value sentinel on failure. A DllCall failure
@@ -16,7 +16,7 @@
 ; "silent_noop", getPos is "return_zero_object") unchanged — only
 ; diagnosability changes.
 ;
-; SCOPE: source introspection of adapters/mouse_control.ahk.
+; SCOPE: source introspection of shortcuts/adapters/mouse_control.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -32,7 +32,7 @@
 
 _MCEL_SetPosHasCatchAndLogs() {
 	Body := _DriverFuncBody("MCSetPos")
-	Assert(Body != "", "MCSetPos must be defined in adapters/mouse_control.ahk")
+	Assert(Body != "", "MCSetPos must be defined in shortcuts/adapters/mouse_control.ahk")
 
 	TryPos := InStr(Body, "try {")
 	Assert(TryPos > 0, "MCSetPos must wrap its DllCall in a try")
@@ -58,7 +58,7 @@ Test("mouse_control: MCSetPos's try has a catch that logs (bare-try-anti-pattern
 
 _MCEL_GetPosHasCatchAndLogs() {
 	Body := _DriverFuncBody("MCGetPos")
-	Assert(Body != "", "MCGetPos must be defined in adapters/mouse_control.ahk")
+	Assert(Body != "", "MCGetPos must be defined in shortcuts/adapters/mouse_control.ahk")
 
 	TryPos := InStr(Body, "try {")
 	Assert(TryPos > 0, "MCGetPos must wrap its DllCall in a try")

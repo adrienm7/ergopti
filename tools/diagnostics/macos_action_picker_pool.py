@@ -19,7 +19,7 @@ GC_SCOPE = "unmeasured; actual controller deliberately retained"
 INPUT_SCOPE = "not attempted; no physical input, synthetic key or AppleEvent"
 BUSINESS_SCOPE = "program and automation discovery controlled; no user assignment executed"
 DEPENDENCIES = (
-    "static/ergopti_plus/macos/ui/action_picker/init.lua",
+    "static/ergopti_plus/macos/shortcuts/ui/action_picker/init.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_controller_pool.lua",
     "static/ergopti_plus/macos/core/ui/ui/builder.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",

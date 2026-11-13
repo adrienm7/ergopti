@@ -20,10 +20,10 @@ local MODULES = {
 	"ai.engine.local_servers.warmup_controller", "ai.engine.api.streaming_handler",
 	"ai.engine.prediction.prompt_builder", "ai.engine.prediction.app_filter", "ai.engine.api.common",
 	"ai.engine.api.remote", "ai.engine.api.mlx", "ai.engine.api.ollama",
-	"ai.engine.settings.profiles", "metrics.engine", "modules.shortcuts.script_control",
-	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
+	"ai.engine.settings.profiles", "metrics.engine", "shortcuts.engine.script_control",
+	"shortcuts.engine.actions.screenshot_save", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
-	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
+	"shortcuts.adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
 	"core.ui.ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "ai.engine.api.token_crypto", "core.network.adapters.http_client",
 	"ai.engine.policy.remote_response_classifier", "ai.engine.local_servers.local_servers",
@@ -67,7 +67,7 @@ local function with_capture(callback)
 			read_exact = function() return true, nil end,
 			set = function() return true end,
 		}
-		package.loaded["adapters.mouse_control"] = {
+		package.loaded["shortcuts.adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return { x = 0, y = 0, w = 640, h = 480 } end,
 		}
 		package.loaded["core.events.timer_scheduler"] = PortFakes.timer_scheduler({
@@ -96,7 +96,7 @@ local function with_capture(callback)
 		package.loaded["ai.engine.prediction.app_filter"] = {}
 		package.loaded["metrics.engine"] = {}
 		package.loaded["ai.engine.settings.profiles"] = { prompt_language = function() return "en" end }
-		package.loaded["modules.shortcuts.script_control"] = {
+		package.loaded["shortcuts.engine.script_control"] = {
 			is_paused = function() return f.paused end,
 		}
 		package.loaded["ai.engine.api.token_crypto"] = {
@@ -119,7 +119,7 @@ local function with_capture(callback)
 			end,
 			encodeForQuery = function(value) return value end,
 		}
-		package.loaded["modules.shortcuts.actions.screenshot_save"] = {
+		package.loaded["shortcuts.engine.actions.screenshot_save"] = {
 			capture_image = function(_, _, _, on_image)
 				f.captures[#f.captures + 1] = on_image
 				return true

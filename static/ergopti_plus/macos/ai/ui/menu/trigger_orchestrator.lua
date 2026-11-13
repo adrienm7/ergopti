@@ -28,7 +28,7 @@ local Logger    = require("core.logger.engine.logger")
 local llm_mod   = require("ai.engine")
 local Chord     = require("keyboard.engine.chord")
 local Hotkeys   = require("platform.input.hotkey_registrar")
-local shortcut_ui = require("ui.menu.shortcut_utils")
+local shortcut_ui = require("shortcuts.ui.menu.utils")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"

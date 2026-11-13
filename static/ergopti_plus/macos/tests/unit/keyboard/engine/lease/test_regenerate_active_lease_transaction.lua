@@ -213,7 +213,7 @@ local function load_active_remap(options)
 		end,
 	}
 	package.loaded["gestures.engine.engine"] = {}
-	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
+	package.loaded["shortcuts.engine"] = { is_paused = function() return false end }
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- unless the test hands a folder of its own.
@@ -287,7 +287,7 @@ end
 --- The deployment port records its input; it does not acknowledge native reload.
 --- @param run function Receives remap, protocol observations and a menu pick function.
 local function with_live_picker(run)
-	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "menu.ui.builder.utils", "ui.action_picker" }, function()
+	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "menu.ui.builder.utils", "shortcuts.ui.action_picker" }, function()
 		local remap, calls = load_active_remap({ actions = {
 			{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
 			{ id = "escape", label = "Escape", category = "Spécial", holdable = false, tappable = true },
@@ -304,7 +304,7 @@ local function with_live_picker(run)
 				if row.label == slot_title then
 					helpers.assert_eq(type(row.action), "function")
 					local offered, confirm = nil, nil
-					package.loaded["ui.action_picker"] = {
+					package.loaded["shortcuts.ui.action_picker"] = {
 						open = function(opts, on_confirm) offered, confirm = opts, on_confirm; return true end,
 					}
 					helpers.assert_true(row.action(), "the slot row opens the shared action picker")

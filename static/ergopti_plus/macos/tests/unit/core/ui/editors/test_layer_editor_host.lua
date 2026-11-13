@@ -80,7 +80,7 @@ end
 local function with_editor(scenario)
 	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system",
 		"core.ui.ui.builder", "layouts.ui.layer_editor", "keyboard.engine.layers.nav_layer", "platform.input.keycodes",
-		"modules.shortcuts.bindings", "layouts.engine.registry.registry", "layouts.engine.registry.emulation",
+		"shortcuts.engine.bindings", "layouts.engine.registry.registry", "layouts.engine.registry.emulation",
 		"core.ui.engine.notifications" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -104,7 +104,7 @@ local function with_editor(scenario)
 		package.loaded["settings.engine.paths"] = { get_config_dir = function() return world.dir end }
 		package.loaded["layouts.engine.registry.registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 		-- The owner of the layer's wheel bindings, which Hammerspoon runs.
-		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+		package.loaded["shortcuts.engine.bindings"] = { reconcile_layer_wheel = function()
 			world.wheel_reconciles = world.wheel_reconciles + 1
 			return true
 		end }
@@ -408,8 +408,8 @@ helpers.describe("macOS navigation layer editor host", function()
 
 	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
 	helpers.it("publishes the page's session while the driver is paused (edd1-paused-writes)", function()
-	local paused_control = package.loaded["modules.shortcuts.script_control"]
-	package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+	local paused_control = package.loaded["shortcuts.engine.script_control"]
+	package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end }
 		local ok, failure = pcall(with_editor, function(editor, world)
 			local text = read_file(FIXTURE)
 			editor.open({ karabiner = world.karabiner })
@@ -418,7 +418,7 @@ helpers.describe("macOS navigation layer editor host", function()
 			helpers.assert_eq(last_call(world, "saveResult").saved, true)
 			helpers.assert_eq(read_file(world.dir .. "/layers.toml"), text)
 		end)
-	package.loaded["modules.shortcuts.script_control"] = paused_control
+	package.loaded["shortcuts.engine.script_control"] = paused_control
 		assert(ok, failure)
 	end)
 

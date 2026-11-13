@@ -347,14 +347,14 @@ helpers.describe("keymap start: exact native commitment", function()
 		end)
 	end)
 	helpers.it("acknowledges effective replacement transitions to the existing ordinary owner", function()
-		helpers.with_stub_scope({ "modules.shortcuts.keyboard_shortcuts", "hotstrings.engine.expander.magic_key_source" }, function()
+		helpers.with_stub_scope({ "shortcuts.engine.keyboard_shortcuts", "hotstrings.engine.expander.magic_key_source" }, function()
 			local fixture, selected
 			local observed = {}
 			package.loaded["hotstrings.engine.expander.magic_key_source"] = {
 				set = function(value) selected = value; return value end,
 				keycode = function() return selected == "KeyJ" and 38 or nil end,
 			}
-			package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
+			package.loaded["shortcuts.engine.keyboard_shortcuts"] = {
 				refresh_magic_editor = function()
 					observed[#observed + 1] = { effective = fixture.keymap.is_magic_key_replacement_effective() }
 					return true
@@ -836,7 +836,7 @@ local INPUT_MODULES = {
 	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
 	"core.text.engine.unicode_case", "unicode_case.init", "core.text.engine.unicode_case.data", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.logger.engine.shim", "hotstrings.engine.catalogue.personal_files", "core.fs.engine.native_path", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
-	"keyboard.engine", "modules.shortcuts.keyboard_shortcuts",
+	"keyboard.engine", "shortcuts.engine.keyboard_shortcuts",
 }
 for _, name in ipairs(RESET_MODULES) do INPUT_MODULES[#INPUT_MODULES + 1] = name end
 

@@ -33,7 +33,7 @@ local FIXTURE_MODULES = {
 	"ai.engine.api.remote",
 	"keyboard.engine.runtime.onboarding",
 	"core.ui.ui.tooltip",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 }
 
 helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE", function()
@@ -266,7 +266,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			}
 			package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 
-			local ScriptControl = require("modules.shortcuts.script_control")
+			local ScriptControl = require("shortcuts.engine.script_control")
 			helpers.assert_true(ScriptControl.pause_all())
 			helpers.assert_true(ScriptControl.is_pause_transition_pending())
 			helpers.assert_eq(ScriptControl.is_paused(), false)

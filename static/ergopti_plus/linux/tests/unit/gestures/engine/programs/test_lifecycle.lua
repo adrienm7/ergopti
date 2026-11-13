@@ -416,7 +416,7 @@ helpers.describe("private program acquisition and resource debt", function()
 end)
 
 local function with_bindings(callback)
-	local modules = { "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts",
+	local modules = { "gestures.engine.manager", "shortcuts.engine.keyboard_shortcuts",
 		"settings.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "gestures.ui.conflicts" }
 	local saved = {}
 	for _, name in ipairs(modules) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -430,7 +430,7 @@ local function with_bindings(callback)
 		package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 		manager = require("gestures.engine.manager")
 		manager.init({ persist = true, config_path = path, enabled = false, is_paused = function() return false end })
-		callback(manager, require("modules.shortcuts.keyboard_shortcuts"), path)
+		callback(manager, require("shortcuts.engine.keyboard_shortcuts"), path)
 	end, debug.traceback)
 	if manager then
 		manager.stop_programs()

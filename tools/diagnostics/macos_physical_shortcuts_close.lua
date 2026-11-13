@@ -15,10 +15,10 @@ function M.run(config, done)
  local policy = assert(io.open(root .. '/_shared/diagnostics/data/redaction.json', 'rb'))
  local policy_bytes = assert(policy:read('*a')); assert(policy:close())
  Logger.initialize_privacy(policy_bytes)
- local Host = require('ui.physical_shortcuts')
+ local Host = require('shortcuts.ui.physical_shortcuts')
  local UI = require('core.ui.ui.builder')
  local Scheduler = require('core.events.timer_scheduler')
- for fn, suffix in pairs({ [Host.open] = '/macos/ui/physical_shortcuts/init.lua',
+ for fn, suffix in pairs({ [Host.open] = '/macos/shortcuts/ui/physical_shortcuts/init.lua',
   [UI.show_webview] = '/macos/core/ui/ui/builder.lua', [Scheduler.after] = '/macos/core/events/timer_scheduler.lua' }) do
   assert(debug.getinfo(fn, 'S').source == '@' .. root .. suffix, 'foreign production owner')
  end

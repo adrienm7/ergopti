@@ -947,7 +947,7 @@ local function activate_lease_generation(options, on_done)
 
 	local script_paused = false
 	if respect_pause_intent and phase == "paused" then
-		local ok_shortcuts, shortcuts = pcall(require, "modules.shortcuts")
+		local ok_shortcuts, shortcuts = pcall(require, "shortcuts.engine")
 		if ok_shortcuts and shortcuts and type(shortcuts.is_paused) == "function" then
 			local ok_paused, paused_or_err = pcall(shortcuts.is_paused)
 			if not ok_paused then
@@ -1314,7 +1314,7 @@ end
 --- @return boolean|nil paused
 local function query_shortcuts_pause_state(label)
 	local ok, result = run_async_step(label, function()
-		local shortcuts = require("modules.shortcuts")
+		local shortcuts = require("shortcuts.engine")
 		if type(shortcuts) ~= "table" or type(shortcuts.is_paused) ~= "function" then
 			error("modules.shortcuts.is_paused is unavailable")
 		end
@@ -3214,7 +3214,7 @@ end
 --- @param present function fn() -> boolean, true when the steps reach the user.
 --- @return boolean registered False when a presenter is already registered.
 --- Registers the owner of the script chords' plan, which each regeneration
---- reads (modules/shortcuts/script_control.lua karabiner_chords): only a chord
+--- reads (shortcuts/engine/script_control.lua karabiner_chords): only a chord
 --- that runs an action gets its sentinel rule. Before the registration a
 --- deploy carries the chords of an empty configuration.
 --- @param source function Returns { normal = slot -> true, paused = slot -> true }.

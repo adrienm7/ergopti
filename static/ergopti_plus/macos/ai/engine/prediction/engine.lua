@@ -724,7 +724,7 @@ function M.set_llm_enabled(enabled)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	-- The keys bound to an AI action follow the switch. Only a gate that is
 	-- loaded has layers to tell, so this never loads it (and its listeners).
-	local ai_actions = rawget(package.loaded, "modules.shortcuts.ai_actions")
+	local ai_actions = rawget(package.loaded, "shortcuts.engine.ai_actions")
 	if ai_actions ~= nil then ai_actions.notify() end
 	if not is_llm_enabled then
 		-- Turning the AI off ends live mode too: turning it back on must not
@@ -776,7 +776,7 @@ function M.set_llm_enabled(enabled)
 	-- suspended — the same violation this function fixes on the disable side. Read
 	-- through package.loaded rather than require() to avoid a circular dependency,
 	-- exactly as perform_check does.
-	local sc = package.loaded["modules.shortcuts.script_control"]
+	local sc = package.loaded["shortcuts.engine.script_control"]
 	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
 		Logger.debug(LOG, "set_llm_enabled(true) while paused — warmup stays parked until resume.")
 		return committed
@@ -1742,7 +1742,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- already calls reset_predictions() to stop these timers, but this closes the
 	-- race window. Read script_control via package.loaded to avoid a circular
 	-- require. Mirrors the AHK LLM_Engine_FirePrediction A_IsSuspended guard.
-	local sc = package.loaded["modules.shortcuts.script_control"]
+	local sc = package.loaded["shortcuts.engine.script_control"]
 	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
 		Logger.debug(LOG, "Paused — LLM request skipped.")
 		return
@@ -2237,7 +2237,7 @@ local MANUAL_REFUSAL_KEYS = {
 --- @return string|nil reason A key of MANUAL_REFUSAL_KEYS, or nil when ready.
 --- @return string context The context the prediction would complete.
 local function manual_refusal()
-	local sc = package.loaded["modules.shortcuts.script_control"]
+	local sc = package.loaded["shortcuts.engine.script_control"]
 	if sc and type(sc.is_paused) == "function" and sc.is_paused() then return "paused", "" end
 	-- A hidden preview is the AI switched off as far as the user can see: the
 	-- request would run and paint nothing.

@@ -16,7 +16,7 @@ M.LEFT_SCREEN, M.RIGHT_SCREEN = 1, 2
 
 local INJECTED = {
 	"platform.focus.window_manager",
-	"adapters.mouse_control",
+	"shortcuts.adapters.mouse_control",
 	"gestures.engine.app_switch",
 }
 
@@ -58,7 +58,7 @@ function M.with_desk(desk, body)
 			return record.refuses_focus ~= true
 		end,
 	}
-	package.loaded["adapters.mouse_control"] = {
+	package.loaded["shortcuts.adapters.mouse_control"] = {
 		screen_id_under_cursor = function() return desk.cursor_screen end,
 	}
 	package.loaded["gestures.engine.app_switch"] = nil

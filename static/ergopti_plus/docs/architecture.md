@@ -35,27 +35,12 @@ graph TD
         P_WindowManager["WindowManager"]
     end
 
-    subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
-        LINUX_window_switch["WindowSwitch.lua"]
-    end
-
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
-        MACOS_apple_shortcuts["AppleShortcuts.lua"]
-        MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
-        MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
-        MACOS_mouse_control["MouseControl.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
-        MACOS_physical_context_probe["PhysicalContextProbe.lua"]
-        MACOS_physical_history_context["PhysicalHistoryContext.lua"]
-        MACOS_physical_lifecycle_event["PhysicalLifecycleEvent.lua"]
-        MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
-        MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
-        WINDOWS_mouse_control["MouseControl.ahk"]
-        WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
     end
 
@@ -67,13 +52,9 @@ graph TD
         D_Terminators["Terminators"]
     end
 
-    %% Port implementations: Linux (Lua)
-
     %% Port implementations: macOS (Hammerspoon)
-    P_MouseControl -->|implements| MACOS_mouse_control
 
     %% Port implementations: Windows (AutoHotkey)
-    P_MouseControl -->|implements| WINDOWS_mouse_control
 
     %% Key domain relationships
     D_Expander -->|uses| D_Registry

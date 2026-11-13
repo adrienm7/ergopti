@@ -19,7 +19,7 @@
 	"windows/layouts/engine/layout.ahk": 1,
 	"windows/metrics/engine/keystats.ahk": 1,
 	"windows/ai/engine/ollama/managed_bootstrap.ahk": 1,
-	"windows/modules/shortcuts/win.ahk": 1,
+	"windows/shortcuts/engine/win.ahk": 1,
 	"windows/diagnostics/ui/healthcheck/collection.ahk": 2,
 	"windows/ai/ui/menu/api_entries.ahk": 1,
 	"windows/core/ui/ui/spotlight/ownership.ahk": 1,

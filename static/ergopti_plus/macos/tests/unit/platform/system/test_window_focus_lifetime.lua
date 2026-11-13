@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local function with_windows(options, callback)
 	helpers.with_stub_scope({
-		"platform.focus.window_manager", "adapters.mouse_control",
+		"platform.focus.window_manager", "shortcuts.adapters.mouse_control",
 		"gestures.engine.app_switch", "core.logger.engine.logger",
 	}, function()
 		local focused = {}

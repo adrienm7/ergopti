@@ -14,7 +14,7 @@ local function fixture(body)
 	local f = { pages = {}, owners = {}, calls = {}, delete_throws = false }
 	local ok, failure = xpcall(function()
 		package.loaded["apps.engine.program_provider_picker"] = nil
-		package.loaded["ui.action_picker"] = nil
+		package.loaded["shortcuts.ui.action_picker"] = nil
 		package.loaded["core.ui.ui.webview_controller_pool"] = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -54,8 +54,8 @@ local function fixture(body)
 			end,
 		}
 		-- Availability cases consume the actual native predicate, never a copied rule.
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		package.loaded["adapters.apple_shortcuts_native"] = nil
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		package.loaded["shortcuts.adapters.apple_shortcuts_native"] = nil
 		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["core.process.adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
 		package.loaded["core.ui.engine.dialog_util"] = {
@@ -63,12 +63,12 @@ local function fixture(body)
 			block_alert = function(_, reason) f.warning = reason end,
 		}
 		package.loaded["gestures.engine.actions_aux_owner"] = { program_available = function() return true end }
-		f.native = require("adapters.apple_shortcuts_native")
-		f.utils = require("ui.menu.shortcut_utils")
+		f.native = require("shortcuts.adapters.apple_shortcuts_native")
+		f.utils = require("shortcuts.ui.menu.utils")
 		f.locale = package.loaded["core.i18n.engine.i18n"]
 		f.native_tasks = 0
 		_G.hs.task = { new = function() f.native_tasks = f.native_tasks + 1; error("native task forbidden") end }
-		f.picker = require("ui.action_picker")
+		f.picker = require("shortcuts.ui.action_picker")
 		function f.open(callback)
 			return f.picker.open({ items = {} }, callback or function(id, parameter)
 				f.calls[#f.calls + 1] = { id, parameter }; return true
@@ -204,14 +204,14 @@ end)
 
 local function automation(f)
 	local owners = {}
-	package.loaded["adapters.apple_shortcuts_native"] = { create = function()
+	package.loaded["shortcuts.adapters.apple_shortcuts_native"] = { create = function()
 		local owner = { invalidations = 0, retirement = true }
 		owner.discover = function(callback) owner.callback = callback; return true end
 		owner.invalidate = function() owner.invalidations = owner.invalidations + 1; return owner.retirement end
 		owners[#owners + 1] = owner
 		return owner
 	end }
-	package.loaded["adapters.apple_shortcuts_native"].is_chosen_program = f.native.is_chosen_program
+	package.loaded["shortcuts.adapters.apple_shortcuts_native"].is_chosen_program = f.native.is_chosen_program
 	return owners
 end
 

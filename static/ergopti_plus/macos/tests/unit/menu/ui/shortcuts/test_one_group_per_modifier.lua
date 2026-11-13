@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- toggle and a Cmd shortcut (no fixed Ctrl shortcut remains since schema v20).
 --- @return table rows
 local function render_shortcuts_submenu()
-	local shortcuts = helpers.load_with_stubs("ui.menu.menu_shortcuts")
+	local shortcuts = helpers.load_with_stubs("shortcuts.ui.menu.shortcuts")
 	local ManifestMenu = require("menu.engine.manifest_menu")
 	local item = shortcuts.build({
 		state      = { shortcuts = true },

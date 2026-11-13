@@ -53,7 +53,7 @@ local OWNED = {
 	"ai.engine.prediction.prompt_builder",
 	"ai.engine.api.streaming_handler",
 	"ai.engine.local_servers.warmup_controller",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"core.fs.engine.native_path",
 	"core.text.engine.number_policy",
 	"core.text.engine.utils_core",

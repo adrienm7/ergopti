@@ -94,15 +94,15 @@ local OWNERS = {
 	"gestures.engine.sticky_modifiers",
 	-- The engine bounds incremental tab steps through the sensitivity owner.
 	"gestures.engine.sensitivity",
-	"modules.shortcuts",
-	"modules.shortcuts.actions.apps",
-	"modules.shortcuts.actions.screenshot_save",
-	"modules.shortcuts.actions.system_mouse",
-	"modules.shortcuts.actions.system_pixel",
-	"modules.shortcuts.actions.text",
-	"modules.shortcuts.bindings",
-	"modules.shortcuts.keyboard_shortcuts",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine",
+	"shortcuts.engine.actions.apps",
+	"shortcuts.engine.actions.screenshot_save",
+	"shortcuts.engine.actions.system_mouse",
+	"shortcuts.engine.actions.system_pixel",
+	"shortcuts.engine.actions.text",
+	"shortcuts.engine.bindings",
+	"shortcuts.engine.keyboard_shortcuts",
+	"shortcuts.engine.script_control",
 	"platform.input.send_input",
 	"core.text.engine.utils_core",
 	-- text_utils builds its case tables from this generated data at require time.
@@ -136,11 +136,11 @@ local function fresh_actions(options)
 		"gestures.engine.actions_aux_owner",
 		"gestures.engine.actions_click",
 		"gestures.engine.sticky_modifiers",
-		"modules.shortcuts.actions.screenshot_save",
-		"modules.shortcuts.actions.text",
-		"modules.shortcuts.actions.system_mouse",
-		"modules.shortcuts.actions.apps",
-		"modules.shortcuts.actions.system_pixel",
+		"shortcuts.engine.actions.screenshot_save",
+		"shortcuts.engine.actions.text",
+		"shortcuts.engine.actions.system_mouse",
+		"shortcuts.engine.actions.apps",
+		"shortcuts.engine.actions.system_pixel",
 		"core.fs.adapters.file_system",
 		"clipboard.adapters.clipboard",
 		"platform.input.key_state",
@@ -339,7 +339,7 @@ local function fresh_actions(options)
 			return controlled_query("aux", "pending", false)
 		end,
 	}
-	package.loaded["modules.shortcuts.actions.screenshot_save"] = {
+	package.loaded["shortcuts.engine.actions.screenshot_save"] = {
 		capture = function(flags, parent)
 			parent = parent or "shortcut_bindings"
 			if screenshot_claims[parent] == true then return false end
@@ -538,8 +538,8 @@ local function fresh_actions(options)
 		end
 		return child
 	end
-	package.loaded["modules.shortcuts.actions.text"] = scoped_child(text_paused, "text")
-	package.loaded["modules.shortcuts.actions.system_mouse"] = scoped_child(mouse_paused, "mouse")
+	package.loaded["shortcuts.engine.actions.text"] = scoped_child(text_paused, "text")
+	package.loaded["shortcuts.engine.actions.system_mouse"] = scoped_child(mouse_paused, "mouse")
 	--- A parent-scoped owner of the shortcut layer: its lifecycle edges and the
 	--- functions a gesture action delegates to, each recording its parent.
 	local function scoped_owner(kind, actions_list)
@@ -569,9 +569,9 @@ local function fresh_actions(options)
 		end
 		return owner
 	end
-	package.loaded["modules.shortcuts.actions.apps"] = scoped_owner("apps",
+	package.loaded["shortcuts.engine.actions.apps"] = scoped_owner("apps",
 		{ "open_downloads", "open_finder", "open_settings", "copy_or_open_path" })
-	package.loaded["modules.shortcuts.actions.system_pixel"] = scoped_owner("pixel",
+	package.loaded["shortcuts.engine.actions.system_pixel"] = scoped_owner("pixel",
 		{ "copy_pixel_color" })
 	package.loaded["gestures.engine.actions_click"] = setmetatable({
 		force_cleanup = function(parent)
@@ -902,7 +902,7 @@ local function fresh_actions(options)
 		return true
 	end
 	calls.static_screenshot = function()
-		return package.loaded["modules.shortcuts.actions.screenshot_save"]
+		return package.loaded["shortcuts.engine.actions.screenshot_save"]
 			.capture({ "-cw" }, "shortcut_bindings")
 	end
 	return actions, calls
@@ -916,10 +916,10 @@ end
 --- @param body function Receives Shortcuts, Gestures, and feature recorder.
 local function with_feature_lifecycles(actions, calls, body)
 	local module_names = {
-		"modules.shortcuts",
-		"modules.shortcuts.bindings",
-		"modules.shortcuts.script_control",
-		"modules.shortcuts.keyboard_shortcuts",
+		"shortcuts.engine",
+		"shortcuts.engine.bindings",
+		"shortcuts.engine.script_control",
+		"shortcuts.engine.keyboard_shortcuts",
 		"platform.input.hotkey_registrar",
 		"core.lifecycle.engine.startup_transaction",
 		"gestures.engine",
@@ -935,7 +935,7 @@ local function with_feature_lifecycles(actions, calls, body)
 		keyboard_started = false,
 		cancel_calls = 0,
 	}
-	package.loaded["modules.shortcuts.bindings"] = {
+	package.loaded["shortcuts.engine.bindings"] = {
 		DEFAULT_CHATGPT_URL = "",
 		start = function() feature.bindings_started = true; return true end,
 		stop = function() feature.bindings_started = false; return true end,
@@ -947,13 +947,13 @@ local function with_feature_lifecycles(actions, calls, body)
 		is_started = function() return feature.bindings_started end,
 		has_pause_debt = function() return false end,
 	}
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		ACTIONS = {}, ACTION_LABELS = {}, PAUSE_OWNER_IDS = {},
 		start = function() return true end,
 		stop = function() return true end,
 		is_paused = function() return false end,
 	}
-	package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
+	package.loaded["shortcuts.engine.keyboard_shortcuts"] = {
 		SLOT_GROUPS = {},
 		start = function() feature.keyboard_started = true; return true end,
 		stop = function() feature.keyboard_started = false; return true end,
@@ -992,7 +992,7 @@ local function with_feature_lifecycles(actions, calls, body)
 		recommended_for = function() return "none" end,
 	}
 	package.loaded["gestures.engine.actions"] = actions
-	package.loaded["modules.shortcuts"] = nil
+	package.loaded["shortcuts.engine"] = nil
 	package.loaded["gestures.engine"] = nil
 
 	feature.keyboard_execute = function(action)
@@ -1005,7 +1005,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	end
 
 	local ok, err = xpcall(function()
-		body(require("modules.shortcuts"), require("gestures.engine"), feature)
+		body(require("shortcuts.engine"), require("gestures.engine"), feature)
 	end, debug.traceback)
 	for _, name in ipairs(module_names) do package.loaded[name] = saved[name] end
 	package.loaded["gestures.engine.actions"] = actions

@@ -39,7 +39,7 @@ local function with_changelog(callback)
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
 			"core.fs.engine.paths",
-			"modules.shortcuts.script_control",
+			"shortcuts.engine.script_control",
 			"hs",
 			"tests.stubs.hs",
 		}, function()
@@ -74,7 +74,7 @@ local function with_changelog(callback)
 					return state.paused
 				end,
 			}
-			package.loaded["modules.shortcuts.script_control"] = state.script_control
+			package.loaded["shortcuts.engine.script_control"] = state.script_control
 			helpers.provide_timings()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()

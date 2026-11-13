@@ -124,7 +124,7 @@ local function driver_state(path)
 	local actions = {}
 	for slot in pairs(gestures.DEFAULT_GESTURES) do actions[slot] = gestures.get_action(slot) end
 
-	local shortcuts = helpers.load_module("modules.shortcuts.manager")
+	local shortcuts = helpers.load_module("shortcuts.engine.manager")
 	shortcuts.init({ persist = true, config_path = path })
 
 	-- The updater reads the subscribed channel at init; its background checks
@@ -140,7 +140,7 @@ local function driver_state(path)
 	if not ok_updater then error(updater_err, 0) end
 
 	local paths = require("settings.engine.paths")
-	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
+	local previous_config, previous_chatgpt = paths.config, package.loaded["shortcuts.engine.chatgpt"]
 	local previous_preferences = package.loaded["hotstrings.engine.matcher.preferences"]
 	local previous_magic_key = package.loaded["hotstrings.engine.magic_key"]
 	paths.config = function(name)
@@ -148,7 +148,7 @@ local function driver_state(path)
 		return path
 	end
 	local ok_url, chatgpt_url = pcall(function()
-		return helpers.load_module("modules.shortcuts.chatgpt").get_url()
+		return helpers.load_module("shortcuts.engine.chatgpt").get_url()
 	end)
 	-- The runtime reads the canonical trigger through hotstring preferences;
 	-- the setup wizard reads the same leaf when it shows the stored choice.
@@ -156,7 +156,7 @@ local function driver_state(path)
 	local ok_key, magic_key = pcall(function()
 		return helpers.load_module("hotstrings.engine.magic_key").get()
 	end)
-	paths.config, package.loaded["modules.shortcuts.chatgpt"] = previous_config, previous_chatgpt
+	paths.config, package.loaded["shortcuts.engine.chatgpt"] = previous_config, previous_chatgpt
 	package.loaded["hotstrings.engine.matcher.preferences"] = previous_preferences
 	package.loaded["hotstrings.engine.magic_key"] = previous_magic_key
 	if not ok_url then error(chatgpt_url, 0) end
@@ -259,10 +259,10 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 
 			-- The Shortcuts scope resolves the same document instead of refusing it.
 			local decoded = TomlCodec.decode(source)
-			local keyboard = require("modules.shortcuts.keyboard_shortcuts").configuration_candidate(decoded)
+			local keyboard = require("shortcuts.engine.keyboard_shortcuts").configuration_candidate(decoded)
 			helpers.assert_eq(keyboard.assignments.primary_k, "select_line")
 			helpers.assert_nil(keyboard.assignments.primary_j)
-			local tap = require("modules.shortcuts.tap_keys").configuration_candidate(decoded)
+			local tap = require("shortcuts.engine.tap_keys").configuration_candidate(decoded)
 			helpers.assert_eq(tap.assignments.number_row_left, "none")
 		end)
 

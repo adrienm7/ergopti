@@ -28,19 +28,19 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 		local load_calls = {}
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
-				"ui.menu.menu_shortcuts",
+				"shortcuts.ui.menu.shortcuts",
 				"core.logger.engine.logger",
 				"core.timing.engine.deferred_work",
 				"core.fs.engine.dir",
 				"core.ui.engine.dialog_util",
-				"modules.shortcuts",
-				"modules.shortcuts.actions.text",
+				"shortcuts.engine",
+				"shortcuts.engine.actions.text",
 				"core.i18n.engine.i18n",
 				"menu.ui.builder.utils",
 				"menu.engine.manifest_menu",
 				"menu.engine.renderer",
 				"core.fs.adapters.json_codec",
-				"ui.menu.shortcut_utils",
+				"shortcuts.ui.menu.utils",
 				"layouts.ui.menu.keyboard_slots",
 				"ui.menu.menu_tap_keys",
 				"menu.engine.manifest_reader",
@@ -67,10 +67,10 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					entries = function() return { "demo" } end,
 				}
 				package.loaded["core.ui.engine.dialog_util"] = {}
-				package.loaded["modules.shortcuts"] = {
+				package.loaded["shortcuts.engine"] = {
 					DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 				}
-				package.loaded["modules.shortcuts.actions.text"] = {
+				package.loaded["shortcuts.engine.actions.text"] = {
 					WRAP_GROUPS = {},
 					build_active_wrap_pairs = function() return {} end,
 				}
@@ -95,7 +95,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 						return providers.extensions_shortcuts()
 					end,
 				}
-				package.loaded["ui.menu.shortcut_utils"] = {}
+				package.loaded["shortcuts.ui.menu.utils"] = {}
 				package.loaded["layouts.ui.menu.keyboard_slots"] = {
 					provide_rows = function() return {} end,
 				}
@@ -122,7 +122,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					]], "@fixture-extension-menu", mode, environment)
 				end
 
-				local MenuShortcuts = require("ui.menu.menu_shortcuts")
+				local MenuShortcuts = require("shortcuts.ui.menu.shortcuts")
 				local item = MenuShortcuts.build({
 					base_dir = "/fixture/driver/",
 					-- The boot catalogue owns which extensions exist; the menu walks no folder.
@@ -180,11 +180,11 @@ end)
 --- @param callback function Native provider and initialized owner assertions.
 local function with_extension_boundary(callback)
 	local names = {
-		"ui.menu.menu_shortcuts", "core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.engine.dir",
-		"core.ui.engine.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
+		"shortcuts.ui.menu.shortcuts", "core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.engine.dir",
+		"core.ui.engine.dialog_util", "shortcuts.engine", "shortcuts.engine.actions.text",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "menu.ui.builder.utils",
-		"menu.engine.manifest_menu", "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots",
+		"menu.engine.manifest_menu", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots",
 		"ui.menu.menu_tap_keys", "menu.engine.manifest_reader", "hs", "tests.stubs.hs",
 	}
 	local saved_hs, saved_pollution = rawget(_G, "hs"), rawget(_G, "extension_boundary_pollution")
@@ -220,9 +220,9 @@ local function with_extension_boundary(callback)
 			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 			package.loaded["core.ui.engine.dialog_util"] = {}
-			package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
-			package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
-			package.loaded["ui.menu.shortcut_utils"] = {}
+			package.loaded["shortcuts.engine"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
+			package.loaded["shortcuts.engine.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
+			package.loaded["shortcuts.ui.menu.utils"] = {}
 			package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
 			package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 			package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }
@@ -245,7 +245,7 @@ local function with_extension_boundary(callback)
 				template_rows = renderer.template_rows,
 				build = function(_, _, _, _, _, providers) return providers.extensions_shortcuts() end,
 			}
-			local native = require("ui.menu.menu_shortcuts")
+			local native = require("shortcuts.ui.menu.shortcuts")
 			local state = { shortcuts = true, chatgpt_url = "https://example.test", wrap_symbol_states = {}, custom_wrap_symbols = {} }
 			local context = {
 				base_dir = helpers.driver_root(), extension_packs = packs,
@@ -358,7 +358,7 @@ helpers.describe("Shortcut extension presentation boundary", function()
 	end)
 
 	helpers.it("the native locale and module owners restore exactly after success and construction failure (extension-boundary)", function()
-		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "ui.menu.menu_shortcuts", "menu.engine.renderer" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "shortcuts.ui.menu.shortcuts", "menu.engine.renderer" }
 		local before = {}
 		for index, name in ipairs(names) do before[index] = package.loaded[name] end
 		local function assert_restored()

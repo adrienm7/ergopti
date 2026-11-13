@@ -34,7 +34,7 @@
 ; No bare ~LButton:: label should exist in the file -- that would be a static
 ; hotkey registration that bypasses HookDispatcher.
 _CWMC_NoStaticLButton() {
-	Src := _DriverDirConcat("modules/shortcuts")
+	Src := _DriverDirConcat("shortcuts/engine")
 	Assert(!InStr(Src, "~LButton::"),
 		"capsword.ahk must NOT contain a static ~LButton:: hotkey label -- use HookDispatcher.Register() instead")
 }
@@ -42,7 +42,7 @@ Test("capsword: no static ~LButton:: hotkey label (F24 capsword-mouse-clobber)",
 
 ; No bare ~RButton:: label should exist in the file.
 _CWMC_NoStaticRButton() {
-	Src := _DriverDirConcat("modules/shortcuts")
+	Src := _DriverDirConcat("shortcuts/engine")
 	Assert(!InStr(Src, "~RButton::"),
 		"capsword.ahk must NOT contain a static ~RButton:: hotkey label -- use HookDispatcher.Register() instead")
 }

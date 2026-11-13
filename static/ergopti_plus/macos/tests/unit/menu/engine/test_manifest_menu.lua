@@ -635,8 +635,8 @@ require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos
 -- Actual component factories consume genuine existing fixture-owned data modules.
 local function fixed_parent_native_cohort(body)
 	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "core.logger.engine.logger",
-		"ui.menu.menu_shortcuts", "gestures.ui.menu.gestures", "ui.menu.menu_tap_holds",
-		"menu.ui.builder.utils", "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys"}
+		"shortcuts.ui.menu.shortcuts", "gestures.ui.menu.gestures", "ui.menu.menu_tap_holds",
+		"menu.ui.builder.utils", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
 	local ok, detail = xpcall(function()
 		return helpers.with_stub_scope(names, function()
@@ -719,7 +719,7 @@ helpers.describe("fixed feature parents: actual Mac component owners (fixed-feat
 		helpers.it("retains actual Shortcuts child order, callbacks, check " .. tostring(preference) .. " and pause " .. tostring(posture) .. " (fixed-feature-parent-native)", function()
 			require("tests.support.shortcut_bindings_fixture").with_bindings(function(bindings)
 				fixed_parent_native_cohort(function(renderer, translator)
-					local module = require("ui.menu.menu_shortcuts")
+					local module = require("shortcuts.ui.menu.shortcuts")
 					local context = {shortcuts = bindings, state = {shortcuts = preference, wrap_symbol_states = {}, custom_wrap_symbols = {}},
 						paused = posture, commands = {}, state_getters = {}, applyTriggerChar = function(value) return value end,
 						save_prefs = function() error("construction must not publish") end,

@@ -151,8 +151,8 @@ package.loaded["metrics.engine"] = {
 -- which would make perform_check return before the prompt builder ever runs and
 -- turn every assertion below into a false green. Pin it to "not paused" and
 -- restore the previous value once this file is done.
-local _prev_script_control = package.loaded["modules.shortcuts.script_control"]
-package.loaded["modules.shortcuts.script_control"] = {
+local _prev_script_control = package.loaded["shortcuts.engine.script_control"]
+package.loaded["shortcuts.engine.script_control"] = {
 	is_paused = function() return false end,
 }
 
@@ -387,4 +387,4 @@ helpers.describe("LLM context length admission", function()
 end)
 
 -- Restore the pre-existing script_control entry so this file leaves no stub behind.
-package.loaded["modules.shortcuts.script_control"] = _prev_script_control
+package.loaded["shortcuts.engine.script_control"] = _prev_script_control

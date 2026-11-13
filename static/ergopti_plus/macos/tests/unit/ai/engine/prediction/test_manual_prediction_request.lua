@@ -67,11 +67,11 @@ end
 helpers.describe("manual prediction request (llm-manual-prediction-feedback)", function()
 	helpers.it("refuses while the script is paused, and says so", function()
 		local fixture = load_fixture()
-		package.loaded["modules.shortcuts.script_control"] = {
+		package.loaded["shortcuts.engine.script_control"] = {
 			is_paused = function() return true end,
 		}
 		local ok, err = pcall(assert_refused, fixture, "paused")
-		package.loaded["modules.shortcuts.script_control"] = nil
+		package.loaded["shortcuts.engine.script_control"] = nil
 		if not ok then error(err, 0) end
 	end)
 

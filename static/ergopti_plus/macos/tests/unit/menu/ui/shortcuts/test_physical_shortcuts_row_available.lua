@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- Renders the Shortcuts submenu with the production manifest renderer.
 --- @return table rows
 local function render_shortcuts_submenu()
-	local shortcuts = helpers.load_with_stubs("ui.menu.menu_shortcuts")
+	local shortcuts = helpers.load_with_stubs("shortcuts.ui.menu.shortcuts")
 	local ManifestMenu = require("menu.engine.manifest_menu")
 	local item = shortcuts.build({
 		state      = { shortcuts = true },
@@ -52,7 +52,7 @@ end
 
 helpers.describe("the physical shortcuts row once delivery is available (physical-delivery-available)", function()
 	helpers.it("no longer names the « not yet available » cause", function()
-		local keyboard = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")
+		local keyboard = helpers.load_with_stubs("shortcuts.engine.keyboard_shortcuts")
 		helpers.assert_eq(keyboard.physical_delivery_available(), true, "the production getter")
 		local found = editor_row()
 		helpers.assert_true(found ~= nil, "the editor row is drawn")
@@ -61,8 +61,8 @@ helpers.describe("the physical shortcuts row once delivery is available (physica
 	end)
 
 	helpers.it("a getter answering false greys the row with the « not yet available » cause", function()
-		local keyboard = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = keyboard
+		local keyboard = helpers.load_with_stubs("shortcuts.engine.keyboard_shortcuts")
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = keyboard
 		local original = keyboard.physical_delivery_available
 		keyboard.physical_delivery_available = function() return false end
 		local ok, err = pcall(function()

@@ -67,7 +67,7 @@ local function genuine_shared_providers(damage)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu",
 		"menu.ui.builder.builder", "layouts.engine.layers.magic_key_source", "hotstrings.engine.magic_key_source",
-		"hotstrings.engine.matcher.preferences", "modules.shortcuts.tap_keys", "settings.engine.paths",
+		"hotstrings.engine.matcher.preferences", "shortcuts.engine.tap_keys", "settings.engine.paths",
 		"core.fs.adapters.storage", "layouts.engine.registry.registry", "hotstrings.engine.input_reader",
 		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created

@@ -62,7 +62,7 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("idempotent keyboard shortcut startup is debug-only", function()
-		local source = read_source("local function load_assignments") -- modules/shortcuts/keyboard_shortcuts.lua
+		local source = read_source("local function load_assignments") -- shortcuts/engine/keyboard_shortcuts.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"M.start() called again after menu-state synchronization", 1, true) ~= nil)
 		helpers.assert_true(source:find("M.start() called more than once", 1, true) == nil)
 	end)

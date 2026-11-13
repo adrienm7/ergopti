@@ -43,8 +43,8 @@ const ROOT = path.resolve(__dirname, '../..');
 const NATIVE = 'tools/test/run-linux-window-switch-receipts.cjs';
 const CONTRACT = 'tools/test/test-linux-window-switch-registration.cjs';
 const SOURCES = [
-	'static/ergopti_plus/linux/adapters/window_switch.lua',
-	'static/ergopti_plus/linux/platform/window_switch_worker.lua',
+	'static/ergopti_plus/linux/shortcuts/adapters/window_switch.lua',
+	'static/ergopti_plus/linux/shortcuts/adapters/window_switch_worker.lua',
 	'static/ergopti_plus/linux/core/process/adapters/program_runner.lua',
 	'static/ergopti_plus/linux/core/lifecycle/engine/libuv_process_group.lua',
 	'static/ergopti_plus/linux/core/lifecycle/engine/shutdown/libuv_exit.lua',
@@ -567,7 +567,7 @@ async function main() {
 		if (name === './lib/host-toolchain.cjs') return { requireCiEquivalentHost() {} };
 		if (name === 'node:child_process')
 			return {
-				execFileSync: () => 'static/ergopti_plus/linux/adapters/window_switch.lua\0',
+				execFileSync: () => 'static/ergopti_plus/linux/shortcuts/adapters/window_switch.lua\0',
 				spawnSync: (_command, args) => {
 					commands.push(args[1]);
 					return { status: 0 };

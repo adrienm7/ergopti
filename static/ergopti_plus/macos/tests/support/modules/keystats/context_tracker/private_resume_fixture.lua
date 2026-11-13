@@ -6,7 +6,7 @@ local ProvenanceFixture = require("tests.support.keystats_provenance_fixture")
 local M = {}
 local OWNERS = {
 	"metrics.engine.capture.physical_lifecycle_observation",
-	"adapters.physical_observation_clock",
+	"shortcuts.adapters.physical_observation_clock",
 	"hs",
 	"tests.stubs.hs",
 	"lfs",
@@ -46,7 +46,7 @@ local OWNERS = {
 	"metrics.engine.capture.physical_context_observation",
 	"metrics.engine.capture.physical_configuration_observation",
 	"metrics.engine.capture.physical_subscription_lifetime",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"core.ui.engine.notifications",
 	"gestures.engine.engine",
 	"gestures.engine.actions",
@@ -313,9 +313,9 @@ function M.with_runtime(callback)
 			for _, name in ipairs({ "metrics.ui.wpm.menubar", "metrics.ui.wpm.widget" }) do package.loaded[name] = { is_running = function() return false end } end
 			package.loaded["keyboard.engine.runtime.onboarding"] = { stop = yes }
 			package.loaded["core.ui.ui.tooltip"] = { hide_forced = yes }
-			local control_path = driver .. "/modules/shortcuts/script_control.lua"
+			local control_path = driver .. "/shortcuts/engine/script_control.lua"
 			control = assert(loadfile(control_path))()
-			package.loaded["modules.shortcuts.script_control"] = control
+			package.loaded["shortcuts.engine.script_control"] = control
 			package.loaded["metrics.engine"] = engine
 			local keymap = { pause_processing = yes, resume_processing = yes, reset_predictions_for_pause = yes }
 			local shortcuts = { is_bindings_started = function() return false end,

@@ -16,8 +16,8 @@ require("core.logger.engine")
 local OWNED = {
 	"ai.engine.agent.runner", "ai.engine.agent.learning", "ai.engine.agent.connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
-	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
-	"modules.shortcuts.ai_actions",
+	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "core.i18n.engine.core", "shortcuts.engine.script_control",
+	"shortcuts.engine.ai_actions",
 }
 
 --- Holds only the native process boundary, preserving the real connector API.

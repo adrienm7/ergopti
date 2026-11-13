@@ -133,7 +133,7 @@ helpers.describe("Versions native managed admission (macOS)", function()
 	helpers.it("does not borrow a replacement script-control module during probe", function()
 		listed(function(_, state, post)
 			state.on_pause_read = function()
-				package.loaded["modules.shortcuts.script_control"] = {
+				package.loaded["shortcuts.engine.script_control"] = {
 					is_paused = function() return false end,
 					is_pause_transition_pending = function() return false end,
 				}

@@ -116,7 +116,7 @@ helpers.describe("private publication diagnostic ownership", function()
 	end)
 	for _, private in ipairs({ true, false }) do
 		helpers.it("private-publication actual keyboard setter exception " .. (private and "is redacted" or "keeps ordinary details"), function()
-			helpers.with_fresh_modules({ "modules.shortcuts.keyboard_shortcuts", "gestures.engine.actions", "settings.engine.paths",
+			helpers.with_fresh_modules({ "shortcuts.engine.keyboard_shortcuts", "gestures.engine.actions", "settings.engine.paths",
 				"core.fs.engine.paths", "settings.engine.preferences.preferences", "core.logger.engine.logger", "core.text.engine.toml_codec.writer", "core.fs.adapters.file_system" }, function()
 				local logs, categories, unavailable = {}, {}, false
 				local logger = helpers.make_logger_stub()
@@ -134,7 +134,7 @@ helpers.describe("private publication diagnostic ownership", function()
 						return '[shortcuts.keyboard]\nprimary_1 = "none"\n', "ok"
 					end,
 				}
-				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+				local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 				helpers.assert_eq(keyboard.get_action("primary_1"), "none")
 				unavailable = true
 				local function reporter(category) categories[#categories + 1] = category end

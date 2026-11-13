@@ -25,8 +25,8 @@ local function with_toggle_fixture(previous, options, body)
 	options = options or {}
 	local names = {
 		"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
-		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker",
-		"ui.menu.shortcut_utils", "core.logger.engine.logger", "gestures.ui.menu.gestures",
+		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "shortcuts.ui.action_picker",
+		"shortcuts.ui.menu.utils", "core.logger.engine.logger", "gestures.ui.menu.gestures",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do
@@ -71,8 +71,8 @@ local function with_toggle_fixture(previous, options, body)
 		render_ctx = ctx
 		return {}
 	end }
-	package.loaded["ui.action_picker"] = {}
-	package.loaded["ui.menu.shortcut_utils"] = {}
+	package.loaded["shortcuts.ui.action_picker"] = {}
+	package.loaded["shortcuts.ui.menu.utils"] = {}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local state = { gestures = previous }

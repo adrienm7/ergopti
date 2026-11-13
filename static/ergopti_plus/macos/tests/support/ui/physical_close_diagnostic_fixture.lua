@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "ui.physical_shortcuts", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
+local OWNED = { "shortcuts.ui.physical_shortcuts", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
 	"shortcuts.engine.physical_availability", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "hs.webview", "core.text.engine.json" }
@@ -118,7 +118,7 @@ local function run(blocked, scenario)
 		end, usercontent = { new = function() return native_userdata(bridge_metadata) end },
 			windowMasks = { titled = 1, closable = 2, resizable = 8 } }
 		package.loaded["hs.webview"] = native
-		local host = helpers.load_with_stubs("ui.physical_shortcuts", {
+		local host = helpers.load_with_stubs("shortcuts.ui.physical_shortcuts", {
 			webview = native, json = { decode = function() return {} end }, focus = function() end,
 			processInfo = { processID = 711, version = "1.1.1", arch = "arm64" },
 			screen = { mainScreen = function() return {} end },

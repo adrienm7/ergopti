@@ -16,7 +16,7 @@ local helpers, binding_source_fixture =
 
 helpers.describe("gesture parameter binding publication with the real script owner", function()
 	helpers.it("binding-identity: actual script publication distinguishes current and retired qualified domains", function()
-		local owner = require("modules.shortcuts.script_chords")
+		local owner = require("shortcuts.engine.script_chords")
 		owner.catalogue()
 		local publication = owner.published_binding_catalogue()
 		helpers.assert_true(type(publication) == "table")

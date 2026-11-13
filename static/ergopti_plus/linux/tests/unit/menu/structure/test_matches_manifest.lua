@@ -229,7 +229,7 @@ end
 --- Builds with the actual ordered-pair owner over an owned neutral source.
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
-	local names = {"modules.shortcuts.key_combinations", "keyboard.engine.keys.combinations_scope", "keyboard.ui.menu_key_combinations",
+	local names = {"shortcuts.engine.key_combinations", "keyboard.engine.keys.combinations_scope", "keyboard.ui.menu_key_combinations",
 		"core.fs.adapters.storage", "hotstrings.ui.hotstring_editor.bridge", "gestures.ui.conflicts",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
@@ -266,7 +266,7 @@ local function build_fixture_menu(context)
 		local Paths = require("core.fs.engine.paths")
 		local file = assert(io.open(Paths.shared("tap_hold/data/defaults.toml"), "rb"))
 		local defaults = assert(require("core.text.engine.toml_codec").decode(file:read("*a"))); assert(file:close())
-		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
+		local Pair = helpers.load_module("shortcuts.engine.key_combinations")
 		context.is_paused = function() return false end
 		-- Layout on pause / resume: a desktop listing no layout, so only « No change ».
 		if context.pause_layout == nil then

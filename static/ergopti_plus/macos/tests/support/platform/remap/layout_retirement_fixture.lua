@@ -6,7 +6,7 @@ local OWNED = {
 	"keyboard.engine.runtime.watchers", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"layouts.adapters.input_source_broker", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
-	"platform.input.key_state", "adapters.mouse_control", "platform.input.hotkey_registrar",
+	"platform.input.key_state", "shortcuts.adapters.mouse_control", "platform.input.hotkey_registrar",
 	"keyboard.adapters.karabiner.lease_contract", "keyboard.adapters.karabiner.ke_variables", "keyboard.engine.capsword_auto_off",
 	"keyboard.engine.capsword_output", "keyboard.engine.caps_word_auto_off",
 }
@@ -20,7 +20,7 @@ function M.with_world(options, callback)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.timings"] = { sec = function(_, key) return key == "layout_poll_ms" and 1 or 0.1 end }
 		package.loaded["platform.input.keycodes"] = { F17_CYCLE_WINDOWS = 64, to_name = function() return "f17" end }
-		for _, name in ipairs({ "platform.input.key_state", "adapters.mouse_control", "platform.input.hotkey_registrar",
+		for _, name in ipairs({ "platform.input.key_state", "shortcuts.adapters.mouse_control", "platform.input.hotkey_registrar",
 			"keyboard.adapters.karabiner.lease_contract", "keyboard.adapters.karabiner.ke_variables", "keyboard.engine.capsword_auto_off",
 			"keyboard.engine.capsword_output", "keyboard.engine.caps_word_auto_off" }) do package.loaded[name] = {} end
 		local w = { now = 0, timers = {}, tasks = {}, changes = {} }

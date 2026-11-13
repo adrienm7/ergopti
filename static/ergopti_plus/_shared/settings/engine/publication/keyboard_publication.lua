@@ -11,7 +11,7 @@
 local M = {}
 local Identity = require("settings.engine.publication.binding_identity")
 local Publication = require("settings.engine.publication.binding_publication")
-local NATIVE_OWNER = "modules.shortcuts.keyboard_shortcuts"
+local NATIVE_OWNER = "shortcuts.engine.keyboard_shortcuts"
 
 --- Registers the native module's genuine accessor exactly once, without IO.
 --- A new instance can initialize after require has withdrawn its predecessor;

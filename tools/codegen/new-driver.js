@@ -78,7 +78,8 @@ const DRIVER_SUBDIRS = [
 	'keyboard',
 	'layouts',
 	'metrics',
-	'onboarding'
+	'onboarding',
+	'shortcuts'
 ];
 
 /** Supported target languages. */

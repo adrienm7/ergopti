@@ -36,7 +36,7 @@ assert(
 	'nested helper comes from same compiler product'
 );
 const native = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua'),
+	path.join(ROOT, 'static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_native.lua'),
 	'utf8'
 );
 assert(native.includes('"ErgoptiAutomationQuery"'), 'runtime resolves fixed bundle sibling');

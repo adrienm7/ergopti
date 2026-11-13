@@ -80,7 +80,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; It exists precisely BECAUSE the previous design had no such variable and
 	; re-derived the hardware intent from GetKeyState — the bit the same function
 	; writes — which made the CapsLock LED self-latching.
-	"modules/shortcuts/capsword.ahk", true,
+	"shortcuts/engine/capsword.ahk", true,
 	; _ComposerCheckBusy — a re-entrancy flag, not injected state. It starts false
 	; at its declaration, ComposerCheck_Run sets it for the one running check and
 	; that check's terminal step clears it; there is no init for a guard to wait on.
@@ -143,7 +143,7 @@ _MetaGuardRatchet() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

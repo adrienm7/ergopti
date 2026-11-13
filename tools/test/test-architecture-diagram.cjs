@@ -54,7 +54,7 @@ check(
 );
 
 // (a2) Every driver, not two of them. The diagram used to hardcode windows and
-// macos, so linux/adapters/ — a full set of them — appeared nowhere in a
+// macos, so linux/shortcuts/adapters/ — a full set of them — appeared nowhere in a
 // document titled "the three-layer hexagonal architecture".
 check(
 	'generator discovers all three drivers',

@@ -113,7 +113,7 @@ local consumer_ok, consumer_error = xpcall(function()
 		is_assignable = function(id) return id == "screen_capture" end,
 		execute_action = function(action) consumer_calls[#consumer_calls + 1] = action end,
 	}
-	local controller = require("modules.shortcuts.script_actions").new({
+	local controller = require("shortcuts.engine.script_actions").new({
 		reset = function() end, reload = function() end,
 		quit = function()
 			consumer_calls[#consumer_calls + 1] = "script_quit"
@@ -122,7 +122,7 @@ local consumer_ok, consumer_error = xpcall(function()
 			native.stop()
 		end,
 	})
-	local tap = require("modules.shortcuts.tap_keys")
+	local tap = require("shortcuts.engine.tap_keys")
 	tap.init({ is_active = function() return not controller.is_paused() end, defer = native.defer })
 	assert(native.defer(controller.handlers.script_quit))
 	assert(tap.on_key({ code = 41, mods = {} }), "actual assigned tap must be consumed and queued")

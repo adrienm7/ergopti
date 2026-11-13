@@ -307,7 +307,7 @@ const WINDOWS_APPS = {
 				'the shared physical shortcut page id names its apps.manifest.json entry'
 			);
 			const reader = fs.readFileSync(
-				path.join(ROOT, SP, 'windows/ui/physical_shortcuts/slots.ahk'),
+				path.join(ROOT, SP, 'windows/shortcuts/ui/physical_shortcuts/slots.ahk'),
 				'utf8'
 			);
 			assert.match(

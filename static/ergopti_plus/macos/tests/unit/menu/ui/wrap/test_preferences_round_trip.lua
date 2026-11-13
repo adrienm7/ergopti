@@ -42,7 +42,7 @@ helpers.describe("actual-file Wrap preference roundtrip", function()
 			local state = { wrap_symbol_states = {}, custom_wrap_symbols = {} }
 			preferences.merge_saved_data(state, saved)
 			helpers.assert_eq(state, expected, "boot overlay must restore exact saved projection")
-			local text = helpers.load_with_stubs("modules.shortcuts.actions.text")
+			local text = helpers.load_with_stubs("shortcuts.engine.actions.text")
 			local active = text.build_active_wrap_pairs(state.wrap_symbol_states, state.custom_wrap_symbols)
 			helpers.assert_nil(active["("], "first input must respect persisted disabled built-in")
 			helpers.assert_eq(active["🙂"], { left = "🙂", right = "é" })

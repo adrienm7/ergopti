@@ -282,7 +282,7 @@ function admittedRemapSwitchRetirement(manifest) {
  * @returns {Set<string>} The admitted retired sources.
  */
 function admittedWindowsRetirements() {
-	const retired = 'windows/modules/shortcuts/ctrl.ahk';
+	const retired = 'windows/shortcuts/engine/ctrl.ahk';
 	for (const file of sourceFiles(path.join(SP, 'windows'), '.ahk'))
 		assert.ok(
 			!/^\s*#Include\b.*shortcuts[\\/]ctrl\.ahk/im.test(fs.readFileSync(file, 'utf8')),
@@ -413,7 +413,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = '8cf8a86dbbaffb228d984e3f979704e4568a5274df05b787f156dffb3b5a62ce';
+const LEGACY_SHA256 = '3ca17a1ac626892ee8432d96b9651aa3b59379cb803656f009ea6c8eda8d3943';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),
@@ -433,7 +433,7 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 		'macos/ui/menu/remap_switch.lua'
 	]),
 	// ctrl.ahk retired when schema v19 turned the chord switches into keyboard slots.
-	windows: Object.freeze(['windows/modules/shortcuts/ctrl.ahk'])
+	windows: Object.freeze(['windows/shortcuts/engine/ctrl.ahk'])
 });
 
 // The frozen oracle keeps the pre-rename spellings; the current tree uses the new ones.

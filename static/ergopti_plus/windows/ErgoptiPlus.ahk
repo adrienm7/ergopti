@@ -430,7 +430,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/ui/adapters/terminal_output_custody.ahk
 #Include core/ui/adapters/terminal_output_sendinput.ahk
 #Include ai/adapters/automation.ahk
-#Include adapters/mouse_control.ahk
+#Include shortcuts/adapters/mouse_control.ahk
 #Include platform/focus/window_manager.ahk
 #Include platform/system/control.ahk
 #Include core/ui/adapters/graphics_renderer.ahk
@@ -438,7 +438,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/ui/adapters/tooltip_renderer.ahk
 #Include core/process/adapters/shell_runner.ahk
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
-#Include adapters/screen_brightness.ahk
+#Include shortcuts/adapters/screen_brightness.ahk
 #Include diagnostics/adapters/crash_report_worker.ahk
 #Include hotstrings/engine/expander/uia_selection_worker.ahk
 BootProfile_Stamp("Adapters initialised")
@@ -467,7 +467,7 @@ if UIASW_IsWorkerInvocation()
 #Include core/text/engine/utils.ahk
 #Include hotstrings/engine/text_case.ahk
 #Include keyboard/engine/wrap_pair.ahk
-#Include infra/open_target.ahk
+#Include shortcuts/engine/open_target.ahk
 #Include settings/engine/send_input_parameter.ahk
 #Include core/ui/ui/spotlight/init.ahk
 #Include keyboard/engine/layers/nav_layer_helpers.ahk
@@ -537,8 +537,8 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include core/text/engine/json.ahk
 #Include settings/engine/program_parameter.ahk
 #Include core/process/adapters/program_providers.ahk
-#Include infra/program_actions.ahk
-#Include infra/user_actions.ahk
+#Include shortcuts/engine/program_actions.ahk
+#Include shortcuts/engine/user_actions.ahk
 #Include keyboard/engine/layers/sticky_modifiers.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
@@ -1236,7 +1236,7 @@ BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled
 	_GateCountsAfter["enabled"], _GateCountsAfter["total"],
 	_GateCountsBefore["enabled"] - _GateCountsAfter["enabled"]))
 
-#Include modules/take_note.ahk
+#Include shortcuts/engine/take_note.ahk
 ; The touchpad registry table and its one owner (backup, write, restore).
 ; Functions only: the first-run wizard above already calls them.
 #Include _generated/touchpad_registry.ahk
@@ -1416,8 +1416,8 @@ BootProfile_Mark("Metrics/keystats started")
 
 
 
-#Include ui/action_picker/init.ahk
-#Include ui/action_picker_webview.ahk
+#Include shortcuts/ui/action_picker/init.ahk
+#Include shortcuts/ui/action_picker_webview.ahk
 #Include settings/ui/paths_editor/init.ahk
 #Include layouts/ui/layout_manager/init.ahk
 #Include layouts/ui/layout_manager/composer.ahk
@@ -1427,7 +1427,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include core/network/proxy_override.ahk
 #Include hotstrings/ui/personal_info_editor/init.ahk
 #Include layouts/ui/layer_editor.ahk
-#Include ui/physical_shortcuts/init.ahk
+#Include shortcuts/ui/physical_shortcuts/init.ahk
 
 #Include keyboard/engine/suppressive_inputhook_ownership.ahk
 
@@ -1455,12 +1455,12 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 ; The number-row tap keys first: AutoHotkey fires the earliest-created eligible
 ; #HotIf variant of a hotkey, and the digit-row emulation below binds the same
 ; three scancodes. Their assignments are read before a press can reach them.
-#Include modules/shortcuts/tap_keys.ahk
+#Include shortcuts/engine/tap_keys.ahk
 ; The key combinations: their slots are read before the pair hotkeys of
 ; keyboard/adapters/remap.ahk can answer a press.
 #Include layouts/engine/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
-#Include modules/shortcuts.ahk
+#Include shortcuts/shortcuts.ahk
 ; After the layout: a slot's letter is the key that types it under the emulation,
 ; which RemappedList only knows from here. Before MagicEditorStart: a Win slot on
 ; a remapped key joins the physical broker, which acquires its keys once.

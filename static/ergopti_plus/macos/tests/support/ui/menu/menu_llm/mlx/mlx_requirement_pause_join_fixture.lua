@@ -35,7 +35,7 @@ local OWNED_MODULES = {
 	"ai.engine.api.ollama",
 	"ai.engine.api.remote",
 	"ai.engine.local_servers.warmup_controller",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"metrics.ui.wpm.menubar",
 	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
@@ -357,7 +357,7 @@ end
 --- Starts the real ScriptControl module with literal lifecycle contracts.
 --- @return table script_control Running ScriptControl module.
 local function start_script_control()
-	local script_control = require("modules.shortcuts.script_control")
+	local script_control = require("shortcuts.engine.script_control")
 	local keymap = {
 		pause_processing = function() return true end,
 		resume_processing = function() return true end,

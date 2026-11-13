@@ -21,7 +21,7 @@ local MODULES = {
 	"ai.ui.menu.models.switcher",
 	"ai.ui.menu.profile_label",
 	"ai.ui.menu.profiles_manager",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"settings.ui.menu.preferences_transaction",
 	"ai.ui.prompt_editor",
 }
@@ -209,7 +209,7 @@ local function with_fixture(options, body)
 		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
-		package.loaded["ui.menu.shortcut_utils"] = {
+		package.loaded["shortcuts.ui.menu.utils"] = {
 			prompt_shortcut = function(spec)
 				shortcut_prompt_count = shortcut_prompt_count + 1
 				last_shortcut_spec = spec

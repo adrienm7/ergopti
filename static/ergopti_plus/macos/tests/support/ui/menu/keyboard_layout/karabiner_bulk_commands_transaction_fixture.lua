@@ -166,13 +166,13 @@ local function find_picker_action(built, case, action_label)
 	end
 	if action_id == nil then return nil end
 	return function()
-		local saved = package.loaded["ui.action_picker"]
+		local saved = package.loaded["shortcuts.ui.action_picker"]
 		local offered, confirm = nil, nil
-		package.loaded["ui.action_picker"] = {
+		package.loaded["shortcuts.ui.action_picker"] = {
 			open = function(opts, on_confirm) offered, confirm = opts, on_confirm; return true end,
 		}
 		local ok, opened = pcall(open)
-		package.loaded["ui.action_picker"] = saved
+		package.loaded["shortcuts.ui.action_picker"] = saved
 		if not ok then error(opened, 0) end
 		helpers.assert_true(opened, "the slot row opens the shared action picker")
 		helpers.assert_type(confirm, "function")

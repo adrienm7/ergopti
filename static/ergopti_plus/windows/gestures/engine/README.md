@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Maps user-configurable gesture slots (3-finger tap, 4-finger tap, left/right/up/down swipe) to actions. Each slot holds one action key read from the features manifest; a user-facing picker (`ui/action_picker/`) lets the user reassign slots without reloading. Also provides three always-available gestures: screenshot (GDI+ region capture), paste-plain (strips rich formatting), and left-button click-lock for drag gestures.
+Maps user-configurable gesture slots (3-finger tap, 4-finger tap, left/right/up/down swipe) to actions. Each slot holds one action key read from the features manifest; a user-facing picker (`shortcuts/ui/action_picker/`) lets the user reassign slots without reloading. Also provides three always-available gestures: screenshot (GDI+ region capture), paste-plain (strips rich formatting), and left-button click-lock for drag gestures.
 
 ## Ports used (`_shared/core/ports/`)
 

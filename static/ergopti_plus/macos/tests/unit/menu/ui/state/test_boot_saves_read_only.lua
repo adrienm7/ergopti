@@ -147,9 +147,9 @@ helpers.describe("shortcut scope menu admission", function()
 				local ctx, selected, constructions, invalidations = fixture.ctx, nil, 0, 0
 				package.loaded["menu.ui.builder.builder"].invalidate_cache = function() invalidations = invalidations + 1 end
 				local idle = true
-				package.loaded["ui.menu.menu_shortcuts"].scope_idle = function() return idle end
+				package.loaded["shortcuts.ui.menu.shortcuts"].scope_idle = function() return idle end
 				for _, name in ipairs({ "bindings", "keyboard_shortcuts", "tap_keys", "script_control" }) do
-					package.loaded["modules.shortcuts." .. name] = {}
+					package.loaded["shortcuts.engine." .. name] = {}
 				end
 				ctx.shortcuts.start_script_control = function(keymap, shortcuts, gestures, karabiner)
 					helpers.assert_true(keymap == ctx.keymap and shortcuts == ctx.shortcuts)
@@ -157,7 +157,7 @@ helpers.describe("shortcut scope menu admission", function()
 					return true
 				end
 				local owner = { pending = function() return false end, retry_restore = function() return true end }
-				package.loaded["ui.menu.shortcuts_scope"] = { new = function(options)
+				package.loaded["shortcuts.ui.menu.scope"] = { new = function(options)
 					constructions, selected = constructions + 1, options
 					owner.apply = function(mode)
 						helpers.assert_eq(mode, "clear")
@@ -175,10 +175,10 @@ helpers.describe("shortcut scope menu admission", function()
 				helpers.assert_eq(ctx.apply_preference_scope("shortcuts", "clear"), expected)
 				helpers.assert_eq(constructions, 1)
 				helpers.assert_true(selected.shortcuts == ctx.shortcuts and selected.state == ctx.state)
-				helpers.assert_true(selected.bindings == package.loaded["modules.shortcuts.bindings"])
-				helpers.assert_true(selected.keyboard == package.loaded["modules.shortcuts.keyboard_shortcuts"])
-				helpers.assert_true(selected.tap_keys == package.loaded["modules.shortcuts.tap_keys"])
-				helpers.assert_true(selected.script_control == package.loaded["modules.shortcuts.script_control"])
+				helpers.assert_true(selected.bindings == package.loaded["shortcuts.engine.bindings"])
+				helpers.assert_true(selected.keyboard == package.loaded["shortcuts.engine.keyboard_shortcuts"])
+				helpers.assert_true(selected.tap_keys == package.loaded["shortcuts.engine.tap_keys"])
+				helpers.assert_true(selected.script_control == package.loaded["shortcuts.engine.script_control"])
 				helpers.assert_true(selected.start_script_control())
 				helpers.assert_eq(invalidations, expected == true and 1 or 0)
 				idle = false
@@ -191,8 +191,8 @@ helpers.describe("shortcut scope menu admission", function()
 		isolated(function()
 			local fixture = boot({ load_status = "corrupt" })
 			fixture.global_actions()
-			package.loaded["ui.menu.menu_shortcuts"].scope_idle = function() return true end
-			package.loaded["ui.menu.shortcuts_scope"] = { new = function() error("read-only construction") end }
+			package.loaded["shortcuts.ui.menu.shortcuts"].scope_idle = function() return true end
+			package.loaded["shortcuts.ui.menu.scope"] = { new = function() error("read-only construction") end }
 			helpers.assert_eq(fixture.ctx.apply_preference_scope("shortcuts", "clear"), false)
 		end)
 	end)

@@ -248,7 +248,7 @@ function H.collect_input()
 	local KeyState = require("platform.input.key_state")
 	local input = {
 		paused    = read("the pause state", function()
-			return require("modules.shortcuts.script_control").is_paused() == true
+			return require("shortcuts.engine.script_control").is_paused() == true
 		end),
 		shift     = KeyState.isDown("shift"),
 		ctrl      = KeyState.isDown("ctrl"),

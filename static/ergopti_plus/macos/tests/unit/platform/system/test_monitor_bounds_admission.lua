@@ -3,7 +3,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("monitor bounds admission", function()
 	helpers.it("does not substitute monitor one for an invalid index", function()
-		local mouse = helpers.load_with_stubs("adapters.mouse_control", {
+		local mouse = helpers.load_with_stubs("shortcuts.adapters.mouse_control", {
 			screen = { allScreens = function()
 				return { { fullFrame = function() return { x = 10, y = 20, w = 30, h = 40 } end } }
 			end },

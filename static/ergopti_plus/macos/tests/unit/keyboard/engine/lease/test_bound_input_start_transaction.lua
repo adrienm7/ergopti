@@ -237,7 +237,7 @@ local function load_remap(options)
 	package.loaded["metrics.adapters.kc_bridge"] = classifier
 	package.loaded["gestures.engine.engine"] = {}
 	local shortcuts_paused = options.shortcuts_paused == true
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		is_paused = function() return shortcuts_paused end,
 		rebind_for_layout = function() return true end,
 	}

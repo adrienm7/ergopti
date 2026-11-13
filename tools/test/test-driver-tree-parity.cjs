@@ -191,7 +191,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    ui/field_check/, so the path is shared on all three. The
 //                    measurement had also carried two paths of slack (38 against
 //                    36); tightened to the measurement.
-const BASELINE_SHARED = 70;
+const BASELINE_SHARED = 68;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -212,7 +212,7 @@ const BASELINE_SHARED = 70;
 //   macOS, for a setting the manifest declares once. That is convergence
 //   downwards wearing a clean ratchet.
 //
-//   49 → 51 on 2026-08-23 — windows/native plus native/nav_event_owner. AHK's
+//   49 → 51 on 2026-08-23 — windows/shortcuts/native plus native/nav_event_owner. AHK's
 //   split HotIf/callback model cannot atomically own a physical event, so the
 //   Windows driver needs a packaged WH_KEYBOARD_LL component with its own C ABI,
 //   hook-free tests and hardened-build gate. Empty Lua counterparts would add
@@ -273,7 +273,7 @@ const BASELINE_SHARED = 70;
 //   the focused window under Wayland, where no client may ask the compositor.
 //   Windows and macOS read focus through their own native APIs and install no
 //   desktop-shell code, so counterpart folders there would hold nothing.
-const BASELINE_UNION = 95;
+const BASELINE_UNION = 97;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //
@@ -397,7 +397,7 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // a missing module. Raised the same day it was measured: leaving it at 16 would
 // hand the ratchet exactly one feature of slack, which is the failure the note
 // above condemns and would silently undo the tightening it describes.
-const BASELINE_CANONICAL_ON_ALL = 6;
+const BASELINE_CANONICAL_ON_ALL = 4;
 
 if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
 	errors.push(

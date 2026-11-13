@@ -16,10 +16,7 @@
 		"divergent": false
 	},
 	"COPY_SETTLE_SEC": {
-		"files": [
-			"macos/modules/shortcuts/actions/apps.lua",
-			"macos/modules/shortcuts/actions/text.lua"
-		],
+		"files": ["macos/shortcuts/engine/actions/apps.lua", "macos/shortcuts/engine/actions/text.lua"],
 		"divergent": false
 	},
 	"DEFAULT_MAX_OUTPUT_BYTES": {
@@ -91,7 +88,7 @@
 		"divergent": false
 	},
 	"RESTORE_DELAY_SEC": {
-		"files": ["macos/menu/engine/ui_restore.lua", "macos/modules/shortcuts/actions/text.lua"],
+		"files": ["macos/menu/engine/ui_restore.lua", "macos/shortcuts/engine/actions/text.lua"],
 		"divergent": false
 	},
 	"SESSION_TIMEOUT_MS": {

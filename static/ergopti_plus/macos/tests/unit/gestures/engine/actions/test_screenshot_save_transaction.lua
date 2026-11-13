@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
-	"adapters.mouse_control",
+	"shortcuts.adapters.mouse_control",
 	"platform.system.screen_capture",
 	"core.process.adapters.shell_runner",
-	"modules.shortcuts.actions.screen_capture_flow",
+	"shortcuts.engine.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"modules.shortcuts.actions.screenshot_save",
+	"shortcuts.engine.actions.screenshot_save",
 }
 
 --- Loads the shared transaction against configurable async-task boundaries.
@@ -51,7 +51,7 @@ local function with_subject(options, scenario)
 		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
 	}
 	-- A whole-screen save names one file per display; this desk has one.
-	package.loaded["adapters.mouse_control"] = { getMonitorCount = function() return 1 end }
+	package.loaded["shortcuts.adapters.mouse_control"] = { getMonitorCount = function() return 1 end }
 	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
@@ -60,7 +60,7 @@ local function with_subject(options, scenario)
 		clipboard_has_image = function() return true end,
 		copy_image_file_to_clipboard = function() return true end,
 	}
-	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
+	package.loaded["shortcuts.engine.actions.screen_capture_flow"] = nil
 	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
@@ -144,14 +144,14 @@ local function with_subject(options, scenario)
 			return handle
 		end,
 	}
-	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
+	package.loaded["shortcuts.engine.actions.screenshot_save"] = nil
 	_G.hs = {
 		processInfo = {processID = modes.process_id or 7001},
 		timer = {absoluteTime = function() return modes.absolute_time or 123456789 end},
 	}
 
 	local ok, err = xpcall(function()
-		local subject = require("modules.shortcuts.actions.screenshot_save")
+		local subject = require("shortcuts.engine.actions.screenshot_save")
 		scenario(subject, fixture)
 	end, debug.traceback)
 
@@ -326,10 +326,10 @@ end)
 helpers.describe("gesture screenshot entry point (HS-015)", function()
 	helpers.it("owns the registered action when the shared save transaction refuses (HS-015)", function()
 		local saved_actions = package.loaded["gestures.engine.actions"]
-		local saved_screenshot = package.loaded["modules.shortcuts.actions.screenshot_save"]
+		local saved_screenshot = package.loaded["shortcuts.engine.actions.screenshot_save"]
 		local saved_hs = _G.hs
 		local calls = {}
-		package.loaded["modules.shortcuts.actions.screenshot_save"] = {
+		package.loaded["shortcuts.engine.actions.screenshot_save"] = {
 			save = function(flags, prefix)
 				calls[#calls + 1] = {flags = flags, prefix = prefix}
 				return false
@@ -347,7 +347,7 @@ helpers.describe("gesture screenshot entry point (HS-015)", function()
 		end, debug.traceback)
 
 		package.loaded["gestures.engine.actions"] = saved_actions
-		package.loaded["modules.shortcuts.actions.screenshot_save"] = saved_screenshot
+		package.loaded["shortcuts.engine.actions.screenshot_save"] = saved_screenshot
 		_G.hs = saved_hs
 		if not ok then error(err, 0) end
 	end)

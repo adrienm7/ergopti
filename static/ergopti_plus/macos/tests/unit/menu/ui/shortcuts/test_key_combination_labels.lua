@@ -25,7 +25,7 @@ end
 local function with_menu(callback)
 	helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.storage",
-		"infra.timer_scheduler", "tap_hold.engine.combination_labels", "ui.action_picker" }, function()
+		"infra.timer_scheduler", "tap_hold.engine.combination_labels", "shortcuts.ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local captured = package.loaded["core.i18n.engine.i18n"]
 		package.loaded["core.i18n.engine.i18n"] = nil
@@ -181,7 +181,7 @@ helpers.describe("canonical physical combination labels", function()
 					for slot_index, slot in ipairs({ "combo", "tap", "hold" }) do
 						-- The slot opens the shared action picker; a pick confirms there.
 						local offered, confirm = nil, nil
-						package.loaded["ui.action_picker"] = {
+						package.loaded["shortcuts.ui.action_picker"] = {
 							open = function(opts, on_confirm) offered, confirm = opts, on_confirm; return true end,
 						}
 						helpers.assert_true(pair.menu[slot_index + 2].fn())

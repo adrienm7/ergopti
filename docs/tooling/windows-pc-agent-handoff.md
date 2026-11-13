@@ -136,7 +136,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 - Dev 3852b250 (1 November, 02:30 UTC), from the latest PC pushes:
   `tools/test/test-config-key-literals.cjs` now counts 18 hand-typed config
   keys in `windows/keyboard/engine/keys/combinations.ahk` (0 allowed) and 25 in
-  `windows/ui/menu/menu_shortcuts.ahk` (22 allowed): use the generated
+  `windows/shortcuts/ui/menu/shortcuts.ahk` (22 allowed): use the generated
   `ConfigKey`/`ConfigLeaf` constants. `tools/test/test-duplicate-constant-names.cjs`:
   `WINDOW_MS` gained a copy in `windows/metrics/engine/perf/hotpath_profiler.ahk`, and its
   copies (`shell_runner.ahk`, `hotpath_profiler.ahk`, `wpm_display.ahk`) now

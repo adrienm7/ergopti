@@ -14,7 +14,7 @@ local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
 local function with_world(scenario)
 	return helpers.with_fresh_modules({ "ai.engine.prediction.screen_answer", "ai.engine.ollama.local_model_offer",
-		"core.ui.engine.dialog_util", "modules.shortcuts.script_control" }, function()
+		"core.ui.engine.dialog_util", "shortcuts.engine.script_control" }, function()
 		return Scope.run(function() return scenario(Fixture.build_world()) end)
 	end)
 end
@@ -99,7 +99,7 @@ helpers.describe("screen missing-model repair retains its own consent revision",
 					elseif change == "successor answer" then
 						helpers.assert_not_nil(world.engine.open_answer_surface("new answer"))
 					else
-						package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+						package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end }
 					end
 					return native_alert(...)
 				end

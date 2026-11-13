@@ -7,7 +7,7 @@
 		"static/ergopti_plus/macos/core/timing/engine/paced_job.lua": 1,
 		"static/ergopti_plus/macos/init.lua": 1,
 		"static/ergopti_plus/macos/ai/engine/api/remote.lua": 1,
-		"static/ergopti_plus/macos/modules/shortcuts/script_control.lua": 2,
+		"static/ergopti_plus/macos/shortcuts/engine/script_control.lua": 2,
 		"static/ergopti_plus/macos/keyboard/engine/runtime/generator.lua": 2,
 		"static/ergopti_plus/windows/diagnostics/engine/reports/snapshot.ahk": 1,
 		"static/ergopti_plus/windows/platform/input/hook_dispatcher.ahk": 1,

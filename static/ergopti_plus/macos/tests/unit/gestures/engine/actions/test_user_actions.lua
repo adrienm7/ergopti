@@ -62,10 +62,10 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"gestures.engine.user_actions", "gestures.engine.apple_shortcut_action",
-	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
+	"shortcuts.adapters.apple_shortcuts_cli", "shortcuts.adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
 	"core.ui.engine.notifications", "gestures.engine.actions_aux_owner", "core.fs.adapters.file_system", "clipboard.adapters.clipboard",
 	"platform.input.synthetic_input", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
-	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
+	"shortcuts.adapters.apple_shortcuts_native", "shortcuts.engine.actions.text",
 }
 
 --- Runs body with every owner of the user actions recorded.
@@ -155,10 +155,10 @@ local function with_world(body)
 			end,
 			cancel = function(handle) handle.cancelled = true; return true end,
 		}
-		package.loaded["adapters.apple_shortcuts_native"] = {
+		package.loaded["shortcuts.adapters.apple_shortcuts_native"] = {
 			cli_identity = function() return { executable = "/usr/bin/shortcuts", token = "fingerprint" } end,
 		}
-		package.loaded["modules.shortcuts.actions.text"] = {
+		package.loaded["shortcuts.engine.actions.text"] = {
 			read_copied_selection = function(_, on_selection, on_empty)
 				if world.defer_selection then world.empty_selection = on_empty; return true end
 				if world.selection then on_selection(world.selection) else on_empty() end
@@ -202,7 +202,7 @@ local function with_world(body)
 		end }
 		world.User = require("gestures.engine.user_actions")
 		world.Shortcut = require("gestures.engine.apple_shortcut_action")
-		world.Cli = require("adapters.apple_shortcuts_cli")
+		world.Cli = require("shortcuts.adapters.apple_shortcuts_cli")
 		body(world)
 	end)
 end

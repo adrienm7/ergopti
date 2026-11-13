@@ -327,11 +327,11 @@ local SLOT_CATALOGUE = {
 --- @param body function Receives the key's rows, the observations and the rebuild.
 local function with_slot_picker(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
-		"core.logger.engine.logger", "menu.ui.builder.utils", "ui.action_picker" }, function()
+		"core.logger.engine.logger", "menu.ui.builder.utils", "shortcuts.ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0,
 			receipt = true, open_result = true }
-		package.loaded["ui.action_picker"] = {
+		package.loaded["shortcuts.ui.action_picker"] = {
 			open = function(opts, on_confirm)
 				observed.opened[#observed.opened + 1] = { opts = opts, confirm = on_confirm }
 				return observed.open_result
@@ -671,10 +671,10 @@ local SHIFT_PAIR = { id = "shift_pair", label = "Shift pair", group = "Shift",
 --- @param body function Receives the pair's slot rows and the observations.
 local function with_pair_picker(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
-		"core.logger.engine.logger", "menu.ui.builder.utils", "ui.action_picker" }, function()
+		"core.logger.engine.logger", "menu.ui.builder.utils", "shortcuts.ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0, receipt = true }
-		package.loaded["ui.action_picker"] = {
+		package.loaded["shortcuts.ui.action_picker"] = {
 			open = function(opts, on_confirm)
 				observed.opened[#observed.opened + 1] = { opts = opts, confirm = on_confirm }
 				return true

@@ -13,9 +13,9 @@ local json = require("core.text.engine.json")
 helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger menu row", function()
 		helpers.with_fresh_modules({ "gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils",
-			"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker",
+			"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "shortcuts.ui.action_picker",
 			"menu.engine.renderer",
-			"ui.menu.shortcut_utils", "core.logger.engine.logger", "core.timing.engine.deferred_work" }, function()
+			"shortcuts.ui.menu.utils", "core.logger.engine.logger", "core.timing.engine.deferred_work" }, function()
 			local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 			local strings = json.decode(file:read("*a"))
 			file:close()
@@ -46,8 +46,8 @@ helpers.describe("configured gesture menu label", function()
 				get_root = function() return { gesture_slots = { ["4"] = { "tap_4" } } } end,
 				build = function(_, _, _, _, _, providers) return providers.gesture_slots_4() end,
 			}
-			package.loaded["ui.action_picker"] = {}
-			package.loaded["ui.menu.shortcut_utils"] = {}
+			package.loaded["shortcuts.ui.action_picker"] = {}
+			package.loaded["shortcuts.ui.menu.utils"] = {}
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.timing.engine.deferred_work"] = {}
 			local menu = require("gestures.ui.menu.gestures").build({ gestures = gestures, state = { gestures = true }, paused = false })

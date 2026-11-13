@@ -21,17 +21,17 @@ local helpers = require("tests.helpers")
 
 local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_inverse)
 	helpers.with_fresh_modules({
-		"ui.menu.menu_shortcuts",
+		"shortcuts.ui.menu.shortcuts",
 		"core.logger.engine.logger",
 		"core.timing.engine.deferred_work",
 		"core.fs.engine.dir",
 		"core.ui.engine.dialog_util",
-		"modules.shortcuts",
-		"modules.shortcuts.actions.text",
+		"shortcuts.engine",
+		"shortcuts.engine.actions.text",
 		"core.i18n.engine.i18n",
 		"menu.ui.builder.utils",
 		"menu.engine.manifest_menu",
-		"ui.menu.shortcut_utils",
+		"shortcuts.ui.menu.utils",
 		"layouts.ui.menu.keyboard_slots",
 		"menu.engine.manifest_reader",
 	}, function()
@@ -65,10 +65,10 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["core.ui.engine.dialog_util"] = {}
-		package.loaded["modules.shortcuts"] = {
+		package.loaded["shortcuts.engine"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
-		package.loaded["modules.shortcuts.actions.text"] = {
+		package.loaded["shortcuts.engine.actions.text"] = {
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
@@ -85,13 +85,13 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 			function(_, _, _, _, _, lists)
 				return lists.keyboard_slots()
 			end)
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["layouts.ui.menu.keyboard_slots"] = {
 			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.primary_ end,
 		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }
 
-		local Menu = require("ui.menu.menu_shortcuts")
+		local Menu = require("shortcuts.ui.menu.shortcuts")
 		local item = Menu.build({
 			shortcuts = shortcuts,
 			state = {
@@ -181,8 +181,8 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		"menu.engine.manifest_menu",
 		"menu.engine.renderer",
 		"core.text.engine.json",
-		"ui.action_picker",
-		"ui.menu.shortcut_utils",
+		"shortcuts.ui.action_picker",
+		"shortcuts.ui.menu.utils",
 		"core.logger.engine.logger",
 		"core.timing.engine.deferred_work",
 	}, function()
@@ -242,8 +242,8 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 				return providers.gesture_slots_2()
 			end,
 		}
-		package.loaded["ui.action_picker"] = { open = function() return true end }
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.action_picker"] = { open = function() return true end }
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 

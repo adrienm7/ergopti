@@ -1510,7 +1510,7 @@ function M.on_pause_change(paused)
 end
 
 --- The catalogue actions this engine answers, for the gesture executor's
---- daemon-injected handlers (modules/shortcuts/action_handlers.lua). The
+--- daemon-injected handlers (shortcuts/engine/action_handlers.lua). The
 --- presets follow the built-in profiles, so a new profile needs no code here.
 --- @return table { [action_id] = function(binding, parameter) }
 function M.action_handlers()

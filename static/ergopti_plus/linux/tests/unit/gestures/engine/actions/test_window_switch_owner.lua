@@ -2,7 +2,7 @@
 
 local helpers = require("tests.helpers")
 local Policy = require("core.ui.engine.cursor_window_policy")
-local Switch = require("adapters.window_switch")
+local Switch = require("shortcuts.adapters.window_switch")
 local Display = require("core.ui.engine.display_server")
 local PACKET = [[pointer
 X=1500

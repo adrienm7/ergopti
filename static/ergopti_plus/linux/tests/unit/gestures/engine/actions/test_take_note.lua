@@ -64,7 +64,7 @@ helpers.describe("Linux daily notes (linux-take-note)", function()
 	-- to nothing under gio. The registered editor is launched by its id instead.
 	helpers.it("linux-take-note: an empty note opens in the registered editor, never a content-sniffing opener", function()
 		fixture(function(path, launches, _, launch)
-			helpers.assert_true(require("modules.take_note").open(launch))
+			helpers.assert_true(require("shortcuts.engine.take_note").open(launch))
 			helpers.assert_eq(Files.read(path), "")
 			helpers.assert_eq(#launches, 1)
 			helpers.assert_eq(launches[1]:match("^xdg%-open ") or launches[1]:match("^gio open "), nil)
@@ -74,7 +74,7 @@ helpers.describe("Linux daily notes (linux-take-note)", function()
 
 	helpers.it("linux-take-note: absent text handler reports the reason without creating a file", function()
 		fixture(function(path, launches, notices, launch)
-			helpers.assert_eq(require("modules.take_note").open(launch), false)
+			helpers.assert_eq(require("shortcuts.engine.take_note").open(launch), false)
 			helpers.assert_eq(#launches, 0)
 			helpers.assert_eq(#notices, 1)
 			helpers.assert_eq(Files.exists(path), false)
@@ -85,7 +85,7 @@ helpers.describe("Linux daily notes (linux-take-note)", function()
 		fixture(function(path, launches, notices, launch)
 			local saved = Files.append
 			Files.append = function() return false end
-			local ok, result = pcall(require("modules.take_note").open, launch)
+			local ok, result = pcall(require("shortcuts.engine.take_note").open, launch)
 			Files.append = saved
 			helpers.assert_true(ok)
 			helpers.assert_eq(result, false)

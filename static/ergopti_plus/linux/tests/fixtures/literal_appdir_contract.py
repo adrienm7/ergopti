@@ -277,7 +277,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         assert isinstance(json.loads(runtime_probe.stdout).get("ok"), bool), runtime_probe.stderr
         assert "module '" not in runtime_probe.stderr, runtime_probe.stderr
         rejected = subprocess.run(
-            [usr / "bin/luajit", driver / "platform/window_switch_worker.lua"],
+            [usr / "bin/luajit", driver / "shortcuts/adapters/window_switch_worker.lua"],
             env=env,
             text=True,
             capture_output=True,

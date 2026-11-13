@@ -84,5 +84,5 @@ checklist every driver must complete.**
 ## Notes
 
 The deleted adapters are in this repository's history at
-`static/ergopti_plus/linux/adapters/` up to the commit that removed them. They
+`static/ergopti_plus/linux/shortcuts/adapters/` up to the commit that removed them. They
 were never wrong code; they were code with no reason to run yet.

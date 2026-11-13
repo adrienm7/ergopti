@@ -37,7 +37,7 @@ _G.hs.timer.absoluteTime = function() return _time * 1e9 end
 -- gestures/engine/init.lua — which is asserted below, so this stub is a load
 -- guard and not a pause switch. It used to carry a `paused` flag that two
 -- placeholder tests toggled to no effect whatsoever.
-package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return false end }
+package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return false end }
 
 
 

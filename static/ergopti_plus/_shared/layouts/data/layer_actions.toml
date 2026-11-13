@@ -85,7 +85,7 @@ reason_key = "platform_reason.layer_fn_modifier_is_macos"
 # as a layer key. The wheel is no longer one: Karabiner-Elements, which carries
 # the rest of the macOS layer, takes no wheel input, so Hammerspoon runs the
 # macOS wheel bindings, consuming a turn only while the layer is held
-# (macos/modules/shortcuts/actions/system.lua, bind_layer_wheel). Nor is the
+# (macos/shortcuts/engine/actions/system.lua, bind_layer_wheel). Nor is the
 # mouse button: the Linux hook takes the mouse for the hold and forwards
 # everything but a bound notch or button (linux/platform/input/keyboard_hook.lua,
 # LayerPointer.sync). No source kind is OS-specific today; a [source_kinds.<kind>]

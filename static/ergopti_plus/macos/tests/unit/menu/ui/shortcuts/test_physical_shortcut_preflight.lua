@@ -20,7 +20,7 @@ helpers.describe('Mac physical preflight actual all-owner registrar',function()
     helpers.assert_eq(f.files.config,mode=='logical_chord' and logical_source or source,'Refusal preserves the exact source')
     helpers.assert_eq(f.owner.pending(),false,'Inverse settles')
     if mode=='foreign_none' or mode=='foreign_action' then
-     helpers.assert_eq(registrar.has_physical_conflict({},38,'modules.shortcuts.keyboard_shortcuts','keyboard__physical_none_KeyJ'),true,'Independent ownership survives refusal')
+     helpers.assert_eq(registrar.has_physical_conflict({},38,'shortcuts.engine.keyboard_shortcuts','keyboard__physical_none_KeyJ'),true,'Independent ownership survives refusal')
      helpers.assert_eq(registrar.replace_physical_claims('independent-owner',{}),true)
     end
    end,mode=='logical_chord' and logical_source or source)

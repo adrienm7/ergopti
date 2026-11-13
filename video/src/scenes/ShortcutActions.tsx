@@ -469,7 +469,7 @@ const SmartDemo: React.FC = () => {
 };
 
 export const ShortcutSearch: React.FC = () => {
-	// Win + S runs the selection-aware search (windows/modules/shortcuts/win.ahk).
+	// Win + S runs the selection-aware search (windows/shortcuts/engine/win.ahk).
 	const slot = shortcut('search_web');
 	return (
 		<Slide

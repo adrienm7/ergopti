@@ -249,7 +249,7 @@ helpers.describe("terminator replay: real transaction ordering", function()
 				local control
 				local deadline
 				if lifecycle == "pause" then
-					control = require("tests.unit.modules.shortcuts.pause_owners.fixtures")
+					control = require("tests.unit.shortcuts.engine.pause_owners.fixtures")
 						.load_inventory_context({ when_idle = fixture.synthetic.when_idle })
 					helpers.assert_true(control.pause_all())
 					helpers.assert_eq(control.is_paused(), false)

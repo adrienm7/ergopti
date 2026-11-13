@@ -196,7 +196,7 @@ local function load_fixture()
 		resync_context = function() return true end,
 		log_shortcut = function() return true end,
 	}
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 	package.loaded["ai.engine.api.ollama"] = nil
 	local hs_overrides = {
 		host = { uuid = function() return nonce:sub(1, 8) .. "-" .. nonce:sub(9, 12) .. "-"
@@ -249,7 +249,7 @@ local function load_fixture()
 	package.loaded["metrics.ui.wpm.widget"] = { is_running = function() return false end }
 	package.loaded["keyboard.engine.runtime.onboarding"] = { stop = function() return true end }
 	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
-	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control", hs_overrides)
+	local script_control = helpers.load_with_stubs("shortcuts.engine.script_control", hs_overrides)
 	return {
 		api = api,
 		hooks = hooks,

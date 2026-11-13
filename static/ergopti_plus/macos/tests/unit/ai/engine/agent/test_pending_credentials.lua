@@ -17,7 +17,7 @@ local OWNED = {
 	"ai.engine.agent.runner", "ai.engine.agent.learning", "ai.engine.agent.connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
 	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "ai.engine.prediction.translate",
-	"diagnostics.adapters.event_provenance", "core.lifecycle.engine.compat.utf8", "core.i18n.engine.core", "modules.shortcuts.script_control",
+	"diagnostics.adapters.event_provenance", "core.lifecycle.engine.compat.utf8", "core.i18n.engine.core", "shortcuts.engine.script_control",
 }
 
 local function with_agent(options, scenario)
@@ -70,7 +70,7 @@ helpers.describe("agent request authority survives pending native credentials", 
 					helpers.assert_eq(#world.posts, 0)
 					if revocation == "off" then world.runner.set_mode("off")
 					elseif revocation == "reset" then world.runner.reset()
-					else package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end } end
+					else package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end } end
 					world.pending[1](true, "fixture-key")
 					helpers.assert_eq(#world.posts, 0, "revoked private agent input must not reach HTTP")
 					helpers.assert_eq(#world.renders, 0)
@@ -118,7 +118,7 @@ helpers.describe("agent request authority survives pending native credentials", 
 			helpers.it(system.name .. " rejects a late credential after " .. change .. " (agent-surface-authority)", function()
 				with_agent(system.options, function(world)
 					local paused = false
-					package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return paused end }
+					package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return paused end }
 					helpers.assert_true(system.start(world))
 					helpers.assert_eq(#world.pending, 1)
 					if change == "pause and resume" then

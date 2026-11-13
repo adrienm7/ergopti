@@ -95,7 +95,7 @@ local function build_world(buffer)
 		package.loaded[name] = nil
 	end
 	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,

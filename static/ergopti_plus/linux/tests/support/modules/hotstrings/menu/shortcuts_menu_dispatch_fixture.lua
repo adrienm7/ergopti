@@ -119,8 +119,8 @@ local function with_keyboard_slot_picker(prompt, body)
 	local source = '[shortcuts.keyboard]\nprimary_k = "none"\n[gesture_parameters]\nkeyboard__primary_k__open_url = "https://old.example"\n[unrelated]\nkeep = 42\n'
 	local ok, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
-			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts",
-				"modules.shortcuts.manager", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
+			for _, name in ipairs({ "gestures.engine.manager", "shortcuts.engine.keyboard_shortcuts",
+				"shortcuts.engine.manager", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
 				"menu.engine.manifest_menu" }) do package.loaded[name] = nil end
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
@@ -143,7 +143,7 @@ local function with_keyboard_slot_picker(prompt, body)
 			local called, result = pcall(function()
 				local gestures = require("gestures.engine.manager")
 				gestures.init({ persist = true, config_path = path, enabled = false })
-				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+				local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 				-- A one-row presentation still delegates all ownership/domain policy.
 				keyboard.SLOT_GROUPS = { { prefix = "primary_", group_key = "menu.shortcuts.mod_ctrl" } }
 				keyboard.available_slots = function() return { "primary_k" } end
@@ -186,7 +186,7 @@ local function with_keyboard_slot_picker(prompt, body)
 					end
 					return accepted
 				end
-				package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+				package.loaded["shortcuts.ui.action_picker.bridge"] = { open = function(options, confirm)
 					scene.picker = { opts = options, on_confirm = confirm }
 					return true
 				end }

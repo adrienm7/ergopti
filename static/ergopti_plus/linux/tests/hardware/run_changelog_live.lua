@@ -65,7 +65,7 @@ local Manager = require("core.ui.ui.webview_manager")
 local Updater = require("modules.updater.manager")
 -- Actual script-control pause state, with lifecycle callbacks scoped to the
 -- one native changelog window owned by this fixture.
-local script_actions = require("modules.shortcuts.script_actions").new({
+local script_actions = require("shortcuts.engine.script_actions").new({
 	reset = function() Manager.hide("changelog") end,
 	reload = function() Manager.hide("changelog") end,
 	quit = function() Manager.hide("changelog") end,

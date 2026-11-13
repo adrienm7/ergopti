@@ -1520,7 +1520,7 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; `#HotIf CapsWordEnabled` Space/Enter hotkeys to do it. Those lose:
 		; both variants' criteria are true at once, and this repo's own pinned
 		; precedence is that the most-recently-DEFINED variant wins —
-		; keyboard/adapters/remap.ahk is included after modules/shortcuts.ahk, so the
+		; keyboard/adapters/remap.ahk is included after shortcuts/shortcuts.ahk, so the
 		; tap-hold variant fires and the unlatch hotkey never runs. CapsWord then
 		; survived the space and kept capitalising the following word.
 		;

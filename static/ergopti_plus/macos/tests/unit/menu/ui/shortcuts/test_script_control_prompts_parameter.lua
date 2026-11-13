@@ -43,8 +43,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("the parameter prompt is shared, not duplicated", function()
 	helpers.it("shortcut_utils exposes prompt_action_parameter", function()
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		local SU = helpers.load_with_stubs("shortcuts.ui.menu.utils")
 
 		helpers.assert_eq(type(SU.prompt_action_parameter), "function",
 			"the prompt must live in the module that already owns shortcut dialogs, so the "
@@ -53,8 +53,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 	end)
 
 	helpers.it("stores the value against the binding it was given", function()
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		local SU = helpers.load_with_stubs("shortcuts.ui.menu.utils")
 
 		local stored = {}
 		local gestures = {
@@ -92,8 +92,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 	end)
 
 	helpers.it("stores nothing when the user cancels", function()
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		local SU = helpers.load_with_stubs("shortcuts.ui.menu.utils")
 
 		local stored = 0
 		local gestures = {
@@ -119,8 +119,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 	end)
 
 	helpers.it("contains a native prompt exception and reports failure", function()
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		local SU = helpers.load_with_stubs("shortcuts.ui.menu.utils")
 		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		dialog.text_prompt = function() error("PROMPT_THROW") end
 
@@ -144,8 +144,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 
 	for _, refusal in ipairs({ false, "nil", "throw" }) do
 		helpers.it("reports " .. tostring(refusal) .. " storage refusal", function()
-			package.loaded["ui.menu.shortcut_utils"] = nil
-			local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+			package.loaded["shortcuts.ui.menu.utils"] = nil
+			local SU = helpers.load_with_stubs("shortcuts.ui.menu.utils")
 			local dialog = package.loaded["core.ui.engine.dialog_util"]
 			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
 				return confirm, "https://example.com"
@@ -187,7 +187,7 @@ end)
 
 helpers.describe("the script-control picker configures before it binds", function()
 	helpers.it("asks for a parameter spec before assigning", function()
-		-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than
+		-- Selected by a declaration unique to shortcuts/ui/menu/shortcuts.lua rather than
 		-- by path. Driving the picker behaviourally needs a full menu context plus a
 		-- menubar; what is decidable is that the assignment is gated on the prompt.
 		local src = helpers.read_driver_source("local function script_control_group")
@@ -219,7 +219,7 @@ helpers.describe("the script-control picker configures before it binds", functio
 		-- the bare key name wrote the URL to an entry nothing consults, so the
 		-- handler found an empty parameter and returned silently: the same inert
 		-- binding the prompt was added to prevent, one layer deeper.
-		local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
+		local SC = helpers.load_with_stubs("shortcuts.engine.script_control")
 		helpers.assert_eq(type(SC.BINDING_PREFIX), "string",
 			"script_control must EXPORT the binding prefix. Re-spelling it in the menu is "
 				.. "precisely the drift that made the configured link unreadable")
@@ -284,7 +284,7 @@ helpers.describe("the script-control picker configures before it binds", functio
 end)
 
 helpers.it("blank free-language input leaves the existing binding unchanged", function()
-	local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+	local SU = helpers.load_with_stubs("shortcuts.ui.menu.utils")
 	local changes = 0
 	local gestures = { get_action_label = function() return "translate" end,
 		parameter_prompt = function() return "target" end,

@@ -3,7 +3,7 @@
 --- Actual X11 workers with explicit controlled kernel-source receipts.
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Switch = require("adapters.window_switch")
+local Switch = require("shortcuts.adapters.window_switch")
 local pulses, result, elapsed = 0, nil, uv.hrtime()
 local pump = uv.new_timer()
 uv.timer_start(pump, 1, 5, function() pulses = pulses + 1 end)

@@ -137,11 +137,11 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 			gestures.get_action_parameter_prompt(action))
 		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
 		value = chosen
-	elseif require("ui.user_action_editor").KINDS[spec] then
+	elseif require("shortcuts.ui.user_action_editor").KINDS[spec] then
 		-- A command is typed then its options chosen; a path is picked.
 		local label = type(gestures.get_action_label) == "function"
 			and gestures.get_action_label(action) or action
-		value = require("ui.user_action_editor").ask(spec, _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label),
+		value = require("shortcuts.ui.user_action_editor").ask(spec, _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label),
 			gestures.get_action_parameter_prompt(action), prior)
 	else
 		local label = type(gestures.get_action_label) == "function"
@@ -178,7 +178,7 @@ end
 ---   id and the value the picker's editor collected, if any.
 --- @return boolean opened
 local function open_action_picker(title, current, binding, on_confirm, selected_items)
-	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+	local ok_picker, Picker = pcall(require, "shortcuts.ui.action_picker.bridge")
 	local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))

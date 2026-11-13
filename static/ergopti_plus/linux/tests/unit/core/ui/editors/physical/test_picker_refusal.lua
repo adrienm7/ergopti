@@ -4,11 +4,11 @@
 local helpers = require("tests.helpers")
 local Writer = require("core.text.engine.toml_codec.writer")
 require("core.process.adapters.shell_runner")
-require("ui.physical_shortcuts.bridge")
-require("ui.action_picker.bridge")
+require("shortcuts.ui.physical_shortcuts.bridge")
+require("shortcuts.ui.action_picker.bridge")
 
 local function with_editor(body)
-	local names = { "ui.physical_shortcuts.bridge", "ui.action_picker.bridge", "core.ui.ui.webview_manager",
+	local names = { "shortcuts.ui.physical_shortcuts.bridge", "shortcuts.ui.action_picker.bridge", "core.ui.ui.webview_manager",
 		"gestures.engine.manager", "platform.input.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
 		"core.ui.ui.text_prompt", "apps.ui.chooser", "core.logger.engine.shim" }
 	local saved = {}
@@ -84,8 +84,8 @@ local function with_editor(body)
 			return state.parameter
 		end }
 		package.loaded["apps.ui.chooser"] = { pick = package.loaded["core.ui.ui.text_prompt"].ask }
-		host = helpers.load_module("ui.physical_shortcuts.bridge")
-		local picker = helpers.load_module("ui.action_picker.bridge")
+		host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
+		local picker = helpers.load_module("shortcuts.ui.action_picker.bridge")
 		function state.open()
 			helpers.assert_true(host.open({ scope = scope, is_paused = function() return false end }))
 			helpers.assert_true(host.on_message({ action = "ready" }, daemon,

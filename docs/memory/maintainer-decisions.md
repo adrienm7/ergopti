@@ -337,7 +337,7 @@ bridge and the compiled-upgrade pin with it.
 Decided by the maintainer on 2026-11-11: Windows gets the host and the editor
 of the physical shortcuts, as macOS and Linux have them, while delivery stays
 refused. The production getter `PhysicalShortcutDeliveryAvailable`
-(`windows/ui/physical_shortcuts/host.ahk`, the Windows
+(`windows/shortcuts/ui/physical_shortcuts/host.ahk`, the Windows
 `physical_delivery_available`) answers false until the maintainer qualifies
 it on real hardware; only the maintainer turns it true.
 

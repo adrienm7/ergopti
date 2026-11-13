@@ -118,8 +118,8 @@ end)
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
-	"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "gestures.ui.menu.gestures",
+	"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "shortcuts.ui.action_picker",
+	"shortcuts.ui.menu.utils", "core.timing.engine.deferred_work", "gestures.ui.menu.gestures",
 }
 local function mode_json(path)
 	local file = assert(io.open(path, "rb"))
@@ -171,8 +171,8 @@ local function with_mode_fixture(options, callback)
 		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["gestures.engine"] = { DEFAULT_STATE = { gestures = true } }
-		for _, name in ipairs({ "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
-			"ui.menu.shortcut_utils", "core.timing.engine.deferred_work" }) do package.loaded[name] = {} end
+		for _, name in ipairs({ "menu.ui.builder.utils", "core.ui.engine.dialog_util", "shortcuts.ui.action_picker",
+			"shortcuts.ui.menu.utils", "core.timing.engine.deferred_work" }) do package.loaded[name] = {} end
 		if options.dialog then package.loaded["core.ui.engine.dialog_util"] = options.dialog end
 		local owner = require("gestures.ui.menu.gestures")
 		function fixture.build()
@@ -448,11 +448,11 @@ local function with_gesture_controls(options, callback)
 			f.queue[#f.queue + 1] = { delay = delay, work = work, tag = tag }
 			return true
 		end
-		package.loaded["ui.action_picker"].open = function(spec, picked)
+		package.loaded["shortcuts.ui.action_picker"].open = function(spec, picked)
 			f.picker_specs[#f.picker_specs + 1] = spec
 			if not options.cancel then picked("copy") end
 		end
-		package.loaded["ui.menu.shortcut_utils"].picker_parameter_fields = function() return {} end
+		package.loaded["shortcuts.ui.menu.utils"].picker_parameter_fields = function() return {} end
 		local owner = require("gestures.ui.menu.gestures")
 		function f.control_build()
 			return owner.build({ gestures = f.gestures, state = f.control_state, paused = f.control_paused,

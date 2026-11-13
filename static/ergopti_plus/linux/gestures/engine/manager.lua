@@ -51,15 +51,15 @@ local ProgramParameter = require("settings.engine.program_parameter")
 local ProgramOwner = require("gestures.engine.program_owner")
 local UserActions = require("gestures.engine.user_actions")
 local UserActionParameter = require("shortcuts.engine.user_action_parameter")
-local WindowSwitch = require("adapters.window_switch")
+local WindowSwitch = require("shortcuts.adapters.window_switch")
 local PromptAction = require("ai.engine.prediction.prompt_action")
 local Vision = require("ai.engine.prediction.vision")
 local AppParameter = require("apps.engine.parameter")
 local TomlCodec = require("core.text.engine.toml_codec")
 local i18n = require("core.i18n.engine.i18n")
 local KeyNames = require("platform.input.keycodes.key_names")
-local ScriptActions = require("modules.shortcuts.script_actions")
-local AiActions = require("modules.shortcuts.ai_actions")
+local ScriptActions = require("shortcuts.engine.script_actions")
+local AiActions = require("shortcuts.engine.ai_actions")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local DesktopNavigation = require("keyboard.engine.desktop_navigation")
 local SystemActions = require("gestures.engine.system_actions")
@@ -508,7 +508,7 @@ local OPEN_PATH = {
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
 	-- The programmable personal source, created from its template when absent,
 	-- as Windows and macOS create theirs before opening it.
-	["open_personal_shortcuts"] = function() return require("infra.personal_shortcuts").path_for_editing() end,
+	["open_personal_shortcuts"] = function() return require("shortcuts.engine.personal_shortcuts").path_for_editing() end,
 }
 
 --- The three log actions, by ui/log_openers function: shared with the tray, so
@@ -647,7 +647,7 @@ local BUILTIN_HANDLERS = {
 		end
 		-- The shortcuts manager owns the send-input vocabulary (read here, not
 		-- through send_vocabulary(), which is declared below this table)
-		return UserActions.run_command(fields, require("modules.shortcuts.manager").send_vocabulary().text_max_code_points)
+		return UserActions.run_command(fields, require("shortcuts.engine.manager").send_vocabulary().text_max_code_points)
 	end,
 	["open_path"] = function(binding)
 		local fields = UserActionParameter.parse("path", M.get_action_parameter(binding, "open_path"))
@@ -678,7 +678,7 @@ local BUILTIN_HANDLERS = {
 		return _click_holds.toggle("3", binding)
 	end,
 	["open_chatgpt"] = function()
-		return require("modules.shortcuts.chatgpt").open()
+		return require("shortcuts.engine.chatgpt").open()
 	end,
 	["open_url"] = function(binding)
 		local url = M.get_action_parameter(binding, "open_url")
@@ -702,7 +702,7 @@ local BUILTIN_HANDLERS = {
 	-- The selected files' paths in a file manager, otherwise what the primary
 	-- selection names: modules/shortcuts/open_selection.
 	["copy_selected_path"] = function()
-		return require("modules.shortcuts.open_selection").copy_selected_path(primary_selection)
+		return require("shortcuts.engine.open_selection").copy_selected_path(primary_selection)
 	end,
 	["search_web"] = function(binding)
 		local template = M.get_action_parameter(binding, "search_web")
@@ -1455,7 +1455,7 @@ end
 --- the daemon loads it after this module.
 --- @return table|nil
 local function shortcuts_manager()
-	local ok, Shortcuts = pcall(require, "modules.shortcuts.manager")
+	local ok, Shortcuts = pcall(require, "shortcuts.engine.manager")
 	if not ok or type(Shortcuts) ~= "table" or type(Shortcuts.resolve_wrap_pair) ~= "function" then
 		Logger.error(LOG, "The wrap-pair catalogue is unavailable: %s.", tostring(Shortcuts))
 		return nil
@@ -1623,10 +1623,10 @@ local function binding_action(binding)
 		return require("platform.remap.tap_hold_manager").get_tap_action(tap_id), "tap_hold", tap_id
 	end
 	local descriptors = {
-		{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
-		{ "script__", "modules.shortcuts.script_chords", ConfigKeys.LEAF.SCRIPT_CONTROL },
-		{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
-		{ "combination__", "modules.shortcuts.key_combinations", "key_combination_taps" },
+		{ "keyboard__", "shortcuts.engine.keyboard_shortcuts", "keyboard" },
+		{ "script__", "shortcuts.engine.script_chords", ConfigKeys.LEAF.SCRIPT_CONTROL },
+		{ "tap_key__", "shortcuts.engine.tap_keys", "tap_keys" },
+		{ "combination__", "shortcuts.engine.key_combinations", "key_combination_taps" },
 	}
 	for _, descriptor in ipairs(descriptors) do
 		if binding:sub(1, #descriptor[1]) == descriptor[1] then
@@ -1648,7 +1648,7 @@ local function capture_program(binding)
 	if runtime ~= "run_program" then return nil end
 	local pair_guard
 	if section == "key_combination_taps" then
-		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, "run_program")
+		pair_guard = require("shortcuts.engine.key_combinations").capture_action(binding, "run_program")
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local scalar = M.get_action_parameter(binding, "run_program")
@@ -1682,7 +1682,7 @@ end
 function M.set_program_paused(paused)
 	-- The hidden run_command children follow the same pause as user programs
 	local commands_settled = UserActions.set_paused(paused)
-	local inhibitor = package.loaded["modules.keep_awake"]
+	local inhibitor = package.loaded["shortcuts.engine.keep_awake"]
 	if paused == true and inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
 	return _program_owner.set_paused(paused) and commands_settled
@@ -1690,7 +1690,7 @@ end
 
 function M.stop_programs()
 	local commands_settled = UserActions.stop()
-	local inhibitor = package.loaded["modules.keep_awake"]
+	local inhibitor = package.loaded["shortcuts.engine.keep_awake"]
 	if inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return commands_settled end
 	return _program_owner.stop() and commands_settled
@@ -1698,7 +1698,7 @@ end
 
 function M.when_programs_settled(callback)
 	if type(callback) ~= "function" then return false end
-	local inhibitor = package.loaded["modules.keep_awake"]
+	local inhibitor = package.loaded["shortcuts.engine.keep_awake"]
 	local commands_done, programs_done, inhibitor_done, delivered = false, _program_owner == nil, inhibitor == nil, false
 	local function notify()
 		if commands_done and programs_done and inhibitor_done and not delivered then
@@ -1723,7 +1723,7 @@ local function capture_window(binding)
 	if action ~= "alt_tab_monitor" then return nil end
 	local pair_guard
 	if section == "key_combination_taps" then
-		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, action)
+		pair_guard = require("shortcuts.engine.key_combinations").capture_action(binding, action)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local FileSystem = require("core.fs.adapters.file_system")
@@ -1805,7 +1805,7 @@ end
 function M.get_picker_parameter_fields(items, binding)
 	local prompts, errors = {}, {}
 	local combination = type(binding) == "string" and binding:match("^combination__") ~= nil
-		and require("modules.shortcuts.key_combinations").configuration_domain(binding) == "combination"
+		and require("shortcuts.engine.key_combinations").configuration_domain(binding) == "combination"
 	for _, item in ipairs(items) do
 		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
 		if kind then
@@ -1866,17 +1866,17 @@ function M.action_parameter_binding_fits(binding)
 		return BindingIdentity.combination_binding_fits(binding, catalogue), BindingIdentity.RETIRED_COMBINATION
 	end
 	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then
-		local catalogue = KeyboardPublication.current(rawget(package.loaded, "modules.shortcuts.keyboard_shortcuts"))
+		local catalogue = KeyboardPublication.current(rawget(package.loaded, "shortcuts.engine.keyboard_shortcuts"))
 		return BindingIdentity.keyboard_binding_fits(binding, catalogue), BindingIdentity.RETIRED_KEYBOARD
 	end
 	if type(binding) == "string" and binding:sub(1, 9) == "tap_key__" then
-		local taps = rawget(package.loaded, "modules.shortcuts.tap_keys")
-		local catalogue = BindingPublication.current("tap", "modules.shortcuts.tap_keys", taps)
+		local taps = rawget(package.loaded, "shortcuts.engine.tap_keys")
+		local catalogue = BindingPublication.current("tap", "shortcuts.engine.tap_keys", taps)
 		return BindingIdentity.tap_binding_fits(binding, catalogue), BindingIdentity.RETIRED_TAP
 	end
 	if type(binding) == "string" and binding:sub(1, 8) == "script__" then
-		local chords = rawget(package.loaded, "modules.shortcuts.script_chords")
-		local catalogue = BindingPublication.current("script", "modules.shortcuts.script_chords", chords)
+		local chords = rawget(package.loaded, "shortcuts.engine.script_chords")
+		local catalogue = BindingPublication.current("script", "shortcuts.engine.script_chords", chords)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
 	local catalogue = BindingPublication.current("gesture", "gestures.engine.manager", M)

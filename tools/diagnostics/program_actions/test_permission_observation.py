@@ -391,8 +391,8 @@ class PermissionAdmissionControls(unittest.TestCase):
                 "tools/diagnostics/program_actions/permission_observation.py",
                 "tools/diagnostics/program_actions/test_permission_observation.py",
                 "tools/diagnostics/macos_owned_process.py",
-                "static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua",
-                "static/ergopti_plus/macos/adapters/apple_shortcuts.lua",
+                "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_native.lua",
+                "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts.lua",
             },
         )
 
@@ -434,8 +434,8 @@ class PermissionMainAdmissionControls(unittest.TestCase):
                 "import os\n" + owner_code
             ).encode()
             for relative in (
-                "static/ergopti_plus/macos/adapters/apple_shortcuts.lua",
-                "static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua",
+                "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts.lua",
+                "static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_native.lua",
             ):
                 inputs[relative] = b"controlled tracked adapter"
             native = "static/ergopti_plus/macos/launcher/Sources/Main.swift"

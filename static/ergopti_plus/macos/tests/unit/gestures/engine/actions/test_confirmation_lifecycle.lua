@@ -13,7 +13,7 @@ local Gesture = require("tests.support.gesture_actions_fixture")
 local OWNED = {
 	"core.ui.engine.native_app_switcher_owner",
 	"gestures.engine.action_confirm", "gestures.engine.system_actions",
-	"core.ui.engine.dialog_util", "adapters.mouse_control", "platform.focus.window_info",
+	"core.ui.engine.dialog_util", "shortcuts.adapters.mouse_control", "platform.focus.window_info",
 	"platform.focus.window_manager", "platform.focus.running_application", "onboarding.adapters.tcc_grant",
 	"core.process.adapters.shell_runner", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",

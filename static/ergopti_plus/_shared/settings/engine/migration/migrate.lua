@@ -93,7 +93,7 @@ local canonical_decode = assert(rawget(TomlCodec, "decode_with_shapes"))
 
 --- Whether a native file adapter sits where this module expects its driver.
 ---
---- A checkout keeps the driver beside the shared tree (<root>/linux/adapters,
+--- A checkout keeps the driver beside the shared tree (<root>/linux/shortcuts/adapters,
 --- <root>/_shared); every package (.deb, .rpm, AppImage, Flatpak) ships the
 --- shared tree inside the driver root (<root>/adapters, <root>/_shared).
 --- Accepting only the first refused the native configuration ports in every

@@ -454,7 +454,7 @@ _TestEnsureErgoptiLayout() {
         ErgoptiLayout_Init(LayoutRegistry_BundledDir())
 }
 
-; UpdateCapsLockLED lives in modules/shortcuts/capsword.ahk (not included).
+; UpdateCapsLockLED lives in shortcuts/engine/capsword.ahk (not included).
 ; nav_layer_helpers.ahk calls it after toggling LayerEnabled.
 UpdateCapsLockLED() {
     global _Stub_SentText

@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local Guard = require("metrics.engine.focus_guard")
-local Wrap = require("modules.shortcuts.wrap_on_type")
+local Wrap = require("shortcuts.engine.wrap_on_type")
 local Engine = require("hotstrings.engine.engine")
 
 --- Runs the original daemon callback against strict ordinary/password fields.

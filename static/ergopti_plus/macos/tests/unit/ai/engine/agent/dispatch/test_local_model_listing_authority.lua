@@ -15,7 +15,7 @@ require("core.logger.engine")
 local OWNED = {
 	"ai.engine.agent.runner", "ai.engine.agent.learning", "ai.engine.agent.connectors",
 	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
-	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
+	"core.ui.engine.dialog_util", "ai.engine.ollama.local_model_offer", "core.i18n.engine.core", "shortcuts.engine.script_control",
 }
 
 --- Keeps real requester callbacks and their native HTTP ports within one owner.
@@ -55,7 +55,7 @@ helpers.describe("local Agent authority survives asynchronous model discovery", 
 					elseif change == "runner reset" then world.runner.reset()
 					elseif change == "off" then world.runner.set_mode("off")
 					elseif change == "pause" then
-						package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+						package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return true end }
 					end
 					local expected_revision, expected_hides = world.engine.current_request_revision(), world.hides
 					if change == "reset" or change == "replacement" then

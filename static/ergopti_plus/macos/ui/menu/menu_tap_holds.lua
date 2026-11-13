@@ -397,7 +397,7 @@ local function open_slot_picker(karabiner, target, update_menu)
 	local items, admitted = slot_picker_items(karabiner, target.slot)
 	Logger.debug(LOG, "Opening the %s action picker for '%s' (current='%s').",
 		target.setter, target.id, current)
-	local opened = require("ui.action_picker").open({
+	local opened = require("shortcuts.ui.action_picker").open({
 		presentation_id     = target.presentation_id,
 		presentation_suffix = target.suffix,
 		current             = current,

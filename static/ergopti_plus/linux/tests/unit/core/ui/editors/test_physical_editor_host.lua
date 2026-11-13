@@ -10,7 +10,7 @@ helpers.describe("Physical shortcut native host ownership", function()
 		local called, detail = pcall(function()
 			require("tests.lua.layouts.physical_editor_host_contract")(helpers, Json,
 				function(relative) return helpers.driver_root() .. "/../_shared/" .. relative end,
-				function() package.loaded["ui.physical_shortcuts.bridge"] = nil; return require("ui.physical_shortcuts.bridge") end, "linux")
+				function() package.loaded["shortcuts.ui.physical_shortcuts.bridge"] = nil; return require("shortcuts.ui.physical_shortcuts.bridge") end, "linux")
 		end)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
@@ -21,7 +21,7 @@ end)
 
 helpers.describe("Physical editor position capture host epoch composition", function()
 	helpers.it("uses genuine thin-host session guards through explicitly controlled native ports", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
+		local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"gestures.engine.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, callback, native_token, guard, cancel_refused, writes, sends = nil, 0, nil, nil, nil, false, 0, 0
@@ -48,7 +48,7 @@ helpers.describe("Physical editor position capture host epoch composition", func
 			package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-			host = helpers.load_module("ui.physical_shortcuts.bridge")
+			host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
 			helpers.assert_true(host.open({ scope = scope, is_paused = function() return false end }))
 			local function send(message, exact) return host.on_message(message, {}, { app_name = "physical_shortcuts", epoch = exact or epoch }) end
 			helpers.assert_true(send({ action = "ready" }))
@@ -99,7 +99,7 @@ end)
 
 helpers.describe("Physical editor exact native-closed debt retry", function()
 	helpers.it("(physical-editor-close-debt) settles only the observed closed epoch before admitting a successor", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
+		local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"gestures.engine.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, serial, callback, token = nil, 0, 0, nil, nil
@@ -132,7 +132,7 @@ helpers.describe("Physical editor exact native-closed debt retry", function()
 			package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-			host = helpers.load_module("ui.physical_shortcuts.bridge")
+			host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
 			local paused_now = false
 			local options = { scope = scope, is_paused = function() return paused_now end }
 			helpers.assert_true(host.open(options))
@@ -180,7 +180,7 @@ end)
 
 helpers.describe("Physical editor premature close notice refusal", function()
 	helpers.it("(physical-editor-close-notice) premature same-epoch notice cannot settle cancellation retry without native ACK", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
+		local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"gestures.engine.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local host, epoch, serial, callback, token = nil, 0, 0, nil, nil
@@ -213,7 +213,7 @@ helpers.describe("Physical editor premature close notice refusal", function()
 			package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-			host = helpers.load_module("ui.physical_shortcuts.bridge")
+			host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
 			local options = { scope = scope, is_paused = function() return false end }
 			helpers.assert_true(host.open(options))
 			local original = epoch
@@ -248,7 +248,7 @@ end)
 helpers.describe("Physical editor pure constructor reservation rollback", function()
 	for _, mode in ipairs({ "throw", "nil", "false" }) do
 		helpers.it("(physical-editor-constructor) refuses before native acquisition and releases only the pure reservation: " .. mode, function()
-			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
+			local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 				"gestures.engine.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 			local host, epoch, serial, options, failing = nil, 0, 0, nil, true
@@ -294,7 +294,7 @@ helpers.describe("Physical editor pure constructor reservation rollback", functi
 					editor_source_current = function(exact) return rawequal(exact, receipt) end,
 					edit = function() error("Constructor-only refusal must never publish") end }
 				options = { scope = scope, is_paused = function() return false end }
-				host = helpers.load_module("ui.physical_shortcuts.bridge")
+				host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
 				local called, opened = pcall(host.open, options)
 				helpers.assert_eq(called, true, "The constructor boundary returns a closed refusal rather than raising")
 				helpers.assert_eq(opened, false, "An unreturned or invalid editor cannot acquire a native page")
@@ -324,7 +324,7 @@ end)
 
 helpers.describe("Physical editor returned Window retirement acknowledgement", function()
 	helpers.it("(physical-editor-window-ack) retains false nil and throw retirement debt after acknowledged native close", function()
-		local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
+		local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "platform.input.keyboard_hook",
 			"gestures.engine.manager", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "shortcuts.engine.physical_editor_window" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local checked, failure = pcall(function()
@@ -372,7 +372,7 @@ helpers.describe("Physical editor returned Window retirement acknowledgement", f
 					editor_source_current = function(exact) return rawequal(exact, receipt) end,
 					edit = function() error("Window retirement receiver must never publish") end }
 				local options = { scope = scope, is_paused = function() return false end }
-				host = helpers.load_module("ui.physical_shortcuts.bridge")
+				host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
 				helpers.assert_true(host.open(options))
 				local closed = epoch
 				helpers.assert_true(package.loaded["core.ui.ui.webview_manager"].hide("physical_shortcuts", closed), "Native owner acknowledges its exact page close")
@@ -403,7 +403,7 @@ end)
 
 helpers.it("physical editor refuses a FIFO key registry without blocking", function()
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "gestures.engine.manager", "platform.input.keyboard_hook" }
+	local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "gestures.engine.manager", "platform.input.keyboard_hook" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local original_shared = Paths.shared
 	local source = assert(original_shared("layouts/data/keycodes/physical_keys.json"))
@@ -415,8 +415,8 @@ helpers.it("physical editor refuses a FIFO key registry without blocking", funct
 		show = function() shows = shows + 1; return false end }
 	package.loaded["gestures.engine.manager"] = {}
 	package.loaded["platform.input.keyboard_hook"] = {}
-	package.loaded["ui.physical_shortcuts.bridge"] = nil
-	local host = require("ui.physical_shortcuts.bridge")
+	package.loaded["shortcuts.ui.physical_shortcuts.bridge"] = nil
+	local host = require("shortcuts.ui.physical_shortcuts.bridge")
 	Paths.shared = function(relative)
 		if relative == "layouts/data/keycodes/physical_keys.json" then return path end
 		return original_shared(relative)

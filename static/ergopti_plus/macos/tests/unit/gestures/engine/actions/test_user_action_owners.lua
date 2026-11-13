@@ -133,7 +133,7 @@ end)
 --- @param answers table { texts = {...}, choices = {...} } consumed in order.
 --- @param body function fn(ShortcutUtils, seen)
 local function with_editor(answers, body)
-	helpers.with_fresh_modules({ "ui.menu.shortcut_utils", "core.ui.engine.dialog_util", "adapters.apple_shortcuts_cli",
+	helpers.with_fresh_modules({ "shortcuts.ui.menu.utils", "core.ui.engine.dialog_util", "shortcuts.adapters.apple_shortcuts_cli",
 		"core.i18n.engine.i18n" }, function()
 		local seen = { choices = {}, alerts = {} }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
@@ -150,8 +150,8 @@ local function with_editor(answers, body)
 			block_alert = function(_, text) seen.alerts[#seen.alerts + 1] = text end,
 			choose_path = function() return answers.path end,
 		}
-		package.loaded["adapters.apple_shortcuts_cli"] = { list_blocking = function() return answers.rows, answers.reason end }
-		body(require("ui.menu.shortcut_utils"), seen)
+		package.loaded["shortcuts.adapters.apple_shortcuts_cli"] = { list_blocking = function() return answers.rows, answers.reason end }
+		body(require("shortcuts.ui.menu.utils"), seen)
 	end)
 end
 
@@ -217,7 +217,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 		local script = Dialog.path_picker_script("Message", "Title")
 		helpers.assert_true(script:find("setCanChooseFiles:true", 1, true) ~= nil, "files")
 		helpers.assert_true(script:find("setCanChooseDirectories:true", 1, true) ~= nil, "folders")
-		local Cli = helpers.load_with_stubs("adapters.apple_shortcuts_cli")
+		local Cli = helpers.load_with_stubs("shortcuts.adapters.apple_shortcuts_cli")
 		helpers.assert_true(Cli.bounded_list_command(20):find("( sleep 20; kill $pid ) >/dev/null 2>&1 &", 1, true) ~= nil,
 			"the editor's listing is stopped at the owner's query deadline")
 	end)

@@ -149,7 +149,7 @@ end
 --- @return table|nil owner Exact pause-state provider.
 --- @return integer|nil epoch Settled active generation.
 local function capture_pause_source()
-	local owner = package.loaded["modules.shortcuts.script_control"]
+	local owner = package.loaded["shortcuts.engine.script_control"]
 	if type(owner) ~= "table" or type(owner.is_paused) ~= "function"
 		or type(owner.is_pause_transition_pending) ~= "function" or type(owner.get_pause_epoch) ~= "function" then
 		return nil

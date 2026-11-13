@@ -42,7 +42,7 @@ local STUB_MODULES = {
 	"core.ui.engine.notifications",
 	"metrics.adapters.kc_bridge",
 	"gestures.engine.engine",
-	"modules.shortcuts",
+	"shortcuts.engine",
 	"hs.caffeinate.watcher",
 	"hs",
 	"tests.stubs.hs",
@@ -652,7 +652,7 @@ local function with_remap(options, body)
 		end,
 	}
 	calls.shortcuts = shortcuts_stub
-	package.loaded["modules.shortcuts"] = shortcuts_stub
+	package.loaded["shortcuts.engine"] = shortcuts_stub
 	package.loaded["hs.caffeinate.watcher"] = {
 		systemDidWake = 7,
 		screensDidUnlock = 8,

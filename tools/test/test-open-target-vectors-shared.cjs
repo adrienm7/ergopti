@@ -7,7 +7,7 @@
  * Checks the corpus of the copy_selected_path action,
  * _shared/tests/corpus/shortcuts/open_target_vectors.json, pins the two ports
  * of its rule together (_shared/shortcuts/engine for macOS and Linux,
- * windows/infra/open_target.ahk for Windows) and checks that every driver
+ * windows/shortcuts/engine/open_target.ahk for Windows) and checks that every driver
  * suite replays it.
  *
  * WHY:
@@ -28,7 +28,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'shortcuts', 'open_target_vectors.json');
 const LUA = path.join(SP, '_shared', 'shortcuts', 'engine', 'open_target.lua');
-const AHK = path.join(SP, 'windows', 'infra', 'open_target.ahk');
+const AHK = path.join(SP, 'windows', 'shortcuts', 'engine', 'open_target.ahk');
 const MANIFEST = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
 const ACTIONS = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
 const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
@@ -202,7 +202,7 @@ check(
 	luaSearch === manifestSearch,
 	`the macOS/Linux search fallback ${luaSearch} must be the Windows default ${manifestSearch}`
 );
-const macApps = read(path.join(SP, 'macos', 'modules', 'shortcuts', 'actions', 'apps.lua'));
+const macApps = read(path.join(SP, 'macos', 'shortcuts', 'engine', 'actions', 'apps.lua'));
 check(
 	!macApps.includes('google.com/search'),
 	'macOS must search through OpenTarget.DEFAULT_SEARCH_URL, not its own copy of the URL'
@@ -231,15 +231,15 @@ for (const file of fs.readdirSync(LOCALES).filter((name) => name.endsWith('.json
 
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/shortcuts/text_actions/test_open_target_vectors.lua',
+		file: 'macos/tests/unit/shortcuts/engine/text_actions/test_open_target_vectors.lua',
 		path: 'tests/corpus/shortcuts/open_target_vectors.json'
 	},
 	{
-		file: 'linux/tests/unit/modules/shortcuts/actions/test_open_selection.lua',
+		file: 'linux/tests/unit/shortcuts/actions/test_open_selection.lua',
 		path: '_shared/tests/corpus/shortcuts/open_target_vectors.json'
 	},
 	{
-		file: 'windows/tests/unit/modules/shortcuts/test_open_target_vectors.ahk',
+		file: 'windows/tests/unit/shortcuts/engine/test_open_target_vectors.ahk',
 		path: '\\tests\\corpus\\shortcuts\\open_target_vectors.json'
 	}
 ];

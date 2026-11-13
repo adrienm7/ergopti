@@ -58,7 +58,7 @@ end
 local MENU_MODULES = {
 	"gestures.ui.menu.gestures",
 	"hotstrings.ui.menu.hotstrings",
-	"ui.menu.menu_shortcuts",
+	"shortcuts.ui.menu.shortcuts",
 	"menu.ui.builder.builder",
 	"ui.menu.menu_llm.init",
 }

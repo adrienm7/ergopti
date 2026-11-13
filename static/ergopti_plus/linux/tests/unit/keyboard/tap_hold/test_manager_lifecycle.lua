@@ -210,7 +210,7 @@ os.remove(user_path)
 	end)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
-		local names = { "gestures.engine.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
+		local names = { "gestures.engine.manager", "platform.remap.tap_hold_manager", "shortcuts.adapters.window_switch",
 			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "settings.engine.paths", "core.fs.adapters.storage", "gestures.ui.conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -231,7 +231,7 @@ os.remove(user_path)
 			package.loaded["settings.engine.paths"] = { config = function() return config_path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
-			package.loaded["adapters.window_switch"] = { new = function(owner_capture)
+			package.loaded["shortcuts.adapters.window_switch"] = { new = function(owner_capture)
 				capture = owner_capture
 				return { run = function(binding)
 					local guard = owner_capture(binding)

@@ -13,7 +13,7 @@ local function fixture(body)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local f = { tasks = {}, inode = 12, wires = {}, decoded = 0 }
 	local ok, failure = xpcall(function()
-		package.loaded["adapters.apple_shortcuts_native"] = nil
+		package.loaded["shortcuts.adapters.apple_shortcuts_native"] = nil
 		package.loaded["core.timing.engine.timings"] = Timings
 		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return "/owned/ErgoptiPlus" end }
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, done, chunks, environment, private, owned, limit)
@@ -47,12 +47,12 @@ local function fixture(body)
 		_G.hs = { task = { new = function() end }, base64 = { decode = function(value)
 			f.decoded = f.decoded + 1; return f.wires[value]
 		end }, fs = { symlinkAttributes = metadata, attributes = metadata, pathToAbsolute = function(path) return path end } }
-		f.native = require("adapters.apple_shortcuts_native")
+		f.native = require("shortcuts.adapters.apple_shortcuts_native")
 		function f.use_actual_shell()
 			package.loaded["core.process.adapters.shell_runner"] = nil
 			f.shell = require("core.process.adapters.shell_runner")
-			package.loaded["adapters.apple_shortcuts_native"] = nil
-			f.native = require("adapters.apple_shortcuts_native")
+			package.loaded["shortcuts.adapters.apple_shortcuts_native"] = nil
+			f.native = require("shortcuts.adapters.apple_shortcuts_native")
 		end
 		function f.reply(task, nonce, operation, id, changes)
 			local packet = { version = 1, nonce = nonce, operation = operation, status = "observed",

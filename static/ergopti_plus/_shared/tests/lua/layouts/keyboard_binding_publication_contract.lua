@@ -30,7 +30,7 @@ end
 --- @param helpers table Registered native test API.
 --- @param driver string macos or linux.
 function M.register(helpers, driver)
-	local native = "modules.shortcuts.keyboard_shortcuts"
+	local native = "shortcuts.engine.keyboard_shortcuts"
 	local policy = require("settings.engine.publication.binding_identity")
 	local known = driver == "macos" and "secondary_k" or "primary_k"
 	local current = "keyboard__" .. known

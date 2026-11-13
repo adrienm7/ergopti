@@ -26,7 +26,7 @@ end
 --- @param driver string macos or linux.
 function M.register(helpers, driver)
 	local Publication = require("settings.engine.publication.keyboard_publication")
-	local native = "modules.shortcuts.keyboard_shortcuts"
+	local native = "shortcuts.engine.keyboard_shortcuts"
 	local prefix = driver == "macos" and "secondary_" or "primary_"
 	-- macOS accepts two slot-only keys (Caps Lock, apostrophe) beyond the 40 shared ones.
 	local slots_per_group = driver == "macos" and 42 or 40

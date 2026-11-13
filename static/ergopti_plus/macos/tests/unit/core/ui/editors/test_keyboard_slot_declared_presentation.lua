@@ -17,11 +17,11 @@ local function fixture(callback, cleanup_failures)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "ui.action_picker", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+			"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "shortcuts.ui.action_picker", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"core.logger.engine.logger", "core.fs.engine.paths", "settings.engine.paths", "core.timing.engine.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
-			"core.process.adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
+			"core.process.adapters.program_providers", "shortcuts.adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
 			"_generated.locale_table", "_generated.logger_sub_files", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
 			"diagnostics.engine.reports.redact", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders", "core.logger.engine", "menu.engine.labels",
 		}, function()
@@ -108,9 +108,9 @@ local function fixture(callback, cleanup_failures)
 				package.loaded["core.ui.ui.builder"] = nil
 				local builder = require("core.ui.ui.builder")
 				package.loaded["core.process.adapters.program_providers"] = {}
-				package.loaded["adapters.apple_shortcuts_native"] = {}
-				package.loaded["ui.action_picker"] = nil
-				local picker = require("ui.action_picker")
+				package.loaded["shortcuts.adapters.apple_shortcuts_native"] = {}
+				package.loaded["shortcuts.ui.action_picker"] = nil
+				local picker = require("shortcuts.ui.action_picker")
 				close_owned_picker = picker.close
 				local titles = require("core.ui.engine.window_titles")
 				local function open(opts)

@@ -252,7 +252,7 @@ local RepeatKey         = require("hotstrings.engine.repeat_key")
 -- The user's own modifier chords. Hard require rather than optional: the module
 -- has no external dependency, and a shortcut layer that silently fails to load
 -- leaves every binding the user made doing nothing with no sign why.
-local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+local keyboard_shortcuts = require("shortcuts.engine.keyboard_shortcuts")
 
 -- Battery, network, lock and suspend, for the metrics.
 local system_metrics = RuntimeGuard.optional_require("metrics.engine.system.metrics")
@@ -279,7 +279,7 @@ local Monotonic         = require("core.logger.engine.monotonic")
 local ManifestReader    = require("menu.engine.manifest_reader")
 local ScriptSettings    = require("settings.engine.scope.script_settings")
 local Timings           = require("core.timing.engine.timings")
-local ScriptActions     = require("modules.shortcuts.script_actions")
+local ScriptActions     = require("shortcuts.engine.script_actions")
 local CrashReporter     = require("diagnostics.engine.reports.crash_reporter")
 local FocusGuard        = require("metrics.engine.focus_guard")
 local privacy_owners = {}
@@ -309,7 +309,7 @@ local updater = RuntimeGuard.optional_require("modules.updater.manager")
 local gestures = RuntimeGuard.optional_require("gestures.engine.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
-local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
+local shortcuts = RuntimeGuard.optional_require("shortcuts.engine.manager")
 
 -- Window info tracker (optional — provides app_id for keystats per-app stats).
 local window_info = RuntimeGuard.optional_require("platform.focus.window_info")
@@ -2343,8 +2343,8 @@ local function main()
 	-- there now. The pointer is watched, never grabbed.
 	-- Wrap the selection when a wrap symbol is typed over it. Decided in the
 	-- consumption callback below, so the symbol never reaches the application
-	-- when it wraps; see modules/shortcuts/wrap_on_type.lua for the probe.
-	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
+	-- when it wraps; see shortcuts/engine/wrap_on_type.lua for the probe.
+	local wrap_on_type = require("shortcuts.engine.wrap_on_type").new({
 		context_epoch = shortcuts and shortcuts.wrap_selection_epoch,
 		is_active = function()
 			return shortcuts ~= nil and shortcuts.is_enabled()
@@ -2395,7 +2395,7 @@ local function main()
 	-- the switch off or, while paused, any action outside script management
 	-- leave the chord to it. They follow no feature switch but their own, so a
 	-- paused daemon can always be resumed from the keyboard.
-	local script_chords = require("modules.shortcuts.script_chords")
+	local script_chords = require("shortcuts.engine.script_chords")
 	script_chords.init({
 		pause_epoch = script_actions.pause_epoch,
 		is_paused = function() return opts.dry_run or script_actions.is_paused() end,
@@ -2405,12 +2405,12 @@ local function main()
 	-- The number-row tap keys: a plain press of one the user assigned runs its
 	-- action on the next loop tick and never reaches the application. Decided in
 	-- the consumption callback below, before wrap-on-type sees the key.
-	local tap_keys = require("modules.shortcuts.tap_keys")
+	local tap_keys = require("shortcuts.engine.tap_keys")
 	tap_keys.init({
 		pause_epoch = script_actions.pause_epoch,
 		is_active = function(action)
 			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
-				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").runs_while_paused(action))
+				and (action == nil or not opts.dry_run or require("shortcuts.engine.script_actions").runs_while_paused(action))
 		end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
@@ -2697,7 +2697,7 @@ local function main()
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
 		-- under the Shortcuts master like the keyboard slots, and only while no
 		-- layout is emulated, as on Windows.
-		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+		local accented, accented_repeat = require("shortcuts.engine.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
@@ -3194,7 +3194,7 @@ local function main()
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
 		-- Required here, not at file scope: main() sits near LuaJIT's 60-upvalue limit.
-		local ActionHandlers = require("modules.shortcuts.action_handlers")
+		local ActionHandlers = require("shortcuts.engine.action_handlers")
 		gestures.init({
 			persist = true,
 			action_handlers = ActionHandlers.compose(script_actions.handlers, shortcuts, prediction_engine),
@@ -3303,7 +3303,7 @@ local function main()
 	-- The user's programmable personal source runs last among the services,
 	-- once everything it may require is initialised (Windows includes its
 	-- personal .ahk, macOS runs its personal_shortcuts.lua, the same way).
-	if not opts.dry_run then require("infra.personal_shortcuts").load() end
+	if not opts.dry_run then require("shortcuts.engine.personal_shortcuts").load() end
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
 	-- The snapshot, the watchers and the loop's setup, unattributed before.
@@ -3698,7 +3698,7 @@ local function main()
 	-- dispatch. They load once per process either way; the loop's first idle
 	-- tick takes them now, after the ready announcement.
 	event_loop.defer(function()
-		local loaded, failure = pcall(require("modules.shortcuts.keyboard_shortcuts").get_assignments)
+		local loaded, failure = pcall(require("shortcuts.engine.keyboard_shortcuts").get_assignments)
 		if not loaded then
 			Logger.error(LOG, "Shortcut assignments could not be loaded before the first key: %s.", tostring(failure))
 		end

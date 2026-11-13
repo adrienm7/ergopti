@@ -51,7 +51,7 @@ const PREFIX_DOMAIN = 'D_';
  *
  * The two directories used to be hardcoded, which is why a document titled
  * "the three-layer hexagonal architecture" contained zero occurrences of the
- * word "linux" while linux/adapters/ held 22 of them. A diagram is read as the
+ * word "linux" while linux/shortcuts/adapters/ held 22 of them. A diagram is read as the
  * map of the system; one that omits a third of it is worse than none, because
  * nobody re-checks a picture.
  * @returns {{name: string, dir: string, prefix: string, title: string}[]}

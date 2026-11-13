@@ -14,7 +14,7 @@ local MODULES = {
 	"ai.ui.menu",
 	"ai.ui.menu.panels.backend_panel",
 	"ai.engine",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
@@ -88,7 +88,7 @@ local function build_fixture(callback, options)
 			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 			return helpers.I18N_PLACEHOLDER_FORMATS[key] or key
 		end }
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {
 				llm_enabled = false,

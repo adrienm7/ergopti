@@ -37,7 +37,7 @@ local RECEIVER_MODULES = {
 	karabiner = "keyboard.engine",
 	keymap = "hotstrings.engine.expander",
 	gestures = "gestures.engine",
-	shortcuts = "modules.shortcuts",
+	shortcuts = "shortcuts.engine",
 	Storage = "core.fs.adapters.storage",
 	TerminationCoordinator = "core.lifecycle.engine.shutdown.termination_coordinator",
 }

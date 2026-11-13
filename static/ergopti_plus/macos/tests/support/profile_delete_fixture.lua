@@ -51,7 +51,7 @@ local MODULES = {
 	"ai.ui.menu.profiles_manager",
 	"ai.ui.menu.trigger_orchestrator",
 	"ai.ui.menu.panels.trigger_panel",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"settings.ui.menu.preferences_transaction",
 	"ai.ui.prompt_editor",
 }
@@ -278,7 +278,7 @@ local function with_trigger_fixture(options, body)
 				return all
 			end,
 		}
-		package.loaded["ui.menu.shortcut_utils"] = {
+		package.loaded["shortcuts.ui.menu.utils"] = {
 			normalize_shortcut = function(mods, key)
 				if type(mods) ~= "table" or #mods == 0 or type(key) ~= "string" or key == "" then
 					return nil

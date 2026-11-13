@@ -254,7 +254,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 		helpers.with_fresh_modules({
 			"core.events.timer_scheduler",
 			"core.timing.engine.deferred_work",
-			"infra.personal_shortcuts",
+			"shortcuts.engine.personal_shortcuts",
 		}, function()
 			local weak_timers, restore_timers = install_weak_timers()
 			local previous_execute = hs.execute
@@ -277,7 +277,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 					shell_quote = function(value) return value end,
 				},
 				}, function()
-				local PersonalShortcuts = require("infra.personal_shortcuts")
+				local PersonalShortcuts = require("shortcuts.engine.personal_shortcuts")
 				helpers.assert_true(PersonalShortcuts.open())
 				collect_twice()
 				helpers.assert_not_nil(weak_timers[1],

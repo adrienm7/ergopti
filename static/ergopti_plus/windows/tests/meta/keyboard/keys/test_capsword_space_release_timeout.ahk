@@ -26,7 +26,7 @@
 _CSRT_CapsWordSpaceExitIsBounded() {
 	Body := _StripFullLineComments(_DriverFuncBody("CapsWordAutoOffNativeKey"))
 	Assert(Body != "", "the actual native delimiter owner must exist")
-	Src := _StripFullLineComments(_DriverDirConcat("modules/shortcuts"))
+	Src := _StripFullLineComments(_DriverDirConcat("shortcuts/engine"))
 	Assert(Src != "", "the actual native hotkey source must exist")
 	Assert(InStr(Src, 'SC039:: CapsWordAutoOffNativeKey("Space")')
 		&& InStr(Src, 'SC01C:: CapsWordAutoOffNativeKey("Enter")'),

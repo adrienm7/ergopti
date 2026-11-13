@@ -19,8 +19,8 @@ local M = {}
 --- @param callback function Receives the real action and boundary observations.
 function M.run(kind, options, callback)
 	helpers.with_stub_scope({
-		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
-		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
+		"shortcuts.engine.actions.text", "shortcuts.engine.actions.text_continuation",
+		"shortcuts.engine.actions.text_dispatch", "shortcuts.engine.actions.text_transform_grace",
 		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "keyboard.engine.capsword_output", "hotstrings.engine.expander.utils",
 	}, function()
 		with_sender(function(f)
@@ -36,7 +36,7 @@ function M.run(kind, options, callback)
 			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
-			state.text = require("modules.shortcuts.actions.text")
+			state.text = require("shortcuts.engine.actions.text")
 			local scheduler = require("core.events.timer_scheduler")
 			local native_after = scheduler.after
 			local function external_copy(boundary)

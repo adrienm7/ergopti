@@ -461,7 +461,7 @@ helpers.describe("Linux system actions", function()
 	end)
 
 	helpers.it("never sends Ctrl+C to a terminal for make_executable_selection", function()
-		local Open = require("modules.shortcuts.open_selection")
+		local Open = require("shortcuts.engine.open_selection")
 		Open._set_deps_for_test({ focused_app = function() return "gnome-terminal-server" end,
 			focused_context = function() return "gnome-terminal-server", "test:terminal" end })
 		local combos = {}
@@ -481,7 +481,7 @@ helpers.describe("Linux system actions", function()
 
 	for _, boundary in ipairs({ "before copy", "after copy" }) do
 		helpers.it("refuses make-executable when focus changes " .. boundary, function()
-			local Open = require("modules.shortcuts.open_selection")
+			local Open = require("shortcuts.engine.open_selection")
 			local app, combos = "nautilus", {}
 			Open._set_deps_for_test({ focused_app = function() return app end,
 				focused_context = function() return app, "test:file-manager-window" end })
@@ -512,7 +512,7 @@ helpers.describe("Linux system actions", function()
 	helpers.it("make_executable_selection chmods exactly the copied paths (system-actions)", function()
 		local combos = {}
 		with_modules({
-			["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
+			["shortcuts.engine.open_selection"] = { capture_file_manager = function() return function() return true end end },
 			["clipboard.adapters.clipboard"] = {
 				read_selection_uri_list = function(emit_combo, sleep_ms)
 					helpers.assert_eq(type(emit_combo), "function")
@@ -538,7 +538,7 @@ helpers.describe("Linux system actions", function()
 			{ true, "", nil },
 		}) do
 			with_modules({
-				["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
+				["shortcuts.engine.open_selection"] = { capture_file_manager = function() return function() return true end end },
 				["clipboard.adapters.clipboard"] = {
 					read_selection_uri_list = function() return report[1], report[2], report[3] end,
 				},

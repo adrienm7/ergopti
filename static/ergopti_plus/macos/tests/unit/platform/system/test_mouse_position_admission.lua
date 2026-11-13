@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 helpers.describe("mouse position admission", function()
 	helpers.it("refuses invalid coordinates without moving the cursor", function()
 		local calls = {}
-		local mouse = helpers.load_with_stubs("adapters.mouse_control", {
+		local mouse = helpers.load_with_stubs("shortcuts.adapters.mouse_control", {
 			mouse = { absolutePosition = function(pos) calls[#calls + 1] = pos; return pos end },
 		})
 		for _, point in ipairs({ { "invalid", 20 }, { 10, math.huge }, { 0/0, 20 } }) do
@@ -18,7 +18,7 @@ helpers.describe("mouse position admission", function()
 
 	helpers.it("requires native readback near the requested position", function()
 		local returned = { x = 10.5, y = 20.5 }
-		local mouse = helpers.load_with_stubs("adapters.mouse_control", {
+		local mouse = helpers.load_with_stubs("shortcuts.adapters.mouse_control", {
 			mouse = { absolutePosition = function() return returned end },
 		})
 		helpers.assert_eq(mouse.setPos(10, 20), true, "sub-point rounding is accepted")

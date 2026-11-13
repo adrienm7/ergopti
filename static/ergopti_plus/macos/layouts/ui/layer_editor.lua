@@ -208,10 +208,10 @@ local function close_session(session)
 end
 
 --- Hands the saved layer's wheel bindings, which Hammerspoon runs rather than
---- Karabiner, to their owner (modules/shortcuts/bindings.lua).
+--- Karabiner, to their owner (shortcuts/engine/bindings.lua).
 local function reconcile_wheel()
 	local ok, committed = pcall(function()
-		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+		return require("shortcuts.engine.bindings").reconcile_layer_wheel()
 	end)
 	if not ok then
 		Logger.error(LOG, "The layer's wheel bindings could not be applied: %s.", tostring(committed))

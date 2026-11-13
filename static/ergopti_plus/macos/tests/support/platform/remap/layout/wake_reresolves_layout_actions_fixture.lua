@@ -296,7 +296,7 @@ local function load_remap(options)
 		end,
 	}
 	package.loaded["gestures.engine.engine"] = {}
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		is_paused = function()
 			append("pause-query")
 			if options.pause_raises then error("synthetic pause-state failure") end

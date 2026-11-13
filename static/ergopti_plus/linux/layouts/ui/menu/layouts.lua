@@ -317,7 +317,7 @@ local function _build_layouts(ctx)
 	-- one submenu per letter, « Désactivé » then the 26 target letters.
 	local group_builders = {}
 	group_builders["accented_letters"] = function()
-		local Accented = require("modules.shortcuts.accented_shortcuts")
+		local Accented = require("shortcuts.engine.accented_shortcuts")
 		local settings = Accented.settings()
 		if not settings then
 			Logger.error(LOG, "The accented shortcuts cannot be read — their submenu is empty.")

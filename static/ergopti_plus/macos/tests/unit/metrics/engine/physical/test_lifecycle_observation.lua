@@ -14,7 +14,7 @@ local MODULE_NAMES = {
 	"metrics.engine.journal.log_manager",
 	"metrics.engine.system.watchers",
 	"metrics.engine.capture.physical_lifecycle_observation",
-	"adapters.physical_observation_clock",
+	"shortcuts.adapters.physical_observation_clock",
 }
 
 --- Creates one object-style Hammerspoon watcher with injectable lifecycle results.
@@ -541,7 +541,7 @@ end)
 
 local root_fixture = require("tests.unit.metrics.engine.lifecycle.test_activation_callback_fail_closed")
 local function with_root(options, scenario)
-	local names={"diagnostics.adapters.event_provenance","layouts.adapters.input_source_broker","platform.input.keyboard_hook","adapters.physical_observation_clock","core.process.adapters.lifecycle","platform.input.synthetic_input","settings.engine.paths","core.ui.engine.dialog_util","core.logger.engine.logger","menu.engine.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","metrics.engine.context_tracker","modules.keystats.init","metrics.adapters.kc_bridge","metrics.engine.journal.log_manager","metrics.engine.system.watchers","hotstrings.engine.expander"}
+	local names={"diagnostics.adapters.event_provenance","layouts.adapters.input_source_broker","platform.input.keyboard_hook","shortcuts.adapters.physical_observation_clock","core.process.adapters.lifecycle","platform.input.synthetic_input","settings.engine.paths","core.ui.engine.dialog_util","core.logger.engine.logger","menu.engine.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","metrics.engine.context_tracker","modules.keystats.init","metrics.adapters.kc_bridge","metrics.engine.journal.log_manager","metrics.engine.system.watchers","hotstrings.engine.expander"}
 	helpers.with_stub_scope(names,function()
 		local original=helpers.load_with_stubs
 		local records,owner,token,clock= {},{},nil,0

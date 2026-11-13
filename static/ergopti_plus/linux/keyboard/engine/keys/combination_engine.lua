@@ -4,8 +4,8 @@
 --- tap-hold engine retains modifier reference counts and live layer ownership.
 local Policy = require("tap_hold.engine.key_combinations")
 local Engine = require("platform.remap.tap_hold_engine")
-local ConfigOwner = require("modules.shortcuts.key_combinations")
-local AiActions = require("modules.shortcuts.ai_actions")
+local ConfigOwner = require("shortcuts.engine.key_combinations")
+local AiActions = require("shortcuts.engine.ai_actions")
 local settings_current = ConfigOwner.buffered_settings_current
 local M = {}
 local input_issuers = setmetatable({}, { __mode = "k" })
@@ -329,7 +329,7 @@ local function revoke_event(code, source)
 		return called and current == true
 	end
 	local function source_settings_current()
-		return package.loaded["modules.shortcuts.key_combinations"]==ConfigOwner
+		return package.loaded["shortcuts.engine.key_combinations"]==ConfigOwner
 			and rawget(ConfigOwner,"buffered_settings_current")==settings_current
 			and type(settings_current)=="function" and settings_current(options)==true
 	end

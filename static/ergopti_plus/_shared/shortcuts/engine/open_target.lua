@@ -7,7 +7,7 @@
 --- opens it on macOS and Linux: a URL (with or without its scheme, an IP
 --- address, localhost, a mail address), a file or folder path, a Windows
 --- registry key, a bare file name, or plain text to search the web for.
---- Windows ports the same rule in windows/infra/open_target.ahk.
+--- Windows ports the same rule in windows/shortcuts/engine/open_target.ahk.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure: the caller passes the environment lookup, so the module needs no

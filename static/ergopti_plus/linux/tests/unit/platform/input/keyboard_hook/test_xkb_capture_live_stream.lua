@@ -810,7 +810,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 	end)
 	helpers.it("joins the original Reader occurrence to the actual host and shared editor without writes", function()
 		with_position_capture(nil, function(s)
-			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "gestures.engine.manager",
+			local names = { "shortcuts.ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "gestures.engine.manager",
 				"core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
@@ -827,7 +827,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 				package.loaded["core.fs.engine.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
 				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 				package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
-				host = helpers.load_module("ui.physical_shortcuts.bridge")
+				host = helpers.load_module("shortcuts.ui.physical_shortcuts.bridge")
 				local scope = { physical_delivery_available = function() return true end,
 					capture_editor_inventory = function() return { assignments = {}, parameters = {} }, receipt end,
 					editor_source_current = function(exact) return rawequal(exact, receipt) end,

@@ -373,7 +373,7 @@ end)
 local function with_remote_fixture(body)
 	local names = {
 		"ai.engine.api.remote", "ai.engine.api.token_crypto",
-		"core.network.adapters.http_client", "modules.shortcuts.script_control",
+		"core.network.adapters.http_client", "shortcuts.engine.script_control",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -384,7 +384,7 @@ local function with_remote_fixture(body)
 		http_gets = 0,
 		cancel_mode = "true",
 	}
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		is_paused = function() return false end,
 		get_pause_epoch = function() return 0 end,
 	}
@@ -434,7 +434,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 	local names = {
 		"ai.engine.api.remote", "ai.engine.api.token_crypto",
 		"core.process.adapters.shell_runner", "core.events.timer_scheduler",
-		"core.network.adapters.http_client", "modules.shortcuts.script_control",
+		"core.network.adapters.http_client", "shortcuts.engine.script_control",
 		"keyboard.adapters.karabiner.lease_helper",
 	}
 	local saved = {}
@@ -482,7 +482,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 				}
 			end,
 		}
-		package.loaded["modules.shortcuts.script_control"] = {
+		package.loaded["shortcuts.engine.script_control"] = {
 			is_paused = function() return false end,
 			get_pause_epoch = function() return 0 end,
 		}

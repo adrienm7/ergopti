@@ -115,8 +115,8 @@ helpers.describe("startup: configuration consumers follow path initialization", 
 		local src = read_code("✅ Hammerspoon boot SUCCESSFUL.")
 		local ready = src:find("local config_paths_ready = config_paths.init(base_dir)", 1, true)
 		helpers.assert_true(ready ~= nil, "the path initialization owner must exist")
-		for _, name in ipairs({ "gestures", "keymap", "shortcuts", "dynamic_hotstrings" }) do
-			local loaded = src:find('require("modules.' .. name .. '")', 1, true)
+		for _, name in ipairs({ "gestures.engine", "hotstrings.engine.expander", "shortcuts.engine", "hotstrings.engine.dynamic" }) do
+			local loaded = src:find('require("' .. name .. '")', 1, true)
 			helpers.assert_true(loaded ~= nil and loaded > ready,
 				"configuration-dependent module must follow the path owner: " .. name)
 		end
@@ -133,7 +133,7 @@ end)
 -- ===========================================================
 
 helpers.describe("startup: duplicate shortcuts.bindings start() does not WARN (bindings-quiet-restart)", function()
-	local src = read_code("local _chatgpt_url = nil") -- modules/shortcuts/bindings.lua
+	local src = read_code("local _chatgpt_url = nil") -- shortcuts/engine/bindings.lua
 
 	helpers.it("the already-started guard logs at DEBUG, not WARNING", function()
 		-- init.lua starts the bindings early, then menu_state re-starts them to

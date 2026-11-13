@@ -149,7 +149,7 @@ function M.deliver_output(text, output, max_typed, publication)
 			return false
 		end
 	end
-	local typed = require("modules.shortcuts.manager").insert_text(value, publication) == true
+	local typed = require("shortcuts.engine.manager").insert_text(value, publication) == true
 	if not typed then Logger.error(LOG, "The output of a run_command binding could not be typed.") end
 	return typed
 end
@@ -275,7 +275,7 @@ function M.run_command(fields, max_typed)
 	end
 	local publication
 	if fields.output == "type" then
-		local shortcuts = require("modules.shortcuts.manager")
+		local shortcuts = require("shortcuts.engine.manager")
 		publication = shortcuts.capture_text_destination()
 		if not publication or _paused then
 			Logger.warn(LOG, "run_command refused: no retained text destination.")

@@ -120,7 +120,7 @@ if (!entry) {
 // ─── 2. Windows: no second derivation ────────────────────────────────────────
 
 const AHK_READ_SITES = [
-	'static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk',
+	'static/ergopti_plus/windows/shortcuts/ui/menu/shortcuts.ahk',
 	'static/ergopti_plus/windows/hotstrings/ui/hotstrings_config_window/hcw_helpers.ahk'
 ];
 

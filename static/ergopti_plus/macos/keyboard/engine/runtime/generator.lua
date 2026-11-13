@@ -120,7 +120,7 @@ M.REQUIREMENT_STATE_FEATURES = {
 -- them; every caller is listed here with its features or its reason.
 M.REQUIREMENT_FACADE_FEATURES = {
 	["gestures/engine/actions.lua"]        = { "gestures.*" },
-	["modules/shortcuts/script_control.lua"] = { "shortcuts.script_control.*" },
+	["shortcuts/engine/script_control.lua"] = { "shortcuts.script_control.*" },
 	["keyboard/engine/runtime/watchers.lua"]         = { "shortcuts.caps_word.**" },
 	["metrics/adapters/kc_bridge.lua"]      = { "metrics.**" },
 	["keyboard/engine/init.lua"]             = { why = "the remap engine that runs this generator; its feature inputs are the state fields above" },
@@ -171,7 +171,7 @@ local NEVER_POSTED_EXPRESSION = "0"
 -- keyboard/engine/layers/script_chord_rules.lua, the Delete slot included.
 local SCRIPT_CONTROL_HOLDER_KEY     = ScriptChordRules.HOLDER_KEY
 -- Synthetic modifier KE stamps onto every emitted F13/F14/F15 sentinel. HS reads
--- it off the EVENT itself (modules/shortcuts/script_control.lua) to confirm a
+-- it off the EVENT itself (shortcuts/engine/script_control.lua) to confirm a
 -- genuine sentinel without depending on the live keyboard modifier state — which
 -- is unreliable: the paused rules gate on a MANDATORY modifier that KE consumes,
 -- so by the time HS polls, nothing is held (the second AltGr+Enter could not
@@ -1959,7 +1959,7 @@ end
 --- rule requires the generation-scoped mode to be ACTIVE. These
 --- pause-only rules gate DIRECTLY on the physical modifier, so
 --- AltGr+Enter / Backspace / Delete / Escape keep emitting their sentinels
---- (consumed by modules/shortcuts/script_control.lua) while every other remap
+--- (consumed by shortcuts/engine/script_control.lua) while every other remap
 --- is off, for the slots whose action is a script-management one: any other
 --- slot, like an unassigned one, leaves the chord to the system while paused.
 --- While paused the remap layer is OFF, so the user reaches these shortcuts with the

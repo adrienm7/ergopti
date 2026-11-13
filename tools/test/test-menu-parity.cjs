@@ -306,8 +306,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua',
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
 		},
@@ -315,7 +315,7 @@ const OPENS_SUBMENU = {
 			menu: 'shortcut_chatgpt_editor_frame',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_shortcuts.lua' }
+			native_sources: { hs: 'macos/shortcuts/ui/menu/shortcuts.lua' }
 		},
 		{
 			menu: 'shortcut_wrap_live_control',
@@ -335,7 +335,7 @@ const OPENS_SUBMENU = {
 		platforms: ['ahk'],
 		kind: 'compose',
 		retained_frame_data: { ahk: 'personal_shortcuts' },
-		native_sources: { ahk: 'windows/ui/menu/menu_shortcuts.ahk' }
+		native_sources: { ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk' }
 	},
 	extensions_shortcuts: [
 		{
@@ -350,8 +350,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua'
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua'
 			}
 		},
 		{
@@ -379,8 +379,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua'
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua'
 			}
 		},
 		{
@@ -388,8 +388,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua'
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua'
 			}
 		},
 		{
@@ -397,8 +397,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua'
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua'
 			}
 		},
 		{
@@ -406,8 +406,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua'
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua'
 			}
 		},
 		{
@@ -415,8 +415,8 @@ const OPENS_SUBMENU = {
 			platforms: ['ahk', 'hs'],
 			kind: 'compose',
 			native_sources: {
-				ahk: 'windows/ui/menu/menu_shortcuts.ahk',
-				hs: 'macos/ui/menu/menu_shortcuts.lua'
+				ahk: 'windows/shortcuts/ui/menu/shortcuts.ahk',
+				hs: 'macos/shortcuts/ui/menu/shortcuts.lua'
 			}
 		}
 	],
@@ -4928,7 +4928,7 @@ function personalInfoProviderComposition(source, declarations, platform) {
 // One finite construction publication: genuine UI handoff plus declared interpreter operators.
 function shortcutConstructionPublication(sources, target, nativeFile) {
 	const assert = require('node:assert/strict');
-	const windows = sources['windows/ui/menu/menu_shortcuts.ahk'];
+	const windows = sources['windows/shortcuts/ui/menu/shortcuts.ahk'];
 	const nativeRenderer = sources['windows/menu/engine/manifest_menu.ahk'];
 	const policy = manifest.shortcut_extension_construction_ahk;
 	const same = require('node:util').isDeepStrictEqual;
@@ -5099,7 +5099,10 @@ function shortcutConstructionPublication(sources, target, nativeFile) {
 // These are physical publication withdrawals, not regenerated native expectations.
 {
 	const assert = require('node:assert/strict');
-	const files = ['windows/ui/menu/menu_shortcuts.ahk', 'windows/menu/engine/manifest_menu.ahk'];
+	const files = [
+		'windows/shortcuts/ui/menu/shortcuts.ahk',
+		'windows/menu/engine/manifest_menu.ahk'
+	];
 	const actual = Object.fromEntries(
 		files.map((file) => [file, readSourceFile(path.join(SP, file))])
 	);
@@ -5174,7 +5177,7 @@ function shortcutConstructionPublication(sources, target, nativeFile) {
 function personalFrameSources() {
 	return Object.fromEntries(
 		[
-			'windows/ui/menu/menu_shortcuts.ahk',
+			'windows/shortcuts/ui/menu/shortcuts.ahk',
 			'windows/menu/ui/builder/menu_init.ahk',
 			'windows/menu/engine/manifest_menu.ahk',
 			'windows/tray/adapters/menu.ahk'
@@ -5184,7 +5187,7 @@ function personalFrameSources() {
 
 function personalFrameEdgePublication(edge, sources, definition, row, platform) {
 	const files = [
-		'windows/ui/menu/menu_shortcuts.ahk',
+		'windows/shortcuts/ui/menu/shortcuts.ahk',
 		'windows/menu/ui/builder/menu_init.ahk',
 		'windows/menu/engine/manifest_menu.ahk',
 		'windows/tray/adapters/menu.ahk'
@@ -5251,7 +5254,7 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 		{ ...edge, platforms: ['hs'] },
 		{ ...edge, retained_frame_data: undefined },
 		{ ...edge, retained_frame_data: { ahk: 'foreign_personal' } },
-		{ ...edge, native_sources: { ahk: 'macos/ui/menu/menu_shortcuts.lua' } },
+		{ ...edge, native_sources: { ahk: 'macos/shortcuts/ui/menu/shortcuts.lua' } },
 		{ ...edge, native_sources: { ahk: 'windows/menu/ui/builder/menu_init.ahk' } }
 	])
 		assert.equal(
@@ -5282,7 +5285,7 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 		false,
 		'foreign module context cannot enlarge the dedicated source domain'
 	);
-	const caller = 'windows/ui/menu/menu_shortcuts.ahk';
+	const caller = 'windows/shortcuts/ui/menu/shortcuts.ahk';
 	const anchor = '"provider", _PersonalShortcutRows';
 	assert.equal(
 		sources[caller].split(anchor).length - 1,
@@ -5506,7 +5509,7 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 																? shortcutConstructionPublication(
 																		Object.fromEntries(
 																			[
-																				'windows/ui/menu/menu_shortcuts.ahk',
+																				'windows/shortcuts/ui/menu/shortcuts.ahk',
 																				'windows/menu/engine/manifest_menu.ahk'
 																			].map((owned) => [
 																				owned,

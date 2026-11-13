@@ -59,7 +59,7 @@ helpers.describe("shortcut retained native release debt", function()
 				return accepted
 			end
 		end
-		local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = path .. ".release-debt-backup",
+		local scope = require("shortcuts.engine.scope").new({ path = path, backup_path = path .. ".release-debt-backup",
 			files = controls.files, is_paused = function() return controls.paused end })
 		return scope, function(value) blocked = value == true end, live, acknowledgements, faults
 	end
@@ -174,9 +174,9 @@ helpers.describe("shortcut retained native release debt", function()
 
 	helpers.it("settles release-only debt after an acknowledged explicit inverse without replaying it", function()
 		with_scope(function(_, _, controls, path)
-			local owners = { manager = require("modules.shortcuts.manager"), keyboard = require("modules.shortcuts.keyboard_shortcuts"),
-				taps = require("modules.shortcuts.tap_keys"), chords = require("modules.shortcuts.script_chords"),
-				url = require("modules.shortcuts.chatgpt"), gestures = require("gestures.engine.manager") }
+			local owners = { manager = require("shortcuts.engine.manager"), keyboard = require("shortcuts.engine.keyboard_shortcuts"),
+				taps = require("shortcuts.engine.tap_keys"), chords = require("shortcuts.engine.script_chords"),
+				url = require("shortcuts.engine.chatgpt"), gestures = require("gestures.engine.manager") }
 			local scope, block, live = controlled_scope(owners, controls, path, "keyboard", function() return false end)
 			block(false)
 			helpers.assert_eq(scope.apply("recommended"), true)
@@ -396,7 +396,7 @@ helpers.describe("Linux merged shortcut acquisition custody", function()
 				if blocked then return false end
 				return release(token)
 			end
-			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = path .. ".acquisition-backup",
+			local scope = require("shortcuts.engine.scope").new({ path = path, backup_path = path .. ".acquisition-backup",
 				files = controls.files, is_paused = function() return controls.paused end })
 			local original = Sandbox.read_bytes(path)
 			helpers.assert_eq(scope.apply("clear"), false)

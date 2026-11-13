@@ -32,7 +32,7 @@ end
 local function with_remote(callback)
 	helpers.with_stub_scope({
 		"ai.engine.api.remote", "ai.engine.api.token_crypto", "metrics.engine",
-		"modules.shortcuts.script_control", "core.network.adapters.http_client",
+		"shortcuts.engine.script_control", "core.network.adapters.http_client",
 		"ai.engine.policy.remote_response_classifier", "ai.engine.local_servers.local_servers",
 		"ai.engine.api.provider_uses", "ai.engine.prediction.progressive_reveal",
 		"ai.engine.api.common", "ai.engine.settings.profiles", "ai.engine.api.parser",
@@ -56,7 +56,7 @@ local function with_remote(callback)
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 		}
 		package.loaded["metrics.engine"] = {}
-		package.loaded["modules.shortcuts.script_control"] = {
+		package.loaded["shortcuts.engine.script_control"] = {
 			is_paused = function() return false end,
 			get_pause_epoch = function() return 0 end,
 		}

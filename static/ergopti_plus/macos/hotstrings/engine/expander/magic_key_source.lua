@@ -168,7 +168,7 @@ function M.choice_reason(value)
 	local resolver = M.resolver()
 	if value == resolver.automatic then return nil end
 	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
-	local TapKeys = require("modules.shortcuts.tap_keys")
+	local TapKeys = require("shortcuts.engine.tap_keys")
 	TapKeys.ensure_loaded(require("gestures.engine.actions").is_assignable)
 	-- Both inputs to the shared policy name canonical physical positions. ISO
 	-- arrival aliases cannot reserve a different key in the stored settings.
@@ -208,7 +208,7 @@ function M.remaps(key_code, flags, replace_on, keyboard_type)
 	if not Shared.unmodified(flags) or replace_on() ~= true then return false end
 	-- Only the already-loaded, acknowledged dispatcher can own this press.
 	-- No native module, file or layout probe is loaded from the keyDown path.
-	local System = package.loaded["modules.shortcuts.actions.system"]
+	local System = package.loaded["shortcuts.engine.actions.system"]
 	if type(System) == "table" and type(System.has_tap_key_claim) == "function" then
 		return System.has_tap_key_claim(key_code, flags, keyboard_type) == false
 	end

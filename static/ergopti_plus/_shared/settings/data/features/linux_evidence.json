@@ -31,11 +31,11 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
-				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/caps_word_auto_off.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/manager.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/caps_word/test_caps_word_auto_off.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/caps_word/test_auto_off.lua",
 				"static/ergopti_plus/_shared/keyboard/engine/caps_word_auto_off.lua"
 			]
 		},
@@ -119,11 +119,11 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/script_chords.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/script_chords.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/infra/shortcuts_scope.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/scope.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_script_chords.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_script_chords.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/scope/test_shortcuts_scope_terminal_shortcut.lua"
 			]
 		},
@@ -482,10 +482,10 @@
 			"evidence": [
 				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
 				"static/ergopti_plus/linux/keyboard/engine/keys/combination_engine.lua",
-				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/key_combinations.lua",
 				"static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua",
 				"static/ergopti_plus/linux/keyboard/ui/menu_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/key_combinations/test_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		},
@@ -499,11 +499,11 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/key_combinations.lua",
 				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
 				"static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua",
 				"static/ergopti_plus/linux/keyboard/ui/menu_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/key_combinations/test_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/settings/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		},
@@ -555,10 +555,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/accented_shortcuts.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/accented_shortcuts.lua",
 				"static/ergopti_plus/linux/layouts/ui/menu/layouts.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_accented_shortcuts.lua"
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_accented_shortcuts.lua"
 			]
 		}
 	},
@@ -636,9 +636,9 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua",
-				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_chatgpt.lua"
+				"static/ergopti_plus/linux/shortcuts/engine/chatgpt.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_chatgpt.lua"
 			]
 		},
 		"shortcuts.enabled": {
@@ -650,9 +650,9 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/manager.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_master_state.lua"
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_master_state.lua"
 			]
 		},
 		"shortcuts.wrap_text_if_selected": {
@@ -664,10 +664,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/wrap_on_type.lua",
-				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/wrap_on_type.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/manager.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_wrap_on_type.lua"
+				"static/ergopti_plus/linux/tests/unit/shortcuts/text_actions/test_wrap_on_type.lua"
 			]
 		},
 		"shortcuts.tap_keys.number_row_left": {
@@ -679,10 +679,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/tap_keys.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
+				"static/ergopti_plus/linux/tests/unit/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
 		"shortcuts.tap_keys.number_row_right_1": {
@@ -694,10 +694,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/tap_keys.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
+				"static/ergopti_plus/linux/tests/unit/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
 		"shortcuts.tap_keys.number_row_right_2": {
@@ -709,10 +709,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/tap_keys.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
+				"static/ergopti_plus/linux/tests/unit/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
 		"shortcuts.keyboard.meta_space": {
@@ -724,10 +724,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/ai/engine/prediction/engine.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/unit/ai/engine/prediction/test_trigger_now.lua"
 			]
 		},
@@ -1077,10 +1077,10 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
-				"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_chatgpt_binding.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_slot_consumes_chord.lua"
+				"static/ergopti_plus/linux/shortcuts/engine/keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/chatgpt.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_chatgpt_binding.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_slot_consumes_chord.lua"
 			]
 		},
 		"shortcuts.keyboard.magic_editor": {
@@ -1093,10 +1093,10 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua",
-				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/shortcuts/engine/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/layouts/adapters/xkb_source_probe.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_magic_editor_policy.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_magic_editor_policy.lua",
+				"static/ergopti_plus/linux/tests/unit/shortcuts/keyboard/test_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
 			]
 		},

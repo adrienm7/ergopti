@@ -577,7 +577,7 @@ end
 --- module had no reference to a pause predicate at all.
 --- @return boolean
 local function _is_paused()
-	local sc = package.loaded["modules.shortcuts.script_control"]
+	local sc = package.loaded["shortcuts.engine.script_control"]
 	return type(sc) == "table" and type(sc.is_paused) == "function" and sc.is_paused() == true
 end
 

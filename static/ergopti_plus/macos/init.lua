@@ -411,7 +411,7 @@ end)
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
 -- having to type out require("hotstrings.engine.expander") each time.
 _G.keymap = keymap
-local shortcuts          = require("modules.shortcuts")
+local shortcuts          = require("shortcuts.engine")
 local dynamic_hotstrings = require("hotstrings.engine.dynamic")
 
 boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir()),

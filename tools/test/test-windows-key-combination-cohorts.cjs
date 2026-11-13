@@ -444,9 +444,9 @@ const pacFixture = (callback) => {
 			'static/ergopti_plus/_shared/core/network/data/pac_helpers.js',
 			'static/ergopti_plus/_shared/core/network/native/pac_runtime.c',
 			'static/ergopti_plus/_shared/core/network/native/pac_runtime.h',
-			'static/ergopti_plus/windows/native/ergopti_network_pac_platform.c',
-			'static/ergopti_plus/windows/native/ergopti_network_pac_platform.h',
-			'static/ergopti_plus/windows/native/ergopti_network_pac.c',
+			'static/ergopti_plus/windows/shortcuts/native/ergopti_network_pac_platform.c',
+			'static/ergopti_plus/windows/shortcuts/native/ergopti_network_pac_platform.h',
+			'static/ergopti_plus/windows/shortcuts/native/ergopti_network_pac.c',
 			'tools/build/build_windows_nav_owner.ps1',
 			'tools/build/build_windows_network_pac.ps1',
 			'tools/build/prepare_network_pac_sources.py'

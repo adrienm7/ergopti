@@ -7,7 +7,7 @@
 local NativeLoop = require("luv")
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
-local Scope = require("infra.shortcuts_scope")
+local Scope = require("shortcuts.engine.scope")
 local path, backup = "/controlled/config.toml", "/controlled/combination.bak"
 local pair, binding = "caps_lock_then_tab", "combination__caps_lock_then_tab"
 local parameter = binding .. "__open_url"
@@ -23,8 +23,8 @@ local edits = {
 local function with_owner(body, managed, prepare)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = pcall(function()
-		package.loaded["modules.shortcuts.key_combinations"] = nil
-		local PairOwner = require("modules.shortcuts.key_combinations")
+		package.loaded["shortcuts.engine.key_combinations"] = nil
+		local PairOwner = require("shortcuts.engine.key_combinations")
 		package.loaded["gestures.engine.manager"] = nil
 		local gestures = require("gestures.engine.manager")
 		local state = { bytes = { [path] = source }, paused = false, publications = 0, changes = 0 }
@@ -63,10 +63,10 @@ local function with_owner(body, managed, prepare)
 				state.native,state.on_tap=engine,callback;return true
 			end}
 			for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
-			package.loaded["modules.shortcuts.key_combinations"]=nil
+			package.loaded["shortcuts.engine.key_combinations"]=nil
 			state.manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
-			state.pairs=require("modules.shortcuts.key_combinations")
+			state.pairs=require("shortcuts.engine.key_combinations")
 		else
 		state.pairs = PairOwner.new({ keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} },
 			hold_picker = { modifiers = {"shift","alt"}, layers = {"nav"} }, files = files,

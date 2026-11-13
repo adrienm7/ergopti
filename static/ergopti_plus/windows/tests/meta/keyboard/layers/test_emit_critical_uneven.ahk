@@ -34,7 +34,7 @@
 
 ; Reads a windows/-relative source file. Still used by the SC029/SC00C/SC00D
 ; hotkey scan below: SC029:: is NOT unique across the modules tree (it also tags
-; the screenshot hotkey in modules/shortcuts/win.ahk), so no concat helper can
+; the screenshot hotkey in shortcuts/engine/win.ahk), so no concat helper can
 ; safely scope that positional/first-match scan — it stays a pinned read.
 _RECU_ReadSource(FileName) {
 	return _DriverFileSource(FileName)

@@ -61,7 +61,7 @@ local OWNED_MODULES = {
 	"ai.engine.local_servers.warmup_controller",
 	"ai.engine.ollama.binary",
 	"ai.engine.ollama.server_command",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"metrics.ui.wpm.menubar",
 	"metrics.ui.wpm.widget",
 	"keyboard.engine.runtime.onboarding",
@@ -410,7 +410,7 @@ local function with_fixture(callback)
 				log_shortcut = function() return true end,
 			}
 
-			local script_control = require("modules.shortcuts.script_control")
+			local script_control = require("shortcuts.engine.script_control")
 			helpers.assert_true(script_control.start({
 				pause_processing = function() return true end,
 				resume_processing = function() return true end,

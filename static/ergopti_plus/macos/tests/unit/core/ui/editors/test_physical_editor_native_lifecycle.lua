@@ -341,7 +341,7 @@ local run_contract = function(helpers, load_host, load_builder)
  return fixture
 end
 
-local capture_fixture=run_contract(helpers,function()package.loaded['ui.physical_shortcuts']=nil;return require('ui.physical_shortcuts')end,function()package.loaded['core.ui.ui.builder']=nil;return require('core.ui.ui.builder')end)
+local capture_fixture=run_contract(helpers,function()package.loaded['shortcuts.ui.physical_shortcuts']=nil;return require('shortcuts.ui.physical_shortcuts')end,function()package.loaded['core.ui.ui.builder']=nil;return require('core.ui.ui.builder')end)
 
 -- Reuse the original controlled natives and actual Builder. The existing thirty
 -- lifecycle bodies/assertions above are unchanged; these use genuine shared ports.
@@ -381,7 +381,7 @@ local function with_observer(body)
    c.pending=false;return true
   end,stop=function()c.stops=c.stops+1;error('Page cancellation must never stop primary metrics')end}
   c.observer=observer;package.loaded['metrics.engine.capture.physical_capture']=observer
-  local host;package.loaded['ui.physical_shortcuts']=nil;host=require('ui.physical_shortcuts')
+  local host;package.loaded['shortcuts.ui.physical_shortcuts']=nil;host=require('shortcuts.ui.physical_shortcuts')
   c.host=host
   c.open=function()
    helpers.assert_true(host.open(options))
@@ -488,7 +488,7 @@ helpers.describe('Mac optional observational position composition',function()
    local saved=package.preload['metrics.engine.capture.physical_capture'];local required=0
    package.preload['metrics.engine.capture.physical_capture']=function()required=required+1;error('Must not acquire producer')end
    local called,detail=pcall(function()
-    package.loaded['ui.physical_shortcuts']=nil;c.host=require('ui.physical_shortcuts')
+    package.loaded['shortcuts.ui.physical_shortcuts']=nil;c.host=require('shortcuts.ui.physical_shortcuts')
     host=c.host
     helpers.assert_true(host.open(options))
     c.bridges[#c.bridges].callback({body={action='ready'}})

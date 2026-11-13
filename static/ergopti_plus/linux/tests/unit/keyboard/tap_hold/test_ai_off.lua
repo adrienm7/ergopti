@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 local Engine = require("platform.remap.tap_hold_engine")
-local AiActions = require("modules.shortcuts.ai_actions")
+local AiActions = require("shortcuts.engine.ai_actions")
 
 local DOWN, UP = 1, 0
 local SPACE, ESCAPE = 57, 1

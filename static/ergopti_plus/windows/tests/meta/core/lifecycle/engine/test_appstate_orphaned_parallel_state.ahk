@@ -94,6 +94,6 @@ _AOPS_NoRemappedListViaAppState() {
 	Assert(InStr(LayoutSrc, "remapped_list") == 0,
 		"layouts/engine/layout.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
 	Assert(InStr(ShortcutSrc, "remapped_list") == 0,
-		"modules/shortcuts/utils.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
+		"shortcuts/engine/utils.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
 }
 Test("app_state: remapped_list accessed via RemappedList, not AppState (appstate-orphaned-parallel-state)", _AOPS_NoRemappedListViaAppState)

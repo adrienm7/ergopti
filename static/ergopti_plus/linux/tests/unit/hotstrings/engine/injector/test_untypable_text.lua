@@ -544,7 +544,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 		end)
 	end
 
-	for _, route in ipairs({ "native", "clipboard", "layouts" }) do
+	for _, route in ipairs({ "native", "clipboard", "layouts", "shortcuts" }) do
 		helpers.it("(injection-route-preflight) retains a complete " .. route .. " route across trigger erasure", function()
 			local clip, restore = stub_clipboard(true)
 			local ch, plans = fake_channel(true), 0

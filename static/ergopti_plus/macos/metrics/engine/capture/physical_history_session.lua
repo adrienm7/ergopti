@@ -3,13 +3,13 @@
 --- Explicit dormant capture wiring; installed runtime authority remains caller-owned.
 local M = {}
 local Coordinator = require("metrics.engine.capture.physical_history_coordinator")
-local Context = require("adapters.physical_history_context")
-local Clock = require("adapters.physical_observation_clock")
+local Context = require("shortcuts.adapters.physical_history_context")
+local Clock = require("shortcuts.adapters.physical_observation_clock")
 local Capture = require("metrics.engine.capture.physical_capture")
 local Keystats = require("metrics.engine")
 local Tracker = require("metrics.engine.context_tracker")
 local Watchers = require("metrics.engine.system.watchers")
-local ScriptControl = require("modules.shortcuts.script_control")
+local ScriptControl = require("shortcuts.engine.script_control")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local Identity = require("metrics.engine.capture.physical_key_identity")
 local LogManager = require("metrics.engine.journal.log_manager")

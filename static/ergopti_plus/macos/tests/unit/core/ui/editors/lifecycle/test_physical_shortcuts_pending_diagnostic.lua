@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 require("core.logger.engine")
 
 local function with_host(scenario)
-	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
+	helpers.with_stub_scope({ "shortcuts.ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
 		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "core.ui.ui.builder", "core.ui.ui.webview_close_owner",
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.webview.i18n_seed", "core.fs.adapters.file_system",
 		"core.ui.engine.window_titles", "core.text.engine.json", "core.fs.adapters.json_codec", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
@@ -66,7 +66,7 @@ local function with_host(scenario)
 			h.timers[#h.timers + 1] = entry
 			return timer
 		end
-		local host = helpers.load_with_stubs("ui.physical_shortcuts", {
+		local host = helpers.load_with_stubs("shortcuts.ui.physical_shortcuts", {
 			json = { decode = function() return {} end }, focus = function() end,
 			timer = { new = native_timer },
 			webview = { windowMasks = { titled = 1, closable = 2, resizable = 8 }, new = function()

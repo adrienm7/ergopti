@@ -20,8 +20,8 @@ local KEYCODE_ESCAPE = 53
 
 local MODULES = {
 	"hotstrings.ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
-	"hotstrings.engine.expander.magic_key_source", "modules.shortcuts.tap_keys", "menu.engine.manifest_menu",
-	"platform.input.keyboard_geometry", "diagnostics.adapters.event_provenance", "modules.shortcuts.script_control",
+	"hotstrings.engine.expander.magic_key_source", "shortcuts.engine.tap_keys", "menu.engine.manifest_menu",
+	"platform.input.keyboard_geometry", "diagnostics.adapters.event_provenance", "shortcuts.engine.script_control",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -39,7 +39,7 @@ local function with_menu(body, faults)
 			is_pause_transition_pending = function() return world.pause.pending end,
 			get_pause_epoch = function() return world.pause.epoch end,
 		}
-		package.loaded["modules.shortcuts.script_control"] = world.pause_owner
+		package.loaded["shortcuts.engine.script_control"] = world.pause_owner
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }
@@ -241,7 +241,7 @@ end)
 helpers.describe("magic key source menu: configured tap ownership", function()
 	helpers.it("(magic-key-source) selection and capture refuse an assigned source before any save", function()
 		with_menu(function(Menu, world)
-			local Tap = require("modules.shortcuts.tap_keys")
+			local Tap = require("shortcuts.engine.tap_keys")
 			local actions = require("gestures.engine.actions")
 			helpers.assert_true(Tap.apply_configuration({ shortcuts = { tap_keys = { number_row_left = "send_text" } } }, actions.is_assignable))
 			local ctx = context(true)
@@ -533,7 +533,7 @@ helpers.describe("magic key source menu: live pause admission", function()
 		helpers.it("refuses capture with " .. invalid .. " live pause state before acquisition", function()
 			with_menu(function(Menu, world)
 				local ctx = context(true)
-				if invalid == "missing" then package.loaded["modules.shortcuts.script_control"] = nil end
+				if invalid == "missing" then package.loaded["shortcuts.engine.script_control"] = nil end
 				if invalid == "paused" then world.pause.paused = true end
 				if invalid == "pending" then world.pause.pending = true end
 				if invalid == "unknown" then world.pause.epoch = nil end
@@ -545,7 +545,7 @@ helpers.describe("magic key source menu: live pause admission", function()
 				helpers.assert_eq(#world.timers, 0)
 				helpers.assert_eq(ctx.saves, 0)
 				world.pause = { paused = false, pending = false, epoch = 2 }
-				package.loaded["modules.shortcuts.script_control"] = world.pause_owner
+				package.loaded["shortcuts.engine.script_control"] = world.pause_owner
 				helpers.assert_true(Menu.capture(ctx))
 				world.taps[1].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
 				helpers.assert_eq(Menu.capturing(), false)
@@ -567,7 +567,7 @@ helpers.describe("magic key source menu: pause crossings retire captured choices
 					if crossing == "pending" then world.pause.pending = true end
 					if crossing == "roundtrip" then world.pause.epoch = world.pause.epoch + 2 end
 					if crossing == "replaced" then
-						package.loaded["modules.shortcuts.script_control"] = {
+						package.loaded["shortcuts.engine.script_control"] = {
 							is_paused = world.pause_owner.is_paused,
 							is_pause_transition_pending = world.pause_owner.is_pause_transition_pending,
 							get_pause_epoch = world.pause_owner.get_pause_epoch,

@@ -56,13 +56,13 @@ end
 
 local function with_native(callback, options)
 	options = options or {}
-	helpers.with_fresh_modules({ "adapters.physical_observation_clock", "adapters.physical_history_context" }, function()
+	helpers.with_fresh_modules({ "shortcuts.adapters.physical_observation_clock", "shortcuts.adapters.physical_history_context" }, function()
 		local previous = hs
 		hs = { timer = { absoluteTime = os.time, secondsSinceEpoch = os.time } }
 		local ok, reason = pcall(function()
 			Fixture.run(function(capture, observed, controls)
 				local owner = {}
-				local clock = require("adapters.physical_observation_clock").bind_history_scope(owner)
+				local clock = require("shortcuts.adapters.physical_observation_clock").bind_history_scope(owner)
 				local clock_token = clock.identity(owner)
 				local f = { capture = capture, controls = controls, observed = observed, owner = owner, clock = clock }
 				controls.dependencies.context = function(ticks)
@@ -79,7 +79,7 @@ local function with_native(callback, options)
 						return scope.current(scope.identity()) and clock.current(owner, clock_token)
 					end)
 					if options.before_constructor then options.before_constructor(f, info) end
-					f.projection, f.reason = require("adapters.physical_history_context").new(owner, f.policy.history,
+					f.projection, f.reason = require("shortcuts.adapters.physical_history_context").new(owner, f.policy.history,
 						{ capture = scope, clock = clock }, info)
 					if options.on_ready then options.on_ready(f) end
 					return f.projection ~= nil

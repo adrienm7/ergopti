@@ -11,7 +11,7 @@
 ; there escalates to the crash-report error net instead of degrading the
 ; same way every other branch does.
 ;
-; SCOPE: source introspection of modules/shortcuts/win.ahk.
+; SCOPE: source introspection of shortcuts/engine/win.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -27,7 +27,7 @@
 
 _SPRJC_CheckRegJumpHasCatch() {
 	Body := _DriverFuncBody("SearchPath")
-	Assert(Body != "", "SearchPath must exist in modules/shortcuts/win.ahk")
+	Assert(Body != "", "SearchPath must exist in shortcuts/engine/win.ahk")
 
 	CallPos := InStr(Body, "RegJump(Value)")
 	Assert(CallPos > 0, "SearchPath must still call RegJump(Value) on its registry branch")

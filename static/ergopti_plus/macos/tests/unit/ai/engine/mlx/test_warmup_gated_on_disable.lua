@@ -97,7 +97,7 @@ end)
 -- ================================================================================
 
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
@@ -222,7 +222,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["metrics.engine"] = { resync_context = function() return true end }
 
-		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
+		local ScriptControl = helpers.load_with_stubs("shortcuts.engine.script_control")
 		local pause_accepted = ScriptControl.pause_all()
 		local before_drain = total_calls()
 		local pending_before_drain = ScriptControl.is_pause_transition_pending()

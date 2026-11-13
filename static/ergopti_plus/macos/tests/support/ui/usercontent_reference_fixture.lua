@@ -13,9 +13,9 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the real picker and native observations.
 local function with_picker(scenario)
 	return helpers.with_stub_scope({
-		"ui.action_picker", "core.ui.ui.webview_controller_pool", "core.ui.ui.builder", "core.logger.engine.logger",
+		"shortcuts.ui.action_picker", "core.ui.ui.webview_controller_pool", "core.ui.ui.builder", "core.logger.engine.logger",
 		"core.i18n.engine.i18n", "core.fs.engine.paths", "core.timing.engine.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
-		"core.process.adapters.program_providers", "adapters.apple_shortcuts_native",
+		"core.process.adapters.program_providers", "shortcuts.adapters.apple_shortcuts_native",
 	}, function()
 		local h = { controllers = {}, userdata_refs = {}, callback_refs = {}, views = {}, errors = {}, nil_calls = 0 }
 		local Json = require("core.text.engine.json")
@@ -27,7 +27,7 @@ local function with_picker(scenario)
 		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 		helpers.provide_timings()
 		package.loaded["core.process.adapters.program_providers"] = {}
-		package.loaded["adapters.apple_shortcuts_native"] = {}
+		package.loaded["shortcuts.adapters.apple_shortcuts_native"] = {}
 		local function new_controller(name)
 			local controller = { name = name }
 			function controller:setCallback(callback)
@@ -80,7 +80,7 @@ local function with_picker(scenario)
 				return view
 			end,
 		}
-		local picker = require("ui.action_picker")
+		local picker = require("shortcuts.ui.action_picker")
 		function h.open(callback)
 			return picker.open({ title = "UCC retention pilot", items = {} }, callback or function() return true end)
 		end

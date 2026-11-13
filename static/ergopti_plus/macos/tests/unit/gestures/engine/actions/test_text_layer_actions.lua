@@ -4,7 +4,7 @@
 --- MODULE: Gesture actions delegate to the shortcut layer's text owner
 --- DESCRIPTION:
 --- The selection, plain-paste and case actions are implemented once, in
---- modules/shortcuts/actions/text.lua, whose lifecycle is scoped by parent. A
+--- shortcuts/engine/actions/text.lua, whose lifecycle is scoped by parent. A
 --- gesture must run them under the "gestures" parent and a keyboard slot under
 --- "shortcut_bindings", so pausing one feature never fences the other.
 ---

@@ -25,7 +25,7 @@ local OWNERS = {
 	"core.text.engine.toml_codec.key_path",
 	"core.text.engine.toml_codec.record_scanner",
 	"core.text.engine.toml_codec.source_open",
-	"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "menu.engine.manifest_reader", "settings.engine.paths",
+	"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "menu.engine.manifest_reader", "settings.engine.paths",
 	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"metrics.engine.journal.log_manager", "metrics.engine.context_tracker",
 	"metrics.adapters.kc_bridge", "metrics.engine.system.watchers", "metrics.engine.journal.timestamp",

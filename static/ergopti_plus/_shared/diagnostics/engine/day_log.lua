@@ -7,7 +7,7 @@
 --- every line redacted by diagnostics.redact, the size checked against a cap,
 --- and a short preview (first and last lines) for the page to show before the
 --- user decides. Pure: the driver reads the file and hands over its text; the
---- AHK port (windows/infra/day_log.ahk) replays the same vectors
+--- AHK port (windows/shortcuts/engine/day_log.ahk) replays the same vectors
 --- (_shared/tests/corpus/diagnostics/day_log_vectors.json).
 ---
 --- FEATURES & RATIONALE:

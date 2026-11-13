@@ -166,7 +166,7 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 
 	helpers.it("records every saved key while Shortcuts is OFF and binds them when it turns ON", function()
 		Fixture.with_bindings(function(bindings, ctx)
-			local tap_keys = require("modules.shortcuts.tap_keys")
+			local tap_keys = require("shortcuts.engine.tap_keys")
 			helpers.assert_eq(tap_keys.set_action("number_row_left", "screen_capture"), true)
 			-- A layers.toml that binds the wheel: the other owner derived from a file.
 			ctx.wheel.vertical[1] = { code = "WheelUp", strokes = { { system = "SOUND_UP" } } }

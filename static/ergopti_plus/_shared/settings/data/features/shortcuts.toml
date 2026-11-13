@@ -10,7 +10,7 @@
 #
 # Do NOT treat it as a single source of truth: the live registries are
 # `windows/lib/feature_state.ahk` (KEYBOARD_SHORTCUT_DEFAULTS, 15 ids) and
-# `macos/modules/shortcuts/bindings.lua` (hotkey_defs, 21 ids), and this file
+# `macos/shortcuts/engine/bindings.lua` (hotkey_defs, 21 ids), and this file
 # mirrors both faithfully while binding nothing.
 #
 # It is kept, not deleted, because it is the best-written description of the

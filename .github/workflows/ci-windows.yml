@@ -146,7 +146,7 @@ jobs:
             static/ergopti_plus/windows/vendor/ergopti_network_pac.json
             static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
             static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
-          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/core/network/native/**', 'static/ergopti_plus/_shared/core/network/data/pac_helpers.js', 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json', 'static/ergopti_plus/_shared/updater/data/defaults.json', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json') }}
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/shortcuts/native/**', 'static/ergopti_plus/_shared/core/network/native/**', 'static/ergopti_plus/_shared/core/network/data/pac_helpers.js', 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json', 'static/ergopti_plus/_shared/updater/data/defaults.json', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json') }}
 
       - name: Build and test native full-URL PAC evaluator
         id: native-pac-build
@@ -535,7 +535,7 @@ jobs:
             static/ergopti_plus/windows/vendor/ergopti_network_pac.json
             static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
             static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
-          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/core/network/native/**', 'static/ergopti_plus/_shared/core/network/data/pac_helpers.js', 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json', 'static/ergopti_plus/_shared/updater/data/defaults.json', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json') }}
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/shortcuts/native/**', 'static/ergopti_plus/_shared/core/network/native/**', 'static/ergopti_plus/_shared/core/network/data/pac_helpers.js', 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json', 'static/ergopti_plus/_shared/updater/data/defaults.json', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json') }}
 
       - name: Build and test native full-URL PAC evaluator
         if: steps.native-pac-cache.outputs.cache-hit != 'true'

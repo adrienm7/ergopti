@@ -228,7 +228,7 @@ local function bind_context_observer(owner, capacity, receive, on_refused, may_p
 	binding.detach = function(exact_owner, exact_token)
 		return M.unbind_physical_context_observer(exact_owner, exact_token)
 	end
-	local clock_port = require("adapters.physical_observation_clock").now
+	local clock_port = require("shortcuts.adapters.physical_observation_clock").now
 	binding.channel = require("metrics.engine.capture.physical_context_observation").new(capacity,
 		function()
 			local guard = binding.sample_guard
@@ -348,7 +348,7 @@ function M.sample_physical_context(owner, token)
 		end
 		if original.is_enabled ~= true or paused then return finish({}, paused, function() return false end) end
 		-- Retain actual native API identities only for an enabled unpaused sample.
-		native_probe = require("adapters.physical_context_probe").snapshot()
+		native_probe = require("shortcuts.adapters.physical_context_probe").snapshot()
 		-- Bounded guards belong only to this explicit sample, never a pause poller.
 		sampling, binding.sample_guard = true, fence
 		local observed = { foreground_refresh_pending = original.foreground_refresh_pending,

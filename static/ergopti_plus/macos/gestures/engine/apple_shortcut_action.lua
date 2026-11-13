@@ -8,8 +8,8 @@
 --- library by identifier and name (_shared/shortcuts/engine/user_action_parameter.lua);
 --- running it lists the library, refuses a shortcut that was deleted or
 --- renamed with a named notice, then invokes it through the chosen Apple
---- Shortcut owner (adapters/apple_shortcuts.lua) over the command-line
---- transport (adapters/apple_shortcuts_cli.lua), which revalidates the
+--- Shortcut owner (shortcuts/adapters/apple_shortcuts.lua) over the command-line
+--- transport (shortcuts/adapters/apple_shortcuts_cli.lua), which revalidates the
 --- identifier once more right before the run.
 ---
 --- FEATURES & RATIONALE:
@@ -31,8 +31,8 @@ local Timings = require("core.timing.engine.timings")
 local AuxOwner = require("gestures.engine.actions_aux_owner")
 local UserActions = require("gestures.engine.user_actions")
 local FileSystem = require("core.fs.adapters.file_system")
-local Owner = require("adapters.apple_shortcuts")
-local Cli = require("adapters.apple_shortcuts_cli")
+local Owner = require("shortcuts.adapters.apple_shortcuts")
+local Cli = require("shortcuts.adapters.apple_shortcuts_cli")
 local Parameter = require("shortcuts.engine.user_action_parameter")
 
 local LOG = "gestures.apple_shortcut"
@@ -371,7 +371,7 @@ function M.run(fields, parent, max_typed, on_finished)
 		invoke(run)
 		return true
 	end
-	local Text = require("modules.shortcuts.actions.text")
+	local Text = require("shortcuts.engine.actions.text")
 	local started = Text.read_copied_selection(parent, function(selection)
 		if _run ~= run or run.cancelled then return end
 		local allocated = acquire_temp_file(run, "input_path", selection)

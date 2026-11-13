@@ -7,7 +7,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(
 	process.env.CHOSEN_QUERY_SOURCE ||
-		path.resolve(__dirname, '../../../static/ergopti_plus/macos/adapters/apple_shortcuts_query.js'),
+		path.resolve(
+			__dirname,
+			'../../../static/ergopti_plus/macos/shortcuts/adapters/apple_shortcuts_query.js'
+		),
 	'utf8'
 );
 const ID1 = '11111111-1111-1111-1111-111111111111';

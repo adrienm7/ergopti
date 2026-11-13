@@ -80,7 +80,7 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("transforms a stable selection without probing AX in the initiating callback", function()
 		Fixture.with_world("Mixed", "fr", function(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			local before = world.native_destination.reads
 			helpers.assert_eq(text.selection_uppercase("gestures"), true)
 			helpers.assert_eq(world.native_destination.reads, before, "initial admission is RAM-only")
@@ -93,7 +93,7 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("refuses an unknown destination and allows a fresh retry after focus recovers", function()
 		Fixture.with_world("Mixed", "fr", function(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			world.native_destination.change_focus(nil)
 			Fixture.settle(world)
 			helpers.assert_eq(text.selection_uppercase("gestures"), false)
@@ -110,7 +110,7 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("does not load a missing destination tracker on the input callback", function()
 		Fixture.with_world("Mixed", "fr", function(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			local tracked = package.loaded["hotstrings.engine.expander.utils"]
 			package.loaded["hotstrings.engine.expander.utils"] = nil
 			local ok, result = pcall(text.selection_uppercase, "gestures")
@@ -125,7 +125,7 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("refuses a destination whose native window number is unavailable", function()
 		Fixture.with_world("Mixed", "fr", function(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			world.native_destination.change_focus("7:0")
 			Fixture.settle(world)
 			helpers.assert_eq(text.selection_uppercase("gestures"), false)
@@ -136,7 +136,7 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("does not paste an uppercase selection after focus moves", function()
 		Fixture.with_world("Mixed", "fr", function(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			helpers.assert_eq(text.selection_uppercase("gestures"), true)
 			step(world) -- Cmd+C has completed and its clipboard text is ready.
 			world.native_destination.change_focus("8:202")
@@ -150,7 +150,7 @@ helpers.describe("selection translation retains its original focus", function()
 
 	helpers.it("does not revive a transform after focus leaves and returns", function()
 		Fixture.with_world("Mixed", "fr", function(world)
-			local text = require("modules.shortcuts.actions.text")
+			local text = require("shortcuts.engine.actions.text")
 			helpers.assert_eq(text.selection_uppercase("gestures"), true)
 			step(world)
 			world.native_destination.change_focus("8:202")

@@ -114,11 +114,11 @@ const CONSUMERS = [
 		path: 'tests/corpus/action_parameters/wrap_pair_vectors.json'
 	},
 	{
-		file: 'linux/tests/unit/modules/shortcuts/text_actions/test_wrap_pair_parameter_vectors.lua',
+		file: 'linux/tests/unit/shortcuts/text_actions/test_wrap_pair_parameter_vectors.lua',
 		path: '_shared/tests/corpus/action_parameters/wrap_pair_vectors.json'
 	},
 	{
-		file: 'windows/tests/unit/modules/shortcuts/test_wrap_selection_action.ahk',
+		file: 'windows/tests/unit/shortcuts/engine/test_wrap_selection_action.ahk',
 		path: '\\tests\\corpus\\action_parameters\\wrap_pair_vectors.json'
 	}
 ];

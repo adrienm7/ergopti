@@ -60,7 +60,7 @@ local Capture = require("layouts.adapters.xkb_capture")
 local Monotonic = require("core.logger.engine.monotonic")
 local Engine = require("platform.remap.tap_hold_engine")
 local Native = require("keyboard.engine.keys.combination_engine")
-local Owner = require("modules.shortcuts.key_combinations")
+local Owner = require("shortcuts.engine.key_combinations")
 
 -- Same node-publication and event-observation bounds as run_modifier_custody.lua.
 -- The registered existing subreaper owns the unchanged 40-second process budget.

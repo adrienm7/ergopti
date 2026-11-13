@@ -15,7 +15,7 @@
 ;    so no global state leaks between invocations.
 ; 2. Per-pixel alpha: UpdateLayeredWindow with AC_SRC_ALPHA renders the
 ;    semi-transparent fill and stroke without a rectangular bounding box.
-; 3. Extracted here from modules/shortcuts/win.ahk so the rendering logic is
+; 3. Extracted here from shortcuts/engine/win.ahk so the rendering logic is
 ;    testable and shareable without loading any hotkey-registration code.
 ; ==============================================================================
 

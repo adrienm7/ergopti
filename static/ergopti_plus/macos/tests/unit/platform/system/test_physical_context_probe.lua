@@ -2,7 +2,7 @@
 
 --- Actual adapter over finite native API leaf models, never an AX permission receipt.
 local helpers = require("tests.helpers")
-local Probe = require("adapters.physical_context_probe")
+local Probe = require("shortcuts.adapters.physical_context_probe")
 local function fixture(callback)
 	local previous = rawget(_G, "hs")
 	local native = { application = { frontmostApplication = function() return nil end },

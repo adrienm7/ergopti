@@ -37,7 +37,7 @@ local function with_menu(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			package.loaded["settings.engine.paths"] = { config = function() return path end }
-			package.loaded["modules.shortcuts.caps_word_auto_off"] = nil
+			package.loaded["shortcuts.engine.caps_word_auto_off"] = nil
 			local context = { path = path, changes = 0, errors = 0 }
 			local i18n = require("core.i18n.engine.i18n")
 			local builder = load_builder({
@@ -114,7 +114,7 @@ helpers.describe("caps word auto-off menu (Linux)", function()
 						row.key .. " follows the stored default")
 				end
 			end
-			local AutoOff = require("modules.shortcuts.caps_word_auto_off")
+			local AutoOff = require("shortcuts.engine.caps_word_auto_off")
 			local kinds = AutoOff.pointer_kind_rows()
 			helpers.assert_true(#kinds > 0, "the manifest declares pointer kinds")
 			for _, entry in ipairs(kinds) do

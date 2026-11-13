@@ -32,9 +32,9 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 	end)
 
 	it("toggles keep-awake through the shortcut layer's session", function(fresh_actions)
-		local saved = package.loaded["modules.shortcuts.actions.system"]
+		local saved = package.loaded["shortcuts.engine.actions.system"]
 		local toggles = 0
-		package.loaded["modules.shortcuts.actions.system"] = {
+		package.loaded["shortcuts.engine.actions.system"] = {
 			toggle_awake = function() toggles = toggles + 1; return true end,
 		}
 		local ok, err = pcall(function()
@@ -42,7 +42,7 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 			helpers.assert_eq(actions.execute_single("activity_simulation"), true)
 			helpers.assert_eq(toggles, 1, "activity_simulation must toggle the keep-awake session")
 		end)
-		package.loaded["modules.shortcuts.actions.system"] = saved
+		package.loaded["shortcuts.engine.actions.system"] = saved
 		helpers.assert_true(ok, tostring(err))
 	end)
 
@@ -52,13 +52,13 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 		-- fresh_actions() installs the fixture's owners; these replace two of
 		-- them for this case and are put back before the fixture restores its own.
 		local actions = fresh_actions()
-		local saved_bindings = package.loaded["modules.shortcuts.bindings"]
-		local saved_apps = package.loaded["modules.shortcuts.actions.apps"]
+		local saved_bindings = package.loaded["shortcuts.engine.bindings"]
+		local saved_apps = package.loaded["shortcuts.engine.actions.apps"]
 		local opened = {}
-		package.loaded["modules.shortcuts.bindings"] = {
+		package.loaded["shortcuts.engine.bindings"] = {
 			get_chatgpt_url = function() return "https://chat.example.test/" end,
 		}
-		package.loaded["modules.shortcuts.actions.apps"] = {
+		package.loaded["shortcuts.engine.actions.apps"] = {
 			open_chatgpt = function(url, parent)
 				opened[#opened + 1] = { url = url, parent = parent }
 				return true
@@ -72,8 +72,8 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 				{ url = "https://chat.example.test/", parent = "shortcut_bindings" },
 			})
 		end)
-		package.loaded["modules.shortcuts.bindings"] = saved_bindings
-		package.loaded["modules.shortcuts.actions.apps"] = saved_apps
+		package.loaded["shortcuts.engine.bindings"] = saved_bindings
+		package.loaded["shortcuts.engine.actions.apps"] = saved_apps
 		helpers.assert_true(ok, tostring(err))
 	end)
 end)

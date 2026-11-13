@@ -56,10 +56,10 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 		-- runs this catalogue action, which must read the live URL setting.
 		local actions = fresh_actions()
 		local opened = {}
-		package.loaded["modules.shortcuts.bindings"] = {
+		package.loaded["shortcuts.engine.bindings"] = {
 			get_chatgpt_url = function() return "https://chat.example.invalid/" end,
 		}
-		package.loaded["modules.shortcuts.actions.apps"].open_chatgpt = function(url, parent)
+		package.loaded["shortcuts.engine.actions.apps"].open_chatgpt = function(url, parent)
 			opened[#opened + 1] = { url = url, parent = parent }
 			return true
 		end

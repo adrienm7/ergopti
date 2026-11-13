@@ -210,14 +210,14 @@ function M.boot(opts)
 		is_pending = function() return fixture.terminal_pending == true end,
 	}
 	for _, module_name in ipairs({
-		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
+		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
 	end
 	package.loaded["ai.ui.menu"] = { create = function() return {} end }
-	package.loaded["infra.personal_shortcuts"] = { load = noop }
+	package.loaded["shortcuts.engine.personal_shortcuts"] = { load = noop }
 	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
@@ -241,7 +241,7 @@ function M.boot(opts)
 		end,
 		stop = function() return true end,
 	}
-	package.loaded["modules.shortcuts"] = {
+	package.loaded["shortcuts.engine"] = {
 		DEFAULT_STATE = { script_control_shortcuts = clone(state.script_control_shortcuts) },
 		is_paused = function() return false end,
 		set_on_pause_change = noop,

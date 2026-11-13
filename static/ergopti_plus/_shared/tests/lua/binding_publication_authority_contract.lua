@@ -113,8 +113,8 @@ function M.register(helpers, driver)
 		end)
 		for _, domain in ipairs({ "tap", "script" }) do
 			local family = domain
-			local name = family == "tap" and "modules.shortcuts.tap_keys"
-				or driver == "macos" and "keyboard.engine.layers.script_chord_catalogue" or "modules.shortcuts.script_chords"
+			local name = family == "tap" and "shortcuts.engine.tap_keys"
+				or driver == "macos" and "keyboard.engine.layers.script_chord_catalogue" or "shortcuts.engine.script_chords"
 			local target = family == "tap" and "number_row_left" or "script_altgr_enter"
 			local consumer_name = driver == "macos" and "gestures.engine.actions" or "gestures.engine.manager"
 			local function fresh()

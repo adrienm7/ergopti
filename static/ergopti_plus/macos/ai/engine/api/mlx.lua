@@ -600,7 +600,7 @@ end
 --- @return integer|nil epoch Current global pause generation.
 --- @return string|nil reason Read failure detail.
 local function read_script_pause_fence()
-	local script_control = package.loaded["modules.shortcuts.script_control"]
+	local script_control = package.loaded["shortcuts.engine.script_control"]
 	if type(script_control) ~= "table" then return false, nil, nil, nil end
 	if type(script_control.is_paused) ~= "function"
 		or type(script_control.get_pause_epoch) ~= "function" then

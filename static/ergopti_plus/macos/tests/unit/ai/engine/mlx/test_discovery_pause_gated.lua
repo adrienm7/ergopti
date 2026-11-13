@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 helpers.describe("api_mlx_discovery: paused means a non-reentrant refusal", function()
 
 	local function load_gated(paused)
-		package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return paused end }
+		package.loaded["shortcuts.engine.script_control"] = { is_paused = function() return paused end }
 		package.loaded["ai.engine.api.mlx_discovery"] = nil
 		return helpers.load_with_stubs("ai.engine.api.mlx_discovery")
 	end

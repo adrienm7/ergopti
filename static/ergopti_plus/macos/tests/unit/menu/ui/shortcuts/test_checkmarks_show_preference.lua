@@ -22,18 +22,18 @@ local DISABLED_ID = "cmd_star"
 --- @return table rows Menu rows.
 local function build_cmd_rows(bindings, state_shortcuts)
 	return helpers.with_fresh_modules({
-		"ui.menu.menu_shortcuts", "core.timing.engine.deferred_work", "core.fs.engine.dir",
-		"core.ui.engine.dialog_util", "modules.shortcuts", "menu.ui.builder.utils",
-		"menu.engine.manifest_menu", "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots",
+		"shortcuts.ui.menu.shortcuts", "core.timing.engine.deferred_work", "core.fs.engine.dir",
+		"core.ui.engine.dialog_util", "shortcuts.engine", "menu.ui.builder.utils",
+		"menu.engine.manifest_menu", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots",
 		"menu.engine.manifest_reader", "core.i18n.engine.i18n",
 	}, function()
-		local text = package.loaded["modules.shortcuts.actions.text"]
+		local text = package.loaded["shortcuts.engine.actions.text"]
 		text.WRAP_GROUPS = {}
 		text.build_active_wrap_pairs = function() return {} end
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["core.ui.engine.dialog_util"] = {}
-		package.loaded["modules.shortcuts"] = {
+		package.loaded["shortcuts.engine"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
 		package.loaded["core.i18n.engine.i18n"] = {
@@ -49,13 +49,13 @@ local function build_cmd_rows(bindings, state_shortcuts)
 			template_rows = native_renderer.template_rows,
 			build = function(_, _, _, _, _, lists) return lists.keyboard_slots() end,
 		}
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["layouts.ui.menu.keyboard_slots"] = {
 			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.primary_ end,
 		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }
 
-		local item = require("ui.menu.menu_shortcuts").build({
+		local item = require("shortcuts.ui.menu.shortcuts").build({
 			shortcuts = bindings,
 			state = {
 				shortcuts = state_shortcuts,

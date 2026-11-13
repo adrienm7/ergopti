@@ -1336,7 +1336,7 @@ function M.bind_physical_configuration_observer(owner, capacity, receive, on_ref
 	binding.detach = function(exact_owner, exact_token)
 		return M.unbind_physical_configuration_observer(exact_owner, exact_token)
 	end
-	binding.channel = Observation.new(capacity, require("adapters.physical_observation_clock").now,
+	binding.channel = Observation.new(capacity, require("shortcuts.adapters.physical_observation_clock").now,
 		function(record) return receive(record, binding.token) end, function(reason)
 			Logger.callback(LOG, "Physical configuration refusal observer", on_refused, reason)
 		end, binding)
@@ -2280,7 +2280,7 @@ end
 
 --- Engine observations are dormant; actual pause commits remain a separate writer.
 local _physical_lifecycle = require("metrics.engine.capture.physical_lifecycle_observation").new("engine", function()
-	return require("adapters.physical_observation_clock").now()
+	return require("shortcuts.adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
 
 local function physical_lifecycle_snapshot(initial)

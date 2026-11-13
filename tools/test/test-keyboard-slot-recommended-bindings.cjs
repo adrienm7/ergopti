@@ -183,8 +183,8 @@ const input = {
 	slots: (manifest.entries || []).filter((entry) => entry.path_prefix === 'shortcuts.keyboard'),
 	ahk: read('windows/settings/engine/preferences/feature_state.ahk'),
 	lua: {
-		hs: read('macos/modules/shortcuts/keyboard_shortcuts.lua'),
-		linux: read('linux/modules/shortcuts/keyboard_shortcuts.lua')
+		hs: read('macos/shortcuts/engine/keyboard_shortcuts.lua'),
+		linux: read('linux/shortcuts/engine/keyboard_shortcuts.lua')
 	}
 };
 const result = validate(input);

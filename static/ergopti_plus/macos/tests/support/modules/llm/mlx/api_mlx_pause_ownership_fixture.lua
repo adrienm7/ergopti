@@ -22,7 +22,7 @@ local MODULE_NAMES = {
 	"ai.engine.api.mlx_fetch",
 	"ai.engine.api.mlx_inference",
 	"ai.engine.local_servers.warmup_controller",
-	"modules.shortcuts.script_control",
+	"shortcuts.engine.script_control",
 }
 
 --- Captures every module slot replaced by the native ownership harness.
@@ -199,7 +199,7 @@ local function with_real_mlx_stack(fn)
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-	package.loaded["modules.shortcuts.script_control"] = {
+	package.loaded["shortcuts.engine.script_control"] = {
 		is_paused = function() return state.script_paused end,
 		get_pause_epoch = function() return state.pause_epoch end,
 	}

@@ -1,7 +1,7 @@
 {
 	"helper": {
 		"path": "../ci/run-windows-key-combination-cohorts.cjs",
-		"sha256": "3e13e82b3129557edfbe04cc7c7f1a7d51a8bfc5dcc4ccbd736dc15463c8fada"
+		"sha256": "b660751effd5f75309d9d0544e01c33677b8ee6ec5c1e3ebf8ef618cb0f2efbd"
 	},
 	"validator": {
 		"path": "validate-ahk-suite-manifest.cjs",
@@ -9,6 +9,6 @@
 	},
 	"inputs": {
 		"path": "../ci/windows-key-combination-cohort-original-inputs.json",
-		"sha256": "355e56788ba65af8c9870c420f3abf70c78cf79f24195d1b924df949f2725268"
+		"sha256": "e60b86211189cbad6f671fa750950044470f1a3567d68fbb9bb352af2d119cb9"
 	}
 }

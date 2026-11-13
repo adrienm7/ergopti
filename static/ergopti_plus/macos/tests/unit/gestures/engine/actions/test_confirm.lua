@@ -26,7 +26,7 @@ local helpers = require("tests.helpers")
 local CONFIRM_OWNED = {
 	"gestures.engine.action_confirm",
 	"core.ui.engine.dialog_util",
-	"adapters.mouse_control",
+	"shortcuts.adapters.mouse_control",
 	"platform.focus.window_info",
 	"platform.focus.window_manager",
 	"core.i18n.engine.i18n",
@@ -56,7 +56,7 @@ local function with_confirm(body, frame, focus)
 			get = function(key) return key end,
 			format = function(key, value) return key .. ":" .. tostring(value) end,
 		}
-		package.loaded["adapters.mouse_control"] = {
+		package.loaded["shortcuts.adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return frame end,
 		}
 		package.loaded["core.ui.engine.dialog_util"] = {

@@ -17,7 +17,7 @@ local SHORTCUT_OWNERS = {
 	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"platform.input.send_input",
 	"menu.engine.native_presentation",
 	"core.ui.engine.window_titles",
@@ -39,7 +39,7 @@ local function with_real_shortcut_prompt_owned(raw, body)
 	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local saved_i18n = package.loaded["core.i18n.engine.i18n"]
 	local saved_logger = package.loaded["core.logger.engine.logger"]
-	local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
+	local saved_shortcuts = package.loaded["shortcuts.ui.menu.utils"]
 	local ok, err = xpcall(function()
 		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function() return "button.ok", raw end,
@@ -48,13 +48,13 @@ local function with_real_shortcut_prompt_owned(raw, body)
 		local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		body(require("ui.menu.shortcut_utils"), warnings)
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		body(require("shortcuts.ui.menu.utils"), warnings)
 	end, debug.traceback)
 	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
 	package.loaded["core.i18n.engine.i18n"] = saved_i18n
 	package.loaded["core.logger.engine.logger"] = saved_logger
-	package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
+	package.loaded["shortcuts.ui.menu.utils"] = saved_shortcuts
 	if not ok then error(err, 0) end
 end
 
@@ -132,7 +132,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 	helpers.it("HS-033 profile shortcut menu action propagates prompt refusal", function()
 		with_delete_fixture({active_profile = "basic"},
 			function(_, _, _, shortcut_action)
-				package.loaded["ui.menu.shortcut_utils"].prompt_shortcut = function()
+				package.loaded["shortcuts.ui.menu.utils"].prompt_shortcut = function()
 					return false
 				end
 				helpers.assert_eq(shortcut_action(), false)
@@ -148,7 +148,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		local saved_logger = package.loaded["core.logger.engine.logger"]
 		local saved_manifest = package.loaded["menu.engine.manifest_menu"]
 		local saved_llm = package.loaded["ai.engine"]
-		local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
+		local saved_shortcuts = package.loaded["shortcuts.ui.menu.utils"]
 		local saved_panel = package.loaded["ai.ui.menu.panels.trigger_panel"]
 		local prompts = 0
 		local ok, err = xpcall(function()
@@ -165,7 +165,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			package.loaded["ai.engine"] = {
 				DEFAULT_STATE = {llm_debounce = 0.2, llm_min_request_interval = 0.5},
 			}
-			package.loaded["ui.menu.shortcut_utils"] = {
+			package.loaded["shortcuts.ui.menu.utils"] = {
 				prompt_shortcut = function() prompts = prompts + 1 return false end,
 				shortcut_to_label = function() return "None" end,
 			}
@@ -192,7 +192,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["menu.engine.manifest_menu"] = saved_manifest
 		package.loaded["ai.engine"] = saved_llm
-		package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
+		package.loaded["shortcuts.ui.menu.utils"] = saved_shortcuts
 		package.loaded["ai.ui.menu.panels.trigger_panel"] = saved_panel
 		if not ok then error(err, 0) end
 	end)

@@ -240,7 +240,7 @@ end
 --- Tells whether the script is paused.
 --- @return boolean paused
 local function is_paused()
-	local control = package.loaded["modules.shortcuts.script_control"]
+	local control = package.loaded["shortcuts.engine.script_control"]
 	return type(control) == "table" and type(control.is_paused) == "function" and control.is_paused() == true
 end
 
@@ -680,7 +680,7 @@ local function admit()
 	if not engine then return nil end
 	-- The order of the refusals is the shared plan's (request_plan/agent.lua); the
 	-- driver reads each fact only when the steps before it have passed.
-	local facts = { paused = is_paused(), ai_enabled = not require("modules.shortcuts.ai_actions").off(),
+	local facts = { paused = is_paused(), ai_enabled = not require("shortcuts.engine.ai_actions").off(),
 		mode = settings().llm_agent_mode }
 	local decision = AgentPlan.admit(facts)
 	local backend, reason
@@ -825,7 +825,7 @@ end
 function M.run_selection(parent)
 	local backend = admit()
 	if not backend then return false end
-	local Text = dependency("modules.shortcuts.actions.text", "read_copied_selection")
+	local Text = dependency("shortcuts.engine.actions.text", "read_copied_selection")
 	if not Text then return false end
 	local focus = WindowInfo.getFocused()
 	local previous = _generation
@@ -958,7 +958,7 @@ local function auto_blocker()
 	-- AI switched off disarms the automatic mode, as on Linux: no pause, no
 	-- triage, no request in flight survives it.
 	local facts = { mode = s.llm_agent_mode, paused = is_paused(),
-		ai_enabled = not require("modules.shortcuts.ai_actions").off(),
+		ai_enabled = not require("shortcuts.engine.ai_actions").off(),
 		live = false, ai_busy = false, vision = false, hotstring_preview = false, focus_blocked = false }
 	local early = AgentPlan.auto_blocker(facts)
 	if early then return AUTO_BLOCKER_TEXT[early] end
@@ -1050,7 +1050,7 @@ function M.observe_typing(buffer)
 	end
 	-- With the AI off no pause is armed: a keystroke only withdraws what is
 	-- left, and the first keystroke after the switch-on arms it again.
-	if require("modules.shortcuts.ai_actions").off() then
+	if require("shortcuts.engine.ai_actions").off() then
 		M.cancel_typing("AI off")
 		return
 	end
@@ -1096,7 +1096,7 @@ end
 -- Tool discovery precedes the answer surface, so a prediction reset cannot
 -- revoke that pending stage. Retire the original run on the AI off edge;
 -- enabling the gate again authorizes only a newly requested action.
-local AiActions = require("modules.shortcuts.ai_actions")
+local AiActions = require("shortcuts.engine.ai_actions")
 AiActions.subscribe("agent_runner", function()
 	if AiActions.off() then
 		_generation = _generation + 1

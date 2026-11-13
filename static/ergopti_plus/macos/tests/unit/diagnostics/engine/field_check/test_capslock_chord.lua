@@ -93,13 +93,13 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 			execute_single = function() executed = executed + 1; return true end,
 		}
 		package.loaded["core.fs.adapters.storage"] = nil
-		package.loaded["modules.shortcuts.ai_actions"] = nil
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+		package.loaded["shortcuts.engine.ai_actions"] = nil
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
 		package.loaded["keyboard.engine.keys.capslock_chord_evidence"] = nil
 		local Evidence = require("keyboard.engine.keys.capslock_chord_evidence")
 		require("tests.support.keyboard_config_fixture").install(
 			{ secondary_capslock = "script_pause_toggle", primary_a = "script_pause_toggle" })
-		local subject = require("modules.shortcuts.keyboard_shortcuts")
+		local subject = require("shortcuts.engine.keyboard_shortcuts")
 		helpers.assert_eq(subject.start(), true)
 		helpers.assert_true(subject.is_slot_bound("secondary_capslock"), "the assigned Caps Lock slot is bound")
 		local caps, plain = nil, nil
@@ -113,7 +113,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		helpers.assert_eq(Evidence.counts().deliveries, 1)
 		helpers.assert_true(executed >= 1, "the slot's action still runs")
 		subject.stop()
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = nil
 		package.loaded["platform.input.hotkey_registrar"] = nil
 		package.loaded["core.fs.adapters.file_system"] = nil
 		package.loaded["core.fs.engine.paths"] = nil

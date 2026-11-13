@@ -19,7 +19,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 	if platform == "linux" then
 		local epoch,serial,callback,backend,picker,lastjs=0,0,nil,nil,nil,nil
 		package.loaded['gestures.engine.manager']=catalogue
-		package.loaded['ui.action_picker.bridge']={open=function(_,confirm)picker=confirm;return true end}
+		package.loaded['shortcuts.ui.action_picker.bridge']={open=function(_,confirm)picker=confirm;return true end}
 		package.loaded['core.ui.ui.webview_manager']={native_available=function()return true end,current_epoch=function()return epoch>0 and epoch or nil end,page_current=function(_,exact)return epoch>0 and epoch==exact end,show=function()serial=serial+1;epoch=serial;return backend.on_window_acquiring(epoch) end,hide=function(_,exact)if exact~=epoch then return false end;local old=epoch;epoch=0;backend.on_window_closed(old);return true end,eval_js=function(_,js)lastjs=js;return true end}
 		backend=load_host()
 		local s=scope()
@@ -41,8 +41,8 @@ return function(helpers, Json, shared_path, load_host, platform)
 		hs={json=Json,webview={usercontent={new=function()local b={};function b:setCallback(fn)if fn==nil and clear_refuse then error('private refused cleanup')end;if fn==nil and clear_false then return false end;callback=fn;return self end;bridge=b;return b end}}}
 		package.loaded['core.fs.adapters.file_system']={read=function(path)local f=assert(io.open(path));local bytes=f:read('*a');f:close();return bytes end}
 		package.loaded['layouts.ui.menu.keyboard_slots']={build_action_items=function()return{}end}
-		package.loaded['ui.menu.shortcut_utils']={picker_parameter_fields=function()return{}end}
-		package.loaded['ui.action_picker']={open=function(_,confirm)picker=confirm;return true end}
+		package.loaded['shortcuts.ui.menu.utils']={picker_parameter_fields=function()return{}end}
+		package.loaded['shortcuts.ui.action_picker']={open=function(_,confirm)picker=confirm;return true end}
 		package.loaded['core.ui.ui.builder']={get_app_geometry=function()return{width=720,height=580}end,get_centered_frame=function()return{}end,show_webview=function(options)
 		 local v=setmetatable({},{__native_owned=true})
 		 function v:evaluateJavaScript(js)lastjs=js end

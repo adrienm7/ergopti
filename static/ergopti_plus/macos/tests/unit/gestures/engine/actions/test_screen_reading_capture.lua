@@ -23,11 +23,11 @@ local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"platform.system.screen_capture",
 	"core.process.adapters.shell_runner",
-	"modules.shortcuts.actions.screen_capture_flow",
+	"shortcuts.engine.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"modules.shortcuts.actions.screenshot_save",
+	"shortcuts.engine.actions.screenshot_save",
 }
 
 --- Encodes a number as a big-endian 32-bit integer.
@@ -83,7 +83,7 @@ local function with_subject(scenario)
 		copy_image_file_to_clipboard = function() error("a screen reading never touches the clipboard") end,
 		encode_base64 = function(data) return "B64(" .. data .. ")" end,
 	}
-	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
+	package.loaded["shortcuts.engine.actions.screen_capture_flow"] = nil
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
@@ -121,11 +121,11 @@ local function with_subject(scenario)
 			return handle
 		end,
 	}
-	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
+	package.loaded["shortcuts.engine.actions.screenshot_save"] = nil
 	_G.hs = { processInfo = { processID = 7001 }, timer = { absoluteTime = function() return 1 end } }
 
 	local ok, err = xpcall(function()
-		scenario(require("modules.shortcuts.actions.screenshot_save"), fixture)
+		scenario(require("shortcuts.engine.actions.screenshot_save"), fixture)
 	end, debug.traceback)
 	_G.hs = saved_hs
 	for _, name in ipairs(SUBJECT_MODULES) do package.loaded[name] = saved[name] end

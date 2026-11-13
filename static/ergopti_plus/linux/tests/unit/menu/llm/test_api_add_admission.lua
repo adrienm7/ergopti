@@ -196,7 +196,7 @@ helpers.describe("API add exact runtime admission", function()
 		end)
 	end)
 
-	for _, boundary in ipairs({ "menu", "logger", "native", "layouts" }) do
+	for _, boundary in ipairs({ "menu", "logger", "native", "layouts", "shortcuts" }) do
 		helpers.it("(api-add-admission) never posts after a successor at " .. boundary, function()
 			Fixture.run(function(state)
 				local function replace() helpers.assert_true(state.scope()) end

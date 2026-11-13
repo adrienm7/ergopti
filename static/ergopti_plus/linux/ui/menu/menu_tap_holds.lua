@@ -124,7 +124,7 @@ local function _build_tap_holds(ctx)
 		local guard, setter = edit_guard("set_tap")
 		if not guard then changed(false); return false end
 		local key_id = catalog_entry.id
-		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+		local ok_picker, Picker = pcall(require, "shortcuts.ui.action_picker.bridge")
 		if not ok_picker or type(Picker.open) ~= "function" then
 			Logger.error(LOG, "Action picker is unavailable for the tap of '%s'.", key_id)
 			return
@@ -161,7 +161,7 @@ local function _build_tap_holds(ctx)
 	--- @return boolean opened
 	local function pick_hold(catalog_entry, current)
 		local key_id = catalog_entry.id
-		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+		local ok_picker, Picker = pcall(require, "shortcuts.ui.action_picker.bridge")
 		if not ok_picker or type(Picker.open) ~= "function" then
 			Logger.error(LOG, "Action picker is unavailable for the hold of '%s'.", key_id)
 			return false

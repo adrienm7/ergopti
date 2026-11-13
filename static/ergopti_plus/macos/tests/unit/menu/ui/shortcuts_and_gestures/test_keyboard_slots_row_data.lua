@@ -387,7 +387,7 @@ local function parameter_ctx()
 		path = path, state = state, hotfiles = {}, core_modules = core,
 		initial_state = state, initial_preferences = snapshot(), restore_runtime = noop,
 	})
-	local shortcuts = require("modules.shortcuts")
+	local shortcuts = require("shortcuts.engine")
 	local global = assert(require("menu.ui.transactions.global_actions_transaction").create({
 		state = state, capture_preferences = snapshot, sync_runtime = noop, restore_state = noop,
 		settings = { get = function() end, set = noop, get_keys = function() return {} end },
@@ -438,7 +438,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 		local ctx, stored = parameter_ctx()
 		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		helpers.assert_eq(type(dialog), "table",
-			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
+			"the slot menu must reach the shared parameter prompt (shortcuts.ui.menu.utils)")
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function(_title, _prompt, _prior, confirm) return confirm, "(" end
 		local group = physical_groups(shortcuts)[1]
@@ -550,7 +550,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 		local ctx, stored = parameter_ctx()
 		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		helpers.assert_eq(type(dialog), "table",
-			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
+			"the slot menu must reach the shared parameter prompt (shortcuts.ui.menu.utils)")
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function() return "cancel", nil end
 		local group = physical_groups(shortcuts)[1]

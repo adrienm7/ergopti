@@ -80,7 +80,7 @@ local function build_world()
 		package.loaded[name] = nil
 	end
 	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end }
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 	package.loaded["metrics.engine"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
@@ -128,7 +128,7 @@ local function build_world()
 		end,
 	}
 	-- The screenshot boundary: the test completes each capture itself
-	package.loaded["modules.shortcuts.actions.screenshot_save"] = {
+	package.loaded["shortcuts.engine.actions.screenshot_save"] = {
 		capture_image = function(flags, parent, max_edge, on_image)
 			world.captures[#world.captures + 1] = {
 				flags = flags, parent = parent, max_edge = max_edge, on_image = on_image,
@@ -136,7 +136,7 @@ local function build_world()
 			return true
 		end,
 	}
-	package.loaded["adapters.mouse_control"] = {
+	package.loaded["shortcuts.adapters.mouse_control"] = {
 		screen_frame_under_cursor = function() return { x = 1512, y = 0, w = 1920, h = 1080.5 } end,
 	}
 

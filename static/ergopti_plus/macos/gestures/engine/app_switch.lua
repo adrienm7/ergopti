@@ -25,7 +25,7 @@ local M = {}
 
 local Logger        = require("core.logger.engine.logger")
 local WindowManager = require("platform.focus.window_manager")
-local MouseControl  = require("adapters.mouse_control")
+local MouseControl  = require("shortcuts.adapters.mouse_control")
 
 local LOG = "gestures.app_switch"
 

@@ -224,7 +224,7 @@ local h = require("tests.helpers")
 local Fixture = require("tests.support.keystats_provenance_fixture")
 local NAMES = {
 	"diagnostics.adapters.event_provenance", "layouts.adapters.input_source_broker", "platform.input.keyboard_hook",
-	"adapters.physical_observation_clock", "core.process.adapters.lifecycle", "platform.input.synthetic_input",
+	"shortcuts.adapters.physical_observation_clock", "core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"settings.engine.paths", "core.ui.engine.dialog_util", "core.logger.engine.logger", "menu.engine.manifest_reader",
 	"metrics.engine.capture.physical_lifecycle_observation", "metrics.engine.context_tracker", "modules.keystats.init",
 	"metrics.adapters.kc_bridge", "metrics.engine.journal.log_manager", "metrics.engine.system.watchers", "hotstrings.engine.expander",
@@ -374,7 +374,7 @@ local h = require("tests.helpers")
 local Pause = require("tests.support.pause_transaction_fixture")
 h.describe("initial native ledger observations", function()
  h.it("observes initial unpaused pause ledger without committing a resume", function()
-  h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+  h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock"}, function()
    Pause.with_context(nil, function(control, ctx)
     local clocks, records, owner = 0, {}, {}
     hs.timer.absoluteTime = function() clocks = clocks + 1; return clocks * 10 end
@@ -391,7 +391,7 @@ h.describe("initial native ledger observations", function()
   end)
  end)
  h.it("validates native options before the first clock and keeps explicit false legacy", function()
-  h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+  h.with_stub_scope({"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock"}, function()
    Pause.with_context(nil, function(control)
     local clocks, records, owner = 0, {}, {}
     hs.timer.absoluteTime = function() clocks = clocks + 1; return clocks * 10 end
@@ -405,7 +405,7 @@ h.describe("initial native ledger observations", function()
   end)
  end)
  h.it("reads actual initialized system scalars without acquiring a hardware watcher", function()
-  h.with_stub_scope({"metrics.engine.system.watchers", "metrics.engine.journal.log_manager", "core.logger.engine.logger", "metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock"}, function()
+  h.with_stub_scope({"metrics.engine.system.watchers", "metrics.engine.journal.log_manager", "core.logger.engine.logger", "metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock"}, function()
    package.loaded["core.logger.engine.logger"] = h.make_logger_stub()
    package.loaded["metrics.engine.journal.log_manager"] = {}
    local clocks, queries, records = 0, 0, {}
@@ -436,7 +436,7 @@ local h = require("tests.helpers")
 h.describe("initial system actual hardware retirement debt", function()
 	h.it("cannot qualify refused retained hardware cleanup as locally settled", function()
 		h.with_stub_scope({ "metrics.engine.system.watchers", "metrics.engine.journal.log_manager", "core.logger.engine.logger",
-			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
+			"metrics.engine.capture.physical_lifecycle_observation", "shortcuts.adapters.physical_observation_clock" }, function()
 			package.loaded["core.logger.engine.logger"] = h.make_logger_stub()
 			package.loaded["metrics.engine.journal.log_manager"] = {}
 			local clock, stops, permit, running = 0, 0, false, false

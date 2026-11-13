@@ -368,7 +368,7 @@ if TAP_WRAP ~= "none" or TAP_COLLISION then
 			end,
 		})
 	end
-	local TapKeys = require("modules.shortcuts.tap_keys")
+	local TapKeys = require("shortcuts.engine.tap_keys")
 	local initialize = TapKeys.init
 	TapKeys.init = function(options)
 		local defer = options.defer
@@ -397,7 +397,7 @@ end
 -- vary only desktop boundaries while the native reader delivers a held press.
 local repeat_controller, repeat_gate
 if MAGIC_REPEAT ~= "none" then
-	local Actions = require("modules.shortcuts.script_actions")
+	local Actions = require("shortcuts.engine.script_actions")
 	local make_actions = Actions.new
 	Actions.new = function(options)
 		repeat_controller = make_actions(options)
@@ -484,8 +484,8 @@ package.preload["core.events.loop"] = function()
 			assert(Source.set("KeyJ"), "the real source owner must acknowledge the key")
 			local choice_ok, choice_reason, before_bytes, native = nil, nil, nil, 36
 			if TAP_COLLISION then
-				local Keys = require("modules.shortcuts.tap_keys")
-				local Master = require("modules.shortcuts.manager")
+				local Keys = require("shortcuts.engine.tap_keys")
+				local Master = require("shortcuts.engine.manager")
 				assert(Master.set_enabled(MAGIC_REPEAT ~= "tap-off"))
 				assert(Keys.set_action("number_row_left", MAGIC_REPEAT == "tap-none" and "none" or "send_text"))
 				for _, key in ipairs(Keys.keys()) do if key.id == "number_row_left" then native = key.linux end end
@@ -572,7 +572,7 @@ package.preload["core.events.loop"] = function()
 				repeat_state.origins, repeat_state.raw, chosen))
 			if TAP_COLLISION then
 				local file = assert(io.open(selection_config, "rb")); local after_bytes = file:read("*a"); file:close()
-				local Keys = require("modules.shortcuts.tap_keys")
+				local Keys = require("shortcuts.engine.tap_keys")
 				print(string.format("TAP_COLLISION choice=%s reason=%s source=%s tap=%s queued=%d executed=%d bytes=%s captured=%s",
 					tostring(choice_ok), tostring(choice_reason), Source.get(), Keys.get_action("number_row_left"),
 					selection.queued, selection.executed, tostring(before_bytes == after_bytes), tostring(refused[1])))
@@ -583,11 +583,11 @@ package.preload["core.events.loop"] = function()
 			return
 		end
 		if TAP_WRAP ~= "none" then
-			local Shortcuts = require("modules.shortcuts.manager")
+			local Shortcuts = require("shortcuts.engine.manager")
 			assert(Shortcuts.set_enabled(true), "the real shortcut owner must acknowledge activation")
 			assert(Shortcuts.set_wrap_on_type_enabled(true), "the real wrap owner must acknowledge activation")
 			if TAP_WRAP ~= "unassigned" then
-				assert(require("modules.shortcuts.tap_keys").set_action("number_row_left", "send_text"),
+				assert(require("shortcuts.engine.tap_keys").set_action("number_row_left", "send_text"),
 					"the real tap-key owner must acknowledge the assignment")
 			end
 		end

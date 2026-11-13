@@ -408,7 +408,7 @@ _PathsEdWeb_Save(ConfigDir, LogsDir := 0) {
 ; Persist ``N`` as the configured directory in paths.toml. THE single writer.
 ;
 ; There used to be two copies of this block — this one, hardened, and a verbatim
-; unhardened twin in ui/action_picker/init.ahk's ConfirmPath, which still had the
+; unhardened twin in shortcuts/ui/action_picker/init.ahk's ConfirmPath, which still had the
 ; original unprotected FileOpen and an `if f` with no else. The drift was the
 ; real defect: hardening one copy left the other silently discarding the user's
 ; chosen directory on a read-only or locked target, then Reload()ing them back

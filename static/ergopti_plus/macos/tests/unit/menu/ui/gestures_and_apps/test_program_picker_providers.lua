@@ -88,31 +88,31 @@ local function with_provider(kind, options, body)
 		end
 		package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
 		package.loaded["keyboard.adapters.karabiner.lease_helper"] = { resolve = function() return nil end }
-		package.loaded["adapters.apple_shortcuts_native"] = nil
+		package.loaded["shortcuts.adapters.apple_shortcuts_native"] = nil
 		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			if options.reject_schedule then return false end
 			callback(); return true
 		end }
-		package.loaded["ui.action_picker"] = { open = function(settings, callback)
+		package.loaded["shortcuts.ui.action_picker"] = { open = function(settings, callback)
 			helpers.assert_eq(settings.items[1].id, selected)
 			helpers.assert_eq(settings.items[1].disabled, options.unavailable and true or nil, "program selection must follow registration readiness")
 			if options.unavailable then helpers.assert_eq(settings.items[1].hint, "platform_reason.program_runner_unavailable") end
 			picker_callback = callback
 		end }
 		package.loaded["gestures.engine.actions_aux_owner"] = { program_available = function() return true end }
-		package.loaded["modules.shortcuts.input_source_conflict"] = { check = function(_, _, callback) callback({}); return true end }
+		package.loaded["shortcuts.engine.input_source_conflict"] = { check = function(_, _, callback) callback({}); return true end }
 		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["layouts.adapters.input_source_broker"] = { subscribe = function() return true end }
-		package.loaded["modules.shortcuts.bindings"] = { reconcile_tap_keys = function()
+		package.loaded["shortcuts.engine.bindings"] = { reconcile_tap_keys = function()
 			if fixture.action == selected then return receipt(options.reconcile) end
 			return true
 		end }
-		package.loaded["modules.shortcuts.tap_keys"] = {
+		package.loaded["shortcuts.engine.tap_keys"] = {
 			ensure_loaded = function() end, keys = function() return { { id = "number_row_left" } } end,
 			get_action = function() return fixture.action end, set_action = set_action,
 			binding_id = function(id) return "tap_key__" .. id end, display_name = function() return "1" end,
 		}
-		package.loaded["modules.shortcuts"] = {
+		package.loaded["shortcuts.engine"] = {
 			DEFAULT_STATE = { shortcuts = true },
 			get_keyboard_slot_groups = function() return { { prefix = "primary_", fixed = true } } end,
 			get_keyboard_group_label = function() return "primary_" end,
@@ -122,7 +122,7 @@ local function with_provider(kind, options, body)
 			get_keyboard_slot_label = function(id) return id end,
 			get_keyboard_slot_chord = function() return { "cmd" }, "1" end,
 		}
-		for _, name in ipairs({ "ui.menu.shortcut_utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts" }) do package.loaded[name] = nil end
+		for _, name in ipairs({ "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "shortcuts.ui.menu.shortcuts" }) do package.loaded[name] = nil end
 		state = { shortcuts = true, script_control_shortcuts = { script_altgr_enter = "none" } }
 		local ctx = { gestures = gestures, state = state, shortcuts = {},
 			save_prefs = function()
@@ -147,7 +147,7 @@ local function with_provider(kind, options, body)
 			rows = require("ui.menu.menu_tap_keys").provide_rows(ctx)
 			rows[1].action()
 		else
-			package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {} }
+			package.loaded["shortcuts.engine.actions.text"] = { WRAP_GROUPS = {} }
 			package.loaded["menu.ui.builder.utils"] = {}
 			package.loaded["menu.engine.manifest_reader"] = {}
 			package.loaded["menu.engine.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(id, _, _, groups, _, providers)
@@ -172,7 +172,7 @@ local function with_provider(kind, options, body)
 					return result
 				end,
 			}).assign
-			require("ui.menu.menu_shortcuts").build(ctx)
+			require("shortcuts.ui.menu.shortcuts").build(ctx)
 			-- The slot row opens the shared picker, as on Windows; the pick runs
 			-- the same transaction the inline row ran (menu-script-slots-picker).
 			helpers.assert_nil(rows[1].items, "a script slot row must not inline the action catalogue")

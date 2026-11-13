@@ -26,7 +26,7 @@ local function choose(parameter, clicked, refusal, picked)
 	end
 	local names = {
 		"gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util",
-		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
+		"core.i18n.engine.i18n", "menu.engine.manifest_menu", "shortcuts.ui.action_picker", "shortcuts.ui.menu.utils",
 		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.adapters.storage", "gestures.ui.conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
 	}
@@ -99,7 +99,7 @@ local function choose(parameter, clicked, refusal, picked)
 			return providers.gesture_slots_2()
 		end,
 	}
-	package.loaded["ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
+	package.loaded["shortcuts.ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.adapters.storage"] = { get = function() return false end }
 	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
@@ -107,8 +107,8 @@ local function choose(parameter, clicked, refusal, picked)
 	local ok, err = xpcall(function()
 		-- Keep the prompt and retained writer owner genuine; dialog/native ports
 		-- remain controlled by this UI-boundary fixture.
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		require("ui.menu.shortcut_utils")
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		require("shortcuts.ui.menu.utils")
 		local state = { gestures = true }
 		local transaction = require("tests.support.program_parameter_fixture")(gestures, state, "dialog",
 			function() return assigned end, function() return true end)
@@ -175,8 +175,8 @@ end)
 -- ports remain controlled so menu construction cannot hide native work.
 local refresh_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
-	"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "gestures.ui.menu.gestures",
+	"gestures.engine", "menu.ui.builder.utils", "core.ui.engine.dialog_util", "shortcuts.ui.action_picker",
+	"shortcuts.ui.menu.utils", "core.timing.engine.deferred_work", "gestures.ui.menu.gestures",
 }
 local function refresh_json(path)
 	local file = assert(io.open(path, "rb"))
@@ -216,8 +216,8 @@ local function with_status_refresh(options, callback)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["menu.ui.builder.utils"] = { section = function(title) return { title = title } end }
 		package.loaded["core.ui.engine.dialog_util"] = {}
-		package.loaded["ui.action_picker"] = {}
-		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["shortcuts.ui.action_picker"] = {}
+		package.loaded["shortcuts.ui.menu.utils"] = {}
 		package.loaded["core.timing.engine.deferred_work"] = {}
 		package.loaded["menu.engine.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,

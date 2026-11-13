@@ -121,7 +121,7 @@ local function run_case(family, change, route)
 							replacement = replacement, group = "owned-static" }
 					end
 					engine:load_mappings(mappings)
-					local scripts = require("modules.shortcuts.script_actions").new({ reset = function() engine:reset() end,
+					local scripts = require("shortcuts.engine.script_actions").new({ reset = function() engine:reset() end,
 						reload = function() error("unexpected reload") end, quit = function() error("unexpected quit") end })
 					local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 					logger.set_sink(function() end)

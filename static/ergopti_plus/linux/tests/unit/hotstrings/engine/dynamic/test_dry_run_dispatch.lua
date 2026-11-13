@@ -131,7 +131,7 @@ local function exercise(kind, dry_run, options)
 				local engine_mod = require("hotstrings.engine.engine")
 				local engine = engine_mod.new()
 				engine:load_mappings(dynamic.prefix_mappings())
-				local scripts = require("modules.shortcuts.script_actions").new({ reset = function() engine:reset() end,
+				local scripts = require("shortcuts.engine.script_actions").new({ reset = function() engine:reset() end,
 					reload = function() error("unexpected reload") end, quit = function() error("unexpected quit") end })
 				local gate = require("platform.input.capture_gate").new()
 				local native = require("hotstrings.engine.user_hotstring_runtime").new({ engine = engine, injector = injector,

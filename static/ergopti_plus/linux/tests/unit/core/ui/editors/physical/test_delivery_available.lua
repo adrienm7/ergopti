@@ -17,16 +17,16 @@ local helpers = require("tests.helpers")
 --- @param fn function Receives (keyboard, bridge).
 local function with_bridge(gui_ready, fn)
 	local saved_manager = package.loaded["core.ui.ui.webview_manager"]
-	local saved_bridge = package.loaded["ui.physical_shortcuts.bridge"]
+	local saved_bridge = package.loaded["shortcuts.ui.physical_shortcuts.bridge"]
 	package.loaded["core.ui.ui.webview_manager"] = { native_available = function() return gui_ready end }
-	package.loaded["ui.physical_shortcuts.bridge"] = nil
+	package.loaded["shortcuts.ui.physical_shortcuts.bridge"] = nil
 	local ok, err = pcall(function()
-		local keyboard = helpers.load_module("modules.shortcuts.keyboard_shortcuts")
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = keyboard
-		fn(keyboard, require("ui.physical_shortcuts.bridge"))
+		local keyboard = helpers.load_module("shortcuts.engine.keyboard_shortcuts")
+		package.loaded["shortcuts.engine.keyboard_shortcuts"] = keyboard
+		fn(keyboard, require("shortcuts.ui.physical_shortcuts.bridge"))
 	end)
 	package.loaded["core.ui.ui.webview_manager"] = saved_manager
-	package.loaded["ui.physical_shortcuts.bridge"] = saved_bridge
+	package.loaded["shortcuts.ui.physical_shortcuts.bridge"] = saved_bridge
 	if not ok then error(err, 0) end
 end
 

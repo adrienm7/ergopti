@@ -128,7 +128,7 @@ assert.deepStrictEqual(
 // ====================================
 // ====================================
 
-const bindings = read(DRIVERS, 'macos', 'modules', 'shortcuts', 'bindings.lua');
+const bindings = read(DRIVERS, 'macos', 'shortcuts', 'engine', 'bindings.lua');
 
 /** The chord a macOS boolean binds, from its hotkey_defs factory. */
 function macosChord(id) {

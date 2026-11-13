@@ -13,7 +13,7 @@ local NativeFixture = require("tests.support.ui.usercontent_reference_fixture")
 
 local OWNED_MODULES = {
 	"gestures.ui.menu.gestures", "gestures.engine", "menu.ui.builder.utils",
-	"core.ui.engine.dialog_util", "menu.engine.manifest_menu", "ui.menu.shortcut_utils",
+	"core.ui.engine.dialog_util", "menu.engine.manifest_menu", "shortcuts.ui.menu.utils",
 	"core.timing.engine.deferred_work", "shortcuts.engine.action_parameter_label", "gestures.ui.conflict_notice",
 	"settings.ui.menu.preferences_transaction", "diagnostics.engine.operation_reporter",
 	"menu.engine.renderer", "core.logger.engine.shim", "core.lifecycle.engine.compat.utf8", "core.text.engine.number_policy", "core.text.engine.toml_codec.leaf_rows",
@@ -34,7 +34,7 @@ local function with_gesture(mode, conflict, scenario)
 				package.loaded["core.logger.engine.shim"] = logger
 				package.loaded["core.ui.engine.dialog_util"] = {}
 				package.loaded["menu.ui.builder.utils"] = {}
-				package.loaded["ui.menu.shortcut_utils"] = {
+				package.loaded["shortcuts.ui.menu.utils"] = {
 					picker_parameter_fields = function() return {} end,
 				}
 				package.loaded["core.timing.engine.deferred_work"] = { after = function(_, work)

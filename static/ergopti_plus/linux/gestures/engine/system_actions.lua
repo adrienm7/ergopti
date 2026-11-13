@@ -345,10 +345,10 @@ end
 --- sleep_ms = fn } from the executor.
 M.HANDLERS = {
 	activity_simulation = function()
-		return require("modules.keep_awake").toggle()
+		return require("shortcuts.engine.keep_awake").toggle()
 	end,
 	take_note = function(deps)
-		return require("modules.take_note").open(deps.run_background)
+		return require("shortcuts.engine.take_note").open(deps.run_background)
 	end,
 	-- X11 pointer moves (gestures/adapters/pointer_warp.lua); Wayland refuses.
 	center_mouse = function(deps) require("gestures.adapters.pointer_warp").center_mouse(deps) end,
@@ -400,7 +400,7 @@ M.HANDLERS = {
 		end
 	end,
 	make_executable_selection = function(deps)
-		local admitted = require("modules.shortcuts.open_selection").capture_file_manager()
+		local admitted = require("shortcuts.engine.open_selection").capture_file_manager()
 		if not admitted then
 			Logger.warn(LOG, "make_executable_selection: no focused file manager; copy refused.")
 			return

@@ -53,7 +53,7 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"gestures.engine.user_actions", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner",
-	"platform.focus.application_notifier", "clipboard.adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
+	"platform.focus.application_notifier", "clipboard.adapters.clipboard", "core.fs.adapters.file_system", "shortcuts.engine.manager",
 }
 
 --- Runs body with every owner of the user actions recorded.
@@ -75,7 +75,7 @@ local function with_world(body)
 			return true
 		end }
 		package.loaded["clipboard.adapters.clipboard"] = { write = function(text) world.clipboard[#world.clipboard + 1] = text; return true end }
-		package.loaded["modules.shortcuts.manager"] = {
+		package.loaded["shortcuts.engine.manager"] = {
 			capture_text_destination = function() return { current = function() return true end, cached = function() return true end } end,
 			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,
 		}
@@ -153,7 +153,7 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 	helpers.it("does not type asynchronous output into a later focused application", function()
 		with_world(function(User, world)
 			local focused = "original"
-			local manager = package.loaded["modules.shortcuts.manager"]
+			local manager = package.loaded["shortcuts.engine.manager"]
 			manager.capture_text_destination = function()
 				local captured = focused
 				return { current = function() return focused == captured end, cached = function() return focused == captured end }
@@ -171,7 +171,7 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 
 	helpers.it("does not start a typed-output command without an admitted destination", function()
 		with_world(function(User, world)
-			package.loaded["modules.shortcuts.manager"].capture_text_destination = function() return nil end
+			package.loaded["shortcuts.engine.manager"].capture_text_destination = function() return nil end
 			helpers.assert_eq(User.run_command({ command = "echo test", mode = "hidden", output = "type" }, 500), false)
 			helpers.assert_eq(#world.async, 0)
 		end)
@@ -294,7 +294,7 @@ helpers.describe("open_path opens an existing file or folder (Linux)", function(
 end)
 
 helpers.describe("the user action editors store one canonical value (Linux)", function()
-	local Editor = helpers.load_module("ui.user_action_editor")
+	local Editor = helpers.load_module("shortcuts.ui.user_action_editor")
 
 	helpers.it("a command is typed, then its mode and output are picked (user-actions)", function()
 		local picks = { "hidden", "type" }

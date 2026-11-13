@@ -64,7 +64,7 @@ local function load_api()
 	package.loaded["ai.engine.api.remote"] = nil
 	package.loaded["ai.engine.policy.remote_response_classifier"] = nil
 	package.loaded["ai.engine.api.provider_uses"] = nil
-	package.loaded["modules.shortcuts.script_control"] = nil
+	package.loaded["shortcuts.engine.script_control"] = nil
 	local api = helpers.load_with_stubs("ai.engine.api.remote", {})
 	local posts = {}
 	for _, name in ipairs({ "_infer_client", "_vision_client", "_probe_client", "_check_client", "_warmup_client" }) do

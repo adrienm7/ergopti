@@ -338,8 +338,8 @@ end
 ---
 local BRIDGE_MODULES = {
 	config_cleanup        = "settings.ui.cleanup",
-	action_picker         = "ui.action_picker.bridge",
-	physical_shortcuts     = "ui.physical_shortcuts.bridge",
+	action_picker         = "shortcuts.ui.action_picker.bridge",
+	physical_shortcuts     = "shortcuts.ui.physical_shortcuts.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
 	error_dialog          = "diagnostics.ui.error_dialog",

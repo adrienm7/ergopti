@@ -518,7 +518,7 @@ const RULES = [
 				'static/ergopti_plus/linux/platform/input/keyboard_hook.lua',
 				'static/ergopti_plus/linux/hotstrings/engine/device_finder.lua',
 				'static/ergopti_plus/linux/hotstrings/engine/magic_key_source.lua',
-				'static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua',
+				'static/ergopti_plus/linux/shortcuts/engine/keyboard_shortcuts.lua',
 				'static/ergopti_plus/linux/ergopti_hotstrings.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
 				'static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua',
@@ -531,8 +531,8 @@ const RULES = [
 		why: 'scoped window switching requires actual owned X11/RandR, input-focus, source-fence and cleanup receipts through the real dispatcher',
 		match: (f) =>
 			[
-				'static/ergopti_plus/linux/adapters/window_switch.lua',
-				'static/ergopti_plus/linux/platform/window_switch_worker.lua',
+				'static/ergopti_plus/linux/shortcuts/adapters/window_switch.lua',
+				'static/ergopti_plus/linux/shortcuts/adapters/window_switch_worker.lua',
 				'static/ergopti_plus/linux/core/process/adapters/program_runner.lua',
 				'static/ergopti_plus/linux/core/lifecycle/engine/libuv_process_group.lua',
 				'static/ergopti_plus/linux/core/lifecycle/engine/shutdown/libuv_exit.lua',
@@ -629,7 +629,7 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/archive_output.lua',
 				'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 				'static/ergopti_plus/linux/core/network/engine/fd_sha256.lua',
-				'static/ergopti_plus/linux/modules/shortcuts/script_actions.lua',
+				'static/ergopti_plus/linux/shortcuts/engine/script_actions.lua',
 				'static/ergopti_plus/linux/core/network/engine/http_output_target.lua',
 				'static/ergopti_plus/linux/core/network/adapters/curl_http_client.lua',
 				'static/ergopti_plus/linux/core/network/adapters/http_client.lua',

@@ -143,13 +143,13 @@ local function scenario(options, body)
 		if options.shortcut_resets_word ~= nil then settings.shortcut_resets_word = options.shortcut_resets_word end
 		assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
 		local gate = require("platform.input.capture_gate").new()
-		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
+		local keyboard_identity = require("shortcuts.engine.keyboard_shortcuts").collision_identity
 		local environment = setmetatable({ engine = matcher, engine_mod = require("hotstrings.engine.engine"),
 			TapHold = { observe_copy_activity = function() end },
 			prediction_engine = prediction, injector = injector, secure_focus_guard = guard,
 			shortcuts = options.restart_prediction and { is_enabled = function() return true end,
 				is_caps_word_active = function() return false end } or nil,
-			script_actions = require("modules.shortcuts.script_actions").new({ reset = function() end,
+			script_actions = require("shortcuts.engine.script_actions").new({ reset = function() end,
 				reload = function() end, quit = function() end }),
 			keystats = policy, WordReset = WordReset, InputEvent = require("platform.input.event"),
 			Monotonic = { now_ms = function() return 1000 + scheduler.now * 1000 end }, _cached_app_id = "owned-editor",
@@ -705,7 +705,7 @@ do
 			-- Gesture/action sources have no configured bindings in this scope.
 			put("hotstrings.engine.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
 			put("hotstrings.engine.repeat_key", { is_enabled = no })
-			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
+			put("shortcuts.engine.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
 			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
 			put("clipboard.adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
 			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
@@ -785,7 +785,7 @@ do
 			  call = function(_, callback) return true, callback() end })
 			put("core.events.loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
 			-- Selected keyboard bindings are absent; the classifier itself is the production module.
-			local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local keyboard_shortcuts = require("shortcuts.engine.keyboard_shortcuts")
 			local function start_successor(port)
 			  state.action_entry = { port = port, old_offer = prediction.has_suggestions(), cancellations = state.cancellations,
 			    predecessor_retired = phase == "visible" and not prediction.has_suggestions() or phase == "late" and state.cancellations > 0 }

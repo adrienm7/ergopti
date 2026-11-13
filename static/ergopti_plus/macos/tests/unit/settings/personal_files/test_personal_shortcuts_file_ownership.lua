@@ -46,8 +46,8 @@ local function load_module(file_system, observations)
 	package.loaded["core.text.engine.utils"] = {
 		shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 	}
-	package.loaded["infra.personal_shortcuts"] = nil
-	return require("infra.personal_shortcuts")
+	package.loaded["shortcuts.engine.personal_shortcuts"] = nil
+	return require("shortcuts.engine.personal_shortcuts")
 end
 
 local function with_runtime(file_system, body)
@@ -59,7 +59,7 @@ local function with_runtime(file_system, body)
 	local original_deferred_work = package.loaded["core.timing.engine.deferred_work"]
 	local original_logger = package.loaded["core.logger.engine.logger"]
 	local original_text_utils = package.loaded["core.text.engine.utils"]
-	local original_subject = package.loaded["infra.personal_shortcuts"]
+	local original_subject = package.loaded["shortcuts.engine.personal_shortcuts"]
 	local observations = {
 		raw_opens = 0,
 		dofiles = 0,
@@ -87,7 +87,7 @@ local function with_runtime(file_system, body)
 	package.loaded["core.timing.engine.deferred_work"] = original_deferred_work
 	package.loaded["core.logger.engine.logger"] = original_logger
 	package.loaded["core.text.engine.utils"] = original_text_utils
-	package.loaded["infra.personal_shortcuts"] = original_subject
+	package.loaded["shortcuts.engine.personal_shortcuts"] = original_subject
 	if not ok then error(err, 0) end
 end
 

@@ -12,9 +12,9 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "settings.engine.paths",
 	"settings.engine.preferences.preferences", "core.timing.engine.deferred_work", "core.ui.engine.dialog_util", "core.logger.engine.logger",
-	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
-	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "gestures.engine.actions",
-	"ui.action_picker", "layouts.ui.menu.keyboard_slots", "ui.menu.shortcut_utils",
+	"shortcuts.engine", "shortcuts.engine.bindings", "shortcuts.engine.keyboard_shortcuts",
+	"shortcuts.engine.tap_keys", "shortcuts.engine.script_control", "gestures.engine.actions",
+	"shortcuts.ui.action_picker", "layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils",
 	"tests.support.keyboard_config_fixture", "menu.engine.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
 	"settings.ui.menu.preferences_transaction", "menu.ui.transactions.program_parameter_transaction", "menu.ui.transactions.global_actions_transaction",
 }
@@ -98,8 +98,8 @@ local function fresh()
 		end,
 	}
 	local ui = require("layouts.ui.menu.keyboard_slots")
-	local shortcuts = require("modules.shortcuts")
-	local picker = require("ui.action_picker")
+	local shortcuts = require("shortcuts.engine")
+	local picker = require("shortcuts.ui.action_picker")
 
 	picker.opened = {}
 	picker.open = function(opts, on_confirm)

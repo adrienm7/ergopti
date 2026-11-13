@@ -11,7 +11,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../../ui/action_picker/init.ahk
+#Include ../../../../../shortcuts/ui/action_picker/init.ahk
 
 _NPR_Picked(State, Id) {
 	State.Picks.Push(Id)

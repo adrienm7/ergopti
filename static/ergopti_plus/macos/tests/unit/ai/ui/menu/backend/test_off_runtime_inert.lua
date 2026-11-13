@@ -283,7 +283,7 @@ local ORCHESTRATOR_MODULES = {
 	"ai.engine",
 	"keyboard.engine.chord",
 	"platform.input.hotkey_registrar",
-	"ui.menu.shortcut_utils",
+	"shortcuts.ui.menu.utils",
 	"ai.ui.menu.trigger_orchestrator",
 }
 
@@ -297,7 +297,7 @@ local function with_orchestrator(body)
 		package.loaded["keyboard.engine.chord"] = {
 			format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
 		}
-		package.loaded["ui.menu.shortcut_utils"] = {
+		package.loaded["shortcuts.ui.menu.utils"] = {
 			normalize_shortcut = function(mods, key)
 				if type(mods) ~= "table" or type(key) ~= "string" then return nil end
 				return { mods = mods, key = key }

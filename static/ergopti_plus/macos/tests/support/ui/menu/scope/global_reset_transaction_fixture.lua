@@ -42,7 +42,7 @@ local MODULE_KEYS = {
 	"menu.ui.transactions.recoverable_file_moves",
 	"menu.ui.transactions.global_actions_transaction",
 	"gestures.ui.menu.gestures",
-	"ui.menu.menu_shortcuts",
+	"shortcuts.ui.menu.shortcuts",
 	"layouts.ui.menu.keyboard_layout",
 	"hotstrings.ui.menu.hotstrings",
 	"metrics.ui.menu.metrics",
@@ -52,10 +52,10 @@ local MODULE_KEYS = {
 	"ai.ui.menu",
 	"ai.engine",
 	"metrics.engine",
-	"modules.shortcuts",
+	"shortcuts.engine",
 	"hotstrings.engine.dynamic",
 	"gestures.engine",
-	"infra.personal_shortcuts",
+	"shortcuts.engine.personal_shortcuts",
 	"settings.ui.menu.preferences_transaction",
 	"menu.ui.transactions.program_parameter_transaction",
 	"ui.menu.init",
@@ -524,7 +524,7 @@ local function with_menu_fixture(options, callback)
 	}
 
 	for _, module_name in ipairs({
-		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "layouts.ui.menu.keyboard_layout",
+		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
 		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
@@ -534,7 +534,7 @@ local function with_menu_fixture(options, callback)
 	package.loaded["ai.engine"] = { set_backend = noop }
 	package.loaded["metrics.engine"] = {}
 	package.loaded["hotstrings.engine.dynamic"] = {}
-	package.loaded["infra.personal_shortcuts"] = { load = noop }
+	package.loaded["shortcuts.engine.personal_shortcuts"] = { load = noop }
 	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left", "swipe_right" },
 		DEFAULT_GESTURES = { swipe_left = "desktop_left", swipe_right = "desktop_right" },
@@ -593,7 +593,7 @@ local function with_menu_fixture(options, callback)
 			end)
 		end,
 	}
-	package.loaded["modules.shortcuts"] = shortcuts
+	package.loaded["shortcuts.engine"] = shortcuts
 
 	local gestures = {
 		configure_program_admission = function(callback)

@@ -90,9 +90,9 @@ check(
 const modulesWithStop = [
 	'static/ergopti_plus/macos/gestures/engine/init.lua',
 	'static/ergopti_plus/macos/hotstrings/engine/expander/init.lua',
-	'static/ergopti_plus/macos/modules/shortcuts/init.lua',
-	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua',
-	'static/ergopti_plus/macos/modules/shortcuts/script_control.lua',
+	'static/ergopti_plus/macos/shortcuts/engine/init.lua',
+	'static/ergopti_plus/macos/shortcuts/engine/keyboard_shortcuts.lua',
+	'static/ergopti_plus/macos/shortcuts/engine/script_control.lua',
 	'static/ergopti_plus/macos/hotstrings/engine/dynamic/init.lua'
 ];
 

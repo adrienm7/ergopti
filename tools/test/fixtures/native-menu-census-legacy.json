@@ -29,8 +29,8 @@
 				"windows/ai/ui/menu/models/models.ahk:289 append",
 				"windows/ai/ui/menu/models/models.ahk:295 append",
 				"windows/ai/ui/menu/models/models.ahk:336 append",
-				"windows/ui/menu/menu_shortcuts.ahk:195 append",
-				"windows/ui/menu/menu_shortcuts.ahk:200 append",
+				"windows/shortcuts/ui/menu/shortcuts.ahk:195 append",
+				"windows/shortcuts/ui/menu/shortcuts.ahk:200 append",
 				"windows/menu/ui/builder/submenus.ahk:62 separator",
 				"windows/menu/ui/builder/submenus.ahk:170 separator",
 				"windows/menu/ui/builder/submenus.ahk:209 separator"
@@ -57,8 +57,8 @@
 				"macos/ai/ui/menu/profiles_manager.lua:1068 static",
 				"macos/settings/ui/menu/paths.lua:537 static",
 				"macos/settings/ui/menu/paths.lua:610 static",
-				"macos/ui/menu/menu_shortcuts.lua:541 static",
-				"macos/ui/menu/menu_shortcuts.lua:644 separator",
+				"macos/shortcuts/ui/menu/shortcuts.lua:541 static",
+				"macos/shortcuts/ui/menu/shortcuts.lua:644 separator",
 				"macos/ui/menu/menu_tap_holds.lua:1155 static",
 				"macos/ui/menu/menu_tap_keys.lua:59 static"
 			]
@@ -117,7 +117,7 @@
 				"windows/platform/input/key_state.ahk",
 				"windows/platform/input/keyboard_hook.ahk",
 				"windows/ai/adapters/nav_event_owner.ahk",
-				"windows/adapters/mouse_control.ahk",
+				"windows/shortcuts/adapters/mouse_control.ahk",
 				"windows/core/ui/adapters/native_folder_picker.ahk",
 				"windows/core/ui/adapters/native_number.ahk",
 				"windows/core/network/adapters/failure_host.ahk",
@@ -125,7 +125,7 @@
 				"windows/platform/system/notifier.ahk",
 				"windows/core/process/adapters/lifecycle.ahk",
 				"windows/core/process/adapters/program_providers.ahk",
-				"windows/adapters/screen_brightness.ahk",
+				"windows/shortcuts/adapters/screen_brightness.ahk",
 				"windows/platform/focus/secure_field_detector.ahk",
 				"windows/core/process/adapters/shell_runner.ahk",
 				"windows/core/fs/adapters/storage.ahk",
@@ -218,7 +218,7 @@
 				"windows/settings/engine/preferences/personal_features.ahk",
 				"windows/hotstrings/engine/catalogue/personal_info_mask.ahk",
 				"windows/hotstrings/engine/catalogue/personal_info_preview.ahk",
-				"windows/infra/program_actions.ahk",
+				"windows/shortcuts/engine/program_actions.ahk",
 				"windows/settings/engine/program_parameter.ahk",
 				"windows/diagnostics/engine/reports/redact.ahk",
 				"windows/settings/engine/registry.ahk",
@@ -377,13 +377,13 @@
 				"windows/ai/engine/prediction/translate_action.ahk",
 				"windows/ai/engine/prediction/vision.ahk",
 				"windows/ai/engine/prediction/vision_action.ahk",
-				"windows/modules/shortcuts.ahk",
-				"windows/modules/shortcuts/capsword.ahk",
-				"windows/modules/shortcuts/ctrl.ahk",
-				"windows/modules/shortcuts/tap_keys.ahk",
-				"windows/modules/shortcuts/utils.ahk",
-				"windows/modules/shortcuts/win.ahk",
-				"windows/modules/take_note.ahk",
+				"windows/shortcuts/shortcuts.ahk",
+				"windows/shortcuts/engine/capsword.ahk",
+				"windows/shortcuts/engine/ctrl.ahk",
+				"windows/shortcuts/engine/tap_keys.ahk",
+				"windows/shortcuts/engine/utils.ahk",
+				"windows/shortcuts/engine/win.ahk",
+				"windows/shortcuts/engine/take_note.ahk",
 				"windows/modules/updater.ahk",
 				"windows/modules/updater/changelog.ahk",
 				"windows/modules/updater/channels.ahk",
@@ -417,8 +417,8 @@
 				"windows/platform/remap/tap_hold_roll_keys.ahk",
 				"windows/platform/remap/tap_hold_writer.ahk",
 				"windows/keyboard/engine/keys/win.ahk",
-				"windows/ui/action_picker/init.ahk",
-				"windows/ui/action_picker_webview.ahk",
+				"windows/shortcuts/ui/action_picker/init.ahk",
+				"windows/shortcuts/ui/action_picker_webview.ahk",
 				"windows/ui/changelog/init.ahk",
 				"windows/settings/ui/cleanup.ahk",
 				"windows/diagnostics/ui/console_window.ahk",
@@ -466,7 +466,7 @@
 				"windows/ai/ui/menu/transactions.ahk",
 				"windows/metrics/ui/menu/metrics.ahk",
 				"windows/metrics/ui/menu/actions.ahk",
-				"windows/ui/menu/menu_shortcuts.ahk",
+				"windows/shortcuts/ui/menu/shortcuts.ahk",
 				"windows/menu/ui/builder/submenus.ahk",
 				"windows/ui/menu/menu_taphold.ahk",
 				"windows/ai/ui/model_browser/init.ahk",
@@ -648,18 +648,18 @@
 					]
 				},
 				{
-					"path": "windows/ui/menu/menu_shortcuts.ahk",
+					"path": "windows/shortcuts/ui/menu/shortcuts.ahk",
 					"sourceSha256": "40d8acad6195f64529aa7e46e87ea79c02dcc0cecc97f091de1288c9de4cb7de",
 					"lines": [
 						{
 							"line": 195,
 							"source": "\t\t\t\t\tif MenuRenderer_AppendTemplate(ExtMenu, \"shortcut_extension_error_frame\", Map(), MarkerState, Map()) == 0",
-							"expectedSite": "windows/ui/menu/menu_shortcuts.ahk:195 append"
+							"expectedSite": "windows/shortcuts/ui/menu/shortcuts.ahk:195 append"
 						},
 						{
 							"line": 200,
 							"source": "\t\t\t\tif MenuRenderer_AppendTemplate(ExtMenu, \"shortcut_extension_empty_frame\", Map(), Map(), Map()) == 0",
-							"expectedSite": "windows/ui/menu/menu_shortcuts.ahk:200 append"
+							"expectedSite": "windows/shortcuts/ui/menu/shortcuts.ahk:200 append"
 						}
 					]
 				},
@@ -744,7 +744,7 @@
 				"macos/ai/ui/menu/warmup_controller.lua",
 				"macos/metrics/ui/menu/metrics.lua",
 				"macos/settings/ui/menu/paths.lua",
-				"macos/ui/menu/menu_shortcuts.lua",
+				"macos/shortcuts/ui/menu/shortcuts.lua",
 				"macos/menu/ui/builder/state.lua",
 				"macos/ui/menu/menu_tap_holds.lua",
 				"macos/ui/menu/menu_tap_keys.lua",
@@ -761,8 +761,8 @@
 				"macos/settings/ui/menu/scoped_preferences.lua",
 				"macos/menu/ui/transactions/script_chords_transaction.lua",
 				"macos/menu/ui/transactions/session_demotions.lua",
-				"macos/ui/menu/shortcut_utils.lua",
-				"macos/ui/menu/shortcuts_scope.lua",
+				"macos/shortcuts/ui/menu/utils.lua",
+				"macos/shortcuts/ui/menu/scope.lua",
 				"macos/onboarding/ui/menu_start_at_login.lua",
 				"macos/menu/ui/transactions/uninstall.lua",
 				"macos/settings/ui/menu/unused_keys_cleanup.lua"
@@ -919,18 +919,18 @@
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_shortcuts.lua",
+					"path": "macos/shortcuts/ui/menu/shortcuts.lua",
 					"sourceSha256": "c86ed856ffd3babc5cce97d5aeb83567d3e1ce82cb75a6319671dc81c90362d8",
 					"lines": [
 						{
 							"line": 541,
 							"source": "\t\tlabel    = i18n.get(\"menu.shortcuts.title\"),",
-							"expectedSite": "macos/ui/menu/menu_shortcuts.lua:541 static"
+							"expectedSite": "macos/shortcuts/ui/menu/shortcuts.lua:541 static"
 						},
 						{
 							"line": 644,
 							"source": "\t\t\t\t\ttable.insert(sub, { separator = true })",
-							"expectedSite": "macos/ui/menu/menu_shortcuts.lua:644 separator"
+							"expectedSite": "macos/shortcuts/ui/menu/shortcuts.lua:644 separator"
 						}
 					]
 				},

@@ -35,7 +35,7 @@ local STUB_MODULES = {
 	"core.events.timer_scheduler",
 	"metrics.adapters.kc_bridge",
 	"gestures.engine.engine",
-	"modules.shortcuts",
+	"shortcuts.engine",
 	"hs.caffeinate.watcher",
 	"hs",
 	"tests.stubs.hs",
@@ -386,7 +386,7 @@ local function with_remap(options, body)
 			end,
 		}
 		package.loaded["gestures.engine.engine"] = {}
-		package.loaded["modules.shortcuts"] = {
+		package.loaded["shortcuts.engine"] = {
 			is_paused = function()
 				if type(calls.pause_queries_until_failure) == "number" then
 					calls.pause_queries_until_failure = calls.pause_queries_until_failure - 1

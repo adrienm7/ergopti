@@ -389,7 +389,7 @@ assemble_native_runtime() {
 	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
 	chmod +x "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery"
 	# The read-only helper ships in both full bundles and the source-run runtime.
-	local switcher_source="$REPO_ROOT/static/ergopti_plus/macos/native/SystemSwitcherState.swift"
+	local switcher_source="$REPO_ROOT/static/ergopti_plus/macos/shortcuts/native/SystemSwitcherState.swift"
 	local switcher_build="$BUILD_DIR/system-switcher-state"
 	mkdir -p "$switcher_build"
 	local arch

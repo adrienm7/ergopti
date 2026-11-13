@@ -43,7 +43,7 @@ local MODULE_NAMES = {
 	"hotstrings.engine.expander",
 	"menu.engine.manifest_reader",
 	"core.text.engine.toml_codec.writer",
-	"modules.shortcuts",
+	"shortcuts.engine",
 	"hotstrings.engine.dynamic",
 	"core.fs.adapters.toml_cache",
 	"core.text.engine.toml.reader",
@@ -348,7 +348,7 @@ local function run_isolated(options, assertions)
 				has_default = function() return false end,
 				sparse_operation = function() error("no configuration write in shutdown fixture") end,
 			},
-			["modules.shortcuts"] = { stop = function() return true end },
+			["shortcuts.engine"] = { stop = function() return true end },
 			["hotstrings.engine.dynamic"] = {},
 			["core.fs.adapters.toml_cache"] = { init = function() return true end },
 			["core.text.engine.toml.reader"] = {

@@ -295,7 +295,7 @@ local function capture_pause_controller(Source, state)
 		TapHold = { set_paused = function() end },
 		package = { loaded = {} },
 	}))()
-	return require("modules.shortcuts.script_actions").new({
+	return require("shortcuts.engine.script_actions").new({
 		reset = function() end, reload = function() end, quit = function() end,
 		on_pause_change = function(paused)
 			state.active = not paused

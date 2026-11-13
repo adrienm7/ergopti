@@ -8,7 +8,7 @@
 local helpers = require("tests.helpers")
 
 local NATIVE_CONSUMERS = {
-	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
+	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "shortcuts.adapters.mouse_control",
 	"core.timing.engine.deferred_work", "core.fs.engine.dir",
 }
 
@@ -21,19 +21,19 @@ end
 --- @return table system
 local function load_system(overrides)
 	refresh_native_consumers()
-	return helpers.load_with_stubs("modules.shortcuts.actions.system", overrides)
+	return helpers.load_with_stubs("shortcuts.engine.actions.system", overrides)
 end
 
 --- Executes one complete scenario, including its deferred callbacks.
 --- @param callback function Scenario body.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
-		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
+		"hs", "tests.stubs.hs", "shortcuts.engine.actions.system",
+		"shortcuts.engine.actions.screenshot_save", "shortcuts.engine.actions.text",
 		"gestures.engine", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
 		"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
 		"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
-		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
+		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "shortcuts.adapters.mouse_control",
 		"core.timing.engine.deferred_work", "core.fs.engine.dir", "hotstrings.engine.expander.utils",
 		"hotstrings.engine.expander.terminator_replay", "platform.input.text_sender", "clipboard.adapters.clipboard",
 	}, function()
@@ -105,7 +105,7 @@ end
 
 
 local function load_capslock_fixture(toggle_impl)
-	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["shortcuts.engine.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["platform.input.key_state"] = {
@@ -169,12 +169,12 @@ end
 -- window_override: optional `window` stub table (defaults to a window with id=42).
 local function make_sys_screenshot_spies(window_override)
 	package.loaded["platform.input.keycodes"] = nil
-	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["shortcuts.engine.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
-	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
+	package.loaded["shortcuts.engine.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
 	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
@@ -332,19 +332,19 @@ local function load_h01_system(options)
 	package.loaded["platform.input.key_state"] = nil
 	package.loaded["core.ui.engine.notifications"] = nil
 	local previous_logger = package.loaded["core.logger.engine.logger"]
-	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["shortcuts.engine.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["modules.shortcuts.actions.text"] = nil
+	package.loaded["shortcuts.engine.actions.text"] = nil
 	package.loaded["gestures.engine"] = options.gestures or {}
 	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
-	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
+	package.loaded["shortcuts.engine.actions.screenshot_save"] = nil
 	if options.logger then package.loaded["core.logger.engine.logger"] = options.logger end
 	if options.text_actions then
-		package.loaded["modules.shortcuts.actions.text"] = options.text_actions
+		package.loaded["shortcuts.engine.actions.text"] = options.text_actions
 	end
 	local system, synthetic = SyntheticInputStack.load(
-		"modules.shortcuts.actions.system", options.hs_overrides)
+		"shortcuts.engine.actions.system", options.hs_overrides)
 	if options.logger then package.loaded["core.logger.engine.logger"] = previous_logger end
 	return { system = system, synthetic = synthetic, hs = _G.hs }
 end

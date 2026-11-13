@@ -31,7 +31,7 @@ _LCPC_Source() {
 	SplitPath(A_ScriptDir, , &CanonicalRoot)
 	for Symbol in _LCPC_PortSymbols() {
 		Owner := Symbol == "StopActivitySimulation"
-			? CanonicalRoot . "\modules\shortcuts\win.ahk" : _DriverProductionFileForSymbol(Symbol)
+			? CanonicalRoot . "\shortcuts\engine\win.ahk" : _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(_DriverIsProductionSource(Owner) && FileExist(Owner) != "")
 		Text := FileRead(Owner, "UTF-8")
 		Body := _DriverExtractFunctionBody(&Text, Symbol)

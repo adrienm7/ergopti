@@ -12,7 +12,7 @@ local M = {}
 
 local notifications = require("core.ui.engine.notifications")
 local llm_mod       = require("ai.engine")
-local shortcut_ui   = require("ui.menu.shortcut_utils")
+local shortcut_ui   = require("shortcuts.ui.menu.utils")
 local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
 local dialog        = require("core.ui.engine.dialog_util")

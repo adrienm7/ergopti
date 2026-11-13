@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 
 local function with_core(callback)
 	return helpers.with_stub_scope({ "metrics.engine", "modules.keystats.init",
-		"metrics.engine.capture.physical_accounting_mode", "adapters.physical_observation_clock",
+		"metrics.engine.capture.physical_accounting_mode", "shortcuts.adapters.physical_observation_clock",
 		"metrics.engine.capture.physical_configuration_observation", "metrics.engine.privacy.text_cipher",
 		"metrics.engine.privacy.text_migration", "metrics.adapters.kc_bridge" }, function()
 		local encrypted, available, migrating = false, true, false
@@ -521,7 +521,7 @@ helpers.describe("physical configuration native boundary strictness", function()
 
 	helpers.it("loads its clock without querying native time and returns exactly one unmodified integer read", function()
 		with_core(function(_, controls)
-			local clock = require("adapters.physical_observation_clock")
+			local clock = require("shortcuts.adapters.physical_observation_clock")
 			helpers.assert_eq(controls.reads(), 0)
 			helpers.assert_eq(type(clock.now), "function")
 			helpers.assert_eq(clock.now(), 101)
@@ -536,7 +536,7 @@ helpers.describe("physical configuration native boundary strictness", function()
 			with_core(function(_, controls)
 				local reads = 0
 				controls.clock(function() reads = reads + 1; return row.value end)
-				local ok, reason = pcall(require("adapters.physical_observation_clock").now)
+				local ok, reason = pcall(require("shortcuts.adapters.physical_observation_clock").now)
 				helpers.assert_eq(ok, false)
 				helpers.assert_true(tostring(reason):find("native observation clock", 1, true) ~= nil)
 				helpers.assert_eq(reads, 1, "Validation must not resample, coerce or synthesize native time")

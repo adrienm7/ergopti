@@ -123,9 +123,9 @@ local function assert_layer_removal(disk)
 end
 
 local function with_wheel_owner(body)
-	helpers.with_fresh_modules({ "modules.shortcuts.bindings" }, function()
+	helpers.with_fresh_modules({ "shortcuts.engine.bindings" }, function()
 		local owner = { reconciles = 0 }
-		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+		package.loaded["shortcuts.engine.bindings"] = { reconcile_layer_wheel = function()
 			owner.reconciles = owner.reconciles + 1
 			return true
 		end }

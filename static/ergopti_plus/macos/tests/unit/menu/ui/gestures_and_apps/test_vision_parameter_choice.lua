@@ -29,8 +29,8 @@ local function fixture(picked, typed, body)
 				return save, typed
 			end,
 		}
-		package.loaded["ui.menu.shortcut_utils"] = nil
-		body(require("ui.menu.shortcut_utils"), asked)
+		package.loaded["shortcuts.ui.menu.utils"] = nil
+		body(require("shortcuts.ui.menu.utils"), asked)
 	end, debug.traceback)
 	for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
 	for key, value in pairs(saved) do package.loaded[key] = value end

@@ -58,7 +58,7 @@ end
 local function run_fixture(body, source)
 	local root = helpers.driver_root()
 	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared"))
-	for _,name in ipairs({"modules.shortcuts.keyboard_shortcuts","adapters.physical_shortcut_hook"}) do package.loaded[name]=nil end
+	for _,name in ipairs({"shortcuts.engine.keyboard_shortcuts","shortcuts.adapters.physical_shortcut_hook"}) do package.loaded[name]=nil end
 	helpers.load_with_stubs("hs")
 	hs.keycodes.map.g, hs.keycodes.map.j, hs.keycodes.map.a = 5, 38, 0
 	local controls = { writes = 0, native = {}, keyboard_handles = {} }
@@ -175,7 +175,7 @@ local function run_fixture(body, source)
 	end
 	for name, facade in pairs(facades) do
 		setmetatable(facade, { __index = function() return function() return true end end })
-		package.loaded["modules.shortcuts.actions." .. name] = facade
+		package.loaded["shortcuts.engine.actions." .. name] = facade
 	end
 	local old_new = hs.eventtap.new
 	hs.eventtap.new = function(...)
@@ -207,8 +207,8 @@ local function run_fixture(body, source)
 		cancel=function(timer) timers[timer]=nil;if timer.settled then timer.settled() end;return true end,
 	}
 	package.loaded["layouts.adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
-	package.loaded["adapters.physical_shortcut_hook"]=nil
-	local Hook=require("adapters.physical_shortcut_hook")
+	package.loaded["shortcuts.adapters.physical_shortcut_hook"]=nil
+	local Hook=require("shortcuts.adapters.physical_shortcut_hook")
 	package.loaded["core.events.timer_scheduler"],package.loaded["layouts.adapters.input_source_broker"],package.loaded["diagnostics.adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
 	local actual_new=hs.eventtap.new
 	hs.eventtap.new=function(types,fn)
@@ -244,15 +244,15 @@ local function run_fixture(body, source)
 		return execute_single(action,binding)
 	end
 	local gestures = require("gestures.engine")
-	local bindings = require("modules.shortcuts.bindings")
-	local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+	local bindings = require("shortcuts.engine.bindings")
+	local keyboard = require("shortcuts.engine.keyboard_shortcuts")
 	-- Explicit controlled-native premise; this fixture does not qualify host input.
 	controls.native_delivery_available = keyboard.physical_delivery_available
 	controls.delivery_available = true
 	keyboard.physical_delivery_available = function() return controls.delivery_available end
-	local taps = require("modules.shortcuts.tap_keys")
-	local script = require("modules.shortcuts.script_control")
-	local shortcuts = require("modules.shortcuts")
+	local taps = require("shortcuts.engine.tap_keys")
+	local script = require("shortcuts.engine.script_control")
+	local shortcuts = require("shortcuts.engine")
 	local prefs = require("settings.engine.preferences.preferences")
 	local saved = prefs.load("config")
 	local state = { shortcuts = true, script_control_enabled = true,
@@ -285,7 +285,7 @@ local function run_fixture(body, source)
 		restore_runtime = function(snapshot) return bindings.set_chatgpt_url(snapshot.chatgpt_url) end,
 	})
 	local busy = false
-	local owner = require("ui.menu.shortcuts_scope").new({
+	local owner = require("shortcuts.ui.menu.scope").new({
 		path = "config", files = file_port, state = state, preferences = prefs, checkpoint = checkpoint,
 		gestures = gestures, shortcuts = shortcuts, bindings = bindings, keyboard = keyboard,
 		tap_keys = taps, script_control = script, start_script_control = start_script, demotions = demotions,
