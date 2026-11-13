@@ -34,6 +34,7 @@ const PAGE_SCRIPTS = [
 	'layout_editor/zip_writer.js',
 	'layout_editor/toml_prelude.js',
 	'vendor/smol-toml.js',
+	'layout_composer/target_compiler.js',
 	'layout_editor/_generated/kbd_dll_writer.js',
 	'layout_editor/source_io.js',
 	'layout_editor/editor_model.js'
@@ -329,11 +330,34 @@ test('the repository tool writes the payload « Install and use » sends', () =>
 	}
 });
 
+// Direct XKB compiler (2026-11-13): the Linux host installs the XKB written from
+// the source's canonical form, so a fifth-level layer reaches the install.
+test('the Linux install carries the converter target with its fifth level (direct-xkb-install)', () => {
+	const file = path.join(shared('tests', 'corpus', 'layouts', 'source'), 'direct_levels.toml');
+	const doc = IO.parse(fs.readFileSync(file, 'utf8')).doc;
+	const target = JSON.parse(IO.installPayload(doc, 'linux').target);
+	assert.equal(target.format, 'ergopti-layout-target');
+	assert.equal(target.version, 1);
+	assert.equal(target.layout, 'sided');
+	assert.equal(target.platform, 'linux');
+	assert.equal(target.canonical.name, 'sided', 'named as the compiled .keylayout');
+	assert.deepEqual(target.level5, { keys: [{ xkb: 'RCTL', keysym: 'ISO_Level5_Shift' }] });
+	assert(
+		target.canonical.selects.some((select) =>
+			select.modifiers.some((modifier) => modifier.required.includes('level5'))
+		),
+		'the Right Ctrl layer is selected by the fifth level'
+	);
+	assert.equal(IO.installPayload(doc, 'macos').target, undefined, 'macOS installs its .keylayout');
+	assert.equal(IO.installPayload(doc, 'windows').target, undefined, 'Windows installs its DLLs');
+});
+
 test('a preserved import installs and exports its own XML, only in its own variant', () => {
 	const xml = registry('ergopti');
 	const doc = IO.importKeylayout(xml, 'ergopti', 'iso');
 	assert.equal(IO.installPayload(doc, 'macos').keylayout, xml);
 	assert.equal(IO.installPayload(doc, 'macos').emulation, undefined, 'an import has no table');
+	assert.equal(IO.installPayload(doc, 'linux').target, undefined, 'an import has no target');
 	assert.equal(IO.keylayoutFile(doc, 'iso').text, xml);
 	refuses(() => IO.keylayoutFile(doc, 'ansi'), 'source_export_unavailable');
 });

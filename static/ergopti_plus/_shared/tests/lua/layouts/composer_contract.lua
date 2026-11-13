@@ -276,6 +276,79 @@ return function(helpers, Json, ports)
 		end)
 	end)
 
+	-- The source compiled straight to the XKB writer's canonical form
+	-- (layout_composer/target_compiler.js hostTarget): here the fixture's
+	-- .keylayout reading with a layer on XKB's fifth level, held by Left Ctrl.
+	local TARGET_PATH = ports.config_dir .. "layout_composer/layout_source_xkb.json"
+	local function target_text(change)
+		local canonical = assert(require("layouts.engine.composer.keylayout").parse(SOURCE_KEYLAYOUT))
+		table.insert(canonical.selects, 1, { index = 99, modifiers = { { required = { "level5" }, optional = {} } } })
+		for _, set in ipairs(canonical.key_map_sets) do
+			if set.id == canonical.map_set then
+				set.key_maps[#set.key_maps + 1] = { index = 99, keys = { { code = 0, output = "\206\177" } } }
+			end
+		end
+		local target = { format = "ergopti-layout-target", version = 1, layout = "source_fixture", platform = "linux",
+			canonical = canonical, level5 = { keys = { { xkb = "LCTL", keysym = "ISO_Level5_Shift" } } } }
+		if change then change(target) end
+		return Json.encode(target)
+	end
+
+	helpers.describe("layout composer (" .. ports.name .. "): a source's converter target", function()
+		helpers.it("refuses a converter target off Linux, beside a composition or not this source's (direct-xkb-install)", function()
+			local registry, deps, state = fresh()
+			local refused = {
+				["not json"] = "{",
+				["another layout"] = target_text(function(t) t.layout = "other" end),
+				["another platform"] = target_text(function(t) t.platform = "macos" end),
+				["a future version"] = target_text(function(t) t.version = 2 end),
+				["another layout name"] = target_text(function(t) t.canonical.name = "other" end),
+				["an unresolved action"] = target_text(function(t)
+					t.canonical.key_map_sets[1].key_maps[1].keys[1] = { code = 0, action = "missing" } end),
+				["a fifth level on a bad keysym"] = target_text(function(t) t.level5.keys[1].keysym = "Control_L" end),
+			}
+			if ports.platform ~= "linux" then refused = { ["any target off Linux"] = target_text() } end
+			for label, target in pairs(refused) do
+				local result = saved(registry, deps, { source = SOURCE, target = target, keylayout = SOURCE_KEYLAYOUT })
+				helpers.assert_true(not result.ok, label .. " must be refused")
+				helpers.assert_eq(result.code, "invalid", label)
+			end
+			local beside = saved(registry, deps, { declaration = DECLARATION, target = target_text(), keylayout = KEYLAYOUT })
+			helpers.assert_true(not beside.ok, "a converter target comes only with a source")
+			helpers.assert_nil(state.files[TARGET_PATH], "nothing is stored")
+		end)
+
+		if ports.platform ~= "linux" then return end
+
+		-- The source's levels no .keylayout holds reach the Linux install (direct XKB compiler, 2026-11-13).
+		helpers.it("installs the XKB written from the source's converter target (direct-xkb-install)", function()
+			local registry, deps, state = fresh()
+			local target = target_text()
+			local result = saved(registry, deps, { source = SOURCE, target = target, keylayout = SOURCE_KEYLAYOUT, use = false })
+			helpers.assert_true(result.ok, "the save must succeed: " .. tostring(result.detail))
+			helpers.assert_eq(state.files[TARGET_PATH], target, "the target is stored as sent")
+			helpers.assert_eq(state.files[ports.installed_copy], SOURCE_KEYLAYOUT, "the record keeps the .keylayout")
+			local symbols = state.files[ports.local_dir .. "composed/composed.xkb"]
+			helpers.assert_true(type(symbols) == "string", "the XKB symbols are written")
+			helpers.assert_true(symbols:find('"ERGOPTI_ELEVEN_LEVEL"', 1, true) ~= nil, "the eleven-level type")
+			helpers.assert_true(symbols:find(", U03B1, ", 1, true) ~= nil, "the fifth level types alpha")
+			helpers.assert_true(symbols:find("key <LCTL> { [ ISO_Level5_Shift ] };", 1, true) ~= nil,
+				"Left Ctrl holds the fifth level")
+			local types = state.files[ports.local_dir .. "composed/xkb_types.txt"]
+			helpers.assert_true(types:find('type "ERGOPTI_ELEVEN_LEVEL"', 1, true) ~= nil, "the type is shipped beside them")
+
+			helpers.assert_true(saved(registry, deps, { source = SOURCE, keylayout = SOURCE_KEYLAYOUT }).ok)
+			helpers.assert_nil(state.files[TARGET_PATH], "a source saved without a target drops the old one")
+			symbols = state.files[ports.local_dir .. "composed/composed.xkb"]
+			helpers.assert_true(symbols:find("ELEVEN", 1, true) == nil, "the .keylayout is converted again")
+			helpers.assert_true(saved(registry, deps, { source = SOURCE, target = target, keylayout = SOURCE_KEYLAYOUT }).ok)
+			local removed
+			registry.composer_remove(function(ok) removed = ok end, deps)
+			helpers.assert_true(removed, "the removal must succeed")
+			helpers.assert_nil(state.files[TARGET_PATH], "the removal deletes the target")
+		end)
+	end)
+
 	helpers.describe("layout composer (" .. ports.name .. "): the manager bridge", function()
 		helpers.it("routes the three composer messages and pushes their results (layout-composer)", function()
 			local ManagerBridge = require("layouts.engine.manager_bridge")

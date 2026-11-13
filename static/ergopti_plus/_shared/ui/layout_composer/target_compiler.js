@@ -293,9 +293,11 @@ var LayoutTargetCompiler = (function () {
 	 * @param {object} source - A validated structured source.
 	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
 	 * @param {'linux'|'windows'} platform
+	 * @param {boolean} [strict] - Refuse the transitions a .keylayout conversion refuses
+	 *   (the exports); an install takes what the plain reader reads.
 	 * @returns {{canonical: object, convention: 'iso', omitted: object[], plan: object}}
 	 */
-	function compile(source, tables, platform) {
+	function compile(source, tables, platform, strict = true) {
 		const linux = platform === 'linux';
 		if (!linux && platform !== 'windows')
 			throw new LayoutSource.SourceError('source_platform', String(platform));
@@ -304,6 +306,7 @@ var LayoutTargetCompiler = (function () {
 			platform,
 			tokens: plan.tokens,
 			format: linux ? 'xkb' : 'klc',
+			strict,
 			layerReason: layerReason(
 				source,
 				plan.tokens,
@@ -329,12 +332,40 @@ var LayoutTargetCompiler = (function () {
 	 * shared Lua reader), or the canonical form a structured source compiles to.
 	 * @returns {{text?: string, canonical?: object, convention: string, omitted: object[], plan?: object}}
 	 */
-	function target(source, tables, platform) {
+	function target(source, tables, platform, strict = true) {
 		LayoutSource.validate(source);
 		if (source.imported_keylayout)
 			return Object.assign({}, LayoutSource.conversionSource(source), { omitted: [] });
-		return compile(source, tables, platform);
+		return compile(source, tables, platform, strict);
 	}
 
-	return { XKB_LEVEL5_KEYS, KLC_BITS, xkbPlan, klcPlan, compile, target };
+	/**
+	 * The converter target the Linux composer host installs a source from
+	 * (_shared/layouts/engine/composer/composer.lua check_target): the source's
+	 * canonical form for the XKB writer and the keys of its fifth level.
+	 * @param {object} source - A validated structured source.
+	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
+	 * @returns {object} { format, version, layout, platform, canonical, level5? }, JSON-ready.
+	 */
+	function hostTarget(source, tables) {
+		// As the host read the .keylayout before: the plain reader's reading.
+		const compiled = target(source, tables, 'linux', false);
+		if (!compiled.canonical)
+			throw new LayoutSource.SourceError('source_imported_preserved', 'imported_keylayout');
+		const level5 = compiled.plan.level5;
+		return Object.assign(
+			{
+				format: 'ergopti-layout-target',
+				version: 1,
+				layout: source.layout.id,
+				platform: 'linux',
+				canonical: compiled.canonical
+			},
+			level5
+				? { level5: { keys: level5.keys.map((key) => ({ xkb: key.xkb, keysym: key.keysym })) } }
+				: {}
+		);
+	}
+
+	return { XKB_LEVEL5_KEYS, KLC_BITS, xkbPlan, klcPlan, compile, target, hostTarget };
 })();
