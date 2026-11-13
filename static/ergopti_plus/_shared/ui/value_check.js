@@ -433,6 +433,94 @@ function requireValue(schema, key, value) {
 				"type": "integer",
 				"min": 0,
 				"max": 100
+			},
+			"llm.generation.temperature": {
+				"file": "config.toml",
+				"type": "decimal",
+				"min": 0,
+				"max": 1.3,
+				"default_from": {
+					"manifest": "llm.generation.temperature"
+				},
+				"max_from": {
+					"file": "ai/data/inference.json",
+					"pattern": "\"max_temperature\": ([0-9.]+)"
+				}
+			},
+			"llm.generation.context_length": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "characters",
+				"min": 80,
+				"max": 4000,
+				"default_from": {
+					"manifest": "llm.generation.context_length"
+				},
+				"max_from": {
+					"file": "ai/engine/policy/context_buffer.lua",
+					"pattern": "M\\.MAX_CONTEXT_LENGTH = ([0-9]+)"
+				}
+			},
+			"llm.generation.min_words": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "words",
+				"min": 1,
+				"max": 20,
+				"default_from": {
+					"manifest": "llm.generation.min_words"
+				}
+			},
+			"llm.generation.max_words": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "words",
+				"min": 0,
+				"max": 10000,
+				"special": [
+					{
+						"value": 0,
+						"label_key": "value_check.special.unlimited"
+					}
+				],
+				"default_from": {
+					"manifest": "llm.generation.max_words"
+				}
+			},
+			"llm.profiles.num_predictions": {
+				"file": "config.toml",
+				"type": "integer",
+				"min": 1,
+				"max": 10,
+				"default_from": {
+					"manifest": "llm.profiles.num_predictions"
+				}
+			},
+			"llm.trigger.debounce_ms": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "ms",
+				"min": 50,
+				"max": 10000,
+				"special": [
+					{
+						"value": -1,
+						"label_key": "value_check.special.never"
+					}
+				],
+				"default_from": {
+					"manifest": "llm.trigger.debounce_ms"
+				}
+			},
+			"llm.trigger.min_request_interval_ms": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "ms",
+				"min": 0,
+				"max": 10000,
+				"default_from": {
+					"manifest": "llm.trigger.min_request_interval_ms"
+				}
 			}
 		}
 	};
@@ -448,7 +536,14 @@ function requireValue(schema, key, value) {
 		"HOTSTRINGS_CONFIG_ANY_DELAY": "hotstrings_config.*.delay",
 		"HOTSTRINGS_CONFIG_ANY_ANY_DELAY": "hotstrings_config.*.*.delay",
 		"HOTSTRINGS_CONFIG_ANY_PRIORITY": "hotstrings_config.*.priority",
-		"HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY": "hotstrings_config.*.*.priority"
+		"HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY": "hotstrings_config.*.*.priority",
+		"LLM_GENERATION_TEMPERATURE": "llm.generation.temperature",
+		"LLM_GENERATION_CONTEXT_LENGTH": "llm.generation.context_length",
+		"LLM_GENERATION_MIN_WORDS": "llm.generation.min_words",
+		"LLM_GENERATION_MAX_WORDS": "llm.generation.max_words",
+		"LLM_PROFILES_NUM_PREDICTIONS": "llm.profiles.num_predictions",
+		"LLM_TRIGGER_DEBOUNCE_MS": "llm.trigger.debounce_ms",
+		"LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS": "llm.trigger.min_request_interval_ms"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

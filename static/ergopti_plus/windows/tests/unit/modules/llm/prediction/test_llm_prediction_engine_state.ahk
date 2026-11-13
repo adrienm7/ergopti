@@ -188,7 +188,7 @@ Test("LLM_Engine_OnKeystroke: stores full buffer in last_buffer", _EngineOnKeyst
 _EngineOnKeystroke_KeepsFullBuffer() {
 	global _LLM_Engine
 	InputText := "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	LLM_Engine_Init(Map("ctx_chars", 50, "debounce_ms", 9999))
+	LLM_Engine_Init(Map("ctx_chars", 80, "debounce_ms", 9999))
 	LLM_Engine_OnKeystroke(InputText)
 	; Truncation happens in PromptBuilder at fire time, not on each keystroke.
 	AssertEqual(InputText, _LLM_Engine["last_buffer"])

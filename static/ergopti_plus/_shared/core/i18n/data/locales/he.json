@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "כבוי",
 	"value_check.special.no_time_limit": "ללא מגבלת זמן",
 	"value_check.special.never": "אף פעם",
+	"value_check.special.unlimited": "ללא הגבלה",
 	"physical_shortcuts.window_title": "קיצורי מקשים פיזיים",
 	"physical_shortcuts.position": "מיקום המקש",
 	"physical_shortcuts.manual_hint": "בחרו מיקום מקש ללא תלות בתו שהוא מקליד.",

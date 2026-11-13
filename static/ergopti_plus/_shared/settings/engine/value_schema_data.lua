@@ -16,6 +16,13 @@ return {
 		["HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS"] = "hotstrings.dynamic.user_code.time_activation_seconds",
 		["HOTSTRINGS_EXPANSION_DELAY"] = "hotstrings.expansion_delay",
 		["HOTSTRINGS_IDLE_RESET_SECONDS"] = "hotstrings.idle_reset_seconds",
+		["LLM_GENERATION_CONTEXT_LENGTH"] = "llm.generation.context_length",
+		["LLM_GENERATION_MAX_WORDS"] = "llm.generation.max_words",
+		["LLM_GENERATION_MIN_WORDS"] = "llm.generation.min_words",
+		["LLM_GENERATION_TEMPERATURE"] = "llm.generation.temperature",
+		["LLM_PROFILES_NUM_PREDICTIONS"] = "llm.profiles.num_predictions",
+		["LLM_TRIGGER_DEBOUNCE_MS"] = "llm.trigger.debounce_ms",
+		["LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS"] = "llm.trigger.min_request_interval_ms",
 		["MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS"] = "mod_combos.simultaneous_threshold_ms",
 		["TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS"] = "tap_holds.lone_modifier_tap_max_ms",
 		["TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS"] = "tap_hold.keys.*.time_activation_seconds",
@@ -103,6 +110,90 @@ return {
 			["max"] = 100,
 			["min"] = 0,
 			["type"] = "integer",
+		},
+		["llm.generation.context_length"] = {
+			["default_from"] = {
+				["manifest"] = "llm.generation.context_length",
+			},
+			["file"] = "config.toml",
+			["max"] = 4000,
+			["max_from"] = {
+				["file"] = "ai/engine/policy/context_buffer.lua",
+				["pattern"] = "M\\.MAX_CONTEXT_LENGTH = ([0-9]+)",
+			},
+			["min"] = 80,
+			["type"] = "integer",
+			["unit"] = "characters",
+		},
+		["llm.generation.max_words"] = {
+			["default_from"] = {
+				["manifest"] = "llm.generation.max_words",
+			},
+			["file"] = "config.toml",
+			["max"] = 10000,
+			["min"] = 0,
+			["special"] = { {
+				["label_key"] = "value_check.special.unlimited",
+				["value"] = 0,
+			} },
+			["type"] = "integer",
+			["unit"] = "words",
+		},
+		["llm.generation.min_words"] = {
+			["default_from"] = {
+				["manifest"] = "llm.generation.min_words",
+			},
+			["file"] = "config.toml",
+			["max"] = 20,
+			["min"] = 1,
+			["type"] = "integer",
+			["unit"] = "words",
+		},
+		["llm.generation.temperature"] = {
+			["default_from"] = {
+				["manifest"] = "llm.generation.temperature",
+			},
+			["file"] = "config.toml",
+			["max"] = 1.3,
+			["max_from"] = {
+				["file"] = "ai/data/inference.json",
+				["pattern"] = "\"max_temperature\": ([0-9.]+)",
+			},
+			["min"] = 0,
+			["type"] = "decimal",
+		},
+		["llm.profiles.num_predictions"] = {
+			["default_from"] = {
+				["manifest"] = "llm.profiles.num_predictions",
+			},
+			["file"] = "config.toml",
+			["max"] = 10,
+			["min"] = 1,
+			["type"] = "integer",
+		},
+		["llm.trigger.debounce_ms"] = {
+			["default_from"] = {
+				["manifest"] = "llm.trigger.debounce_ms",
+			},
+			["file"] = "config.toml",
+			["max"] = 10000,
+			["min"] = 50,
+			["special"] = { {
+				["label_key"] = "value_check.special.never",
+				["value"] = -1,
+			} },
+			["type"] = "integer",
+			["unit"] = "ms",
+		},
+		["llm.trigger.min_request_interval_ms"] = {
+			["default_from"] = {
+				["manifest"] = "llm.trigger.min_request_interval_ms",
+			},
+			["file"] = "config.toml",
+			["max"] = 10000,
+			["min"] = 0,
+			["type"] = "integer",
+			["unit"] = "ms",
 		},
 		["mod_combos.simultaneous_threshold_ms"] = {
 			["default_from"] = {

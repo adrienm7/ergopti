@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "desactivado",
 	"value_check.special.no_time_limit": "sin límite de tiempo",
 	"value_check.special.never": "nunca",
+	"value_check.special.unlimited": "sin límite",
 	"physical_shortcuts.window_title": "Atajos físicos",
 	"physical_shortcuts.position": "Posición de la tecla",
 	"physical_shortcuts.manual_hint": "Elige una posición de tecla, independientemente del carácter que escriba.",

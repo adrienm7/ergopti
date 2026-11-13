@@ -182,6 +182,25 @@ local function reject_numeric_input(title, reason_key)
 	return false
 end
 
+--- Refuses a value its shared value schema declaration refuses, with the
+--- localized text naming the accepted range.
+--- @param title string Localized prompt title.
+--- @param key string Value schema key.
+--- @param value any Candidate in the declared unit.
+--- @return boolean refused True when the value was refused (and notified).
+local function refuse_outside_declaration(title, key, value)
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(key), value)
+	if checked.ok then return false end
+	Logger.warn(LOG, "Numeric input for %s refused (%s).", key, checked.reason)
+	local ok, notified = Logger.callback(LOG, "Numeric input rejection notification", Notifications.notify,
+		tostring(title), ValueCheck.refusal_text(key, checked, i18n.get), "warning")
+	if ok ~= true or notified ~= true then
+		Logger.warn(LOG, "Numeric input rejection notification was refused.")
+	end
+	return true
+end
+
 --- Opens a standardized numeric input prompt and updates the state.
 --- @param deps table Global dependencies.
 --- @param apply_setting_transaction function Transaction owner.
@@ -194,6 +213,7 @@ end
 --- @param min_val number|nil Minimum allowed value.
 --- @param max_val number|nil Maximum allowed value.
 --- @param integer_only boolean|nil Refuse a fractional value (a count, not a measure).
+--- @param schema_key string|nil Value schema key whose declaration the typed value must pass.
 local function generic_numeric_prompt(
 	deps,
 	apply_setting_transaction,
@@ -205,7 +225,8 @@ local function generic_numeric_prompt(
 	default_val,
 	min_val,
 	max_val,
-	integer_only
+	integer_only,
+	schema_key
 )
 	local state = deps.state
 
@@ -237,6 +258,7 @@ local function generic_numeric_prompt(
 			-- fraction made it extract an empty context.
 			return reject_numeric_input(title)
 		elseif new_val and is_finite_number(new_val) then
+			if schema_key and refuse_outside_declaration(title, schema_key, new_val) then return false end
 			if (min_val and new_val < min_val) or (max_val and new_val > max_val) then
 				return reject_numeric_input(title, "numeric_prompt.out_of_range")
 			end
@@ -540,7 +562,12 @@ function M.new(deps)
 			elseif raw:lower() == string.lower(i18n.get("menu.settings.never")) then
 				new_val = -1
 			else
-				new_val = tonumber(raw)
+				-- The typed milliseconds pass the shared value schema first: a
+				-- value between -1 and 0 (other than -1) is no longer admitted.
+				local typed_ms = tonumber(raw)
+				if typed_ms and refuse_outside_declaration(i18n.get("menu.settings.delay_title"),
+					require("settings.engine.keys").KEY.LLM_TRIGGER_DEBOUNCE_MS, typed_ms) then return false end
+				new_val = typed_ms
 				if new_val and new_val >= 0 then new_val = new_val / 1000 end
 			end
 			
@@ -579,7 +606,10 @@ function M.new(deps)
 			if raw:match("^%s*$") then
 				new_val = llm_mod.DEFAULT_STATE.llm_min_request_interval
 			else
-				new_val = tonumber(raw)
+				local typed_ms = tonumber(raw)
+				if typed_ms and refuse_outside_declaration(i18n.get("menu.settings.min_interval_title"),
+					require("settings.engine.keys").KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS, typed_ms) then return false end
+				new_val = typed_ms
 				if new_val and new_val >= 0 then new_val = new_val / 1000 end
 			end
 
@@ -618,6 +648,8 @@ function M.new(deps)
 				return reject_numeric_input(i18n.get("menu.settings.max_words_title"))
 			end
 			local new_val = tonumber(digits) or 0
+			if refuse_outside_declaration(i18n.get("menu.settings.max_words_title"),
+				require("settings.engine.keys").KEY.LLM_GENERATION_MAX_WORDS, new_val) then return false end
 
 			return obj.apply_setting_transaction({
 				key = "llm_max_words",
@@ -650,6 +682,8 @@ function M.new(deps)
 				return reject_numeric_input(i18n.get("menu.settings.min_words_title"))
 			end
 			local new_val = tonumber(digits) or 1
+			if refuse_outside_declaration(i18n.get("menu.settings.min_words_title"),
+				require("settings.engine.keys").KEY.LLM_GENERATION_MIN_WORDS, new_val) then return false end
 
 			return obj.apply_setting_transaction({
 				key = "llm_min_words",
@@ -670,7 +704,8 @@ function M.new(deps)
 		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
 			i18n.get("menu.settings.temperature_title"),
 			i18n.get("menu.llm.temperature_prompt"),
-			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, 0.0, 1.0
+			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, nil, nil, nil,
+			require("settings.engine.keys").KEY.LLM_GENERATION_TEMPERATURE
 		)
 	end
 	
@@ -691,7 +726,7 @@ function M.new(deps)
 			i18n.get("menu.settings.context_length_title"),
 			i18n.get("menu.llm.context_length_prompt"),
 			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length,
-			nil, nil, true
+			nil, nil, true, require("settings.engine.keys").KEY.LLM_GENERATION_CONTEXT_LENGTH
 		)
 	end
 	

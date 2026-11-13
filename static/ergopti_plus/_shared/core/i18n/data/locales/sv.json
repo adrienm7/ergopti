@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "av",
 	"value_check.special.no_time_limit": "ingen tidsgräns",
 	"value_check.special.never": "aldrig",
+	"value_check.special.unlimited": "ingen gräns",
 	"physical_shortcuts.window_title": "Fysiska kortkommandon",
 	"physical_shortcuts.position": "Tangentposition",
 	"physical_shortcuts.manual_hint": "Välj en tangentposition oberoende av tecknet som tangenten skriver.",

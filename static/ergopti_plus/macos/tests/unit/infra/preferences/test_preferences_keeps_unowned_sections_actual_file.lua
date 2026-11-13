@@ -22,6 +22,9 @@ local TomlWriter = Fixture.TomlWriter
 
 
 
+-- llm.display.pred_indent carries the exact integers: it has no value schema
+-- declaration, so a 2^53 survives the load untouched (a declared setting such
+-- as the temperature is refused past its maximum).
 helpers.describe("Mac actual file exact integer scalar publication", function()
 	helpers.it("writes exact requested integer through root inline with native file and fresh reader", function()
 		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
@@ -30,15 +33,15 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
-			local file=assert(io.open(path,"wb")); assert(file:write("llm={generation={temperature=9007199254740993,future=[]}} # exact\n")); assert(file:close())
+			local file=assert(io.open(path,"wb")); assert(file:write("llm={display={pred_indent=9007199254740993,future=[]}} # exact\n")); assert(file:close())
 			local called,detail=xpcall(function()
 				local _,status=preferences.load(path); helpers.assert_eq(status,"ok")
-				helpers.assert_true(preferences.save(path,{llm_temperature=9007199254740992},{},{}))
+				helpers.assert_true(preferences.save(path,{llm_pred_indent=9007199254740992},{},{}))
 				local current=assert(io.open(path,"rb")); local bytes=assert(current:read("*a")); assert(current:close())
-				helpers.assert_eq(bytes,"llm={generation={temperature=9007199254740992,future=[]}} # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				helpers.assert_eq(bytes,"llm={display={pred_indent=9007199254740992,future=[]}} # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
 				package.loaded["infra.preferences"]=nil
 				local state,read_status=helpers.load_with_stubs("infra.preferences").load(path)
-				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_temperature,9007199254740992)
+				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_pred_indent,9007199254740992)
 			end,debug.traceback)
 			os.remove(path)
 			if not called then error(detail,0) end
@@ -51,15 +54,15 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
-			local file=assert(io.open(path,"wb")); assert(file:write("llm.generation.temperature=9007199254740993 # owned\nfuture=[] # exact\n")); assert(file:close())
+			local file=assert(io.open(path,"wb")); assert(file:write("llm.display.pred_indent=9007199254740993 # owned\nfuture=[] # exact\n")); assert(file:close())
 			local called,detail=xpcall(function()
 				local _,status=preferences.load(path); helpers.assert_eq(status,"ok")
-				helpers.assert_true(preferences.save(path,{llm_temperature=9007199254740992},{},{}))
+				helpers.assert_true(preferences.save(path,{llm_pred_indent=9007199254740992},{},{}))
 				local current=assert(io.open(path,"rb")); local bytes=assert(current:read("*a")); assert(current:close())
-				helpers.assert_eq(bytes,"llm.generation.temperature = 9007199254740992\nfuture=[] # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				helpers.assert_eq(bytes,"llm.display.pred_indent = 9007199254740992\nfuture=[] # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
 				package.loaded["infra.preferences"]=nil
 				local state,read_status=helpers.load_with_stubs("infra.preferences").load(path)
-				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_temperature,9007199254740992)
+				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_pred_indent,9007199254740992)
 			end,debug.traceback)
 			os.remove(path)
 			if not called then error(detail,0) end
@@ -72,15 +75,15 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
-			local file=assert(io.open(path,"wb")); assert(file:write("[llm]\ngeneration.temperature=9007199254740993 # owned\nfuture=[] # exact\n")); assert(file:close())
+			local file=assert(io.open(path,"wb")); assert(file:write("[llm]\ndisplay.pred_indent=9007199254740993 # owned\nfuture=[] # exact\n")); assert(file:close())
 			local called,detail=xpcall(function()
 				local _,status=preferences.load(path); helpers.assert_eq(status,"ok")
-				helpers.assert_true(preferences.save(path,{llm_temperature=9007199254740992},{},{}))
+				helpers.assert_true(preferences.save(path,{llm_pred_indent=9007199254740992},{},{}))
 				local current=assert(io.open(path,"rb")); local bytes=assert(current:read("*a")); assert(current:close())
-				helpers.assert_eq(bytes,"[llm]\ngeneration.temperature = 9007199254740992\nfuture=[] # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				helpers.assert_eq(bytes,"[llm]\ndisplay.pred_indent = 9007199254740992\nfuture=[] # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
 				package.loaded["infra.preferences"]=nil
 				local state,read_status=helpers.load_with_stubs("infra.preferences").load(path)
-				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_temperature,9007199254740992)
+				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_pred_indent,9007199254740992)
 			end,debug.traceback)
 			os.remove(path)
 			if not called then error(detail,0) end
@@ -93,15 +96,15 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
-			local file=assert(io.open(path,"wb")); assert(file:write("[llm.generation]\ntemperature=9007199254740993 # owned\nfuture=[] # exact\n")); assert(file:close())
+			local file=assert(io.open(path,"wb")); assert(file:write("[llm.display]\npred_indent=9007199254740993 # owned\nfuture=[] # exact\n")); assert(file:close())
 			local called,detail=xpcall(function()
 				local _,status=preferences.load(path); helpers.assert_eq(status,"ok")
-				helpers.assert_true(preferences.save(path,{llm_temperature=9007199254740992},{},{}))
+				helpers.assert_true(preferences.save(path,{llm_pred_indent=9007199254740992},{},{}))
 				local current=assert(io.open(path,"rb")); local bytes=assert(current:read("*a")); assert(current:close())
-				helpers.assert_eq(bytes,"[llm.generation]\ntemperature = 9007199254740992\nfuture=[] # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				helpers.assert_eq(bytes,"[llm.display]\npred_indent = 9007199254740992\nfuture=[] # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
 				package.loaded["infra.preferences"]=nil
 				local state,read_status=helpers.load_with_stubs("infra.preferences").load(path)
-				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_temperature,9007199254740992)
+				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_pred_indent,9007199254740992)
 			end,debug.traceback)
 			os.remove(path)
 			if not called then error(detail,0) end
@@ -114,15 +117,15 @@ helpers.describe("Mac actual file exact integer scalar publication", function()
 			package.loaded["adapters.file_system"]=nil
 			local preferences=helpers.load_with_stubs("infra.preferences")
 			local path=os.tmpname()
-			local file=assert(io.open(path,"wb")); assert(file:write("[llm]\ngeneration={temperature=9007199254740993,future=[]} # exact\n")); assert(file:close())
+			local file=assert(io.open(path,"wb")); assert(file:write("[llm]\ndisplay={pred_indent=9007199254740993,future=[]} # exact\n")); assert(file:close())
 			local called,detail=xpcall(function()
 				local _,status=preferences.load(path); helpers.assert_eq(status,"ok")
-				helpers.assert_true(preferences.save(path,{llm_temperature=9007199254740992},{},{}))
+				helpers.assert_true(preferences.save(path,{llm_pred_indent=9007199254740992},{},{}))
 				local current=assert(io.open(path,"rb")); local bytes=assert(current:read("*a")); assert(current:close())
-				helpers.assert_eq(bytes,"[llm]\ngeneration={temperature=9007199254740992,future=[]} # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
+				helpers.assert_eq(bytes,"[llm]\ndisplay={pred_indent=9007199254740992,future=[]} # exact\n" .. '\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
 				package.loaded["infra.preferences"]=nil
 				local state,read_status=helpers.load_with_stubs("infra.preferences").load(path)
-				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_temperature,9007199254740992)
+				helpers.assert_eq(read_status,"ok"); helpers.assert_eq(state.llm_pred_indent,9007199254740992)
 			end,debug.traceback)
 			os.remove(path)
 			if not called then error(detail,0) end
@@ -138,7 +141,7 @@ helpers.describe("Mac actual file authenticated integer candidate proof", functi
 			package.loaded["adapters.file_system"]=nil
 			local file_owner=require("adapters.file_system")
 			local LeafRows=require("core.text.engine.toml_codec.leaf_rows")
-			local source='[llm.generation]\ntemperature=0\nfuture=9223372036854775807 # exact\n'
+			local source='[llm.display]\npred_indent=0\nfuture=9223372036854775807 # exact\n'
 			local path=os.tmpname()
 			local file=assert(io.open(path,"wb")); assert(file:write(source)); assert(file:close())
 			local function bytes()
@@ -149,7 +152,7 @@ helpers.describe("Mac actual file authenticated integer candidate proof", functi
 				local capability
 				LeafRows.value_literal=function(value) if value==9007199254740992 then return "9007199254740993" end return original(value) end
 				local called,accepted=pcall(function()
-					local rows=LeafRows.prepare(source,{ {path={"llm","generation","temperature"},value=9007199254740992} })
+					local rows=LeafRows.prepare(source,{ {path={"llm","display","pred_indent"},value=9007199254740992} })
 					capability=LeafRows.publication_capability(rows[1])
 					return TomlWriter.batch_write(path,rows,file_owner)
 				end)
@@ -158,12 +161,12 @@ helpers.describe("Mac actual file authenticated integer candidate proof", functi
 				helpers.assert_true(capability~=nil)
 				helpers.assert_eq(accepted,false)
 				helpers.assert_eq(bytes(),source)
-				local rows=LeafRows.prepare(source,{ {path={"llm","generation","temperature"},value=9007199254740992} })
+				local rows=LeafRows.prepare(source,{ {path={"llm","display","pred_indent"},value=9007199254740992} })
 				helpers.assert_true(TomlWriter.batch_write(path,rows,file_owner))
-				helpers.assert_eq(bytes(),'[llm.generation]\ntemperature = 9007199254740992\nfuture=9223372036854775807 # exact\n')
+				helpers.assert_eq(bytes(),'[llm.display]\npred_indent = 9007199254740992\nfuture=9223372036854775807 # exact\n')
 				package.loaded["infra.preferences"]=nil
 				local state,status=helpers.load_with_stubs("infra.preferences").load(path)
-				helpers.assert_eq(status,"ok");helpers.assert_eq(state.llm_temperature,9007199254740992)
+				helpers.assert_eq(status,"ok");helpers.assert_eq(state.llm_pred_indent,9007199254740992)
 			end,debug.traceback)
 			os.remove(path)
 			if not okay then error(detail,0) end
@@ -173,8 +176,8 @@ end)
 
 helpers.describe("Mac native absent inline scalar preference",function()
 	local vectors={
-		{source='llm={generation={top_p=0.75,future=[]}} # keep\n',expected='llm={generation={top_p=0.75,future=[],temperature = 0.25}} # keep\n'},
-		{source='[llm]\ngeneration={top_p=0.75,future=[]} # keep\n',expected='[llm]\ngeneration={top_p=0.75,future=[],temperature = 0.25} # keep\n'},
+		{source='llm={display={top_p=0.75,future=[]}} # keep\n',expected='llm={display={top_p=0.75,future=[],pred_indent = 0.25}} # keep\n'},
+		{source='[llm]\ndisplay={top_p=0.75,future=[]} # keep\n',expected='[llm]\ndisplay={top_p=0.75,future=[],pred_indent = 0.25} # keep\n'},
 	}
 	for index,vector in ipairs(vectors) do
 		helpers.it("inserts absent known scalar with native file and fresh Preferences reader "..index,function()
@@ -186,12 +189,12 @@ helpers.describe("Mac native absent inline scalar preference",function()
 				local path=os.tmpname();local file=assert(io.open(path,"wb"));assert(file:write(vector.source));assert(file:close())
 				local okay,detail=xpcall(function()
 					local _,status=preferences.load(path);helpers.assert_eq(status,"ok")
-					helpers.assert_true(preferences.save(path,{llm_temperature=0.25},{},{}))
+					helpers.assert_true(preferences.save(path,{llm_pred_indent=0.25},{},{}))
 					local current=assert(io.open(path,"rb"));local bytes=assert(current:read("*a"));assert(current:close())
 					helpers.assert_eq(bytes,vector.expected..'\n[hotstrings]\nmodules = {  }\n\n[shortcuts]\nkeys = {  }\n')
 					package.loaded["infra.preferences"]=nil
 					local state,fresh_status=helpers.load_with_stubs("infra.preferences").load(path)
-					helpers.assert_eq(fresh_status,"ok");helpers.assert_eq(state.llm_temperature,0.25)
+					helpers.assert_eq(fresh_status,"ok");helpers.assert_eq(state.llm_pred_indent,0.25)
 				end,debug.traceback)
 				os.remove(path);if not okay then error(detail,0) end
 			end)

@@ -876,9 +876,18 @@ end
 
 function M.set_llm_temperature(t)
 	-- Reaches `temperature <= GREEDY_TEMP_THRESHOLD` in the shared prompt_builder
-	-- on the single-prediction path, which throws on a string
-	temperature = tonumber(t) or LLM_DEFAULTS.llm_temperature
+	-- on the single-prediction path, which throws on a string: the shared value
+	-- schema's declaration is checked first.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_GENERATION_TEMPERATURE), t)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Temperature '%s' refused (%s).", tostring(t), checked.reason)
+		return false
+	end
+	temperature = t
 	Logger.debug(LOG, "Temperature: %s.", tostring(temperature))
+	return true
 end
 
 function M.set_llm_num_predictions(n)
@@ -886,9 +895,16 @@ function M.set_llm_num_predictions(n)
 	-- path, since llm_auto_raise_temp ships enabled — which throws on a string.
 	-- Floor + clamp because a fractional or zero count would also make
 	-- compute_temperature and the streaming batch logic behave nonsensically.
-	local coerced = tonumber(n) or LLM_DEFAULTS.llm_num_predictions
-	num_predictions = math.max(MIN_NUM_PREDICTIONS, math.floor(coerced))
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_PROFILES_NUM_PREDICTIONS), n)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Prediction count '%s' refused (%s).", tostring(n), checked.reason)
+		return false
+	end
+	num_predictions = math.max(MIN_NUM_PREDICTIONS, n)
 	Logger.debug(LOG, "Prediction count: %s.", tostring(num_predictions))
+	return true
 end
 
 function M.set_llm_pred_indent(v)
@@ -1021,13 +1037,29 @@ function M.set_llm_min_words(w)
 	-- string, which later reaches `<=`/`>` comparisons in the shared prompt_builder
 	-- and `> 0` in the menu — both crash on a non-number. SettingsManager remains
 	-- the sole native plist publisher; this setter owns runtime state only.
-	min_words = tonumber(w) or LLM_DEFAULTS.llm_min_words
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_GENERATION_MIN_WORDS), w)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Min words '%s' refused (%s).", tostring(w), checked.reason)
+		return false
+	end
+	min_words = w
 	Logger.debug(LOG, "Min words: %s.", tostring(min_words))
+	return true
 end
 
 function M.set_llm_max_words(w)
-	max_words = tonumber(w) or LLM_DEFAULTS.llm_max_words
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_GENERATION_MAX_WORDS), w)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Max words '%s' refused (%s).", tostring(w), checked.reason)
+		return false
+	end
+	max_words = w
 	Logger.debug(LOG, "Max words: %s (0 = unlimited).", tostring(max_words))
+	return true
 end
 
 --- Reads the actual engine-owned runtime value for one transactional menu key.
@@ -1076,7 +1108,17 @@ function M.set_llm_debounce(seconds)
 	-- Coerce for the same reason as the other numeric setters: the value is fed
 	-- straight to setDelay() and to the adaptive-debounce arithmetic, and a string
 	-- from config.toml would blow up inside the timer callback where nothing logs
-	inactivity_debounce_sec = tonumber(seconds) or LLM_DEFAULTS.llm_debounce
+	-- The declaration is in milliseconds (-1 = never); the engine keeps seconds.
+	local declared_ms = type(seconds) == "number" and seconds ~= -1 and math.floor(seconds * 1000 + 0.5) or seconds
+	if type(seconds) == "number" and seconds ~= seconds then declared_ms = seconds end
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_TRIGGER_DEBOUNCE_MS), declared_ms)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Debounce '%s' refused (%s).", tostring(seconds), checked.reason)
+		return false
+	end
+	inactivity_debounce_sec = seconds
 	if _inactivity_timer then
 		if stop_inactivity_timer() ~= true then
 			Logger.error(LOG, "Debounce update rejected because the active timer could not be stopped.")

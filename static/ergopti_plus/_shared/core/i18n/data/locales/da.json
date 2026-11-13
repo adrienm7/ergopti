@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "fra",
 	"value_check.special.no_time_limit": "ingen tidsgrænse",
 	"value_check.special.never": "aldrig",
+	"value_check.special.unlimited": "ingen grænse",
 	"physical_shortcuts.window_title": "Fysiske genveje",
 	"physical_shortcuts.position": "Tastens position",
 	"physical_shortcuts.manual_hint": "Vælg en tastposition uafhængigt af det tegn, tasten skriver.",

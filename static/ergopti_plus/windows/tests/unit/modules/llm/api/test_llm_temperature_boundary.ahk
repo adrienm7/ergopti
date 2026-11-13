@@ -4,11 +4,11 @@ _LTB_CanonicalDecimalValuesNormalizeExactly() {
 	Cases := [
 		["0", "0.00"],
 		["0.10", "0.10"],
-		["1.5", "1.50"],
-		["2", "2.00"],
+		["1.3", "1.30"],
+		["1", "1.00"],
 		[0, "0.00"],
 		[0.25, "0.25"],
-		[2.0, "2.00"]
+		[1.3, "1.30"]
 	]
 	for Entry in Cases {
 		Normalized := false
@@ -25,7 +25,9 @@ _LTB_NonCanonicalAndOutOfDomainValuesFailClosed() {
 	Rejected := [
 		"0x10", "1e0", "1E+0", "+1", "-0", " 1", "1 ",
 		".5", "2.", "00.10", "1.000", "1.234", "2.0001",
-		"999999999999999999999999", "NaN", "Inf", -0.01, 0.123, 2.01
+		"999999999999999999999999", "NaN", "Inf", -0.01, 0.123, 2.01,
+		; Past the shared value schema's maximum (the inference canon's 1.3).
+		"1.31", "1.5", "2", 2.0
 	]
 	for Value in Rejected {
 		Normalized := "sentinel"

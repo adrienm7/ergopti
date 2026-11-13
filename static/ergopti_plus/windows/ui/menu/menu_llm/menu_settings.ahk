@@ -26,6 +26,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\..\infra\value_check.ahk
 #Include ../../../../_shared/ai/data/trigger_policy.ahk
 
 
@@ -674,11 +675,30 @@ _LLM_Menu_TryNormalizeIntegerPrompt(Result, Raw, Key, &Normalized,
 	Normalized := false
 	if Result != "OK"
 		return false
-	if !NumberTryParseInputInteger(Raw, &Parsed)
+	Declarations := LLM_Option_IntegerDeclarations()
+	if Declarations.Has(Key) {
+		; The shared value schema owns the grammar, the range and its refusal text.
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Declarations[Key]), String(Raw))
+		if !Typed["ok"]
+			return _LLM_Menu_NotifyRefusal(Declarations[Key], Typed, Raw, NotifyFn)
+		Parsed := Integer(Typed["value"])
+	} else if !NumberTryParseInputInteger(Raw, &Parsed)
 		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
 	if !LLM_Option_TryNormalize(Key, Parsed, &Normalized)
 		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
 	return true
+}
+
+; Shows a value schema refusal: the localized text naming the accepted range,
+; through the injected notifier when there is one, else the shared presenter.
+_LLM_Menu_NotifyRefusal(SchemaKey, Typed, Raw, NotifyFn := 0) {
+	if HasMethod(NotifyFn, "Call") {
+		try LoggerWarn("LLMMenu", "Typed value for {1} refused ({2}).", SchemaKey, Typed["reason"])
+		NotifyFn.Call(ValueCheckRenderMessage(ValueCheckMessageParts(ValueCheckEntryFor(SchemaKey), Typed),
+			(K) => t(K)), t("dialog.value_check.title"))
+	} else
+		ValueCheckShowRefusal(SchemaKey, Typed, Raw)
+	return false
 }
 
 _LLM_Menu_TryNormalizePortPrompt(Result, Raw, &Normalized, NotifyFn := 0) {
@@ -696,8 +716,12 @@ _LLM_Menu_TryNormalizeTemperaturePrompt(Result, Raw, &Normalized,
 	if Result != "OK"
 		return false
 	Raw := StrReplace(Raw, ",", ".")
-	if !LLM_Option_TryNormalizeTemperature(Raw, &Normalized)
-		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	if !LLM_Option_TryNormalizeTemperature(Raw, &Normalized) {
+		; The refusal names the shared value schema's range (and its two decimals).
+		Entry := ValueCheckEntryFor(ConfigKey.LLM_GENERATION_TEMPERATURE)
+		Refusal := Map("ok", false, "reason", "wrong_type", "min", Entry["min"], "max", Entry["max"])
+		return _LLM_Menu_NotifyRefusal(ConfigKey.LLM_GENERATION_TEMPERATURE, Refusal, Raw, NotifyFn)
+	}
 	return true
 }
 

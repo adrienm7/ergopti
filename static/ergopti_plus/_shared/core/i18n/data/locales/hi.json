@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "बंद",
 	"value_check.special.no_time_limit": "कोई समय सीमा नहीं",
 	"value_check.special.never": "कभी नहीं",
+	"value_check.special.unlimited": "कोई सीमा नहीं",
 	"physical_shortcuts.window_title": "भौतिक कुंजी शॉर्टकट",
 	"physical_shortcuts.position": "कुंजी की स्थिति",
 	"physical_shortcuts.manual_hint": "टाइप किए जाने वाले अक्षर से स्वतंत्र कुंजी की स्थिति चुनें।",

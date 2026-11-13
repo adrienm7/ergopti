@@ -3,6 +3,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 ; Generous but finite admission budgets. These protect boot/config inputs from
 ; turning canonical signature construction into an unbounded per-request walk.
@@ -352,15 +353,31 @@ LLM_Option_TryNormalizeTemperature(Value, &Normalized) {
 	} else {
 		return false
 	}
-	; This comparison also rejects non-finite/NaN candidates because they cannot
-	; satisfy both ordered bounds.
-	if !(Candidate >= 0.0 && Candidate <= 2.0)
+	; The shared value schema's declaration (0 to the inference canon's maximum
+	; temperature); it also refuses non-finite and NaN candidates.
+	if !ValueCheckValue(ValueCheckEntryFor(ConfigKey.LLM_GENERATION_TEMPERATURE), Candidate)["ok"]
 		return false
 	Rounded := Round(Candidate, 2)
 	if Abs(Candidate - Rounded) > 0.0000000001
 		return false
 	Normalized := Format("{:.2f}", Rounded)
 	return true
+}
+
+/**
+ * Each whole-number LLM option's declaration in the shared value schema, which
+ * owns its bounds and special values (the debounce's -1 = never).
+ * @returns {Map} Option key to its value schema key.
+ */
+LLM_Option_IntegerDeclarations() {
+	static Declarations := Map(
+		"n_predictions", ConfigKey.LLM_PROFILES_NUM_PREDICTIONS,
+		ConfigLeaf.MIN_WORDS, ConfigKey.LLM_GENERATION_MIN_WORDS,
+		ConfigLeaf.MAX_WORDS, ConfigKey.LLM_GENERATION_MAX_WORDS,
+		ConfigLeaf.DEBOUNCE_MS, ConfigKey.LLM_TRIGGER_DEBOUNCE_MS,
+		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, ConfigKey.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS,
+		"ctx_chars", ConfigKey.LLM_GENERATION_CONTEXT_LENGTH)
+	return Declarations
 }
 
 /**
@@ -377,13 +394,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	; public integer in this one table so boot restore, menu persistence, runtime
 	; publication and interactive setters cannot disagree. max_words=0 is the
 	; documented unlimited sentinel; the finite ceiling bounds token arithmetic.
-	static IntegerRanges := Map(
-		"n_predictions", [1, 10],
-		ConfigLeaf.MIN_WORDS, [1, 20],
-		ConfigLeaf.MAX_WORDS, [0, 10000],
-		ConfigLeaf.DEBOUNCE_MS, [50, 10000],
-		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, [0, 10000],
-		"ctx_chars", [50, 10000])
+	static IntegerRanges := LLM_Option_IntegerDeclarations()
 	static BooleanKeys := Map(
 		"enabled", true, ConfigLeaf.AUTO_PROFILE_FOR_MODEL, true,
 		ConfigLeaf.INSTANT_ON_WORD_END, true, ConfigLeaf.AFTER_HOTSTRING, true,
@@ -427,13 +438,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 			return false
 		if (Candidate != Value)
 			return false
-		; The stored "never" of the debounce: the one value outside its range.
-		if (Key == ConfigLeaf.DEBOUNCE_MS && Candidate == LLM_REQUEST_PLAN_NEVER_MS) {
-			Normalized := Candidate
-			return true
-		}
-		Range := IntegerRanges[Key]
-		if (Candidate < Range[1] || Candidate > Range[2])
+		if !ValueCheckValue(ValueCheckEntryFor(IntegerRanges[Key]), Candidate)["ok"]
 			return false
 		Normalized := Candidate
 		return true

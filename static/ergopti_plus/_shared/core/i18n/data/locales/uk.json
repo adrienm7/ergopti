@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "вимк.",
 	"value_check.special.no_time_limit": "без обмеження часу",
 	"value_check.special.never": "ніколи",
+	"value_check.special.unlimited": "без обмеження",
 	"physical_shortcuts.window_title": "Фізичні комбінації клавіш",
 	"physical_shortcuts.position": "Розташування клавіші",
 	"physical_shortcuts.manual_hint": "Виберіть розташування клавіші незалежно від введеного символу.",

@@ -15,7 +15,8 @@ _LNR_Ranges() {
 		"min_words", Map("min", 1, "max", 20, "baseline", 3),
 		"max_words", Map("min", 0, "max", 10000, "baseline", 15),
 		"debounce_ms", Map("min", 50, "max", 10000, "baseline", 500),
-		"ctx_chars", Map("min", 50, "max", 10000, "baseline", 500),
+		; The shared value schema's 80 to 4000 (the context buffer's limit).
+		"ctx_chars", Map("min", 80, "max", 4000, "baseline", 500),
 		"pred_indent", Map("min", -7, "max", 7, "baseline", 0))
 }
 
@@ -359,13 +360,21 @@ Test("LLM integer prompt: an overflowing decimal cannot alias a valid prediction
 _LNR_InputIntegerGrammarPreserved() {
 	Notices := [], Normalized := false
 	Notify := (Body, Title) => Notices.Push(Body)
-	for Raw in [3, "3", "+3", "0x3", "+0x0003", "0X3", "0X0003", "0003", "+0003", " 3 ", "`t3`t"] {
-		AssertTrue(IsInteger(Raw), "The compatibility control must belong to the original native integer grammar")
+	for Raw in [3, "3", "+3", "0003", "+0003", " 3 ", "`t3`t"] {
 		AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", Raw, "n_predictions", &Normalized, Notify),
-			"Native integer syntax that represents3 must keep its prior public prompt behavior")
+			"Decimal integer text that represents 3 is accepted by the shared value check")
 		AssertTrue(Normalized is Integer)
 		AssertEqual(3, Normalized)
 	}
+	AssertEqual(0, Notices.Length, "Valid decimal syntax remains silent")
+	; The shared value schema's grammar: a hexadecimal spelling is refused with
+	; the accepted range, on every OS alike, never reinterpreted.
+	for Raw in ["0x3", "+0x0003", "0X3"] {
+		Before := Notices.Length
+		AssertFalse(_LLM_Menu_TryNormalizeIntegerPrompt("OK", Raw, "n_predictions", &Normalized, Notify))
+		AssertEqual(Before + 1, Notices.Length, "a refused spelling is explained once: " . Raw)
+	}
+	Notices := []
 	for Raw in ["-3", "-0003", "-0x3"] {
 		AssertTrue(IsInteger(Raw), "Signed negative controls use the same original native grammar")
 		AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", Raw, "pred_indent", &Normalized, Notify))

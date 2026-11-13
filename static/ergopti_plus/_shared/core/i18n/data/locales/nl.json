@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "uit",
 	"value_check.special.no_time_limit": "geen tijdslimiet",
 	"value_check.special.never": "nooit",
+	"value_check.special.unlimited": "geen limiet",
 	"physical_shortcuts.window_title": "Fysieke sneltoetsen",
 	"physical_shortcuts.position": "Toetspositie",
 	"physical_shortcuts.manual_hint": "Kies een toetspositie, onafhankelijk van het teken dat de toets typt.",

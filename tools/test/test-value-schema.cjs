@@ -201,7 +201,14 @@ function manifestDefault(manifest, key) {
 	const segments = key.split('.');
 	const id = segments.pop();
 	let node = manifest.features;
-	for (const segment of segments) node = node && node[segment];
+	for (const segment of segments) {
+		// [[features.llm.generation]] after [[features.llm]] rows attaches to an
+		// element of the features.llm array (TOML array-of-tables semantics).
+		if (Array.isArray(node)) {
+			node = node.flatMap((element) => (element && element[segment]) || []);
+			if (node.length === 0) node = undefined;
+		} else node = node && node[segment];
+	}
 	const row = Array.isArray(node) ? node.find((item) => item.id === id) : null;
 	return row ? row.default : undefined;
 }
@@ -257,7 +264,15 @@ function checkDeclarations(V, en) {
 				check(Number.isFinite(item.value), `${where}: a special value is a number`);
 				check(typeof en[item.label_key] === 'string', `${where}: en.json has ${item.label_key}`);
 			}
-			if (entry.max_from) {
+			if (entry.max_from && entry.max_from.file) {
+				// A maximum another shared file owns: read it there, never restate it.
+				const text = fs.readFileSync(path.join(SP, '_shared', entry.max_from.file), 'utf8');
+				const found = new RegExp(entry.max_from.pattern).exec(text);
+				check(
+					found && Number(found[1]) === entry.max,
+					`${where}: max ${entry.max} equals ${entry.max_from.file}`
+				);
+			} else if (entry.max_from) {
 				const value = timingValue(timings, entry.max_from.timing);
 				check(
 					value !== undefined && Math.abs(value * entry.max_from.scale - entry.max) < 1e-9,
@@ -300,11 +315,16 @@ function checkConfigSchema(schema) {
 		const where = `config.schema.json ${name}`;
 		if (entry.type === 'integer') check(node.type === 'integer', `${where}: type integer`);
 		if (entry.type === 'integer' || entry.type === 'decimal') {
+			// A JSON schema bound cannot skip a gap: a special value outside the
+			// range (the debounce's -1 = never) widens it to that value.
+			const specials = (entry.special || []).map((item) => item.value);
+			const min = Math.min(entry.min, ...specials);
+			const max = Math.max(entry.max, ...specials);
 			check(
-				node.minimum === entry.min && node.exclusiveMinimum === undefined,
-				`${where}: minimum ${entry.min}`
+				node.minimum === min && node.exclusiveMinimum === undefined,
+				`${where}: minimum ${min}`
 			);
-			check(node.maximum === entry.max, `${where}: maximum ${entry.max}`);
+			check(node.maximum === max, `${where}: maximum ${max}`);
 		}
 	}
 }

@@ -4277,6 +4277,7 @@
 	"value_check.special.off": "выкл.",
 	"value_check.special.no_time_limit": "без ограничения времени",
 	"value_check.special.never": "никогда",
+	"value_check.special.unlimited": "без ограничения",
 	"physical_shortcuts.window_title": "Физические сочетания клавиш",
 	"physical_shortcuts.position": "Положение клавиши",
 	"physical_shortcuts.manual_hint": "Выберите положение клавиши независимо от вводимого символа.",
