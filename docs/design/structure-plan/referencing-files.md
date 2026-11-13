@@ -8,9 +8,9 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 
 ## ci-workflow (7 files)
 
-- `.github/workflows/ci-linux.yml` — S01, S12, S29, S35, S37, S38
+- `.github/workflows/ci-linux.yml` — S01, S12, S29, S35, S37
 - `.github/workflows/ci-macos.yml` — S01, S35, S38
-- `.github/workflows/ci-windows.yml` — S01, S06, S21, S33, S38
+- `.github/workflows/ci-windows.yml` — S01, S06, S21, S33
 - `.github/workflows/ci.yml` — S01
 - `.github/workflows/linux-layout.yml` — S01
 - `.github/workflows/remap-runtime-build.yml` — S01
@@ -24,7 +24,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `static/ergopti_plus/windows/vendor/ergopti_nav_owner.manifest.json` — S16
 - `tools/build/build-features-manifest.js` — S01
 - `tools/build/build-menu-manifest.js` — S01
-- `tools/build/macos-bundle-manifest.json` — S01, S21, S33, S38
+- `tools/build/macos-bundle-manifest.json` — S01, S21, S33
 - `tools/build/windows_bundle_manifest.json` — S01, S21
 - `tools/test/fixtures/badge-root-predecessor/menu_manifest.json` — S01
 
@@ -282,18 +282,16 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/locale/report-identical-to-english.cjs` — S01
 - `tools/maintainer/windows-live-checks-list.cjs` — S01
 
-## repo-test (566 files)
+## repo-test (553 files)
 
 - `tools/lint/audit-file-headers.cjs` — S01, S27, S33, S34, S35
 - `tools/lint/audit-gui-titles.cjs` — S01, S12
 - `tools/lint/audit-translations.cjs` — S01
 - `tools/lint/config-key-literal-baseline.json` — S01
-- `tools/lint/fix-pinned-source-reads.cjs` — S38
 - `tools/lint/hex-literal-baseline.json` — S01
 - `tools/lint/identifier-literal-baseline.json` — S01, S21
-- `tools/lint/lint-conventions.js` — S01, S29, S33, S34, S35, S38
+- `tools/lint/lint-conventions.js` — S01, S29, S33, S34, S35
 - `tools/lint/log-vocabulary-free-form-baseline.json` — S04, S06, S07, S11, S15, S18, S21, S24, S28, S30, S33, S35
-- `tools/test/ahk-parallel.cjs` — S38
 - `tools/test/browser/changelog-release-install.playwright.cjs` — S01
 - `tools/test/browser/layer-editor.playwright.cjs` — S01
 - `tools/test/browser/layout-composer.playwright.cjs` — S01
@@ -354,12 +352,10 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/macos_managed_ollama_pull_caller_test.py` — S21
 - `tools/test/macos_managed_ollama_source_test.py` — S01
 - `tools/test/macos_mlx_bootstrap_workspace_test.py` — S21
-- `tools/test/macos_native_http_client_root_controls.py` — S38
 - `tools/test/macos_native_http_clock_contract_controls.py` — S38
 - `tools/test/macos_native_http_clock_passive_receiving_controls.py` — S38
 - `tools/test/macos_native_http_failure_stage_test.py` — S01
-- `tools/test/macos_native_http_fixture_builder_controls.py` — S38
-- `tools/test/macos_native_http_receiving_facts_test.py` — S01, S38
+- `tools/test/macos_native_http_receiving_facts_test.py` — S01
 - `tools/test/macos_native_ollama_alias_api_test.py` — S01, S08
 - `tools/test/macos_native_ollama_api_test.py` — S08
 - `tools/test/macos_network_check_workspace_test.py` — S21
@@ -381,7 +377,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/native_pac_source_fixture_test.py` — S38
 - `tools/test/native_python_probe_test.lua` — S01, S03, S04, S07, S09, S21
 - `tools/test/prepare-linux-managed-http-snapshot.py` — S08
-- `tools/test/run-ahk-under-wine.sh` — S01, S38
+- `tools/test/run-ahk-under-wine.sh` — S01
 - `tools/test/run-compiled-save-upgrade.ps1` — S01
 - `tools/test/run-compiled-user-hotstrings.ps1` — S01
 - `tools/test/run-go-proxy-relay.cjs` — S01
@@ -391,8 +387,8 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/run-linux-http-stream-receipts.cjs` — S01
 - `tools/test/run-linux-managed-http-native.cjs` — S01
 - `tools/test/run-linux-runtime-native.cjs` — S01, S37
-- `tools/test/run-linux-updater-archive-native.cjs` — S27, S37
-- `tools/test/run-linux-updater-temp-native.cjs` — S08, S35, S37
+- `tools/test/run-linux-updater-archive-native.cjs` — S27
+- `tools/test/run-linux-updater-temp-native.cjs` — S08, S35
 - `tools/test/run-linux-window-switch-receipts.cjs` — S01
 - `tools/test/run-linux-xkb-source.cjs` — S01
 - `tools/test/run-nav-event-owner-portable.cjs` — S16
@@ -416,14 +412,8 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-ahk-format-placeholders.cjs` — S01
 - `tools/test/test-ahk-full-startup-smoke.cjs` — S01, S36
 - `tools/test/test-ahk-local-same-as-global.cjs` — S12, S24
-- `tools/test/test-ahk-module-matrix.cjs` — S38
-- `tools/test/test-ahk-not-executed.cjs` — S38
-- `tools/test/test-ahk-parallel.cjs` — S38
-- `tools/test/test-ahk-runner-scan-streaming.cjs` — S38
-- `tools/test/test-ahk-runners-are-invoked.cjs` — S38
 - `tools/test/test-ahk-startup-contract.cjs` — S06, S18, S24
 - `tools/test/test-ahk-suite-manifest.cjs` — S01, S06
-- `tools/test/test-ahk-test-coverage.cjs` — S38
 - `tools/test/test-ahk-tray-rows-read-as-text.cjs` — S01, S36
 - `tools/test/test-app-cloner-families.cjs` — S01
 - `tools/test/test-app-cloner-generated-literals.cjs` — S01
@@ -581,7 +571,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-linux-portable-commands.cjs` — S09
 - `tools/test/test-linux-portable-network-registration.cjs` — S01
 - `tools/test/test-linux-runner-private-output.cjs` — S18
-- `tools/test/test-linux-runtime-acceptance-diagnostics.py` — S01, S35, S37
+- `tools/test/test-linux-runtime-acceptance-diagnostics.py` — S01, S35
 - `tools/test/test-linux-runtime-native-registration.cjs` — S01, S08, S09, S21, S37
 - `tools/test/test-linux-shared-path-resolver.cjs` — S01, S04, S18
 - `tools/test/test-linux-shell-messages.cjs` — S27
@@ -619,7 +609,6 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-logger-scalars-single-source.cjs` — S01, S06, S07
 - `tools/test/test-lua-closure-before-local.cjs` — S01
 - `tools/test/test-lua-features-manifest-projection.cjs` — S01
-- `tools/test/test-lua-fixtures-stay-out-of-the-repo.cjs` — S38
 - `tools/test/test-lua-undefined-globals.cjs` — S01
 - `tools/test/test-luajit-52-isms.cjs` — S01
 - `tools/test/test-macos-bundle-layout.cjs` — S01, S06
@@ -701,7 +690,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-native-menu-census-admission.cjs` — S01, S19, S21, S33
 - `tools/test/test-native-menu-flags.cjs` — S05
 - `tools/test/test-native-menu-rows.cjs` — S01, S19, S20, S21, S33, S35
-- `tools/test/test-native-pac-source-contract.cjs` — S01, S38
+- `tools/test/test-native-pac-source-contract.cjs` — S01
 - `tools/test/test-nav-layer-recommended-golden.cjs` — S01, S28
 - `tools/test/test-network-field-check-parity.cjs` — S01, S08, S19, S24
 - `tools/test/test-network-pac-helpers.cjs` — S01
@@ -728,9 +717,9 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-physical-keys-registry.cjs` — S01, S15, S28, S34
 - `tools/test/test-platform-reason-wording.cjs` — S01
 - `tools/test/test-platform-restrictions-explained.cjs` — S01
-- `tools/test/test-port-compliance.cjs` — S01, S08, S35
+- `tools/test/test-port-compliance.cjs` — S01, S02, S08, S35
 - `tools/test/test-port-vector-traceability.cjs` — S06
-- `tools/test/test-preview-masking-cross-driver.cjs` — S01, S12, S26, S38
+- `tools/test/test-preview-masking-cross-driver.cjs` — S01, S12, S26
 - `tools/test/test-priority-parity.cjs` — S01, S18, S26
 - `tools/test/test-prompt-builder-constants-parity.cjs` — S01
 - `tools/test/test-prompt-editor-bridge.cjs` — S21
@@ -744,7 +733,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-release-notes-assets-are-uploaded.cjs` — S01
 - `tools/test/test-release-packaging-workflow.cjs` — S01, S06
 - `tools/test/test-remap-runtime-manifest.cjs` — S01, S28
-- `tools/test/test-repo-url-single-source.cjs` — S01, S38, unknown
+- `tools/test/test-repo-url-single-source.cjs` — S01, unknown
 - `tools/test/test-restore-recommended-no-confirm.cjs` — S01
 - `tools/test/test-script-chords-three-os.cjs` — S01, S18, S28, S33
 - `tools/test/test-section-decoration-parity.cjs` — S01, S05, S19
@@ -754,7 +743,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-shared-js-is-loadable.cjs` — S01
 - `tools/test/test-shared-js-is-reachable.cjs` — S01, S12
 - `tools/test/test-shared-lua-gate-coverage.cjs` — S01
-- `tools/test/test-shared-lua-helpers-single-use.cjs` — S01, S09, S12, S21, S22, S23, S28, S29, S38
+- `tools/test/test-shared-lua-helpers-single-use.cjs` — S01, S09, S12, S21, S22, S23, S28, S29
 - `tools/test/test-shared-pages-never-show-raw-keys.cjs` — S01, S12
 - `tools/test/test-shared-root-resolvers.cjs` — S01, S18
 - `tools/test/test-shared-sources-are-lf.cjs` — S01
@@ -802,7 +791,6 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-updater-copy-is-shown.cjs` — S01
 - `tools/test/test-user-action-vectors-shared.cjs` — S01, S25
 - `tools/test/test-utf8-compat.lua` — S01
-- `tools/test/test-verify-change-ahk-registration.cjs` — S38
 - `tools/test/test-verify-change-full-plan.cjs` — S01, S08, S09, S21, S26, S29, S30, S37
 - `tools/test/test-verify-change-red-classification.cjs` — S21
 - `tools/test/test-version-compare-contract.cjs` — S01, S35
@@ -827,7 +815,6 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/test-windows-llm-nav-cycle.cjs` — S01, S16
 - `tools/test/test-windows-managed-bootstrap.cjs` — S04, S21
 - `tools/test/test-windows-metrics-range-bridge.cjs` — S30
-- `tools/test/test-windows-native-desktop.cjs` — S38
 - `tools/test/test-windows-proxy-override-e2e.cjs` — S01
 - `tools/test/test-windows-proxy-relay-bundle.cjs` — S01, S21
 - `tools/test/test-windows-proxy-relay-e2e.cjs` — S01
@@ -851,15 +838,14 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `tools/test/timer-literal-baseline.json` — S03, S06, S09, S12, S21, S24, S26, S29, S30, S33
 - `tools/test/verify-change.cjs` — S01, S04, S06, S07, S08, S09, S11, S15, S21, S25, S26, S29, S30, S33, S35, S37, S38
 
-## other (362 files)
+## other (361 files)
 
 - `.github/ISSUE_TEMPLATE/bug_report.yml` — S01
 - `.github/ISSUE_TEMPLATE/feature_request.yml` — S01
 - `.github/ci/stable_v102_macos_native_qualification_exception.json` — S38
 - `.github/ci/stable_v103_macos_native_qualification_exception.json` — S38
-- `.gitignore` — S01, S27, S38
-- `.husky/pre-commit` — S01, S38
-- `.luacheckrc` — S38
+- `.gitignore` — S01, S27
+- `.husky/pre-commit` — S01
 - `.prettierignore` — S01, S21
 - `package.json` — S21
 - `src/lib/js/driverWindowHost.js` — S01
@@ -960,7 +946,7 @@ Workflows, packaging manifests, build scripts, tools and repository tests that s
 - `static/ergopti_plus/_shared/modules/features/behaviors.json` — S15, S26, S29
 - `static/ergopti_plus/_shared/modules/features/linux_evidence.json` — S01, S05, S12, S14, S15, S18, S19, S21, S22, S24, S25, S26, S28, S29, S30, S33, S34, S37
 - `static/ergopti_plus/_shared/modules/features/manifest.toml` — S01, S28
-- `static/ergopti_plus/_shared/modules/features/requirements.toml` — S01, S28
+- `static/ergopti_plus/_shared/modules/features/requirements.toml` — S01, S04, S12, S14, S18, S21, S24, S25, S26, S28, S29, S30, S32, S33, S34, S35, unknown
 - `static/ergopti_plus/_shared/modules/features/shortcuts.toml` — S01, S33
 - `static/ergopti_plus/_shared/modules/hotstrings/_index.toml` — S01
 - `static/ergopti_plus/_shared/modules/hotstrings/autocorrection.toml` — S01
