@@ -48,7 +48,7 @@ local SPACE_LAYER = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_
 
 helpers.describe("tap-hold roll: a typing key is decided by the order of the releases", function()
 	helpers.it("retains the first origin when a second same-code source cannot be captured", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local engine = Engine.new({ keys = { space = { hold_modifier = "shift" } }, roll_keys = { "space" },
 			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
 		local first, calls = {}, 0
@@ -66,7 +66,7 @@ helpers.describe("tap-hold roll: a typing key is decided by the order of the rel
 	end)
 
 	helpers.it("does not capture or journal an ordinary unconfigured key", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local engine = Engine.new({ keys = {}, roll_keys = { "space" }, tap_min_ms = 0,
 			lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
 		local captures = 0
@@ -79,7 +79,7 @@ helpers.describe("tap-hold roll: a typing key is decided by the order of the rel
 	end)
 
 	helpers.it("journals both instant actions in physical order", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local engine = Engine.new({ keys = { space = { hold_modifier = "shift" }, escape = { tap_action = "copy" },
 			delete = { tap_action = "paste" } }, roll_keys = { "space" }, tap_min_ms = 0,
 			lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
@@ -186,7 +186,7 @@ helpers.describe("tap-hold roll: a typing key is decided by the order of the rel
 	end)
 
 	helpers.it("(tap-hold-roll-is-a-tap-2026-10-01) the typing keys are the shared list", function()
-		local loaded = require("platform.remap.tap_hold_loader").load(DEFAULTS, nil)
+		local loaded = require("tap_hold.engine.loader").load(DEFAULTS, nil)
 		table.sort(loaded.roll_keys)
 		helpers.assert_eq(table.concat(loaded.roll_keys, ","), "backspace,delete,enter,escape,space,tab")
 		helpers.assert_true(LSHIFT == 42 and LCTRL == 29, "the modifier codes the streams above read")

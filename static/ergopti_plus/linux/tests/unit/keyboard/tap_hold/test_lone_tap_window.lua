@@ -17,7 +17,7 @@ local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_f
 local helpers, Engine, DOWN, UP, SHIFT, CTRL, CAPS, KEY_A, trail =
 	Fixture.helpers, Fixture.Engine, Fixture.DOWN, Fixture.UP, Fixture.SHIFT, Fixture.CTRL, Fixture.CAPS,
 	Fixture.KEY_A, Fixture.trail
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
@@ -65,7 +65,7 @@ local function fresh_writer()
 	assert(made == true or made == 0, "the isolated configuration folder must exist")
 	local path = dir .. "/tap_hold.toml"
 	local state = { reloads = 0 }
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({
 		path = path,
 		reload = function() state.reloads = state.reloads + 1; return true end,

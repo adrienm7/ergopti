@@ -1,4 +1,4 @@
---- ui/menu/menu_tap_holds.lua
+--- tap_hold/ui/menu_tap_holds.lua
 
 --- ==============================================================================
 --- MODULE: Linux Menu Tap-Hold Submenu
@@ -20,7 +20,7 @@ local prompt_text = require("menu.ui.builder.dialogs").prompt_text
 local show_error = require("menu.ui.builder.dialogs").show_error
 local plain_markup = require("menu.ui.builder.dialogs").plain_markup
 
-local LOG = "ui.menu.menu_tap_holds"
+local LOG = "tap_hold.ui.menu_tap_holds"
 
 --- Display name of a tap-hold key: its name in the shared key name table, the
 --- one the Windows and macOS menus show. A key the table does not name raises
@@ -82,7 +82,7 @@ local function _build_tap_holds(ctx)
 		if not declared or #declared ~= 1 then return nil end
 		return declared[1]
 	end
-	local Writer = require("platform.remap.tap_hold_writer")
+	local Writer = require("tap_hold.engine.writer")
 	local HoldOptions = require("tap_hold.engine.hold_options")
 	local KeyCatalog = require("tap_hold.engine.key_catalog")
 
@@ -103,7 +103,7 @@ local function _build_tap_holds(ctx)
 		if not ok or type(scope) ~= "function" then return nil end
 		local function ports_current()
 			return ctx.tap_holds == th and th.capture_configuration_edit == capture_edit
-				and package.loaded["platform.remap.tap_hold_writer"] == Writer and Writer[setter_name] == setter
+				and package.loaded["tap_hold.engine.writer"] == Writer and Writer[setter_name] == setter
 				and type(is_paused) == "function" and ctx.is_paused == is_paused
 		end
 		local function current()
@@ -219,7 +219,7 @@ local function _build_tap_holds(ctx)
 	local function ask_global_delay(current_ms)
 		local guard, setter = edit_guard("set_global_threshold")
 		if not guard then changed(false); return false end
-		local default_ms = math.floor(require("platform.remap.tap_hold_loader").GLOBAL_DEFAULT_SECONDS * 1000 + 0.5)
+		local default_ms = math.floor(require("tap_hold.engine.loader").GLOBAL_DEFAULT_SECONDS * 1000 + 0.5)
 		local value = prompt_text(i18n_safe("menu.tapholds.tap_hold_dialog_title"),
 			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
 			tostring(current_ms))
@@ -249,7 +249,7 @@ local function _build_tap_holds(ctx)
 			i18n_safe("menu.tapholds.sticky_dialog_prompt"), tostring(current_ms))
 		if value == nil then return false end
 		local ms = tonumber(value)
-		local Loader = require("platform.remap.tap_hold_loader")
+		local Loader = require("tap_hold.engine.loader")
 		if not ms or ms ~= ms or not Loader.valid_one_shot_timeout_ms(math.floor(ms)) then
 			Logger.warn(LOG, "Invalid one-shot timeout '%s' — ignored.", tostring(value))
 			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
@@ -409,7 +409,7 @@ local function _build_tap_holds(ctx)
 	-- acknowledging the candidate before it is published.
 	local function apply_scope(mode)
 		-- Runs while paused: a pause stops typing, not configuration (EDD-1).
-		local committed = require("infra.tap_hold_scope").apply(mode)
+		local committed = require("tap_hold.engine.scope").apply(mode)
 		changed(committed)
 		return committed
 	end

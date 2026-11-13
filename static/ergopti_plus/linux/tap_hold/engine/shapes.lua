@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_shapes.lua
+--- tap_hold/engine/shapes.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold Table Admission (Linux)

@@ -1,4 +1,4 @@
---- adapters/one_shot_shift.lua
+--- tap_hold/one_shot_shift.lua
 
 --- ==============================================================================
 --- MODULE: One-shot Shift Native Event Adapter
@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local State = require("modules.keymap.one_shot_shift")
+local State = require("tap_hold.engine.one_shot_shift")
 local Keycodes = require("platform.input.keycodes.core")
 local Timer = require("core.events.timer_scheduler")
 local SyntheticInput = require("platform.input.synthetic_input")

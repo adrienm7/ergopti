@@ -88,7 +88,7 @@ helpers.with_fresh_modules({
 	"keyboard.engine.runtime.generator",
 	"layouts.engine.registry.registry",
 	"core.text.engine.toml_codec",
-	"adapters.one_shot_shift",
+	"tap_hold.one_shot_shift",
 }, function()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["settings.engine.paths"] = {
@@ -121,7 +121,7 @@ helpers.with_fresh_modules({
 
 	local Config    = helpers.load_with_stubs("keyboard.engine.runtime.config")
 	local Generator = helpers.load_with_stubs("keyboard.engine.runtime.generator")
-	local OneShot   = require("adapters.one_shot_shift")
+	local OneShot   = require("tap_hold.one_shot_shift")
 	local Defaults  = require("keyboard.engine.runtime.defaults")
 
 	local actions = assert(Config.load_available_actions(DATA_DIR .. "actions.json"))

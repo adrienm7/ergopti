@@ -121,7 +121,7 @@ Test("LLM accept: no hotkey is named by the Tab key while SC00F hotkeys exist (l
 	_LTAV_NoHotkeyIsNamedByTheTabKey)
 
 _LTAV_AcceptanceVariantOwnsTheKeyWithoutTapHold() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Variants := _LTAV_Variants(Src, "SC00F")
 	Exact := []
 	for Variant in Variants {

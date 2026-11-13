@@ -78,7 +78,7 @@
 # (depth-first, left to right — ctrl, ctrl+shift, ctrl+shift+alt, …), then one
 # entry per layer.
 #
-# It lived in windows/platform/remap/tap_hold_writer.ahk until 2026-08-08, as a
+# It lived in windows/tap_hold/engine/writer.ahk until 2026-08-08, as a
 # hardcoded array whose comment said it "mirrors _shared/menu/data/
 # menu_manifest.json hold_options" — a key that has never existed in that file.
 # So the canonical list was a copy pointing at nothing, and the two Lua drivers

@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
@@ -46,7 +46,7 @@ local function with_file(text, body)
 	local path = os.tmpname()
 	os.remove(path)
 	if text then write_file(path, text) end
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({
 		path = path,
 		reload = function() return true end,

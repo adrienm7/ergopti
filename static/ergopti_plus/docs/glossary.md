@@ -235,7 +235,7 @@ configuration folder, written in the vocabulary of
 navigation layer from the user's `layers.toml` (no file = no binding): Windows
 registers hotkeys (`windows/keyboard/engine/layers/nav_layer_table.ahk`) and macOS
 deploys a Karabiner rule (`macos/keyboard/engine/layers/nav_layer.lua`). Linux runs
-its navigation layer in `linux/platform/remap/tap_hold_engine.lua`; connecting
+its navigation layer in `linux/tap_hold/engine/engine.lua`; connecting
 the shared layer file to that native engine remains pending. Linux has no
 Kanata runtime or generated Kanata configuration. The preset reproduces the
 Windows layer key for key.

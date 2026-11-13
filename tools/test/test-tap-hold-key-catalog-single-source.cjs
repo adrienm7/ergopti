@@ -43,7 +43,7 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
 const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const MAC_KEYS = path.join(SP, 'macos', 'keyboard', 'data', 'tap_hold_keys.json');
-const LINUX_ENGINE = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua');
+const LINUX_ENGINE = path.join(SP, 'linux', 'tap_hold', 'engine', 'engine.lua');
 const WINDOWS_REMAP = path.join(SP, 'windows');
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
@@ -223,7 +223,7 @@ sameKeys('hs', macKeys, 'macos/keyboard/data/tap_hold_keys.json', true);
 const linuxEngine = stripLineComments(read(LINUX_ENGINE), '.lua');
 const codes = linuxEngine.match(/M\.KEY_CODES\s*=\s*\{([\s\S]*?)\}/);
 const linuxKeys = codes ? [...codes[1].matchAll(/([a-z_]+)\s*=\s*\d+/g)].map((m) => m[1]) : [];
-sameKeys('linux', linuxKeys, 'linux/platform/remap/tap_hold_engine.lua KEY_CODES', false);
+sameKeys('linux', linuxKeys, 'linux/tap_hold/engine/engine.lua KEY_CODES', false);
 
 // Windows: every key a platform/remap hotkey reads a tap or a hold for.
 const windowsKeys = new Set();
@@ -235,7 +235,7 @@ for (const file of fs.readdirSync(WINDOWS_REMAP).filter((f) => f.endsWith('.ahk'
 		windowsKeys.add(m[1]);
 	}
 }
-sameKeys('ahk', [...windowsKeys], 'windows/platform/remap/*.ahk', false);
+sameKeys('ahk', [...windowsKeys], 'windows/tap_hold/engine/*.ahk', false);
 
 // ==========================================
 // ==========================================
@@ -245,7 +245,7 @@ sameKeys('ahk', [...windowsKeys], 'windows/platform/remap/*.ahk', false);
 
 const READERS = [
 	{
-		file: 'macos/ui/menu/menu_tap_holds.lua',
+		file: 'macos/tap_hold/ui/menu_tap_holds.lua',
 		reads: /require\("tap_hold\.engine\.key_catalog"\)/,
 		retired: [/tap_hold_keys_catalog/, /LEFT_HAND_IDS/, /_load_left_hand_from_catalog/]
 	},
@@ -255,17 +255,17 @@ const READERS = [
 		retired: [/KEY_ORDER/]
 	},
 	{
-		file: 'linux/platform/remap/tap_hold_engine.lua',
+		file: 'linux/tap_hold/engine/engine.lua',
 		reads: null,
 		retired: [/KEY_ORDER/]
 	},
 	{
-		file: 'linux/platform/remap/tap_hold_loader.lua',
+		file: 'linux/tap_hold/engine/loader.lua',
 		reads: /require\("tap_hold\.engine\.key_catalog"\)/,
 		retired: []
 	},
 	{
-		file: 'windows/platform/remap/tap_hold_writer.ahk',
+		file: 'windows/tap_hold/engine/writer.ahk',
 		reads: /"tap_hold\.catalog"/,
 		retired: [/tap_hold_keys_catalog/, /Map\("id",\s*"[a-z_]+",\s*"i18n",\s*"tap_hold\.group\./]
 	}
@@ -294,7 +294,10 @@ for (const reader of READERS) {
 // ================================================
 // ================================================
 
-const macMenu = stripLineComments(read(path.join(SP, 'macos/ui/menu/menu_tap_holds.lua')), '.lua');
+const macMenu = stripLineComments(
+	read(path.join(SP, 'macos/tap_hold/ui/menu_tap_holds.lua')),
+	'.lua'
+);
 if (
 	!/require\("tap_hold\.engine\.combination_labels"\)/.test(macMenu) ||
 	!macMenu.includes(
@@ -354,7 +357,7 @@ const manifest = TOML.parse(
 manifest.menu = require('../lib/menu-source.cjs').readMenuTables(TOML.parse);
 const combinations = manifest.menu.shortcuts_menu.find((row) => row.id === 'key_combinations');
 const linuxManager = stripLineComments(
-	read(path.join(SP, 'linux/platform/remap/tap_hold_manager.lua')),
+	read(path.join(SP, 'linux/tap_hold/engine/manager.lua')),
 	'.lua'
 );
 const linuxPairs = stripLineComments(
@@ -474,7 +477,7 @@ function savedLinuxOneShotClosure(sources) {
 		managerAt >= 0 &&
 		hookAt > managerAt &&
 		daemon.indexOf('TapHold.init({') > hookAt &&
-		keystats.includes('require("platform.remap.tap_hold_manager")') &&
+		keystats.includes('require("tap_hold.engine.manager")') &&
 		// CapsWord is an ordinary executor action: handing its id back to the
 		// Hook would start the engine's second, settings-less CapsWord.
 		bodies.tap.startsWith('if action == "one_shot_shift" then return action end') &&
@@ -723,7 +726,7 @@ for (const [index, token] of [
 	[4, 'pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)'],
 	[5, 'require("metrics.engine.keystats")'],
 	[5, 'TapHold.init({'],
-	[6, 'require("platform.remap.tap_hold_manager")']
+	[6, 'require("tap_hold.engine.manager")']
 ]) {
 	const changed = linuxSources.slice();
 	if (!changed[index].includes(token))

@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_migration.lua
+--- tap_hold/engine/migration.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold File Migration (Linux)
@@ -21,7 +21,7 @@
 local M = {}
 
 local Migrate = require("tap_hold.engine.migrate")
-local Shapes = require("platform.remap.tap_hold_shapes")
+local Shapes = require("tap_hold.engine.shapes")
 local Paths = require("core.fs.engine.paths")
 
 M.META_SECTION = Migrate.META_SECTION

@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- @param source string TOML source.
 --- @param body function Receives { config, path, load, read, errors }.
 local function with_file(source, body)
-	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
+	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
 		"core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()

@@ -152,8 +152,8 @@ end
 --- @param path string Absolute config.toml path.
 --- @return table|nil values nil when the tap-hold file cannot be read.
 local function tap_hold_values_of(state, path)
-	local writer = dependency(state, "tap_hold_writer", "platform.remap.tap_hold_writer")
-	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	local writer = dependency(state, "tap_hold_writer", "tap_hold.engine.writer")
+	local loader = dependency(state, "tap_hold_loader", "tap_hold.engine.loader")
 	if not writer or not loader then
 		Logger.error(LOG, "The tap-hold keys in force cannot be read: the tap-hold owner is unavailable.")
 		return nil
@@ -352,8 +352,8 @@ end
 --- @param keys table The engine's key ids to import, at least one.
 --- @return boolean imported
 local function import_tap_holds(state, target_dir, keys)
-	local writer = dependency(state, "tap_hold_writer", "platform.remap.tap_hold_writer")
-	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	local writer = dependency(state, "tap_hold_writer", "tap_hold.engine.writer")
+	local loader = dependency(state, "tap_hold_loader", "tap_hold.engine.loader")
 	if not writer or not loader then
 		Logger.error(LOG, "The tap-hold keys were not imported: the tap-hold writer is unavailable.")
 		report_failure(state, "onboarding.error.tap_holds_import")
@@ -378,7 +378,7 @@ end
 --- @param keys table The imported tap-hold key ids.
 --- @return boolean ok False when the layer was due and could not be written.
 local function import_nav_layer(state, target_dir, keys)
-	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
+	local loader = dependency(state, "tap_hold_loader", "tap_hold.engine.loader")
 	local LayerPreset = dependency(state, "layer_preset", "layouts.engine.layers.preset")
 	local ok, import, err = pcall(function()
 		local shared_root = Paths.shared_root()

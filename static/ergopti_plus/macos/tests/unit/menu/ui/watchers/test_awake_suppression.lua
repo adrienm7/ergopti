@@ -119,7 +119,7 @@ local OWNED_MODULES = {
 	"settings.ui.menu.paths",
 	"shortcuts.ui.menu.shortcuts",
 	"menu.ui.builder.state",
-	"ui.menu.menu_tap_holds",
+	"tap_hold.ui.menu_tap_holds",
 	"menu.ui.builder.watchers",
 	"settings.ui.menu.preferences_transaction",
 	"menu.ui.transactions.preview_transaction",

@@ -42,7 +42,7 @@ const PRESET = TOML.parse(read(shared('layouts', 'data', 'layers.recommended.tom
 const LUA_HOST = read(shared('layouts', 'engine', 'layers', 'editor.lua'));
 const MODEL = read(shared('ui', 'layer_editor', 'layer_model.js'));
 const WINDOWS_HOST = read(path.join(DRIVERS, 'windows', 'layouts', 'ui', 'layer_editor.ahk'));
-const LINUX_ENGINE = read(path.join(DRIVERS, 'linux', 'platform', 'remap', 'tap_hold_engine.lua'));
+const LINUX_ENGINE = read(path.join(DRIVERS, 'linux', 'tap_hold', 'engine', 'engine.lua'));
 const MACOS_NAV_LAYER = read(
 	path.join(DRIVERS, 'macos', 'keyboard', 'engine', 'layers', 'nav_layer.lua')
 );

@@ -699,9 +699,9 @@ do
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
 			put("hotstrings.engine.catalogue.config", config)
-			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end, config_path = function() return marker .. ".config.toml" end,
+			put("tap_hold.engine.manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end, config_path = function() return marker .. ".config.toml" end,
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
-			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
+			put("tap_hold.engine.writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
 			-- Gesture/action sources have no configured bindings in this scope.
 			put("hotstrings.engine.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
 			put("hotstrings.engine.repeat_key", { is_enabled = no })

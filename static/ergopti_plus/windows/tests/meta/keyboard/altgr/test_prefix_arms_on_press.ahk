@@ -36,7 +36,7 @@ _APAP_GoverningHotIf(Src, Pos) {
 }
 
 _APAP_AnchorArmsThePrefixOnEveryPress() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Anchor := RegExMatch(Src, "m)^~SC138 & ~F24::")
 	AssertTrue(Anchor > 0,
 		"an always-eligible combination with ~ on the SC138 prefix must arm the AltGr prefix on its own press")
@@ -73,7 +73,7 @@ Test("altgr prefix: an always-eligible pass-through combination arms SC138 on it
 ; the host layout's native AltGr either way (anchor-prefix-tilde-2026-09-26).
 ; This pins the prefix itself, not the whole label.
 _APAP_AnchorPrefixKeepsItsTilde() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Prefix := ""
 	Found := 0
 	Pos := 1

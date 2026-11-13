@@ -11,8 +11,8 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
-local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.scope.transaction" }
+local MODULES = { "tap_hold.engine.manager", "tap_hold.engine.loader",
+	"tap_hold.engine.writer", "tap_hold.engine.scope", "settings.engine.scope.transaction" }
 
 local function read(path)
 	local fh = io.open(path, "r")
@@ -89,7 +89,7 @@ local function with_scope(tap_text, config_text, body)
 	if tap_text then write(tap_path, tap_text) end
 	if config_text then write(config_path, config_text) end
 	local installed = {}
-	local Manager = require("platform.remap.tap_hold_manager")
+	local Manager = require("tap_hold.engine.manager")
 	Manager.init({
 		keyboard_hook = { set_remapper = function(engine) installed[#installed + 1] = engine or false end,
 			key_text = function() return nil end, held_modifiers = function() return {} end,
@@ -113,7 +113,7 @@ local function with_scope(tap_text, config_text, body)
 		end,
 	}, { __index = files })
 	function s.owner()
-		return require("infra.tap_hold_scope").new({
+		return require("tap_hold.engine.scope").new({
 			path = config_path, backup_path = config_path .. ".bak",
 			tap_hold_path = tap_path, tap_hold_backup_path = tap_path .. ".bak",
 			parameters = s.parameters, files = s.files,

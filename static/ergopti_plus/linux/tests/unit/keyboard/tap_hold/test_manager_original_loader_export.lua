@@ -21,7 +21,7 @@ helpers.describe("original loader export refusal preserves the installed engine"
   helpers.it("refuses a replaced "..spec[1].." before invoking or installing it",function()
    local Manager,hook,_,user_path=manager()
    local running,calls=hook.engine,hook.calls
-   local Loader=require("platform.remap.tap_hold_loader")
+   local Loader=require("tap_hold.engine.loader")
    local original,foreign_calls=Loader[spec[1]],0
    Loader[spec[1]]=function(...)foreign_calls=foreign_calls+1;return original(...)end
    local original_open,source_reads=io.open,0
@@ -54,7 +54,7 @@ helpers.describe("loader currency after the last construction callback",function
  helpers.it("retains the original tuple after catalogue callbacks replace the candidate loader",function()
   local Manager,hook,_,user_path=manager()
   Manager._reset_for_test()
-  local Loader=require("platform.remap.tap_hold_loader")
+  local Loader=require("tap_hold.engine.loader")
   local original=Loader.load_document
   local original_names=require("gestures.engine.manager").get_executable_action_names
   local change=false
@@ -84,7 +84,7 @@ end)
 -- Logical publication uses the actual loader and Manager constructor, with a
 -- receiving hook double only. No hardware or installed-daemon claim is made.
 helpers.describe("complete original-issuer combination binding publication", function()
-	local owner_name = "platform.remap.tap_hold_manager"
+	local owner_name = "tap_hold.engine.manager"
 	local combination_name = "shortcuts.engine.key_combinations"
 	local function owned(body, delayed)
 		local saved, undo = {}, {}
@@ -221,9 +221,9 @@ keep = true
 			local snapshot, getter = Manager.configuration_snapshot(), Manager.published_binding_catalogue
 			local constructor, instance_current = Combinations.new, Combinations.instance_is_current
 			local observer, calls = Manager.managed_combination_catalogue_current, 0
-			local Loader = require("platform.remap.tap_hold_loader")
+			local Loader = require("tap_hold.engine.loader")
 			local load = Loader.load
-			local Engine = require("platform.remap.tap_hold_engine")
+			local Engine = require("tap_hold.engine.engine")
 			local key_code = Engine.KEY_CODES.tab
 			local PairPolicy = require("tap_hold.engine.key_combinations")
 			local pair = PairPolicy.pair
@@ -398,7 +398,7 @@ end)
 helpers.describe("ordinary tap actions retain their Manager owner through logging", function()
 	for _, transition in ipairs({ "pause", "disable", "reload", "pause/resume", "benign" }) do
 		helpers.it("revalidates an actual Shift tap across a " .. transition .. " logging callback", function()
-			local names = { "core.logger.engine", "core.logger.engine.shim", "keyboard.engine.layers.nav_layer", "platform.remap.tap_hold_manager" }
+			local names = { "core.logger.engine", "core.logger.engine.shim", "keyboard.engine.layers.nav_layer", "tap_hold.engine.manager" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local Manager, path, Logger

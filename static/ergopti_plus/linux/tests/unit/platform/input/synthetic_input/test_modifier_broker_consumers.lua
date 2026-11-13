@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.modifier_broker_fixture")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 
 local function engine()
 	return Engine.new({ keys = { caps_lock = { tap_action = "none", hold_modifier = "shift", time_activation_seconds = 10 } },
@@ -183,7 +183,7 @@ helpers.describe("modifier broker: producer receipts and typed attach admission"
 	end)
 
 	helpers.it("observes handoff restoration role before the actual XKB callback", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local configured = Engine.new({ tap_min_ms = 0, lone_tap_max_ms = 0, tap_max_ms = 300, double_press_ms = 400, one_shot_timeout_ms = 2000, keys = {
 			caps_lock = { tap_action = "enter", hold_modifier = "shift", time_activation_seconds = 10 },
 		} })

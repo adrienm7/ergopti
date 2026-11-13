@@ -21,7 +21,7 @@ helpers.describe("native navigation reload transactions", function()
 		os.remove(dir)
 		local made = os.execute('mkdir "' .. dir .. '"')
 		assert(made == true or made == 0)
-		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local Manager = helpers.load_module("tap_hold.engine.manager")
 		local hook = { key_text = function() return nil end,
 			held_modifiers = function() return {} end,
 			held_text_modifier_codes = function() return {} end,
@@ -170,7 +170,7 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 		os.remove(dir)
 		local made = os.execute('mkdir "' .. dir .. '"')
 		assert(made == true or made == 0)
-		local names = { "core.logger.engine.shim", "keyboard.engine.layers.nav_layer", "platform.remap.tap_hold_manager" }
+		local names = { "core.logger.engine.shim", "keyboard.engine.layers.nav_layer", "tap_hold.engine.manager" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local errors = {}
@@ -184,7 +184,7 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 			held_shortcut_modifier_codes = function() return {} end }
 		function hook.set_remapper(engine) hook.engine = engine end
 		local ok, err = pcall(function()
-			Manager = require("platform.remap.tap_hold_manager")
+			Manager = require("tap_hold.engine.manager")
 			NavLayer = require("keyboard.engine.layers.nav_layer")
 			compile = NavLayer.compile
 			write(dir .. "/tap_hold.toml", tap_text)
@@ -405,10 +405,10 @@ helpers.describe("original configured Navigation source reservations", function(
 			write_source(dir .. "/config.toml", "[tap_holds]\nenabled = true\n" .. (config_text or ""))
 			package.loaded["settings.engine.paths"] = { config = function(name) return dir .. "/" .. name end }
 			package.loaded["keyboard.engine.layers.nav_layer"] = nil
-			package.loaded["platform.remap.tap_hold_manager"] = nil
+			package.loaded["tap_hold.engine.manager"] = nil
 			package.loaded["shortcuts.engine.key_combinations"] = nil
 			local Nav = require("keyboard.engine.layers.nav_layer")
-			Manager = require("platform.remap.tap_hold_manager")
+			Manager = require("tap_hold.engine.manager")
 			write_source(dir .. "/layers.toml", nav_text)
 			write_source(dir .. "/tap_hold.toml", tap_text or TAP_NAV)
 			local opts = { shared_root = require("core.fs.engine.paths").shared_root(), config_dir = dir }

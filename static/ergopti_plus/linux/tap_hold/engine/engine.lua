@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_engine.lua
+--- tap_hold/engine/engine.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold Engine (Linux)
@@ -139,7 +139,7 @@ local KEY_LEFTCTRL, KEY_LEFTALT = 29, 56
 local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = true, [57] = true, [111] = true }
 
 -- What a key with a tap and no hold does while it is down, as its Windows
--- tap-only hotkey does (windows/platform/remap/<key>.ahk). Most fire the tap
+-- tap-only hotkey does (windows/tap_hold/engine/<key>.ahk). Most fire the tap
 -- at key-down and at each repeat (see fire_instant). These keys, and these
 -- taps, wait for a quick release instead and hold meanwhile what the Windows
 -- hotkey holds:

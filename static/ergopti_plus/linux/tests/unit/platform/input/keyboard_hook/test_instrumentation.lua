@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 
 local EV_KEY = 1
 local KEYS = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = 10 } }

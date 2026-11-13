@@ -73,7 +73,7 @@ const RULES = {
 			kind: 'add',
 			re: /\.Add\(/,
 			unless: GUI_CONTROL,
-			files: /(?:^windows\/ui\/menu\/|tray)/
+			files: /(?:^windows\/tap_hold\/ui\/|tray)/
 		}
 	],
 	'.lua': [
@@ -375,7 +375,8 @@ function inventory(driver) {
 // The rules on the shapes they must tell apart.
 {
 	const lua = (text) => sitesOf('f.lua', text, '.lua').map((s) => s.split(' ')[1]);
-	const ahk = (text) => sitesOf('windows/ui/menu/f.ahk', text, '.ahk').map((s) => s.split(' ')[1]);
+	const ahk = (text) =>
+		sitesOf('windows/tap_hold/ui/f.ahk', text, '.ahk').map((s) => s.split(' ')[1]);
 	assert.deepEqual(lua('rows[#rows + 1] = { label = i18n.get("menu.x"), action = go }'), [
 		'static'
 	]);
@@ -413,7 +414,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = '3ca17a1ac626892ee8432d96b9651aa3b59379cb803656f009ea6c8eda8d3943';
+const LEGACY_SHA256 = 'ffb16e570b7e573b6f3b2b31b71e98c7a41afc465861ff6eaf2432844801d9b4';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),

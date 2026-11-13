@@ -8,10 +8,10 @@ The macOS implementation of ErgoptiPlus.
 > counterpart of a file; making the trees identical is invariant I1, measured
 > and ratcheted by `tools/test/test-driver-tree-parity.cjs`.
 >
-> Name collision to know first: `modules/keymap/` is the **hotstring expansion
+> Name collision to know first: `tap_hold/engine/` is the **hotstring expansion
 > engine** here, while on Windows the same path is the **physical layout remap**.
-> The layout remap lives in `platform/remap/` plus
-> `modules/keymap/{layout_install,input_sources}.lua`.
+> The layout remap lives in `tap_hold/engine/` plus
+> `tap_hold/engine/{layout_install,input_sources}.lua`.
 
 ## Install with Homebrew
 

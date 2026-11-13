@@ -1374,7 +1374,7 @@ do
 	-- this one boot (_shared/tap_hold/data/migrations.toml [legacy_imports.hs]).
 	local tap_hold_path = config_paths.get("TapHoldConfigPath")
 	-- keyboard/engine/runtime/config.lua reads the rows from the config.toml beside it.
-	local TapHoldFile = require("platform.remap.tap_hold_file")
+	local TapHoldFile = require("tap_hold.engine.file")
 	if TapHoldFile.config_toml_path_for(tap_hold_path) ~= config_paths.get("ConfigTomlPath") then
 		Logger.error(LOG, "tap_hold.toml '%s' is not beside config.toml '%s': the remap settings cannot find their rows.",
 			tap_hold_path, config_paths.get("ConfigTomlPath"))

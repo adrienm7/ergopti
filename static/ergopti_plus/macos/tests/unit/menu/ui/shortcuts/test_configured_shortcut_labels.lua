@@ -12,7 +12,7 @@ local keyboard_binding = require("shortcuts.engine.keyboard_shortcuts").binding_
 local tap_binding = require("shortcuts.engine.tap_keys").binding_id
 local script_prefix = require("shortcuts.engine.script_control").BINDING_PREFIX
 local names = {
-	"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "shortcuts.ui.menu.shortcuts",
+	"layouts.ui.menu.keyboard_slots", "tap_hold.ui.menu_tap_keys", "shortcuts.ui.menu.shortcuts",
 	"shortcuts.engine", "shortcuts.engine.tap_keys", "shortcuts.engine.bindings",
 	"shortcuts.engine.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 	"core.timing.engine.deferred_work", "layouts.adapters.input_source_broker", "menu.ui.builder.utils",
@@ -95,7 +95,7 @@ helpers.describe("configured shortcut row labels", function()
 					label = require("layouts.ui.menu.keyboard_slots").provide_rows(ctx)[1].items[4].label
 					expected = parameters[keyboard_binding("secondary_a")]
 				elseif surface == "tap" then
-					label = require("ui.menu.menu_tap_keys").provide_rows(ctx)[1].label
+					label = require("tap_hold.ui.menu_tap_keys").provide_rows(ctx)[1].label
 					expected = parameters[tap_binding("number_row_left")]
 				else
 					local menu = require("shortcuts.ui.menu.shortcuts").build(ctx)

@@ -11,7 +11,7 @@ local h = require("tests.helpers")
 function M.with_session(options, body)
 	options = options or {}
 	local names = { "ffi", "core.logger.engine.monotonic", "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook",
-		"layouts.adapters.xkb_capture", "hotstrings.engine.device_finder", "platform.remap.tap_hold_engine",
+		"layouts.adapters.xkb_capture", "hotstrings.engine.device_finder", "tap_hold.engine.engine",
 		"keyboard.engine.keys.combination_engine", "shortcuts.engine.key_combinations", "menu.engine.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	if options.public_chords ~= true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
@@ -153,7 +153,7 @@ function M.with_session(options, body)
 		end,
 	}
 	local called, err = pcall(function()
-		local Engine = h.load_module("platform.remap.tap_hold_engine")
+		local Engine = h.load_module("tap_hold.engine.engine")
 		-- Preserve the actual source issuer through Pair construction and Manager.
 		local Owner = h.load_module("shortcuts.engine.key_combinations")
 		local Native = h.load_module("keyboard.engine.keys.combination_engine")
@@ -288,7 +288,7 @@ function M.with_manager_session(options, body)
 		local ConfigPaths = require("settings.engine.paths")
 		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
-		local names = { "platform.remap.tap_hold_manager", "layouts.adapters.keyboard_layout", "keyboard.engine.layers.nav_layer", "clipboard.adapters.clipboard" }
+		local names = { "tap_hold.engine.manager", "layouts.adapters.keyboard_layout", "keyboard.engine.layers.nav_layer", "clipboard.adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local folder = os.tmpname(); os.remove(folder)
 		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
@@ -314,7 +314,7 @@ function M.with_manager_session(options, body)
 			if options.before_manager then options.before_manager(s) end
 			local Layout = h.load_module("layouts.adapters.keyboard_layout")
 			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })
-			manager = options.cached_manager or h.load_module("platform.remap.tap_hold_manager")
+			manager = options.cached_manager or h.load_module("tap_hold.engine.manager")
 			s.actions = {}
 			assert(manager.init({ keyboard_hook = s.hook, capture_copy_owner = options.capture_copy_owner,
 				execute_action = function(action, binding)

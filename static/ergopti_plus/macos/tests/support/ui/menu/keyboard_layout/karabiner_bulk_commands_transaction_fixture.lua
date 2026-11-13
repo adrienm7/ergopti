@@ -374,7 +374,7 @@ local function build_menu(mode, configure)
 		stop = function() return true end,
 	}
 	package.loaded["menu.engine.manifest_menu"] = nil
-	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+	local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 	local remap = make_remap(observations, mode)
 	if type(configure) == "function" then configure(remap, observations) end
 	local ctx = {

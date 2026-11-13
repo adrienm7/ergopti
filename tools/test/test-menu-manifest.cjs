@@ -2611,7 +2611,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [path, consumer, nativeId, tapId, holdId, start, end] of [
 		[
-			'windows/ui/menu/menu_taphold.ahk',
+			'windows/tap_hold/ui/menu_taphold.ahk',
 			'MenuRenderer_TemplateRows',
 			'tap_hold_key_native',
 			'tap_hold_key_tap',
@@ -2620,7 +2620,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'; Return the "none" hold option'
 		],
 		[
-			'macos/ui/menu/menu_tap_holds.lua',
+			'macos/tap_hold/ui/menu_tap_holds.lua',
 			'ManifestMenu.template_rows',
 			'tap_hold_key_no_action',
 			'tap_hold_key_tap',
@@ -3035,7 +3035,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [file, start, end, required] of [
 		[
-			'macos/ui/menu/menu_tap_holds.lua',
+			'macos/tap_hold/ui/menu_tap_holds.lua',
 			'local function build_one_tap_hold_item(',
 			'--- Builds the tap / hold rows of one hand',
 			[
@@ -3078,7 +3078,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert(!source.includes('"' + key + '"'), 'native providers retire caption metadata: ' + key);
 	}
 	const windows = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_taphold.ahk')
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/tap_hold/ui/menu_taphold.ahk')
 	);
 	assert(windows.includes('MenuRenderer_TemplateRows("tap_hold_key_rows"'));
 	assert(!windows.includes('tap_hold_key_delay_rows'), 'Windows renders no delay submenu');
@@ -3516,7 +3516,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const [section, expected] of Object.entries(corpus.declarations))
 		assert.deepEqual(manifest[section], expected, 'handwritten guidance descriptor: ' + section);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold/ui/menu_tap_holds.lua')
 	);
 	function tokens(text) {
 		return scriptTokens(text, '.lua').map((token) => token.kind + ':' + token.value);
@@ -9916,7 +9916,7 @@ console.log(
 		assert.equal(generated[name], undefined, 'retired action submenu output: ' + name);
 	}
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/tap_hold/ui/menu_tap_holds.lua')
 	);
 	assert(!source.includes('build_action_picker'), 'no native action submenu builder remains');
 	assert(

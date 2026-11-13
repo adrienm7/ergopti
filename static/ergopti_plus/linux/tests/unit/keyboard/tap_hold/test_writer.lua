@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
@@ -24,7 +24,7 @@ local function fresh_writer(reload_ok)
 	local path = os.tmpname()
 	os.remove(path)
 	local state = { reloads = 0 }
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({
 		path = path,
 		-- The switch and the timings land beside the throwaway file, never in a shared folder.
@@ -66,7 +66,7 @@ local function with_folder_writer(opts, body)
 	local made = os.execute('mkdir "' .. dir .. '"')
 	assert(made == true or made == 0, "the isolated configuration folder must exist")
 	local state = { reloads = 0 }
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({
 		path = dir .. "/tap_hold.toml",
 		config_path = dir .. "/tap_hold.toml.config.toml",
@@ -260,7 +260,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 		local source = fh:read("*a")
 		fh:close()
-		local call = source:match('require%("platform%.remap%.tap_hold_writer"%)%.init%(%b{}%)')
+		local call = source:match('require%("tap_hold%.engine%.writer"%)%.init%(%b{}%)')
 		helpers.assert_type(call, "string", "the daemon must initialise the tap-hold writer")
 		helpers.assert_true(call:find("layers%s*=%s*{") ~= nil and call:find("config_dir", 1, true) ~= nil
 			and call:find("shared_root", 1, true) ~= nil, "the writer must be given the folder a layer hold needs")
@@ -293,7 +293,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		local key = effective(path).keys.caps_lock
 		helpers.assert_eq(key.tap_action, "")
 		helpers.assert_eq(key.hold_modifier, "")
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local engine = Engine.new({ keys = effective(path).keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end, })
 		helpers.assert_true(not engine:handles(58), "the engine leaves CapsLock alone")
@@ -432,7 +432,7 @@ end)
 -- sets up, which may not be the running one, and restarts the daemon after.
 helpers.describe("tap-hold writer: the wizard imports only the checked keys", function()
 	helpers.it("refuses a dangling link at the proposed backup name", function()
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local writer = helpers.load_module("tap_hold.engine.writer")
 		local path, victim = os.tmpname(), os.tmpname()
 		os.remove(victim)
 		local original = '[tap_hold]\ninherit_defaults = false\n'
@@ -456,7 +456,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 	end)
 
 	helpers.it("removes its own incomplete backup when its write is refused", function()
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local writer = helpers.load_module("tap_hold.engine.writer")
 		local path = os.tmpname()
 		local original = '[tap_hold]\ninherit_defaults = false\n'
 		write_file(path, original)
@@ -492,7 +492,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 	end
 
 	helpers.it("imports each key's preset exactly over a backup, switches the feature on and leaves the rest", function()
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local writer = helpers.load_module("tap_hold.engine.writer")
 		local path = absent_path()
 		local original = '[tap_hold]\ninherit_defaults = false\n'
 			.. '[tap_hold.keys.caps_lock]\ncustom = 3\n'
@@ -523,7 +523,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 
 	-- A re-run answered Yes imported over the keys the user had set.
 	helpers.it("never imports over a key the user configured, and writes nothing", function()
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local writer = helpers.load_module("tap_hold.engine.writer")
 		local preset = Loader.preset_keys(DEFAULTS)
 		local path = absent_path()
 		for label, text in pairs({
@@ -548,7 +548,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 	end)
 
 	helpers.it("creates the file of a folder that has none", function()
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local writer = helpers.load_module("tap_hold.engine.writer")
 		local path = absent_path()
 		local imported, _, backup = writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS), path .. ".config.toml")
 		helpers.assert_true(imported)
@@ -561,7 +561,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 	end)
 
 	helpers.it("refuses what it cannot import exactly, and writes nothing", function()
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local writer = helpers.load_module("tap_hold.engine.writer")
 		local preset = Loader.preset_keys(DEFAULTS)
 		local path = absent_path()
 		for label, keys in pairs({

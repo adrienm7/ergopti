@@ -1,10 +1,10 @@
-﻿; platform/remap/tap_hold_roll_keys.ahk
+﻿; tap_hold/engine/roll_keys.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — The Keys Struck While A Typing Key Is Undecided
 ; DESCRIPTION:
 ; The static hotkeys that make a key wait while a typing key is neither a tap
-; nor a hold yet (tap_hold_roll.ahk holds the logic and the rationale). They
+; nor a hold yet (roll.ahk holds the logic and the rationale). They
 ; are eligible only during that wait, and are created before every key file's
 ; own hotkeys and before every Hotkey() call: the earliest-created eligible
 ; variant of a hotkey fires. Like every hotkey of a tap-hold key, they stand

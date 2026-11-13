@@ -31,8 +31,8 @@ local function fixture()
 			setUnicodeString = function(_, value) unicode = value end,
 		}
 	end
-	package.loaded["adapters.one_shot_shift"] = nil
-	local adapter = require("adapters.one_shot_shift").new({
+	package.loaded["tap_hold.one_shot_shift"] = nil
+	local adapter = require("tap_hold.one_shot_shift").new({
 		data = data, magic = function() return "★" end, now = function() return 10 end,
 		event = { rawFlagMasks = { shift = 2 } },
 		translate = function(code, flags) return event(code, flags):getCharacters(false) end,
@@ -64,8 +64,8 @@ helpers.describe("one-shot native boundary", function()
 				setUnicodeString = function(_, value) text = value end,
 			}
 			local emitted = {}
-			package.loaded["adapters.one_shot_shift"] = nil
-			local adapter = require("adapters.one_shot_shift").new({
+			package.loaded["tap_hold.one_shot_shift"] = nil
+			local adapter = require("tap_hold.one_shot_shift").new({
 				data = data, magic = function() return "★" end, now = function() return 10 end,
 				event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
 				translate = function(_, flags) return flags == 0 and "." or ":" end,
@@ -97,7 +97,7 @@ helpers.describe("one-shot native boundary", function()
 			getCharacters = function() return text end,
 			setUnicodeString = function(_, value) text = value end,
 		}
-		local adapter = require("adapters.one_shot_shift").new({
+		local adapter = require("tap_hold.one_shot_shift").new({
 			data = data, magic = function() return "★" end, now = function() return 10 end,
 			event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
 			translate = function(_, flags) return ({ [16] = "é", [2] = "É", [18] = "Ω" })[flags] end,
@@ -119,7 +119,7 @@ helpers.describe("one-shot native boundary", function()
 				getCharacters = function() return text end,
 				setUnicodeString = function(_, value) text = value end,
 			}
-			local adapter = require("adapters.one_shot_shift").new({
+			local adapter = require("tap_hold.one_shot_shift").new({
 				data = data, magic = function() return "★" end, now = function() return 10 end,
 				event = { rawFlagMasks = { shift = SHIFT } }, is_repeat = function() return false end,
 				translate = function(_, flags) return layout[flags] end,

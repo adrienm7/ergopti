@@ -85,7 +85,7 @@ local function build_action_items(gestures)
 	return items
 end
 
--- The tap-key rows (ui/menu/menu_tap_keys.lua) offer the same catalogue.
+-- The tap-key rows (tap_hold/ui/menu_tap_keys.lua) offer the same catalogue.
 M.build_action_items = build_action_items
 
 --- Builds the picker item list of the slots a group can still offer.

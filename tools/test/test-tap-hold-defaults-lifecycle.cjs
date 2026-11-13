@@ -59,7 +59,7 @@ const read = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
 
 const LOADERS = [
 	{
-		file: 'windows/platform/remap/tap_hold_loader.ahk',
+		file: 'windows/tap_hold/engine/loader.ahk',
 		needle: 'defaults.toml',
 		lifecycle: 'parses the shared defaults first, then merges the user file on top per key'
 	},

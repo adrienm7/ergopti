@@ -15,7 +15,7 @@
 --- (`tap_hold_keys_catalog`) that never existed. The macOS one fell back to a
 --- built-in table in which `action = true` stood where `fn = true` was meant, so
 --- Fn was listed under the right hand. The Windows reader of the same table is
---- windows/platform/remap/tap_hold_writer.ahk (_TH_BuildKeyDefs).
+--- windows/tap_hold/engine/writer.ahk (_TH_BuildKeyDefs).
 ---
 --- FAIL FAST: a malformed catalogue raises. A tray that silently guessed a hand
 --- or a key would be the exact failure this table exists to end.

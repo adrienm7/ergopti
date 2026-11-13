@@ -86,7 +86,7 @@ end
 helpers.describe("the key combinations are a group of their own under Shortcuts", function()
 	helpers.it("opens with its own switch, which persists and redeploys", function()
 		local observed = { combos = true, writes = {}, regenerations = 0 }
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local group = menu.build_key_combinations({ karabiner = remap_double(observed), updateMenu = function() end })
 		helpers.assert_not_nil(group, "the group is built")
 		local first = group[1]
@@ -110,7 +110,7 @@ helpers.describe("the key combinations are a group of their own under Shortcuts"
 
 	helpers.it("leaves no combination row in the Tap-Holds submenu", function()
 		local observed = { combos = true, writes = {}, regenerations = 0 }
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local built = menu.build({ karabiner = remap_double(observed), updateMenu = function() end })
 		local all = titles(built.submenu)
 		helpers.assert_true(has_prefix(all, "key_name.left_shift  :"), "the key rows are still there")
@@ -136,9 +136,9 @@ end
 
 helpers.describe("key-combination pairs use the shared declaration", function()
 	helpers.it("a changed template controls actual row order (key-combination-pair-menu)", function()
-		helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu" }, function()
+		helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu" }, function()
 			local observed = { combos = true, writes = {}, regenerations = 0 }
-			local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 			local renderer = require("menu.engine.manifest_menu")
 			local root = renderer.get_root()
 			local saved = root.key_combination_pair_menu
@@ -167,7 +167,7 @@ helpers.describe("key-combination pairs use the shared declaration", function()
 			local observed = { combos = true, writes = {}, regenerations = 0 }
 			local remap = remap_double(observed)
 			remap.get_combo_tap_action = function() return assigned and "escape" or "none" end
-			local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 			local built = menu.build_key_combinations({ karabiner = remap })
 			local row = pair_row(built)
 			helpers.assert_not_nil(row)
@@ -188,7 +188,7 @@ helpers.describe("combination bulk commands use their own scope", function()
 				observed.request, observed.terminal = request, on_done
 				return true
 			end
-			local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 			local group = menu.build_key_combinations({ karabiner = remap,
 				updateMenu = function() observed.refreshes = observed.refreshes + 1 end })
 			local command = group[mode == "recommended" and 2 or 3]

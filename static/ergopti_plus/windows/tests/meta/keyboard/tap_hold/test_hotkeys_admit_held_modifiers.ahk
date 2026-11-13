@@ -117,7 +117,7 @@ Test("tap-hold admission: the scanner flags a variant without the wildcard (held
 	_THAM_ScannerFindsTheExactMatchShape)
 
 _THAM_EveryModifierTapHoldFiresUnderAHeldModifier() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Offenders := _THAM_Offenders(Src, &Subjects, &Exempt)
 	AssertEqual("", Offenders,
 		"these tap-hold variants do not fire under a held modifier, so the key's native function replaces the configured tap and hold")
@@ -191,7 +191,7 @@ Test("tap-hold admission: LAlt tapping Backspace is swallowed while another key 
 	_THAM_LAltSwallowedUnderAnotherLayerHolder)
 
 _THAM_NativeKeysStayNativeUnderAHeldModifier() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "the tap-hold sources must be readable")
 	Offenders := _THAM_NativeWildcards(Src, &Subjects)
 	AssertEqual("", Offenders,
@@ -207,7 +207,7 @@ Test("tap-hold admission: Tab, Space, Enter, Escape, Backspace and Delete stay n
 ; repeated the layer's Backspace) or reached the system (owned-press-repeat-all-2026-09-25).
 _THAM_EveryTapHoldKeySwallowsItsOwnedRepeat() {
 	global _TH_TapHoldScToKeyId
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "the tap-hold sources must be readable")
 	Checked := 0
 	for Sc, KeyId in _TH_TapHoldScToKeyId {
@@ -256,7 +256,7 @@ Test("tap-hold admission: owned-repeat swallowers precede the layer mappings (ow
 ; repeat swallowers do not: a press already owned keeps swallowing its repeat.
 _THAM_NativeKeysStayNativeUnderTheKanaAltGr() {
 	global _THAM_NATIVE_KEY_PATTERN
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Subjects := 0
 	Missing := ""
 	for _, Variant in _THAM_Variants(Src, _THAM_NATIVE_KEY_PATTERN) {

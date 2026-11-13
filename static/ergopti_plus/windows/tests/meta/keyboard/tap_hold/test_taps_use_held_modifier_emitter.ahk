@@ -14,7 +14,7 @@
 #Requires AutoHotkey v2.0
 
 _THME_NativeTapsUseTheEmitter() {
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	Quote := Chr(34)
 	for KeyId, Key in Map("tab", "Tab", "enter", "Enter", "escape", "Escape",
 			"backspace", "BackSpace", "delete", "Delete") {
@@ -32,7 +32,7 @@ Test("tap-hold modifiers: native and special Tab taps use the held-modifier emit
 	_THME_NativeTapsUseTheEmitter)
 
 _THME_NoTapBindsABareKey() {
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	Dispatches := 0
 	Pos := 1
 	while Pos := RegExMatch(Src, "TapHoldDispatchTap\(\s*" . Chr(34) . "(\w+)" . Chr(34) . "\s*,\s*([^\r\n]*)", &Match, Pos) {
@@ -43,7 +43,7 @@ _THME_NoTapBindsABareKey() {
 			"the '" . Match[1] . "' tap binds the Tab wrapper without the held modifiers: " . Match[0])
 		Pos += StrLen(Match[0])
 	}
-	Assert(Dispatches >= 15, "every tap dispatch of platform/remap must be scanned, got " . Dispatches)
+	Assert(Dispatches >= 15, "every tap dispatch of tap_hold/engine must be scanned, got " . Dispatches)
 }
 Test("tap-hold modifiers: no tap dispatch binds a bare key (held-modifier-tap-2026-09-25)",
 	_THME_NoTapBindsABareKey)

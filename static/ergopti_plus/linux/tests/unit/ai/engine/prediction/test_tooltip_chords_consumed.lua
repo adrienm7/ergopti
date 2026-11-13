@@ -494,7 +494,7 @@ end)
 --- tap-hold engine holding `keys`.
 --- @return table details { code, mods }
 local function consumed_details(keys, events)
-	local Engine = require("platform.remap.tap_hold_engine")
+	local Engine = require("tap_hold.engine.engine")
 	local hook = helpers.load_module("platform.input.keyboard_hook")
 	hook.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 }))
 	local details = {}

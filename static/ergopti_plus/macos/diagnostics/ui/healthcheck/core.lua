@@ -637,7 +637,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.one_shot_shift",
+		id       = "tap_hold.one_shot_shift",
 		contract = { "new" },
 		wired    = true,
 	},

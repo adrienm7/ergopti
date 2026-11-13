@@ -111,7 +111,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				environment.secure_focus_guard = guard
 				evaluate(assert(source:match("\n\t\t(gestures%.init%b())")), environment)
 				evaluate(assert(source:match("\n\t\t(shortcuts%.init%b())")), environment)
-				manager = helpers.load_module("platform.remap.tap_hold_manager")
+				manager = helpers.load_module("tap_hold.engine.manager")
 				environment.TapHold, environment.keyboard_hook = manager, session.hook
 				environment.action_catalogue = environment.gestures
 				environment.WordReset = require("hotstrings.engine.word_reset")

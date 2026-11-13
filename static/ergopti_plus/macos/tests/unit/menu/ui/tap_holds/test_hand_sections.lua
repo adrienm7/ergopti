@@ -69,7 +69,7 @@ end
 --- Renders the submenu and returns its rows.
 --- @return table rows
 local function render()
-	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+	local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 	local built = menu.build({ karabiner = remap_double(), updateMenu = function() end })
 	return built.submenu
 end
@@ -157,9 +157,9 @@ end)
 --- @param configured boolean Whether the selected key has a tap assignment.
 --- @param body function Receives menu finder, observed native calls and declaration.
 local function with_native_key_menu(configured, body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu",
+	return helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu",
 		"core.i18n.engine.i18n", "core.logger.engine.logger", "menu.ui.builder.utils" }, function()
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local observed = { calls = {}, refreshes = 0, receipt = true }
 		local native = remap_double()
 		native.get_tap_action = function(kid) return configured and kid == "left_shift" and "copy" or "none" end
@@ -326,9 +326,9 @@ local SLOT_CATALOGUE = {
 --- recorder of what it was opened with and of its confirmation callback.
 --- @param body function Receives the key's rows, the observations and the rebuild.
 local function with_slot_picker(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
+	return helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
 		"core.logger.engine.logger", "menu.ui.builder.utils", "shortcuts.ui.action_picker" }, function()
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0,
 			receipt = true, open_result = true }
 		package.loaded["shortcuts.ui.action_picker"] = {
@@ -470,9 +470,9 @@ end)
 --- Drives the actual provider with only native ports controlled. Each build
 --- rereads the native values; captured callbacks keep their original owners.
 local function with_delay_native(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu",
+	return helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu",
 		"core.i18n.engine.i18n", "core.logger.engine.logger", "menu.ui.builder.utils" }, function()
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local native = remap_double()
 		local observed = { value = 1500, receipt = true, calls = {}, refreshes = 0, regenerations = 0,
 			dialog_ok = true, answer = { ["text returned"] = "375.8" } }
@@ -670,9 +670,9 @@ local SHIFT_PAIR = { id = "shift_pair", label = "Shift pair", group = "Shift",
 --- window replaced by a recorder.
 --- @param body function Receives the pair's slot rows and the observations.
 local function with_pair_picker(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
+	return helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
 		"core.logger.engine.logger", "menu.ui.builder.utils", "shortcuts.ui.action_picker" }, function()
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0, receipt = true }
 		package.loaded["shortcuts.ui.action_picker"] = {
 			open = function(opts, on_confirm)

@@ -3,7 +3,7 @@
 #
 # READ AT RUNTIME, ON EVERY BOOT, BY THE LINUX DRIVER through
 # _shared/tap_hold/engine/migrate.lua AND BY THE WINDOWS DRIVER through
-# windows/platform/remap/tap_hold_migration.ahk; macOS has no tap_hold.toml.
+# windows/tap_hold/engine/migration.ahk; macOS has no tap_hold.toml.
 # This is NOT the config.toml registry
 # (_shared/settings/data/config_schema/migrations.toml): that one is validated at every
 # Windows boot by windows/settings/engine/migration/migrate.ahk, which refuses an op it does

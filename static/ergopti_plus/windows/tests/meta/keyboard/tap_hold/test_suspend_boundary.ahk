@@ -62,7 +62,7 @@ Test("tap-holds: in-flight hold-layer candidates cannot activate after Suspend (
 	_THSB_HoldLayerGateChecksSuspendBeforeMutation)
 
 _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	Whole := _DriverSourceNoComments()
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(InStr(Lifecycle, "TapHoldReleaseSyntheticKeys()") > 0,
@@ -75,13 +75,13 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 	SplitPath(A_ScriptDir, , &Root)
 	Q := Chr(34)
 	; Floored, because it was not. This loop scanned the directory by a hardcoded
-	; path and asserted per file; when platform/remap was extracted the pattern
+	; path and asserted per file; when tap_hold/engine was extracted the pattern
 	; matched nothing, the body never ran, and every per-file assertion below
 	; disappeared without a single failure. A scan that finds no file is a broken
 	; scan, never a clean one — the sibling _DriverDirConcat throws for exactly
 	; this reason, and this loop predated it.
 	Scanned := 0
-	Loop Files, Root . "\platform\remap\*.ahk", "FR" {
+	Loop Files, Root . "\tap_hold\engine\*.ahk", "FR" {
 		if (A_LoopFileName = "constants.ahk")
 			continue
 		Scanned++
@@ -93,7 +93,7 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 		"expected the tap-hold key modules to be scanned (got " . Scanned . ") — a moved or renamed "
 			. "directory must fail here, not quietly assert nothing")
 	; Guard the lifetime class across the entire production driver as well. A
-	; future sustained transition may move out of platform/remap; only the two
+	; future sustained transition may move out of tap_hold/engine; only the two
 	; owner-internal sends and the separately modelled pass-through physical Up
 	; are allowed to bypass the public ownership pair.
 	RawTransitionCount := 0

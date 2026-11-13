@@ -25,7 +25,7 @@ _THPPP_CandidateCommitsOnlyAfterWrite() {
 	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
 	Assert(Publisher != "" && InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
 		"one memory-only helper must own live TapHold publication")
-	MenuSource := _DriverDirConcat("ui/menu")
+	MenuSource := _DriverDirConcat("tap_hold/ui")
 	Assert(InStr(MenuSource, "WriteTapHoldNative(this.KeyId)") > 0,
 		"the Disable action must use the single-write native transaction")
 	DisableAllBody := _DriverFuncBody("_TH_DisableAll")

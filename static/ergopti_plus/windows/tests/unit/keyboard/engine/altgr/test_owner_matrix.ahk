@@ -173,7 +173,7 @@ Test("altgr owners: a pass-through combination presses only its other members (s
 ; the pass-through ones and on every SC01D prefix (see test_takes_its_lctrl.ahk): a standard layout's AltGr arrives as "SC01D & SC138",
 ; QWERTY's RAlt and the Kana AltGr as "*SC138" alone.
 _AOM_CriteriaGovernTheirLabels() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Expected := Map(
 		"#HotIf AltGrOwnerPassesThrough(false)", ["~SC01D & ~SC138::", "~*SC138::"],
 		"#HotIf AltGrOwnerPassesThrough(true)", ["~*$SC138::"],

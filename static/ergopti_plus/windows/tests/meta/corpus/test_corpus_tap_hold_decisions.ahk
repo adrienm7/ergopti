@@ -4,7 +4,7 @@
 ; MODULE: Tap-Hold Decision Corpus Replay (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/tap_hold/decision_vectors.json through the
-; production owners of platform/remap (TapHoldOwnImmediateModifier,
+; production owners of tap_hold/engine (TapHoldOwnImmediateModifier,
 ; TapHoldOwnRoll, TapHoldRollOtherKey), the real activity tracker fed through
 ; HookDispatcher, the real TapHoldDispatchTap, TapHoldEmitKeyTap and the
 ; synthetic-key ledger. What reaches _AHK_SendInput is read as the keystrokes an

@@ -10,7 +10,7 @@
 ;
 ; ARCHITECTURE:
 ; This file is the entry-point only. Implementation is split across sub-modules
-; under platform/remap/ for navigability.
+; under tap_hold/engine/ for navigability.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,14 +28,14 @@
 ; Explicitly own the tap-hold configuration API used by every sub-module below.
 ; The aggregate driver includes this first already; normal #Include include-once
 ; semantics preserve that order while modular validation resolves TapHoldDuration.
-#Include ../../platform/remap/tap_hold_loader.ahk
+#Include ../../tap_hold/engine/loader.ahk
 
 #Include ../engine/keys/constants.ahk
-#Include ../../platform/remap/tap_hold_roll.ahk
+#Include ../../tap_hold/engine/roll.ahk
 ; The second key of a key combination, before every other hotkey of a
 ; tap-hold key: the earliest-created eligible variant fires.
 #Include ../engine/keys/combination_keys.ahk
-#Include ../../platform/remap/tap_hold_roll_keys.ahk
+#Include ../../tap_hold/engine/roll_keys.ahk
 #Include ../engine/one_shot_shift.ahk
 #Include ../engine/keys/capslock.ahk
 #Include ../engine/keys/lshift_lctrl.ahk

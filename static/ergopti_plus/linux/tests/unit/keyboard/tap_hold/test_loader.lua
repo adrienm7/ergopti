@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 -- Loaded fresh: the cases below capture the current logger shim, and a module
 -- an earlier suite loaded under a substitute logger would report elsewhere.
-local Config = helpers.load_module("platform.remap.tap_hold_loader")
+local Config = helpers.load_module("tap_hold.engine.loader")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
@@ -35,7 +35,7 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		os.remove(path)
 		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
 		local code = string.format([[package.path = %q
-local loader = require("platform.remap.tap_hold_loader")
+local loader = require("tap_hold.engine.loader")
 local result = loader.load(%q, %q)
 assert(type(result.user_error) == "string", "a FIFO is not an absent source")
 assert(result.enabled == false and next(result.keys) == nil)
@@ -116,7 +116,7 @@ assert(result.enabled == false and next(result.keys) == nil)
 	helpers.it("falls back to the global delay for a NaN key threshold", function()
 		local loaded = load('[tap_hold]\ntime_activation_seconds = 0.4\n[tap_hold.keys.left_shift]\ntime_activation_seconds = nan\n')
 		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, 0.4)
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end })
 		engine:process(Engine.KEY_CODES.left_shift, 1, 0)
@@ -214,7 +214,7 @@ end)
 -- held its modifiers while the tray showed no hold.
 helpers.describe("tap-hold config: the spellings of a hold", function()
 
-	local Engine = require("platform.remap.tap_hold_engine")
+	local Engine = require("tap_hold.engine.engine")
 	local HoldOptions = require("tap_hold.engine.hold_options")
 
 	--- The modifier codes the engine presses when `key_id` goes down.

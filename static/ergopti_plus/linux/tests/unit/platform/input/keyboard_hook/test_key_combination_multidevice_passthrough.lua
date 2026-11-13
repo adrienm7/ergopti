@@ -61,7 +61,7 @@ local function with_manager(route, body)
 				reload = function() s.reloads = s.reloads + 1 end,
 				quit = function() error("unexpected quit") end,
 			})
-			manager = helpers.load_module("platform.remap.tap_hold_manager")
+			manager = helpers.load_module("tap_hold.engine.manager")
 			assert(manager.init({ keyboard_hook = s.hook,
 				execute_action = function(action) assert(scripts.handlers[action])() end,
 				action_names = function() return { "script_reload" } end,

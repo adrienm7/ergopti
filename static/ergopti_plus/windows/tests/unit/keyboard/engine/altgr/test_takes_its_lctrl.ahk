@@ -101,7 +101,7 @@ Test("altgr lctrl: only a layout whose AltGr adds a fake LCtrl hands the hold ba
 ; The SC01D combinations carry ~ on the prefix, so the left_ctrl hotkey fires on
 ; the LCtrl press instead of its release, and both detectors are wired.
 _ATIL_TheWiringIsInPlace() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Bare := RegExMatch(Src, "m)^SC01D & ")
 	AssertEqual(0, Bare, "every SC01D combination must carry ~ on its prefix, or AutoHotkey postpones the left_ctrl hold to the LCtrl release")
 	StrReplace(Src, "~SC01D & ", , , &Tilded)

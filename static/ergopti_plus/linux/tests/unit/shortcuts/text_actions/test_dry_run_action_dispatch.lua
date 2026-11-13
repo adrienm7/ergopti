@@ -102,7 +102,7 @@ local function with_action(route, mode, action, body)
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "metrics.engine.keystats", Monotonic = "core.logger.engine.monotonic",
 				MagicKeySource = "hotstrings.engine.magic_key_source", script_chords = "shortcuts.engine.script_chords",
 				tap_keys = "shortcuts.engine.tap_keys", hotstrings_config = "hotstrings.engine.catalogue.config",
-				MagicKey = "hotstrings.engine.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
+				MagicKey = "hotstrings.engine.magic_key", TapHold = "tap_hold.engine.manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector
 			environment.input_capture_gate = require("platform.input.capture_gate").new()
 			environment.on_char = function() error("The bound chord must not become a text callback") end

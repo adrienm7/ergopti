@@ -61,7 +61,7 @@ local function with_wrap_controls(options, callback)
 		"shortcuts.ui.menu.shortcuts", "menu.engine.wrap_mutation", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
 		"core.logger.engine.logger", "core.ui.engine.dialog_util", "shortcuts.engine.actions.text",
 		"menu.ui.builder.utils", "layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils",
-		"ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
+		"tap_hold.ui.menu_tap_keys", "menu.engine.manifest_reader",
 	}, function()
 		local renderer = helpers.load_with_stubs("menu.engine.manifest_menu")
 		-- Keys read as themselves, except the label-value join, the French template.
@@ -578,7 +578,7 @@ end)
 local function with_shortcut_presentation(language, scenario)
 	local names = {
 		"shortcuts.ui.menu.shortcuts", "menu.engine.manifest_menu", "menu.ui.builder.utils",
-		"layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils", "ui.menu.menu_tap_keys",
+		"layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils", "tap_hold.ui.menu_tap_keys",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.renderer", "core.logger.engine.logger",
 		"core.ui.engine.dialog_util", "core.fs.engine.paths", "shortcuts.engine", "menu.engine.row_dialect",
 	}

@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_loader.lua
+--- tap_hold/engine/loader.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold Configuration (Linux)
@@ -34,7 +34,7 @@
 ---     set it, else the timing registry's default. No shipped key carries a
 ---     delay. The per-key delays this build used to ship, copied into a file by
 ---     a rewrite, are removed once by the versioned migration of
----     _shared/tap_hold/data/migrations.toml (platform/remap/tap_hold_migration.lua);
+---     _shared/tap_hold/data/migrations.toml (tap_hold/engine/migration.lua);
 ---     a file not yet migrated on disk is read as the migration leaves it;
 ---   - a threshold outside 0..10 s falls back to the global delay, a field of
 ---     the wrong type disables its key, and a malformed user file is reported and
@@ -50,12 +50,12 @@ local HoldOptions = require("tap_hold.engine.hold_options")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Manifest = require("menu.engine.manifest_reader")
 local Outdated = require("settings.engine.migration.outdated")
-local Shapes = require("platform.remap.tap_hold_shapes")
-local Migration = require("platform.remap.tap_hold_migration")
+local Shapes = require("tap_hold.engine.shapes")
+local Migration = require("tap_hold.engine.migration")
 local ConfigKeys = require("settings.engine.keys")
 local LoneTap = require("tap_hold.engine.lone_tap")
 
-local LOG = "platform.remap.tap_hold_loader"
+local LOG = "tap_hold.engine.loader"
 local TIME_FIELD = require("settings.engine.keys").LEAF.TIME_ACTIVATION_SECONDS
 
 -- The bound of time_activation_seconds and the global default: the timing

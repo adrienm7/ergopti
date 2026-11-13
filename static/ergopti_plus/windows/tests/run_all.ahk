@@ -231,8 +231,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../core/text/engine/toml/config_loader.ahk
 #Include ../settings/engine/migration/migrate.ahk
 #Include ../../_shared/settings/data/outdated.ahk
-#Include ../platform/remap/tap_hold_loader.ahk
-#Include ../platform/remap/tap_hold_writer.ahk
+#Include ../tap_hold/engine/loader.ahk
+#Include ../tap_hold/engine/writer.ahk
 ; The layer-file loader reads _shared/layouts/data and the physical-key registry at run
 ; time; meta/corpus/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
 #Include ../keyboard/engine/layers/loader.ahk
@@ -243,7 +243,7 @@ global _DefaultLogsDir := _LogsDir
 ; driven by unit/hotstrings/engine/expander/test_layer_editor_host.ahk without a WebView.
 #Include ../layouts/ui/layer_editor.ahk
 #Include ../shortcuts/ui/physical_shortcuts/init.ahk
-#Include ../ui/menu/menu_taphold.ahk
+#Include ../tap_hold/ui/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
 #Include ../hotstrings/ui/menu/switches.ahk
 ; The whole tree's path collector and tick, which the bulk hotstring writer in
@@ -1386,7 +1386,7 @@ global _AhkSubDir := ""
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keystats-walker and tap-hold reassign-at-boot loaders.
 #Include ../keyboard/engine/keys/constants.ahk
-#Include ../platform/remap/tap_hold_roll.ahk
+#Include ../tap_hold/engine/roll.ahk
 #Include ../keyboard/engine/keys/altgr_criteria.ahk
 #Include unit/keyboard/engine/tap_hold/test_activity_cancel.ahk
 #Include unit/keyboard/engine/tap_hold/test_owned_press.ahk

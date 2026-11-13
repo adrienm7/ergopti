@@ -827,8 +827,8 @@ end)
 -- Keep these input scenarios inside a separate fixture scope: the historical
 -- lifecycle scenarios above intentionally reuse their own construction helpers.
 local INPUT_MODULES = {
-	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
-	"modules.keymap.one_shot_shift", "hotstrings.engine.expander.control_sentinels",
+	"hs", "tests.stubs.hs", "tap_hold.one_shot_shift",
+	"tap_hold.engine.one_shot_shift", "hotstrings.engine.expander.control_sentinels",
 	"hotstrings.engine.expander.magic_key_source", "core.events.clock",
 	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "core.timing.engine.deferred_work",
 	"platform.input.text_sender", "platform.input.keyboard_geometry", "ai.engine.prediction.app_filter",
@@ -868,8 +868,8 @@ local function with_input_fixture(callback)
 				owns = function(code) return controls.magic_code == code end,
 				remaps = function(code) return controls.magic_code == code end,
 			}
-			factory = require("adapters.one_shot_shift")
-			package.loaded["adapters.one_shot_shift"] = { new = function(deps)
+			factory = require("tap_hold.one_shot_shift")
+			package.loaded["tap_hold.one_shot_shift"] = { new = function(deps)
 				owner = factory.new({
 					data = ONE_SHOT_DATA, magic = deps.magic,
 					event = { rawFlagMasks = { shift = 2 } },

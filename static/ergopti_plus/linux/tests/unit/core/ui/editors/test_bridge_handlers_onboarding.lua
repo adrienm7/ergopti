@@ -500,7 +500,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local state, _, captured = onboarding_state()
 			local target = scratch_dir()
 			helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
-			local Writer = helpers.load_module("platform.remap.tap_hold_writer")
+			local Writer = helpers.load_module("tap_hold.engine.writer")
 			local imports = {}
 			state.tap_hold_writer = setmetatable({
 				import_recommended = function(path, keys, preset)
@@ -514,7 +514,7 @@ helpers.describe("ui.bridge_handlers", function()
 				{ path = "tap_holds.keys.left_alt", value = false },
 				{ path = "tap_holds.keys.tab", value = true },
 			} })
-			local loaded = require("platform.remap.tap_hold_loader").load(
+			local loaded = require("tap_hold.engine.loader").load(
 				require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), target .. "/tap_hold.toml",
 				target .. "/config.toml")
 			os.remove(target .. "/tap_hold.toml")

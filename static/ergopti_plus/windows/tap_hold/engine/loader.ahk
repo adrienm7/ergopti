@@ -1,4 +1,4 @@
-﻿; platform/remap/tap_hold_loader.ahk
+﻿; tap_hold/engine/loader.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Hold Loader
@@ -36,7 +36,7 @@
 ; owner here so a runner that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 ; The loader reads a file the boot has not migrated as the migration leaves it.
-#Include %A_LineFile%\..\tap_hold_migration.ahk
+#Include %A_LineFile%\..\migration.ahk
 
 ; The global default tap-hold delay (TAPHOLD_DEFAULT_ACTIVATION_SECONDS) is the
 ; timing registry's tap_hold.default_activation_ms, loaded at boot by
@@ -115,7 +115,7 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "", CapturedSource := unset) {
 		InheritDefaults := !!UserData["inherit_defaults"]
 		; Carry the flag into the map we RETURN, not only into this local. The
 		; writer gates its ``[tap_hold]`` emit on Data.Has("inherit_defaults")
-		; (tap_hold_writer.ahk), and it serializes the live TapHold global — so a
+		; (writer.ahk), and it serializes the live TapHold global — so a
 		; loader that keeps the flag to itself makes the opt-out a one-way trip:
 		; the next individual tray write drops the line and the following reload
 		; re-merges every shipped default, undoing « Tout désactiver ».
@@ -756,6 +756,7 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel) {
 
 
 
+
 ; =========================================
 ; =========================================
 ; ======= 5. One-shot Shift results =======
@@ -873,7 +874,7 @@ _TapHoldReadMacOnlyModifiers() {
 		return Names
 	}
 	; Read here, not through the writer's picker reader: this runs at the
-	; loader's include position, where tap_hold_writer.ahk may not be included.
+	; loader's include position, where writer.ahk may not be included.
 	Picker := ParseTomlFile(_SharedDir . "\tap_hold\data\defaults.toml").Get("tap_hold.hold_picker", Map())
 	Modifiers := (Picker is Map) ? Picker.Get("modifiers", "") : ""
 	if !(Modifiers is Array) {

@@ -1,4 +1,4 @@
-﻿; platform/remap/tap_hold_migration.ahk
+﻿; tap_hold/engine/migration.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Hold File Migration (Windows)
@@ -6,7 +6,7 @@
 ; Versions a user's tap_hold.toml. It reads ``[_meta] schema_version``, replays
 ; the steps of _shared/tap_hold/data/migrations.toml on the typed document and stamps
 ; the result. The Windows counterpart of _shared/tap_hold/engine/migrate.lua and of
-; linux/platform/remap/tap_hold_writer.lua's migrate_file; the corpus
+; linux/tap_hold/engine/writer.lua's migrate_file; the corpus
 ; _shared/tests/corpus/tap_hold_migrations pins the semantics of all of them.
 ;
 ; FEATURES & RATIONALE:

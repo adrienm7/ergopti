@@ -20,7 +20,7 @@ local COMBOS = { { id = "esc_tab" } }
 --- @param source string|nil Initial bytes, nil for absent.
 --- @param body function Receives the config module and the disk table.
 local function with_disk(source, body)
-	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
+	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
 		local config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local files = require("core.fs.adapters.file_system")
 		local old_read, old_write = files.read_with_status, files.write_if_unchanged

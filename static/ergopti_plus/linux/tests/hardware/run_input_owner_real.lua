@@ -58,7 +58,7 @@ local Broker = require("platform.input.modifier_broker")
 local Layout = require("layouts.adapters.keyboard_layout")
 local Capture = require("layouts.adapters.xkb_capture")
 local Monotonic = require("core.logger.engine.monotonic")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 local Native = require("keyboard.engine.keys.combination_engine")
 local Owner = require("shortcuts.engine.key_combinations")
 

@@ -65,8 +65,8 @@ end
 
 helpers.describe("the macOS Tap-Holds submenu draws its feature switch", function()
 	helpers.it("renders the switch, checks the parent, and toggles it off then on", function()
-		package.loaded["ui.menu.menu_tap_holds"] = nil
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		package.loaded["tap_hold.ui.menu_tap_holds"] = nil
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local observed = { enabled = true, switch_writes = {}, regenerations = 0 }
 		local ctx = { karabiner = remap_double(observed), updateMenu = function() end }
 

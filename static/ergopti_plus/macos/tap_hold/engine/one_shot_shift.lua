@@ -1,4 +1,4 @@
---- modules/keymap/one_shot_shift.lua
+--- tap_hold/engine/one_shot_shift.lua
 
 --- ==============================================================================
 --- MODULE: One-shot Shift State Owner

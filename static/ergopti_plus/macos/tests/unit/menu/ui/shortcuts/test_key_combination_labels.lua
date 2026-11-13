@@ -23,10 +23,10 @@ end
 --- Uses genuine locale JSON and the genuine locale wrapper without reloading.
 --- @param callback function Receives the actual menu, locale wrapper and codec.
 local function with_menu(callback)
-	helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu",
+	helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.storage",
 		"infra.timer_scheduler", "tap_hold.engine.combination_labels", "shortcuts.ui.action_picker" }, function()
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local captured = package.loaded["core.i18n.engine.i18n"]
 		package.loaded["core.i18n.engine.i18n"] = nil
 		local real = require("core.i18n.engine.i18n")

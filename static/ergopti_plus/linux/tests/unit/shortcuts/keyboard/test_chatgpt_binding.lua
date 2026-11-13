@@ -50,7 +50,7 @@ local function with_binding(body, options)
 					defer = function(callback) seen.queue[#seen.queue + 1] = callback; return true end })
 				local combinations = require("shortcuts.engine.key_combinations")
 				if not options or options.initialize_pairs ~= false then
-					local Loader = require("platform.remap.tap_hold_loader")
+					local Loader = require("tap_hold.engine.loader")
 					local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 					local catalogue = Loader.load_document(defaults,
 						{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })

@@ -16,7 +16,7 @@
 ---    display) leaves its copies unchecked; that is said once in the log, not
 ---    at every copy.
 --- 3. Pure over its ports, so the suite drives it with a fake counter and
----    clock; platform/remap/tap_hold_manager.lua owns the live instance.
+---    clock; tap_hold/engine/manager.lua owns the live instance.
 --- ==============================================================================
 
 local M = {}

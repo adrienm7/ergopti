@@ -3,7 +3,7 @@
 --- Native effect ownership for the shared ordered-pair policy. The underlying
 --- tap-hold engine retains modifier reference counts and live layer ownership.
 local Policy = require("tap_hold.engine.key_combinations")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 local ConfigOwner = require("shortcuts.engine.key_combinations")
 local AiActions = require("shortcuts.engine.ai_actions")
 local settings_current = ConfigOwner.buffered_settings_current
@@ -709,7 +709,7 @@ end
 
 -- This final join reads only exact private issuer and original export facts.
 local function input_issuer_current(record)
-	if not record or not record.available() or package.loaded["platform.remap.tap_hold_engine"] ~= Engine
+	if not record or not record.available() or package.loaded["tap_hold.engine.engine"] ~= Engine
 		or getmetatable(record.base) ~= record.base_metatable or record.base_index ~= Engine
 		or rawget(record.base_metatable, "__index") ~= record.base_index
 		or getmetatable(record.owner) ~= record.owner_metatable
@@ -759,7 +759,7 @@ local function input_owner_current(receipt)
 		if type(port) ~= "function" or rawget(owned.issuer.owner, name) ~= port then return false end
 	end
 	return Engine.arm_one_shot == engine_input_ports.arm and Engine.input_arm_state == engine_input_ports.state
-		and Engine.clear_input_arm == engine_input_ports.clear and package.loaded["platform.remap.tap_hold_engine"] == Engine
+		and Engine.clear_input_arm == engine_input_ports.clear and package.loaded["tap_hold.engine.engine"] == Engine
 		and rawget(owned.issuer.base, "key_text") == owned.key_text and rawget(owned.issuer.base, "plan_text") == owned.plan_text
 		and rawget(owned.issuer.base, "one_shot_result") == owned.one_shot_result
 end

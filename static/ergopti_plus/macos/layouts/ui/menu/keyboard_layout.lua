@@ -97,7 +97,7 @@ local TIS_CALL_DELAY = Timings.sec("ui", "tis_call_delay_ms")
 -- =================================================
 -- =================================================
 
--- The bundle-install and input-source layers moved to modules/keymap/{layout_install,
+-- The bundle-install and input-source layers moved to tap_hold/engine/{layout_install,
 -- input_sources}.lua (audit F4). Bind their public functions to locals so the
 -- submenu builder below reads exactly as it did pre-split, and re-export the
 -- unit-test seams the suite pins on M.

@@ -1620,7 +1620,7 @@ local function binding_action(binding)
 	if M.DEFAULT_GESTURES[binding] ~= nil then return M.get_action(binding), "gestures", binding end
 	local tap_id = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
 	if tap_id then
-		return require("platform.remap.tap_hold_manager").get_tap_action(tap_id), "tap_hold", tap_id
+		return require("tap_hold.engine.manager").get_tap_action(tap_id), "tap_hold", tap_id
 	end
 	local descriptors = {
 		{ "keyboard__", "shortcuts.engine.keyboard_shortcuts", "keyboard" },
@@ -1731,7 +1731,7 @@ local function capture_window(binding)
 	local physical = Keyboard.physical_source_receipt()
 	if type(physical) ~= "table" or physical.ready ~= true then return nil end
 	if section == "tap_hold" then
-		local tap_guard, path = require("platform.remap.tap_hold_manager").capture_tap_action(binding, "alt_tab_monitor")
+		local tap_guard, path = require("tap_hold.engine.manager").capture_tap_action(binding, "alt_tab_monitor")
 		if type(tap_guard) ~= "function" then return nil end
 		local revision = _program_revision
 		return function()
@@ -1861,8 +1861,8 @@ end
 --- @return string detail
 function M.action_parameter_binding_fits(binding)
 	if type(binding) == "string" and binding:sub(1, 13) == "combination__" then
-		local owner = rawget(package.loaded, "platform.remap.tap_hold_manager")
-		local catalogue = BindingPublication.current("combination", "platform.remap.tap_hold_manager", owner)
+		local owner = rawget(package.loaded, "tap_hold.engine.manager")
+		local catalogue = BindingPublication.current("combination", "tap_hold.engine.manager", owner)
 		return BindingIdentity.combination_binding_fits(binding, catalogue), BindingIdentity.RETIRED_COMBINATION
 	end
 	if type(binding) == "string" and binding:sub(1, 10) == "keyboard__" then

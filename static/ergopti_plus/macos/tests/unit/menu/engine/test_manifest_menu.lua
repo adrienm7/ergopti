@@ -635,8 +635,8 @@ require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos
 -- Actual component factories consume genuine existing fixture-owned data modules.
 local function fixed_parent_native_cohort(body)
 	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "core.logger.engine.logger",
-		"shortcuts.ui.menu.shortcuts", "gestures.ui.menu.gestures", "ui.menu.menu_tap_holds",
-		"menu.ui.builder.utils", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys"}
+		"shortcuts.ui.menu.shortcuts", "gestures.ui.menu.gestures", "tap_hold.ui.menu_tap_holds",
+		"menu.ui.builder.utils", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots", "tap_hold.ui.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
 	local ok, detail = xpcall(function()
 		return helpers.with_stub_scope(names, function()
@@ -747,7 +747,7 @@ helpers.describe("fixed feature parents: actual Mac component owners (fixed-feat
 		require("tests.support.remap_transaction_fixture")(function(fixture)
 			local remap = fixture.load_enabled_remap()
 			fixed_parent_native_cohort(function(renderer, translator)
-				local module = require("ui.menu.menu_tap_holds")
+				local module = require("tap_hold.ui.menu_tap_holds")
 				local context = {karabiner = remap, state_getters = {}, updateMenu = function() error("construction must not redraw") end}
 				observe_actual_fixed_parent("tap_holds", module, context, renderer, translator, remap.get_tap_holds_enabled() == true)
 			end)

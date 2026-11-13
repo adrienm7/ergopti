@@ -71,7 +71,7 @@ _TMDF_CapsLockLayerHasFloorAndPriorKey() {
 	; Move-resilient: scan the whole tap_holds module instead of a pinned path.
 	; The 2.3 hold-modifier and 2.4 hold-layer blocks both declare *$SC03A, so
 	; the slice starts at the 2.4 block's own #HotIf, unique in this dir.
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	Seg := _TMDF_BlockBody(Src, "#HotIf _CapsLockHasHoldLayer() and not LayerEnabled")
 	Assert(Seg != "", "capslock.ahk hold-layer block (2.4) must exist")
 	Assert(InStr(Seg, "TapMinDurationMs()") > 0,
@@ -102,7 +102,7 @@ _TMDF_LAltGenericLayerHasFloor() {
 	; The TapHoldPriorKeyIsSelf("left_alt")) { anchor is unique to lalt.ahk in this
 	; dir (the 4.5 guard ends its line with a comment instead), and the
 	; TapMinDurationMs() floor sits on the same line just before it.
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	; The generic hold-layer dispatch is the only call to _LAltDispatch() guarded
 	; that way; isolate that statement and assert the floor is present.
 	Idx := InStr(Src, "TapHoldPriorKeyIsSelf(" . Chr(34) . "left_alt" . Chr(34) . ")) {")

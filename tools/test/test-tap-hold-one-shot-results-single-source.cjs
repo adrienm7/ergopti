@@ -26,11 +26,11 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DATA = path.join(SP, '_shared', 'tap_hold', 'data', 'one_shot_shift.json');
 const AHK_ONE_SHOT = path.join(SP, 'windows', 'keyboard', 'engine', 'one_shot_shift.ahk');
-const AHK_LOADER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_loader.ahk');
-const LINUX_MANAGER = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_manager.lua');
-const LINUX_ENGINE = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua');
-const MACOS_ADAPTER = path.join(SP, 'macos', 'adapters', 'one_shot_shift.lua');
-const MACOS_OWNER = path.join(SP, 'macos', 'modules', 'keymap', 'one_shot_shift.lua');
+const AHK_LOADER = path.join(SP, 'windows', 'tap_hold', 'engine', 'loader.ahk');
+const LINUX_MANAGER = path.join(SP, 'linux', 'tap_hold', 'engine', 'manager.lua');
+const LINUX_ENGINE = path.join(SP, 'linux', 'tap_hold', 'engine', 'engine.lua');
+const MACOS_ADAPTER = path.join(SP, 'macos', 'tap_hold', 'one_shot_shift.lua');
+const MACOS_OWNER = path.join(SP, 'macos', 'tap_hold', 'engine', 'one_shot_shift.lua');
 
 const errors = [];
 const data = JSON.parse(fs.readFileSync(DATA, 'utf8'));
@@ -95,13 +95,13 @@ if (body.includes('TapHoldOneShotEndKeys(')) {
 }
 if (!fs.readFileSync(AHK_LOADER, 'utf8').includes('one_shot_shift.json')) {
 	errors.push(
-		'windows/platform/remap/tap_hold_loader.ahk does not read _shared/tap_hold/data/one_shot_shift.json.'
+		'windows/tap_hold/engine/loader.ahk does not read _shared/tap_hold/data/one_shot_shift.json.'
 	);
 }
 
 if (!fs.readFileSync(LINUX_MANAGER, 'utf8').includes('tap_hold/data/one_shot_shift.json')) {
 	errors.push(
-		'linux/platform/remap/tap_hold_manager.lua does not read _shared/tap_hold/data/one_shot_shift.json.'
+		'linux/tap_hold/engine/manager.lua does not read _shared/tap_hold/data/one_shot_shift.json.'
 	);
 }
 if (!fs.readFileSync(MACOS_ADAPTER, 'utf8').includes('tap_hold/data/one_shot_shift.json')) {

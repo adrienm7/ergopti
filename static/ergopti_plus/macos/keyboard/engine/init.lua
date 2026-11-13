@@ -4556,7 +4556,7 @@ local function back_up_settings_source(backup_path, source_path, admitted_source
 	end
 	-- The tap-hold rows of the manifest live in the config.toml beside it: the
 	-- save checks and rewrites both, so both are backed up first.
-	local config_path = require("platform.remap.tap_hold_file").config_toml_path_for(path)
+	local config_path = require("tap_hold.engine.file").config_toml_path_for(path)
 	local config_content, config_status = FileSystem.read_with_status(config_path)
 	if admitted_source ~= nil and type(admitted_source.config) == "table"
 		and (config_status ~= admitted_source.config.status
@@ -7104,7 +7104,7 @@ function M.init(file_system)
 	-- An old config_karabiner.toml is carried over into tap_hold.toml once, before
 	-- the first read; one that cannot be is refused like a corrupt file.
 	local imported, import_outcome = timed("import_legacy_tap_hold_file", function()
-		return require("platform.remap.tap_hold_file").import_legacy(resolve_user_config(), FileSystem)
+		return require("tap_hold.engine.file").import_legacy(resolve_user_config(), FileSystem)
 	end)
 	if not imported then
 		Logger.error(LOG, "Karabiner bridge initialization refused: the old remap settings could not be carried over (%s).",

@@ -70,9 +70,9 @@ end
 --- Builds the submenu with readable captions for the lone tap row.
 --- @param body function Receives build() and the observation table.
 local function with_menu(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "menu.engine.manifest_menu",
+	return helpers.with_stub_scope({ "tap_hold.ui.menu_tap_holds", "menu.engine.manifest_menu",
 		"core.i18n.engine.i18n", "core.logger.engine.logger", "menu.ui.builder.utils" }, function()
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local i18n = require("core.i18n.engine.i18n")
 		local original_get = i18n.get
 		i18n.get = function(key) return TEMPLATES[key] or original_get(key) end

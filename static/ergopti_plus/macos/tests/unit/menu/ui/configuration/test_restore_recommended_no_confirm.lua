@@ -162,7 +162,7 @@ end
 --- @return table asked Dialog messages shown.
 --- @return number refreshes Menu refreshes.
 local function run_tap_hold_row(id)
-	local names = { "core.ui.engine.dialog_util", "settings.engine.paths", "menu.engine.manifest_menu", "ui.menu.menu_tap_holds" }
+	local names = { "core.ui.engine.dialog_util", "settings.engine.paths", "menu.engine.manifest_menu", "tap_hold.ui.menu_tap_holds" }
 	return helpers.with_fresh_modules(names, function()
 		local asked, requests, refreshes, commands = {}, {}, 0, nil
 		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, no)
@@ -174,7 +174,7 @@ local function run_tap_hold_row(id)
 			if menu_key == "tap_holds_menu" then commands = context.commands end
 			return {}
 		end)
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds")
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds")
 		menu.build({ karabiner = remap_double(requests), updateMenu = function() refreshes = refreshes + 1 end })
 		helpers.assert_type(commands and commands[id], "function", "the Tap-Holds submenu registers " .. id)
 		return commands[id](), requests, asked, refreshes

@@ -65,7 +65,7 @@ Test("nav layer: the scanner flags a layer hotkey without the wildcard (nav-laye
 	_NLHM_ScannerFindsTheExactMatchShape)
 
 _NLHM_EveryLayerHotkeyFiresUnderAHeldModifier() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "the tap-hold sources must be readable")
 	; Scan both the remaining static special cases and the dynamic labels the
 	; recommended file actually registers. The source alone now has only two.

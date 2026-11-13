@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger",
+local MODULES = { "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.logger.engine.logger",
 	"core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }
 local CORPUS = helpers.shared() .. "/tests/corpus/tap_hold_shared_file/"
 -- The pairs of the corpus, each <name>.toml and <name>.config.toml.
@@ -372,7 +372,7 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 			local legacy = f.dir .. "/config_karabiner.toml"
 			local text = assert(read(CORPUS .. "macos_legacy.toml"))
 			write(legacy, text)
-			local TapHoldFile = require("platform.remap.tap_hold_file")
+			local TapHoldFile = require("tap_hold.engine.file")
 			helpers.assert_eq({ TapHoldFile.import_legacy(f.path, f.files) }, { true, "imported" })
 			-- The boot then versions config.toml: its v22 step moves the rows on.
 			write(f.config_path, "[_meta]\nschema_version = 21\n")
@@ -408,7 +408,7 @@ helpers.describe("The shared tap_hold.toml on macOS (tap-hold-shared-file)", fun
 	helpers.it("an unparseable config_karabiner.toml is refused, not carried over (tap-hold-shared-file)", function()
 		with_folder(function(f)
 			write(f.dir .. "/config_karabiner.toml", "[tap_holds\n")
-			local TapHoldFile = require("platform.remap.tap_hold_file")
+			local TapHoldFile = require("tap_hold.engine.file")
 			helpers.assert_eq({ TapHoldFile.import_legacy(f.path, f.files) }, { false, "unparseable" })
 			helpers.assert_eq(read(f.path), nil)
 		end)

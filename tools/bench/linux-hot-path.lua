@@ -92,7 +92,7 @@ end
 -- 2/ Key path: a recorded typing stream through the real hook and the engine.
 do
 	local helpers = require("tests.helpers")
-	local Engine = require("platform.remap.tap_hold_engine")
+	local Engine = require("tap_hold.engine.engine")
 	local keys = {
 		caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = 0.15 },
 		left_shift = { tap_action = "", hold_modifier = "shift", time_activation_seconds = 0.15 },

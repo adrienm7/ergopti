@@ -1209,9 +1209,9 @@ local function main()
 	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
 	-- whose closure reads it.
 	-- tap_hold.toml is versioned like config.toml: migrated before the engine reads it.
-	require("platform.remap.tap_hold_writer").migrate_file(
-		require("settings.engine.paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
-	local TapHold = require("platform.remap.tap_hold_manager")
+	require("tap_hold.engine.writer").migrate_file(
+		require("settings.engine.paths").config(require("tap_hold.engine.writer").FILE_NAME))
+	local TapHold = require("tap_hold.engine.manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
 	local WordReset = require("hotstrings.engine.word_reset")
@@ -1259,7 +1259,7 @@ local function main()
 			engine:reset(false)
 		end,
 		defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),
-		user_path = require("settings.engine.paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
+		user_path = require("settings.engine.paths").config(require("tap_hold.engine.writer").FILE_NAME),
 		-- The switch and the timings are config.toml rows on every OS.
 		config_path = require("settings.engine.paths").config("config.toml"),
 	})
@@ -1292,7 +1292,7 @@ local function main()
 	-- The tray's tap-hold rows write the user's file through this and reload
 	-- the engine live. A hold that enters the recommended layer creates the
 	-- configuration folder's layers.toml when it has none.
-	require("platform.remap.tap_hold_writer").init({
+	require("tap_hold.engine.writer").init({
 		path = TapHold.user_path(),
 		config_path = TapHold.config_path(),
 		reload = TapHold.reload,
@@ -2447,7 +2447,7 @@ local function main()
 		-- action cannot be inferred to type the magic character from its name.
 		direct_source_admitted = function(code, magic_remapped)
 			if TapHold.is_active() then
-				local native = require("platform.remap.tap_hold_engine").KEY_CODES
+				local native = require("tap_hold.engine.engine").KEY_CODES
 				for id, key in pairs(TapHold.keys()) do
 					if native[id] == code and key.enabled ~= false then return false end
 				end

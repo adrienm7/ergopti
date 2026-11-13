@@ -122,7 +122,7 @@ local function with_provider(kind, options, body)
 			get_keyboard_slot_label = function(id) return id end,
 			get_keyboard_slot_chord = function() return { "cmd" }, "1" end,
 		}
-		for _, name in ipairs({ "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "shortcuts.ui.menu.shortcuts" }) do package.loaded[name] = nil end
+		for _, name in ipairs({ "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots", "tap_hold.ui.menu_tap_keys", "shortcuts.ui.menu.shortcuts" }) do package.loaded[name] = nil end
 		state = { shortcuts = true, script_control_shortcuts = { script_altgr_enter = "none" } }
 		local ctx = { gestures = gestures, state = state, shortcuts = {},
 			save_prefs = function()
@@ -144,7 +144,7 @@ local function with_provider(kind, options, body)
 			rows = require("layouts.ui.menu.keyboard_slots").provide_rows(ctx)
 			rows[1].items[1].action()
 		elseif kind == "tap" then
-			rows = require("ui.menu.menu_tap_keys").provide_rows(ctx)
+			rows = require("tap_hold.ui.menu_tap_keys").provide_rows(ctx)
 			rows[1].action()
 		else
 			package.loaded["shortcuts.engine.actions.text"] = { WRAP_GROUPS = {} }

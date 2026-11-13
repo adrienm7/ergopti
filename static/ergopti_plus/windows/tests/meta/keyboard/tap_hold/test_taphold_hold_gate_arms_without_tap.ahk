@@ -14,7 +14,7 @@
 ; on the hold alone. Eight keys (CapsLock, Space, Escape, Enter, Backspace,
 ; Delete, Win) always did; Left Alt, Right Ctrl and Tab carried the conjunct.
 ;
-; SCOPE: source introspection. platform/remap/*.ahk register #HotIf hotkeys
+; SCOPE: source introspection. tap_hold/engine/*.ahk register #HotIf hotkeys
 ; at load and cannot be #Included by the headless runner, so the gate text is
 ; scanned instead of being exercised.
 ; ==============================================================================
@@ -53,7 +53,7 @@ _THG_PickerKeyIds() {
 ; =====================================================================
 
 _THG_HoldGatesDoNotRequireATapAction() {
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	Ids := _THG_PickerKeyIds()
 	Assert(Ids.Length > 0,
 		"prerequisite: the tap-hold picker key ids must be derivable from _TH_KeyDefs — with none found this guard would check nothing")
@@ -124,7 +124,7 @@ _THG_EveryPickerKeyUsesTheImmediateModifierOwner() {
 		; A key whose criteria live apart (altgr_criteria.ahk) lists both files.
 		KeySrc := ""
 		for _, File in StrSplit(Files[Id], "|")
-			KeySrc .= _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . File, "UTF-8"))
+			KeySrc .= _StripFullLineComments(FileRead(DriverRoot . "\tap_hold\engine\" . File, "UTF-8"))
 		Assert(InStr(KeySrc, 'TapHoldHoldModifier(TapHold, "' . Id . '")') > 0,
 			"key '" . Id . "' offers modifier holds but never reads the configured modifier")
 		; A typing key enters the common owner through TapHoldOwnHoldModifier,
@@ -157,7 +157,7 @@ _THG_SpecialTapBranchesYieldToConfiguredModifiers() {
 	]
 	SplitPath(A_ScriptDir, , &DriverRoot)
 	for Item in Cases {
-		Src := _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . Item.File, "UTF-8"))
+		Src := _StripFullLineComments(FileRead(DriverRoot . "\tap_hold\engine\" . Item.File, "UTF-8"))
 		Needle := '#HotIf TapHoldTapAction(TapHold, "' . Item.Id . '") == "' . Item.Action . '"'
 		Pos := InStr(Src, Needle)
 		Assert(Pos > 0, Item.File . " must retain the special tap branch for " . Item.Action)

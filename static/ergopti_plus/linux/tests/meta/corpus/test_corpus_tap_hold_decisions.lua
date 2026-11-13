@@ -16,7 +16,7 @@ local Json = require("core.text.engine.json")
 local Catalog = require("tap_hold.engine.key_catalog")
 local Timings = require("core.timing.engine.timings")
 local EvdevCodes = require("platform.input.evdev_codes")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
 local Contract = require("tests.lua.keyboard.tap_hold_decision_contract")
 

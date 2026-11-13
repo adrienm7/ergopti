@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
-local OWNER_MODULES = { "infra.tap_hold_scope", "shortcuts.engine.scope", "ai.engine.scope", "metrics.engine.scope",
+local OWNER_MODULES = { "tap_hold.engine.scope", "shortcuts.engine.scope", "ai.engine.scope", "metrics.engine.scope",
 	"hotstrings.engine.catalogue.scope", "settings.engine.scope.script_scope" }
 
 --- A stub participant journaling into a shared trace.
@@ -258,8 +258,8 @@ end)
 --- @param source string The tap-hold file's bytes.
 --- @param body function Receives the manager, the folder, tap_hold.toml's path and config.toml's path.
 local function with_real_tap_holds(source, body)
-	local names = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-		"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.paths", "settings.engine.scope.global_scope",
+	local names = { "tap_hold.engine.manager", "tap_hold.engine.loader",
+		"tap_hold.engine.writer", "tap_hold.engine.scope", "settings.engine.paths", "settings.engine.scope.global_scope",
 		"menu.ui.builder.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -276,7 +276,7 @@ local function with_real_tap_holds(source, body)
 		local real_paths = require("settings.engine.paths")
 		package.loaded["settings.engine.paths"] = setmetatable(
 			{ config = function(name) return dir .. "/" .. name end }, { __index = real_paths })
-		local Manager = require("platform.remap.tap_hold_manager")
+		local Manager = require("tap_hold.engine.manager")
 		Manager.init({
 			keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 				held_modifiers = function() return {} end, held_text_modifier_codes = function() return {} end,
@@ -353,7 +353,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 			local trace = {}
 			local GlobalScope = require("settings.engine.scope.global_scope")
 			local committed, report = apply_now(GlobalScope, "clear", {
-				tap_holds = require("infra.tap_hold_scope").participant(),
+				tap_holds = require("tap_hold.engine.scope").participant(),
 				llm = stub(trace, "llm", true),
 			})
 			helpers.assert_eq(committed, false)
@@ -368,8 +368,8 @@ end)
 
 helpers.describe("Linux global scope: a real owner is reverted", function()
 	helpers.it("puts the real tap-hold files and engine back when a later category refuses", function()
-		local names = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-			"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.paths", "settings.engine.scope.global_scope" }
+		local names = { "tap_hold.engine.manager", "tap_hold.engine.loader",
+			"tap_hold.engine.writer", "tap_hold.engine.scope", "settings.engine.paths", "settings.engine.scope.global_scope" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local dir = os.tmpname()
@@ -383,7 +383,7 @@ helpers.describe("Linux global scope: a real owner is reverted", function()
 		fh:close()
 		local ok, err = pcall(function()
 			package.loaded["settings.engine.paths"] = { config = function(name) return dir .. "/" .. name end }
-			local Manager = require("platform.remap.tap_hold_manager")
+			local Manager = require("tap_hold.engine.manager")
 			Manager.init({
 				keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 					held_modifiers = function() return {} end, held_text_modifier_codes = function() return {} end,
@@ -394,7 +394,7 @@ helpers.describe("Linux global scope: a real owner is reverted", function()
 			local trace = {}
 			local GlobalScope = require("settings.engine.scope.global_scope")
 			local committed, report = apply_now(GlobalScope, "recommended", {
-				tap_holds = require("infra.tap_hold_scope").participant(),
+				tap_holds = require("tap_hold.engine.scope").participant(),
 				llm = stub(trace, "llm", true),
 			})
 			helpers.assert_eq(committed, false)

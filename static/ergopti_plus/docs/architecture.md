@@ -36,7 +36,6 @@ graph TD
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
-        MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
     end
 

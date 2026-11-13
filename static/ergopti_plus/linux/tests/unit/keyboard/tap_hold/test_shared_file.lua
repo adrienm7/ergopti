@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 local Paths = require("core.fs.engine.paths")
 local Codec = require("core.text.engine.toml_codec")
 
@@ -50,7 +50,7 @@ local function with_writer(body)
 	os.remove(dir)
 	local made = os.execute('mkdir "' .. dir .. '"')
 	assert(made == true or made == 0, "the isolated configuration folder must exist")
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({
 		path = dir .. "/tap_hold.toml",
 		reload = function() return true end,

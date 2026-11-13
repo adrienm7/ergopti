@@ -16,8 +16,8 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
-local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.scope.transaction" }
+local MODULES = { "tap_hold.engine.manager", "tap_hold.engine.loader",
+	"tap_hold.engine.writer", "tap_hold.engine.scope", "settings.engine.scope.transaction" }
 
 local function read(path)
 	local fh = io.open(path, "r")
@@ -94,7 +94,7 @@ local function with_scope(tap_text, config_text, body)
 	if tap_text then write(tap_path, tap_text) end
 	if config_text then write(config_path, config_text) end
 	local installed = {}
-	local Manager = require("platform.remap.tap_hold_manager")
+	local Manager = require("tap_hold.engine.manager")
 	Manager.init({
 		keyboard_hook = { set_remapper = function(engine) installed[#installed + 1] = engine or false end,
 			key_text = function() return nil end, held_modifiers = function() return {} end,
@@ -118,7 +118,7 @@ local function with_scope(tap_text, config_text, body)
 		end,
 	}, { __index = files })
 	function s.owner()
-		return require("infra.tap_hold_scope").new({
+		return require("tap_hold.engine.scope").new({
 			path = config_path, backup_path = config_path .. ".bak",
 			tap_hold_path = tap_path, tap_hold_backup_path = tap_path .. ".bak",
 			parameters = s.parameters, files = s.files,
@@ -136,7 +136,7 @@ end
 
 --- What the engine runs for a decoded user document.
 local function effective(document)
-	return require("platform.remap.tap_hold_loader").load_document(DEFAULTS, document)
+	return require("tap_hold.engine.loader").load_document(DEFAULTS, document)
 end
 
 --- The [tap_holds] switch of the config.toml a scenario reads, nil when unset.
@@ -157,7 +157,7 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 			helpers.assert_nil(stored.tap_hold.enabled, "the switch is a config.toml row")
 			helpers.assert_eq(stored_switch(s),
 				require("menu.engine.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED))
-			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
+			local preset = require("tap_hold.engine.loader").preset_keys(DEFAULTS)
 			helpers.assert_true(next(preset) ~= nil, "the shipped preset has keys")
 			helpers.assert_eq(stored.tap_hold.keys, preset)
 			local inherited = effective({ tap_hold = { inherit_defaults = true } })
@@ -571,7 +571,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				end
 				return committed, detail
 			end
-			local Scope = require("infra.tap_hold_scope")
+			local Scope = require("tap_hold.engine.scope")
 			Scope._reset_for_test()
 			removal(s, function() return false end)
 			package.loaded["settings.engine.paths"] = { config = function(name)

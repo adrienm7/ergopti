@@ -52,7 +52,7 @@ helpers.describe("tap-key dispatcher ownership", function()
 
 	helpers.it("the real picker reconciles an assignment and its removal after persistence", function()
 		Fixture.with_bindings(function(bindings, ctx)
-			helpers.with_stub_scope({ "ui.menu.menu_tap_keys", "shortcuts.ui.action_picker", "core.timing.engine.deferred_work",
+			helpers.with_stub_scope({ "tap_hold.ui.menu_tap_keys", "shortcuts.ui.action_picker", "core.timing.engine.deferred_work",
 				"layouts.adapters.input_source_broker", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots" }, function()
 				local picked, updates
 				updates = 0
@@ -61,8 +61,8 @@ helpers.describe("tap-key dispatcher ownership", function()
 				package.loaded["layouts.adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["shortcuts.ui.menu.utils"] = { picker_parameter_fields = function() return {} end }
 				package.loaded["layouts.ui.menu.keyboard_slots"] = { build_action_items = function() return {} end }
-				package.loaded["ui.menu.menu_tap_keys"] = nil
-				local menu = require("ui.menu.menu_tap_keys")
+				package.loaded["tap_hold.ui.menu_tap_keys"] = nil
+				local menu = require("tap_hold.ui.menu_tap_keys")
 				local menu_ctx = { gestures = {
 					is_assignable = function() return true end,
 					get_action_label = function(id) return id end,

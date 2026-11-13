@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 
 local UP, DOWN, REPEAT = 0, 1, 2
 local ALT, KEY_J, KEY_T = 56, 36, 20

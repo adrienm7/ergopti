@@ -24,7 +24,7 @@ local FUTURE = '[future]\nmaximum = 9_223_372_036_854_775_807\n'
 --- @param raw boolean|nil True when `source` is already the file's bytes.
 --- @param config_raw string|nil With `raw`: the bytes of the config.toml beside it.
 local function with_file(source, body, raw, config_raw)
-	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
+	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
 		local Config = helpers.load_with_stubs("keyboard.engine.runtime.config")
 		local Files, Codec = require("core.fs.adapters.file_system"), require("core.text.engine.toml.codec")
 		local path = require("tests.support.tap_hold_file_text").private_path()

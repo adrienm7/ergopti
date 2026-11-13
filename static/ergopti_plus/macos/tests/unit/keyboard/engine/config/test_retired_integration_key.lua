@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param source string Independent TOML source.
 --- @param body function Assertions receiving the owner and native boundary controls.
 local function with_file(source, body)
-	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
+	helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end

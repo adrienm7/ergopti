@@ -236,8 +236,8 @@ end)
 
 describe("managers delegate TOML parsing to the shared codec", function()
 
-	local tap_hold_src = read_file(DRIVER_ROOT .. "/platform/remap/tap_hold_loader.lua")
-	local writer_src   = read_file(DRIVER_ROOT .. "/platform/remap/tap_hold_writer.lua")
+	local tap_hold_src = read_file(DRIVER_ROOT .. "/tap_hold/engine/loader.lua")
+	local writer_src   = read_file(DRIVER_ROOT .. "/tap_hold/engine/writer.lua")
 	-- modules/dynamic_hotstrings/manager, selected by a declaration unique to it.
 	local dynamic_src = helpers.read_driver_unit("local function strict_codepoint_length(")
 

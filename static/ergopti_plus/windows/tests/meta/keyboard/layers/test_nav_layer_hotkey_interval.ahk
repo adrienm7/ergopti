@@ -12,7 +12,7 @@
 
 ; Regression: A_MaxHotkeysPerInterval set inside *WheelUp/WheelDown hotkey bodies
 TestAuditV4_MaxHotkeysNotInHotkey() {
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 
 	; The bug: assignment inside *WheelUp:: and *WheelDown:: hotkey bodies — only
 	; takes effect after the first wheel event, too late to suppress the warning.

@@ -12,7 +12,7 @@
 --- model text becomes (tap_hold.toml stamped with the current version, then the
 --- config.toml rows or nil); `model(text, config_text)` is the model a pair
 --- reads as, without the stamp. Both go through the driver's own translation
---- (platform/remap/tap_hold_file.lua), never a second one; `write_config`,
+--- (tap_hold/engine/file.lua), never a second one; `write_config`,
 --- `read_config` and `remove_config` reach the config.toml beside a path.
 ---
 --- An entry under an id no driver has (a retired key or combination, the
@@ -28,7 +28,7 @@ local SharedFile = require("tap_hold.engine.shared_file")
 
 --- The driver's translation binding, loaded fresh for the current stub scope.
 local function binding()
-	return require("platform.remap.tap_hold_file")
+	return require("tap_hold.engine.file")
 end
 
 --- The array test of one decoded document.

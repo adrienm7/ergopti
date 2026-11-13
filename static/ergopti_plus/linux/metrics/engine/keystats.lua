@@ -90,7 +90,7 @@ local MS_PER_SECOND = 1000
 -- nil when the keys disagree or nothing is configured, and the split is then
 -- declined rather than made on a number nobody chose. The duration, the count
 -- and the maximum are still recorded: those need no threshold.
-local TapHold = require("platform.remap.tap_hold_manager")
+local TapHold = require("tap_hold.engine.manager")
 
 --- @return number|nil
 local function tap_hold_threshold_ms()

@@ -478,7 +478,7 @@ function M.new(options)
 				if collision_inventory == nil then
 					local constructed, candidate = pcall(function()
 						return require("shortcuts.engine.physical_collisions").new(keyboard, taps, combinations,
-							require("platform.remap.tap_hold_manager"), require("layouts.adapters.xkb_capture"))
+							require("tap_hold.engine.manager"), require("layouts.adapters.xkb_capture"))
 					end)
 					if not constructed or type(candidate) ~= "table" or type(candidate.validate) ~= "function" then return false, "unavailable" end
 					collision_inventory = candidate

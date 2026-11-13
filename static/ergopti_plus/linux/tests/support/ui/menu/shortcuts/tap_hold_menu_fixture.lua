@@ -12,11 +12,11 @@ local helpers = require("tests.helpers")
 
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
-local WRITER = "platform.remap.tap_hold_writer"
+local WRITER = "tap_hold.engine.writer"
 
 local PICKER = "shortcuts.ui.action_picker.bridge"
 
-local SCOPE = "infra.tap_hold_scope"
+local SCOPE = "tap_hold.engine.scope"
 
 --- A fake writer recording its calls.
 local function fake_writer(calls)
@@ -41,7 +41,7 @@ end
 --- Builds the menu with a real tap-hold manager on the shared defaults, a fake
 --- writer and a fake picker, and returns the Tap-Holds section.
 local function build(calls, picked, user_text)
-	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+	local Manager = helpers.load_module("tap_hold.engine.manager")
 	local user_path = os.tmpname()
 	os.remove(user_path)
 	-- The keys in tap_hold.toml, the switch and the timings in the config.toml beside it.

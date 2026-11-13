@@ -365,7 +365,7 @@ local function with_chord_fixture(mode, body)
 		"shortcuts.ui.menu.shortcuts", "menu.ui.transactions.script_chords_transaction", "settings.ui.menu.preferences_transaction",
 		"menu.ui.transactions.global_actions_transaction", "menu.ui.builder.state", "shortcuts.engine",
 		"shortcuts.engine.actions.text", "menu.ui.builder.utils", "shortcuts.ui.menu.utils",
-		"layouts.ui.menu.keyboard_slots", "ui.menu.menu_tap_keys", "menu.engine.manifest_reader",
+		"layouts.ui.menu.keyboard_slots", "tap_hold.ui.menu_tap_keys", "menu.engine.manifest_reader",
 		"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local Transaction = require("settings.ui.menu.preferences_transaction")
@@ -462,7 +462,7 @@ local function with_chord_fixture(mode, body)
 				package.loaded["menu.ui.builder.utils"] = {}
 				package.loaded["shortcuts.ui.menu.utils"] = {}
 				package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
-				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
+				package.loaded["tap_hold.ui.menu_tap_keys"] = { provide_rows = function() return {} end }
 				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["core.i18n.engine.i18n"], logger = require("core.logger.engine.logger") }))

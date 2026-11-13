@@ -222,7 +222,8 @@ try {
 						'layouts',
 						'metrics',
 						'onboarding',
-						'shortcuts'
+						'shortcuts',
+						'tap_hold'
 					])
 		);
 		reset();

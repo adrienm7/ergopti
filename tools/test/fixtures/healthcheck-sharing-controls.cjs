@@ -133,10 +133,7 @@ exports.run = function run(root) {
 		new RegExp('^user_file = "' + spec.file_names.layers.replace('.', '\\.') + '"', 'm'),
 		'the layers file name is the layer vocabulary user_file'
 	);
-	for (const rel of [
-		'../windows/platform/remap/tap_hold_loader.ahk',
-		'../linux/platform/remap/tap_hold_loader.lua'
-	])
+	for (const rel of ['tap_hold/engine/loader.ahk', 'p_hold/engine/loader.lua'])
 		assert.ok(
 			fs.readFileSync(path.join(shared, rel), 'utf8').includes(spec.file_names.tap_hold),
 			rel + ' reads the configured tap-hold file name'

@@ -90,7 +90,7 @@ local MetricsState = require("metrics.engine.state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard", "layouts", "onboarding" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard", "layouts", "onboarding", "tap_hold" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -208,7 +208,7 @@ local KEY_MAP = {
 	layout_pause_switch_enabled          = { sec = "layout", key = ConfigKeys.LEAF.PAUSE_SWITCH_ENABLED    },
 	layout_on_pause                      = { sec = "layout", key = ConfigKeys.LEAF.ON_PAUSE                },
 	layout_on_resume                     = { sec = "layout", key = ConfigKeys.LEAF.ON_RESUME               },
-	-- The Karabiner virtual keyboard type (auto / iso / ansi): platform/remap deploys it.
+	-- The Karabiner virtual keyboard type (auto / iso / ansi): tap_hold/engine deploys it.
 	layout_virtual_keyboard              = { sec = "layout", key = LEAF.VIRTUAL_KEYBOARD, enum = true },
 
 	-- ── Shortcuts ──────────────────────────────────────────────────────────

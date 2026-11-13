@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local names = {
-	"ui.menu.menu_tap_keys", "shortcuts.engine.tap_keys", "core.logger.engine.logger",
+	"tap_hold.ui.menu_tap_keys", "shortcuts.engine.tap_keys", "core.logger.engine.logger",
 	"layouts.adapters.input_source_broker", "layouts.ui.menu.keyboard_slots", "shortcuts.ui.menu.utils",
 	"shortcuts.ui.action_picker", "shortcuts.engine.bindings", "core.timing.engine.deferred_work",
 }
@@ -39,7 +39,7 @@ helpers.describe("tap-key rows follow the input source", function()
 				updateMenu = function() rebuilds = rebuilds + 1 end,
 			}
 			local ok, err = pcall(function()
-				local TapKeysMenu = require("ui.menu.menu_tap_keys")
+				local TapKeysMenu = require("tap_hold.ui.menu_tap_keys")
 				helpers.assert_eq(#TapKeysMenu.provide_rows(ctx), 1)
 				helpers.assert_type(callback, "function", "the rows subscribe to input-source changes")
 				callback()

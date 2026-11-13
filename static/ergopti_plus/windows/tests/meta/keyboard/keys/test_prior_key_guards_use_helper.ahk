@@ -46,7 +46,7 @@ Test("tap-hold prior key: no guard compares A_PriorKey with a literal (tap-hold-
 ; concatenated remap sources every file stays contiguous, so the nearest
 ; preceding TapHoldDuration(TapHold, "<id>") belongs to the same block.
 _PKGH_EveryGuardNamesItsOwnKey() {
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "the tap-hold remap sources must be readable")
 	Guards := 0
 	Position := 1

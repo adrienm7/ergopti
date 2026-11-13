@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 local InputEvent = require("platform.input.event")
 
 -- Kernel ABI values (input-event-codes.h), spelled here rather than read from

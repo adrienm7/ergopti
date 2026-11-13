@@ -26,7 +26,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local ok, err = pcall(function()
 			helpers.assert_true(section ~= nil, "a Tap-Holds section in the tray")
 			local engine_keys = 0
-			for _ in pairs(require("platform.remap.tap_hold_engine").KEY_CODES) do engine_keys = engine_keys + 1 end
+			for _ in pairs(require("tap_hold.engine.engine").KEY_CODES) do engine_keys = engine_keys + 1 end
 			helpers.assert_eq(#key_rows(section), engine_keys, "every key the engine can remap has its row")
 			local i18n = require("core.i18n.engine.i18n")
 			local reset = find(section.menu, i18n.get("common.restore_recommended"))
@@ -228,7 +228,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local HoldOptions = require("tap_hold.engine.hold_options")
 		local Json = require("core.text.engine.json")
 		local Paths = require("core.fs.engine.paths")
-		local picker = require("platform.remap.tap_hold_loader").load(DEFAULTS, nil).hold_picker
+		local picker = require("tap_hold.engine.loader").load(DEFAULTS, nil).hold_picker
 		local options = HoldOptions.build(picker)
 		helpers.assert_true(#options > #picker.modifiers, "the shipped picker must be read, or this proves nothing")
 		local order_fh = assert(io.open(Paths.shared("core/i18n/data/locale_order.json"), "r"))

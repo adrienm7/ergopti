@@ -1923,7 +1923,7 @@ local function plan_key(plan)
 end
 
 --- The script chords Karabiner must turn into sentinels now, and the source
---- of every regeneration (platform/remap set_script_chords_source).
+--- of every regeneration (tap_hold/engine set_script_chords_source).
 --- @return table plan { normal = slot -> true, paused = slot -> true }
 function M.karabiner_chords()
 	local plan = ScriptChords.plan(ChordCatalogue.get(), chord_state())

@@ -29,7 +29,7 @@ _AKTE_GoverningHotIf(Src, Pos) {
 }
 
 _AKTE_AltGrOwnsKanaTap() {
-    Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+    Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
     Assert(Src != "", "the tap-hold remap sources must be readable")
     Owner := _DriverFuncBody("_AltGrHandleHold")
     StrReplace(Owner, '"alt_gr", "SC138"', , , &Waits)
@@ -44,7 +44,7 @@ Test("tap-holds: Kana SC138 owns configured AltGr tap exactly once (altgr-single
     _AKTE_AltGrOwnsKanaTap)
 
 _AKTE_KanaAltGrHoldPassesThrough() {
-    Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+    Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
     Identity := InStr(Src, "~*$SC138:: _AltGrHandleHold(true)")
     Assert(Identity > 0, "the Kana AltGr held as AltGr must pass the physical key through")
     AssertEqual("#HotIf AltGrOwnerPassesThrough(true)", _AKTE_GoverningHotIf(Src, Identity),

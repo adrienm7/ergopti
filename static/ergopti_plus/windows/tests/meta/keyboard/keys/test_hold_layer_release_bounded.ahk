@@ -17,7 +17,7 @@
 ; finally { DisableLayer() } so the layer is ALWAYS deactivated and the wait
 ; is bounded.
 ;
-; Meta-static (scans source text) because platform/remap/*.ahk register
+; Meta-static (scans source text) because tap_hold/engine/*.ahk register
 ; top-level #HotIf hotkeys and cannot be #Included by the headless runner.
 ; If a hold-layer branch regresses to a bare unbounded KeyWait or drops the
 ; finally, this test fails.
@@ -38,7 +38,7 @@
 ; unique across these files, so a whole-dir scan resolves each block regardless of
 ; how the module is split — move-resilient. RelPath is kept for call-site clarity.
 _HLRB_ReadSource(RelPath) {
-	return _DriverDirConcat("platform/remap")
+	return _DriverDirConcat("tap_hold/engine")
 }
 
 ; Extracts the body of a single hotkey block: from the Anchor (a substring on

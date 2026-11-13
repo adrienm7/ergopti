@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_file.lua
+--- tap_hold/engine/file.lua
 
 --- ==============================================================================
 --- MODULE: Shared Tap-Hold File (macOS)

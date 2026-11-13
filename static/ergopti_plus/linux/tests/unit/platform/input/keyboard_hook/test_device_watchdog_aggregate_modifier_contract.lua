@@ -236,7 +236,7 @@ end)
 helpers.describe("actual shared-output handoff dependencies: green controls", function()
 
 	helpers.it("does not orphan the retained physical Shift when retiring its synthetic TapHold owner", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local engine = Engine.new({ keys = { caps_lock = { tap_action = "none", hold_modifier = "shift", time_activation_seconds = 10 } },
 			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 })
 		local session = aggregate_consumer_session({ a = { { 58, 1, 1 }, { 42, 1, 2 } } }, { engine = engine })

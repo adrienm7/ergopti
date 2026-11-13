@@ -19,7 +19,7 @@
 ; finally { TextPressKey(ModKey, "Up") } so the release ALWAYS runs and the wait
 ; is bounded.
 ;
-; Meta-static (scans source text) because platform/remap/*.ahk register
+; Meta-static (scans source text) because tap_hold/engine/*.ahk register
 ; top-level #HotIf hotkeys and cannot be #Included by the headless runner. If a
 ; long-press branch regresses to a bare unbounded KeyWait or drops the finally,
 ; this test fails.
@@ -41,7 +41,7 @@
 ; resolves each block regardless of how the module is split — move-resilient.
 ; RelPath is kept for call-site clarity.
 _HMRB_ReadSource(RelPath) {
-	return _DriverDirConcat("platform/remap")
+	return _DriverDirConcat("tap_hold/engine")
 }
 
 ; Extracts the body of a single hotkey block: from the Anchor (a substring on the
@@ -157,23 +157,23 @@ Test("tap-holds: Tab alt_tab_monitor hold release is bounded + in finally (hold-
 ; ==================================================
 ; ==================================================
 
-; Scans the ENTIRE platform/remap/ directory for any bare KeyWait(key, "U")
+; Scans the ENTIRE tap_hold/engine/ directory for any bare KeyWait(key, "U")
 ; call — the unbounded form that can latch a modifier or layer permanently on a
 ; lost key-up event. The per-block guards above cover the documented regression
 ; sites; this guard catches any missed sibling added to any tap_holds file.
 _HMRB_WholeClassNoBareUnbounded() {
 	Q := Chr(34)
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	; Q . "U" . Q . ")" is the 4-char token "U") — the bare unbounded form of the
 	; KeyWait mode argument. The bounded form "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC
 	; never produces this token because the timeout constant follows before the closing
 	; paren, making the mode string "U T<N>" not "U".
 	Assert(!RegExMatch(Src, "m)^[^;\n]*\bKeyWait\("),
-		"platform/remap/ must wait through the bounded KS_WaitReleased, never a KeyWait of its own")
+		"tap_hold/engine/ must wait through the bounded KS_WaitReleased, never a KeyWait of its own")
 	Assert(!InStr(Src, Q . "U" . Q . ")"),
-		"platform/remap/ contains a bare KeyWait(key, " . Q . "U" . Q . ") "
+		"tap_hold/engine/ contains a bare KeyWait(key, " . Q . "U" . Q . ") "
 		. "— all hold-modifier and hold-layer long-press waits must use "
 		. Q . "U T" . Q . " . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC "
 		. "so a lost key-up never latches a modifier or layer permanently")
 }
-Test("tap-holds: no bare unbounded KeyWait anywhere in platform/remap/ (hold-keywait-whole-class)", _HMRB_WholeClassNoBareUnbounded)
+Test("tap-holds: no bare unbounded KeyWait anywhere in tap_hold/engine/ (hold-keywait-whole-class)", _HMRB_WholeClassNoBareUnbounded)

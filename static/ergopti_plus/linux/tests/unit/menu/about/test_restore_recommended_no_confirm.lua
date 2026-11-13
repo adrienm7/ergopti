@@ -129,13 +129,13 @@ end)
 --- scope transaction recorded.
 --- @param body function Receives the menu context and the scope calls.
 local function with_tap_holds(body)
-	local names = { "platform.remap.tap_hold_manager", "infra.tap_hold_scope", "menu.ui.builder.builder" }
+	local names = { "tap_hold.engine.manager", "tap_hold.engine.scope", "menu.ui.builder.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local user_path = os.tmpname()
 	local config_path = require("tests.support.tap_hold_fixture").write(user_path, nil)
 	local ok, err = pcall(function()
-		local Manager = require("platform.remap.tap_hold_manager")
+		local Manager = require("tap_hold.engine.manager")
 		Manager.init({
 			keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 				held_modifiers = function() return {} end, held_text_modifier_codes = function() return {} end,
@@ -145,7 +145,7 @@ local function with_tap_holds(body)
 			config_path = config_path,
 		})
 		local calls = {}
-		package.loaded["infra.tap_hold_scope"] = {
+		package.loaded["tap_hold.engine.scope"] = {
 			apply = function(mode) calls[#calls + 1] = mode; return true end,
 		}
 		body({ _version = "test", on_quit = function() end, tap_holds = Manager }, calls)

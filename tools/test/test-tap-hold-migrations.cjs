@@ -228,10 +228,10 @@ for (const outcome of OUTCOMES)
 
 const driversRoot = path.dirname(shared(''));
 for (const file of [
-	'linux/platform/remap/tap_hold_loader.lua',
-	'linux/platform/remap/tap_hold_writer.lua',
-	'windows/platform/remap/tap_hold_loader.ahk',
-	'windows/platform/remap/tap_hold_writer.ahk'
+	'linux/tap_hold/engine/loader.lua',
+	'linux/tap_hold/engine/writer.lua',
+	'windows/tap_hold/engine/loader.ahk',
+	'windows/tap_hold/engine/writer.ahk'
 ]) {
 	const source = fs.readFileSync(path.join(driversRoot, file), 'utf8');
 	assert(

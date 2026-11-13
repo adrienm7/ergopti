@@ -183,7 +183,7 @@ helpers.describe("hold durations: tap or hold", function()
 	--- on one threshold, or on the shared defaults (which disagree) when `seconds`
 	--- is nil.
 	local function with_tap_holds(seconds, body)
-		local TapHold = helpers.load_module("platform.remap.tap_hold_manager")
+		local TapHold = helpers.load_module("tap_hold.engine.manager")
 		local user_path = os.tmpname()
 		local fh = assert(io.open(user_path, "w"))
 		if seconds then

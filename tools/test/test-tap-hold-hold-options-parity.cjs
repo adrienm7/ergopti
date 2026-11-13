@@ -9,7 +9,7 @@
  * its Option, Command and Fn choices need semantic comparison separately.
  *
  * WHAT THIS CAUGHT (2026-08-08):
- * the list was a hardcoded array in windows/platform/remap/tap_hold_writer.ahk
+ * the list was a hardcoded array in windows/tap_hold/engine/writer.ahk
  * whose own comment claimed it "mirrors _shared/menu/data/menu_manifest.json
  * hold_options" — a key that has never existed in that file. So the canonical
  * list was a copy pointing at nothing, and the two Lua drivers offered no hold
@@ -35,7 +35,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
 const SHARED_LUA = path.join(SP, '_shared', 'tap_hold', 'engine', 'hold_options.lua');
-const AHK_WRITER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_writer.ahk');
+const AHK_WRITER = path.join(SP, 'windows', 'tap_hold', 'engine', 'writer.ahk');
 
 const errors = [];
 
@@ -106,14 +106,14 @@ if (modifiers && modifiers.length > 0) {
 	// array of its own: that is the failure this gate was written for.
 	if (/_TH_HoldModifierIds\s*:=\s*\[/.test(ahk)) {
 		errors.push(
-			'windows/platform/remap/tap_hold_writer.ahk declares its own modifier array again. The ids ' +
+			'windows/tap_hold/engine/writer.ahk declares its own modifier array again. The ids ' +
 				'belong to _shared/tap_hold/data/defaults.toml — a second list is one edit away from two ' +
 				'different hold pickers reading one config file.'
 		);
 	}
 	if (!/tap_hold\.hold_picker/.test(ahk)) {
 		errors.push(
-			'windows/platform/remap/tap_hold_writer.ahk no longer reads [tap_hold.hold_picker] from the ' +
+			'windows/tap_hold/engine/writer.ahk no longer reads [tap_hold.hold_picker] from the ' +
 				'shared defaults.'
 		);
 	}
@@ -151,7 +151,7 @@ function readInlineTable(field) {
 	}
 	return table;
 }
-const AHK_LOADER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_loader.ahk');
+const AHK_LOADER = path.join(SP, 'windows', 'tap_hold', 'engine', 'loader.ahk');
 const aliasTables = ['modifier_aliases', 'left_modifier_aliases'];
 const aliases = {};
 for (const field of aliasTables) {
@@ -178,7 +178,7 @@ if (Object.keys(aliases).length > 0) {
 	const resolveBody =
 		resolveStart >= 0 ? ahkLoader.slice(resolveStart, ahkLoader.indexOf('\n}', resolveStart)) : '';
 	if (resolveBody === '')
-		errors.push('windows/platform/remap/tap_hold_loader.ahk has no ResolveHoldModifierKey.');
+		errors.push('windows/tap_hold/engine/loader.ahk has no ResolveHoldModifierKey.');
 	for (const field of aliasTables) {
 		if (!lua.includes(field)) {
 			errors.push(
@@ -187,7 +187,7 @@ if (Object.keys(aliases).length > 0) {
 		}
 		if (!ahkLoader.includes('"' + field + '"')) {
 			errors.push(
-				`windows/platform/remap/tap_hold_loader.ahk does not read \`${field}\` from the hold picker.`
+				`windows/tap_hold/engine/loader.ahk does not read \`${field}\` from the hold picker.`
 			);
 		}
 	}

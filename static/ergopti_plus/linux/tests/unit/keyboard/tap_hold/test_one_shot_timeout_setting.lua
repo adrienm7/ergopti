@@ -14,7 +14,7 @@
 package.loaded["tests.support.platform.remap.tap_hold.tap_hold_engine_fixture"] = nil
 local Fixture = require("tests.support.platform.remap.tap_hold.tap_hold_engine_fixture")
 local helpers, Engine = Fixture.helpers, Fixture.Engine
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 local Timings = require("core.timing.engine.timings")
 
 local DEFAULTS_PATH = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
@@ -35,7 +35,7 @@ local function fresh_writer()
 	assert(made == true or made == 0, "the isolated configuration folder must exist")
 	local path = dir .. "/tap_hold.toml"
 	local state = { reloads = 0 }
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({
 		path = path,
 		reload = function() state.reloads = state.reloads + 1; return true end,
@@ -112,7 +112,7 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 	end)
 
 	helpers.it("hands the engine the loaded timeout, not the registry constant (one-shot-timeout-setting)", function()
-		local source = assert(io.open(require("core.fs.engine.paths").driver_root() .. "/platform/remap/tap_hold_manager.lua", "r"))
+		local source = assert(io.open(require("core.fs.engine.paths").driver_root() .. "/tap_hold/engine/manager.lua", "r"))
 		local text = source:read("*a")
 		source:close()
 		helpers.assert_true(text:find("one_shot_timeout_ms = loaded.one_shot_timeout_ms,", 1, true) ~= nil,

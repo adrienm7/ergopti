@@ -68,7 +68,7 @@ local function shared_defaults_path()
 	-- Fallback: walk up from this file.
 	-- macos/keyboard/engine/runtime/defaults.lua → … → ergopti_plus → /_shared.
 	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir = NativePath.dirname(src) or src             -- → macos/platform/remap
+	local dir = NativePath.dirname(src) or src             -- → macos/tap_hold/engine
 	dir = NativePath.dirname(dir) or dir                    -- → macos/platform
 	dir = NativePath.dirname(dir) or dir                    -- → macos
 	dir = NativePath.dirname(dir) or dir

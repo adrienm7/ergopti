@@ -8,7 +8,7 @@
 ; soon as Space went down, so a letter struck before Space came up was typed
 ; under it (« fonctionnerA ussi », 2026-10-01). A typing key that keeps its own
 ; key on a tap is now decided by the order of the releases
-; (platform/remap/tap_hold_roll.ahk). The owner and the thread of the key
+; (tap_hold/engine/roll.ahk). The owner and the thread of the key
 ; struck during its wait are driven here in the order AutoHotkey runs them:
 ; the key's thread runs inside the owner's wait, which is where it interrupts.
 ; ==============================================================================

@@ -12,7 +12,7 @@ local OWNED = {
 	"settings.ui.menu.paths", "settings.engine.factory_reset_journal", "menu.ui.builder.watchers", "modules.updater",
 	"tray.adapters.menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "gestures.ui.menu.gestures",
 	"shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout", "hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics",
-	"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about", "ai.ui.menu", "shortcuts.engine.personal_shortcuts",
+	"tap_hold.ui.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about", "ai.ui.menu", "shortcuts.engine.personal_shortcuts",
 	"hotstrings.engine.dynamic", "gestures.engine", "metrics.engine.privacy.text_cipher", "ai.engine",
 	"metrics.engine", "shortcuts.engine", "shortcuts.engine.actions.text", "menu.engine.wrap_mutation",
 	"menu.ui.transactions.global_scope", "metrics.ui.menu.scope", "gestures.ui.menu.scope", "hotstrings.ui.menu.scope",

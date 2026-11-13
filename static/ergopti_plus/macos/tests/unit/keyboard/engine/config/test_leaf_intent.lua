@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
+local MODULES = { "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
 	"core.text.engine.toml_codec", "core.text.engine.toml.codec" }
 
 --- Runs body against one real source file; publication is captured in place.

@@ -26,7 +26,7 @@ _THNG_Count(Haystack, Needle) {
 
 _THNG_ReadTapHoldSource(FileName) {
 	SplitPath(A_ScriptDir, , &DriverRoot)
-	return FileRead(DriverRoot . "\platform\remap\" . FileName)
+	return FileRead(DriverRoot . "\tap_hold\engine\" . FileName)
 }
 
 _THNG_CentralGateOwnsCleanup() {

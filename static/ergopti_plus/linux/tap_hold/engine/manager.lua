@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_manager.lua
+--- tap_hold/engine/manager.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold Manager (Linux)
@@ -25,8 +25,8 @@ local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
 local NativePath = require("core.fs.engine.native_path")
-local Config = require("platform.remap.tap_hold_loader")
-local Engine = require("platform.remap.tap_hold_engine")
+local Config = require("tap_hold.engine.loader")
+local Engine = require("tap_hold.engine.engine")
 local Combinations = require("shortcuts.engine.key_combinations")
 local AiActions = require("shortcuts.engine.ai_actions")
 local original_combination_constructor = Combinations.new
@@ -51,7 +51,7 @@ local NavLayer = require("keyboard.engine.layers.nav_layer")
 local Outdated = require("settings.engine.migration.outdated")
 local Codec = require("core.text.engine.toml_codec")
 
-local LOG = "platform.remap.tap_hold_manager"
+local LOG = "tap_hold.engine.manager"
 local MS_PER_SECOND = 1000
 
 
@@ -80,7 +80,7 @@ local function nav_ports_current()
 		or type(original_nav_capture) ~= "function" or rawget(NavLayer, "capture_source_observation") ~= original_nav_capture
 		or not rawequal(package.loaded["core.fs.engine.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
 		or not rawequal(package.loaded["core.text.engine.toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
-		or not rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine) or getmetatable(Engine) ~= nil
+		or not rawequal(package.loaded["tap_hold.engine.engine"], Engine) or getmetatable(Engine) ~= nil
 		or not rawequal(package.loaded["keyboard.engine.keys.combination_engine"], PairModule)
 		or rawget(PairModule, "new") ~= original_pair_constructor then return false end
 	for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
@@ -359,14 +359,14 @@ function M.managed_combination_catalogue_current(owner)
 	local issuer = type(owner) == "table" and managed_owners[owner] or nil
 	return issuer ~= nil and _initialized and type(_loaded) == "table" and getmetatable(_loaded) == nil
 		and rawequal(owner, _combinations) and type(owner) == "table"
-		and getmetatable(M) == nil and rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+		and getmetatable(M) == nil and rawequal(package.loaded["tap_hold.engine.manager"], M)
 		and getmetatable(Combinations) == nil
 		and rawequal(package.loaded["shortcuts.engine.key_combinations"], Combinations)
 		and rawget(Combinations, "new") == original_combination_constructor
 		and rawget(Combinations, "instance_is_current") == original_combination_instance_current
 		and original_combination_instance_current(owner, issuer.catalogue) == true
-		and rawequal(package.loaded["platform.remap.tap_hold_loader"], Config)
-		and rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine)
+		and rawequal(package.loaded["tap_hold.engine.loader"], Config)
+		and rawequal(package.loaded["tap_hold.engine.engine"], Engine)
 		and getmetatable(Engine) == nil and rawget(Engine, "new") == original_engine_constructor
 		and fields_equal(rawget(Engine, "KEY_CODES"), original_engine_key_codes)
 		and getmetatable(Config) == nil and rawget(Config, "load") == original_config_load
@@ -378,7 +378,7 @@ local original_logical_catalogue_current = M.managed_combination_catalogue_curre
 --- Returns a detached complete logical publication from the original build issuer.
 --- @return table|nil catalogue Withdrawn ownership remains unjudged without IO.
 function M.published_binding_catalogue()
-	if not BindingPublication.owner_is_current("combination", "platform.remap.tap_hold_manager", M)
+	if not BindingPublication.owner_is_current("combination", "tap_hold.engine.manager", M)
 		or rawget(M, "managed_combination_catalogue_current") ~= original_logical_catalogue_current
 		or not original_logical_catalogue_current(_combinations)
 		or not rawequal(package.loaded["settings.engine.publication.binding_identity"], BindingIdentity)
@@ -421,17 +421,17 @@ function M.managed_pair_options_current(owner,configured)
  for _,action in pairs(configured.chords) do
   if action~="none" and catalogue_snapshot[action]==nil then return false end
  end
- return getmetatable(M)==nil and rawequal(package.loaded["platform.remap.tap_hold_manager"],M)
+ return getmetatable(M)==nil and rawequal(package.loaded["tap_hold.engine.manager"],M)
   and record~=nil and rawequal(record.owner,owner) and rawequal(_combinations,owner) and rawequal(record.loaded,_loaded)
   and rawequal(record.engine,_engine) and rawequal(_installed_engine,_engine) and record.generation==_generation
   and _initialized and not _paused and rawequal(_hook,_native_hook) and type(_native_hook)=="table"
   and rawequal(package.loaded["shortcuts.engine.key_combinations"],Combinations)
   and rawget(Combinations,"new")==original_combination_constructor
   and rawget(Engine,"new")==original_engine_constructor
-  and rawequal(package.loaded["platform.remap.tap_hold_engine"],Engine)
+  and rawequal(package.loaded["tap_hold.engine.engine"],Engine)
   and rawequal(package.loaded["keyboard.engine.keys.combination_engine"],PairModule)
   and rawget(PairModule,"new")==original_pair_constructor
-  and rawequal(package.loaded["platform.remap.tap_hold_loader"],Config)
+  and rawequal(package.loaded["tap_hold.engine.loader"],Config)
   and rawget(Config,"load")==original_config_load and rawget(Config,"load_document")==original_config_document
   and rawequal(package.loaded["_generated.action_catalogue"],NativeCatalogue)
   and fields_equal(rawget(NativeCatalogue,"actions"),catalogue_snapshot)
@@ -459,7 +459,7 @@ end
 local original_roll_runtime, original_roll_tap, original_roll_get_tap, original_roll_is_active
 local cached_roll_proof
 local function roll_ports_current()
-	return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+	return rawequal(package.loaded["tap_hold.engine.manager"], M)
 		and type(original_roll_runtime) == "function" and type(original_roll_tap) == "function"
 		and type(original_roll_get_tap) == "function" and type(original_roll_is_active) == "function"
 		and rawget(M, "is_active") == original_roll_is_active
@@ -729,7 +729,7 @@ end
 --- Pure currency of the original loader module and its captured entry ports.
 --- @return boolean current
 local function config_exports_current()
-	return rawequal(package.loaded["platform.remap.tap_hold_loader"],Config)
+	return rawequal(package.loaded["tap_hold.engine.loader"],Config)
 		and rawget(Config,"load")==original_config_load and rawget(Config,"load_document")==original_config_document
 end
 
@@ -945,7 +945,7 @@ end
 --- @return boolean True when the new engine is in force.
 function M.set_lone_tap_max_ms(ms, guard)
 	_require_init()
-	return require("platform.remap.tap_hold_writer").set_lone_tap_max_ms(ms, guard)
+	return require("tap_hold.engine.writer").set_lone_tap_max_ms(ms, guard)
 end
 
 --- How long a one-shot Shift waits for its key, in milliseconds: the value of
@@ -963,7 +963,7 @@ end
 --- @return boolean True when the new engine is in force.
 function M.set_one_shot_timeout_ms(ms, guard)
 	_require_init()
-	return require("platform.remap.tap_hold_writer").set_one_shot_timeout_ms(ms, guard)
+	return require("tap_hold.engine.writer").set_one_shot_timeout_ms(ms, guard)
 end
 
 --- Follows the daemon's pause: a paused script remaps nothing.
@@ -1031,7 +1031,7 @@ function M.capture_configuration_edit()
 		copy_fields(loaded.catalog), copy_fields(loaded.hold_picker)
 	local file_enabled, lone, one_shot_ms = loaded.enabled, loaded.lone_tap_max_ms, loaded.one_shot_timeout_ms
 	local function runtime()
-		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+		return rawequal(package.loaded["tap_hold.engine.manager"], M)
 			and M.capture_configuration_edit == factory and _initialized and not _paused
 			and _generation == generation and _user_path == path and _defaults_path == defaults
 			and _config_path == config_path
@@ -1229,7 +1229,7 @@ function M._reset_for_test()
 	return true
 end
 
-BindingPublication.register("combination", "platform.remap.tap_hold_manager", M, M.published_binding_catalogue)
+BindingPublication.register("combination", "tap_hold.engine.manager", M, M.published_binding_catalogue)
 
 --- Captures configured native key-prefix reservations from the original Manager.
 --- This observes source/configuration ownership; it grants no physical/output rights.
@@ -1272,7 +1272,7 @@ function M.capture_collision_inventory()
 		for code, saved in pairs(native_records) do
 			if not rawequal(engine.by_code[code], saved.row) or not fields_equal(saved.row, saved.fields) then return false end
 		end
-		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M) and _initialized
+		return rawequal(package.loaded["tap_hold.engine.manager"], M) and _initialized
 			and _user_path == path and _defaults_path == defaults and _config_path == config_path and rawequal(_loaded, loaded)
 			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _generation == epoch
 			and _enabled == enabled and _paused == paused and not paused and config_exports_current()

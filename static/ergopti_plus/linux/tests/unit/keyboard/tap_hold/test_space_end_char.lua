@@ -26,7 +26,7 @@ local function type_events(events, space_tap_hold)
 		"the fixture mapping must publish")
 	local kh = helpers.load_module("platform.input.keyboard_hook")
 	if space_tap_hold then
-		local TapHoldEngine = require("platform.remap.tap_hold_engine")
+		local TapHoldEngine = require("tap_hold.engine.engine")
 		kh.set_remapper(TapHoldEngine.new({
 			keys = { space = { tap_action = "space", hold_modifier = "ctrl", time_activation_seconds = 10 } },
 			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,

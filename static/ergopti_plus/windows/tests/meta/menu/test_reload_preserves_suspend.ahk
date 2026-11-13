@@ -27,9 +27,9 @@
 ; remember to add it to a list.
 ;
 ; WIDENED 2026-07-29 (reload-drops-suspend-outside-the-menu-layer). The original
-; scan covered ui/menu ONLY — the directory the fix touched — while the guarantee
+; scan covered tap_hold/ui ONLY — the directory the fix touched — while the guarantee
 ; is transitive: ANY path reachable while paused that reloads must carry the
-; pause. Twenty-one bare Reload sites existed; fourteen were outside ui/menu, in
+; pause. Twenty-one bare Reload sites existed; fourteen were outside tap_hold/ui, in
 ; settings/engine/io.ahk (ten), core/i18n/engine/i18n.ahk, modules/updater/core.ahk, core/ui/ui/editors.ahk
 ; (three), shortcuts/ui/action_picker, settings/ui/paths_editor, hotstrings/ui/personal_info_editor,
 ; onboarding/ui (two) and gestures/engine/actions.ahk. Changing the interface
@@ -98,7 +98,7 @@ _MRS_NoBareReloadAnywhereReachable() {
 	; directory, so scanning by directory excludes it structurally rather than by
 	; a name this test would have to keep in step.
 	Src := ""
-	for Dir in ["infra", "ui", "modules", "platform", "adapters", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts"]
+	for Dir in ["infra", "ui", "modules", "platform", "adapters", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold"]
 		Src .= "`n" . _StripFullLineComments(_DriverDirConcat(Dir))
 	Assert(StrLen(Src) > 200000,
 		"the driver source trees must be readable for this scan to mean anything (read " . StrLen(Src) . " chars)")

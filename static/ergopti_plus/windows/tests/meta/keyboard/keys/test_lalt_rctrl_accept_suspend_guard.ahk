@@ -26,12 +26,12 @@
 ; =====================================================
 ; =====================================================
 
-; Scans the whole platform/remap/ directory instead of one hardcoded file.
+; Scans the whole tap_hold/engine/ directory instead of one hardcoded file.
 ; Every assertion below is a PRESENCE check, so widening the scope cannot weaken
 ; one — and _DriverDirConcat throws when the directory moves, instead of dying
 ; with an unreadable-path error that says nothing about the invariant at stake.
 _LARSG_ReadSource() {
-	return _DriverDirConcat("platform/remap")
+	return _DriverDirConcat("tap_hold/engine")
 }
 
 ; =====================================================

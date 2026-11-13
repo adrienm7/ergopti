@@ -156,8 +156,8 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
-				"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
+				"static/ergopti_plus/linux/tap_hold/engine/loader.lua",
+				"static/ergopti_plus/linux/tap_hold/engine/writer.lua",
 				"static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_integration.lua",
 				"static/ergopti_plus/linux/tests/unit/keyboard/tap_hold/test_lone_tap_window.lua"
 			]
@@ -480,7 +480,7 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+				"static/ergopti_plus/linux/tap_hold/engine/manager.lua",
 				"static/ergopti_plus/linux/keyboard/engine/keys/combination_engine.lua",
 				"static/ergopti_plus/linux/shortcuts/engine/key_combinations.lua",
 				"static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua",
@@ -500,7 +500,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/shortcuts/engine/key_combinations.lua",
-				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+				"static/ergopti_plus/linux/tap_hold/engine/manager.lua",
 				"static/ergopti_plus/linux/keyboard/engine/keys/combinations_scope.lua",
 				"static/ergopti_plus/linux/keyboard/ui/menu_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/shortcuts/key_combinations/test_key_combinations.lua",

@@ -42,7 +42,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				"core.fs.adapters.json_codec",
 				"shortcuts.ui.menu.utils",
 				"layouts.ui.menu.keyboard_slots",
-				"ui.menu.menu_tap_keys",
+				"tap_hold.ui.menu_tap_keys",
 				"menu.engine.manifest_reader",
 				"hs",
 				"tests.stubs.hs",
@@ -99,7 +99,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				package.loaded["layouts.ui.menu.keyboard_slots"] = {
 					provide_rows = function() return {} end,
 				}
-				package.loaded["ui.menu.menu_tap_keys"] = {
+				package.loaded["tap_hold.ui.menu_tap_keys"] = {
 					provide_rows = function() return {} end,
 				}
 				package.loaded["menu.engine.manifest_reader"] = {
@@ -185,7 +185,7 @@ local function with_extension_boundary(callback)
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "menu.ui.builder.utils",
 		"menu.engine.manifest_menu", "shortcuts.ui.menu.utils", "layouts.ui.menu.keyboard_slots",
-		"ui.menu.menu_tap_keys", "menu.engine.manifest_reader", "hs", "tests.stubs.hs",
+		"tap_hold.ui.menu_tap_keys", "menu.engine.manifest_reader", "hs", "tests.stubs.hs",
 	}
 	local saved_hs, saved_pollution = rawget(_G, "hs"), rawget(_G, "extension_boundary_pollution")
 	local root = os.tmpname()
@@ -224,7 +224,7 @@ local function with_extension_boundary(callback)
 			package.loaded["shortcuts.engine.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
 			package.loaded["shortcuts.ui.menu.utils"] = {}
 			package.loaded["layouts.ui.menu.keyboard_slots"] = { provide_rows = function() return {} end }
-			package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
+			package.loaded["tap_hold.ui.menu_tap_keys"] = { provide_rows = function() return {} end }
 			package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }
 			local native_i18n = require("core.i18n.engine.i18n")
 			local locale = require("core.i18n.engine.locale")

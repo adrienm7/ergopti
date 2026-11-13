@@ -19,7 +19,7 @@ local helpers, DEFAULTS, fake_hook, write, manager =
 helpers.describe("tap-hold manager", function()
 	helpers.it("permits retry after the first engine installation is refused (init-apply-refusal)", function()
 		helpers.load_module("keyboard.engine.layers.nav_layer")
-		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local Manager = helpers.load_module("tap_hold.engine.manager")
 		local user_path = os.tmpname()
 		write(user_path, "")
 		local hook = fake_hook()
@@ -108,7 +108,7 @@ os.remove(user_path)
 				local selected = field
 				return { current = function() return selected == field end }
 			end })
-			local code = require("platform.remap.tap_hold_engine").KEY_CODES.left_shift
+			local code = require("tap_hold.engine.engine").KEY_CODES.left_shift
 			hook.engine:process(code, 1, 0)
 			local _, action, binding = hook.engine:process(code, 0, 100)
 			helpers.assert_eq(action, "copy")
@@ -167,7 +167,7 @@ os.remove(user_path)
 
 	helpers.it("transports the actual monitor tap binding through release and queued rollover", function()
 		local Manager, hook, actions, user_path = manager()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local code = Engine.KEY_CODES.tab
 		local saved_hook, native_hook = package.loaded["platform.input.keyboard_hook"], nil
 		local ok, failure = pcall(function()
@@ -210,7 +210,7 @@ os.remove(user_path)
 	end)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
-		local names = { "gestures.engine.manager", "platform.remap.tap_hold_manager", "shortcuts.adapters.window_switch",
+		local names = { "gestures.engine.manager", "tap_hold.engine.manager", "shortcuts.adapters.window_switch",
 			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "settings.engine.paths", "core.fs.adapters.storage", "gestures.ui.conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -241,14 +241,14 @@ os.remove(user_path)
 			end }
 			local Gestures = helpers.load_module("gestures.engine.manager")
 			Gestures.init({ persist = true, config_path = config_path, enabled = false })
-			Manager = helpers.load_module("platform.remap.tap_hold_manager")
-			package.loaded["platform.remap.tap_hold_manager"] = Manager
+			Manager = helpers.load_module("tap_hold.engine.manager")
+			package.loaded["tap_hold.engine.manager"] = Manager
 			local hook = fake_hook()
 			Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,
 				action_names = Gestures.get_executable_action_names, on_text_injected = function() end,
 				defaults_path = DEFAULTS, user_path = user_path,
 				config_path = require("tests.support.tap_hold_fixture").config_path(user_path) })
-			local code = require("platform.remap.tap_hold_engine").KEY_CODES.tab
+			local code = require("tap_hold.engine.engine").KEY_CODES.tab
 			hook.engine:process(code, 1, 0)
 			local _, tap, binding = hook.engine:process(code, 0, 100)
 			hook.on_tap(tap, binding)
@@ -289,7 +289,7 @@ os.remove(user_path)
 	-- (engine-live-modifiers).
 	helpers.it("tells the engine which modifiers the live layout holds (engine-live-modifiers)", function()
 		local Manager, hook, _, user_path = manager()
-		local TAB = require("platform.remap.tap_hold_engine").KEY_CODES.tab
+		local TAB = require("tap_hold.engine.engine").KEY_CODES.tab
 		hook.mods = { ctrl = true }
 		helpers.assert_nil(hook.engine:process(TAB, 1, 0), "Tab under a Ctrl only the layout knows is Ctrl+Tab")
 		hook.engine:process(TAB, 0, 50)
@@ -533,7 +533,7 @@ os.remove(user_path)
 	helpers.it("keeps the running engine when a reload cannot read the defaults", function()
 		local Manager, hook, _, user_path = manager()
 		local running = hook.engine
-		local Loader = require("platform.remap.tap_hold_loader")
+		local Loader = require("tap_hold.engine.loader")
 		local real = Loader.load
 		Loader.load = function() error("defaults unreadable", 0) end
 		local ok = Manager.reload()
@@ -616,7 +616,7 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 		local Logger = require("core.logger.engine.shim")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local Manager = helpers.load_module("tap_hold.engine.manager")
 		local user_path = os.tmpname()
 		if user_text then write(user_path, user_text) else os.remove(user_path) end
 		local ok, err = pcall(Manager.init, {
@@ -1694,13 +1694,13 @@ helpers.describe("OneShot daemon Manager bootstrap", function()
 		helpers.assert_true(keystats_at < hook_at, "actual daemon loads keystats before its Hook import")
 		-- modules/keystats/keystats, selected by a declaration unique to it.
 		local source = assert(helpers.read_driver_unit("local function new_live_tracker("))
-		helpers.assert_true(source:find('require("platform.remap.tap_hold_manager")', 1, true) ~= nil,
+		helpers.assert_true(source:find('require("tap_hold.engine.manager")', 1, true) ~= nil,
 			"actual keystats constructs Manager before daemon Hook setup")
 		local options = {}
 		options.before_manager = function(s)
 			local hook = package.loaded["platform.input.keyboard_hook"]
 			package.loaded["platform.input.keyboard_hook"] = nil
-			local ok, manager = pcall(helpers.load_module, "platform.remap.tap_hold_manager")
+			local ok, manager = pcall(helpers.load_module, "tap_hold.engine.manager")
 			package.loaded["platform.input.keyboard_hook"] = hook
 			if not ok then error(manager, 0) end
 			options.cached_manager = manager

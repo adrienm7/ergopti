@@ -211,8 +211,8 @@ end
 --- @param shared_root string The _shared folder.
 --- @return table codes
 local function layer_keys(state, ctx, shared_root)
-	local manager = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
-	local engine = dependency(state, "tap_hold_engine", "platform.remap.tap_hold_engine")
+	local manager = dependency(state, "tap_hold", "tap_hold.engine.manager")
+	local engine = dependency(state, "tap_hold_engine", "tap_hold.engine.engine")
 	local ok, keys = pcall(function() return manager.keys() end)
 	if not ok or type(keys) ~= "table" or not engine then
 		Logger.warn(LOG, "The tap-hold keys are unknown, so no layer key is marked: %s.", tostring(keys))
@@ -234,7 +234,7 @@ end
 --- Asks the remap manager to regenerate and reload its configuration.
 --- @return boolean applied
 local function apply(state)
-	local remap = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
+	local remap = dependency(state, "tap_hold", "tap_hold.engine.manager")
 	if not remap or type(remap.reload) ~= "function" then
 		Logger.error(LOG, "No remap manager: the saved navigation layer cannot be applied.")
 		return false

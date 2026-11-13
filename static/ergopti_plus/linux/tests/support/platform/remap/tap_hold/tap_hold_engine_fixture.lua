@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 
 local DOWN, UP, REPEAT = 1, 0, 2
 

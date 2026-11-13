@@ -127,7 +127,7 @@ local function load_fixture(opts)
 
 	for _, module_name in ipairs({
 		"gestures.ui.menu.gestures", "shortcuts.ui.menu.shortcuts", "layouts.ui.menu.keyboard_layout",
-		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "ui.menu.menu_tap_holds",
+		"hotstrings.ui.menu.hotstrings", "metrics.ui.menu.metrics", "tap_hold.ui.menu_tap_holds",
 		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}

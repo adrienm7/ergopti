@@ -528,7 +528,7 @@ end
 -- ================================
 
 -- A Karabiner lease failure is followed by a bounded recovery with a fresh
--- lease (platform/remap: retries after 1, 10 and 30 s, the last attempt's own
+-- lease (tap_hold/engine: retries after 1, 10 and 30 s, the last attempt's own
 -- duration on top). A window for a failure that recovered by itself alarms the
 -- user about nothing, so these errors are held for this long and shown only if
 -- the lease is not running again when it ends (hold-recoverable-error).

@@ -657,104 +657,104 @@ const OPENS_SUBMENU = {
 			menu: 'tap_hold_karabiner_off_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_guardian_approval_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_guardian_unavailable_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_login_items_open_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_legacy_rules_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_close_other_karabiner_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_user_karabiner_closed_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_vhid_incompatible_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_vhid_update_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_vhid_not_active_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		// Why Ergopti's own Karabiner runtime does not run (menu_tap_holds.lua BLOCK_ROWS).
 		{
 			menu: 'tap_hold_owned_not_installed_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_owned_install_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_owned_service_stopped_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_owned_repair_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_owned_other_running_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_owned_close_failed_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		},
 		{
 			menu: 'tap_hold_owned_fetch_failed_rows',
 			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+			native_sources: { hs: 'macos/tap_hold/ui/menu_tap_holds.lua' }
 		}
 	],
 	// Both hand providers render this declared fixed command under every native key.

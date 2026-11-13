@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 local Codec = require("core.text.engine.toml_codec")
 local Outdated = require("settings.engine.migration.outdated")
 local Logger = require("core.logger.engine.shim")
@@ -54,7 +54,7 @@ local function with_writer(text, body)
 	local path = dir .. "/tap_hold.toml"
 	write(path, text)
 	local state = { reloads = 0, receipt = true }
-	local writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local writer = helpers.load_module("tap_hold.engine.writer")
 	writer.init({ path = path,
 		reload = function()
 			state.reloads = state.reloads + 1

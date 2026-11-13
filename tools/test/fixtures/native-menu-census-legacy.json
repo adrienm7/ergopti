@@ -59,8 +59,8 @@
 				"macos/settings/ui/menu/paths.lua:610 static",
 				"macos/shortcuts/ui/menu/shortcuts.lua:541 static",
 				"macos/shortcuts/ui/menu/shortcuts.lua:644 separator",
-				"macos/ui/menu/menu_tap_holds.lua:1155 static",
-				"macos/ui/menu/menu_tap_keys.lua:59 static"
+				"macos/tap_hold/ui/menu_tap_holds.lua:1155 static",
+				"macos/tap_hold/ui/menu_tap_keys.lua:59 static"
 			]
 		},
 		"linux": {
@@ -412,10 +412,10 @@
 				"windows/keyboard/engine/keys/rshift.ahk",
 				"windows/keyboard/engine/keys/space.ahk",
 				"windows/keyboard/engine/keys/tab.ahk",
-				"windows/platform/remap/tap_hold_loader.ahk",
-				"windows/platform/remap/tap_hold_roll.ahk",
-				"windows/platform/remap/tap_hold_roll_keys.ahk",
-				"windows/platform/remap/tap_hold_writer.ahk",
+				"windows/tap_hold/engine/loader.ahk",
+				"windows/tap_hold/engine/roll.ahk",
+				"windows/tap_hold/engine/roll_keys.ahk",
+				"windows/tap_hold/engine/writer.ahk",
 				"windows/keyboard/engine/keys/win.ahk",
 				"windows/shortcuts/ui/action_picker/init.ahk",
 				"windows/shortcuts/ui/action_picker_webview.ahk",
@@ -468,7 +468,7 @@
 				"windows/metrics/ui/menu/actions.ahk",
 				"windows/shortcuts/ui/menu/shortcuts.ahk",
 				"windows/menu/ui/builder/submenus.ahk",
-				"windows/ui/menu/menu_taphold.ahk",
+				"windows/tap_hold/ui/menu_taphold.ahk",
 				"windows/ai/ui/model_browser/init.ahk",
 				"windows/onboarding/ui/answers.ahk",
 				"windows/onboarding/ui/core.ahk",
@@ -746,8 +746,8 @@
 				"macos/settings/ui/menu/paths.lua",
 				"macos/shortcuts/ui/menu/shortcuts.lua",
 				"macos/menu/ui/builder/state.lua",
-				"macos/ui/menu/menu_tap_holds.lua",
-				"macos/ui/menu/menu_tap_keys.lua",
+				"macos/tap_hold/ui/menu_tap_holds.lua",
+				"macos/tap_hold/ui/menu_tap_keys.lua",
 				"macos/menu/ui/builder/utils.lua",
 				"macos/menu/ui/builder/watchers.lua",
 				"macos/metrics/ui/menu/scope.lua",
@@ -935,24 +935,24 @@
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_tap_holds.lua",
+					"path": "macos/tap_hold/ui/menu_tap_holds.lua",
 					"sourceSha256": "581e1fc8c3d2429dd8aadf3647bfe5a3ae10b723f17231ab3137ee100db1aa42",
 					"lines": [
 						{
 							"line": 1155,
 							"source": "\t\tlabel   = i18n.get(\"menu.tapholds.title\"),",
-							"expectedSite": "macos/ui/menu/menu_tap_holds.lua:1155 static"
+							"expectedSite": "macos/tap_hold/ui/menu_tap_holds.lua:1155 static"
 						}
 					]
 				},
 				{
-					"path": "macos/ui/menu/menu_tap_keys.lua",
+					"path": "macos/tap_hold/ui/menu_tap_keys.lua",
 					"sourceSha256": "ad9629f2df5a3668ce422484836ace595c375936ecc4d74b2354f00b4b73f4c8",
 					"lines": [
 						{
 							"line": 59,
 							"source": "\t\tlabel   = i18n.get(\"dialog.action_picker.label\"),",
-							"expectedSite": "macos/ui/menu/menu_tap_keys.lua:59 static"
+							"expectedSite": "macos/tap_hold/ui/menu_tap_keys.lua:59 static"
 						}
 					]
 				}

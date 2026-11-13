@@ -33,7 +33,7 @@ local function with_scope(body, source, chord_j_identity)
 			for _, name in ipairs({ "shortcuts.engine.manager", "shortcuts.engine.keyboard_shortcuts", "shortcuts.engine.tap_keys",
 				"shortcuts.engine.chatgpt", "shortcuts.engine.script_chords", "gestures.engine.manager",
 				"shortcuts.engine.scope", "menu.ui.builder.builder", "shortcuts.engine.key_combinations",
-				"platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "shortcuts.engine.physical_collisions",
+				"tap_hold.engine.manager", "layouts.adapters.xkb_capture", "shortcuts.engine.physical_collisions",
 				"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }) do
 				package.loaded[name] = nil
 			end
@@ -140,7 +140,7 @@ local function with_scope(body, source, chord_j_identity)
 			function hook.held_modifiers() return {} end
 			function hook.held_text_modifier_codes() return {} end
 			function hook.held_shortcut_modifier_codes() return {} end
-			tap_manager = require("platform.remap.tap_hold_manager")
+			tap_manager = require("tap_hold.engine.manager")
 			assert(tap_manager.init({ keyboard_hook = hook,
 				execute_action = function() error("no output during edit admission") end,
 				action_names = gestures.get_executable_action_names,

@@ -34,7 +34,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Directories that ship runtime code. `tests/` is excluded by the walker.
-local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts" }
+local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding", "shortcuts", "tap_hold" }
 
 -- A file joins the corpus when it runs AppleScript at all — through
 -- hs.osascript, through the /usr/bin/osascript binary, or through the

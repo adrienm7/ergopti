@@ -62,6 +62,7 @@ class EmittedServeCommand(unittest.TestCase):
                 "static/ergopti_plus/_shared",
                 "static/ergopti_plus/macos/ai/engine",
                 "static/ergopti_plus/macos/platform",
+                "static/ergopti_plus/macos/tap_hold/engine",
                 "static/ergopti_plus/macos/keyboard/adapters/karabiner",
                 "static/ergopti_plus/macos/keyboard/adapters/runtime",
                 "static/ergopti_plus/macos/keyboard/engine",

@@ -75,7 +75,7 @@ helpers.describe("canonical TOML optional shape receipts", function()
 
 end)
 
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 

@@ -18,7 +18,7 @@
 --- 1. Content never kept: the watched command drains the offered data to
 ---    /dev/null, so the source application's write completes, and prints a bare
 ---    newline. Nothing of the clipboard reaches the daemon.
---- 2. Explicit lifecycle: platform/remap/tap_hold_manager.lua starts it with
+--- 2. Explicit lifecycle: tap_hold/engine/manager.lua starts it with
 ---    the copy owner and stops it with the copy owner; a second start is refused.
 --- ==============================================================================
 

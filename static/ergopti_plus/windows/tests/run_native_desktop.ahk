@@ -63,8 +63,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../diagnostics/ui/console_window.ahk
 #Include ../keyboard/engine/keys/combinations.ahk
 #Include ../core/text/engine/toml/helpers.ahk
-#Include ../platform/remap/tap_hold_loader.ahk
-#Include ../platform/remap/tap_hold_writer.ahk
+#Include ../tap_hold/engine/loader.ahk
+#Include ../tap_hold/engine/writer.ahk
 ; The tap window of a lone modifier (TapHoldTapMaxMs) reads its default from
 ; the manifest by its generated key: without both owners the AltGr pair cases
 ; died on an unset ConfigKey in constants.ahk.

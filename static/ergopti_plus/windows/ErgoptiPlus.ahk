@@ -507,8 +507,8 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; script being included twice.
 #Include onboarding/engine/first_boot.ahk
 #Include ../_shared/settings/data/outdated.ahk
-#Include platform/remap/tap_hold_loader.ahk
-#Include platform/remap/tap_hold_writer.ahk
+#Include tap_hold/engine/loader.ahk
+#Include tap_hold/engine/writer.ahk
 ; Tap-hold timing constants must load HERE, before core/lifecycle/engine/boot.ahk calls
 ; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
 ; assignments at its #Include position, so if constants.ahk loaded at its natural

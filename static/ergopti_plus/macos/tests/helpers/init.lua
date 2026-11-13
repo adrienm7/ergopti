@@ -466,7 +466,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- cached instance bound to a previous test's hs. Same rationale as text_utils.
 	loaded["layouts.engine.registry.install"] = nil
 	loaded["layouts.engine.input_sources"]  = nil
-	loaded["adapters.one_shot_shift"] = nil
+	loaded["tap_hold.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
 	loaded["diagnostics.ui.console_window"] = nil
 	-- The Accessibility adapter remembers which application left a read

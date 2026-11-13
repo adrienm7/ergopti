@@ -1,4 +1,4 @@
-﻿; platform/remap/tap_hold_roll.ahk
+﻿; tap_hold/engine/roll.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — A Typing Key Decided By The Order Of The Releases
@@ -16,7 +16,7 @@
 ;    passes. A quick chord therefore stays a chord and needs no wait.
 ; 2. The keys struck meanwhile must wait for the decision, and they are other
 ;    hotkeys or no hotkey at all. A block of static hotkeys, eligible only
-;    while a key is undecided, takes them (tap_hold_roll_keys.ahk, kept apart
+;    while a key is undecided, takes them (roll_keys.ahk, kept apart
 ;    so the test suites include this logic without hooking the keyboard); a
 ;    static variant is created before every Hotkey() one, so it wins over
 ;    the layout emulation and the layer.
@@ -102,7 +102,7 @@ TapHoldKeyRolls(KeyId) {
 }
 
 ; Whether a typing key is down and not yet a tap or a hold: the criterion of
-; the block of hotkeys in tap_hold_roll_keys.ahk.
+; the block of hotkeys in roll_keys.ahk.
 ; @returns {Boolean}
 TapHoldRollUndecided() {
 	; A key waiting for its chord partner holds the next characters the same way.

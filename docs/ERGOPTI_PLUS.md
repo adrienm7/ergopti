@@ -310,7 +310,7 @@ aujourd'hui.
 | #   | Implémentation                                                              | Utilisée par                                                                                |
 | --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 1   | `_shared/hotstrings/engine/matcher/init.lua` (281 l)                        | **Linux uniquement** — malgré une docstring affirmant « partagée par tous les drivers Lua » |
-| 2   | `macos/modules/keymap/{registry*,expander}.lua` (2 302 l)                   | macOS                                                                                       |
+| 2   | `macos/tap_hold/engine/{registry*,expander}.lua` (2 302 l)                  | macOS                                                                                       |
 | 3   | `windows/hotstrings/engine/matcher/match.ahk` + `hotstring_engine_main.ahk` | Windows                                                                                     |
 | 4   | un matcher **écrit dans un fichier de test AHK**                            | personne (fixture)                                                                          |
 | 5   | un algorithme de référence JS dans un script de mutation                    | personne                                                                                    |
@@ -366,7 +366,7 @@ le lecteur macOS ignore chaque `[tap_hold.*]`, et rien ne les recoupe.
 
 > **Caduc depuis le 2026-09-24.** kanata, son générateur et `kanata.kbd` ont été retirés :
 > la colonne Linux ci-dessus décrit l'ancien chemin. Les tap-holds et la couche navigation
-> tournent désormais dans le daemon (`linux/platform/remap/tap_hold_engine.lua`), avec la
+> tournent désormais dans le daemon (`linux/tap_hold/engine/engine.lua`), avec la
 > sémantique et les seuils par touche de Windows, lus depuis `[tap_hold.*]`.
 
 > **Décidé le 2026-09-29 ([ADR 011](../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)).**

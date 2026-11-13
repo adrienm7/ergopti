@@ -9,7 +9,7 @@
 --- global delay, the Karabiner integration) and the config.toml beside it (the
 --- manifest rows: the Tap-Holds switch, the one-shot and lone-tap timings and
 --- the key combinations, maintainer decision of 2026-11-11) through
---- platform/remap/tap_hold_file.lua, which translates both to and from the
+--- tap_hold/engine/file.lua, which translates both to and from the
 --- Karabiner model this module merges (the layout config_karabiner.toml had).
 ---
 --- FEATURES & RATIONALE:
@@ -48,7 +48,7 @@ local OutdatedEntries = require("settings.engine.migration.outdated")
 local KePaths = require("keyboard.adapters.karabiner.ke_paths")
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")
-local TapHoldFile = require("platform.remap.tap_hold_file")
+local TapHoldFile = require("tap_hold.engine.file")
 -- Resolved at use, as before: the shared writer binds its native admission when loaded.
 local function writer() return require("core.text.engine.toml_codec.writer") end
 -- Declared here, above the readers below: section 1 declares its own TomlCodec later.
@@ -74,7 +74,7 @@ local function adopt_config_publication(path, previous, content)
 end
 
 --- The config.toml that holds the manifest's tap-hold rows, beside tap_hold.toml
---- (platform/remap/tap_hold_file.lua owns the rule).
+--- (tap_hold/engine/file.lua owns the rule).
 --- @param user_config_path string The tap_hold.toml path.
 --- @return string
 function M.config_toml_path_for(user_config_path)

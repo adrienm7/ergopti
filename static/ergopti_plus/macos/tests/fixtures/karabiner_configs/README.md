@@ -24,7 +24,7 @@ mod_combos JSON files actually resolve). The recipe:
    kb.get_tap_hold_keys(),
    kb.get_mod_combos(),
    kb.get_non_canonical(),
-   hs.configdir .. "/platform/remap/"
+   hs.configdir .. "/tap_hold/engine/"
    )
    hs.json.write(out, hs.configdir .. "/tests/fixtures/karabiner_configs/defaults.json", true)
 

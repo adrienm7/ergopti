@@ -75,7 +75,7 @@ Test("tap-hold owned repeat: the scanner reads stacked labels as canonical chord
 
 _THOR_NativeKeysSwallowEveryChord() {
 	global _THOR_NATIVE_KEYS
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "the tap-hold sources must be readable")
 	Missing := ""
 	for ScanCode, KeyId in _THOR_NATIVE_KEYS {
@@ -97,7 +97,7 @@ Test("tap-hold owned repeat: the six native keys swallow their repeat under ever
 ; has an owned-press variant of the same identity.
 _THOR_EmulationHotkeysAreCovered() {
 	global KLE_Registered, _TH_TapHoldScToKeyId, SHIFT_SYMBOLS, SHIFTED_LETTERS
-	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Src := _StripFullLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "the tap-hold sources must be readable")
 	Names := []
 	Saved := KLE_Registered

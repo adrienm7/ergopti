@@ -48,7 +48,7 @@ end
 
 
 helpers.describe("menu_karabiner picker-tree memoisation", function()
-	local kar = helpers.load_with_stubs("ui.menu.menu_tap_holds")
+	local kar = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds")
 
 	helpers.it("reuses the cached trees when the binding state is unchanged", function()
 		kar._reset_picker_cache()

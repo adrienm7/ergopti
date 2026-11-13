@@ -23,8 +23,8 @@ local LABEL = "notify.karabiner.user_closed"
 --- @return table menu
 --- @return table karabiner
 local function menu_over_double(integration_enabled, extra)
-	package.loaded["ui.menu.menu_tap_holds"] = nil
-	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+	package.loaded["tap_hold.ui.menu_tap_holds"] = nil
+	local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 	menu._reset_picker_cache()
 	local karabiner = {
 		DEFAULT_TAP_HOLD_TIMEOUT_MS = 200,

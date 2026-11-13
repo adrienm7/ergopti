@@ -6,7 +6,7 @@
 --- The field run's proof of the number-row options on macOS
 --- (docs/design/layout-option-emulation.md, section 3.1), with no person: it
 --- builds a layout that types the symbols first from the Ergo-L file shipped with
---- the app, installs, selects and reads it back (modules/keymap/
+--- the app, installs, selects and reads it back (tap_hold/engine/
 --- layout_rows_build.lua), replaces it live by a second build that also moves the
 --- edge keys, then puts back the user's exact input sources.
 ---

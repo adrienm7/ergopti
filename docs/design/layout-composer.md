@@ -170,7 +170,7 @@ page sends (bounds, schema, name, map set) and never trust it.
 - **macOS.** The file is installed as a system input source by the code that
   installs a registry layout (`macos/layouts/engine/registry/registry.lua`,
   `install_local`). Karabiner is not involved: the system types the layout. No
-  file of `macos/platform/remap/` is touched. As for an updated registry
+  file of `macos/tap_hold/engine/` is touched. As for an updated registry
   layout, macOS may read a rewritten file only after the input source is
   toggled or the user logs in again.
 - **Linux.** The file goes through the converter the registry layouts use

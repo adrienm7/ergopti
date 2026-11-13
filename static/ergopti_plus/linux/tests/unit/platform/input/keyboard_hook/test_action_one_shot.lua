@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 
 local EV_KEY = 1
 local KEY_A, KEY_LEFTSHIFT = 30, 42

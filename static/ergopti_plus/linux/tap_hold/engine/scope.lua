@@ -1,4 +1,4 @@
---- infra/tap_hold_scope.lua
+--- tap_hold/engine/scope.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold Scope Transaction (Linux)
@@ -38,7 +38,7 @@ local Logger = require("core.logger.engine.shim")
 local LayerPreset = require("layouts.engine.layers.preset")
 local NativePath = require("core.fs.engine.native_path")
 local ConfigKeys = require("settings.engine.keys")
-local LOG = "infra.tap_hold_scope"
+local LOG = "tap_hold.engine.scope"
 local _owner, _sequence = nil, 0
 require("settings.engine.scope.registry").register("tap_hold_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
@@ -98,9 +98,9 @@ function M.new(options)
 	for _, name in ipairs({ "path", "backup_path", "tap_hold_path", "tap_hold_backup_path" }) do
 		assert(type(options[name]) == "string" and options[name] ~= "", "tap-hold scope requires " .. name)
 	end
-	local manager = options.manager or require("platform.remap.tap_hold_manager")
-	local loader = options.loader or require("platform.remap.tap_hold_loader")
-	local writer = options.writer or require("platform.remap.tap_hold_writer")
+	local manager = options.manager or require("tap_hold.engine.manager")
+	local loader = options.loader or require("tap_hold.engine.loader")
+	local writer = options.writer or require("tap_hold.engine.writer")
 	local parameters = options.parameters or require("gestures.engine.manager")
 	local files = options.files or require("core.fs.adapters.file_system")
 	local owner, held, legacy, source, layer = {}, false, {}, nil, nil
@@ -241,7 +241,7 @@ local function paths()
 	_sequence = _sequence + 1
 	local stamp = os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence
 	local config_path = require("settings.engine.paths").config("config.toml")
-	local tap_hold_path = require("platform.remap.tap_hold_manager").user_path()
+	local tap_hold_path = require("tap_hold.engine.manager").user_path()
 	return config_path, config_path .. ".tap_holds-" .. stamp .. ".bak",
 		tap_hold_path, tap_hold_path .. ".tap_holds-" .. stamp .. ".bak"
 end

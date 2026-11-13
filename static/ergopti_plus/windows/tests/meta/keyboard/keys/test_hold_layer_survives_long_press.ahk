@@ -26,7 +26,7 @@
 ; reported: the same three lines are repeated across a dozen tap-hold files,
 ; and fixing the reported one would leave eleven identical bugs behind.
 ;
-; SCOPE: source-level. platform/remap/*.ahk register top-level #HotIf
+; SCOPE: source-level. tap_hold/engine/*.ahk register top-level #HotIf
 ; hotkeys and cannot be included by the headless runner.
 ; ==============================================================================
 
@@ -74,7 +74,7 @@ _HLSL_CapIsNotRemoved() {
 ; reason this misuse was identifiable at all, and the reason a future reader
 ; will not re-apply it to another wait that holds no synthetic key.
 _HLSL_ConstantStillDocumentsItsPurpose() {
-	Src := _DriverDirConcat("platform/remap")
+	Src := _DriverDirConcat("tap_hold/engine")
 	Assert(RegExMatch(Src, "m)^global\s+STUCK_MODIFIER_RELEASE_TIMEOUT_SEC\s*:="),
 		"STUCK_MODIFIER_RELEASE_TIMEOUT_SEC must remain a named constant in the tap-holds layer")
 	Assert(InStr(Src, "SYNTHETIC modifier") > 0,

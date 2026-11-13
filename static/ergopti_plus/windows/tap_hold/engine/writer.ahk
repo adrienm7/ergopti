@@ -1,4 +1,4 @@
-﻿; platform/remap/tap_hold_writer.ahk
+﻿; tap_hold/engine/writer.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Hold Writer
@@ -30,8 +30,12 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\input\key_names.ahk
+#Include %A_LineFile%\..\..\..\platform\input\key_names.ahk
 #Include ../../core/ui/adapters/native_number.ahk
+
+
+
+
 
 ; ===========================
 ; ===========================
@@ -748,7 +752,7 @@ _TH_DurationInitialImage(Data) {
 	return Content
 }
 
-; A write migrates before it applies (see tap_hold_migration.ahk), so the key being
+; A write migrates before it applies (see migration.ahk), so the key being
 ; set keeps the value being set, even one an earlier build shipped.
 _TH_DurationLeafImage(Source, KeyId, Seconds) {
 	global _SharedDir

@@ -123,7 +123,7 @@ function M.new(options)
 		-- the script chords' submenu writes only its own leaves.
 		local containers = config.select == nil and not config.editing and Preferences.SHORTCUT_CONTAINERS or nil
 		-- [mod_combos] lives in tap_hold.toml: the remap engine applies
-		-- the Shortcuts scope's combination section itself (platform/remap
+		-- the Shortcuts scope's combination section itself (tap_hold/engine
 		-- REMAP_SCOPE_SECTIONS), so this config.toml transaction leaves it.
 		if not config.editing then
 			local narrowed = config.select

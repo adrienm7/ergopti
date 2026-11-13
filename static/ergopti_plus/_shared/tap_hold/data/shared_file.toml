@@ -8,7 +8,7 @@
 # which translates the file to and from the Karabiner model of
 # macos/keyboard/engine/runtime/config.lua. The Linux driver reads the same file
 # directly (platform/remap/tap_hold_loader.lua); the Windows driver will read
-# it through its own port (windows/platform/remap/tap_hold_loader.ahk).
+# it through its own port (windows/tap_hold/engine/loader.ahk).
 #
 # Key ids are the catalogue ids of [tap_hold.catalog] in defaults.toml, never a
 # driver's own spelling (no `left_control`, no `spacebar`), and a key

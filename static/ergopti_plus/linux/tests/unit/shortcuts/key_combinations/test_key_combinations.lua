@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local assert_false = function(value, message) helpers.assert_eq(value, false, message) end
 local Owner = require("shortcuts.engine.key_combinations")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 local Native = require("keyboard.engine.keys.combination_engine")
 local catalog = {}; for _, id in ipairs({ "caps_lock", "tab", "left_shift", "left_alt", "space" }) do catalog[#catalog + 1] = { id = id, key = id } end
 local path, binding = "/controlled/config.toml", "combination__caps_lock_then_tab"
@@ -221,18 +221,18 @@ helpers.describe("ordered pairs through actual native consumers", function()
 		end)
 	end)
 	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
-		local Loader = require("platform.remap.tap_hold_loader")
+		local Loader = require("tap_hold.engine.loader")
 		local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 		local loaded = Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
-		protected_modules({ ["shortcuts.engine.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
+		protected_modules({ ["shortcuts.engine.key_combinations"] = false, ["tap_hold.engine.manager"] = false, ["tap_hold.engine.loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
 			["keyboard.engine.layers.nav_layer"]={load=function() return {} end},
 			["core.fs.adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
 			["settings.engine.paths"]={config=function() return path end} },function()
 			-- The owner must capture these actual declared ports before the manager
 			-- requires it; previous cache identity is restored by the outer guard.
-			local manager = require("platform.remap.tap_hold_manager")
+			local manager = require("tap_hold.engine.manager")
 			manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"})
 			helpers.assert_true(manager.is_active()); helpers.assert_true(hook.engine.has_combinations ~= nil)
@@ -310,7 +310,7 @@ helpers.describe("pair native receipt refusal boundaries",function()
 end)
 helpers.describe("configured pair publication lifecycle",function()
 	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
-		local Loader=require("platform.remap.tap_hold_loader")
+		local Loader=require("tap_hold.engine.loader")
 		local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = true } })
 		local bytes=base_text
@@ -322,11 +322,11 @@ helpers.describe("configured pair publication lifecycle",function()
 			hook.engine,hook.on_tap=engine,callback;return true
 		end
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
-		protected_modules({["shortcuts.engine.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
-			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
+		protected_modules({["shortcuts.engine.key_combinations"]=false,["tap_hold.engine.manager"]=false,
+			["tap_hold.engine.loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["keyboard.engine.layers.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["settings.engine.paths"]={config=function() return path end}},function()
-			local manager=require("platform.remap.tap_hold_manager")
+			local manager=require("tap_hold.engine.manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			local pairs=require("shortcuts.engine.key_combinations");local token={}
@@ -392,7 +392,7 @@ helpers.describe("pair source and restoration refusals",function()
 end)
 helpers.describe("independent pair enablement across empty configuration",function()
 	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
-		local Loader=require("platform.remap.tap_hold_loader")
+		local Loader=require("tap_hold.engine.loader")
 		local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
@@ -403,11 +403,11 @@ helpers.describe("independent pair enablement across empty configuration",functi
 			hook.engine,hook.on_tap=engine,callback;return true
 		end
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
-		protected_modules({["shortcuts.engine.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
-			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
+		protected_modules({["shortcuts.engine.key_combinations"]=false,["tap_hold.engine.manager"]=false,
+			["tap_hold.engine.loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["keyboard.engine.layers.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["settings.engine.paths"]={config=function() return path end}},function()
-			local manager=require("platform.remap.tap_hold_manager")
+			local manager=require("tap_hold.engine.manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			helpers.assert_eq(hook.engine,nil)
@@ -865,7 +865,7 @@ helpers.describe("original input issuer export fences (controlled ports)", funct
 		"combination_hold", "combination_release", "combination_lift", "combination_restore", "arm_one_shot", "input_arm_state", "clear_input_arm" }) do
 		helpers.it("refuses rebound base export " .. name .. " after arm", function()
 			InputOwnerFixture.with_session(nil, function(s)
-				arm_input(s); local actual = require("platform.remap.tap_hold_engine"); local original = actual[name]
+				arm_input(s); local actual = require("tap_hold.engine.engine"); local original = actual[name]
 				actual[name] = function() return { { code = 99, value = 1 } } end
 				local current = s.hook.input_owner_current(s.lease)
 				actual[name] = original; assert_false(current)
@@ -891,7 +891,7 @@ helpers.describe("original input issuer export fences (controlled ports)", funct
 				if code ~= 42 or value ~= 1 then return end
 				options.after_sync = nil
 				local object = target == "hook_cleanup" and s.hook or target == "native_release_all" and s.engine
-					or require("platform.remap.tap_hold_engine")
+					or require("tap_hold.engine.engine")
 				local name = target == "hook_cleanup" and "emergency_stop" or target == "native_release_all" and "release_all" or target
 				local original = object[name]; local calls = 0
 				object[name] = function() calls = calls + 1; return { { code = 99, value = 1 } } end
@@ -1525,7 +1525,7 @@ helpers.describe("same-device third slot through original production consumers (
 
 	helpers.it("refuses a caller-normalized table even on an original installed Pair issuer",function()
 		with_chord({},function(s)
-			local Engine=require("platform.remap.tap_hold_engine")
+			local Engine=require("tap_hold.engine.engine")
 			local Pair=require("keyboard.engine.keys.combination_engine")
 			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},tap_min_ms=0,enabled=true,revision=0,
 				chords={tab_then_caps_lock="copy"},chord_settings={simultaneous_threshold_ms=100,combo_symmetric=true},
@@ -1737,7 +1737,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
   Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
  end
  local function detach(s,configured)
-  local Base=require("platform.remap.tap_hold_engine")
+  local Base=require("tap_hold.engine.engine")
   local Pair=require("keyboard.engine.keys.combination_engine")
   local base=Base.new({keys={tab={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},
    tap_min_ms=0,lone_tap_max_ms=0,one_shot_timeout_ms=1000})
@@ -1808,8 +1808,8 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
   if not ok then error(err,0) end
  end
  for _,spec in ipairs({{"shortcuts.engine.key_combinations","new"},
-  {"platform.remap.tap_hold_engine","new"},{"keyboard.engine.keys.combination_engine","new"},
-  {"platform.remap.tap_hold_loader","load"},{"platform.remap.tap_hold_loader","load_document"}}) do
+  {"tap_hold.engine.engine","new"},{"keyboard.engine.keys.combination_engine","new"},
+  {"tap_hold.engine.loader","load"},{"tap_hold.engine.loader","load_document"}}) do
   helpers.it("retires pending custody after original constructor replacement "..spec[1].."."..spec[2],function()
    public(function(s)
     local module=require(spec[1]);local original=module[spec[2]]
@@ -1879,15 +1879,15 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
  helpers.it("refuses a future first-read Manager pretender returning positive currency",function()
   public(function(s)
    local Source=require("shortcuts.engine.key_combinations")
-   local actual=package.loaded["platform.remap.tap_hold_manager"]
-   package.loaded["platform.remap.tap_hold_manager"]={managed_pair_options_current=function()return true end}
+   local actual=package.loaded["tap_hold.engine.manager"]
+   package.loaded["tap_hold.engine.manager"]={managed_pair_options_current=function()return true end}
    local ok,err=pcall(function()
     local caller=Source.new({keys={{id="tab",key="tab"},{id="caps_lock",key="caps_lock"}},
      hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
      changed=function()return true end,actions={is_assignable=function(action)return action=="copy" end}})
     helpers.assert_eq(Source.buffered_settings_current(caller.engine_options({tab=300,caps_lock=300})),false)
    end)
-   package.loaded["platform.remap.tap_hold_manager"]=actual
+   package.loaded["tap_hold.engine.manager"]=actual
    if not ok then error(err,0) end
   end)
  end)
@@ -1912,7 +1912,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
    local snapshot=s.manager.configuration_snapshot()
    helpers.assert_eq(snapshot.combinations,s.owner)
    helpers.assert_eq(snapshot.engine,s.engine)
-   helpers.assert_eq(package.loaded["platform.remap.tap_hold_manager"],s.manager)
+   helpers.assert_eq(package.loaded["tap_hold.engine.manager"],s.manager)
    helpers.assert_true(require("_generated.action_catalogue").actions.copy~=nil)
    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
    s.edge("a",58,1,1100)
@@ -1928,7 +1928,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
   public(function(s)
    local actual=s.manager
    local alias={managed_pair_options_current=actual.managed_pair_options_current}
-   package.loaded["platform.remap.tap_hold_manager"]=alias
+   package.loaded["tap_hold.engine.manager"]=alias
    local ok,err=pcall(function()
     helpers.assert_true(actual.set_enabled(false),"independent pair master remains installed")
     s.rows={};s.edge("a",15,1,1000)
@@ -1941,7 +1941,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
     helpers.assert_eq(pending,false,"only the exact original loaded Manager observes managed custody")
     helpers.assert_eq(s.actions,{})
    end)
-   package.loaded["platform.remap.tap_hold_manager"]=actual
+   package.loaded["tap_hold.engine.manager"]=actual
    if not ok then error(err,0) end
   end)
  end)
@@ -1955,7 +1955,7 @@ helpers.describe("relative-loader simultaneous source admission (controlled tran
 		return source
 	end
 	local function session(kind, body)
-		local names = { "shortcuts.engine.key_combinations", "platform.remap.tap_hold_manager" }
+		local names = { "shortcuts.engine.key_combinations", "tap_hold.engine.manager" }
 		local saved, preloads = {}, {}
 		for _, name in ipairs(names) do saved[name], preloads[name] = package.loaded[name], package.preload[name] end
 		local native_hs = rawget(_G, "hs")
@@ -1969,8 +1969,8 @@ helpers.describe("relative-loader simultaneous source admission (controlled tran
 			local relative = name:gsub("%.", "/") .. ".lua"
 			local source = bytes(helpers.driver_root() .. "/" .. relative)
 			local coordinate = "@./" .. relative
-			if kind == "foreign" and name == "platform.remap.tap_hold_manager" then coordinate = "@./foreign/" .. relative end
-			if kind == "wrong-anchor" and name == "platform.remap.tap_hold_manager" then coordinate = "@/different-loader-root/" .. relative end
+			if kind == "foreign" and name == "tap_hold.engine.manager" then coordinate = "@./foreign/" .. relative end
+			if kind == "wrong-anchor" and name == "tap_hold.engine.manager" then coordinate = "@/different-loader-root/" .. relative end
 			package.preload[name] = function()
 				local constructor = assert((loadstring or load)(source, coordinate))
 				local previous_hs = rawget(_G, "hs")
@@ -2038,7 +2038,7 @@ helpers.describe("original Manager pair action after genuine Logger callback (co
 			end }, function(s)
 				local sink_calls = 0
 				logger.set_sink(function(line)
-					if line:find("[platform.remap.tap_hold_manager] Tap action 'copy'.", 1, true) then
+					if line:find("[tap_hold.engine.manager] Tap action 'copy'.", 1, true) then
 						sink_calls = sink_calls + 1
 						if mode == "source" then
 							s.bytes = s.bytes:gsub('combo = "copy"', 'combo = "paste"')
@@ -2093,7 +2093,7 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 				end }, function(s)
 					local sink_calls, eq_calls, restore_result = 0, 0, nil
 					logger.set_sink(function(line)
-						if line:find("[platform.remap.tap_hold_manager] Tap action 'copy'.", 1, true) then
+						if line:find("[tap_hold.engine.manager] Tap action 'copy'.", 1, true) then
 							sink_calls = sink_calls + 1
 							local snapshot = s.manager.configuration_snapshot()
 							original = snapshot[role]
@@ -2168,7 +2168,7 @@ end)
 
 helpers.describe("owned roll journal action acknowledgement", function()
 	helpers.it("does not advance a roll after an action explicitly refuses", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local Pair = require("keyboard.engine.keys.combination_engine")
 		local base = Engine.new({ keys = { space = { hold_modifier = "shift" }, escape = { tap_action = "copy" },
 			delete = { tap_action = "paste" } }, roll_keys = { "space" }, tap_min_ms = 0,

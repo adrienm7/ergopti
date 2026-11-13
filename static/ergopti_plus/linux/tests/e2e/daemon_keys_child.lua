@@ -386,7 +386,7 @@ end
 -- The action runner the daemon hands the tap-hold manager, kept so {TAP} can
 -- run a tap action through it exactly as a tap would.
 local tap_executor = nil
-local TapHold = require("platform.remap.tap_hold_manager")
+local TapHold = require("tap_hold.engine.manager")
 local real_tap_hold_init = TapHold.init
 TapHold.init = function(options)
 	tap_executor = options.execute_action

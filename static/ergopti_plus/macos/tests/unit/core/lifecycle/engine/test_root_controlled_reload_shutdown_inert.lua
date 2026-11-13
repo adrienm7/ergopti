@@ -51,7 +51,7 @@ local MODULE_NAMES = {
 	"core.lifecycle.engine.launcher_guard",
 	"core.fs.adapters.file_system",
 	"keyboard.engine",
-	"platform.remap.tap_hold_file",
+	"tap_hold.engine.file",
 	"menu.ui",
 	"ai.ui.menu",
 	"ai.engine.local_servers.mlx_deps_checker",
@@ -375,7 +375,7 @@ local function run_isolated(options, assertions)
 			["keyboard.engine"] = Karabiner,
 			-- The boot carries an old config_karabiner.toml over before the config
 			-- migration; this fixture has no file system, hence no old file.
-			["platform.remap.tap_hold_file"] = {
+			["tap_hold.engine.file"] = {
 				config_toml_path_for = function() return "/virtual/ConfigTomlPath" end,
 				import_legacy = function() return true, "none" end,
 			},

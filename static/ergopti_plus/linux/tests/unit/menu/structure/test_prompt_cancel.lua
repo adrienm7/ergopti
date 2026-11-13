@@ -23,8 +23,8 @@ local writer_calls = {}
 --- build time, so the click reaches this spy instead of the filesystem.
 --- @return any Previous package.loaded entry (possibly nil).
 local function install_fake_writer()
-	local previous = package.loaded["platform.remap.tap_hold_writer"]
-	package.loaded["platform.remap.tap_hold_writer"] = {
+	local previous = package.loaded["tap_hold.engine.writer"]
+	package.loaded["tap_hold.engine.writer"] = {
 		set_threshold = function(key_id, seconds, guard)
 			if guard ~= nil then
 				assert(type(guard) == "function", "deferred editor guard")
@@ -120,7 +120,7 @@ local last_user_path
 
 --- A tap-hold manager on the shared defaults.
 local function manager()
-	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+	local Manager = helpers.load_module("tap_hold.engine.manager")
 	local user_path = os.tmpname()
 	last_user_path = user_path
 	-- Tap-holds on over the shared defaults: with no file the category reads
@@ -169,7 +169,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		end)
 		th._reset_for_test()
 		os.remove(last_user_path); os.remove(last_user_path .. ".config.toml")
-		package.loaded["platform.remap.tap_hold_writer"] = previous
+		package.loaded["tap_hold.engine.writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 
@@ -190,7 +190,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		end)
 		th._reset_for_test()
 		os.remove(last_user_path); os.remove(last_user_path .. ".config.toml")
-		package.loaded["platform.remap.tap_hold_writer"] = previous
+		package.loaded["tap_hold.engine.writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 

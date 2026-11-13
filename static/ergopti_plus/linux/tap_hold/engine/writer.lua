@@ -1,4 +1,4 @@
---- platform/remap/tap_hold_writer.lua
+--- tap_hold/engine/writer.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Hold Writer (Linux)
@@ -11,7 +11,7 @@
 ---    an action id, "" (the key itself) or "none" (nothing); a hold is a
 ---    modifier, a layer or none, and choosing one removes the other; "native"
 ---    clears both. The scope restore and clear render through render_scope()
----    and publish through infra/tap_hold_scope.lua, never through commit().
+---    and publish through tap_hold/engine/scope.lua, never through commit().
 ---    The first-run wizard imports its checked keys through import_recommended(),
 ---    into the folder it configures, before the daemon restarts on it: it only
 ---    adds keys, refuses to overwrite one the user configured, and backs the
@@ -42,17 +42,17 @@ local Logger = require("core.logger.engine.shim")
 local TomlCodec = require("core.text.engine.toml_codec")
 local TomlWriter = require("core.text.engine.toml_codec.writer")
 local BasicString = require("core.text.engine.toml_codec.basic_string")
-local Engine = require("platform.remap.tap_hold_engine")
+local Engine = require("tap_hold.engine.engine")
 local Manifest = require("menu.engine.manifest_reader")
 local LayerPreset = require("layouts.engine.layers.preset")
-local Shapes = require("platform.remap.tap_hold_shapes")
+local Shapes = require("tap_hold.engine.shapes")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
-local Migration = require("platform.remap.tap_hold_migration")
+local Migration = require("tap_hold.engine.migration")
 local Paths = require("core.fs.engine.paths")
 local ConfigKeys = require("settings.engine.keys")
 local LoneTap = require("tap_hold.engine.lone_tap")
 
-local LOG = "platform.remap.tap_hold_writer"
+local LOG = "tap_hold.engine.writer"
 
 --- The user file's name in the configuration folder.
 M.FILE_NAME = require("tap_hold.engine.shared_file").FILE_NAME
@@ -70,8 +70,8 @@ local FOREIGN_HOLD_FIELD = "hold_action"
 
 -- The config.toml [tap_holds] fields of the lone modifier tap window and of
 -- the one-shot timeout (the loader's).
-local LONE_TAP_FIELD = require("platform.remap.tap_hold_loader").LONE_TAP_FIELD
-local ONE_SHOT_TIMEOUT_FIELD = require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_FIELD
+local LONE_TAP_FIELD = require("tap_hold.engine.loader").LONE_TAP_FIELD
+local ONE_SHOT_TIMEOUT_FIELD = require("tap_hold.engine.loader").ONE_SHOT_TIMEOUT_FIELD
 -- The [tap_hold] leaves config.toml owns since config schema v22: a scope
 -- render drops one a migration could not delete.
 local CONFIG_OWNED_FIELDS = { "enabled", LONE_TAP_FIELD, ONE_SHOT_TIMEOUT_FIELD }
@@ -599,7 +599,7 @@ function M.set_global_threshold(seconds, guard)
 end
 
 --- The config.toml beside a tap_hold.toml (the loader's).
-M.config_path_for = require("platform.remap.tap_hold_loader").config_path_for
+M.config_path_for = require("tap_hold.engine.loader").config_path_for
 
 --- One change to config.toml [tap_holds], then the engine reload.
 --- @param what string For the logs.
@@ -657,13 +657,13 @@ end
 --- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
 function M.set_one_shot_timeout_ms(ms, guard)
-	if not require("platform.remap.tap_hold_loader").valid_one_shot_timeout_ms(ms) then
+	if not require("tap_hold.engine.loader").valid_one_shot_timeout_ms(ms) then
 		Logger.error(LOG, "set_one_shot_timeout_ms: %s is not a positive whole number of milliseconds — nothing written.",
 			tostring(ms))
 		return false
 	end
 	local row = { section = ConfigKeys.KEY.TAP_HOLDS, key = ConfigKeys.LEAF.STICKY_TIMEOUT_MS }
-	if ms == require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_DEFAULT_MS then row.delete = true else row.value = ms end
+	if ms == require("tap_hold.engine.loader").ONE_SHOT_TIMEOUT_DEFAULT_MS then row.delete = true else row.value = ms end
 	return commit_setting("one-shot timeout = " .. tostring(ms) .. " ms", row, guard)
 end
 

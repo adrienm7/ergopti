@@ -8,7 +8,7 @@
 --- combination of the declared modifiers, then one entry per declared layer.
 ---
 --- WHY THIS IS SHARED:
---- the list was a hardcoded array in windows/platform/remap/tap_hold_writer.ahk
+--- the list was a hardcoded array in windows/tap_hold/engine/writer.ahk
 --- whose own comment claimed it mirrored a shared key that has never existed —
 --- so the canonical list was a copy pointing at nothing, and the two Lua drivers
 --- had no hold picker at all. A driver that offers a different set of holds than

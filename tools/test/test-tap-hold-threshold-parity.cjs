@@ -120,7 +120,7 @@ if (
 }
 if (
 	/TAPHOLD_DEFAULT_ACTIVATION_SECONDS\s*:=\s*[0-9.]+\s*$/m.test(
-		read('windows', 'platform', 'remap', 'tap_hold_loader.ahk')
+		read('windows', 'tap_hold', 'engine', 'loader.ahk')
 	)
 ) {
 	errors.push(
@@ -131,7 +131,7 @@ if (
 // Linux and macOS read the registry value, never a literal of their own.
 if (
 	!/GLOBAL_DEFAULT_SECONDS\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
-		read('linux', 'platform', 'remap', 'tap_hold_loader.lua')
+		read('linux', 'tap_hold', 'engine', 'loader.lua')
 	)
 ) {
 	errors.push(

@@ -1,4 +1,4 @@
---- ui/menu/menu_tap_holds.lua
+--- tap_hold/ui/menu_tap_holds.lua
 
 --- ==============================================================================
 --- MODULE: Tap-Holds Menu

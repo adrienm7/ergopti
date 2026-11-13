@@ -77,7 +77,7 @@ Test("boot: every shared-constant sentinel file loads before boot.ahk (F-18)",
 ; the hook thread, with a synthetic modifier already armed.
 _A0720B4_TapHoldDurationIsValidated() {
 	Body := _DriverFuncBody("TapHoldDuration")
-	Assert(Body != "", "TapHoldDuration must exist in platform/remap/tap_hold_loader.ahk")
+	Assert(Body != "", "TapHoldDuration must exist in tap_hold/engine/loader.ahk")
 	Code := _DriverMaskNonCode(&Body)
 	Assert(RegExMatch(Code, "m)^\s*if\s+!_TapHoldDurationValid\(Raw\)\s*\{") > 0,
 		"TapHoldDuration must reject an invalid raw TOML value through the shared duration validator before it reaches a KeyWait option string")

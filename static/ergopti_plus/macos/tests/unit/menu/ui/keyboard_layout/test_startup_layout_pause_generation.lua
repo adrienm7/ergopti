@@ -149,7 +149,7 @@ for _, module_name in ipairs({
 	"shortcuts.ui.menu.shortcuts",
 	"hotstrings.ui.menu.hotstrings",
 	"metrics.ui.menu.metrics",
-	"ui.menu.menu_tap_holds",
+	"tap_hold.ui.menu_tap_holds",
 	"ui.menu.menu_about",
 }) do
 	package.loaded[module_name] = {}
@@ -164,7 +164,7 @@ package.loaded["ai.ui.menu"] = { create = function() return {} end }
 package.loaded["apps.ui.menu.apps"] = {
 	prime = function() prime_counts.apps = prime_counts.apps + 1 end,
 }
-package.loaded["ui.menu.menu_tap_holds"] = {
+package.loaded["tap_hold.ui.menu_tap_holds"] = {
 	prime = function() prime_counts.karabiner = prime_counts.karabiner + 1 end,
 }
 package.loaded["ai.engine"] = { set_backend = function() end }

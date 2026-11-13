@@ -495,7 +495,7 @@ package.preload["core.events.loop"] = function()
 		end
 		-- hardening-e-presets: the navigation layer the tap-holds can enter.
 		local layer_keys = 0
-		local ok_tap, TapHold = pcall(require, "platform.remap.tap_hold_manager")
+		local ok_tap, TapHold = pcall(require, "tap_hold.engine.manager")
 		if ok_tap then
 			local ok_keys, keys = pcall(TapHold.keys)
 			for _, key in pairs(ok_keys and keys or {}) do

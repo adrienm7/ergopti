@@ -3021,7 +3021,7 @@ function M.start()
 		end
 	end
 	if not _one_shot_shift then
-		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
+		_one_shot_shift = require("tap_hold.one_shot_shift").new({ magic = M.get_trigger_char })
 	end
 
 	if not _tap_copy then _tap_copy = build_tap_copy() end

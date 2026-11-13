@@ -1,4 +1,4 @@
-﻿; ui/menu/menu_taphold.ahk
+﻿; tap_hold/ui/menu_taphold.ahk
 
 ; ==============================================================================
 ; MODULE: Tray Menu / Tap-Hold Submenu

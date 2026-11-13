@@ -111,7 +111,7 @@ local function type_through_hook(events, switches, tap_holds, app_id)
 		local text, log, seen = {}, {}, {}
 		local kh = helpers.load_module("platform.input.keyboard_hook")
 		if tap_holds then
-			local TapHoldEngine = require("platform.remap.tap_hold_engine")
+			local TapHoldEngine = require("tap_hold.engine.engine")
 			kh.set_remapper(TapHoldEngine.new({ keys = TAP_HOLDS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 				nav_layer = require("tests.support.nav_layer_fixture").recommended() }), function(action, binding)
 				log[#log + 1] = tostring(action) .. "=" .. WordReset.apply_tap_action(engine, binding)

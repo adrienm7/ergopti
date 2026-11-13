@@ -100,7 +100,7 @@ local function with_scope(body, source, options)
 			-- native retirement/installation acknowledgements are controlled here.
 			local combinations = require("shortcuts.engine.key_combinations")
 			if not options or options.initialize_pairs ~= false then
-				local Loader = require("platform.remap.tap_hold_loader")
+				local Loader = require("tap_hold.engine.loader")
 				local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 				local loaded_pairs = Loader.load_document(defaults,
 					{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
@@ -156,7 +156,7 @@ local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 --- Real configuration/claim owners; only the native map observation is modeled.
 local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
-		local names = { "platform.remap.tap_hold_manager", "layouts.adapters.xkb_capture", "shortcuts.engine.physical_collisions",
+		local names = { "tap_hold.engine.manager", "layouts.adapters.xkb_capture", "shortcuts.engine.physical_collisions",
 			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook, navigation_dir, navigation_made
@@ -187,7 +187,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			function hook.held_modifiers() return {} end
 			function hook.held_text_modifier_codes() return {} end
 			function hook.held_shortcut_modifier_codes() return {} end
-			Manager = require("platform.remap.tap_hold_manager")
+			Manager = require("tap_hold.engine.manager")
 			helpers.assert_true(Manager.init({ keyboard_hook = hook, execute_action = function() error("no action during collision validation") end,
 				action_names = owners.gestures.get_executable_action_names, on_text_injected = function() error("no output during validation") end,
 				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))

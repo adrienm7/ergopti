@@ -73,8 +73,8 @@ helpers.describe("the macOS Tap-Holds menu is inert and has no engine controls",
 			start = function() calls.start = calls.start + 1 return true end,
 			stop = function() calls.stop = calls.stop + 1 return true end,
 		}
-		package.loaded["ui.menu.menu_tap_holds"] = nil
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {
+		package.loaded["tap_hold.ui.menu_tap_holds"] = nil
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {
 			execute = function()
 				calls.execute = calls.execute + 1
 				return "", true
@@ -101,8 +101,8 @@ helpers.describe("the macOS Tap-Holds menu is inert and has no engine controls",
 	end)
 
 	helpers.it("offers no start, stop, status or open-engine row", function()
-		package.loaded["ui.menu.menu_tap_holds"] = nil
-		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		package.loaded["tap_hold.ui.menu_tap_holds"] = nil
+		local menu = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 		local built = menu.build({ karabiner = remap_double(true), updateMenu = function() end })
 		helpers.assert_true(type(built) == "table", "the Tap-Holds submenu must render")
 		helpers.assert_eq(built.label, "menu.tapholds.title", "the row carries the Windows tap-holds title")

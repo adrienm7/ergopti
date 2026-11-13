@@ -17,7 +17,7 @@ local Timings = require("core.timing.engine.timings")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
- "shortcuts/engine/key_combinations.lua","platform/remap/tap_hold_manager.lua",module_directory)
+ "shortcuts/engine/key_combinations.lua","tap_hold/engine/manager.lua",module_directory)
 
 local original_default, original_find = Features.default_for, Features.find_entry_by_path
 local declarations = {}
@@ -260,7 +260,7 @@ function M.new(options)
 			enabled = state.enabled and lease == nil and options.is_paused() == false, revision = generation, capture = owner.capture_runtime, capture_action = owner.capture_action }
 		-- Only this actual config-reading owner issues pending settings. A copied
 		-- normalized table or positive caller closure has no enrollment here.
-		local manager=package.loaded["platform.remap.tap_hold_manager"]
+		local manager=package.loaded["tap_hold.engine.manager"]
 		local observe=type(manager)=="table" and rawget(manager,"managed_pair_options_current") or nil
 		local source=type(observe)=="function" and original_debug_info(observe,"S").source or nil
 		if options.files == nil and options.route == nil and configured.chords and type(observe)=="function"
@@ -272,7 +272,7 @@ function M.new(options)
 			end
 			local function private_current()
 				if state~=captured or generation~=revision or busy or lease or delivery_fence or getmetatable(configured)~=nil then return false end
-				if package.loaded["platform.remap.tap_hold_manager"]~=manager or rawget(manager,"managed_pair_options_current")~=observe then return false end
+				if package.loaded["tap_hold.engine.manager"]~=manager or rawget(manager,"managed_pair_options_current")~=observe then return false end
 				local called,current=pcall(observe,owner,configured)
 				if not called or current~=true then return false end
 				for name,value in pairs(configured) do if fields[name]~=value then return false end end

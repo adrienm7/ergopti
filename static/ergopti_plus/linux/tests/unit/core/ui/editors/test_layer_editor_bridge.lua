@@ -231,7 +231,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("sends the loaded keymap's legends and the layer key (layer-editor-current-layout-legends)", function()
-		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local Manager = helpers.load_module("tap_hold.engine.manager")
 		local corpus = Json.decode(read_file(LEGENDS))
 		local Layout = helpers.load_module("layouts.adapters.keyboard_layout")
 		local LayerEditor = require("layouts.engine.layers.editor")
@@ -308,7 +308,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("saves the page's session and the live daemon applies every keyboard edit (e2e)", function()
-		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local Manager = helpers.load_module("tap_hold.engine.manager")
 		local dir = make_config_dir()
 		local config = assert(io.open(dir .. "/tap_hold.toml", "wb"))
 		config:write('[tap_hold]\ninherit_defaults = false\n'
@@ -359,7 +359,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("saving layer mappings never enables an unconfigured tap-hold owner", function()
-		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local Manager = helpers.load_module("tap_hold.engine.manager")
 		local dir = make_config_dir()
 		local world = make_state(dir)
 		local hook = { key_text = function() return nil end,

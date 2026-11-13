@@ -1,7 +1,7 @@
 --- tests/unit/settings/test_empty_config_neutral.lua
 
 local helpers = require("tests.helpers")
-local Loader = require("platform.remap.tap_hold_loader")
+local Loader = require("tap_hold.engine.loader")
 local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 helpers.describe("empty tap-hold configuration is neutral", function()

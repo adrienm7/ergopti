@@ -1,4 +1,4 @@
---- ui/menu/menu_tap_keys.lua
+--- tap_hold/ui/menu_tap_keys.lua
 
 --- ==============================================================================
 --- MODULE: Menu Tap Keys

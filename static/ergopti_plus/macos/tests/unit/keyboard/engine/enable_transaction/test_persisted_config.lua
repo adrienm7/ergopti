@@ -33,7 +33,7 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 			logger.success = function() observations.successes = observations.successes + 1 end
 			local saved_logger = package.loaded["core.logger.engine.logger"]
 			package.loaded["core.logger.engine.logger"] = logger
-			local MenuRemap = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+			local MenuRemap = helpers.load_with_stubs("tap_hold.ui.menu_tap_holds", {})
 			package.loaded["core.logger.engine.logger"] = saved_logger
 
 			local function build_menu()

@@ -573,7 +573,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 
 // --- 4.7 The daemon's tap-hold input keys use the same physical identities.
 {
-	const src = read('linux/platform/remap/tap_hold_engine.lua');
+	const src = read('linux/tap_hold/engine/engine.lua');
 	const block = (src.match(/M\.KEY_CODES\s*=\s*\{([\s\S]*?)\}/) || [])[1];
 	if (!block) fail('native tap-hold engine: KEY_CODES table is missing');
 	const physical = {

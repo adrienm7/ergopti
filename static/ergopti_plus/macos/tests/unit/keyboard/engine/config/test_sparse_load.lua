@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger",
+local MODULES = { "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system", "core.logger.engine.logger",
 	"core.text.engine.toml.codec", "core.text.engine.toml_codec" }
 
 --- Loads one remap configuration source through the real codec.
@@ -101,7 +101,7 @@ helpers.describe("Remap configuration sparse loading", function()
 		local source = '[_meta]\nschema_version = 1\n[tap_hold.keys]\nretired_key = "legacy"\n'
 			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
 		local config_source = '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
-		helpers.with_stub_scope({ "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system",
+		helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system",
 			"core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml.codec", "core.text.engine.toml_codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
@@ -184,7 +184,7 @@ helpers.describe("Remap obsolete scalar leaves", function()
 	--- Karabiner model layout (written as its shared tap_hold.toml text,
 	--- `f.original`), or the raw bytes when `raw` is set.
 	local function with_file(original, body, raw)
-		helpers.with_stub_scope({ "keyboard.engine.runtime.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system",
+		helpers.with_stub_scope({ "keyboard.engine.runtime.config", "tap_hold.engine.file", "core.fs.adapters.file_system",
 			"core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()

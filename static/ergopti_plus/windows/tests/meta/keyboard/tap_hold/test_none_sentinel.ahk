@@ -21,7 +21,7 @@
 ;   2. TapHoldTapAction returns "" for a key absent from TapHold["keys"].
 ;   3. _TH_TapNoneI18n is declared as a global constant.
 ;
-; SCOPE: source introspection of platform/remap/tap_hold_writer.ahk.
+; SCOPE: source introspection of tap_hold/engine/writer.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,11 +36,11 @@
 ; ====================================================
 
 _THNS_ReadSource() {
-	return _DriverDirConcat("platform/remap")
+	return _DriverDirConcat("tap_hold/engine")
 }
 
 ; The hold options are built by one function. Scanning its body, not the whole
-; platform/remap folder, keeps another module's own "kind", "none" Map (the
+; tap_hold/engine folder, keeps another module's own "kind", "none" Map (the
 ; layer loader has one) from being taken for the hold sentinel.
 _THNS_ReadHoldOptionsBuilder() {
 	return _DriverFuncBody("_TH_BuildHoldOptions")
@@ -89,7 +89,7 @@ Test("tap_hold_writer: none-sentinel hold entry has empty-string id (tap-hold-no
 
 _THNS_TapNoneI18nDeclared() {
 	Src := _THNS_ReadSource()
-	Assert(Src != "", "platform/remap/ source must be readable")
+	Assert(Src != "", "tap_hold/engine/ source must be readable")
 
 	Assert(InStr(Src, "_TH_TapNoneI18n") > 0,
 		"_TH_TapNoneI18n must be declared as a global constant in tap_hold_writer.ahk — it is the single source of truth for the i18n key that the action picker displays when a key has no tap action")
@@ -103,10 +103,10 @@ Test("tap_hold_writer: _TH_TapNoneI18n is declared (tap-hold-none-sentinel)",
 
 _THNS_TapHoldTapActionReturnsSentinel() {
 	Src := _THNS_ReadSource()
-	Assert(Src != "", "platform/remap/ source must be readable")
+	Assert(Src != "", "tap_hold/engine/ source must be readable")
 
 	Body := _DriverFuncBody("TapHoldConfiguredTapAction")
-	Assert(Body != "", "TapHoldConfiguredTapAction must be defined in platform/remap/tap_hold_loader.ahk or tap_hold_writer.ahk")
+	Assert(Body != "", "TapHoldConfiguredTapAction must be defined in tap_hold/engine/loader.ahk or tap_hold_writer.ahk")
 
 	; The function must check Has() before indexing to avoid a missing-key throw
 	Assert(InStr(Body, ".Has(") > 0,

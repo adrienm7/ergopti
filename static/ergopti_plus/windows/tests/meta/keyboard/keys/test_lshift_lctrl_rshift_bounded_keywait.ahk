@@ -57,12 +57,12 @@ _LLRBK_WindowAround(Src, Needle, WindowChars := 300) {
 ; =========================================================
 
 _LLRBK_NoBareKeyWait() {
-	Src := _DriverDirConcat("platform/remap")
-	Assert(Src != "", "platform/remap must be readable")
+	Src := _DriverDirConcat("tap_hold/engine")
+	Assert(Src != "", "tap_hold/engine must be readable")
 
 	for _, Sc in ["SC02A", "SC01D", "SC036"] {
 		Assert(InStr(Src, 'KeyWait("' . Sc . '")') = 0,
-			"platform/remap/ must not contain a bare KeyWait(" . Chr(34) . Sc . Chr(34) . ") with no timeout -- a lost key-up would wedge this hotkey's tap/hold discrimination forever")
+			"tap_hold/engine/ must not contain a bare KeyWait(" . Chr(34) . Sc . Chr(34) . ") with no timeout -- a lost key-up would wedge this hotkey's tap/hold discrimination forever")
 	}
 }
 Test("tap_holds: lshift_lctrl/rshift no longer use a bare unbounded KeyWait (hold-keywait-tap-only-shape)", _LLRBK_NoBareKeyWait)

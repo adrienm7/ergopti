@@ -41,7 +41,7 @@ _TSTC_ConfigurableTimeout() {
 	; Move-resilient: scan the tap-holds module dir via the framework helper instead
 	; of a pinned modules path; the constant declaration lives at module scope (not
 	; inside a function), so keep the comment-stripping extractor
-	Src := _TSTC_StripLineComments(_DriverDirConcat("platform/remap"))
+	Src := _TSTC_StripLineComments(_DriverDirConcat("tap_hold/engine"))
 	Assert(Src != "", "keyboard/engine/keys/space.ahk must be readable")
 
 	Body := _DriverFuncBody("SpaceTapHold")

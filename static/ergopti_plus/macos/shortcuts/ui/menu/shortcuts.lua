@@ -30,7 +30,7 @@ local WrapMutation  = require("menu.engine.wrap_mutation")
 local ShortcutUtils = require("shortcuts.ui.menu.utils")
 local KeyboardSlots = require("layouts.ui.menu.keyboard_slots")
 local ActionPicker  = require("shortcuts.ui.action_picker")
-local TapKeysMenu   = require("ui.menu.menu_tap_keys")
+local TapKeysMenu   = require("tap_hold.ui.menu_tap_keys")
 local ManifestReader = require("menu.engine.manifest_reader")
 local TextUtils = require("core.text.engine.utils_core")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
@@ -842,7 +842,7 @@ function M.build(ctx)
 	-- their rows, as it owns the engine they configure.
 	local group_builders = {
 		["key_combinations"] = function()
-			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
+			return require("tap_hold.ui.menu_tap_holds").build_key_combinations(ctx)
 		end,
 		[require("settings.engine.keys").LEAF.SCRIPT_CONTROL] = script_control_group,
 		-- « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.

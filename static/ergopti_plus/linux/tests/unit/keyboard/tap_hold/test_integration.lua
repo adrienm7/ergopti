@@ -25,8 +25,8 @@ local function session(user_text)
 	local config_text = require("tests.support.tap_hold_fixture").config(user_text)
 	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
 	local Hook = helpers.load_module("platform.input.keyboard_hook")
-	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
-	local Writer = helpers.load_module("platform.remap.tap_hold_writer")
+	local Manager = helpers.load_module("tap_hold.engine.manager")
+	local Writer = helpers.load_module("tap_hold.engine.writer")
 	local dir = os.tmpname()
 	os.remove(dir)
 	local made = os.execute('mkdir "' .. dir .. '"')
@@ -358,7 +358,7 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 
 	helpers.it("clears everything, then restores the recommended preset", function()
 		with_session(nil, function(s)
-			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
+			local preset = require("tap_hold.engine.loader").preset_keys(DEFAULTS)
 			-- The switch is a config.toml row the scope publishes beside the keys.
 			local function scope(mode, config)
 				local path = s.manager.user_path()
@@ -523,7 +523,7 @@ end)
 local function with_native_session(user_text, body)
 	require("tests.support.input_owner_fixture").with_manager_session({ tap_hold_text = user_text, nav_fixture = true },
 		function(s)
-			local Writer = helpers.load_module("platform.remap.tap_hold_writer")
+			local Writer = helpers.load_module("tap_hold.engine.writer")
 			Writer.init({ path = s.tap_path, reload = s.manager.reload, is_tap_action = s.manager.is_tap_action,
 				canonical_hold = s.manager.canonical_hold })
 			s.writer = Writer
@@ -543,7 +543,7 @@ end
 helpers.describe("tap-holds end to end: every option of the hold picker", function()
 
 	helpers.it("(hold-picker-every-option-2026-10-01) the hold a key gets is the option picked, after Shift", function()
-		local Engine = require("platform.remap.tap_hold_engine")
+		local Engine = require("tap_hold.engine.engine")
 		local SPACE = Engine.KEY_CODES.space
 		with_native_session('[tap_hold.keys.space]\nhold_modifier = "shift"\n', function(s)
 			local options = s.manager.hold_options()

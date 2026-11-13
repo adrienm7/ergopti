@@ -79,7 +79,8 @@ const DRIVER_SUBDIRS = [
 	'layouts',
 	'metrics',
 	'onboarding',
-	'shortcuts'
+	'shortcuts',
+	'tap_hold'
 ];
 
 /** Supported target languages. */
