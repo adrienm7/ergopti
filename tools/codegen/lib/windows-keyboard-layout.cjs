@@ -366,22 +366,27 @@ function deadKeyName(state) {
  * @param {string} convention - The layout's keycode convention.
  * @returns {object} { keys, deadKeys, ligatures, omitted }.
  */
-function buildModel(canonical, keycodeTable, convention) {
+function buildModel(canonical, keycodeTable, convention, columns = COLUMNS) {
 	const layout = indexLayout(canonical);
 	for (const modifier of [['option'], ['option', 'shift']]) {
 		if (keyMapIndex(layout, [...modifier, 'caps']) !== keyMapIndex(layout, modifier))
 			throw new Error('Caps Lock changes the AltGr columns (CAPLOKALTGR is not generated)');
 	}
+	for (const column of columns.slice(COLUMNS.length))
+		if (keyMapIndex(layout, [...column.mac, 'caps']) !== keyMapIndex(layout, column.mac))
+			throw new Error(
+				`Caps Lock changes the ${column.name} column (a KLC has no Caps Lock attribute for it)`
+			);
 	const keys = [];
 	for (const physical of physicalKeys(keycodeTable, convention)) {
 		const cells = {};
-		for (const column of COLUMNS) {
+		for (const column of columns) {
 			cells[column.name] =
 				column.mac === null
 					? { kind: 'none' }
 					: resolveCell(layout, keyMapIndex(layout, column.mac), physical.mac);
 		}
-		if (COLUMNS.every((column) => cells[column.name].kind === 'none')) continue;
+		if (columns.every((column) => cells[column.name].kind === 'none')) continue;
 		const key = { code: physical.code, scanCode: physical.scanCode, cells, vk: null, attribute: 0 };
 		key.attribute = capsAttribute(layout, physical.mac, cells, physical.code);
 		keys.push(key);
@@ -410,7 +415,7 @@ function buildModel(canonical, keycodeTable, convention) {
 
 	const ligatures = [];
 	for (const key of keys) {
-		COLUMNS.forEach((column, position) => {
+		columns.forEach((column, position) => {
 			const cell = key.cells[column.name];
 			if (cell.kind === 'dead') cell.deadChar = deadCharOf(cell.state);
 			if (cell.kind !== 'text') return;
@@ -445,7 +450,7 @@ function buildModel(canonical, keycodeTable, convention) {
 		dead.entries.push({ base: baseUnit, ...entry });
 	};
 	for (const key of keys) {
-		for (const column of COLUMNS) {
+		for (const column of columns) {
 			const cell = key.cells[column.name];
 			if (cell.kind === 'dead' && !deadKeys.has(cell.state))
 				deadKeys.set(cell.state, {
@@ -458,7 +463,7 @@ function buildModel(canonical, keycodeTable, convention) {
 	}
 	const stateOrder = [...deadKeys.keys()].sort();
 	for (const key of keys) {
-		for (const column of COLUMNS) {
+		for (const column of columns) {
 			const cell = key.cells[column.name];
 			if (!cell.action) continue;
 			const typed =
@@ -501,11 +506,28 @@ function buildModel(canonical, keycodeTable, convention) {
 		}
 	}
 	return {
+		columns,
 		keys,
 		deadKeys: stateOrder.map((state) => deadKeys.get(state)),
 		ligatures,
 		omitted
 	};
+}
+
+/**
+ * The columns of a layout with its extra modifier bits: each bit's own column
+ * and its Shift column after the six standard ones.
+ * @param {{bit: string, shift_state: number}[]} bits - Kana, Roya or Loya.
+ * @returns {object[]} Columns, as COLUMNS.
+ */
+function columnsWith(bits) {
+	const columns = COLUMNS.slice();
+	for (const { bit, shift_state: state } of bits)
+		columns.push(
+			{ name: bit, klc: String(state), mac: [bit] },
+			{ name: `shift_${bit}`, klc: String(state + 1), mac: [bit, 'shift'] }
+		);
+	return columns;
 }
 
 // ===================================
@@ -919,19 +941,26 @@ function renderKlc(model, context) {
 		`VERSION\t${String(meta.version).split('.').slice(0, 2).join('.')}`,
 		'',
 		'SHIFTSTATE',
-		...COLUMNS.map((column) => column.klc),
+		...model.columns.map((column) => column.klc),
 		'',
 		'LAYOUT',
-		`//SC\tVK_\tCap\t${COLUMNS.map((column) => column.klc).join('\t')}`
+		`//SC\tVK_\tCap\t${model.columns.map((column) => column.klc).join('\t')}`
 	];
+	const empty = model.columns.map(() => '-1');
 	for (const key of model.keys) {
 		const sc = key.scanCode.toString(16).padStart(2, '0');
 		const cap = key.attribute === 'CAPLOK' ? '1' : '0';
 		lines.push(
-			[sc, key.vk, cap, ...COLUMNS.map((column) => klcCell(key.cells[column.name]))].join('\t')
+			[sc, key.vk, cap, ...model.columns.map((column) => klcCell(key.cells[column.name]))].join(
+				'\t'
+			)
 		);
 	}
-	lines.push(`53\tDECIMAL\t0\t002e\t002e\t-1\t-1\t-1\t-1`, '');
+	// The key each extra modifier bit is held with types its virtual key (VK_KANA,
+	// VK_OEM_FJ_ROYA, VK_OEM_FJ_LOYA) and no character.
+	for (const bit of context.modifierBits || [])
+		lines.push([hex2(bit.scan_code).toLowerCase(), bit.vk, '0', ...empty].join('\t'));
+	lines.push(['53', 'DECIMAL', '0', '002e', '002e', ...empty.slice(2)].join('\t'), '');
 	if (model.ligatures.length > 0) {
 		lines.push('LIGATURE', '');
 		for (const item of model.ligatures)
@@ -977,7 +1006,9 @@ function renderKlc(model, context) {
 /**
  * Every generated source of one layout.
  * @param {object} canonical - Canonical keylayout.
- * @param {object} context - { meta, spec, keycodes, sourceRel }.
+ * @param {object} context - { meta, spec, keycodes, sourceRel, modifierBits? }. modifierBits:
+ *   the Kana, Roya and Loya bits of layout_composer/target_compiler.js klcPlan, each with
+ *   its key; the KLC then has their columns, and no C sources are written.
  * @returns {{model: object, files: Map<string, string>, klc: string}}
  */
 function generate(canonical, context) {
@@ -987,9 +1018,19 @@ function generate(canonical, context) {
 		);
 	if (!/^[0-9A-F]{4}$/.test(context.spec.language_id))
 		throw new Error(`language_id '${context.spec.language_id}' must be four upper-case hex digits`);
-	const model = buildModel(canonical, context.keycodes, context.meta.keycode_convention);
+	const bits = context.modifierBits || [];
+	const model = buildModel(
+		canonical,
+		context.keycodes,
+		context.meta.keycode_convention,
+		columnsWith(bits)
+	);
 	const name = context.spec.dll_name;
 	const files = new Map();
+	// The C sources hold the six standard columns; a layout with Kana, Roya or Loya
+	// bits gets its DLL from the source (tools/kbd-dll.cjs), not from these.
+	if (bits.length)
+		return { model, files, klc: renderKlc(model, { ...context, fileName: `${name}.klc` }) };
 	files.set(`${name}.c`, renderC(model, { ...context, fileName: `${name}.c` }));
 	files.set(`${name}.h`, renderHeader(model, { ...context, fileName: `${name}.h` }));
 	files.set(`${name}.rc`, renderRc(model, { ...context, fileName: `${name}.rc` }));
@@ -1011,6 +1052,7 @@ function encodeKlc(text) {
 
 module.exports = {
 	COLUMNS,
+	columnsWith,
 	buildModel,
 	generate,
 	encodeKlc,

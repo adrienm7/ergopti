@@ -503,6 +503,20 @@ function M.parse_conversion(text)
 	if not admitted then return nil, "unsupported_keylayout:" .. refusal end
 	local canonical, reason = M.parse(text)
 	if not canonical then return nil, "keylayout_parse:" .. tostring(reason) end
+	return M.admit_canonical(canonical)
+end
+
+--- Rejects unresolved references in a canonical form, read from a file
+--- (M.parse_conversion) or compiled straight from a layout source
+--- (layout_composer/source_compiler.js compileCanonical).
+--- @param canonical table Schema-1 form.
+--- @return table|nil canonical
+--- @return string|nil reason Stable conversion refusal.
+function M.admit_canonical(canonical)
+	if type(canonical) ~= "table" or canonical.schema ~= M.SCHEMA then return nil, "canonical_schema" end
+	for _, field in ipairs({ "selects", "key_map_sets", "actions", "terminators" }) do
+		if type(canonical[field]) ~= "table" then return nil, "canonical_field:" .. field end
+	end
 	local sets, actions = {}, {}
 	for _, set in ipairs(canonical.key_map_sets) do
 		sets[set.id] = {}
@@ -510,6 +524,7 @@ function M.parse_conversion(text)
 	end
 	for _, action in ipairs(canonical.actions) do actions[action.id] = true end
 	local root = sets[canonical.map_set]
+	if not root then return nil, "undefined_keymap_set" end
 	if not root[canonical.default_index] then return nil, "undefined_default_keymap" end
 	for _, select in ipairs(canonical.selects) do
 		if not root[select.index] then return nil, "undefined_selected_keymap:" .. select.index end
