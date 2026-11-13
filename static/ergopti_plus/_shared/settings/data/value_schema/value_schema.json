@@ -1,0 +1,46 @@
+{
+	"_comment": "The one declaration of every user-entered setting value: its file, type, inclusive bounds, whether decimals are allowed (integer refuses them) and its special values. Read by value_check.js (web pages), _shared/settings/engine/value_check.lua (macOS, Linux) and the generated windows/_generated/value_schema.ahk. Values stay in the unit the file stores; entry_scale, entry_type and entry_unit describe the unit a person types (milliseconds typed for seconds stored: entry_scale 1000). Defaults are not repeated here: they stay in the feature manifest and the timing registry, and tools/test/test-value-schema.cjs checks that each default passes its declaration. Layout and rules: docs/design/value-validation-inventory.md.",
+	"version": 1,
+	"settings": {
+		"tap_hold.time_activation_seconds": {
+			"file": "tap_hold.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0.001,
+			"max": 10,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms",
+			"default_from": { "timing": "tap_hold.default_activation_ms", "scale": 0.001 },
+			"max_from": { "timing": "tap_hold.max_activation_ms", "scale": 0.001 }
+		},
+		"tap_hold.keys.*.time_activation_seconds": {
+			"file": "tap_hold.toml",
+			"type": "decimal",
+			"unit": "s",
+			"min": 0.001,
+			"max": 10,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms",
+			"max_from": { "timing": "tap_hold.max_activation_ms", "scale": 0.001 }
+		},
+		"tap_holds.lone_modifier_tap_max_ms": {
+			"file": "config.toml",
+			"type": "integer",
+			"unit": "ms",
+			"min": 0,
+			"max": 10000,
+			"special": [{ "value": 0, "label_key": "value_check.special.off" }],
+			"default_from": { "manifest": "tap_holds.lone_modifier_tap_max_ms" }
+		},
+		"mod_combos.simultaneous_threshold_ms": {
+			"file": "config.toml",
+			"type": "integer",
+			"unit": "ms",
+			"min": 1,
+			"max": 1000,
+			"default_from": { "manifest": "mod_combos.simultaneous_threshold_ms" }
+		}
+	}
+}

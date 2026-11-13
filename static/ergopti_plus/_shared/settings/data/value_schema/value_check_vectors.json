@@ -1,0 +1,474 @@
+{
+	"_comment": "Replayed by value_check.js (tools/test/test-value-schema.cjs), the Lua port (_shared/tests/lua/value_check_contract.lua, run by the macOS and Linux suites) and the AHK port (windows/tests/unit/infra/test_value_check_vectors.ahk). Values JSON cannot spell are strings: \"nan\", \"inf\", \"-inf\". A stored vector checks a loaded value, an entry vector checks typed text. ahk_skip marks a vector the AHK port cannot express.",
+	"declarations": {
+		"timeout_ms": {
+			"type": "integer",
+			"min": 1,
+			"max": 600000,
+			"special": [{ "value": 0, "label_key": "value_check.special.no_time_limit" }]
+		},
+		"debounce_ms": {
+			"type": "integer",
+			"min": 50,
+			"max": 10000,
+			"special": [{ "value": -1, "label_key": "value_check.special.never" }]
+		},
+		"temperature": { "type": "decimal", "min": 0, "max": 2 },
+		"seconds": { "type": "decimal", "min": 0, "max": 60 },
+		"flag": { "type": "boolean" },
+		"level": { "type": "enum", "values": ["off", "action", "auto"] },
+		"tristate": { "type": "enum", "values": ["auto", true, false] },
+		"trigger": { "type": "string", "max_length": 1 },
+		"optional_url": { "type": "string", "allow_empty": true, "max_length": 2048 },
+		"folder": { "type": "path" },
+		"delay_seconds": {
+			"type": "decimal",
+			"unit": "s",
+			"min": 0.001,
+			"max": 10,
+			"entry_scale": 1000,
+			"entry_type": "integer",
+			"entry_unit": "ms"
+		}
+	},
+	"stored": [
+		{ "id": "integer-inside", "declaration": "timeout_ms", "value": 2000, "ok": true },
+		{ "id": "integer-min-boundary", "declaration": "timeout_ms", "value": 1, "ok": true },
+		{ "id": "integer-max-boundary", "declaration": "timeout_ms", "value": 600000, "ok": true },
+		{
+			"id": "integer-above-max",
+			"declaration": "timeout_ms",
+			"value": 600001,
+			"ok": false,
+			"reason": "above_maximum"
+		},
+		{
+			"id": "integer-below-min",
+			"declaration": "timeout_ms",
+			"value": -5,
+			"ok": false,
+			"reason": "below_minimum"
+		},
+		{ "id": "integer-special-zero", "declaration": "timeout_ms", "value": 0, "ok": true },
+		{ "id": "integer-special-below-min", "declaration": "debounce_ms", "value": -1, "ok": true },
+		{
+			"id": "integer-between-special-and-min",
+			"declaration": "debounce_ms",
+			"value": 10,
+			"ok": false,
+			"reason": "below_minimum"
+		},
+		{ "id": "integer-integral-float", "declaration": "timeout_ms", "value": 2000.0, "ok": true },
+		{
+			"id": "integer-fraction",
+			"declaration": "timeout_ms",
+			"value": 1.5,
+			"ok": false,
+			"reason": "not_integer"
+		},
+		{
+			"id": "integer-string",
+			"declaration": "timeout_ms",
+			"value": "2000",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "integer-boolean",
+			"ahk_skip": "AutoHotkey has no boolean type: true is the integer 1",
+			"declaration": "timeout_ms",
+			"value": true,
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "integer-nan",
+			"declaration": "timeout_ms",
+			"value": "nan",
+			"ok": false,
+			"reason": "not_finite"
+		},
+		{
+			"id": "integer-inf",
+			"declaration": "timeout_ms",
+			"value": "inf",
+			"ok": false,
+			"reason": "not_finite"
+		},
+		{ "id": "decimal-inside", "declaration": "temperature", "value": 0.7, "ok": true },
+		{ "id": "decimal-max-boundary", "declaration": "temperature", "value": 2, "ok": true },
+		{
+			"id": "decimal-above-max",
+			"declaration": "temperature",
+			"value": 2.01,
+			"ok": false,
+			"reason": "above_maximum"
+		},
+		{
+			"id": "decimal-below-min",
+			"declaration": "temperature",
+			"value": -0.1,
+			"ok": false,
+			"reason": "below_minimum"
+		},
+		{
+			"id": "decimal-neg-inf",
+			"declaration": "seconds",
+			"value": "-inf",
+			"ok": false,
+			"reason": "not_finite"
+		},
+		{ "id": "boolean-true", "declaration": "flag", "value": true, "ok": true },
+		{
+			"id": "boolean-number",
+			"ahk_skip": "AutoHotkey has no boolean type: true is the integer 1",
+			"declaration": "flag",
+			"value": 1,
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{ "id": "enum-member", "declaration": "level", "value": "auto", "ok": true },
+		{
+			"id": "enum-stranger",
+			"declaration": "level",
+			"value": "always",
+			"ok": false,
+			"reason": "not_allowed"
+		},
+		{
+			"id": "enum-case",
+			"declaration": "level",
+			"value": "Auto",
+			"ok": false,
+			"reason": "not_allowed"
+		},
+		{
+			"id": "enum-number",
+			"declaration": "level",
+			"value": 1,
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "enum-boolean-member",
+			"ahk_skip": "AutoHotkey has no boolean type: true is the integer 1",
+			"declaration": "tristate",
+			"value": false,
+			"ok": true
+		},
+		{ "id": "string-one-char", "declaration": "trigger", "value": "★", "ok": true },
+		{
+			"id": "string-too-long",
+			"declaration": "trigger",
+			"value": "ab",
+			"ok": false,
+			"reason": "too_long"
+		},
+		{
+			"id": "string-empty-refused",
+			"declaration": "trigger",
+			"value": "",
+			"ok": false,
+			"reason": "empty"
+		},
+		{ "id": "string-empty-allowed", "declaration": "optional_url", "value": "", "ok": true },
+		{
+			"id": "string-number",
+			"declaration": "trigger",
+			"value": 5,
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{ "id": "path-plain", "declaration": "folder", "value": "/home/a/Ergopti", "ok": true },
+		{ "id": "path-empty", "declaration": "folder", "value": "", "ok": false, "reason": "empty" }
+	],
+	"entry": [
+		{
+			"id": "entry-integer",
+			"declaration": "timeout_ms",
+			"text": "2000",
+			"ok": true,
+			"value": 2000
+		},
+		{
+			"id": "entry-integer-blanks",
+			"declaration": "timeout_ms",
+			"text": "  350 ",
+			"ok": true,
+			"value": 350
+		},
+		{
+			"id": "entry-integer-plus",
+			"declaration": "timeout_ms",
+			"text": "+350",
+			"ok": true,
+			"value": 350
+		},
+		{
+			"id": "entry-special-zero",
+			"declaration": "timeout_ms",
+			"text": "0",
+			"ok": true,
+			"value": 0
+		},
+		{
+			"id": "entry-integer-max",
+			"declaration": "timeout_ms",
+			"text": "600000",
+			"ok": true,
+			"value": 600000
+		},
+		{
+			"id": "entry-integer-above",
+			"declaration": "timeout_ms",
+			"text": "600001",
+			"ok": false,
+			"reason": "above_maximum"
+		},
+		{
+			"id": "entry-integer-negative",
+			"declaration": "timeout_ms",
+			"text": "-3",
+			"ok": false,
+			"reason": "below_minimum"
+		},
+		{
+			"id": "entry-integer-fraction",
+			"declaration": "timeout_ms",
+			"text": "1.5",
+			"ok": false,
+			"reason": "not_integer"
+		},
+		{
+			"id": "entry-integer-comma-fraction",
+			"declaration": "timeout_ms",
+			"text": "1,5",
+			"ok": false,
+			"reason": "not_integer"
+		},
+		{
+			"id": "entry-integer-letters",
+			"declaration": "timeout_ms",
+			"text": "abc",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-integer-exponent",
+			"declaration": "timeout_ms",
+			"text": "1e3",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-integer-hex",
+			"declaration": "timeout_ms",
+			"text": "0x10",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-integer-nan",
+			"declaration": "timeout_ms",
+			"text": "nan",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-integer-inf",
+			"declaration": "timeout_ms",
+			"text": "inf",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-integer-thousands",
+			"declaration": "timeout_ms",
+			"text": "2 000",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-empty",
+			"declaration": "timeout_ms",
+			"text": "   ",
+			"ok": false,
+			"reason": "empty"
+		},
+		{
+			"id": "entry-special-negative",
+			"declaration": "debounce_ms",
+			"text": "-1",
+			"ok": true,
+			"value": -1
+		},
+		{
+			"id": "entry-decimal-dot",
+			"declaration": "temperature",
+			"text": "0.7",
+			"ok": true,
+			"value": 0.7
+		},
+		{
+			"id": "entry-decimal-comma",
+			"declaration": "temperature",
+			"text": "0,7",
+			"ok": true,
+			"value": 0.7
+		},
+		{
+			"id": "entry-decimal-whole",
+			"declaration": "temperature",
+			"text": "1",
+			"ok": true,
+			"value": 1
+		},
+		{
+			"id": "entry-decimal-above",
+			"declaration": "temperature",
+			"text": "2.5",
+			"ok": false,
+			"reason": "above_maximum"
+		},
+		{
+			"id": "entry-decimal-dangling-dot",
+			"declaration": "temperature",
+			"text": "1.",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{ "id": "entry-boolean", "declaration": "flag", "text": "true", "ok": true, "value": true },
+		{
+			"id": "entry-boolean-word",
+			"declaration": "flag",
+			"text": "yes",
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "entry-enum",
+			"declaration": "level",
+			"text": " action ",
+			"ok": true,
+			"value": "action"
+		},
+		{
+			"id": "entry-enum-stranger",
+			"declaration": "level",
+			"text": "on",
+			"ok": false,
+			"reason": "not_allowed"
+		},
+		{
+			"id": "entry-string-kept-verbatim",
+			"declaration": "optional_url",
+			"text": " https://a ",
+			"ok": true,
+			"value": " https://a "
+		},
+		{
+			"id": "entry-string-too-long",
+			"declaration": "trigger",
+			"text": "jj",
+			"ok": false,
+			"reason": "too_long"
+		},
+		{
+			"id": "entry-scaled-inside",
+			"declaration": "delay_seconds",
+			"text": "200",
+			"ok": true,
+			"value": 0.2
+		},
+		{
+			"id": "entry-scaled-max",
+			"declaration": "delay_seconds",
+			"text": "10000",
+			"ok": true,
+			"value": 10
+		},
+		{
+			"id": "entry-scaled-min",
+			"declaration": "delay_seconds",
+			"text": "1",
+			"ok": true,
+			"value": 0.001
+		},
+		{
+			"id": "entry-scaled-above",
+			"declaration": "delay_seconds",
+			"text": "10001",
+			"ok": false,
+			"reason": "above_maximum",
+			"min": 1,
+			"max": 10000
+		},
+		{
+			"id": "entry-scaled-zero",
+			"declaration": "delay_seconds",
+			"text": "0",
+			"ok": false,
+			"reason": "below_minimum",
+			"min": 1,
+			"max": 10000
+		},
+		{
+			"id": "entry-scaled-fraction",
+			"declaration": "delay_seconds",
+			"text": "1.5",
+			"ok": false,
+			"reason": "not_integer",
+			"min": 1,
+			"max": 10000
+		}
+	],
+	"messages": [
+		{
+			"id": "message-integer-special",
+			"declaration": "timeout_ms",
+			"text": "x",
+			"parts": [
+				{ "key": "dialog.value_check.range_integer", "args": [1, 600000] },
+				{
+					"key": "dialog.value_check.special",
+					"args": [0, { "key": "value_check.special.no_time_limit" }]
+				}
+			]
+		},
+		{
+			"id": "message-decimal",
+			"declaration": "temperature",
+			"text": "3",
+			"parts": [{ "key": "dialog.value_check.range_decimal", "args": [0, 2] }]
+		},
+		{
+			"id": "message-scaled-unit",
+			"declaration": "delay_seconds",
+			"text": "0",
+			"parts": [
+				{
+					"key": "dialog.value_check.range_integer_unit",
+					"args": [1, 10000, { "key": "value_check.unit.ms" }]
+				}
+			]
+		},
+		{
+			"id": "message-too-long",
+			"declaration": "trigger",
+			"text": "jj",
+			"parts": [{ "key": "dialog.value_check.too_long", "args": [1] }]
+		},
+		{
+			"id": "message-not-allowed",
+			"declaration": "level",
+			"text": "on",
+			"parts": [{ "key": "dialog.value_check.not_allowed", "args": [] }]
+		},
+		{
+			"id": "message-empty",
+			"declaration": "folder",
+			"text": "",
+			"parts": [{ "key": "dialog.value_check.empty", "args": [] }]
+		}
+	]
+}

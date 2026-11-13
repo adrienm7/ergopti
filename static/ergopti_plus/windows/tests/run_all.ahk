@@ -205,6 +205,7 @@ global _DefaultLogsDir := _LogsDir
 
 #Include ../infra/window_utils.ahk
 #Include ../infra/external_url_policy.ahk
+#Include ../infra/value_check.ahk
 #Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/text_case.ahk
@@ -628,6 +629,7 @@ InstallSendNoOps()
 #Include unit/infra/i18n/test_locale_probe_is_silent.ahk
 #Include unit/adapters/test_window_utils.ahk
 #Include unit/infra/test_external_url_policy.ahk
+#Include unit/infra/test_value_check_vectors.ahk
 #Include unit/infra/test_text_utils.ahk
 #Include unit/adapters/test_registry.ahk
 #Include unit/modules/hotstrings/personal/test_personal_toml_io.ahk

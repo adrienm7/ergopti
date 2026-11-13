@@ -21,7 +21,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"enabled": { "type": "boolean" },
-				"lone_modifier_tap_max_ms": { "type": "integer", "minimum": 0 },
+				"lone_modifier_tap_max_ms": { "type": "integer", "minimum": 0, "maximum": 10000 },
 				"sticky_timeout_ms": {
 					"description": "How long a one-shot Shift waits for its key, in milliseconds. Absent: the timing registry's tap_hold.one_shot_shift_timeout_ms.",
 					"type": "integer",
@@ -35,7 +35,7 @@
 			"additionalProperties": true,
 			"properties": {
 				"enabled": { "type": "boolean" },
-				"simultaneous_threshold_ms": { "type": "number", "exclusiveMinimum": 0 },
+				"simultaneous_threshold_ms": { "type": "integer", "minimum": 1, "maximum": 1000 },
 				"symmetric": { "type": "boolean" },
 				"config": {
 					"type": "object",
