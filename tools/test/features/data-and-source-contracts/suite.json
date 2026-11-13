@@ -801,6 +801,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-python-anchor.cjs"],
 			"repro": "npm run test:structure-python-anchor"
+		},
+		{
+			"id": "js-0527",
+			"ordinal": 646,
+			"name": "structure plan follows a regex-escaped tool path by its unique tail",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-regex-tail-paths.cjs"],
+			"repro": "npm run test:structure-regex-tail-paths"
 		}
 	]
 }
