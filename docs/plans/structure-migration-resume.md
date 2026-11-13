@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 05:40)
+## Where things stand (2026-11-13, 07:45)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
   dev `520bb24c`, merged in `ee1aa96f`.
@@ -13,17 +13,20 @@ same commit as each step or checkpoint. Times are Paris time.
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
   the verdicts). Any other red on a proof is the steps'.
-- Proof 4 (S01+S02, run 43354609303): 16 red jobs. Fixed since: AHK port
-  coverage table (`4dd77319`), HCW and loader staging (`fb508ac9`),
-  PowerShell `[IO.Path]::Combine` (`49fcf313`). Unexplained so far: Common
-  Ai and network, Linux integration native, macOS Launcher XCTest and Archive
-  update controls.
-- **Proof 5** (S01 `920a42bd` + S02 `39f10697`, from `49fcf313`) on
-  `claude/ergopti-todo-structure-phase2-proof-5`, dispatched at 05:40.
-- Locally (`/home/user/wt-seq`, disposable, built on proof 4): S03 to S27
-  apply and pass the runner's gates; S28 (`keyboard`) needed the data-home
-  rule (`bbacde62`) and the remap banner edits (`01cce82a`) and is re-running
-  toward S38 (log `scratchpad/s28b-run.log`). None of S03+ has a CI run.
+- Proof 5 (S01+S02, run 43366970653): 13 red jobs, 7 of them the steps'.
+  Fixed since: hotstrings tails (`9a4f62ce`, `b5e4b75a`), the PAC paths
+  fixture (`607b4f91`). Common Ai and network fails on
+  `test-managed-ollama-protocol` (CI only: locally it fails on clock controls
+  both before and after). Unexplained: Linux integration native, macOS
+  Launcher XCTest and Archive update controls (logs not read yet; try a long
+  tail of each job).
+- Locally all 38 steps apply (`/home/user/wt-seq`), with these later-step
+  fixes: driver discovery by `_generated` (`426d6432`), the tap-hold writer
+  anchor (`d8eee7ef`), constant concatenation (`9526c0ef`).
+- **Next:** a full S01–S38 proof is being built from the tip in
+  `/home/user/wt-proof` (log `scratchpad/full2-run.log`); push it to
+  `claude/ergopti-todo-structure-phase2-proof-6` and dispatch `ci.yml`
+  (`os_lanes=all`), then fix per step.
 - S02 (`core/crypto`) needed: derived pins found where S01 left them
   (`a4d8fcd6`, `4c145c12`), the committed step numbers kept (`4e04dd96`), the
   folder gain rule (`ffe92aff`, `1e98ba49`), one adapter path table
