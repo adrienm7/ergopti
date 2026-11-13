@@ -1,5 +1,5 @@
 ﻿; _generated/logger_sub_files.ahk
-; AUTO-GENERATED from _shared/modules/logger/sub_files.toml.
+; AUTO-GENERATED from _shared/core/logger/data/sub_files.toml.
 ; DO NOT EDIT BY HAND — run `npm run codegen:logger-sub-files` to refresh.
 #Requires AutoHotkey v2.0
 

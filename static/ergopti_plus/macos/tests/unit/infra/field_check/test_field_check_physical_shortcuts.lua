@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Check = require("infra.field_check_physical_shortcuts")
 
 --- Runs the check over canned facts.

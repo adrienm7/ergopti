@@ -12,10 +12,10 @@ local Fixture = require("tests.support.modules.keystats.aggregation.aggregate_wa
 
 local file = assert(io.open(assert(require("infra.paths").shared(
 	"tests/corpus/keystats/correction_erased_vectors.json")), "rb"))
-local data = require("json").decode(assert(file:read("*a")))
+local data = require("core.text.engine.json").decode(assert(file:read("*a")))
 assert(file:close())
 
-require("test.keystats_correction_erased_contract")(Fixture.helpers, data, function(vec)
+require("tests.lua.metrics.correction_erased_contract")(Fixture.helpers, data, function(vec)
 	local batch, ctx = nil, {}
 	for _, flush in ipairs(vec.flushes) do
 		local events = {}

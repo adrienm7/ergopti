@@ -95,7 +95,7 @@ helpers.describe("detached recommendation source admission", function()
 	end
 
 	local neutral = "# exact admitted neutral source\n[custom]\nkeep = 19\n[karabiner]\nintegration_enabled = false\n"
-	-- The shared tap_hold.toml layout (_shared/tap_hold/SCHEMA.md).
+	-- The shared tap_hold.toml layout (_shared/tap_hold/data/SCHEMA.md).
 	local personalized = neutral .. '[tap_hold.keys.left_shift]\ntap_action = "paste"\n'
 
 	--- Intercepts the actual loader's completed single read, forwarding its exact
@@ -125,7 +125,7 @@ helpers.describe("detached recommendation source admission", function()
 					if not absent then seed(path, neutral) end
 					helpers.assert_eq(remap.save_recommended_keys(request), false, "neutral source A cannot authorize overwriting personalized source B")
 					helpers.assert_eq(fs.read_with_status(path), personalized)
-					helpers.assert_eq(require("toml_codec").decode(fs.read_with_status(path)).tap_hold.keys.left_shift.tap_action, "paste")
+					helpers.assert_eq(require("core.text.engine.toml_codec").decode(fs.read_with_status(path)).tap_hold.keys.left_shift.tap_action, "paste")
 					local _, backup_status = fs.read_with_status(request.backup_path)
 					helpers.assert_eq(backup_status, "absent", "a personalized successor is never backed up as recommendation authority")
 					helpers.assert_eq(control.writes, 0)
@@ -179,9 +179,9 @@ helpers.describe("detached recommendation source admission", function()
 			with_recommendation(nil, function(remap, _, fs, control, seed, path, _, request)
 				if not absent then seed(path, neutral) end
 				helpers.assert_eq(remap.save_recommended_keys(request), true)
-				local model = require("toml_codec").decode(fs.read_with_status(path))
+				local model = require("core.text.engine.toml_codec").decode(fs.read_with_status(path))
 				helpers.assert_eq(model.tap_hold.keys.left_shift.tap_action, "escape")
-				local rows = require("toml_codec").decode(fs.read_with_status(path:match("^(.*)/") .. "/config.toml"))
+				local rows = require("core.text.engine.toml_codec").decode(fs.read_with_status(path:match("^(.*)/") .. "/config.toml"))
 				helpers.assert_eq(rows.tap_holds.enabled, true, "the switch is the config.toml row")
 				helpers.assert_nil(model.tap_hold.enabled)
 				if not absent then
@@ -215,7 +215,7 @@ helpers.describe("detached recommendation source admission", function()
 				return state, status
 			end
 			helpers.assert_eq(remap.save_recommended_keys(request), true)
-			helpers.assert_eq(require("toml_codec").decode(fs.read_with_status(path)).tap_hold.keys.left_shift.tap_action, "escape")
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(fs.read_with_status(path)).tap_hold.keys.left_shift.tap_action, "escape")
 		end)
 	end)
 end)

@@ -43,7 +43,7 @@ const { namesCommandConstant } = require('../lib/menu-command-constant.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
 const RESTORE_KEY = 'common.restore_recommended';
 const CLEAR_KEY = 'common.clear_to_system';
 
@@ -330,7 +330,7 @@ for (const driver of DRIVERS) {
 		);
 }
 let sharedLua = 0;
-for (const file of sourceFiles(path.join(SP, '_shared', 'lua'), '.lua')) {
+for (const file of sourceFiles(path.join(SP, '_shared'), '.lua')) {
 	const rel = path.relative(SP, file).split(path.sep).join('/');
 	sharedLua += checkQuestions(rel, stripComments(fs.readFileSync(file, 'utf8'), '.lua'), '.lua');
 }

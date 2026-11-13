@@ -4,7 +4,7 @@
 --- MODULE: Space navigation replays the shared desktop vectors (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/desktop_navigation/vectors.json, which the Linux
---- and Windows suites replay too, through _shared/lua/desktop_navigation, the
+--- and Windows suites replay too, through _shared/keyboard/engine, the
 --- index maths the space_prev_wrap / space_next_wrap actions use.
 ---
 --- ROOT CAUSE ENCODED:
@@ -15,6 +15,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-require("test.desktop_navigation_contract")(helpers, json, helpers.shared(""))
+require("tests.lua.core.desktop_navigation_contract")(helpers, json, helpers.shared(""))

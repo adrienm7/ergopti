@@ -10,9 +10,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ParentSource = require("menu.frames.parent_source")
-local COMMAND = require("config_keys").COMMAND
+local Logger = require("core.logger.engine.shim")
+local ParentSource = require("menu.engine.frames.parent_source")
+local COMMAND = require("settings.engine.keys").COMMAND
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -75,23 +75,23 @@ local function _build_debug(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").LEAF.LOG_LEVEL]      = ctx.on_set_log_level,
-		[require("config_keys").COMMAND.OPEN_LOGS]      = call_ctx("on_open_logs"),
-		[require("config_keys").COMMAND.OPEN_TODAY_LOG] = call_ctx("on_open_today_log"),
-		[require("config_keys").COMMAND.OPEN_ERROR_LOG] = call_ctx("on_open_error_log"),
+		[require("settings.engine.keys").LEAF.LOG_LEVEL]      = ctx.on_set_log_level,
+		[require("settings.engine.keys").COMMAND.OPEN_LOGS]      = call_ctx("on_open_logs"),
+		[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = call_ctx("on_open_today_log"),
+		[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = call_ctx("on_open_error_log"),
 		["healthcheck"]    = call_ctx("on_healthcheck"),
 		[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check"),
 		-- Self-contained like the report rows: the check reads its own settings and ports
 		[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check.network_check").run() end,
 		-- Self-contained: the report reads the daemon state the webview manager
 		-- already holds, so the daemon supplies no callback for them
-		[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug() end,
-		[require("config_keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
-		[require("config_keys").LEAF.SHOW_ERROR_DIALOG] = call_ctx("on_toggle_error_dialog"),
+		[require("settings.engine.keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug() end,
+		[require("settings.engine.keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+		[require("settings.engine.keys").LEAF.SHOW_ERROR_DIALOG] = call_ctx("on_toggle_error_dialog"),
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return ctx.log_level end
+	render_ctx.state_getters[require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL] = function() return ctx.log_level end
 	render_ctx.state_getters["error_dialog_enabled"] = function()
 		return require("ui.error_dialog.bridge").is_enabled()
 	end

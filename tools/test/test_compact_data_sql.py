@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "tools" / "compact_data_sql.py"
-SCHEMA = ROOT / "static" / "ergopti_plus" / "_shared" / "data" / "db" / "schema.sql"
+SCHEMA = ROOT / "static" / "ergopti_plus" / "_shared" / "metrics" / "data" / "db" / "schema.sql"
 SPEC = importlib.util.spec_from_file_location("compact_data_sql_owner", TOOL)
 OWNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(OWNER)

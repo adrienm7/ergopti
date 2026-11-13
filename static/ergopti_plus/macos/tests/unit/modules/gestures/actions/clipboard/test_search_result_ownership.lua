@@ -10,11 +10,11 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.gesture_actions_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function it(name, scenario)
 	helpers.it(name, function()
-		helpers.with_stub_scope({ "adapters.window_manager", "native_app_switcher_owner", "adapters.clipboard" }, function()
+		helpers.with_stub_scope({ "adapters.window_manager", "core.ui.engine.native_app_switcher_owner", "adapters.clipboard" }, function()
 			Fixture.with_fixture(function(fresh)
 				local actions, calls = fresh()
 				local f = { restores = 0 }
@@ -273,7 +273,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 	end)
 	it("uses native-shaped generations for the legacy fixture's private clipboard", function()
 		-- The fixture's own board remains coherent for existing search scenarios.
-		helpers.with_stub_scope({ "adapters.window_manager", "native_app_switcher_owner" }, function()
+		helpers.with_stub_scope({ "adapters.window_manager", "core.ui.engine.native_app_switcher_owner" }, function()
 			Fixture.with_fixture(function(fresh)
 				local actions, calls = fresh()
 				local board = calls.hs.pasteboard

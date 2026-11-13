@@ -36,7 +36,7 @@ _EKT_Bundled(Id) => LayoutRegistry_ReadBundled(Id, LayoutRegistry_BundledDir())
 
 _EKT_KeyCodes() => KeylayoutEmulation_KeyCodes(LayoutRegistry_Keycodes(), "iso")
 
-_EKT_WrapPairs() => ErgoptiLayout_ReadWrapPairs(_SharedDir . "\modules\wrap_symbols\wrap_symbols.json")
+_EKT_WrapPairs() => ErgoptiLayout_ReadWrapPairs(_SharedDir . "\keyboard\data\wrap_symbols\wrap_symbols.json")
 
 _EKT_Spec(ErgoptiText := "", PlusText := "") {
 	if (ErgoptiText == "")

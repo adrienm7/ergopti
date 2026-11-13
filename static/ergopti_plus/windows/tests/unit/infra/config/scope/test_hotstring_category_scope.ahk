@@ -546,7 +546,7 @@ _HSCS_DefaultMenuTargetsAreIndependent() {
 Test("hotstring-personal-menu: default rendering creates independent native menus", _HSCS_DefaultMenuTargetsAreIndependent)
 
 
-#Include %A_LineFile%\..\..\..\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+#Include %A_LineFile%\..\..\..\..\..\..\..\_shared\hotstrings\data\catalogue\personal_scope.ahk
 
 
 ; Cross-driver order vectors execute the native policy, not a source scan.
@@ -592,7 +592,7 @@ _HSCS_OrderCategoryVectors() {
 }
 
 _HSCS_OrderCategoryVector(Vector) {
-	Wanted := "\modules\hotstrings\" . (Vector["folder"] != "" ? Vector["folder"] . "\" : "") . Vector["stem"] . ".toml"
+	Wanted := "\hotstrings\data\catalogue\" . (Vector["folder"] != "" ? Vector["folder"] . "\" : "") . Vector["stem"] . ".toml"
 	Matches := []
 	for Name in _HSCS_OrderMenuCategories() {
 		Path := _HotstringsPhysicalBundledTomlPath(Name)

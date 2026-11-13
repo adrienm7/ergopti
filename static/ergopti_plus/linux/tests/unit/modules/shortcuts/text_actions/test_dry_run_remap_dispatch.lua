@@ -33,7 +33,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	for name in pairs(saved) do
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
+			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "core.logger.engine.shim" then package.loaded[name] = nil end
 	end
 	local config_path, tap_path = os.tmpname(), os.tmpname()
 	local injector, manager
@@ -84,10 +84,10 @@ local function with_remap(route, dry, action, hold, body, revoke)
 			require("tests.support.input_owner_fixture").with_session({ public_chords = true, source_ids = { "a" }, keys = {}, capture = capture }, function(session)
 				assert(session.hook.set_remapper(nil))
 				local world = { reads = 0, writes = 0, lifecycle = 0, resets = 0, errors = {} }
-				local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+				local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 				logger.set_sink(function() end)
 				logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
-				package.loaded["logger.shim"], environment.Logger = logger, logger
+				package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger
 				local pending, clipboard = nil, "ok"
 				package.loaded["adapters.shell_runner"] = {
 					has_command = function() return true end,

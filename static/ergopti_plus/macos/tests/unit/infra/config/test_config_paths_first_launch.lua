@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MANAGED_FILE = "/Users/test/" .. AppDirs.config.macos_paths_file
 local MANAGED_DIR = MANAGED_FILE:match("^(.*)/[^/]+$")

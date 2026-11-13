@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shared Manifest Reader Tests (macOS)
 --- DESCRIPTION:
---- Pins the shared manifest reader (_shared/lua/manifest_reader.lua) that
+--- Pins the shared manifest reader (_shared/menu/engine/manifest_reader_core.lua) that
 --- infra/manifest_reader.lua binds: a missing or malformed generated manifest
 --- raises, the platform hooks run before a value that includes their default
 --- and never for declaration metadata, the absences split by whether they say
@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Reader = require("manifest_reader")
+local Reader = require("menu.engine.manifest_reader_core")
 
 local function silent_logger()
 	return { done = function() end }

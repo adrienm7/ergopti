@@ -10,11 +10,11 @@
 
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
-local Codec = require("toml_codec")
-local Outdated = require("config_outdated")
-local Logger = require("logger.shim")
-local LayerPreset = require("keymap.layer_preset")
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local Codec = require("core.text.engine.toml_codec")
+local Outdated = require("settings.engine.migration.outdated")
+local Logger = require("core.logger.engine.shim")
+local LayerPreset = require("layouts.engine.layers.preset")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 local FUTURE = '\n[future]\nnote = "kept"\n'
 local CASES = {
 	{ name = "scalar root", text = 'tap_hold = "opaque"\n', path = "tap_hold" },
@@ -63,7 +63,7 @@ local function with_writer(text, body)
 		end,
 		is_tap_action = function(id) return id == "copy" or id == "paste" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 		layers = { shared_root = require("infra.paths").shared_root(), config_dir = dir },
 	})

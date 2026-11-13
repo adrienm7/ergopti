@@ -22,7 +22,7 @@ end)()
 local Import = require("modules.keystats.ledger_import")
 local Rebuild = require("modules.keystats.ledger_rebuild")
 local Digest = require("infra.openssl_digest")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
 local FOREIGN = "0b6f4c1e-3a2d-4f5b-9c8e-1d2e3f4a5b6c"
 local LOCAL = "linux-import-host"
@@ -33,14 +33,14 @@ local function temp_dir()
 end
 
 local function shared_sql(name)
-	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/db/" .. name, "rb"))
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/metrics/data/db/" .. name, "rb"))
 	local text = handle:read("*a")
 	handle:close()
 	return text
 end
 
 local function schema_sql()
-	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/db/schema.sql", "rb"))
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/metrics/data/db/schema.sql", "rb"))
 	local text = handle:read("*a")
 	handle:close()
 	return text
@@ -165,13 +165,13 @@ helpers.describe("Linux foreign metrics ledger import", function()
 	end)
 
 	-- Every driver writes a CR or a NUL in text as a char() concatenation
-	-- (_shared/lua/sqlite/literal.lua, Windows SQLite_Q). The importer read only
+	-- (_shared/core/fs/engine/sqlite/literal.lua, Windows SQLite_Q). The importer read only
 	-- plain literals, refused such a statement and retried the same batch on
 	-- every tick: that device's ledger was stuck for good (KML-001,
 	-- linux-import-control-bytes).
 	it("linux-import-control-bytes: a CR or NUL written as char() passes, as its exact bytes", function()
 		local columns = Import.raw_columns(schema_sql())
-		local Literal = require("sqlite.literal")
+		local Literal = require("core.fs.engine.sqlite.literal")
 		local row = "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json) VALUES ('d', %d, "
 			.. "'%s', '2026-11-05', 'k', '', NULL);\n"
 		local text = "BEGIN TRANSACTION;\n" .. string.format(row, 1, Literal.escape("l1\r\nl2"))
@@ -299,7 +299,7 @@ helpers.describe("Linux foreign metrics ledger import", function()
 	end)
 
 	it("linux-import-utc-offset: an older Linux row is read with this device's offset, an older macOS row as local", function()
-		local LocalTime = require("keystats.local_time")
+		local LocalTime = require("metrics.engine.local_time")
 		local linux = fixture({ os = "linux" })
 		write(linux.ledger, HEADER .. batch(offset_typing(1, "2026-11-05 09:15:00", "2026-11-05", nil)))
 		drain(linux)

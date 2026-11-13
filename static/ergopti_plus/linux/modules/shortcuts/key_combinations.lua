@@ -2,17 +2,17 @@
 
 --- Canonical config-backed ordered pairs. Runtime selection and publication
 --- retain separate exact leases; unknown/future pairs are never rewritten here.
-local Shared = require("tap_hold.key_combinations")
-local TableUtil = require("table_util")
-local Codec = require("toml_codec")
+local Shared = require("tap_hold.engine.key_combinations")
+local TableUtil = require("core.text.engine.table_util")
+local Codec = require("core.text.engine.toml_codec")
 local Files = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
-local Logger = require("logger.shim")
-local HoldOptions = require("tap_hold.hold_options")
+local Logger = require("core.logger.engine.shim")
+local HoldOptions = require("tap_hold.engine.hold_options")
 local Features = require("infra.manifest_reader")
-local ModuleSource = require("module_source_identity")
-local ModuleDirectory = require("module_source_directory")
-local ConfigKeys = require("config_keys")
+local ModuleSource = require("core.fs.engine.module_source_identity")
+local ModuleDirectory = require("core.fs.engine.module_source_directory")
+local ConfigKeys = require("settings.engine.keys")
 local Timings = require("infra.timings")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
@@ -63,7 +63,7 @@ function M.new(options)
 	local route = options.route or function() return ConfigPaths.config("config.toml") end
 	local key_ids, known, holds = {}, {}, { none = true }
 	local pair = Shared.pair
-	local original_policy = rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+	local original_policy = rawequal(rawget(package.loaded, "tap_hold.engine.key_combinations"), Shared)
 		and getmetatable(Shared) == nil and pair == original_pair
 		and rawget(Shared, "PAIR_SEPARATOR") == original_pair_separator
 	for _, key in ipairs(options.keys) do
@@ -442,7 +442,7 @@ function M.instance_is_current(owner, keys)
 	local receipt = type(owner) == "table" and identity_receipts[owner] or nil
 	if not rawequal(instance, owner) or receipt == nil or type(keys) ~= "table" or getmetatable(keys) ~= nil
 		or receipt.original_policy ~= true
-		or not rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+		or not rawequal(rawget(package.loaded, "tap_hold.engine.key_combinations"), Shared)
 		or getmetatable(Shared) ~= nil or rawget(Shared, "pair") ~= original_pair
 		or rawget(Shared, "PAIR_SEPARATOR") ~= original_pair_separator then return false end
 	local ids, count = {}, 0

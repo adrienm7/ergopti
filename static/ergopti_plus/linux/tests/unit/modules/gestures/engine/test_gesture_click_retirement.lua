@@ -1,7 +1,7 @@
 --- tests/unit/modules/gestures/engine/test_gesture_click_retirement.lua
 
 --- Real manager/lifecycle with explicit native process admission and settlement.
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 local function with_manager(body)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
@@ -14,8 +14,8 @@ local function with_manager(body)
 		return true
 	end
 	local ok, err = pcall(function()
-		local logger = dofile(helpers.driver_root() .. "/../_shared/lua/logger/init.lua")
-		package.loaded["logger.shim"] = logger
+		local logger = dofile(helpers.driver_root() .. "/../_shared/core/logger/engine/init.lua")
+		package.loaded["core.logger.engine.shim"] = logger
 		state.logger, state.diagnostics, state.errors = logger, {}, 0
 		logger.clock_fn = function() return state.time / 1000 end
 		logger.set_sink(function(line, variant)
@@ -352,7 +352,7 @@ helpers.describe("gesture click retirement", function()
 				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
-				local writer, write = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+				local writer, write = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").batch_write
 				writer.batch_write = function(...)
 					if publish then helpers.assert_true(write(...)) end
 					error("controlled writer exception")
@@ -384,7 +384,7 @@ helpers.describe("gesture click retirement", function()
 				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
-				local writer = require("toml_codec.writer"); local write, read = writer.batch_write, writer.read_classified
+				local writer = require("core.text.engine.toml_codec.writer"); local write, read = writer.batch_write, writer.read_classified
 				writer.batch_write = function()
 					if mode == "foreign" then local x = assert(io.open(path, "wb")); assert(x:write('[gestures]\nenabled = true\n# foreign\n')); assert(x:close())
 					else writer.read_classified = function() return nil, "error" end end
@@ -447,7 +447,7 @@ helpers.describe("gesture click retirement", function()
 			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end, drain = function() return 0, "would_block" end }
 			helpers.assert_true(manager.enable())
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
-			local writer, publish = require("toml_codec.writer"), require("toml_codec.writer").publish_if_unchanged
+			local writer, publish = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").publish_if_unchanged
 			local reentered = false
 			writer.publish_if_unchanged = function(...)
 				if not reentered then
@@ -478,14 +478,14 @@ helpers.describe("gesture click retirement", function()
 			helpers.assert_true(manager.enable()); helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 			local scope = require("infra.gesture_scope").new({ path = path, backup_path = backup, gestures = manager })
-			local participant = require("config_scope_participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
+			local participant = require("settings.engine.scope.participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
 			local releases, reversions = 0, 0
 			local other = { pending = function() return false end, apply = function(_, done) done(true) end,
 				revert = function(done) reversions = reversions + 1; done(true) end,
 				release = function() releases = releases + 1; return releases > 1 end,
 				retry_restore = function(done) done(true) end }
 			local logger = { start = function() end, success = function() end, info = function() end, warn = function() end, error = function() end }
-			local composed = require("config_scope_composition").new({ scope = "all", logger = logger,
+			local composed = require("settings.engine.scope.composition").new({ scope = "all", logger = logger,
 				manifest = { scopes = function() return { all = { includes = { "gestures", "other" } }, gestures = {}, other = {} } end },
 				participants = function() return { gestures = participant, other = other } end })
 			local ok, detail = xpcall(function()
@@ -515,7 +515,7 @@ helpers.describe("gesture click retirement", function()
 				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 				local scope = require("infra.gesture_scope").new({ path = path, backup_path = backup, gestures = manager })
-				local participant = require("config_scope_participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
+				local participant = require("settings.engine.scope.participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
 				local reached = false
 				local other = { pending = function() return false end, apply = function(_, done)
 						reached = true
@@ -524,7 +524,7 @@ helpers.describe("gesture click retirement", function()
 					end,
 					revert = function(done) done(true) end, release = function() end, retry_restore = function(done) done(true) end }
 				local logger = { start = function() end, success = function() end, info = function() end, warn = function() end, error = function() end }
-				local composed = require("config_scope_composition").new({ scope = "all", logger = logger,
+				local composed = require("settings.engine.scope.composition").new({ scope = "all", logger = logger,
 					manifest = { scopes = function() return { all = { includes = { "gestures", "other" } }, gestures = {}, other = {} } end },
 					participants = function() return { gestures = participant, other = other } end })
 				local ok, detail = xpcall(function()
@@ -548,7 +548,7 @@ helpers.describe("gesture click retirement", function()
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 				local path = os.tmpname(); local backup = path .. ".backup"
 				local file = assert(io.open(path, "w")); file:write('[gestures]\nswipe_3_left = "left_click_toggle"\n'); file:close()
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local files = {
 					read_with_status = function(target) return Writer.read_classified(target) end,
 					write = function() error("unconditional publication is forbidden") end,

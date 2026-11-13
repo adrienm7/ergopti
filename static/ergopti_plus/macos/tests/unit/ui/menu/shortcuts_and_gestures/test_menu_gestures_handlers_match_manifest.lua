@@ -117,7 +117,7 @@ end)
 -- Independent mode expectations predate this presentation migration. Drive the
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
-	"json", "menu.renderer", "infra.manifest_menu", "infra.i18n", "infra.logger",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "infra.i18n", "infra.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
 }
@@ -125,23 +125,23 @@ local function mode_json(path)
 	local file = assert(io.open(path, "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return require("json").decode(bytes)
+	return require("core.text.engine.json").decode(bytes)
 end
 local function with_mode_fixture(options, callback)
 	return helpers.with_fresh_modules(mode_fixture_modules, function()
 		options = options or {}
 		local corpus = mode_json(helpers.shared("tests/corpus/menus/gesture_slot_modes.json"))
 		local locale = options.locale or "en"
-		local strings = mode_json(helpers.shared("data/locales/" .. locale .. ".json"))
+		local strings = mode_json(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"))
 		local i18n = {
 			get = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end,
 		}
 		local logger = helpers.make_logger_stub()
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = options.platform or "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode, i18n = i18n, logger = logger,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = logger,
 		}))
 		local root = renderer.get_root()
 		root.gesture_slots = { ["2"] = { "swipe_2_left" }, ["3"] = {}, ["4"] = {}, ["5"] = {} }
@@ -415,7 +415,7 @@ local function with_gesture_controls(options, callback)
 	options = options or {}
 	return with_mode_fixture({ locale = options.locale, platform = options.platform, mode = "incremental" }, function(f)
 		local controls = mode_json(helpers.shared("tests/corpus/menus/gesture_slot_controls.json"))
-		local labels = require("menu.labels")
+		local labels = require("menu.engine.labels")
 		package.loaded["infra.i18n"].section = function(key)
 			return labels.decorate_section(f.strings[key] or key)
 		end
@@ -466,7 +466,7 @@ local function with_gesture_controls(options, callback)
 		function f.control_slot()
 			local item = f.control_build()
 			local slot = f.root.gesture_slots["2"][1]
-			local prefix = require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot, "")
+			local prefix = require("core.i18n.engine.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot, "")
 			for _, row in ipairs(item.submenu) do
 				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return row end
 			end

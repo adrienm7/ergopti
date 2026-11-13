@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
-local CategoryStore = require("keystats.app_category_store")
+local CategoryStore = require("metrics.engine.apps.category_store")
 local CATEGORY_OWNERS = {
 	"hs",
 	"tests.stubs.hs",
@@ -27,7 +27,7 @@ local CATEGORY_OWNERS = {
 	"adapters.webview_result",
 	"adapters.running_application",
 	"adapters.own_window",
-	"native_path",
+	"core.fs.engine.native_path",
 }
 
 -- The driver folder of an installed app is inside its read-only bundle, and
@@ -377,7 +377,7 @@ helpers.describe("metrics_apps categories: failed publication exposes no candida
 		with_category_store({ initial = flat }, function(metrics, state, callbacks, _logs)
 			attempt_edit(metrics, callbacks)
 			helpers.assert_eq(state.writes, 1)
-			local saved = assert(CategoryStore.decode(state.target, require("json").decode))
+			local saved = assert(CategoryStore.decode(state.target, require("core.text.engine.json").decode))
 			helpers.assert_eq(saved.legacy, false, "the file is rewritten in the shared versioned layout")
 			helpers.assert_eq(saved.apps, {
 				Example = { type = "New", score = 1 },

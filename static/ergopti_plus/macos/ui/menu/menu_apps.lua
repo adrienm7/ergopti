@@ -22,7 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
@@ -367,8 +367,8 @@ function M.build(ctx)
 				-- Resolve the shared locales directory through the single shared-tree
 				-- resolver (Paths.shared). AppleScript apps read this to load UI strings
 				-- for any locale without hardcoding translations; adding a new locale to
-				-- _shared/data/locales/ automatically works in the apps.
-				local locales_dir = Paths.shared("data/locales") or ""
+				-- _shared/core/i18n/data/locales/ automatically works in the apps.
+				local locales_dir = Paths.shared("core/i18n/data/locales") or ""
 				-- Launch the .app bundle via `open --env` so the locale variables
 				-- are injected directly into the launched app's environment.
 				-- `setEnvironment` on the `open` process itself does not propagate

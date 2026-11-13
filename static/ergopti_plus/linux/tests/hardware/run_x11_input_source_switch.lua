@@ -1,8 +1,8 @@
 --- tests/hardware/run_x11_input_source_switch.lua
 --- Real Xvfb regression: a successful switch must activate the selected group.
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local helpers = require("tests.helpers")
-package.loaded["logger.shim"] = helpers.make_logger_stub()
+package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 local uv, ffi = require("luv"), require("ffi")
 assert(require("infra.paths").driver_root():find("[;?]"), "test driver must retain its literal delimiter")
 ffi.cdef[[

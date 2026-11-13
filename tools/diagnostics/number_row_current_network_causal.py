@@ -13,14 +13,14 @@ COMPANION_PATH = "tools/diagnostics/number_row_current_network_causal.py"
 CORE_PATH = "tools/diagnostics/number_row_native_causal.py"
 POSITIVE_PATH = "tools/diagnostics/keyboard_geometry_xctest_receipt.py"
 FIXED_SOURCE_PINS = {
-    CORE_PATH: "d913505e2d3522d5023227b947f3c7896ba3ef4aeadfbd0c1a7042fa9686c148",
+    CORE_PATH: "5f5ee81e905a065d29a4879666a9cc64b9a4fa9da1f17f778a4ae7bcc8f03459",
     POSITIVE_PATH: "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
-    "tools/diagnostics/generate_number_row_source_composition.py": "8478aca8584e3da947f1e2c3b0f894874cce77aa97022be7832cb40d4182644c",
-    "tools/diagnostics/prepare_number_row_native_causal.py": "9203a7f77e0ed607557283b8ff27355ad871d99e58229e018c213d7653e79139",
-    "tools/diagnostics/test_number_row_native_causal.py": "f058b0937e278229f2b348d07c65c8e73c575dbb12cbbde53713ab91d3df9ca2",
-    "tools/diagnostics/test_number_row_source_composition.py": "0981b0f400596680b19215ffcd2ecef20346dca8bfeae8c46a46f0a7ad68e7f1",
+    "tools/diagnostics/generate_number_row_source_composition.py": "319e327902f0f0f5664bbb7ee7c8c8159c9f4cf602715feb2a2b7e0be02d8f11",
+    "tools/diagnostics/prepare_number_row_native_causal.py": "562d1caf2707085bbff7f986b120c1af88ac0f7bf0c1bcc258e84d0f03d96a42",
+    "tools/diagnostics/test_number_row_native_causal.py": "7ed72b7951cd4e1145ccc195f47f65c27376aa60ebad9d40af31edd7fda9f0e7",
+    "tools/diagnostics/test_number_row_source_composition.py": "45bf80e3cdad217f19ba80b8e22b81ffa7ddbecb3f8ab6415abd6982bc56d58c",
     "tools/diagnostics/tis_evidence_transport.cjs": "f62344840267ab207370df974cc344fce83cbe3b758f2a25c986837a41d04269",
-    "tools/diagnostics/fixtures/number-row-native-causal/projection-manifest.original-c15.json.raw": "77118a5238f504b1475988957843427f61aaaa798ab9f972e812205a2fb5b7ba",
+    "tools/diagnostics/fixtures/number-row-native-causal/projection-manifest.original-c15.json.raw": "14c30e31904ff85dbe4fa749b38d7a074f9df8e06942ca69b9648eb4519b2e58",
     "tools/diagnostics/fixtures/number-row-native-causal/g5-source-approvals.json.raw": "47b2dc03e558db6418234ab6c69a279cc91fd9c29bc587505e13ea0989764549",
 }
 

@@ -52,7 +52,7 @@ const DRIVERS_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus');
 
 /** Spec sources. Both moved under _shared/core/ in the same reorg. */
 const PORTS_DIR = path.join(DRIVERS_DIR, '_shared', 'core', 'ports');
-const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'core', 'domain');
+const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'core', 'text', 'data', 'domain');
 
 /** Sub-directories every driver is expected to contain (canonical mirror layout:
  *  see the driver READMEs and docs/memory). */
@@ -376,7 +376,7 @@ Done. Next steps:
   [ ] Implement each adapter stub in static/ergopti_plus/${driverName}/adapters/
       (${ports.length} files — one per port contract in _shared/core/ports/)
 
-  [ ] Satisfy the domain specs listed in static/ergopti_plus/_shared/core/domain/
+  [ ] Satisfy the domain specs listed in static/ergopti_plus/_shared/core/text/data/domain/
       (${domains.length} specs: ${domains.join(', ')})
 
   [ ] Add driver entry-point under static/ergopti_plus/${driverName}/

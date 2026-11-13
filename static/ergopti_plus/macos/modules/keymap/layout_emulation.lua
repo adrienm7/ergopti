@@ -8,7 +8,7 @@
 --- Windows driver does: the user keeps ABC, French or any other system layout,
 --- and each physical key-down the keymap tap sees is rewritten to what the
 --- emulated .keylayout types there. The decisions are the shared engine's
---- (_shared/lua/layouts/keylayout_emulation.lua), so the three drivers type
+--- (_shared/layouts/engine/composer/keylayout_emulation.lua), so the three drivers type
 --- the same text for the same physical keys.
 ---
 --- FEATURES & RATIONALE:
@@ -31,7 +31,7 @@
 ---    sees the keys, so the system layout types there.
 --- 6. A layout source's records no .keylayout holds (custom modifiers, tap-holds,
 ---    shortcuts sending another key, key chords, system-key remaps) come first,
----    from the composed layout's emulation table (layouts/source_emulation.lua).
+---    from the composed layout's emulation table (layouts/engine/composer/source_emulation.lua).
 ---    One output rides the event itself (its text, or its key code and flags,
 ---    the key-up rewritten alike); several are posted after the callback in
 ---    physical order (defer_consumed_input_action). A built-in modifier a
@@ -39,9 +39,9 @@
 ---    a mouse click.
 --- ==============================================================================
 
-local Emulation = require("layouts.keylayout_emulation")
-local SourceEmulation = require("layouts.source_emulation")
-local Settings = require("layouts.emulation_settings")
+local Emulation = require("layouts.engine.composer.keylayout_emulation")
+local SourceEmulation = require("layouts.engine.composer.source_emulation")
+local Settings = require("layouts.engine.emulation.settings")
 local Logger = require("infra.logger")
 
 local M = {}
@@ -138,7 +138,7 @@ function M.reload()
 	local extras = nil
 	local ok, built = pcall(function()
 		local model = Emulation.load(source.text, _deps.keycodes(), source.convention, { composer = source.composer })
-		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry(), require("json").is_null))
+		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry(), require("core.text.engine.json").is_null))
 		Emulation.configure(session, { base = settings.base, alt_gr = settings.alt_gr, layout = settings.layout,
 			number_row = settings.number_row, edges = settings.edges })
 		if source.emulation ~= nil then extras = SourceEmulation.new_session(SourceEmulation.compile(source.emulation)) end
@@ -168,7 +168,7 @@ function M.reload_if_started()
 end
 
 --- What the running emulation types unshifted on a key, for the layer
---- editor's legends (layouts/keylayout_emulation.lua M.legend).
+--- editor's legends (layouts/engine/composer/keylayout_emulation.lua M.legend).
 --- @param code string The key's KeyboardEvent.code.
 --- @return string|nil text nil when the emulation is off or leaves the key to
 ---   the system layout.
@@ -416,7 +416,7 @@ end
 local _json_cache = {}
 local function shared_json(rel, lossless)
 	if _json_cache[rel] == nil then
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local text = require("adapters.file_system").read(require("infra.paths").shared(rel))
 		if type(text) ~= "string" then error("layout_emulation: " .. rel .. " is unreadable") end
 		local decoded = lossless and Json.decode_lossless(text) or Json.decode(text)
@@ -454,13 +454,13 @@ function M.start(ports)
 	local Geometry = require("adapters.keyboard_geometry")
 	M.init({
 		read_config = function()
-			local content, status, detail = require("toml_codec.writer").read_classified(
+			local content, status, detail = require("core.text.engine.toml_codec.writer").read_classified(
 				require("infra.config_paths").get("ConfigTomlPath"), require("adapters.file_system"))
 			if status ~= "ok" and status ~= "absent" then error("config.toml is unreadable: " .. tostring(detail)) end
-			return require("toml_codec").decode(content or "")
+			return require("core.text.engine.toml_codec").decode(content or "")
 		end,
 		default_for = require("infra.manifest_reader").default_for,
-		report_outdated = function(segments, detail) require("config_outdated").report(segments, detail, Logger) end,
+		report_outdated = function(segments, detail) require("settings.engine.migration.outdated").report(segments, detail, Logger) end,
 		source = function(id)
 			local composer = Registry.composer_settings()
 			return Settings.source(id, { installed = Registry.snapshot().installed,
@@ -470,14 +470,14 @@ function M.start(ports)
 				read_emulation = function() return Registry.composer_emulation() end,
 				read_composed = function() return Registry.composer_copy() end })
 		end,
-		keycodes = function() return shared_json("modules/layouts/mac_keycodes.json", false) end,
-		registry = function() return shared_json("data/keycodes/physical_keys.json", true) end,
+		keycodes = function() return shared_json("layouts/data/mac_keycodes.json", false) end,
+		registry = function() return shared_json("layouts/data/keycodes/physical_keys.json", true) end,
 		keyboard_type = Geometry.event_type,
 		physical_code = Geometry.physical_code,
 		-- The key the selected input source types a character with.
 		-- On the US position when the source has none (a non-Latin source).
 		keycode_for_char = function(char)
-			return hs.keycodes.map[char] or M.us_keycode(char, shared_json("modules/layouts/mac_keycodes.json", false))
+			return hs.keycodes.map[char] or M.us_keycode(char, shared_json("layouts/data/mac_keycodes.json", false))
 		end,
 		magic_code = ports.magic_code,
 		is_active = function() return not ports.is_paused() end,

@@ -118,7 +118,7 @@ helpers.describe("Managed daemon original-task lifecycle receiver", function()
 	end)
 
 	helpers.it("(daemon-dead-unpublished-release) the pause releases an exited daemon that never published", function()
-		local Lifecycle = require("core.llm.managed_ollama_daemon_lifecycle")
+		local Lifecycle = require("core.lifecycle.engine.core.managed_ollama_daemon_lifecycle")
 		local function build(published)
 			local task, nonce = owned_task()
 			local released = {}
@@ -260,7 +260,7 @@ end)
 
 helpers.describe("Managed daemon shared policy ports", function()
 	helpers.it("(daemon-shared-ports) captures explicit transport ports without Mac dependencies", function()
-		local Shared = require("core.llm.managed_ollama_daemon_receipt")
+		local Shared = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 		local task, nonce = owned_task()
 		task.isSettled = nil
 		local ports = {
@@ -310,7 +310,7 @@ end)
 
 helpers.describe("Managed daemon constructor publication", function()
 	helpers.it("(daemon-constructor-reentry) preserves the first receiver acquired inside a predicate", function()
-		local Shared = require("core.llm.managed_ollama_daemon_receipt")
+		local Shared = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 		local task, nonce = owned_task()
 		local inner
 		local outer, reason = Shared.new(task, nonce, {
@@ -382,7 +382,7 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 	end)
 
 	helpers.it("(daemon-observed-rollback) keeps frame custody and rechecks attempt after settlement lookup", function()
-		local Shared = require("core.llm.managed_ollama_daemon_receipt")
+		local Shared = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 		local task, nonce = owned_task()
 		function task.wasStartAttempted() return false end
 		local receiver = assert(Receiver.new(task, nonce))
@@ -458,7 +458,7 @@ end)
 helpers.describe("Managed daemon refusal diagnostic", function()
 	helpers.it("(daemon-refusal-logged) logs the serve owner's fixed refusal line and nothing else", function()
 		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "adapters.shell_runner",
-			"core.llm.managed_ollama_daemon_lifecycle", "infra.logger" }, function()
+			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "infra.logger" }, function()
 			local logs = {}
 			local Logger = helpers.make_logger_stub()
 			Logger.warn = function(_log, format_string, ...)
@@ -478,7 +478,7 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 					return task
 				end,
 			}
-			package.loaded["core.llm.managed_ollama_daemon_lifecycle"] = {
+			package.loaded["core.lifecycle.engine.core.managed_ollama_daemon_lifecycle"] = {
 				new = function()
 					return { complete = function() end, feed = function() end }
 				end,

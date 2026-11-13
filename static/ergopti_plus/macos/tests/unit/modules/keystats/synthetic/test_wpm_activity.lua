@@ -4,7 +4,7 @@
 
 local helpers = require("tests.helpers")
 local fixtures = require("tests.support.keystats_provenance_fixture")
-local Model = require("wpm_widget.model")
+local Model = require("metrics.engine.wpm_widget_model")
 
 helpers.describe("keystats WPM activity", function()
 	helpers.it("(wpm-source-parity) preserves priorities, physical provenance and reset ownership", function()

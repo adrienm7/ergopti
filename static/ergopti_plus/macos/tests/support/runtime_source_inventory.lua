@@ -7,8 +7,8 @@
 --- source. The owning guard rejects the complete unreadable list before use.
 --- ==============================================================================
 
-local Discovery = require("test.runner_discovery")
-local NativePath = require("native_path")
+local Discovery = require("tests.lua.core.runner_discovery")
+local NativePath = require("core.fs.engine.native_path")
 local SourceFile = require("tests.support.source_file")
 local M = {}
 

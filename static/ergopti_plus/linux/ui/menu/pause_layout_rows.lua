@@ -14,13 +14,13 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
-local Logger = require("logger.shim")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local Logger = require("core.logger.engine.shim")
 local ManifestMenu = require("infra.manifest_menu")
-local Policy = require("layout.pause_switch_policy")
+local Policy = require("layouts.engine.layout.pause_switch_policy")
 
 local LOG = "ui.menu.pause_layout_rows"
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local COMMAND, LEAF = ConfigKeys.COMMAND, ConfigKeys.LEAF
 
 --- Builds the three switching rows.

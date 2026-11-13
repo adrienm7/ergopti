@@ -11,7 +11,7 @@
  * 1. check-elf-glibc-ceiling.cjs proves the symbol versions; this proves the
  *    other half of "self-contained": every DT_NEEDED entry of every ELF file in
  *    the tree has a file name or symlink in the tree or is listed in
- *    _shared/data/linux_appimage_recipient_libraries.json,
+ *    _shared/updater/data/linux_appimage_recipient_libraries.json,
  *    the documented list of what the recipient supplies (glibc and its loader,
  *    GLib and the C++ runtime, GTK 3). A library a build host linked by accident
  *    fails here, on the runner, instead of at the first launch on a machine
@@ -36,7 +36,7 @@ const { isElf, regularFiles } = require('./check-elf-glibc-ceiling.cjs');
 
 const RECIPIENT_LIBRARIES = path.resolve(
 	__dirname,
-	'../../static/ergopti_plus/_shared/data/linux_appimage_recipient_libraries.json'
+	'../../static/ergopti_plus/_shared/updater/data/linux_appimage_recipient_libraries.json'
 );
 
 /**

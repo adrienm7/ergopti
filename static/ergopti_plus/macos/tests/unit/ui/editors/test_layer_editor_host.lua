@@ -29,8 +29,8 @@
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
 
 local FIXTURE = helpers.shared("tests/corpus/layer_editor/edited_layers.toml")
 local LEGENDS = helpers.shared("tests/corpus/layer_editor/legends.json")
@@ -165,7 +165,7 @@ local function with_editor(scenario)
 			return bridge
 		end } } }
 		-- The remap facade, holding the shipped tap-hold keys and defaults.
-		local defaults = TomlCodec.decode(read_file(helpers.shared("tap_hold/defaults.toml")))
+		local defaults = TomlCodec.decode(read_file(helpers.shared("tap_hold/data/defaults.toml")))
 		world.karabiner = {
 			regenerate = function(on_done)
 				world.regenerations = world.regenerations + 1
@@ -493,7 +493,7 @@ helpers.describe("macOS navigation layer editor host", function()
 
 	helpers.it("sends the current input source's legends and the layer key (layer-editor-current-layout-legends)", function()
 		local corpus = Json.decode(read_file(LEGENDS))
-		local registry = Json.decode(read_file(helpers.shared("data/keycodes/physical_keys.json")))
+		local registry = Json.decode(read_file(helpers.shared("layouts/data/keycodes/physical_keys.json")))
 		for _, case in ipairs(corpus.cases) do
 			with_editor(function(editor, world)
 				-- The layout, by the keycode macOS reports on Ergopti's ISO board.
@@ -563,7 +563,7 @@ helpers.describe("macOS navigation layer editor host", function()
 	end)
 
 	helpers.it("(leh-001-emulated-legends) shows the emulated layout's characters while one is emulated", function()
-		local registry = Json.decode(read_file(helpers.shared("data/keycodes/physical_keys.json")))
+		local registry = Json.decode(read_file(helpers.shared("layouts/data/keycodes/physical_keys.json")))
 		with_editor(function(editor, world)
 			world.keymap[registry.keys.KeyQ.hs] = "q"
 			world.keymap[registry.keys.KeyW.hs] = "w"

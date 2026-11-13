@@ -442,7 +442,7 @@ function verifyLuaJitEnrollment(value) {
 		'candidate.is_file() and original.digest(candidate) == CANDIDATE_SHA',
 		'original.family_run(\n        directory,\n        "abi-compile",',
 		'original.family_run(\n        directory,\n        "lua-native",',
-		'static/ergopti_plus/_shared/lua/logger/init.lua',
+		'static/ergopti_plus/_shared/core/logger/engine/init.lua',
 		'result["display_pidfd_closed"] is True and result["rescue"] == 0'
 	])
 		assert(value.luaRunner.includes(literal), 'real diagnostic custody: ' + literal);

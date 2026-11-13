@@ -59,7 +59,7 @@ local function shipped()
 	local file = assert(io.open(helpers.driver_root() .. "/vendor/remap-runtime/manifest.json", "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return require("json").decode(bytes)
+	return require("core.text.engine.json").decode(bytes)
 end
 
 --- Sets one dotted path.

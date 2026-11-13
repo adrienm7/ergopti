@@ -58,7 +58,7 @@ helpers.describe("keystats init: device identifier", function()
 			local device = writer.devices[1].device_id
 			helpers.assert_true(device:match("^%x+%-%x+%-4%x+%-[89ab]%x+%-%x+$") ~= nil, device)
 			local handle = assert(io.open(metrics .. "/by_device/" .. device .. "/device.json", "rb"))
-			local identity = require("json").decode(handle:read("*a"))
+			local identity = require("core.text.engine.json").decode(handle:read("*a"))
 			handle:close()
 			helpers.assert_eq(identity.device_id, device)
 			helpers.assert_eq(identity.os, "linux")

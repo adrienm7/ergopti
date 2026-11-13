@@ -13,7 +13,7 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 local MODULE_KEYS = {
 	"adapters.file_system",
 	"infra.timings",
-	"keystats.metrics",
+	"metrics.engine.metrics",
 	"modules.keystats.aggregator",
 	"modules.keystats.export",
 	"adapters.ledger_append", "modules.keystats.log_manager",
@@ -73,7 +73,7 @@ local function run_refused_transaction(failure)
 			ms = function() return 5000 end,
 			sec = function() return 1 end,
 		}
-		package.loaded["keystats.metrics"] = {}
+		package.loaded["metrics.engine.metrics"] = {}
 		package.loaded["modules.keystats.aggregator"] = {
 			flush = function() return true end,
 			get_ngram_ctx = function() return {} end,

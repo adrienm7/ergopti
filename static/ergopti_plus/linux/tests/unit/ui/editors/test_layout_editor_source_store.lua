@@ -4,8 +4,8 @@
 --- MODULE: Layout Editor Source Store
 --- DESCRIPTION:
 --- The unified layout editor saves its files from the layout manager window
---- through the shared store (_shared/lua/layouts/source_store.lua) and the
---- shared bridge (_shared/lua/layouts/manager_bridge.lua). These tests pin the
+--- through the shared store (_shared/layouts/engine/composer/source_store.lua) and the
+--- shared bridge (_shared/layouts/engine/manager_bridge.lua). These tests pin the
 --- store's bounds (plain names, allowed types, UTF-8, size), reopening the last
 --- saved source, the bridge's routing and refusals, and the Linux bridge
 --- forwarding both operations to the real registry module.
@@ -13,15 +13,15 @@
 
 local helpers = require("tests.helpers")
 
-local SourceStore = require("layouts.source_store")
-local ManagerBridge = require("layouts.manager_bridge")
+local SourceStore = require("layouts.engine.composer.source_store")
+local ManagerBridge = require("layouts.engine.manager_bridge")
 
-local DEFAULTS_PATH = "modules/layouts/defaults.json"
+local DEFAULTS_PATH = "layouts/data/defaults.json"
 
 --- The store's settings from the shared defaults, as the registries read them.
 --- @return table
 local function settings()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local Paths = require("infra.paths")
 	local handle = assert(io.open(Paths.shared(DEFAULTS_PATH), "r"))
 	local text = handle:read("*a")
@@ -125,7 +125,7 @@ helpers.describe("layout editor source store", function()
 		local s = settings()
 		helpers.assert_eq(s.nav_file, "layers.toml")
 		helpers.assert_eq(s.failures, { invalid = "source_invalid_file", write = "write_failed" })
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local Paths = require("infra.paths")
 		local handle = assert(io.open(Paths.shared(DEFAULTS_PATH), "r"))
 		local defaults = Json.decode(handle:read("*a"))

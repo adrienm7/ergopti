@@ -5,7 +5,7 @@
  * MODULE: Owned Runtimes Table Generator
  * DESCRIPTION:
  * Writes the tables of docs/design/owned-runtimes.md (headline counts, and the
- * macOS, Linux and Windows rows) from _shared/data/owned_runtimes.json.
+ * macOS, Linux and Windows rows) from _shared/core/network/data/owned_runtimes.json.
  *
  * FEATURES & RATIONALE:
  * 1. Text splice: the document's prose stays hand-written; only the regions

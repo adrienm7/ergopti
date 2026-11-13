@@ -4,7 +4,7 @@
 ; MODULE: Logger Behaviour Corpus Consumer (AHK)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/logger/behaviour_vectors.json against this
-; driver's logger. The sibling corpus (_shared/modules/logger/test_vectors.json)
+; driver's logger. The sibling corpus (_shared/core/logger/data/test_vectors.json)
 ; pins the LINE FORMAT; this one pins the parts that decide whether a line exists
 ; at all -- severity filtering (spec section 4) and the ring buffer (section 5).
 ;

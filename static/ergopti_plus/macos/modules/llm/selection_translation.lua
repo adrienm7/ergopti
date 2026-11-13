@@ -25,13 +25,13 @@
 ---    whose late answer is dropped by generation.
 ---
 --- The pure logic (binding parameter, target language, prompt, answer reading)
---- is shared: _shared/lua/llm/translate.lua, configured by
---- _shared/modules/llm/translate.json.
+--- is shared: _shared/ai/engine/prediction/translate.lua, configured by
+--- _shared/ai/data/translate.json.
 --- ==============================================================================
 
 local M = {}
 
-local Translate  = require("llm.translate")
+local Translate  = require("ai.engine.prediction.translate")
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
@@ -77,11 +77,11 @@ local function read_shared_json(path, name)
 	return decoded
 end
 
---- Returns the decoded _shared/modules/llm/translate.json, read once.
+--- Returns the decoded _shared/ai/data/translate.json, read once.
 --- @return table config
 function M.config()
 	if _config then return _config end
-	local config = read_shared_json(Paths.shared_llm_path("translate.json"), "modules/llm/translate.json")
+	local config = read_shared_json(Paths.shared_llm_path("translate.json"), "ai/data/translate.json")
 	for _, key in ipairs({ "ui_value", "tag", "user_prefix", "prompt", "prediction_prompt" }) do
 		if type(config[key]) ~= "string" or config[key] == "" then
 			error("selection_translation: translate.json field '" .. key .. "' must be a non-empty string")
@@ -96,11 +96,11 @@ function M.config()
 	return _config
 end
 
---- Returns the decoded _shared/data/locale_names.json, read once.
+--- Returns the decoded _shared/core/i18n/data/locale_names.json, read once.
 --- @return table names
 function M.locale_names()
 	if _names then return _names end
-	local names = read_shared_json(Paths.shared("data/locale_names.json"), "data/locale_names.json")
+	local names = read_shared_json(Paths.shared("core/i18n/data/locale_names.json"), "core/i18n/data/locale_names.json")
 	if type(names.locales) ~= "table" then
 		error("selection_translation: locale_names.json holds no 'locales' table")
 	end
@@ -108,11 +108,11 @@ function M.locale_names()
 	return _names
 end
 
---- Returns the decoded _shared/data/locale_order.json, read once.
+--- Returns the decoded _shared/core/i18n/data/locale_order.json, read once.
 --- @return table order
 local function locale_order()
 	if _order then return _order end
-	local order = read_shared_json(Paths.shared("data/locale_order.json"), "data/locale_order.json")
+	local order = read_shared_json(Paths.shared("core/i18n/data/locale_order.json"), "core/i18n/data/locale_order.json")
 	if type(order.order) ~= "table" then
 		error("selection_translation: locale_order.json holds no 'order' list")
 	end

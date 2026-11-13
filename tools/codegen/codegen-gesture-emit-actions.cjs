@@ -43,7 +43,7 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const CATALOGUE = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
+const CATALOGUE = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
 const OUT = path.join(SP, 'windows', '_generated', 'gesture_emit_actions.ahk');
 
 // Portable modifier token -> the name TextPressKey expects on Windows.
@@ -87,7 +87,7 @@ const q = (s) => '"' + String(s).replace(/`/g, '``').replace(/"/g, '`"') + '"';
 
 const lines = [];
 lines.push('﻿; _generated/gesture_emit_actions.ahk');
-lines.push('; AUTO-GENERATED from _shared/modules/actions/actions.toml.');
+lines.push('; AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.');
 lines.push('; DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions` to refresh.');
 lines.push('#Requires AutoHotkey v2.0');
 lines.push('');

@@ -33,7 +33,7 @@ local LAUNCHER_ENV = {
 }
 
 local OWNED = {
-	"infra.logger", "infra.i18n", "infra.locale", "locale.core",
+	"infra.logger", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
 	"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
@@ -246,8 +246,8 @@ local function load_world(world)
 			context = context or {}
 			context.network_receipt = world.native_network_receipt
 			local raw = package.loaded["adapters.file_system"].read(
-				require("infra.paths").shared("modules/network/managed_network.json"))
-			context.network_contract = require("network.failure").new(require("json").decode(raw))
+				require("infra.paths").shared("core/network/data/managed_network.json"))
+			context.network_contract = require("core.network.engine.failure").new(require("core.text.engine.json").decode(raw))
 		end
 		return classify(lines, exit_code, context)
 	end

@@ -349,7 +349,7 @@ luajit ergopti_hotstrings.lua --tray       # the real thing, with a tray icon
 
 `bin/ergopti-hotstrings` does the same after exporting `LUA_PATH`, always from
 the tree it lives in, even when a package is installed. With no `~/.config/ergopti/hotstrings/`, the daemon
-falls back to the TOML definitions bundled in `_shared/modules/hotstrings/`.
+falls back to the TOML definitions bundled in `_shared/hotstrings/data/catalogue/`.
 
 | Flag                      | Effect                                                                                            |
 | ------------------------- | ------------------------------------------------------------------------------------------------- |

@@ -1,9 +1,9 @@
 --- tests/unit/infra/scope/test_metrics_scope.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 local SOURCE = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nwpm_widget_visible = true\nwpm_menubar_visible = true\nunknown = "keep"\n[other]\nvalue = 42\n'
 
@@ -349,7 +349,7 @@ helpers.describe("metrics private native claim", function()
 			revert = function() committed = false; reverted = reverted + 1; return true end,
 			release = function() end,
 		}
-		local owner = require("config_scope_fenced_transaction").new({ owner = {}, transaction = primary,
+		local owner = require("settings.engine.scope.fenced_transaction").new({ owner = {}, transaction = primary,
 			scope = "metrics", available = function() return true end, fences = { {
 				acquire = function() held = true; return true end,
 				release = function() if refusal then return false end; held = false; return true end,
@@ -369,13 +369,13 @@ helpers.describe("metrics private native claim", function()
 			local public, claim, primary = {}, {}, nil
 			local runtime = "original"
 			claim.pending = function() return primary.pending() end
-			primary = require("config_scope_transaction").new({ path = path, backup_path = backup,
+			primary = require("settings.engine.scope.transaction").new({ path = path, backup_path = backup,
 				files = controls.files, manifest = require("infra.manifest_reader"),
 				capture = function() return { marker = runtime } end,
 				apply = function() runtime = "candidate"; return true end,
 				restore = function(snapshot) runtime = snapshot.marker; return true end })
 			local releases = 0
-			local owner = require("config_scope_fenced_transaction").new({ owner = public, native_token = claim,
+			local owner = require("settings.engine.scope.fenced_transaction").new({ owner = public, native_token = claim,
 				transaction = primary, scope = "metrics", available = function() return true end,
 				fences = { { acquire = Preferences.acquire, release = function(token)
 					helpers.assert_eq(token, claim)
@@ -504,9 +504,9 @@ helpers.describe("metrics retained native release debt", function()
 			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
 				revert = function(done) done(true) end, release = function() end,
 				pending = function() return false end, retry_restore = function(done) done(true) end }
-			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { tap_holds = before, metrics = { actual, after } } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
@@ -529,7 +529,7 @@ helpers.describe("metrics retained native release debt", function()
 		-- dropped without a word. The refusal stays, and now it is logged.
 		with_scope(function(_owner, collector)
 			local Preferences = require("infra.metrics_preferences")
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local claim = { pending = function() return false end }
 			helpers.assert_true(Preferences.acquire(claim))
 			local logged, original = {}, Logger.error

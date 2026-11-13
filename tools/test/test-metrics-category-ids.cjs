@@ -44,6 +44,7 @@ const ALIASES_FILE = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
+	'metrics',
 	'data',
 	'metrics_general_category_aliases.json'
 );

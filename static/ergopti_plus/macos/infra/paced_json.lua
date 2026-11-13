@@ -17,7 +17,7 @@
 ---    multi-megabyte payload never needs one table slot per token.
 --- ==============================================================================
 
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local M = {}
 
 local utf8 = utf8

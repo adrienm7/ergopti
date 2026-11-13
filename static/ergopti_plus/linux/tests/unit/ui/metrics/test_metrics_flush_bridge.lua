@@ -131,7 +131,7 @@ H.describe("metrics flush bridge", function()
 		local F = fixture("metrics_apps")
 		F.read_safe()
 		F.K.get_dashboard_payload = function() error("private-application-name") end
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original, messages = logger.error, {}
 		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
 		local ok, result = pcall(F.B.on_message, "ready", F.state, F.context)
@@ -145,7 +145,7 @@ H.describe("metrics flush bridge", function()
 		local F = fixture("metrics_apps")
 		F.read_safe()
 		F.K.request_session_reset = function() error("private-reset-application") end
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original, messages = logger.error, {}
 		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
 		local ok, result = pcall(F.B.on_message, { action = "reset" }, F.state, F.context)

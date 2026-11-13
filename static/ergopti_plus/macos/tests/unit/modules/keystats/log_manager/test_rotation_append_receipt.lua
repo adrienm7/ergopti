@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local CommandLines = require("tests.support.command_lines")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 local TIMESTAMP = "2026-10-26 00:00:00.000"
 
 --- Exercise one refused append against an actual unbuffered stream.

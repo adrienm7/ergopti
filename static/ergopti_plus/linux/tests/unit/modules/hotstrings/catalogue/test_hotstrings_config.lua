@@ -152,7 +152,7 @@ helpers.describe("hotstrings_config", function()
 
           local Loader = require("modules.hotstrings.loader")
           local Paths = require("infra.paths")
-          local bundled = Loader.find_toml_files(Paths.shared("modules/hotstrings"))
+          local bundled = Loader.find_toml_files(Paths.shared("hotstrings/data/catalogue"))
           helpers.assert_true(#bundled > 0, "fixture requires the actual bundled TOML inventory")
           helpers.assert_true(cfg.mapping_count() > 0,
             "an absent personal directory must not hide discovered bundled mappings")
@@ -195,7 +195,7 @@ helpers.describe("hotstrings_config", function()
 
   helpers.describe("group management", function()
     local Choices = require("tests.support.hotstring_choices")
-    local Codec = require("toml_codec")
+    local Codec = require("core.text.engine.toml_codec")
 
     --- A config manager over one real catalogue group and a private config.toml.
     --- @param source string|table|nil Initial choices.
@@ -297,7 +297,7 @@ helpers.describe("hotstrings_config", function()
 
     helpers.it("republishes the previous catalogue when the write is refused", function()
       with_groups({ probe = true }, function(cfg, engine, path)
-        local Writer = require("toml_codec.writer")
+        local Writer = require("core.text.engine.toml_codec.writer")
         local original = Writer.batch_write
         Writer.batch_write = function() return false, "injected refusal" end
         local ok, changed = pcall(cfg.disable_group, "probe")
@@ -313,7 +313,7 @@ helpers.describe("hotstrings_config", function()
 
     helpers.it("refuses a write that an external editor raced", function()
       with_groups({ probe = true }, function(cfg, engine, path)
-        local Writer = require("toml_codec.writer")
+        local Writer = require("core.text.engine.toml_codec.writer")
         local original = Writer.batch_write
         local external = "[hotstrings]\ngroups = { probe = true }\nexternal = 9\n"
         Writer.batch_write = function(...)
@@ -395,11 +395,11 @@ helpers.describe("hotstrings_config", function()
     --- @return table offered Sorted dotted paths the cleanup offers.
     --- @return table warnings Outdated-entry warnings logged.
     local function cleanup_offers(opts, source)
-      local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["logger.shim"]
+      local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["core.logger.engine.shim"]
       local warnings = {}
       local logger = helpers.make_logger_stub()
       logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-      package.loaded["logger.shim"] = logger
+      package.loaded["core.logger.engine.shim"] = logger
       package.loaded["modules.hotstrings.loader"] = {
         find_toml_files = function() return {} end,
         list_subdirs = function() return {} end,
@@ -410,7 +410,7 @@ helpers.describe("hotstrings_config", function()
       }
       local offered = {}
       local ok, err = pcall(function()
-        require("config_outdated").reset_for_tests()
+        require("settings.engine.migration.outdated").reset_for_tests()
         local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
         Choices.with_file(cfg, source, function()
           local engine = make_engine()
@@ -418,13 +418,13 @@ helpers.describe("hotstrings_config", function()
           helpers.assert_true(cfg.init(engine, opts.config_dir), "the private choices must be readable")
           local _, committed, reason = cfg.load_all()
           helpers.assert_eq(committed, opts.publish == true, tostring(reason))
-          for _, key in ipairs(require("config_unused_keys").find_in_source(source, cfg.mark_config_reads).keys) do
+          for _, key in ipairs(require("settings.engine.migration.unused_keys").find_in_source(source, cfg.mark_config_reads).keys) do
             offered[#offered + 1] = key.section .. "." .. key.key
           end
         end)
       end)
       package.loaded["modules.hotstrings.loader"] = saved_loader
-      package.loaded["logger.shim"] = saved_logger
+      package.loaded["core.logger.engine.shim"] = saved_logger
       package.loaded["modules.hotstrings.hotstrings_config"] = nil
       if not ok then error(err, 0) end
       table.sort(offered)
@@ -487,11 +487,11 @@ helpers.describe("hotstrings_config", function()
       fh:write("[probe]\ndelay_offset = -0.55\n[probe.main]\ndelay_offset = -0.65\n"
         .. "[probe.gone_section]\ndelay_offset = -0.65\n[retired_category]\ndelay_offset = -0.25\n")
       fh:close()
-      local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["logger.shim"]
+      local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["core.logger.engine.shim"]
       local warnings = {}
       local logger = helpers.make_logger_stub()
       logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-      package.loaded["logger.shim"] = logger
+      package.loaded["core.logger.engine.shim"] = logger
       package.loaded["modules.hotstrings.loader"] = {
         find_toml_files = function() return {} end,
         list_subdirs = function() return {} end,
@@ -503,7 +503,7 @@ helpers.describe("hotstrings_config", function()
         end,
       }
       local ok, err = pcall(function()
-        require("config_outdated").reset_for_tests()
+        require("settings.engine.migration.outdated").reset_for_tests()
         local cfg = helpers.load_module("modules.hotstrings.hotstrings_config")
         cfg._set_override_config_dir_for_test(dir)
         Choices.with_file(cfg, nil, function()
@@ -520,7 +520,7 @@ helpers.describe("hotstrings_config", function()
         cfg._set_override_config_dir_for_test(nil)
       end)
       package.loaded["modules.hotstrings.loader"] = saved_loader
-      package.loaded["logger.shim"] = saved_logger
+      package.loaded["core.logger.engine.shim"] = saved_logger
       package.loaded["modules.hotstrings.hotstrings_config"] = nil
       os.execute("rm -rf '" .. dir .. "'")
       if not ok then error(err, 0) end

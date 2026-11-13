@@ -8,4 +8,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.hotstring_cascade_net_edit_contract").register(helpers)
+require("tests.lua.hotstrings.cascade_net_edit_contract").register(helpers)

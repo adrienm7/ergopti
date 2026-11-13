@@ -44,7 +44,7 @@
 local M = {}
 M.bridge_name = "hsEditor"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Storage = require("adapters.storage")
 local MagicKey = require("modules.hotstrings.magic_key")
 
@@ -97,7 +97,7 @@ local _save_refused = false
 --- @return table|nil
 local function get_writer()
 	if _writer then return _writer end
-	local ok, mod = pcall(require, "toml_codec.writer")
+	local ok, mod = pcall(require, "core.text.engine.toml_codec.writer")
 	if ok and type(mod) == "table" and type(mod.write) == "function" then _writer = mod end
 	return _writer
 end
@@ -105,7 +105,7 @@ end
 --- @return table|nil
 local function get_reader()
 	if _reader then return _reader end
-	local ok, mod = pcall(require, "toml_codec.reader")
+	local ok, mod = pcall(require, "core.text.engine.toml_codec.reader")
 	if ok and type(mod) == "table" and type(mod.parse) == "function" then _reader = mod end
 	return _reader
 end
@@ -237,7 +237,7 @@ local function capture_opening(state, context)
 		or (status == "absent" and content ~= nil) then return nil end
 	local parsed = { meta = {}, sections_order = {}, sections = {} }
 	if status == "ok" then
-		local codec_ok, codec = pcall(require, "toml_codec")
+		local codec_ok, codec = pcall(require, "core.text.engine.toml_codec")
 		if not codec_ok or type(codec.decode) ~= "function" then return nil end
 		local valid, document = pcall(codec.decode, content)
 		if not valid or type(document) ~= "table" then return nil end
@@ -305,10 +305,10 @@ local function build_payload(state, open_mode, parsed, opening)
 
 	-- The placeholder the priority field shows for an entry that inherits. From
 	-- the shared table, never a literal: the number lives in
-	-- _shared/modules/hotstrings/priority.json and a copy here would be a second
+	-- _shared/hotstrings/data/catalogue/priority.json and a copy here would be a second
 	-- answer to a question with one.
 	local default_priority = nil
-	local ok_prio, Priority = pcall(require, "hotstring_priority")
+	local ok_prio, Priority = pcall(require, "hotstrings.engine.priority")
 	if ok_prio and type(Priority.source_priority) == "function" then
 		local ok_value, value = pcall(Priority.source_priority, PERSONAL_CATEGORY)
 		if ok_value and type(value) == "number" then default_priority = value end
@@ -381,7 +381,7 @@ local function save_all(state, data, context)
 			for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict" }) do
 				if type(entry[flag]) ~= "boolean" then return false end
 			end
-			if entry.priority ~= nil and not require("hotstrings.personal_metadata").valid("priority", entry.priority) then return false end
+			if entry.priority ~= nil and not require("hotstrings.engine.catalogue.personal_metadata").valid("priority", entry.priority) then return false end
 		end
 		listed[name] = true
 	end
@@ -419,7 +419,7 @@ local function save_all(state, data, context)
 	if status == "ok" then
 		-- The hotstring reader projects an already validated TOML snapshot.
 		-- Validate its syntax with the canonical codec before that projection.
-		local codec_ok, codec = pcall(require, "toml_codec")
+		local codec_ok, codec = pcall(require, "core.text.engine.toml_codec")
 		if not codec_ok or type(codec) ~= "table" or type(codec.decode) ~= "function" then
 			Logger.error(LOG, "Personal save requires the canonical TOML decoder.")
 			return false
@@ -580,7 +580,7 @@ end
 --- @param message string Already translated.
 --- @return boolean
 function M.show_alert(message, context)
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
 	if not ok_json or not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "%s", tostring(message))
@@ -626,7 +626,7 @@ function M.push_init(state, context)
 	_save_refused = false
 	local opening = capture_opening(state, context)
 	if not opening then return false end
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push initData(): the shared json module is unavailable — the editor stays on its loading screen.")
 		return false

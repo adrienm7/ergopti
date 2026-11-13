@@ -62,7 +62,7 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 		local _, deps = scripted("custom", "")
 		local value = Prompt.ask("Read the screen", "", deps)
 		helpers.assert_eq(value, "custom|")
-		helpers.assert_eq(require("llm.vision").is_valid(value), false)
+		helpers.assert_eq(require("ai.engine.prediction.vision").is_valid(value), false)
 	end)
 
 	helpers.it("(linux-vision-choice-list) a cancelled list or model is a cancellation", function()
@@ -103,7 +103,7 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 				get_action_parameter = function() return "local" end,
 				get_action_label = function() return "Read the screen" end,
 				get_action_parameter_prompt = function() error("the backend list is never typed") end,
-				validate_action_parameter = function(_, value) return require("llm.vision").is_valid(value) end,
+				validate_action_parameter = function(_, value) return require("ai.engine.prediction.vision").is_valid(value) end,
 			}
 			helpers.assert_eq(Dialogs.assign_parameterized_action({}, gestures, "slot", "screen_read", function() return true end), true)
 		end)

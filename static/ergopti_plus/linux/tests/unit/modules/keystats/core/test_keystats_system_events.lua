@@ -44,7 +44,7 @@ local function with_recorder(transitions, script)
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local taken = 0
 	local stamp = require("modules.keystats.calendar").capture()
-	transitions = require("table_util").deep_copy(transitions)
+	transitions = require("core.text.engine.table_util").deep_copy(transitions)
 	for _, batch in ipairs(transitions) do
 		for _, event in ipairs(batch) do
 			event.ts = event.ts or stamp.ts
@@ -205,7 +205,7 @@ helpers.describe("keystats system events: the UTC offset column", function()
 
 	it("linux-utc-offset: a stored row carries the offset of its UTC instant", function()
 		with_store(nil, function(writer)
-			local LocalTime = require("keystats.local_time")
+			local LocalTime = require("metrics.engine.local_time")
 			helpers.assert_true(writer.insert_system_events("owned-device", {
 				{ ts = "2026-07-01 12:00:00", date = "2026-07-01", action = "lock" },
 				{ ts = "2026-01-01 12:00:00", date = "2026-01-01", action = "unlock" },
@@ -220,7 +220,7 @@ helpers.describe("keystats system events: the UTC offset column", function()
 	-- column bounded at ISO 8601's +-18:00 refused every row of such a flush.
 	it("linux-utc-offset-bound: a row keeps the widest offset the host clock can report", function()
 		with_store(nil, function(writer)
-			local LocalTime = require("keystats.local_time")
+			local LocalTime = require("metrics.engine.local_time")
 			helpers.assert_eq(LocalTime.MAX_OFFSET_MIN, 24 * 60 + 59)
 			local real = LocalTime.offset_of_utc
 			local offsets = { 1440, LocalTime.MAX_OFFSET_MIN, -LocalTime.MAX_OFFSET_MIN }
@@ -242,10 +242,10 @@ helpers.describe("keystats system events: the UTC offset column", function()
 	end)
 
 	it("linux-utc-offset-bound: schema.sql and the store migration spell the clock's bound", function()
-		local LocalTime = require("keystats.local_time")
-		local UtcOffsetColumn = require("keystats.utc_offset_column")
+		local LocalTime = require("metrics.engine.local_time")
+		local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
 		local bound = "BETWEEN -" .. LocalTime.MAX_OFFSET_MIN .. " AND " .. LocalTime.MAX_OFFSET_MIN
-		local file = assert(io.open(require("infra.paths").shared("data/db/schema.sql"), "r"))
+		local file = assert(io.open(require("infra.paths").shared("metrics/data/db/schema.sql"), "r"))
 		local schema = file:read("*a")
 		file:close()
 		local columns, bounded = 0, 0
@@ -263,7 +263,7 @@ helpers.describe("keystats system events: the UTC offset column", function()
 	it("linux-utc-offset: a store created before the column gains it, with the current purge triggers", function()
 		local function older_store(path)
 			local Paths = require("infra.paths")
-			local file = assert(io.open(Paths.shared("data/db/schema.sql"), "r"))
+			local file = assert(io.open(Paths.shared("metrics/data/db/schema.sql"), "r"))
 			local schema = file:read("*a"):gsub("\n\tutc_offset_min INTEGER[^\n]*", "")
 			file:close()
 			local pipe = assert(io.popen("sqlite3 '" .. path .. "' >/dev/null", "w"))
@@ -274,7 +274,7 @@ helpers.describe("keystats system events: the UTC offset column", function()
 			pipe:close()
 		end
 		with_store(older_store, function(writer)
-			local UtcOffsetColumn = require("keystats.utc_offset_column")
+			local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
 			local rows = writer.query_rows("SELECT count(*) FROM pragma_table_info('events_system') WHERE name='utc_offset_min';")
 			helpers.assert_eq(rows, { "1" })
 			for _, name in ipairs(UtcOffsetColumn.TABLES) do

@@ -18,7 +18,7 @@ package.loaded["infra.i18n"] = {
 }
 
 -- Load the module. This will trigger load_models_presets() internally
--- which reads static/ergopti_plus/_shared/modules/llm/models.json
+-- which reads static/ergopti_plus/_shared/ai/data/models.json
 local Models = helpers.load_with_stubs("ui.menu.menu_llm.models_manager")
 
 helpers.describe("LLM Models Catalogue", function()

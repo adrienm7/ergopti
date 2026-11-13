@@ -37,10 +37,14 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SHARED = path.join(SP, '_shared', 'data');
+const SHARED = path.join(SP, '_shared');
 
-const order = JSON.parse(fs.readFileSync(path.join(SHARED, 'locale_order.json'), 'utf8')).order;
-const names = JSON.parse(fs.readFileSync(path.join(SHARED, 'locale_names.json'), 'utf8')).locales;
+const order = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core/i18n/data/locale_order.json'), 'utf8')
+).order;
+const names = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core/i18n/data/locale_names.json'), 'utf8')
+).locales;
 
 // Fail before writing anything: a locale in the order with no name would emit a
 // table whose row is silently blank, which is the failure being fixed.
@@ -75,8 +79,8 @@ function padToken(token, width) {
 }
 
 const HEADER_WHY = [
-	'The display ORDER comes from _shared/data/locale_order.json and the native',
-	'names from _shared/data/locale_names.json. Both are shared, because three',
+	'The display ORDER comes from _shared/core/i18n/data/locale_order.json and the native',
+	'names from _shared/core/i18n/data/locale_names.json. Both are shared, because three',
 	'hand-maintained copies is how the Linux table came to hold 16 of 21 locales',
 	'— its five missing rows rendered as bare two-letter codes in the menu.'
 ];
@@ -90,7 +94,7 @@ function emitMacos() {
 	});
 	return (
 		'--- _generated/locale_table.lua\n' +
-		'--- AUTO-GENERATED from _shared/data/locale_order.json + locale_names.json.\n' +
+		'--- AUTO-GENERATED from _shared/core/i18n/data/locale_order.json + locale_names.json.\n' +
 		'--- DO NOT EDIT BY HAND — run `npm run codegen:locale-tables` to refresh.\n' +
 		'\n' +
 		'--- ==============================================================================\n' +
@@ -116,7 +120,7 @@ function emitLinux() {
 	);
 	return (
 		'--- _generated/locale_table.lua\n' +
-		'--- AUTO-GENERATED from _shared/data/locale_order.json + locale_names.json.\n' +
+		'--- AUTO-GENERATED from _shared/core/i18n/data/locale_order.json + locale_names.json.\n' +
 		'--- DO NOT EDIT BY HAND — run `npm run codegen:locale-tables` to refresh.\n' +
 		'\n' +
 		'--- ==============================================================================\n' +
@@ -143,7 +147,7 @@ function emitWindows() {
 	);
 	return (
 		'﻿; _generated/locale_table.ahk\n' +
-		'; AUTO-GENERATED from _shared/data/locale_order.json + locale_names.json.\n' +
+		'; AUTO-GENERATED from _shared/core/i18n/data/locale_order.json + locale_names.json.\n' +
 		'; DO NOT EDIT BY HAND — run `npm run codegen:locale-tables` to refresh.\n' +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +

@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. A Purge appends a dated tombstone (events_system, action 'metrics_purge')
 ;    through the journal like any other row, so it reaches data.sql, the
-;    append-only ledger every device replays. _shared/data/db/purge_schema.sql
+;    append-only ledger every device replays. _shared/metrics/data/db/purge_schema.sql
 ;    applies it in SQLite while any ledger replays, so a sibling device never
 ;    brings a purged row back (maintainer decision 2026-11-06). The receipt is
 ;    the tombstone read back from the replayed reader image.
@@ -21,7 +21,7 @@
 ; 3. An Export is a VACUUM INTO copy of the reader image (query
 ;    export.vacuum_into) into the user's Downloads folder, taken after the
 ;    flush settles. Names and the tombstone match the macOS and Linux helper
-;    (_shared/lua/keystats/metrics_maintenance.lua) and the shared vectors.
+;    (_shared/metrics/engine/maintenance.lua) and the shared vectors.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

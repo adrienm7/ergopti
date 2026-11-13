@@ -59,7 +59,7 @@ local function with_writer_spy(module_name, invoke)
 	local captured = nil
 	-- One fake fits every handler: batch_write (config.toml handlers) and write
 	-- (hotstring group-file handlers) both capture their arguments.
-	local classified_read = require("toml_codec.writer").read_classified
+	local classified_read = require("core.text.engine.toml_codec.writer").read_classified
 	local fake = {
 		read_classified = classified_read,
 		batch_write = function(path, updates)
@@ -71,18 +71,18 @@ local function with_writer_spy(module_name, invoke)
 			return true
 		end,
 	}
-	local saved = package.loaded["toml_codec.writer"]
+	local saved = package.loaded["core.text.engine.toml_codec.writer"]
 	local previous_manager = package.loaded["ui.webview_manager"]
 	if module_name == "ui.hotstring_editor.bridge" then
 		package.loaded["ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
 	end
-	package.loaded["toml_codec.writer"] = fake
+	package.loaded["core.text.engine.toml_codec.writer"] = fake
 	local ok, err = pcall(function()
 		local handler = helpers.load_module(module_name)
 		invoke(handler)
 	end)
 	-- Restore the real cache before asserting so a failure cannot leak the fake.
-	package.loaded["toml_codec.writer"] = saved
+	package.loaded["core.text.engine.toml_codec.writer"] = saved
 	package.loaded["ui.webview_manager"] = previous_manager
 	if not ok then error(err, 0) end
 	return captured
@@ -335,8 +335,8 @@ helpers.describe("shared toml writer preserves file-level tuning (meta-tuning)",
     -- The Linux loader resolves meta.delay/color/show_tooltip/priority and
     -- meta.section_delays, but the shared writer never emitted them: any
     -- write through it silently reset that tuning to the shipped defaults.
-    local writer = helpers.load_module("toml_codec.writer")
-    local reader = helpers.load_module("toml_codec.reader")
+    local writer = helpers.load_module("core.text.engine.toml_codec.writer")
+    local reader = helpers.load_module("core.text.engine.toml_codec.reader")
     local path = os.tmpname()
     local data = {
       meta = {
@@ -372,7 +372,7 @@ helpers.describe("shared toml writer preserves file-level tuning (meta-tuning)",
   helpers.it("meta-tuning: callers without tuning get byte-identical output", function()
     -- Additive emission only: the onboarding/config-window bridges never set
     -- tuning, so their files must not gain lines they never had.
-    local writer = helpers.load_module("toml_codec.writer")
+    local writer = helpers.load_module("core.text.engine.toml_codec.writer")
     local path = os.tmpname()
     local ok = writer.write(path, {
       meta = { description = "Personal" },
@@ -410,9 +410,9 @@ helpers.describe("hotstring editor classified source admission", function()
 		local native_stage = NativeWriter.open
 		local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
 		local old_manager = package.loaded["ui.webview_manager"]
-		local writer = require("toml_codec.writer")
-		local reader = require("toml_codec.reader")
-		local old_writer, old_reader = package.loaded["toml_codec.writer"], package.loaded["toml_codec.reader"]
+		local writer = require("core.text.engine.toml_codec.writer")
+		local reader = require("core.text.engine.toml_codec.reader")
+		local old_writer, old_reader = package.loaded["core.text.engine.toml_codec.writer"], package.loaded["core.text.engine.toml_codec.reader"]
 		local obs = { stages = 0, renames = 0, reloads = 0, source = initial, faults = 0, source_reads = 0, epochs = 0 }
 		local function put(content)
 			local fh = assert(native_open(path, "w")); assert(fh:write(content)); assert(fh:close())
@@ -474,12 +474,12 @@ helpers.describe("hotstring editor classified source admission", function()
 					return data
 				end
 				if mode == "missing_parse" then port.parse_text = nil end
-				package.loaded["toml_codec.reader"] = port
+				package.loaded["core.text.engine.toml_codec.reader"] = port
 			end
 			if mode == "missing_classified" or mode == "write_truthy" then
 				local port = {}; for key, value in pairs(writer) do port[key] = value end
 				if mode == "missing_classified" then port.read_classified = nil else port.write = function() obs.faults = obs.faults + 1; return 2 end end
-				package.loaded["toml_codec.writer"] = port
+				package.loaded["core.text.engine.toml_codec.writer"] = port
 			end
 			local bridge = helpers.load_module("ui.hotstring_editor.bridge")
 			obs.opened = bridge.push_init(state, context)
@@ -491,14 +491,14 @@ helpers.describe("hotstring editor classified source admission", function()
 		io.open, os.rename, NativeWriter.open = native_open, native_rename, native_stage
 		package.loaded["ui.hotstring_editor.bridge"] = old_bridge
 		package.loaded["ui.webview_manager"] = old_manager
-		package.loaded["toml_codec.writer"], package.loaded["toml_codec.reader"] = old_writer, old_reader
+		package.loaded["core.text.engine.toml_codec.writer"], package.loaded["core.text.engine.toml_codec.reader"] = old_writer, old_reader
 		local fh = native_open(path, "r"); obs.bytes = fh and fh:read("*a") or nil; if fh then fh:close() end
 		local stage = native_open(helpers.stage_path(path), "r"); obs.stage_left = stage ~= nil; if stage then stage:close() end
 		os.remove(path); os.remove(path .. ".tmp"); os.remove(root)
 		obs.ok, obs.problem = ok, problem
 		obs.restored = io.open == native_open and os.rename == native_rename and NativeWriter.open == native_stage
 			and package.loaded["ui.hotstring_editor.bridge"] == old_bridge
-			and package.loaded["toml_codec.writer"] == old_writer and package.loaded["toml_codec.reader"] == old_reader
+			and package.loaded["core.text.engine.toml_codec.writer"] == old_writer and package.loaded["core.text.engine.toml_codec.reader"] == old_reader
 			and package.loaded["ui.webview_manager"] == old_manager
 		return obs
 	end
@@ -545,7 +545,7 @@ helpers.describe("hotstring editor classified source admission", function()
 			helpers.assert_eq(obs.renames, 1, "one native atomic publication must acknowledge replacement")
 			helpers.assert_eq(obs.reloads, 1)
 			helpers.assert_eq(obs.stage_left, false)
-			local parsed, committed = require("toml_codec.reader").parse_text(obs.bytes)
+			local parsed, committed = require("core.text.engine.toml_codec.reader").parse_text(obs.bytes)
 			helpers.assert_eq(committed, true)
 			helpers.assert_eq(parsed.sections.english.entries[1].trigger, "new", "the requested whole-model edit must persist")
 			helpers.assert_eq(#parsed.sections.english.entries, 1, "deleted old entries must stay deleted")

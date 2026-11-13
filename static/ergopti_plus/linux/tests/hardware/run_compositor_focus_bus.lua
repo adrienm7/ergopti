@@ -15,10 +15,10 @@
 --- Exit 0 = every check held; 1 = a check failed; 2 = no session bus or libgio.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 local ffi = require("ffi")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Focus = require("adapters.compositor_focus")
 
 if (os.getenv("DBUS_SESSION_BUS_ADDRESS") or "") == "" then
@@ -96,7 +96,7 @@ check(call(shell, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesk
 	{ Focus.SERVICES.gnome }, 4), "the stand-in Shell owns org.gnome.Shell")
 
 local worker_command = "exec luajit adapters/compositor_focus_worker.lua " .. Focus.SERVICES.gnome .. " "
-	.. tostring(ffi.C.getpid()) .. " ../_shared/lua"
+	.. tostring(ffi.C.getpid()) .. " ../_shared"
 local worker = assert(io.popen(worker_command, "r"))
 local function next_record()
 	local line = worker:read("*l")

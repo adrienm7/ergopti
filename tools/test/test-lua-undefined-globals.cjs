@@ -24,7 +24,7 @@
  * 3. Self-test: the shapes that shipped (a missing require, a local function
  *    called above its declaration) are flagged; locals, upvalues, base and
  *    host globals, and an assigned global are not.
- * 4. Production: every Lua file of macos/, linux/ and _shared/lua outside the
+ * 4. Production: every Lua file of macos/, linux/ and _shared outside the
  *    test folders, every hit listed at once.
  * ==============================================================================
  */
@@ -38,7 +38,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BASE = path.join(ROOT, 'static', 'ergopti_plus');
-const TREES = ['macos', 'linux', '_shared/lua'];
+const TREES = ['macos', 'linux', '_shared'];
 // Test folders stub host globals on purpose; only shipped Lua is read.
 const TEST_FOLDER = /(^|\/)tests?(\/|$)/;
 // luac lists a bounded number of files per call to stay under argv limits.
@@ -199,7 +199,7 @@ try {
 			'return { ms = ms, base_delay = base_delay }'
 		],
 		'clean.lua': [
-			'local Text = require("text_utils")',
+			'local Text = require("core.text.engine.utils_core")',
 			'local unpack_ = table.unpack or unpack',
 			'local is_jit = jit ~= nil and type(arg) == "table"',
 			'local function helper(value) return Text.trim(value) end',

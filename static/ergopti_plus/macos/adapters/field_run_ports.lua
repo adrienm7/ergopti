@@ -36,11 +36,11 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local FileSystem = require("adapters.file_system")
 local ShellRunner = require("adapters.shell_runner")
 local Timer = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "adapters.field_run_ports"
 
@@ -226,7 +226,7 @@ local function run_diagnostics(finish)
 	local schema = Core.config().schema
 	local snapshot = Core.run({ complete_local = true })
 	local issues = type(snapshot.sections) == "table" and snapshot.sections.issues or {}
-	local safe = require("healthcheck.share").snapshot(snapshot, schema)
+	local safe = require("diagnostics.engine.healthcheck.share").snapshot(snapshot, schema)
 	local verdict, codes = M.diagnostics_codes(issues, Core.last_phase_a())
 	finish(verdict, codes, safe)
 end
@@ -297,7 +297,7 @@ local function ollama_runtime(finish)
 		end)
 	end
 	local accepted
-	if path and require("core.llm.ollama_runtime_choice").classify(source) == "foreign" then
+	if path and require("core.lifecycle.engine.core.ollama_runtime_choice").classify(source) == "foreign" then
 		accepted = Deps.check_and_install_deps(settle)
 	else
 		accepted = require("ui.menu.menu_llm.runtime_install_offer").install_ollama(settle)

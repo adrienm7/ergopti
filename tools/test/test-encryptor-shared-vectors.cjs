@@ -5,7 +5,7 @@
  * MODULE: Encryptor Shared Vectors
  * DESCRIPTION:
  * Pins the Encryptor container that every driver reads and writes
- * (_shared/data/encryptor/format.json) to its vectors
+ * (_shared/apps/data/encryptor/format.json) to its vectors
  * (_shared/tests/corpus/encryptor/vectors.json). Node's own crypto derives the
  * key, decrypts each container and, with the same salt, encrypts it back byte
  * for byte, so the vectors are checked by an implementation that is none of
@@ -28,7 +28,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const plus = path.join(root, 'static/ergopti_plus');
 const format = JSON.parse(
-	fs.readFileSync(path.join(plus, '_shared/data/encryptor/format.json'), 'utf8')
+	fs.readFileSync(path.join(plus, '_shared/apps/data/encryptor/format.json'), 'utf8')
 );
 const vectors = JSON.parse(
 	fs.readFileSync(path.join(plus, '_shared/tests/corpus/encryptor/vectors.json'), 'utf8')
@@ -175,7 +175,7 @@ scenario(
 	() => {
 		const code = fs.readFileSync(path.join(plus, 'linux/apps/encryptor_core.lua'), 'utf8');
 		assert.ok(
-			code.includes('shared("data/encryptor/format.json")'),
+			code.includes('shared("apps/data/encryptor/format.json")'),
 			'Linux no longer reads the format'
 		);
 		for (const literal of [String(format.iterations), format.cipher, '".enc"']) {

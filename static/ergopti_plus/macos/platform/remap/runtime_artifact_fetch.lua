@@ -32,7 +32,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "remap.runtime_artifact_fetch"
 

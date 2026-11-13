@@ -30,9 +30,9 @@
 local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
 local MAGIC_REPEAT = os.getenv("ERGOPTI_E2E_MAGIC_REPEAT") or "none"
 local TAP_COLLISION = MAGIC_REPEAT:match("^tap%-") ~= nil
-if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/modules/hotstrings/magickey.toml" end
+if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/hotstrings/data/catalogue/magickey.toml" end
 arg = { "--device", DEVICE, "--config", CONFIG }
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 -- On a Windows checkout the daemon's POSIX edges (HOME, /tmp, mkdir -p, sh
 -- and coreutils) are emulated for this test process as tests/run.lua does for

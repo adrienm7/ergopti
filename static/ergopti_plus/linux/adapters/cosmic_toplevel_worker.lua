@@ -386,7 +386,7 @@ if type(arg) == "table" and type(arg[0]) == "string"
 	else
 		package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
 	end
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local function emit(record)
 		local written = io.stdout:write(Json.encode(record), "\n")
 		return written ~= nil and io.stdout:flush() ~= nil

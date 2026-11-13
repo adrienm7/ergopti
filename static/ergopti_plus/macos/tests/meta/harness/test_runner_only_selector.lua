@@ -223,13 +223,13 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		local helper_file = assert(io.open(helper_path, "rb"))
 		local helper_source = helper_file:read("*a")
 		assert(helper_file:close())
-		local Timing = require("test.runner_timing")
+		local Timing = require("tests.lua.core.runner_timing")
 		local rows, ticks, printed, captures = {}, 0, 0, 0
 		-- A separate real helper instance keeps the deliberately failed module out
 		-- of the outer test reporter. Only the fixture clock and sink are recorded.
 		local helper_environment = setmetatable({
 			require = function(name)
-				if name ~= "test.runner_timing" then return require(name) end
+				if name ~= "tests.lua.core.runner_timing" then return require(name) end
 				return { capture = function(driver)
 					helpers.assert_eq(driver, "macos")
 					captures = captures + 1
@@ -335,8 +335,8 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 	end)
 end)
 
-require("test.runner_timing_contract").run(helpers)
+require("tests.lua.core.runner_timing_contract").run(helpers)
 
-require("test.runner_home_contract").run(helpers)
+require("tests.lua.core.runner_home_contract").run(helpers)
 
-require("test.runner_replay_contract").run(helpers, "macos")
+require("tests.lua.core.runner_replay_contract").run(helpers, "macos")

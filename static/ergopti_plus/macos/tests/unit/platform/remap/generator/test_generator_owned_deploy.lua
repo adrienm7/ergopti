@@ -27,7 +27,7 @@ local function with_generator(existing, run)
 	helpers.with_fresh_modules({
 		"adapters.file_system", "adapters.json_codec", "infra.config_paths", "infra.keycodes", "infra.logger",
 		"infra.toml.codec", "platform.remap.config", "platform.remap.generator",
-		"modules.keymap.layout_registry", "infra.i18n", "infra.locale", "locale.core", "toml_codec",
+		"modules.keymap.layout_registry", "infra.i18n", "infra.locale", "core.i18n.engine.core", "core.text.engine.toml_codec",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/tmp/ergopti_test" end }
@@ -37,7 +37,7 @@ local function with_generator(existing, run)
 			F20_LAYER_NAV_ENTERED = 90, F19_LAYER_NAV_EXITED = 80,
 		}
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-		package.loaded["toml_codec"], package.loaded["infra.toml.codec"] = toml_stub, toml_stub
+		package.loaded["core.text.engine.toml_codec"], package.loaded["infra.toml.codec"] = toml_stub, toml_stub
 		local file_state = { content = existing, writes = {}, merged_reads = 0 }
 		package.loaded["adapters.file_system"] = {
 			read = SourceFile.read,

@@ -155,7 +155,7 @@ def main():
                 CURL_CA_BUNDLE=str(cert),
                 NO_PROXY="127.0.0.1,localhost",
                 no_proxy="127.0.0.1,localhost",
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 ERGOPTI_NATIVE_TLS_URL=url,
                 ERGOPTI_NATIVE_TLS_METHOD=method,
                 ERGOPTI_NATIVE_TLS_EXPECTED=expected,

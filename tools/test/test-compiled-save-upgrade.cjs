@@ -58,12 +58,12 @@ function healthyUpgrade(sha = 'a'.repeat(40), digest = 'b'.repeat(64)) {
 			},
 			extracted_assets: [
 				{
-					path: 'static/ergopti_plus/_shared/core/config_schema/migrations.toml',
+					path: 'static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml',
 					bytes: 74264,
 					sha256: '37a89fb1add8e022aee1440147687017c6280023313945c0c9affc3b07f09402'
 				},
 				{
-					path: 'static/ergopti_plus/_shared/data/locales/en.json',
+					path: 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json',
 					bytes: 299858,
 					sha256: '86baa730998670f61b51712f2ded7f03983697f3452b9e64ea60f597a0028af7'
 				}
@@ -304,7 +304,7 @@ function runContractCases(verifyStartup) {
 function runFixtureSchemaCases(verifyStartup) {
 	const registry = path.resolve(
 		__dirname,
-		'../../static/ergopti_plus/_shared/core/config_schema/migrations.toml'
+		'../../static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml'
 	);
 	const current = currentSchemaVersion();
 	const future = current + 1;

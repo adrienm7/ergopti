@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local MODULE = "ui.numeric_prompt.bridge"
 
 --- Runs an isolated real bridge over explicit native page acknowledgements.

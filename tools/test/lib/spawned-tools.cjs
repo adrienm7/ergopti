@@ -5,7 +5,7 @@
  * MODULE: Spawned Tools
  * DESCRIPTION:
  * Derives, from the driver sources themselves, the external programs the macOS
- * and Linux drivers start: _shared/data/owned_runtimes.json must list each one
+ * and Linux drivers start: _shared/core/network/data/owned_runtimes.json must list each one
  * in a row with a decision (own and pin it, or take the system copy with a
  * version check and a clear refusal), and a spawn added without a row fails the inventory
  * test instead of joining the product unnoticed.

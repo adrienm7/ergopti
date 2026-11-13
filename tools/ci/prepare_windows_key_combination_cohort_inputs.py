@@ -19,7 +19,7 @@ import sys
 import tempfile
 import types
 
-LEGACY_SHA = "a60f016ec2a530831fc5ae03015a60f1356ed4cb36035eeb1ab3e59bbcbfaeae"
+LEGACY_SHA = "3b7b7049ba7f507c7c5f3225d48ed348fea2a68a17647d3b969aa303e8958d6c"
 BUNDLE_BUILDER = "tools/build/build_static_bundle.py"
 BUNDLE_MANIFEST = "tools/build/windows_bundle_manifest.json"
 WIN = "static/ergopti_plus/windows/"
@@ -52,8 +52,8 @@ BUILD_INPUTS = {
     "tools/build/build_windows_nav_owner.ps1",
     "tools/build/build_windows_network_pac.ps1",
     "tools/build/prepare_network_pac_sources.py",
-    SHARED + "data/linux_native_runtime.json",
-    SHARED + "modules/network/pac_helpers.js",
+    SHARED + "core/network/data/linux_native_runtime.json",
+    SHARED + "core/network/data/pac_helpers.js",
 }
 
 
@@ -149,7 +149,7 @@ def selected_paths(legacy, rows, manifest, require_enrollment=False):
         # The real suite loads all registration files; shared fixtures can be read at bootstrap.
         if path.startswith(SHARED + "tests/"):
             roles.append("shared-registered-fixture-source-superset")
-        if path.startswith(SHARED + "native/network/"):
+        if path.startswith(SHARED + "core/network/native/"):
             roles.append("original-native-pac-build-source")
         if path in BUILD_INPUTS:
             roles.append("declared-original-build-input")

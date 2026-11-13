@@ -398,16 +398,16 @@ local DELIMITER_CONFIG = table.concat({
 
 helpers.describe("menu_state: saved delimiter states replay without ERROR (config-outdated-terminators)", function()
 	helpers.it("applies built-in and custom states and only warns about a retired key", function()
-		helpers.with_fresh_modules({ "logger.shim", "keymap.terminators", "config_outdated", "infra.preferences" },
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "layouts.engine.layers.terminators", "settings.engine.migration.outdated", "infra.preferences" },
 			function()
 				local errors, warnings = {}, {}
 				local shim = helpers.make_logger_stub()
 				shim.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 				shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-				package.loaded["logger.shim"] = shim
-				local Terminators = require("keymap.terminators")
+				package.loaded["core.logger.engine.shim"] = shim
+				local Terminators = require("layouts.engine.layers.terminators")
 				local Preferences = helpers.load_with_stubs("infra.preferences")
-				local saved = Preferences.flatten_document(require("toml_codec").decode(DELIMITER_CONFIG))
+				local saved = Preferences.flatten_document(require("core.text.engine.toml_codec").decode(DELIMITER_CONFIG))
 				helpers.assert_eq(saved.terminator_states, { comma = false, custom_at = false })
 
 				local state = {
@@ -433,7 +433,7 @@ helpers.describe("menu_state: saved delimiter states replay without ERROR (confi
 				helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
 				helpers.assert_true(warnings[1]:find("'hotstrings.terminator_states.retired_pipe'", 1, true) ~= nil,
 					warnings[1])
-				local scan = require("config_unused_keys").find_in_source(DELIMITER_CONFIG,
+				local scan = require("settings.engine.migration.unused_keys").find_in_source(DELIMITER_CONFIG,
 					Preferences.mark_config_reads)
 				helpers.assert_eq(#scan.keys, 1)
 				helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key },

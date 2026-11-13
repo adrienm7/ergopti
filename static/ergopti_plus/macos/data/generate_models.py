@@ -24,8 +24,8 @@ from typing import Any, Dict, Optional, Union
 import requests
 from bs4 import BeautifulSoup
 
-# The hosts are declared once in _shared/data/identifiers.json.
-_IDENTIFIERS = Path(__file__).resolve().parents[2] / "_shared/data/identifiers.py"
+# The hosts are declared once in _shared/core/text/data/identifiers.json.
+_IDENTIFIERS = Path(__file__).resolve().parents[2] / "_shared/core/text/data/identifiers.py"
 sys.path.insert(0, str(_IDENTIFIERS.parent))
 _bytecode_default = sys.dont_write_bytecode
 sys.dont_write_bytecode = True  # a cache beside the shared data would ship in the bundles
@@ -479,9 +479,9 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Source and output files now live in _shared/modules/llm/ — two levels up from this
-    # script (hammerspoon/data/ → hammerspoon/ → drivers/ → _shared/modules/llm/).
-    shared_llm_dir = os.path.normpath(os.path.join(script_dir, "../../_shared/modules/llm"))
+    # Source and output files now live in _shared/ai/data/ — two levels up from this
+    # script (hammerspoon/data/ → hammerspoon/ → drivers/ → _shared/ai/data/).
+    shared_llm_dir = os.path.normpath(os.path.join(script_dir, "../../_shared/ai/data"))
     v0_path = os.path.join(shared_llm_dir, "models_v0.json")
     final_path = os.path.join(shared_llm_dir, "models.json")
 

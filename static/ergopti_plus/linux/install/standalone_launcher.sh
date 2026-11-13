@@ -9,7 +9,7 @@ unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_DI
 WRAPPER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 INSTALL_ROOT="$(cd -- "$WRAPPER_DIR/.." && pwd -P)"
 DRIVER_ROOT="$INSTALL_ROOT/linux"
-SHARED_LUA="$INSTALL_ROOT/_shared/lua"
+SHARED_LUA="$INSTALL_ROOT/_shared"
 if [ -e "$DRIVER_ROOT/runtime" ] || [ -L "$DRIVER_ROOT/runtime" ]; then
 	# A release install carries the private runtime every package runs; its
 	# environment refuses a missing part. _shared sits beside linux/ here, so

@@ -6,7 +6,7 @@
 local uv = require("luv")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-storage-XXXXXX"))
 local previous_xdg = uv.os_getenv("XDG_CONFIG_HOME")
 local directories, files = { root }, {}

@@ -35,7 +35,7 @@
 ; ==================================
 ; ==================================
 
-; The vector count, pinned as _shared/lua/test/tap_hold_decision_contract.lua
+; The vector count, pinned as _shared/tests/lua/keyboard/tap_hold_decision_contract.lua
 ; pins it, so a truncated corpus fails instead of shrinking the contract.
 global _CTHD_VECTOR_COUNT := 30
 
@@ -329,7 +329,7 @@ _CTHD_HoldPickerOrder() {
 	global _SharedDir
 	static Order := 0
 	if !IsObject(Order)
-		Order := TOML_ParseFreshFile(_SharedDir . "\tap_hold\defaults.toml")["tap_hold.hold_picker"]["modifiers"]
+		Order := TOML_ParseFreshFile(_SharedDir . "\tap_hold\data\defaults.toml")["tap_hold.hold_picker"]["modifiers"]
 	return Order
 }
 

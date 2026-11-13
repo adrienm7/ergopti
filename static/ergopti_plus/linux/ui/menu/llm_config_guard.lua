@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: AI Menu Configuration Guard (Linux binding)
 --- DESCRIPTION:
---- Binds the shared AI configuration guard (_shared/lua/llm/config_guard.lua)
+--- Binds the shared AI configuration guard (_shared/ai/engine/policy/config_guard.lua)
 --- to this driver's provider rows (`action`, `items`), its logger and its
 --- config.toml path, and greys the rows that write the file with the cause.
 ---
@@ -15,8 +15,8 @@
 ---    a reload can read a newer file, and the click must not write over it.
 --- ==============================================================================
 
-local Shared = require("llm.config_guard")
-local Logger = require("logger.shim")
+local Shared = require("ai.engine.policy.config_guard")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.llm_config_guard"
 
@@ -31,7 +31,7 @@ local DIALECT = {
 --- The locale key naming why config.toml cannot be written now, or nil.
 --- @return string|nil reason_key
 function M.reason()
-	return Shared.reason_key(require("infra.config_paths").config("config.toml"), require("config_migrate"))
+	return Shared.reason_key(require("infra.config_paths").config("config.toml"), require("settings.engine.migration.migrate"))
 end
 
 --- Wraps every action of a provider tree, in place, so a click asks again.

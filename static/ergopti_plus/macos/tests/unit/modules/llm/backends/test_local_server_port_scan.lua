@@ -19,14 +19,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Policy = require("llm.local_server_ports")
+local Json = require("core.text.engine.json")
+local Policy = require("ai.engine.local_servers.ports_core")
 local Timings = require("infra.timings")
 
 --- Builds the scan entries of the actual catalogue.
 --- @return table entries
 local function catalogue_entries()
-	local file = assert(io.open(helpers.shared("modules/llm/local_servers.json"), "rb"))
+	local file = assert(io.open(helpers.shared("ai/data/local_servers.json"), "rb"))
 	local root = assert(Json.decode(file:read("*a")))
 	file:close()
 	local entries = {}

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Exercises a fresh connector with independently controlled process close ACKs.
 --- @param options table Constructor fault and completion controls.
@@ -18,7 +18,7 @@ local function with_owner(options, body)
 	package.loaded["modules.llm.agent_connectors"] = nil
 	local Connector = require("modules.llm.agent_connectors")
 	local state = { operations = {}, callbacks = 0, writes = 0, removals = 0, lists = 0, directories = 0, files = {} }
-	local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+	local file = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 	local config = assert(Json.decode(file:read("*a"))); file:close()
 	local function done()
 		state.callbacks = state.callbacks + 1
@@ -314,7 +314,7 @@ helpers.describe("agent connector owned shutdown", function()
 
 	for _, mode in ipairs({ "cancel", "second calendar" }) do
 		helpers.it("(agent-connector-shutdown) logger reentry " .. mode .. " retains the first calendar input", function()
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local original = Logger.info
 			local ok, why = pcall(function()
 				with_owner({}, function(Connector, state)
@@ -466,7 +466,7 @@ helpers.describe("native agent connector shutdown", function()
 		for _, mode in ipairs({ "normal", "shutdown", "cold", "spawn-refused" }) do
 			helpers.it("(agent-connector-shutdown-native) actual " .. mode .. " helper lifetime", function()
 				local uv = require("luv")
-				local quote = require("text_utils").shell_quote
+				local quote = require("core.text.engine.utils_core").shell_quote
 				local fixture = helpers.driver_root() .. "/tests/fixtures/native_agent_connector_shutdown.lua"
 				local result = os.execute(quote(assert(uv.exepath())) .. " " .. quote(fixture) .. " " .. quote(mode))
 				helpers.assert_true(result == true or result == 0, "native connector lifetime must retire all physical resources")

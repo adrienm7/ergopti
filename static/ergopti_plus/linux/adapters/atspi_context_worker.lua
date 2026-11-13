@@ -32,7 +32,7 @@ function M.run(bus, path, role, shared, parent_pid, mode, first, last)
 	else
 		package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 	end
-	require("logger.shim").set_level("error")
+	require("core.logger.engine.shim").set_level("error")
 	local ffi = require("ffi")
 	ffi.cdef([[int getppid(void); int prctl(int option, ...);]])
 	parent_pid = tonumber(parent_pid)
@@ -41,7 +41,7 @@ function M.run(bus, path, role, shared, parent_pid, mode, first, last)
 	assert(parent_pid and parent_pid > 0 and parent_pid % 1 == 0, "context worker parent unavailable")
 	assert(ffi.C.prctl(PR_SET_PDEATHSIG, ffi.cast("unsigned long", SIGKILL), 0, 0, 0) == 0, "parent lifetime binding failed")
 	assert(tonumber(ffi.C.getppid()) == parent_pid, "context worker parent already exited")
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local field = { bus = bus, path = path, role = tonumber(role) }
 	if mode ~= nil then
 		assert(mode == "selection" or mode == "span", "unknown context worker operation")

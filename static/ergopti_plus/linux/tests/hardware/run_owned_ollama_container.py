@@ -45,7 +45,7 @@ DRIVER = HERE.parent.parent
 SHARED = DRIVER.parent / "_shared"
 CONTROL = "linux/tests/hardware/run_owned_ollama_container.lua"
 STAND_IN = HERE / "fake_ollama_server.py"
-DEFAULTS = json.loads((SHARED / "modules/llm/defaults.json").read_text())
+DEFAULTS = json.loads((SHARED / "ai/data/defaults.json").read_text())
 OWNED, STOCK = DEFAULTS["llm_ollama_owned_port"], DEFAULTS["llm_ollama_port"]
 MODEL = "qwen3:0.6b"
 
@@ -171,8 +171,8 @@ class OwnedOllamaContainer(unittest.TestCase):
                 for part in (
                     "linux/?.lua",
                     "linux/?/init.lua",
-                    "_shared/lua/?.lua",
-                    "_shared/lua/?/init.lua",
+                    "_shared/?.lua",
+                    "_shared/?/init.lua",
                 )
             )
             + ";;",
@@ -188,7 +188,7 @@ class OwnedOllamaContainer(unittest.TestCase):
     def plan(self, env):
         script = (
             'local r = assert(require("modules.llm.ollama_install_resolver").new())\n'
-            'local p = r.plan(); io.write(require("json").encode({directory = p.directory}))\n'
+            'local p = r.plan(); io.write(require("core.text.engine.json").encode({directory = p.directory}))\n'
         )
         completed = subprocess.run(
             ["luajit", "-e", script],
@@ -445,8 +445,8 @@ class OwnedOllamaContainer(unittest.TestCase):
 
 ENGINE_CASES = r"""
 local Runtime = require("platform.network.pac_runtime")
-local Json = require("json")
-local file = assert(io.open(os.getenv("ERGOPTI_PROOF_SHARED") .. "/modules/network/pac_helpers.js", "rb"))
+local Json = require("core.text.engine.json")
+local file = assert(io.open(os.getenv("ERGOPTI_PROOF_SHARED") .. "/core/network/data/pac_helpers.js", "rb"))
 local helpers = file:read("*a")
 file:close()
 local limits = { max_heap_bytes = 67108864, max_native_queries = 128, max_output_bytes = 65536,
@@ -473,7 +473,7 @@ class PacEngine(unittest.TestCase):
                 "ERGOPTI_PROOF_SHARED": str(SHARED),
                 # The lookup child's own path (system_proxy_probe.lua): shared
                 # modules resolve from their init.lua too.
-                "LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/lua/?.lua;{SHARED}/lua/?/init.lua;;",
+                "LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/?.lua;{SHARED}/?/init.lua;;",
             },
             capture_output=True,
             text=True,

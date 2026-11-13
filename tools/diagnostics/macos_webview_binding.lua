@@ -232,9 +232,9 @@ end
 guarded(function()
 	local root = assert(config.production_root)
 	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
-		.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path
+		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
 	local Logger = require("infra.logger")
-	local policy = assert(io.open(root .. "/_shared/modules/diagnostics/redaction.json", "rb"))
+	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
 	WebViewResult = require("adapters.webview_result")

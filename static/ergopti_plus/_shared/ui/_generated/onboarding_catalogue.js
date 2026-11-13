@@ -2,7 +2,7 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Source: static/ergopti_plus/_shared/modules/features/manifest.toml [onboarding]
+// Source: static/ergopti_plus/_shared/settings/data/features/manifest.toml [onboarding]
 // Run: npm run codegen:onboarding-catalogue
 // ==========================================
 

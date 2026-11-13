@@ -21,7 +21,7 @@ def main():
             [
                 runtime,
                 "-e",
-                'io.write(require("json").encode(require("test.response_error_contract").vectors))',
+                'io.write(require("core.text.engine.json").encode(require("tests.lua.response_error_contract").vectors))',
             ]
         )
     )

@@ -5,11 +5,11 @@
 ; DESCRIPTION:
 ; AHK port of _shared/ui/issue_link.js: builds the prefilled "new issue" URL
 ; of the repository's GitHub issue forms, bounded to the byte budget of
-; _shared/modules/diagnostics/issue_templates.json.
+; _shared/diagnostics/data/issue_templates.json.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Pure: the caller passes the templates document and the repository read
-;    from _shared/modules/updater/defaults.json, so neither is typed here.
+;    from _shared/updater/data/defaults.json, so neither is typed here.
 ; 2. The budget is measured on the percent-encoded string, where an accented
 ;    letter costs 6 bytes and an emoji 12.
 ; 3. An oversized prefill is cut, never refused: the last parameter first, at

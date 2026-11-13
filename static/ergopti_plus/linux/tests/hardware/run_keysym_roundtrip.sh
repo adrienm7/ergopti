@@ -45,7 +45,7 @@ set -uo pipefail
 
 DRIVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LUA_BIN="$(command -v luajit || command -v lua5.4 || command -v lua || true)"
-export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+export LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 
 PASS=0
 FAIL=0

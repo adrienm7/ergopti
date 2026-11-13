@@ -58,12 +58,16 @@ function project(source, target, pick) {
 	);
 }
 
-project(shared('data', 'secure_apps.json'), shared('lua', 'secure_apps_data.lua'), ({ apps }) => ({
-	apps
-}));
+project(
+	shared('data', 'secure_apps.json'),
+	shared('apps', 'engine', 'secure_apps_data.lua'),
+	({ apps }) => ({
+		apps
+	})
+);
 project(
 	shared('data', 'linux_app_identities.json'),
-	shared('lua', 'linux_app_identities_data.lua'),
+	shared('apps', 'engine', 'linux_app_identities_data.lua'),
 	({ marker, aliases, same }) => ({
 		marker,
 		aliases,

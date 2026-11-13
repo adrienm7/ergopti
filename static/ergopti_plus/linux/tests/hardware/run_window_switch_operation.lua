@@ -1,7 +1,7 @@
 --- tests/hardware/run_window_switch_operation.lua
 
 --- Actual X11 workers with explicit controlled kernel-source receipts.
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Switch = require("adapters.window_switch")
 local pulses, result, elapsed = 0, nil, uv.hrtime()
@@ -163,7 +163,7 @@ elseif preactivation then
 			debt = owner.stop() == false and owner.has_pending()
 			assert(debt, "pause acknowledged physical retirement before owned worker exit")
 		elseif mode == "preactivation_program_binding" then
-			local scalar = require("json").encode({ version = 1, executable = "/bin/true", arguments = { "owned-program-binding" } })
+			local scalar = require("core.text.engine.json").encode({ version = 1, executable = "/bin/true", arguments = { "owned-program-binding" } })
 			configuration = require("infra.program_binding_transaction").new({
 				binding = "tap_3", scalar = scalar, path = arg[4], backup_path = arg[4] .. ".owned-program-binding",
 				is_paused = function() return paused end,

@@ -255,7 +255,7 @@ end
 --- @return table Array of { id, locale, categories }.
 local function load_language_packs()
 	if _language_packs_cache then return _language_packs_cache end
-	local path = Paths.shared("modules/hotstrings/_index.toml")
+	local path = Paths.shared("hotstrings/data/catalogue/_index.toml")
 	local fh = io.open(path, "r")
 	if not fh then error("[builder] hotstring index is unreadable: " .. tostring(path)) end
 	local raw = fh:read("*a")

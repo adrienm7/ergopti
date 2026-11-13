@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/paths/legacy_folder_migration_vectors.json
 ; through infra/legacy_folder_migration.ahk. macOS and Linux replay the same
-; file through _shared/lua/legacy_folder_migration.lua, so the three drivers
+; file through _shared/settings/engine/migration/legacy_folder_migration_core.lua, so the three drivers
 ; move, back up and refuse the same entries and rewrite paths.toml the same
 ; way. The moves run on a private tree under A_Temp, never on a user folder.
 ; ==============================================================================

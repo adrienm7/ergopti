@@ -1,5 +1,5 @@
 {
-	"_comment": "The rows a layout emulation types, each behind its own [layout] switch (emulate_<row>). Written by hand from a physical ISO keyboard, never generated from the registry: every driver reads the rows from _shared/data/keycodes/physical_keys.json through its layout_rows_policy and must find exactly these keys, left to right.",
+	"_comment": "The rows a layout emulation types, each behind its own [layout] switch (emulate_<row>). Written by hand from a physical ISO keyboard, never generated from the registry: every driver reads the rows from _shared/layouts/data/keycodes/physical_keys.json through its layout_rows_policy and must find exactly these keys, left to right.",
 	"rows": {
 		"number_row": [
 			"Backquote",

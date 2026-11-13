@@ -15,7 +15,7 @@ them the same way since fc5d3a11df: it rebuilds the `.keylayout` and replaces it
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | Windows | Applied. The driver emulates the layout, and `#HotIf NumberRowEffectiveMode()` hotkeys retype the ten digit keys (`modules/keymap/layout.ahk`, `layout/digit_row_bindings.ahk`, `layout/number_row_send.ahk`).            | Applied with the ordering.             |
 | macOS   | Applied by the layout itself: `modules/keymap/number_row_live.lua` rebuilds the installed `.keylayout` with the options (`layouts/keylayout_rows.lua`) and replaces it live (`layout_rows_build.lua`). No key is retyped. | Applied with the ordering, same path.  |
-| Linux   | Applied by the layout itself: the converter (`_shared/lua/layouts/xkb_converter.lua`) swaps the cells while converting, and the session loads the new XKB layout. No key is retyped by the hook.                          | Applied with the ordering, same path.  |
+| Linux   | Applied by the layout itself: the converter (`_shared/layouts/engine/composer/xkb_converter.lua`) swaps the cells while converting, and the session loads the new XKB layout. No key is retyped by the hook.              | Applied with the ordering, same path.  |
 
 ## Why the layout and not the hook
 

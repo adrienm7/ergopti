@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix="ergopti-aggregation-regression-") as te
     database = pathlib.Path(temporary) / "fixture.sqlite"
     with closing(sqlite3.connect(database)) as connection:
         connection.executescript(
-            (root / "static/ergopti_plus/_shared/data/db/schema.sql").read_text()
+            (root / "static/ergopti_plus/_shared/metrics/data/db/schema.sql").read_text()
         )
         for table in tables:
             for day in ["2020-01-01", datetime.date.today().isoformat()]:

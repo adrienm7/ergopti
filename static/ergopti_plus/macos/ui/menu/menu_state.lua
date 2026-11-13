@@ -18,7 +18,7 @@ local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
 local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local LOG    = "menu_state"
 
 -- Delay before starting the keystats engine. Its start (~1.3 s of SQLite +

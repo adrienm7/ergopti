@@ -33,7 +33,7 @@ DRIVER = HERE.parent.parent
 # lua-lgi installs for the distro's Lua 5.1, not under LuaJIT's default paths;
 # without it the daemon draws no prediction offer (as run_daemon_live.sh says).
 LUA_PATH = (
-    "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"
+    "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;"
     "/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;;"
 )
 LUA_CPATH = "/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
@@ -638,7 +638,7 @@ def build_preload(root):
 
 def config_folder(env):
     return subprocess.run(
-        ["luajit", "-e", 'io.write(require("app_dirs").linux.folder_name)'],
+        ["luajit", "-e", 'io.write(require("core.fs.engine.app_dirs").linux.folder_name)'],
         cwd=DRIVER,
         env=env,
         check=True,

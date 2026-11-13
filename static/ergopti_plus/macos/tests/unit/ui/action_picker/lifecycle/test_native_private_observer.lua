@@ -119,7 +119,7 @@ helpers.describe("private source-pinned observer remains read-only and exact", f
 	end)
 
 	helpers.it("keeps the native completion error and value without accepting an NSError failure", function()
-		helpers.with_stub_scope({ "json", "adapters.webview_result", "compat.utf8" }, function()
+		helpers.with_stub_scope({ "core.text.engine.json", "adapters.webview_result", "core.lifecycle.engine.compat.utf8" }, function()
 			for _, failure in ipairs({ { code = 0 }, { code = 5, domain = "WKErrorDomain",
 				localizedDescription = "JavaScript execution returned an unsupported type" } }) do
 				local completion, script, accepted, detail, observed

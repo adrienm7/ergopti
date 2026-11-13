@@ -11,7 +11,7 @@
  * WHY A GENERATED CATALOGUE:
  * The scripts run before LuaJIT, jq or Python can be assumed (install.sh is
  * what installs them), so they cannot read the JSON catalogues. The sentences
- * still live in _shared/data/locales/*.json under `linux_shell.`, translated in
+ * still live in _shared/core/i18n/data/locales/*.json under `linux_shell.`, translated in
  * all 21 locales like every other string, and this generator projects them to a
  * format a bash `read` loop parses.
  *
@@ -36,14 +36,14 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const LOCALES_DIR = path.join(SP, '_shared', 'data', 'locales');
+const LOCALES_DIR = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const OUTPUT_DIR = path.join(SP, 'linux', '_generated', 'shell_messages');
 const PREFIX = 'linux_shell.';
 const SOURCE_LOCALE = 'en';
 const PLACEHOLDER = /\{([1-9])\}/g;
 
 const order = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'data', 'locale_order.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'core', 'i18n', 'data', 'locale_order.json'), 'utf8')
 ).order;
 
 /**
@@ -93,7 +93,7 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 for (const [code, messages] of catalogues) {
 	const lines = [
 		`# linux/_generated/shell_messages/${code}.msg`,
-		`# AUTO-GENERATED from _shared/data/locales/${code}.json (${PREFIX}* keys).`,
+		`# AUTO-GENERATED from _shared/core/i18n/data/locales/${code}.json (${PREFIX}* keys).`,
 		'# DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.',
 		...Object.keys(messages)
 			.sort()

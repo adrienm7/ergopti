@@ -3,14 +3,14 @@
 --- ==============================================================================
 --- MODULE: Test Proxy Sign-In Relay Policy
 --- DESCRIPTION:
---- Drives the shared relay policy (network/proxy_auth_relay.lua) with the
+--- Drives the shared relay policy (core/network/engine/proxy_auth_relay_core.lua) with the
 --- shipped contract and the probe-line vectors the Go relay is pinned to, and
 --- the Linux binding's refusal when the relay is not installed.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function it(name, body) helpers.it(name .. " (proxy-auth-relay)", body) end
 local function eq(actual, expected, label)
@@ -24,8 +24,8 @@ local function read_json(relative)
 	return Json.decode(bytes)
 end
 
-local CONTRACT = read_json("modules/network/proxy_auth_relay.json")
-local Relay = require("network.proxy_auth_relay")
+local CONTRACT = read_json("core/network/data/proxy_auth_relay.json")
+local Relay = require("core.network.engine.proxy_auth_relay_core")
 local policy = assert(Relay.new(CONTRACT))
 local TIMINGS = { dial_ms = 10, handshake_ms = 20, idle_ms = 30 }
 
@@ -75,7 +75,7 @@ it("the probe and run vectors carry every deadline and the child after --", func
 end)
 
 it("every refusal names a localized message, and an unknown one the generic failure", function()
-	local en = read_json("data/locales/en.json")
+	local en = read_json("core/i18n/data/locales/en.json")
 	for reason, key in pairs(CONTRACT.refusals) do
 		eq(policy.message_key(reason), key, reason)
 		assert(type(en[key]) == "string" and en[key] ~= "", key .. " is not in en.json")
@@ -89,7 +89,7 @@ it("an invalid contract is refused", function()
 	for _, contract in ipairs({ {}, { schema_version = 2 }, false }) do
 		eq(Relay.new(contract), nil)
 	end
-	local broken = read_json("modules/network/proxy_auth_relay.json")
+	local broken = read_json("core/network/data/proxy_auth_relay.json")
 	broken.refusals.relay_unavailable = nil
 	eq(Relay.new(broken), nil, "the caller-side refusal is required")
 end)

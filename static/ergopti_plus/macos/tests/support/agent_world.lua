@@ -13,9 +13,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
 local M = {}
@@ -37,7 +37,7 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-M.CONFIG = read_json("modules/llm/agent.json")
+M.CONFIG = read_json("ai/data/agent.json")
 
 --- Returns one named closure upvalue.
 --- @param fn function Closure to inspect.

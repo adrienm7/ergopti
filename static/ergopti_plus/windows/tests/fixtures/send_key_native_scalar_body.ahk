@@ -7,7 +7,7 @@ if A_Args.Length != 3 || A_Args[1] != "--allow-explicit-owned-edit-send-key"
 if !(A_Args[2] == "ascii" || A_Args[2] == "bmp" || A_Args[2] == "astral")
 	throw Error("Unknown native scalar case.")
 global _SharedDir := A_Args[3]
-global _SEND_INPUT_VOCABULARY_JSON := FileRead(_SharedDir . "\modules\actions\send_keys.json", "UTF-8")
+global _SEND_INPUT_VOCABULARY_JSON := FileRead(_SharedDir . "\shortcuts\data\actions\send_keys.json", "UTF-8")
 global _SEND_INPUT_VOCABULARY := JsonParse(_SEND_INPUT_VOCABULARY_JSON)
 global TEXT_SENDER_SEND_LEVEL := 0
 global HSE_Buffer := "", _PrefixBuffer := "", HSE_Suppressed := 0, HSE_FinalNoOpPending := false

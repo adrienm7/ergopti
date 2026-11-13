@@ -26,10 +26,10 @@ local M = {}
 
 local json = require("hs.json")
 local LedgerAppend = require("adapters.ledger_append")
-local JournalSeal = require("keystats.journal_seal")
-local TextCrypto = require("keystats.text_crypto")
+local JournalSeal = require("metrics.engine.journal.seal")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 local TextCipher = require("modules.keystats.text_cipher")
-local TriggerRoi = require("keystats.trigger_roi")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 
 local Logger = require("infra.logger")
 local LOG    = "keystats.rotation"

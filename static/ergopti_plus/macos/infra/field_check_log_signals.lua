@@ -25,7 +25,7 @@
 ---    level > DEBUG, and a count of 0 at a higher level says nothing.
 --- ==============================================================================
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 
 local M = {}
 

@@ -8,9 +8,9 @@
 
 local M = {}
 local Monotonic = require("infra.monotonic")
-local TableUtil = require("table_util")
-local StorageOwned = require("storage_owned")
-local Logger = require("logger.shim")
+local TableUtil = require("core.text.engine.table_util")
+local StorageOwned = require("core.fs.engine.storage_owned")
+local Logger = require("core.logger.engine.shim")
 local MS_PER_SECOND = 1000
 local US_PER_MS = MS_PER_SECOND
 local LOG = "modules.keystats.calendar"

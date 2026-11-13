@@ -151,8 +151,8 @@ const HEADERS = [
 const RUNTIME = [
 	'static/ergopti_plus/macos/platform/network/native_http.py',
 	'static/ergopti_plus/macos/platform/network/managed_http.py',
-	'static/ergopti_plus/_shared/python/network_proxy_policy.py',
-	'static/ergopti_plus/_shared/modules/network/proxy_policy.json'
+	'static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
+	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 ];
 const OWNERS = [
 	'static/ergopti_plus/macos/tests/support/native_http_fixture_builder.py',
@@ -364,7 +364,7 @@ function sourceFixture(change = () => {}) {
 	const roots = [
 		'static/ergopti_plus/macos/launcher',
 		'static/ergopti_plus/macos/adapters/release_stage.sh',
-		'static/ergopti_plus/_shared/modules/updater/defaults.json',
+		'static/ergopti_plus/_shared/updater/data/defaults.json',
 		'tools/build',
 		'tools/diagnostics'
 	];

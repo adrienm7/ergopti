@@ -45,8 +45,8 @@ local CHOICES = { "auto", "iso", "ansi" }
 --- @return string usage The HID usage name the keyboard reports.
 --- @return integer native The keycode macOS natively gives that keyboard for it.
 local function physical(code, form)
-	local source = assert(io.open(helpers.shared("data/keycodes/physical_keys.json"), "rb"))
-	local registry = require("json").decode(source:read("*a")); source:close()
+	local source = assert(io.open(helpers.shared("layouts/data/keycodes/physical_keys.json"), "rb"))
+	local registry = require("core.text.engine.json").decode(source:read("*a")); source:close()
 	local entry = assert(registry.keys[code], code)
 	local record = form == "iso" and entry.macos_iso or entry
 	return record.karabiner.key_code, record.hs

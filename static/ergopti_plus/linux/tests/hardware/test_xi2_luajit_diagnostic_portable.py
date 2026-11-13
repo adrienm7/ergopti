@@ -90,7 +90,9 @@ class PortableControls(unittest.TestCase):
         self.assertNotIn("runtime.xkbcommon =", text)
         self.assertIn('local ffi = require("ffi")', text)
         self.assertNotIn("ffi = {", text)
-        self.assertIn('package.loaded["logger.shim"] = assert(loadfile(logger_source))()', text)
+        self.assertIn(
+            'package.loaded["core.logger.engine.shim"] = assert(loadfile(logger_source))()', text
+        )
         self.assertIn('driver .. "/?.lua;"', text)
         self.assertIn("output_print(string.format(", text)
 

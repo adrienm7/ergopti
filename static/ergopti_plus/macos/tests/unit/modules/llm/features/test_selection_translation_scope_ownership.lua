@@ -11,25 +11,25 @@
 local helpers = require("tests.helpers")
 -- Stateless generated constants every owner now reads; loaded before any snapshot so they are
 -- not mistaken for residue of the fixture under test.
-require("config_keys")
-require("adapter_errors") -- the adapters compare its ids
-require("file_system.ports") -- the file-system owner checks itself against it when it loads
+require("settings.engine.keys")
+require("diagnostics.engine.adapter_errors") -- the adapters compare its ids
+require("core.fs.engine.ports") -- the file-system owner checks itself against it when it loads
 require("infra.dev_source") -- the updater identity reads it; it only caches this process's mode
-require("llm.api_url_template") -- pure: the remote backend fills per-account addresses with it
-require("llm.api_token_exchange") -- pure: the remote backend reads auth blocks with it
-require("llm.failure_class") -- pure: every LLM backend asks it whether a refused key failed the call
-require("llm.request_settings") -- pure: the prediction engine compares a request's settings with it
-require("perf_budget") -- pure: the remote backend judges its request time with it
+require("ai.engine.api.url_template") -- pure: the remote backend fills per-account addresses with it
+require("ai.engine.api.token_exchange") -- pure: the remote backend reads auth blocks with it
+require("ai.engine.policy.failure_class") -- pure: every LLM backend asks it whether a refused key failed the call
+require("ai.engine.settings.request_settings") -- pure: the prediction engine compares a request's settings with it
+require("core.logger.engine.perf_budget") -- pure: the remote backend judges its request time with it
 require("infra.main_thread_hold") -- pure: the logger reads its read-only hold bounds from it
-require("llm.local_server_fingerprint") -- pure: the local server rows identify a server by its models answer
-require("llm.local_server_menu") -- pure: the remote backend names the local server rows with it
-require("keycodes.key_names") -- pure, with its data: the gesture actions name their chord keys with it
-require("actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
-require("gestures.incremental") -- pure: the gesture geometry steps an incremental swipe with it
-require("gestures.contact_join") -- pure: the gesture geometry judges a third contact with it
+require("ai.engine.local_servers.fingerprint") -- pure: the local server rows identify a server by its models answer
+require("ai.engine.local_servers.menu") -- pure: the remote backend names the local server rows with it
+require("platform.input.keycodes.key_names") -- pure, with its data: the gesture actions name their chord keys with it
+require("shortcuts.engine.actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
+require("gestures.engine.incremental") -- pure: the gesture geometry steps an incremental swipe with it
+require("gestures.engine.contact_join") -- pure: the gesture geometry judges a third contact with it
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
-local SharedLogger = require("logger")
+local SharedLogger = require("core.logger.engine")
 local NATIVE_GLOBALS = {
 	"ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME", "ERGOPTI_TOUCH_DEVICES",
 	"ERGOPTI_TOUCH_WATCHERS", "ERGOPTI_TOUCH_WATCHER_TOKENS", "lfs",
@@ -87,7 +87,7 @@ local function assert_restored(before)
 	assert_entries(before.globals, _G, "globals")
 	helpers.assert_true(rawequal(rawget(_G, "hs"), before.hs), "fixture changed the native hs identity")
 	helpers.assert_true(rawequal(package.loaded["infra.logger"], before.logger), "fixture replaced the native logger owner")
-	helpers.assert_true(rawequal(package.loaded.logger, SharedLogger), "fixture replaced the preloaded shared logger")
+	helpers.assert_true(rawequal(package.loaded["core.logger.engine"], SharedLogger), "fixture replaced the preloaded shared logger")
 end
 
 --- Exercises the actual fixture without letting outer cleanup mask its leaks.
@@ -103,11 +103,11 @@ local function check_scope(cold, forced)
 		-- These are fixture preconditions, not a whole-cache rollback. The inner
 		-- scope itself must restore its cold dependency and a pre-existing owner.
 		helpers.with_fresh_modules({ "modules.llm.profiles", "modules.llm.mlx_stream_retirement", "adapters.event_provenance",
-			"json", "llm.translate", "compat.utf8", "tests.support.modules.llm.selection_translation_destination" }, function()
+			"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }, function()
 			local profile = {}
 			package.loaded["modules.llm.profiles"] = profile
 			for _, name in ipairs({ "modules.llm.mlx_stream_retirement", "adapters.event_provenance",
-				"json", "llm.translate", "compat.utf8", "tests.support.modules.llm.selection_translation_destination" }) do
+				"core.text.engine.json", "ai.engine.prediction.translate", "core.lifecycle.engine.compat.utf8", "tests.support.modules.llm.selection_translation_destination" }) do
 				helpers.assert_nil(package.loaded[name], "the transitive fixture owner must start cold: " .. name)
 			end
 			local before = snapshot()

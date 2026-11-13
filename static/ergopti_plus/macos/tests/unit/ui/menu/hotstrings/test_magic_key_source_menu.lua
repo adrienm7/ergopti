@@ -251,7 +251,7 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 			helpers.assert_eq(ctx.saves, 0)
 			helpers.assert_eq(ctx.applied, {})
 			helpers.assert_eq(ctx.state.magic_key_source, "auto")
-			local reason = require("infra.i18n").get(require("keymap.magic_key_source").TAP_CONFLICT_REASON)
+			local reason = require("infra.i18n").get(require("layouts.engine.layers.magic_key_source").TAP_CONFLICT_REASON)
 			helpers.assert_eq(world.notices[1].body, reason)
 			local row = nil
 			for _, candidate in ipairs(Menu.rows(ctx)[1].items) do
@@ -273,7 +273,7 @@ end)
 
 helpers.describe("magic key source: the actual declared native menu", function()
 	helpers.it("(magic-key-source) cold English and warm French use the real native renderer and retain capture and choice callbacks", function()
-		helpers.with_stub_scope({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
+		helpers.with_stub_scope({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
 			with_menu(function(_, world)
 				package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
 				local translations = require("infra.i18n")
@@ -288,7 +288,7 @@ helpers.describe("magic key source: the actual declared native menu", function()
 					local rows = Menu.rows(ctx)
 					helpers.assert_eq(#world.taps, 0, "construction cannot start native capture")
 					helpers.assert_eq(ctx.saves, 0, "construction never persists")
-					helpers.assert_eq(rows[1].label, require("locale.label_value").compose(translations.get,
+					helpers.assert_eq(rows[1].label, require("core.i18n.engine.label_value").compose(translations.get,
 						translations.get("menu.layout.magic_key_source"), "j   (KeyJ)"))
 					helpers.assert_eq(rows[1].items[1].label, translations.get("menu.layout.magic_key_source.capture"))
 					helpers.assert_eq(rows[1].items[3].label, translations.get("menu.layout.magic_key_source.auto"))

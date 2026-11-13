@@ -47,7 +47,7 @@ function splitQuit(sources) {
 	const part = [
 		'--- ui/menu/menu_quit.lua',
 		'local M = {}',
-		'local Logger = require("logger.shim")',
+		'local Logger = require("core.logger.engine.shim")',
 		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
 		'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end',
 		'local LOG = "ui.menu.menu_quit"',

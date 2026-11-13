@@ -4,7 +4,7 @@
 ; MODULE: FileSystem Port Spec (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/file_system/port_vectors.json through the Windows
-; reader, as _shared/lua/test/file_system_ports_contract.lua does on macOS and
+; reader, as _shared/tests/lua/core_fs/file_system_ports_contract.lua does on macOS and
 ; Linux, then exercises the real owner's classified read and publication on real
 ; files under the temporary directory.
 ; ==============================================================================

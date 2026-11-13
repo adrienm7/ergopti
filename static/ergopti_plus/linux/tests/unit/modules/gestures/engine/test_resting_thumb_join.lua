@@ -8,14 +8,14 @@
 --- swiping fingers join them within the landing window (tab_close fired) and a
 --- held tap with that thumb commit tap_3. The Linux decoder's join had the same
 --- gap: a third contact became the gesture's count with no spatial check. The
---- decoder now asks the shared rule (_shared/lua/gestures/contact_join.lua),
+--- decoder now asks the shared rule (_shared/gestures/engine/contact_join.lua),
 --- which the macOS engine asks too, in millimetres from the pad's resolution.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 local Decoder = helpers.load_module("modules.gestures.mt_decoder")
-local ContactJoin = require("gestures.contact_join")
+local ContactJoin = require("gestures.engine.contact_join")
 
 local EV_SYN, EV_KEY, EV_ABS = Decoder.EV_SYN, Decoder.EV_KEY, Decoder.EV_ABS
 local BTN_TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }

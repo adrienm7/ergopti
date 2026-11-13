@@ -91,7 +91,7 @@ _KLRManifest_TwoDevicesMergeCanonicalPayload() {
 		manifest := KLR_ReadManifest(db, "2025-05-01", "2025-05-01")
 		app := manifest["2025-05-01"]["editor.exe"]
 		contract := JsonParse(FileRead(
-			_SharedDir . "\data\metrics_manifest_contract.json", "UTF-8"))
+			_SharedDir . "\metrics\data\metrics_manifest_contract.json", "UTF-8"))
 		_KLRManifest_AssertContractKeys(app, contract)
 
 		AssertEqual(5, app["burst_count_total"])
@@ -709,7 +709,7 @@ _KLRMedia_OpenFixture() {
 	global _SharedDir
 	Db := _KLRManifest_OpenFixture()
 	try {
-		AssertTrue(SQLite_Exec(Db, FileRead(_SharedDir . "\data\db\media_schema.sql", "UTF-8")))
+		AssertTrue(SQLite_Exec(Db, FileRead(_SharedDir . "\metrics\data\db\media_schema.sql", "UTF-8")))
 		return Db
 	} catch as Failure {
 		SQLite_Close(Db)
@@ -891,7 +891,7 @@ _KLRMedia_UpgradeRefusalPreservesPublished() {
 	AssertTrue(_DriverFuncBody("KLR_UpgradeMediaCache") != "", "the negative schedule requires the actual upgrade owner")
 	KLR_ResetCache()
 	Db := _KLRManifest_OpenFixture((OwnedDb) => SQLite_Exec(OwnedDb,
-		FileRead(_SharedDir . "\data\db\schema.sql", "UTF-8")))
+		FileRead(_SharedDir . "\metrics\data\db\schema.sql", "UTF-8")))
 	KLRCache.db := Db
 	KLRCache.last_sizes := Map("original.sql", 23)
 	KLRCache.ledger_snapshots := Map("original.sql", Map("index_low", 41))

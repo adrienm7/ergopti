@@ -53,13 +53,13 @@ const TREES = [
 	'linux/infra',
 	'linux/bin',
 	'linux/ui',
-	// _shared/core (the port specs) and _shared/modules were outside the audit,
+	// _shared (the port specs) and _shared were outside the audit,
 	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)
 	// where every other tree under _shared/ uses the BASE-relative form.
-	'_shared/lua',
+	'_shared',
 	'_shared/ui',
-	'_shared/core',
-	'_shared/modules'
+	'_shared',
+	'_shared'
 ];
 const EXTS = new Set(['.ahk', '.lua', '.js', '.cjs', '.mjs', '.py', '.sh', '.swift', '.toml']);
 const SKIP_DIR = new Set(['tests', 'vendor', '_generated', 'node_modules']);

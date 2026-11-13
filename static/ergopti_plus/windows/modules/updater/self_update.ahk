@@ -90,7 +90,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 ; a restart mid-interval does not check at boot, a machine that was off past its
 ; due time catches up once the boot delay has passed, and failures retry on the
 ; shared backoff. The decision is the shared port (modules/updater/schedule.ahk,
-; replayed against _shared/modules/updater/schedule_vectors.json).
+; replayed against _shared/updater/data/schedule_vectors.json).
 
 ; Test seams: the Storage port (a Map with "read" and "write" callables) and the
 ; wall clock (a callable returning epoch seconds). 0 means the production ones.
@@ -2452,8 +2452,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
 			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
 			_UpdaterDownloadStartedTick,
-			_SharedDir . "\modules\network\proxy_policy.json",
-			_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)
+			_SharedDir . "\core\network\data\proxy_policy.json",
+			_SharedDir . "\updater\data\defaults.json", AuthenticatedSize)
 		_Updater_BindStagedArtifactTransport(Transport, Staged)
 		if IsObject(Capture)
 			_Updater_BindCurlCaptureTransport(Transport, Capture)

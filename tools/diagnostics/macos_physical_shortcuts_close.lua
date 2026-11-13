@@ -10,9 +10,9 @@ function M.run(config, done)
  assert(type(config.nonce) == 'string' and config.expected_version == hs.processInfo.version)
  local root = config.production_root
  package.path = root .. '/macos/?.lua;' .. root .. '/macos/?/init.lua;'
-  .. root .. '/_shared/lua/?.lua;' .. root .. '/_shared/lua/?/init.lua;' .. package.path
+  .. root .. '/_shared/?.lua;' .. root .. '/_shared/?/init.lua;' .. package.path
  local Logger = require('infra.logger')
- local policy = assert(io.open(root .. '/_shared/modules/diagnostics/redaction.json', 'rb'))
+ local policy = assert(io.open(root .. '/_shared/diagnostics/data/redaction.json', 'rb'))
  local policy_bytes = assert(policy:read('*a')); assert(policy:close())
  Logger.initialize_privacy(policy_bytes)
  local Host = require('ui.physical_shortcuts')

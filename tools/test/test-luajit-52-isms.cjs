@@ -11,7 +11,7 @@
  * WHY THIS GATE EXISTS, WITH THE DATE:
  * On 2026-08-05 the Linux suite passed locally under Lua 5.4 and failed on the CI
  * runner with `attempt to call field 'unpack' (a nil value)` — fourteen times.
- * `table.unpack` was in four files, three of them in _shared/lua and therefore
+ * `table.unpack` was in four files, three of them in _shared and therefore
  * loaded by the daemon itself: compat/utf8.lua (the shim that exists FOR LuaJIT),
  * text_utils and the TOML codec. Two of those are on paths the daemon runs
  * constantly, so the only reason it had not crashed in front of a user is that
@@ -41,7 +41,7 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 // Everything the Linux driver loads: its own tree, plus the shared Lua both
 // drivers share. macOS is excluded — Hammerspoon embeds Lua 5.4, so 5.2+
 // constructs are legitimate there and flagging them would be noise.
-const ROOTS = [path.join(SP, 'linux'), path.join(SP, '_shared', 'lua')];
+const ROOTS = [path.join(SP, 'linux'), path.join(SP, '_shared')];
 
 // Absent under LuaJIT unless the build enabled 5.2 compatibility, which neither
 // the CI runner's nor a distribution's luajit does. Each maps to what to write
@@ -78,19 +78,19 @@ const FORBIDDEN = [
 	}
 ];
 
-// A bare `utf8.x` inside _shared/lua. LuaJIT has no utf8 table; the daemon and
+// A bare `utf8.x` inside _shared. LuaJIT has no utf8 table; the daemon and
 // the unit runner each install the compat shim as a global before loading
 // anything, which is why a first version of this gate called these correct and
 // dropped the rule entirely.
 //
-// CI then crashed in _shared/lua/keymap/terminators.lua from the E2E runner —
+// CI then crashed in _shared/layouts/engine/layers/terminators.lua from the E2E runner —
 // a THIRD entry point, which installs nothing. The reasoning was right about the
 // two call sites it looked at and wrong about the population: a SHARED module
 // cannot depend on its caller having installed a global, because it does not know
 // its callers. Each one asks for the shim itself, which costs a require and
 // removes a whole class of "works from here, crashes from there".
 //
-// Scoped to _shared/lua on purpose. A driver's own files may legitimately use the
+// Scoped to _shared on purpose. A driver's own files may legitimately use the
 // global — that driver's entry point installs it, and it is the same codebase.
 const SHARED_ONLY = {
 	// No trailing `\(` here, and that is the point: the crash CI found was
@@ -100,8 +100,8 @@ const SHARED_ONLY = {
 	pattern: /\butf8\.(char|codepoint|len|offset|codes)\b/g,
 	name: 'a bare utf8.* in shared code',
 	instead:
-		'a module-local `local utf8_lib = ... or require("compat.utf8")`, ' +
-		'as _shared/lua/keymap/terminators.lua does',
+		'a module-local `local utf8_lib = ... or require("core.lifecycle.engine.compat.utf8")`, ' +
+		'as _shared/layouts/engine/layers/terminators.lua does',
 	// The shim necessarily names the functions it provides.
 	skip: (file) => file.endsWith(path.join('compat', 'utf8.lua'))
 };
@@ -144,8 +144,8 @@ for (const root of ROOTS) {
 		const src = fs.readFileSync(file, 'utf8');
 		const relative = path.relative(SP, file).replace(/\\/g, '/');
 
-		// The shared-only rule applies to _shared/lua and nothing else.
-		const rules = relative.startsWith('_shared/lua/') ? FORBIDDEN.concat([SHARED_ONLY]) : FORBIDDEN;
+		// The shared-only rule applies to _shared and nothing else.
+		const rules = relative.startsWith('_shared/') ? FORBIDDEN.concat([SHARED_ONLY]) : FORBIDDEN;
 
 		for (const rule of rules) {
 			if (rule.skip && rule.skip(file)) continue;

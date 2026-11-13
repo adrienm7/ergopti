@@ -36,7 +36,7 @@ local M = {}
 local Logger = require("infra.logger")
 local Timer  = require("adapters.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
-local Segments = require("hotpath_segments")
+local Segments = require("metrics.engine.perf.hotpath_segments")
 local Timings = require("infra.timings")
 local LOG    = "HotPath"
 -- Tag of the paired trace()/done() lines, the same on Linux.
@@ -47,7 +47,7 @@ local _phase_names = {}
 
 -- Segments whose processing exceeds this many milliseconds are logged at
 -- WARNING. The budget and the declared segments live in the shared inventory
--- (_shared/lua/hotpath_segments.lua), so macOS and Linux share one policy.
+-- (_shared/metrics/engine/perf/hotpath_segments.lua), so macOS and Linux share one policy.
 local DEFAULT_SLOW_MS = Timings.ms("logger", "hotpath_slow_ms")
 local _slow_ms = DEFAULT_SLOW_MS
 -- A declared segment with its own measured threshold keeps it whatever the

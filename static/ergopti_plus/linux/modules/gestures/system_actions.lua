@@ -38,13 +38,13 @@
 --- ==============================================================================
 
 local M = {}
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local i18n = require("infra.i18n")
 local ShellRunner = require("adapters.shell_runner")
 local NativeDialog = require("ui.native_dialog")
-local FileSelection = require("file_selection")
+local FileSelection = require("core.fs.engine.file_selection")
 local Timings = require("infra.timings")
 
 local LOG = "modules.gestures.system_actions"

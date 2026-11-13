@@ -274,8 +274,8 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- parent row names the preset in force in words. A value outside the presets
 	-- read as raw seconds ("Check frequency: 600") with no ticked row.
 	helpers.it("the frequency picker lists the shared presets with translated labels", function()
-		local Json = require("json")
-		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/updater/defaults.json", "rb"))
+		local Json = require("core.text.engine.json")
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/updater/data/defaults.json", "rb"))
 		local presets = Json.decode(handle:read("*a")).timing.check_interval_presets
 		handle:close()
 		helpers.assert_true(#presets >= 5, "the shared presets must be present")
@@ -286,7 +286,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			local rows = submenu_of(build(up), "menu.about.title")
 			local picker = rows[CHANNEL_AT + 2]
 			helpers.assert_eq(picker.title,
-				require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. pair[2])),
+				require("core.i18n.engine.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. pair[2])),
 				"the parent row names the preset in force for " .. pair[1] .. " s")
 			helpers.assert_eq(#picker.menu, #presets, "one row per shared preset")
 			local ticked = 0
@@ -315,7 +315,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local first = up.INTERVAL_PRESETS[1].code
 		local expected = {
 			i18n.get("menu.about.check_for_updates"),
-			require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. first)),
+			require("core.i18n.engine.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. first)),
 		}
 		local found = {}
 		for index, row in ipairs(rows) do
@@ -460,7 +460,7 @@ local function channel_corpus()
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/update_channel_rows.json", "rb"))
 	local raw = handle:read("*a")
 	handle:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("tray (linux): published About channel choices", function()
@@ -470,8 +470,8 @@ helpers.describe("tray (linux): published About channel choices", function()
 		local prior = i18n.get
 		local ok, detail = pcall(function()
 			for _, locale in ipairs({ "en", "fr" }) do
-				local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. locale .. ".json", "rb"))
-				local labels = assert(require("json").decode(handle:read("*a")))
+				local handle = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. locale .. ".json", "rb"))
+				local labels = assert(require("core.text.engine.json").decode(handle:read("*a")))
 				handle:close()
 				i18n.get = function(key) return labels[key] or key end
 				for index, state in ipairs(corpus.states) do
@@ -555,7 +555,7 @@ local function frequency_corpus()
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/update_check_frequency.json", "rb"))
 	local raw = assert(handle:read("*a"))
 	assert(handle:close())
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Exercises the actual manager and menu around durable writer and timer ports.
@@ -563,7 +563,7 @@ local function with_frequency_owner(refusal, body)
 	local names = {"adapters.timer_scheduler", "adapters.storage", "modules.updater.manager"}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local writer = require("toml_codec.writer")
+	local writer = require("core.text.engine.toml_codec.writer")
 	local previous_write = writer.batch_write
 	local Installation = require("infra.installation")
 	local previous_source_run = Installation.is_source_run
@@ -616,7 +616,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 			up.get_check_interval = function() return expected.stored end
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
 			local i18n = require("infra.i18n")
-			helpers.assert_eq(row.title, require("locale.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
+			helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
 			helpers.assert_eq(#row.menu, #corpus.choices)
 			for index, choice in ipairs(corpus.choices) do
 				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
@@ -754,10 +754,10 @@ end)
 --- @param alternative boolean True to independently replace the declaration's label and reason.
 local function with_source_command(alternative, callback)
 	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
-		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
-		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
+		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
+		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
-		"llm.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
+		"ai.engine.policy.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
 	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
 	local ok, err = xpcall(function()
@@ -771,10 +771,10 @@ local function with_source_command(alternative, callback)
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
 		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
-		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
+		local header_file = assert(io.open(driver .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local header_raw = header_file:read("*a")
 		assert(header_file:close())
-		local header_labels = assert(require("json").decode(assert(header_raw)))
+		local header_labels = assert(require("core.text.engine.json").decode(assert(header_raw)))
 		local header_brand = assert(header_labels["menu.builder.active_brand"])
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
 		labels["menu.builder.active_brand"] = header_brand
@@ -810,8 +810,8 @@ local function with_source_command(alternative, callback)
 			declaration[1].i18n = "common.restore_recommended"
 			declaration[1].disabled_reason_key = "common.clear_to_system"
 		end
-		local handle = assert(io.open(driver .. "/../_shared/modules/updater/defaults.json", "rb"))
-		local timing = require("json").decode(assert(handle:read("*a"))).timing
+		local handle = assert(io.open(driver .. "/../_shared/updater/data/defaults.json", "rb"))
+		local timing = require("core.text.engine.json").decode(assert(handle:read("*a"))).timing
 		assert(handle:close())
 		local up = { get_channel = function() return "dev" end, set_channel = effect,
 			get_check_interval = function() return timing.default_check_interval_sec end,
@@ -895,7 +895,7 @@ helpers.describe("Linux About channel durable receipts", function()
 	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
 		helpers.it("retries actual updater persistence after refusal without changing canonical bytes (channel-ack durable " .. outcome .. ")", function()
 			with_frequency_owner(nil, function(up, obs, path, original)
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local previous_write = writer.batch_write
 				local refusing, writes = true, 0
 				writer.batch_write = function(...)
@@ -947,7 +947,7 @@ end
 helpers.describe("About version separator shared fragment (Linux)", function()
 	helpers.it("retains actual rendered version-separator-channel order", function()
 		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/about_version_separator.json", "rb"))
-		local expected = assert(require("json").decode(handle:read("*a"))); assert(handle:close())
+		local expected = assert(require("core.text.engine.json").decode(handle:read("*a"))); assert(handle:close())
 		helpers.assert_eq(require("infra.manifest_menu").get_root()[expected.section], expected.rows)
 		local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
 		helpers.assert_not_nil(rows[expected.version_index])

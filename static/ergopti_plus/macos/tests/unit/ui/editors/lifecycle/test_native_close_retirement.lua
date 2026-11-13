@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 --- Runs one real controller and factory over isolated native reference ownership.
 --- @param module_name string Window controller to load.
@@ -20,20 +20,20 @@ local function with_window(module_name, scenario)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
 			"ui.layer_editor", "ui.action_picker", "ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
-			"infra.config_paths", "adapters.program_providers", "program_provider_picker", "modules.keymap.layout_registry",
-			"keymap.layer_editor", "keymap.layers", "platform.remap.nav_layer", "infra.keycodes", "adapters.file_system",
-			"infra.text_utils", "text_utils", "compat.utf8", "layouts.manager_bridge",
+			"infra.config_paths", "adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
+			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "infra.keycodes", "adapters.file_system",
+			"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
 			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "adapters.shell_runner", "adapters.task_environment",
-			"diagnostics.runtime_log", "platform.remap.lease_helper", "program_parameter", "user_action_parameter",
-			"brightness_actions", "brightness_actions_data", "config_migrate", "diagnostics.operation_reporter",
-			"infra.fs_dir", "keycodes", "lfs", "module_source_directory", "module_source_identity", "modules.keymap.layout",
-			"toml_codec.basic_string", "toml_codec.bom", "toml_codec.key_path", "toml_codec.leaf_rows",
-			"toml_codec.record_scanner", "toml_codec.writer",
+			"diagnostics.engine.runtime_log", "platform.remap.lease_helper", "settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
+			"shortcuts.engine.brightness_actions", "shortcuts.engine.brightness_actions_data", "settings.engine.migration.migrate", "diagnostics.engine.operation_reporter",
+			"infra.fs_dir", "platform.input.keycodes.core", "lfs", "core.fs.engine.module_source_directory", "core.fs.engine.module_source_identity", "modules.keymap.layout",
+			"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.leaf_rows",
+			"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.writer",
 			"adapters.webview_result", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
-			"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
-			"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-			"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
+			"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact",
+			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
+			"core.fs.engine.app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 			"tests.support.native_webview_close_fixture",
 		}, function()
 			local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, timers = {}, bridges = {}, errors = {} }

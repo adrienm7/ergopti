@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Extension Pack Discovery (macOS)
 --- DESCRIPTION:
---- Supplies the shared extension scanner (_shared/lua/hotstrings/extensions.lua)
+--- Supplies the shared extension scanner (_shared/hotstrings/engine/extensions.lua)
 --- with this driver's filesystem and roots, then registers the discovered packs
 --- through the existing keymap TOML loader. Linux (infra/paths.extension_roots)
 --- and Windows (infra/hotstrings/extension_packs.ahk) discover the same roots in
@@ -36,7 +36,7 @@
 local M = {}
 
 local Logger     = require("infra.logger")
-local Extensions = require("hotstrings.extensions")
+local Extensions = require("hotstrings.engine.extensions")
 
 local LOG = "extension_packs"
 

@@ -15,11 +15,11 @@
  * unnoticed because the pre-commit hook that calls it had been naming a moved
  * path — so the formatter had not successfully run on this machine in a long
  * time. The moment the hook was repaired, its first run rewrote
- * `_shared/modules/hotstrings/_index.toml` entirely in CRLF, and git printed a
+ * `_shared/hotstrings/data/catalogue/_index.toml` entirely in CRLF, and git printed a
  * warning that is easy to read past.
  *
  * Two more files were already CRLF and had been for a while:
- * `_shared/modules/llm/models.json` (3 864 lines) and
+ * `_shared/ai/data/models.json` (3 864 lines) and
  * `_shared/tests/corpus/llm/process_prediction_vectors.json`. Both parse fine —
  * which is exactly the problem. A mixed-ending repo produces diffs where every
  * line appears changed, and it hides the one edit that mattered inside them.

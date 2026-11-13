@@ -9,14 +9,14 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.logger_async_sink_fixture")
 local OWNERS = {
-	"infra.logger", "adapters.log_transport", "tests.stubs.hs", "hs", "logger",
+	"infra.logger", "adapters.log_transport", "tests.stubs.hs", "hs", "core.logger.engine",
 	"infra.launcher_environment", "_generated.logger_sub_files", "socket",
 }
 
 helpers.describe("Logger asynchronous fixture scope", function()
 	helpers.it("(async-fixture-scope) isolates policy loading even when its callback throws", function()
 		helpers.with_stub_scope(OWNERS, function()
-			local Core = require("logger")
+			local Core = require("core.logger.engine")
 			local records = {}
 			Core.set_sink(function(line) records[#records + 1] = line end)
 			local predecessor_hs = rawget(_G, "hs")
@@ -52,7 +52,7 @@ helpers.describe("Logger asynchronous fixture scope", function()
 						package.loaded[name] = predecessor
 					end
 					_G.hs = predecessor
-					local Core = require("logger")
+					local Core = require("core.logger.engine")
 					local sink_records = {}
 					Core.set_sink(function(line) sink_records[#sink_records + 1] = line end)
 					local saved = {}
@@ -102,7 +102,7 @@ helpers.describe("Logger asynchronous fixture scope", function()
 
 	helpers.it("(async-fixture-scope) preserves the retained predecessor core's actual sink", function()
 		helpers.with_stub_scope(OWNERS, function()
-			local Core = require("logger")
+			local Core = require("core.logger.engine")
 			local records = {}
 			Core.set_sink(function(line) records[#records + 1] = line end)
 			Core.info("predecessor", "before fixture")

@@ -164,7 +164,7 @@ local function run()
 		"« Editor » mounts the editor with « Install and use »") then return 1 end
 
 	-- The source as the host hands a saved one to the page (window.sourceData).
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	eval_sync(webview, "window.sourceData(" .. Json.encode({ filename = "ergopti.toml", text = source_text })
 		.. "); 'opened'")
 	check(wait_for(webview, "document.getElementById('le-name') && document.getElementById('le-name').value.length"),

@@ -168,7 +168,7 @@ function scanText(text) {
  * Finds the places where code decides by comparing a reason, error, phase or cause with a
  * free-form literal (a sentence, not a code-shaped id). Such a matcher breaks silently when
  * the message is reworded, so none is allowed: compare an id of
- * _shared/lua/adapter_errors.lua instead.
+ * _shared/diagnostics/engine/adapter_errors.lua instead.
  * @param {string} text File contents.
  * @returns {Array<{line: number, value: string}>}
  */

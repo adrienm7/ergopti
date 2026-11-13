@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * While the AI tooltip shows several predictions, the user moves between them
  * with the chords its footer and its menu advertise. The shared tooltip
- * constants (_shared/modules/tooltip/constants.toml [llm_ui]) are that
+ * constants (_shared/core/ui/data/tooltip/constants.toml [llm_ui]) are that
  * contract: the chords left of the accept hint step back, those right of it
  * step forward. "left_shift+tab" / "right_shift+tab" name the left and right
  * Shift with Tab (each named in the user's language by the key name table),
@@ -52,7 +52,7 @@ const check = (ok, message) => {
 
 const read = (rel) => fs.readFileSync(path.join(PLUS, rel), 'utf8').replace(/^﻿/, '');
 
-const registry = JSON.parse(read('_shared/data/keycodes/physical_keys.json')).keys;
+const registry = JSON.parse(read('_shared/layouts/data/keycodes/physical_keys.json')).keys;
 
 // Glyphs of the footer and the label, by physical-key registry id.
 const ARROW_GLYPHS = new Map([
@@ -80,7 +80,7 @@ const llmUi = (toml, key) => {
 };
 
 // 1. The contract, from the footer hints.
-const toml = read('_shared/modules/tooltip/constants.toml');
+const toml = read('_shared/core/ui/data/tooltip/constants.toml');
 const contract = { arrows: new Map(), shiftTab: new Map() };
 for (const [key, step] of [
 	['hint_arrow_left', -1],
@@ -116,7 +116,8 @@ check(
 	'the footer must advertise the left Shift+Tab back and the right one forward'
 );
 for (const locale of ['en', 'fr']) {
-	const label = JSON.parse(read(`_shared/data/locales/${locale}.json`))['menu.llm.nav_label'] || '';
+	const label =
+		JSON.parse(read(`_shared/core/i18n/data/locales/${locale}.json`))['menu.llm.nav_label'] || '';
 	check(
 		label.includes(llmUi(toml, 'hint_arrow_left')) &&
 			label.indexOf(llmUi(toml, 'hint_arrow_left')) <

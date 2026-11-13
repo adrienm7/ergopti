@@ -96,8 +96,8 @@ const updaterLuaPath =
 	[
 		path.join(updaterDriver, '?.lua'),
 		path.join(updaterDriver, '?/init.lua'),
-		path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua'),
-		path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')
+		path.join(ROOT, 'static/ergopti_plus/_shared/?.lua'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/?/init.lua')
 	].join(';') + ';;';
 // The native Linux lane must never certify POSIX observations with Windows Lua.
 const targetCwd = 'C:\\owned checkout\\static\\ergopti_plus\\linux';
@@ -251,7 +251,7 @@ function uv.spawn(command, options, callback)
  return {}, 4000 + native.requests
 end
 package.preload.luv = function() return uv end
-package.preload['logger.shim'] = function() return {
+package.preload['core.logger.engine.shim'] = function() return {
  debug = function() end,
  info = function() end,
  warn = function(_, _, detail)
@@ -269,14 +269,14 @@ package.preload['adapters.shell_runner'] = function() return { validate_spawn_ar
 -- Both public reader entries share the same strict modeled boundary.
 local function admit_client_source(path)
  local normalized = path:gsub('\\\\', '/')
- assert(normalized:find('/_shared/modules/timings/constants%.toml$')
-  or normalized:find('/_shared/data/locales/en%.json$')
-  or normalized:find('/_shared/modules/network/route_origins%.json$')
-  or normalized:find('/_shared/modules/network/proxy_policy%.json$')
-  or normalized:find('/_shared/modules/network/proxy_override%.json$')
-  or normalized:find('/_shared/data/http/transport_policy%.json$')
-  or normalized:find('/_shared/data/http/header_policy%.json$')
-  or normalized:find('/_shared/data/http/redirect_policy%.json$'),
+ assert(normalized:find('/_shared/core/timing/data/constants%.toml$')
+  or normalized:find('/_shared/core/i18n/data/locales/en%.json$')
+  or normalized:find('/_shared/core/network/data/route_origins%.json$')
+  or normalized:find('/_shared/core/network/data/proxy_policy%.json$')
+  or normalized:find('/_shared/core/network/data/proxy_override%.json$')
+  or normalized:find('/_shared/core/network/data/http/transport_policy%.json$')
+  or normalized:find('/_shared/core/network/data/http/header_policy%.json$')
+  or normalized:find('/_shared/core/network/data/http/redirect_policy%.json$'),
   'the simulated backend admits only declared checked-in client sources: ' .. tostring(path))
  return io.open(path, 'r')
 end
@@ -287,7 +287,7 @@ package.preload['infra.regular_file_reader'] = function() return {
 local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')
 package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. package.path
 local Client = dofile(os.getenv('UPDATER_NATIVE_CLIENT'))
-local Json = require('json')
+local Json = require('core.text.engine.json')
 local rows = assert(Json.decode(os.getenv('UPDATER_AUTH_CASES')))
 local original_headers = { Accept = 'application/vnd.github+json', ['If-None-Match'] = 'original-etag' }
 local options = { owner = 'updater', timeout_ms = 9000, follow_redirects = true, https_only = true, etag_compare = '/owned/etag-in', etag_save = '/owned/etag-out', max_body_bytes = 65536 }
@@ -454,7 +454,7 @@ end
 				encoding: 'utf8',
 				env: {
 					...process.env,
-					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/?/init.lua')};;`,
 					GITHUB_ACTIONS: ci,
 					GITHUB_TOKEN: token,
 					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
@@ -704,7 +704,7 @@ end`
 	const managedProxy = 'http://127.0.0.1:9';
 	const managedEnvironment = (evidence, ci, status, cases) => ({
 		...process.env,
-		LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+		LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/?/init.lua')};;`,
 		GITHUB_ACTIONS: ci,
 		GITHUB_TOKEN: fixtureToken,
 		ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
@@ -897,7 +897,7 @@ end
 				encoding: 'utf8',
 				env: {
 					...process.env,
-					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/?/init.lua')};;`,
 					GITHUB_ACTIONS: 'true',
 					GITHUB_TOKEN: token,
 					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
@@ -927,7 +927,7 @@ end
 				encoding: 'utf8',
 				env: {
 					...process.env,
-					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
+					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/?/init.lua')};;`,
 					GITHUB_ACTIONS: 'true',
 					GITHUB_TOKEN: fixtureToken,
 					UPDATER_GETTER_ABSENT: endpoint === null ? 'true' : 'false',

@@ -51,12 +51,12 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SHARED = "static/ergopti_plus/_shared"
-CONTRACT = SHARED + "/modules/llm/managed_ollama_runtime.json"
-OFFICIAL_RELEASE = SHARED + "/modules/llm/ollama_release.json"
-CHANNELS = SHARED + "/modules/updater/channels.json"
-IDENTIFIERS = SHARED + "/data/identifiers.json"
-POLICY_SOURCE = SHARED + "/python/managed_ollama_runtime.py"
-OUTPUT = SHARED + "/modules/llm/managed_ollama_release.json"
+CONTRACT = SHARED + "/ai/data/managed_ollama_runtime.json"
+OFFICIAL_RELEASE = SHARED + "/ai/data/ollama_release.json"
+CHANNELS = SHARED + "/updater/data/channels.json"
+IDENTIFIERS = SHARED + "/core/text/data/identifiers.json"
+POLICY_SOURCE = SHARED + "/ai/adapters/python/managed_ollama_runtime.py"
+OUTPUT = SHARED + "/ai/data/managed_ollama_release.json"
 PRODUCER = "tools/build/build-macos-managed-ollama.py"
 GENERATOR = "tools/build/stage-macos-managed-ollama-catalogue.py"
 CATALOGUE = "managed_ollama_release.json"

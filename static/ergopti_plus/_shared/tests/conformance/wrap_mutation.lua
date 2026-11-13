@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 return function(helpers)
-	local Mutation = require("menu.wrap_mutation")
+	local Mutation = require("menu.engine.wrap_mutation")
 	local function fresh()
 		return { wrap_symbol_states = { ["("] = false, future = true },
 			custom_wrap_symbols = { { left = "a", right = "b", future = { note = "retain" } },

@@ -627,7 +627,7 @@ class NativeScriptOverlayControls(unittest.TestCase):
         self.output = self.root / "output"
         self.output.mkdir()
         self.source = self.root / "source"
-        for relative in ("macos/init.lua", "_shared/lua/sentinel.lua"):
+        for relative in ("macos/init.lua", "_shared/sentinel.lua"):
             target = self.source / "static/ergopti_plus" / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("-- actual source capture model\n")

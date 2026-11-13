@@ -116,7 +116,7 @@ end)
 local function with_caps_word_menu(body, shortcuts_enabled)
 	local enabled = shortcuts_enabled ~= false and "true" or "false"
 	with_manager("unused", function(manager, _, capture_text_owner)
-		require("test.config_unused_keys_contract").sandbox.with_config(
+		require("tests.lua.settings.unused_keys_contract").sandbox.with_config(
 			'[shortcuts]\nenabled = ' .. enabled .. '\n[foreign]\nvalue = "keep"\n', function(path)
 				manager.init({ persist = true, config_path = path, capture_text_owner = capture_text_owner })
 				local changed = { count = 0 }
@@ -137,9 +137,9 @@ local function with_caps_word_menu(body, shortcuts_enabled)
 					end
 					return find(rows)
 				end
-				local original = require("test.config_unused_keys_contract").sandbox.read_bytes(path)
+				local original = require("tests.lua.settings.unused_keys_contract").sandbox.read_bytes(path)
 				body(manager, row, changed)
-				helpers.assert_eq(require("test.config_unused_keys_contract").sandbox.read_bytes(path), original,
+				helpers.assert_eq(require("tests.lua.settings.unused_keys_contract").sandbox.read_bytes(path), original,
 					"CapsWord is runtime state and must leave every configuration byte untouched")
 			end)
 	end)
@@ -148,7 +148,7 @@ end
 helpers.describe("CapsWord selection checkbox ownership", function()
 	local path = require("infra.paths").shared("tests/corpus/menus/linux_caps_word.json")
 	local file = assert(io.open(path, "rb"))
-	local corpus = require("json").decode(file:read("*a"))
+	local corpus = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
 
 	for _, vector in ipairs(corpus.states) do
@@ -323,10 +323,10 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 
 	for _, vector in ipairs(corpus.platforms) do
 		helpers.it("keeps the existing " .. vector.platform .. " platform boundary (selection-caps-word)", function()
-			local renderer = assert(require("menu.renderer").new({ platform = vector.platform,
-				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-				json_decode = require("json").decode, i18n = require("infra.i18n"),
-				logger = require("logger.shim"),
+			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
+				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"),
+				logger = require("core.logger.engine.shim"),
 			}))
 			local rows = renderer.build(corpus.section, "CapsWord", nil, nil, {
 				commands = { [corpus.id] = function() return true end },
@@ -378,7 +378,7 @@ end
 helpers.describe("shared selection case command ownership", function()
 	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_case.json")
 	local file = assert(io.open(path, "rb"))
-	local corpus = require("json").decode(file:read("*a"))
+	local corpus = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
 
 	for _, vector in ipairs(corpus.commands) do
@@ -461,9 +461,9 @@ helpers.describe("shared selection case command ownership", function()
 
 	for _, vector in ipairs(corpus.platforms) do
 		helpers.it("keeps " .. vector.platform .. " selection command placement (selection-case-command)", function()
-			local renderer = assert(require("menu.renderer").new({ platform = vector.platform,
-				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-				json_decode = require("json").decode, i18n = require("infra.i18n"), logger = require("logger.shim"),
+			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
+				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			local commands, getters = {}, {}
 			for _, command in ipairs(corpus.commands) do
@@ -528,7 +528,7 @@ end
 helpers.describe("shared selection helper command ownership", function()
 	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_helpers.json")
 	local file = assert(io.open(path, "rb"))
-	local corpus = require("json").decode(file:read("*a"))
+	local corpus = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
 
 	for _, vector in ipairs(corpus.commands) do
@@ -630,9 +630,9 @@ helpers.describe("shared selection helper command ownership", function()
 
 	for _, vector in ipairs(corpus.platforms) do
 		helpers.it("preserves " .. vector.platform .. " placement (selection-helper-command)", function()
-			local renderer = assert(require("menu.renderer").new({ platform = vector.platform,
-				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-				json_decode = require("json").decode, i18n = require("infra.i18n"), logger = require("logger.shim"),
+			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
+				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			local commands, getters, calls = {}, {}, 0
 			for _, command in ipairs(corpus.commands) do
@@ -708,7 +708,7 @@ helpers.describe("shared selection helper command ownership", function()
 	helpers.it("uses actual helper captions in all 21 locales (selection-helper-command)", function()
 		-- Each binding captures its locale owner at load time. The full suite may
 		-- have replaced that owner; reload the whole chain and restore it together.
-		local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+		local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 		local previous_modules = {}
 		for _, name in ipairs(names) do
 			previous_modules[name] = package.loaded[name]
@@ -716,8 +716,8 @@ helpers.describe("shared selection helper command ownership", function()
 		end
 		local isolated_ok, isolated_err = pcall(function()
 			with_helper_menu(function(_, item)
-				local paths, json = require("infra.paths"), require("json")
-				local order_file = assert(io.open(paths.shared("data/locale_order.json"), "rb"))
+				local paths, json = require("infra.paths"), require("core.text.engine.json")
+				local order_file = assert(io.open(paths.shared("core/i18n/data/locale_order.json"), "rb"))
 				local order = json.decode(order_file:read("*a")).order
 				order_file:close()
 				helpers.assert_eq(#order, 21)
@@ -726,7 +726,7 @@ helpers.describe("shared selection helper command ownership", function()
 				local previous = i18n.get_locale()
 				local ok, err = pcall(function()
 					for _, code in ipairs(order) do
-						local source = assert(io.open(paths.shared("data/locales/" .. code .. ".json"), "rb"))
+						local source = assert(io.open(paths.shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
 						local labels = json.decode(source:read("*a"))
 						source:close()
 						locale.set_locale(code)
@@ -752,7 +752,7 @@ local function selection_boundary_corpus()
 	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
 	local file = assert(io.open(path, "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 --- Finds the existing CapsWord-led selection block inside the actual finished tray.
@@ -852,9 +852,9 @@ helpers.describe("shared selection presentation boundaries", function()
 	for platform, expected_count in pairs(corpus.platform_rows) do
 		local native_platform, count = platform, expected_count
 		helpers.it("keeps the truthful " .. native_platform .. " boundary projection without an action", function()
-			local renderer = assert(require("menu.renderer").new({ platform = native_platform,
-				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-				json_decode = require("json").decode, i18n = require("infra.i18n"), logger = require("logger.shim"),
+			local renderer = assert(require("menu.engine.renderer").new({ platform = native_platform,
+				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			for _, section in ipairs(fragments) do
 				local rows = assert(renderer.template_rows(section, {}, {}, {}))

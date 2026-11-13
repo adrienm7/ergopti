@@ -1,7 +1,7 @@
 --- tests/unit/infra/preferences/test_preferences_llm_units.lua
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local FS = require("adapters.file_system")
 local function fixture(initial)
 	local content, writes = initial, 0
@@ -66,7 +66,7 @@ helpers.describe("canonical LLM debounce persistence", function()
 	helpers.it("persists the \"never\" debounce as the shared sentinel and reads it back", function()
 		-- Never (no automatic trigger) is the one negative value: the unit
 		-- conversion asserted on it, so choosing it in the menu was never saved.
-		local Debounce = require("llm.request_plan.debounce")
+		local Debounce = require("ai.engine.request_plan.debounce")
 		local prefs, observed = fixture('[llm.trigger]\ndebounce_ms = 350\n')
 		local state = prefs.load("config")
 		state.llm_debounce = -1
@@ -112,8 +112,8 @@ package.loaded["adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("Mac actual preference schema reader and publication", function()
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Migration = require("config_migrate")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Migration = require("settings.engine.migration.migrate")
 	local registry = assert(Migration.load_registry(helpers.shared(Migration.REGISTRY_PATH)))
 	local function current(enabled)
 		return '# retain every foreign byte\n[_meta]\nschema_version = ' .. registry.current

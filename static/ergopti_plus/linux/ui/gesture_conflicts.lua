@@ -9,14 +9,14 @@
 --- ==============================================================================
 
 local M = {}
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 local I18n = require("infra.i18n")
 local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local ManifestMenu = require("infra.manifest_menu")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "gesture_conflicts"
 local boot_notified = false
 

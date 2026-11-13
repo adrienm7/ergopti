@@ -281,7 +281,7 @@ end)
 local ORCHESTRATOR_MODULES = {
 	"infra.logger",
 	"modules.llm",
-	"chord",
+	"keyboard.engine.chord",
 	"adapters.hotkey_registrar",
 	"ui.menu.shortcut_utils",
 	"ui.menu.menu_llm.trigger_orchestrator",
@@ -294,7 +294,7 @@ local function with_orchestrator(body)
 		local logger, lines = recording_logger()
 		package.loaded["infra.logger"] = logger
 		package.loaded["modules.llm"] = { BUILTIN_PROFILES = { { id = "basic" }, { id = "advanced" } } }
-		package.loaded["chord"] = {
+		package.loaded["keyboard.engine.chord"] = {
 			format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {
@@ -418,7 +418,7 @@ local OLLAMA_MODULES = {
 	"infra.i18n",
 	"infra.text_utils",
 	"modules.llm.ollama_binary",
-	"core.llm.ollama_runtime_choice",
+	"core.lifecycle.engine.core.ollama_runtime_choice",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	"adapters.managed_ollama_pull",
@@ -455,7 +455,7 @@ local function with_ollama_manager(enabled, body)
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return "/opt/homebrew/bin/ollama", nil, "homebrew" end,
 		}
-		package.loaded["core.llm.ollama_runtime_choice"] = {}
+		package.loaded["core.lifecycle.engine.core.ollama_runtime_choice"] = {}
 		package.loaded["modules.llm.ollama_server_command"] = {}
 		package.loaded["modules.llm.network_env"] = {}
 		package.loaded["adapters.managed_ollama_pull"] = {}

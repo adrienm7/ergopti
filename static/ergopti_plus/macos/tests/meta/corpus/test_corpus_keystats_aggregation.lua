@@ -650,7 +650,7 @@ helpers.describe("keystats aggregation corpus — cleanup", function()
 end)
 
 
-local KUtils = require("keystats.utils")
+local KUtils = require("metrics.engine.utils")
 
 helpers.describe("keystats corpus - pure text primitives", function()
 	helpers.it("classifies every char_class vector as the corpus says", function()
@@ -754,7 +754,7 @@ end)
 -- corpus is decoded by the shared JSON codec: its keys hold \u0001
 -- separators, which the hs.json test stub leaves escaped.
 do
-	local Corpus = require("test.keystats_aggregation_corpus")
+	local Corpus = require("tests.lua.metrics.aggregation_corpus")
 	local function read_file(path)
 		local handle = io.open(path, "rb")
 		if not handle then return nil end
@@ -763,7 +763,7 @@ do
 		return content
 	end
 	Corpus.register(helpers, {
-		corpus = Corpus.load(read_file, require("json").decode, corpus_path),
+		corpus = Corpus.load(read_file, require("core.text.engine.json").decode, corpus_path),
 		label = "keystats aggregation corpus — shared readings (macOS)",
 		replay = function(vec)
 			setup_and_replay(vec)

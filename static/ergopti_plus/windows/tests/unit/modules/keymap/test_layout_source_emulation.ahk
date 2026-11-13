@@ -188,7 +188,7 @@ Test("layout source emulation: the composed layout registers its keys before the
 
 _LSE_RegistrationCase() {
 	Log := []
-	Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
+	Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	KeylayoutEmulation_SourceUnload()
 	try {
 		_KLT_WithLayoutFeatures(Map("emulated_layout", "composed"), () =>

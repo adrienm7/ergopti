@@ -16,7 +16,7 @@
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
 --- - hs.json, hs.sqlite3, hs.fs.
---- - Canonical SQLite schema: static/ergopti_plus/_shared/data/db/schema.sql.
+--- - Canonical SQLite schema: static/ergopti_plus/_shared/metrics/data/db/schema.sql.
 --- ==============================================================================
 
 local M = {}
@@ -32,18 +32,18 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
-local Queries = require("keystats.queries")
-local LocalTime = require("keystats.local_time")
-local WindowTopology = require("keystats.window_topology")
-local CapturePresence = require("keystats.capture_presence")
-local NetworkTransitions = require("keystats.network_transitions")
+local Queries = require("metrics.engine.queries")
+local LocalTime = require("metrics.engine.local_time")
+local WindowTopology = require("metrics.engine.system.window_topology")
+local CapturePresence = require("metrics.engine.capture_presence")
+local NetworkTransitions = require("metrics.engine.system.network_transitions")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keystats.text_cipher")
 -- Statement shapes for the at-rest migration (section 8). Shared with Linux so
 -- the two drivers cannot drift on which columns a conversion may rewrite.
-local Migration  = require("keystats.text_migration")
-local MediaStore = require("keystats.media_store")
+local Migration  = require("metrics.engine.privacy.text_migration_core")
+local MediaStore = require("metrics.engine.media.store")
 local LOG    = "keystats.sqlite_writer"
 
 
@@ -147,7 +147,7 @@ local _now_ts = require("modules.keystats.timestamp").now_ts
 
 --- Resolve the canonical schema.sql path through the single shared-tree
 --- resolver (Paths.shared) so the shared root lives in exactly one place.
-local _SCHEMA_SQL_PATH = Paths.shared("data/db/schema.sql")
+local _SCHEMA_SQL_PATH = Paths.shared("metrics/data/db/schema.sql")
 
 --- Read and retire one schema stream before admitting its SQL.
 --- @param path string Canonical schema path.
@@ -274,7 +274,7 @@ local function _initialize_db(db, existed)
 		Logger.success(LOG, "Schema applied (version 1).")
 	end
 
-	local media_schema = _read_schema_file(Paths.shared("data/db/media_schema.sql"), "semantic media schema")
+	local media_schema = _read_schema_file(Paths.shared("metrics/data/db/media_schema.sql"), "semantic media schema")
 	if media_schema == nil then
 		return false
 	end
@@ -294,7 +294,7 @@ local function _initialize_db(db, existed)
 	-- 2026-11-11) gains it on every raw table, and its purge triggers written
 	-- before it are retired, in one transaction; the purge schema below then
 	-- creates the current ones.
-	local UtcOffsetColumn = require("keystats.utc_offset_column")
+	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
 	local missing = {}
 	for row in db:nrows(UtcOffsetColumn.missing_query()) do missing[#missing + 1] = row.name end
 	local offset_statements = UtcOffsetColumn.statements(missing)
@@ -306,7 +306,7 @@ local function _initialize_db(db, existed)
 
 	-- The purge tombstone triggers run on every open, so a cache built before
 	-- them still applies a tombstone, from this writer or a replayed ledger.
-	local purge_schema = _read_schema_file(Paths.shared("data/db/purge_schema.sql"), "metrics purge schema")
+	local purge_schema = _read_schema_file(Paths.shared("metrics/data/db/purge_schema.sql"), "metrics purge schema")
 	if purge_schema == nil then
 		return false
 	end
@@ -354,7 +354,7 @@ local function _initialize_db(db, existed)
 	end
 
 	-- Ensure meta keys exist (INSERT OR IGNORE is idempotent on replay). This set MUST
-	-- stay in lockstep with the meta seeds in _shared/data/db/schema.sql: the schema
+	-- stay in lockstep with the meta seeds in _shared/metrics/data/db/schema.sql: the schema
 	-- block runs only on a fresh DB, so any key missing here is never back-filled into
 	-- an existing/older DB, and writes to it become silent no-op UPDATEs. 'rev' was the
 	-- omitted key — its UPDATE froze the UI cache-invalidation counter at 0 (F-L2).
@@ -711,7 +711,7 @@ function _builders.clipboard(e, id)
 	for key, value in pairs(e) do
 		if key ~= "type" and key ~= "timestamp" and key ~= "app" then meta[key] = value end
 	end
-	return require("keystats.clipboard_events").insert_sql({
+	return require("metrics.engine.capture.clipboard_events").insert_sql({
 		device_id = tostring(_device_id), id = id,
 		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = e.type, app = tostring(e.app or "Unknown"),

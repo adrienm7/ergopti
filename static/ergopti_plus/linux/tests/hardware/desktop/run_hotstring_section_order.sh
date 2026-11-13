@@ -80,7 +80,7 @@ enabled() {
 }
 
 saved_order() {
-	TOML="${CONFIG}" luajit -e 'local f = assert(io.open(os.getenv("TOML"), "rb")); local d = require("toml_codec").decode(f:read("*a"))
+	TOML="${CONFIG}" luajit -e 'local f = assert(io.open(os.getenv("TOML"), "rb")); local d = require("core.text.engine.toml_codec").decode(f:read("*a"))
 		local o = ((d.hotstrings or {}).order_overrides or {}).autocorrection
 		print(o and table.concat(o, "|") or "none")'
 }

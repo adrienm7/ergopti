@@ -24,8 +24,8 @@ set -euo pipefail
 # directory name. Capture a sentinel and remove only that final byte afterward.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "$PWD")"
 REPO_ROOT="${REPO_ROOT%.}"
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 APP_PATH="$REPO_ROOT/build/macos/$ERGOPTI_APP_BUNDLE"
 
 fail() { printf '[macos-dev-app] ERROR: %s\n' "$*" >&2; exit 1; }

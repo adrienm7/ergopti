@@ -4,9 +4,9 @@
 ; MODULE: Local Driver Control (reload command)
 ; DESCRIPTION:
 ; A tool run by the same user asks this running driver to reload. The AHK port
-; of _shared/lua/control/driver_control.lua, pinned to it by the corpus under
+; of _shared/diagnostics/engine/control_driver_control.lua, pinned to it by the corpus under
 ; _shared/tests/corpus/control; the declaration is
-; _shared/modules/control/driver_control.json.
+; _shared/diagnostics/data/control/driver_control.json.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One endpoint owner. The registered message rings the same
@@ -613,7 +613,7 @@ DriverControl_Start() {
 		throw Error("The driver control already has an owner.")
 	LoggerStart("DriverControl", "Starting the local reload control…")
 	try {
-		Spec := DriverControl_LoadSpec(_SharedDir . "\modules\control\driver_control.json")
+		Spec := DriverControl_LoadSpec(_SharedDir . "\diagnostics\data\control\driver_control.json")
 		Base := (IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != "")
 			? _DriverStartupSmokeDir : EnvGet(Spec["folders"]["windows"]["base"])
 		Message := DriverControl_RegisterMessage(Spec["windows_message"])

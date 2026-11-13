@@ -15,8 +15,8 @@ CONTROL_TIMEOUT_SECONDS = 10
 CAPTURE = r"""
 assert(_VERSION == "Lua 5.4", "Release arming controls require Lua 5.4")
 local driver, shared, app, staged, pid, override = table.unpack(arg)
-package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
-local Json = require('json')
+package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/?.lua;' .. shared .. '/?/init.lua;' .. package.path
+local Json = require('core.text.engine.json')
 local logger = {}
 for _, name in ipairs({'start','success','trace','done','info','debug','warn','error'}) do logger[name]=function() end end
 package.preload['infra.logger']=function() return logger end

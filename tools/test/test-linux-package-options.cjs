@@ -37,7 +37,7 @@ const built = run('build-linux-driver.sh');
 const stagingArgs = (format) => [`--skip-${format}`];
 assert.equal(built.status, 0, built.stderr || built.stdout || built.error?.message);
 assert.equal(
-	fs.existsSync(path.join(BUILD, '_shared/modules/features/behaviors.json')),
+	fs.existsSync(path.join(BUILD, '_shared/settings/data/features/behaviors.json')),
 	false,
 	'the shared review catalogue belongs to website generation, not the Linux runtime bundle'
 );

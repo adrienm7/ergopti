@@ -77,7 +77,7 @@ helpers.describe("Ollama model delete: owned removal", function()
 			helpers.assert_eq(#transport.deletes, 1)
 			local sent = transport.deletes[1]
 			helpers.assert_eq(sent.url, "http://127.0.0.1:11434/api/delete")
-			helpers.assert_eq(require("json").decode(sent.body), { name = "qwen:2b" })
+			helpers.assert_eq(require("core.text.engine.json").decode(sent.body), { name = "qwen:2b" })
 			helpers.assert_eq(sent.headers["Content-Type"], "application/json")
 			helpers.assert_eq(sent.options.owner, "ollama_model_delete")
 			helpers.assert_true(sent.options.timeout_ms > 0)

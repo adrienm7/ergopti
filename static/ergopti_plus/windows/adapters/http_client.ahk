@@ -67,7 +67,7 @@ global _HTTP_CURL_ABORT_TIMER := 0
 ; curl.exe ignored the Windows (WinINet) proxy that browsers and WebView2 use,
 ; so a proxy-only corporate network saw every request fail while GitHub
 ; worked in the browser. Mirrors release_sources.proxy_resolve_timeout_sec in
-; _shared/modules/updater/defaults.json (pinned by the JS drift gate).
+; _shared/updater/data/defaults.json (pinned by the JS drift gate).
 global SYSTEM_PROXY_RESOLVE_TIMEOUT_MS := 10000
 ; Copy of [limits] process_output_bytes: a request can run before the registry loads (pinned by test-keystats-timings-single-source.cjs).
 global SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES := 65536
@@ -463,8 +463,8 @@ class CurlAsyncRequest {
 		Input .= ',"body":"","headers":[],"request_id":' . JsonStringLiteral(this.CleanupDebtId)
 		Input .= ',"response_path":' . JsonStringLiteral(this.OutputPath != "" ? this.OutputPath : this.BodyPath)
 		Input .= ',"header_path":' . JsonStringLiteral(this.HeaderPath)
-		Input .= ',"policy_path":' . JsonStringLiteral(_SharedDir . "\modules\network\proxy_policy.json")
-		Input .= ',"defaults_path":' . JsonStringLiteral(_SharedDir . "\modules\updater\defaults.json")
+		Input .= ',"policy_path":' . JsonStringLiteral(_SharedDir . "\core\network\data\proxy_policy.json")
+		Input .= ',"defaults_path":' . JsonStringLiteral(_SharedDir . "\updater\data\defaults.json")
 		Input .= ',"route_path":' . JsonStringLiteral(_VendorDir . "\ergopti_network_routes.ps1")
 		Input .= ',"max_response_bytes":' . HTTP_CURL_MAX_RESPONSE_BYTES
 		Input .= ',"max_header_bytes":' . HTTP_CURL_MAX_HEADER_BYTES
@@ -947,7 +947,7 @@ _SystemProxy_UrlParts(Url) {
 _SystemProxy_EnvironmentPrecedence(Scheme) {
 	global _SYSTEM_PROXY_ENV_PRECEDENCE, _SharedDir
 	if !(_SYSTEM_PROXY_ENV_PRECEDENCE is Map) {
-		Lists := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json"))
+		Lists := JsonParse(FSReadStrict(_SharedDir . "\core\network\data\proxy_policy.json"))
 			.Get("environment_precedence", 0)
 		if !(Lists is Map)
 			throw ValueError("proxy_policy.json holds no environment_precedence.")
@@ -1184,8 +1184,8 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 		if Strict {
 			Input := '{"version":1,"auto_detect":' . (Config.Get("auto_detect", false) ? "true" : "false")
 				. ',"pac_url":' . JsonStringLiteral(Config["pac_url"])
-				. ',"policy_path":' . JsonStringLiteral(_SharedDir . "\modules\network\proxy_policy.json")
-				. ',"updater_defaults_path":' . JsonStringLiteral(_SharedDir . "\modules\updater\defaults.json")
+				. ',"policy_path":' . JsonStringLiteral(_SharedDir . "\core\network\data\proxy_policy.json")
+				. ',"updater_defaults_path":' . JsonStringLiteral(_SharedDir . "\updater\data\defaults.json")
 				. ',"deadline_tick":' . (DllCall("Kernel32\GetTickCount64", "UInt64")
 					+ TickRemaining64(Budget["start"], SYSTEM_PROXY_RESOLVE_TIMEOUT_MS)) . ',"urls":['
 			for Index, Url in Missing
@@ -1458,7 +1458,7 @@ SystemProxy_IsLoopbackUrl(Url) {
 _SystemProxy_LoopbackPolicy() {
 	global _SYSTEM_PROXY_LOOPBACK, _SharedDir
 	if !(_SYSTEM_PROXY_LOOPBACK is Map) {
-		Policy := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json")).Get("loopback", 0)
+		Policy := JsonParse(FSReadStrict(_SharedDir . "\core\network\data\proxy_policy.json")).Get("loopback", 0)
 		if !(Policy is Map)
 			throw ValueError("proxy_policy.json holds no loopback rows.")
 		Networks := []

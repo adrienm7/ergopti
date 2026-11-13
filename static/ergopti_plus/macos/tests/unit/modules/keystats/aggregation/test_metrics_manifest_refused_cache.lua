@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local OWNERS = {
 	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json",
+	"infra.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 local PAST, TODAY, TOMORROW = "2026-10-17", "2026-10-18", "2026-10-19"
 
@@ -140,7 +140,7 @@ end)
 
 local APP_OWNERS = {
 	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
+	"infra.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
 	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "ui.ui_builder",
 	"infra.paths", "infra.i18n", "infra.dialog_util", "infra.deferred_work", "infra.config_paths",
 	"adapters.file_system", "adapters.timer_scheduler", "adapters.webview_result",

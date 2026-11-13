@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The gesture slot key-space (tap/swipe slot names) is identical on every driver:
  * a gesture bound on one platform must name the same slot on the other. The single
- * declared slot-space lives in _shared/modules/actions/actions.toml [slots]. The
+ * declared slot-space lives in _shared/shortcuts/data/actions/actions.toml [slots]. The
  * Linux manager takes its lists from its generated action catalogue (this gate
  * checks the generated lists equal the TOML in order, and that the manager reads
  * them rather than re-hardcoding them; the Linux Lua suite proves the loaded lists
@@ -50,7 +50,7 @@ function eqOrdered(a, b) {
 
 const errors = [];
 try {
-	const toml = read('_shared/modules/actions/actions.toml');
+	const toml = read('_shared/shortcuts/data/actions/actions.toml');
 	const single = tomlSlotArray(toml, 'single');
 	const axis = tomlSlotArray(toml, 'axis');
 	const union = new Set([...single, ...axis]);
@@ -61,7 +61,7 @@ try {
 	// Native two-finger OS gestures remain unassigned until the user explicitly binds one.
 	{
 		const parse = require('smol-toml').parse;
-		const source = read('_shared/modules/features/manifest.toml');
+		const source = read('_shared/settings/data/features/manifest.toml');
 		const manifest = parse(
 			source.replace(
 				/^\[\[features\.([^\]]+)\]\]\r?$/gm,
@@ -174,7 +174,7 @@ try {
 try {
 	const LABEL_FAMILY =
 		/^(gesture\.slots|menu\.gestures|menu\.gestures\.modes|menu\.gestures\.sensitivities)\.(tap|swipe)_(\d)(?:_[a-z_]+)?$/;
-	const localesDir = path.join(SP, '_shared/data/locales');
+	const localesDir = path.join(SP, '_shared/core/i18n/data/locales');
 	for (const file of fs.readdirSync(localesDir).filter((name) => name.endsWith('.json'))) {
 		const data = JSON.parse(fs.readFileSync(path.join(localesDir, file), 'utf8'));
 		const owners = new Map();

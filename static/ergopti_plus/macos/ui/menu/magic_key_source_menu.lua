@@ -6,7 +6,7 @@
 --- The `magic_key_source` list of the keyboard-layout menu: one row naming the
 --- physical key that types the magic key, whose submenu captures the next key
 --- pressed, restores the automatic key or lists every candidate. The rows are
---- the shared ones (_shared/lua/keymap/magic_key_source.lua), which Linux draws
+--- the shared ones (_shared/layouts/engine/layers/magic_key_source.lua), which Linux draws
 --- too.
 ---
 --- FEATURES & RATIONALE:
@@ -32,7 +32,7 @@ local Notifications   = require("infra.notifications")
 local Timings         = require("infra.timings")
 local Timer           = require("adapters.timer_scheduler")
 local EventProvenance = require("adapters.event_provenance")
-local Shared          = require("keymap.magic_key_source")
+local Shared          = require("layouts.engine.layers.magic_key_source")
 local ManifestMenu    = require("infra.manifest_menu")
 local PhaseStats      = require("infra.phase_stats")
 local Source          = require("modules.keymap.magic_key_source")

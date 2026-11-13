@@ -12,7 +12,7 @@
 ; ROOT CAUSE ENCODED: a tag that expands one field and previews another is
 ; invisible. The bubble looks right, the expansion looks right, and only a user
 ; comparing the two notices — which is exactly the failure mode
-; _shared/modules/personal_info/fields.toml's own header describes for the
+; _shared/hotstrings/data/personal_info/fields.toml's own header describes for the
 ; masked-field list, and the reason that file writes every field out both ways.
 ; One map, read by both sides, is the only shape in which the two cannot
 ; disagree.
@@ -90,7 +90,7 @@ _PITS_EveryTagNamesADeclaredField() {
 		"floor: the shared declaration must have been read (only " . Declaration.Fields.Count . " field(s)) — against the fail-closed policy every assertion below would pass over an empty map")
 	for Tag, Field in PERSONAL_INFO_TAGS {
 		Assert(Declaration.Fields.Has(Field),
-			"'@" . Tag . "' names the field '" . Field . "', which _shared/modules/personal_info/fields.toml does not declare. An undeclared field masks fail-closed, so the preview would hide a value the user asked to see and nothing would say why")
+			"'@" . Tag . "' names the field '" . Field . "', which _shared/hotstrings/data/personal_info/fields.toml does not declare. An undeclared field masks fail-closed, so the preview would hide a value the user asked to see and nothing would say why")
 	}
 }
 Test("personal-info tags: every tag names a field the shared declaration classifies (personal-info-tag-map-single-source)",

@@ -107,7 +107,7 @@ def publish(path, value):
 def module_roots(app):
     """Return the installed Lua module roots the native fixtures load."""
     macos = app / "Contents/Resources/static/ergopti_plus/macos"
-    return macos, macos.parent / "_shared/lua"
+    return macos, macos.parent / "_shared"
 
 
 def module_tree_sha256(app):

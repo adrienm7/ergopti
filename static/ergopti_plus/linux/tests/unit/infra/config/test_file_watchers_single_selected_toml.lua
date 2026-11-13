@@ -95,7 +95,7 @@ helpers.describe("file watchers single selected TOML", function()
 			if not reuse_owner then
 				watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", backend_name == "native" and backend or false)
 			end
-			local logger, held_debug = require("logger.shim"), nil
+			local logger, held_debug = require("core.logger.engine.shim"), nil
 			held_debug = logger.debug
 			state.staging_reasons = state.staging_reasons or {}
 			logger.debug = function(tag, format, ...)
@@ -395,7 +395,7 @@ helpers.describe("file watchers single selected TOML", function()
 	helpers.it("(linux-watch-selected-topology) a selected path that is not a regular file is refused in the log", function()
 		local device_mode = assert(native_luv.fs_stat("/dev/null")).mode
 		selected_file_session("native", function(s)
-			local logger = require("logger.shim")
+			local logger = require("core.logger.engine.shim")
 			local held, refusals = logger.warn, {}
 			logger.warn = function(tag, format, ...)
 				if type(format) == "string" and format:find("not a regular file", 1, true) then refusals[#refusals + 1] = format end
@@ -413,7 +413,7 @@ helpers.describe("file watchers single selected TOML", function()
 
 	helpers.it("(linux-watch-selected-file) native ENOENT is reported as absence", function()
 		selected_file_session("native", function(s)
-			local logger = require("logger.shim")
+			local logger = require("core.logger.engine.shim")
 			local original, absent = logger.info, 0
 			logger.info = function(tag, format, ...)
 				if type(format) == "string" and format:find("is absent", 1, true) then absent = absent + 1 end
@@ -429,7 +429,7 @@ helpers.describe("file watchers single selected TOML", function()
 	if native_luv.getuid() ~= 0 then
 		helpers.it("(linux-watch-selected-file) denied metadata is not reported as absence", function()
 			selected_file_session("native", function(s)
-				local logger = require("logger.shim")
+				local logger = require("core.logger.engine.shim")
 				local old_info, old_warn = logger.info, logger.warn
 				local absent, unreadable = 0, 0
 				logger.info = function(tag, format, ...)

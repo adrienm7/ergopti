@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Update-Check Schedule Vectors (Linux)
 --- DESCRIPTION:
---- Replays _shared/modules/updater/schedule_vectors.json through the shared Lua
+--- Replays _shared/updater/data/schedule_vectors.json through the shared Lua
 --- port (updater.schedule) with the real timing of defaults.json. The
 --- JavaScript module and the AHK port replay the same file, so the drivers
 --- cannot disagree on when an automatic check is due, how a retired interval
@@ -11,9 +11,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local SHARED = helpers.driver_root() .. "/../_shared/modules/updater/"
+local SHARED = helpers.driver_root() .. "/../_shared/updater/data/"
 
 local function read_json(name)
 	local handle = assert(io.open(SHARED .. name, "rb"))
@@ -23,8 +23,8 @@ local function read_json(name)
 end
 
 local function load_schedule()
-	package.loaded["updater.schedule"] = nil
-	return require("updater.schedule")
+	package.loaded["updater.engine.schedule"] = nil
+	return require("updater.engine.schedule")
 end
 
 --- Compares two flat records key by key.
@@ -47,7 +47,7 @@ local function describe_record(record)
 	return "{" .. table.concat(parts, ", ") .. "}"
 end
 
-helpers.describe("updater.schedule — shared vectors (Linux)", function()
+helpers.describe("updater.engine.schedule — shared vectors (Linux)", function()
 	local vectors = read_json("schedule_vectors.json")
 	local timing = read_json("defaults.json").timing
 	local Schedule = load_schedule()

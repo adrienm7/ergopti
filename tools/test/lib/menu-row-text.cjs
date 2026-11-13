@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Says whether the visible text of one menu row is an unresolved identifier,
  * a raw key id or an abbreviation no locale translates (`lalt`, `LCtrl`).
- * `_shared/lua/test/menu_row_text.lua` is the same rule for the Lua walks; both
+ * `_shared/tests/lua/menu/row_text.lua` is the same rule for the Lua walks; both
  * read `_shared/tests/corpus/menu_row_text_allowlist.json`. French rows also
  * keep a space before `:`, `?`, `!` and `;` in both.
  * ==============================================================================
@@ -19,7 +19,7 @@ const path = require('path');
 
 const ERGOPTI = path.resolve(__dirname, '..', '..', '..', 'static', 'ergopti_plus');
 const ALLOWLIST = path.join(ERGOPTI, '_shared', 'tests', 'corpus', 'menu_row_text_allowlist.json');
-const KEY_NAMES = path.join(ERGOPTI, '_shared', 'data', 'keycodes', 'key_names.json');
+const KEY_NAMES = path.join(ERGOPTI, '_shared', 'layouts', 'data', 'keycodes', 'key_names.json');
 
 // Spellings of the key name table that are also plain words of a sentence
 // (« Insert a space », « tab »; `alt` is « all » in Danish and Norwegian, « old »
@@ -46,9 +46,9 @@ const PROSE_SPELLINGS = new Set([
 
 /**
  * Every key spelling a row must never show: the lowercase ids and aliases of
- * _shared/data/keycodes/key_names.json that read as no word, and the side
+ * _shared/layouts/data/keycodes/key_names.json that read as no word, and the side
  * abbreviations the Tap-Hold rows used to print (LCtrl, RShift, LAlt…).
- * `_shared/lua/test/menu_row_text.lua` builds the same set.
+ * `_shared/tests/lua/menu/row_text.lua` builds the same set.
  * @returns {Set<string>}
  */
 function loadRawKeySpellings() {

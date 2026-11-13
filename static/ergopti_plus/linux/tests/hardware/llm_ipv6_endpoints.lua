@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Remote = require("modules.llm.api_remote")
 local Http = require("adapters.http_client")
 local vectors = assert(Json.decode(assert(os.getenv("AUDIT_VECTORS"))))

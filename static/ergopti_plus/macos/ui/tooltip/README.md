@@ -9,14 +9,14 @@ Central tooltip façade exposing a unified API for all overlay previews. Delegat
 
 ## Key files
 
-| File                    | Description                                                                |
-| ----------------------- | -------------------------------------------------------------------------- |
-| `init.lua`              | `M.show(kind, data)` / `M.hide()` unified façade                           |
-| `tooltip_hotstring.lua` | Per-group tinted hotstring preview (hs.canvas)                             |
-| `tooltip_llm.lua`       | LLM streaming prediction overlay (hs.canvas, multi-slot)                   |
-| `renderer.lua`          | Canvas creation and screen coordinate resolution                           |
-| `config.lua`            | Loader of the shared visual constants (fails fast on a missing key)        |
-| `dequeue.lua`           | Lua port of `_shared/modules/tooltip/dequeue.js`: stacked row expiry logic |
+| File                    | Description                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `init.lua`              | `M.show(kind, data)` / `M.hide()` unified façade                                |
+| `tooltip_hotstring.lua` | Per-group tinted hotstring preview (hs.canvas)                                  |
+| `tooltip_llm.lua`       | LLM streaming prediction overlay (hs.canvas, multi-slot)                        |
+| `renderer.lua`          | Canvas creation and screen coordinate resolution                                |
+| `config.lua`            | Loader of the shared visual constants (fails fast on a missing key)             |
+| `dequeue.lua`           | Lua port of `_shared/core/ui/data/tooltip/dequeue.js`: stacked row expiry logic |
 
 The Linux driver renders the same tooltips in `linux/ui/tooltip/` (`config.lua`
 reads the same constants file, `preview.lua` decides what the preview shows,
@@ -25,4 +25,4 @@ module there.
 
 ## Shared constants
 
-`_shared/modules/tooltip/constants.toml` — colours and geometry; `_shared/modules/tooltip/tint.js` — parity gate with Windows.
+`_shared/core/ui/data/tooltip/constants.toml` — colours and geometry; `_shared/core/ui/data/tooltip/tint.js` — parity gate with Windows.

@@ -2,7 +2,7 @@
 
 --- Exercises the actual private adapter boundary and closed worker protocol.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local DIGEST = string.rep("a", 64)
 local SOURCE = { source_path = "/private/config.toml", source_sha256 = DIGEST }
 local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"

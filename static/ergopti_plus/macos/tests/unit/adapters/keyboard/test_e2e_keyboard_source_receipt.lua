@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local World = require("tests.e2e.boot.world")
 local ABC = "com.apple.keylayout.ABC"
 local FRENCH = "com.apple.keylayout.French"

@@ -9,7 +9,7 @@
 --- restore(nil) CLEARED the clipboard — destroying the user's non-text content.
 ---
 --- Fix (2026-06-19): save() now uses readAllData() and restore() uses
---- writeAllData(), matching the approach in keymap/utils.lua.
+--- writeAllData(), matching the approach in layouts/engine/utils.lua.
 ---
 --- Behaviour, not spelling: the adapter runs against a pasteboard double that
 --- holds several types at once and keeps only text through its text-only calls,

@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 helpers.describe("Keyboard layout row rebuild cost", function()
 	helpers.it("(menu-rebuild-2026-10-31) decodes unchanged registry settings once", function()
 		helpers.with_fresh_modules({ "modules.keymap.layout_registry" }, function()
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local Registry = require("modules.keymap.layout_registry")
 			local original, decodes = Json.decode, 0
 			Json.decode = function(...)

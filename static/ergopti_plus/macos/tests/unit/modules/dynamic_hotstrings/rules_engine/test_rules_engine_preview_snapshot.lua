@@ -17,7 +17,7 @@ end
 
 helpers.describe("dynamic rules consume the exact committed preview snapshot", function()
 	helpers.it("does not invoke a mutable resolver twice for one visible action", function()
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 

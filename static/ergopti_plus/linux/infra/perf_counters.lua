@@ -8,7 +8,7 @@
 --- writers, the keystats writer and the tray. Counters aggregate in memory and
 --- one evidence line per interval reports them, so the cost stays flat however
 --- fast the user types. A span that belongs to the shared hot-path inventory
---- (_shared/lua/hotpath_segments.lua) is also reported at WARNING the moment it
+--- (_shared/metrics/engine/perf/hotpath_segments.lua) is also reported at WARNING the moment it
 --- exceeds its threshold, the Linux counterpart of the Windows HotPath and the
 --- macOS hotpath_profiler.
 ---
@@ -43,9 +43,9 @@
 
 local M = {}
 
-local Logger    = require("logger.shim")
+local Logger    = require("core.logger.engine.shim")
 local Monotonic = require("infra.monotonic")
-local Segments  = require("hotpath_segments")
+local Segments  = require("metrics.engine.perf.hotpath_segments")
 
 local LOG = "PerfCounters"
 -- Tag of the slow-segment WARNING, shared with the Windows and macOS drivers so

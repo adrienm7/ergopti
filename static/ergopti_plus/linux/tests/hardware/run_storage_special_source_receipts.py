@@ -16,7 +16,7 @@ import tempfile
 import tomllib
 
 # The application folder under every XDG base, read from the one declaration.
-APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml"
+APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
 FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
@@ -90,7 +90,7 @@ def main():
             env = dict(os.environ)
             env.update(
                 XDG_CONFIG_HOME=str(root),
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 ERGOPTI_STORAGE_REGULAR="yes" if kind.startswith("regular") else "no",
                 ERGOPTI_STORAGE_OPERATION=operation,
             )

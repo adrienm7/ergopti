@@ -17,7 +17,7 @@
 --- the same reason.
 ---
 --- FEATURES & RATIONALE:
---- 1. The key space is the shared catalogue. `_shared/modules/actions/
+--- 1. The key space is the shared catalogue. `_shared/shortcuts/data/actions/
 ---    modifier_chords.json` already lists the forty keys the gesture actions and
 ---    the Windows driver use; a private list here would be a fourth answer to
 ---    "which keys exist".
@@ -36,26 +36,26 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local ShortcutCatalogue = require("shortcuts.catalogue")
-local ConfigOutdated = require("config_outdated")
-local SlotRoles = require("shortcuts.slot_roles")
+local Logger = require("core.logger.engine.shim")
+local ShortcutCatalogue = require("shortcuts.engine.catalogue")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local SlotRoles = require("shortcuts.engine.slot_roles")
 local Paths = require("infra.paths")
 local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
-local Codec = require("toml_codec")
-local Writer = require("toml_codec.writer")
-local MagicEditor = require("shortcuts.magic_editor")
-local KeyboardPublication = require("config_keyboard_publication")
+local Codec = require("core.text.engine.toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local MagicEditor = require("shortcuts.engine.magic_editor_core")
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
 local KeyboardComposition = KeyboardPublication.compose
 local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
-local PhysicalSlots = require("shortcuts.physical_slots")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
-local PhysicalAvailability = require("shortcuts.physical_availability")
-local ConfigKeys = require("config_keys")
-local KeyNames = require("keycodes.key_names")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
+local ConfigKeys = require("settings.engine.keys")
+local KeyNames = require("platform.input.keycodes.key_names")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -140,7 +140,7 @@ end
 local KEYBOARD_SECTION = ConfigKeys.KEY.SHORTCUTS_KEYBOARD
 
 -- The shared key catalogue.
-local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"
+local CATALOGUE_REL_PATH = "shortcuts/data/actions/modifier_chords.json"
 
 -- Decoded once. `false` after a failed read, so a missing catalogue is reported
 -- once rather than on every menu rebuild.
@@ -199,14 +199,14 @@ local function catalogue_keys()
 		Logger.error(LOG, "Cannot locate the shared tree — no key catalogue, so no slots are offered.")
 		return nil
 	end
-	local body, status = require("toml_codec.writer").read_classified(path)
+	local body, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	if status ~= "ok" then
 		_catalogue = false
 		Logger.error(LOG, "The key catalogue at '%s' was not completely read and closed — no slots are offered.", path)
 		return nil
 	end
 
-	local ok_json, Json = pcall(require, "json")
+	local ok_json, Json = pcall(require, "core.text.engine.json")
 	if not ok_json then
 		_catalogue = false
 		Logger.error(LOG, "No JSON decoder — the key catalogue cannot be read.")
@@ -242,13 +242,13 @@ end
 --- @return table owner Shared physical-slot policy.
 local function physical_slots()
 	if _physical_slots then return _physical_slots end
-	assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+	assert(rawequal(rawget(package.loaded, "shortcuts.engine.physical_slots"), PhysicalSlots)
 		and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
 		"physical-key constructor ownership changed")
-	local path = assert(Paths.shared("data/keycodes/physical_keys.json"), "physical-key registry path unavailable")
-	local raw, status = require("toml_codec.writer").read_classified(path)
+	local path = assert(Paths.shared("layouts/data/keycodes/physical_keys.json"), "physical-key registry path unavailable")
+	local raw, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	assert(status == "ok" and type(raw) == "string", "physical-key registry was not completely read and closed")
-	_physical_slots, _physical_binding_publication = PhysicalSlotConstructor(require("json").decode(raw))
+	_physical_slots, _physical_binding_publication = PhysicalSlotConstructor(require("core.text.engine.json").decode(raw))
 	return _physical_slots
 end
 
@@ -543,7 +543,7 @@ function M.set_action(slot_id, action_id)
 	end
 	-- Explicit None is a personal native-behavior claim. Scope removal alone
 	-- restores absence; it must never be confused with selecting this action.
-	local operation = require("shortcuts.assignment").operation(slot_id, action_id, owns_slot, Gestures.is_assignable)
+	local operation = require("shortcuts.engine.assignment").operation(slot_id, action_id, owns_slot, Gestures.is_assignable)
 	local assignments, explicit, generation = _assignments, _explicit_assignments, _dispatch_generation
 	local bytes, status = Writer.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then return false end
@@ -1063,7 +1063,7 @@ end
 --- Returns a detached complete native publication without reading or dispatching input.
 --- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
 function M.published_binding_catalogue()
-	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+	if not rawequal(rawget(package.loaded, "settings.engine.publication.keyboard_publication"), KeyboardPublication)
 		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
 		or type(KeyboardOwnerCurrent) ~= "function"
 		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)

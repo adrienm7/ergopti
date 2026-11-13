@@ -19,11 +19,11 @@ local M = {}
 -- Every module the scenario loads or replaces, restored after each run so no
 -- keystats, aggregator or accounting state leaks into a sibling test.
 local OWNED_MODULES = {
-	"lfs", "native_path", "error_description", "number_policy", "toml_codec.source_open",
+	"lfs", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.text.engine.toml_codec.source_open",
 	"adapters.http_client", "adapters.managed_ollama_daemon",
 	"adapters.owned_program_runner", "adapters.running_application",
-	"core.llm.managed_ollama_daemon_receipt", "infra.notifications",
-	"llm.local_model_policy", "modules.llm.api_mlx_fetch",
+	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "infra.notifications",
+	"ai.engine.ollama.local_model_policy", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama",
 	"modules.llm.mlx_stream_retirement", "modules.llm.network_env",
 	"modules.llm.ollama_endpoint", "modules.llm.ollama_server_command",

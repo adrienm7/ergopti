@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
-local LocalTime = require("keystats.local_time")
+local LocalTime = require("metrics.engine.local_time")
 
 local function upvalue(fn, wanted, replacement)
 	for index = 1, math.huge do
@@ -48,7 +48,7 @@ helpers.describe("keystats: rows in UTC with their recorded offset (utc-offset-r
 			helpers.with_stub_scope({
 				"infra.logger", "adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-				"keystats.metrics", "adapters.file_system", "adapters.timer_scheduler",
+				"metrics.engine.metrics", "adapters.file_system", "adapters.timer_scheduler",
 			}, function()
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
 				local seen = {}

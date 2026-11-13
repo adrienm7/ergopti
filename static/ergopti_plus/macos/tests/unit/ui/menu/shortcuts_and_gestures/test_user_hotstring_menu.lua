@@ -1,7 +1,7 @@
 --- tests/unit/ui/menu/shortcuts_and_gestures/test_user_hotstring_menu.lua
 
 --- Registers independent shared programmable-menu checks with the macOS renderer.
-require("test.user_hotstring_menu_contract").run(require("tests.helpers"), require("infra.manifest_menu"), require("infra.logger"))
+require("tests.lua.hotstrings.user_hotstring_menu_contract").run(require("tests.helpers"), require("infra.manifest_menu"), require("infra.logger"))
 
 local helpers = require("tests.helpers")
 local Preferences = require("infra.preferences")

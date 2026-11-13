@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-raw-batches-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -21,7 +21,7 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local checks, failures = 0, 0
 
 local function check(name, test)

@@ -13,8 +13,8 @@
  * was to snapshot whole `_generated/` directories instead — better, but still a
  * guess, and a wrong one for the generators that write OUTSIDE those
  * directories. Measured: build-domain.cjs writes twelve files, three of which
- * (`_shared/lua/keymap/terminators_catalogue.lua`,
- * `_shared/modules/menu/menu_manifest.json` and `docs/architecture.md` from its
+ * (`_shared/layouts/engine/layers/terminators_catalogue.lua`,
+ * `_shared/menu/data/menu_manifest.json` and `docs/architecture.md` from its
  * sibling) live nowhere near a `_generated/` folder. Adding that generator to a
  * directory-scoped gate would silently overwrite them in the working tree and
  * never restore them — exactly the bug the directory scan was introduced to fix,
@@ -43,7 +43,7 @@ const GENERATORS = [
 		outputs: [
 			'static/ergopti_plus/macos/modules/llm/managed-python-release.sh',
 			'static/ergopti_plus/macos/modules/llm/managed-python-downloads.json',
-			'static/ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua'
+			'static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua'
 		]
 	},
 	{
@@ -64,16 +64,16 @@ const GENERATORS = [
 		outputs: [
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift',
 			'static/ergopti_plus/macos/platform/network/native_http.py',
-			'static/ergopti_plus/_shared/go/native_http/transport.go'
+			'static/ergopti_plus/_shared/core/network/native/go/native_http/transport.go'
 		]
 	},
 	{
 		script: 'codegen/codegen-managed-bootstrap.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift',
-			'static/ergopti_plus/_shared/go/native_http/managed_ollama_bootstrap.json',
-			'static/ergopti_plus/_shared/go/native_http/proxy_policy.json',
-			'static/ergopti_plus/_shared/go/native_http/managed_ollama_environment.json'
+			'static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_bootstrap.json',
+			'static/ergopti_plus/_shared/core/network/native/go/native_http/proxy_policy.json',
+			'static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_environment.json'
 		]
 	},
 	{
@@ -95,14 +95,14 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-personal-file-descriptors.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/hotstrings/personal_files.lua',
+			'static/ergopti_plus/_shared/hotstrings/engine/catalogue/personal_files.lua',
 			'static/ergopti_plus/windows/_generated/personal_file_descriptors.ahk'
 		]
 	},
 	{
 		script: 'codegen/codegen-window-titles.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/window_titles.lua',
+			'static/ergopti_plus/_shared/core/ui/engine/window_titles.lua',
 			'static/ergopti_plus/windows/_generated/window_titles.ahk',
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/WindowTitles.generated.swift'
 		]
@@ -111,7 +111,7 @@ const GENERATORS = [
 		script: 'build/build-features-manifest.js',
 		outputs: [
 			'static/ergopti_plus/_shared/_generated/config_template.toml',
-			'static/ergopti_plus/_shared/lua/features/manifest_data.lua',
+			'static/ergopti_plus/_shared/settings/engine/features/manifest_data.lua',
 			'static/ergopti_plus/linux/_generated/config_template.toml',
 			'static/ergopti_plus/linux/_generated/features_manifest.lua',
 			'static/ergopti_plus/macos/_generated/config_template.toml',
@@ -123,15 +123,15 @@ const GENERATORS = [
 	{
 		script: 'build/build-menu-manifest.js',
 		outputs: [
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
-			'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk'
+			'static/ergopti_plus/_shared/menu/data/menu_manifest.json',
+			'static/ergopti_plus/_shared/menu/data/startup_tray_projection.ahk'
 		]
 	},
 	{
 		// Reads menu_manifest.json, so it runs after the menu build above.
 		script: 'codegen/codegen-config-keys.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/config_keys.lua',
+			'static/ergopti_plus/_shared/settings/engine/keys.lua',
 			'static/ergopti_plus/_shared/ui/_generated/config_keys.js',
 			'tools/lib/_generated/config_keys.cjs',
 			'static/ergopti_plus/windows/_generated/config_keys.ahk'
@@ -140,7 +140,7 @@ const GENERATORS = [
 	{
 		script: 'build/gen-metrics-category-aliases.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/data/metrics_general_category_aliases.json',
+			'static/ergopti_plus/_shared/metrics/data/metrics_general_category_aliases.json',
 			'static/ergopti_plus/_shared/ui/_generated/metrics_general_category_aliases.js'
 		]
 	},
@@ -151,7 +151,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-key-names.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/keycodes/key_names_data.lua',
+			'static/ergopti_plus/_shared/platform/input/keycodes/key_names_data.lua',
 			'static/ergopti_plus/windows/_generated/key_names.ahk',
 			'static/ergopti_plus/_shared/ui/_generated/key_names.js'
 		]
@@ -159,7 +159,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-slot-roles.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/shortcuts/slot_roles_data.lua',
+			'static/ergopti_plus/_shared/shortcuts/engine/slot_roles_data.lua',
 			'static/ergopti_plus/windows/_generated/slot_roles.ahk'
 		]
 	},
@@ -167,7 +167,7 @@ const GENERATORS = [
 		script: 'codegen/codegen-terminators.cjs',
 		outputs: [
 			'static/ergopti_plus/windows/_generated/terminators.ahk',
-			'static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua'
+			'static/ergopti_plus/_shared/layouts/engine/layers/terminators_catalogue.lua'
 		]
 	},
 	{
@@ -185,7 +185,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-keystats-tokens.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/keystats/tokens_data.lua',
+			'static/ergopti_plus/_shared/metrics/engine/privacy/tokens_data.lua',
 			'static/ergopti_plus/windows/_generated/keystats_tokens.ahk',
 			'static/ergopti_plus/_shared/ui/metrics_typing/_generated/keystats_tokens.js'
 		]
@@ -209,36 +209,36 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-native-theme.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/native_theme_data.lua',
+			'static/ergopti_plus/_shared/core/ui/engine/native_theme_data.lua',
 			'static/ergopti_plus/windows/_generated/native_theme.ahk'
 		]
 	},
 	{
 		script: 'codegen/codegen-brightness-actions.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
+		outputs: ['static/ergopti_plus/_shared/shortcuts/engine/brightness_actions_data.lua']
 	},
 	{
 		script: 'codegen/codegen-secure-apps.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/secure_apps_data.lua',
-			'static/ergopti_plus/_shared/lua/linux_app_identities_data.lua'
+			'static/ergopti_plus/_shared/apps/engine/secure_apps_data.lua',
+			'static/ergopti_plus/_shared/apps/engine/linux_app_identities_data.lua'
 		]
 	},
 	{
 		script: 'codegen/codegen-adapter-errors.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/adapter_errors.lua']
+		outputs: ['static/ergopti_plus/_shared/diagnostics/engine/adapter_errors.lua']
 	},
 	{
 		script: 'codegen/codegen-menu-row-order.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/menu/row_order_data.lua',
+			'static/ergopti_plus/_shared/menu/engine/row_order_data.lua',
 			'static/ergopti_plus/windows/_generated/menu_row_order.ahk'
 		]
 	},
 	{
 		script: 'codegen/codegen-menu-section-header.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/menu/section_header_data.lua',
+			'static/ergopti_plus/_shared/menu/engine/section_header_data.lua',
 			'static/ergopti_plus/windows/_generated/menu_section_header.ahk'
 		]
 	},
@@ -276,7 +276,7 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-layout-composer-check.cjs',
-		outputs: ['static/ergopti_plus/_shared/modules/layouts/composer_check/composed.keylayout']
+		outputs: ['static/ergopti_plus/_shared/layouts/data/composer_check/composed.keylayout']
 	},
 	{
 		script: 'codegen/codegen-windows-keyboard-layout.cjs',
@@ -301,10 +301,10 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-identifiers.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/identifiers.lua',
+			'static/ergopti_plus/_shared/core/text/engine/identifiers.lua',
 			'static/ergopti_plus/_shared/ui/_generated/identifiers.js',
-			'static/ergopti_plus/_shared/data/identifiers.sh',
-			'static/ergopti_plus/_shared/data/identifiers.py',
+			'static/ergopti_plus/_shared/core/text/data/identifiers.sh',
+			'static/ergopti_plus/_shared/core/text/data/identifiers.py',
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift',
 			'static/ergopti_plus/windows/_generated/identifiers.ahk'
 		]
@@ -312,7 +312,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-app-dirs.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/app_dirs.lua',
+			'static/ergopti_plus/_shared/core/fs/engine/app_dirs.lua',
 			'static/ergopti_plus/windows/_generated/app_dirs.ahk',
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift'
 		]
@@ -384,8 +384,8 @@ const GENERATORS = [
 		// Also splices the availability table between the README's GENERATED markers.
 		script: 'codegen/codegen-action-catalogue.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
-			'static/ergopti_plus/_shared/modules/actions/README.md',
+			'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue_data.lua',
+			'static/ergopti_plus/_shared/shortcuts/data/actions/README.md',
 			'static/ergopti_plus/macos/_generated/action_catalogue.lua',
 			'static/ergopti_plus/linux/_generated/action_catalogue.lua',
 			'static/ergopti_plus/windows/_generated/action_catalogue.ahk'
@@ -394,7 +394,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-unicode-case.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/unicode_case/data.lua',
+			'static/ergopti_plus/_shared/core/text/engine/unicode_case/data.lua',
 			'static/ergopti_plus/windows/_generated/unicode_title.ahk'
 		]
 	},
@@ -410,7 +410,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-keystats-roi-case.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/keystats/roi_case.lua',
+			'static/ergopti_plus/_shared/metrics/engine/privacy/roi_case.lua',
 			'static/ergopti_plus/_shared/tests/corpus/keystats/roi_lowercase_vectors.json'
 		]
 	},
@@ -423,12 +423,12 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-keystats-roi-policy.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/keystats/roi_policy.lua']
+		outputs: ['static/ergopti_plus/_shared/metrics/engine/privacy/roi_policy_core.lua']
 	},
 	{
 		script: 'codegen/codegen-keystats-queries.cjs',
 		outputs: [
-			'static/ergopti_plus/_shared/lua/keystats/queries.lua',
+			'static/ergopti_plus/_shared/metrics/engine/queries.lua',
 			'static/ergopti_plus/windows/_generated/keystats_queries.ahk'
 		]
 	},

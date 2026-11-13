@@ -19,7 +19,7 @@
 --- bounds it to the flush interval instead of the session length.
 ---
 --- WHY THE CADENCE IS NOT A LITERAL:
---- `_shared/modules/timings/constants.toml [keystats] ingest_tick_ms` is what
+--- `_shared/core/timing/data/constants.toml [keystats] ingest_tick_ms` is what
 --- Windows already uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. A fourth
 --- number written by hand here would be a fourth thing to drift, and the drift
 --- would be invisible — three drivers persisting at three cadences look

@@ -29,7 +29,7 @@ local STUBBED_MODULES = {
 	"modules.keystats.aggregator",
 	"modules.keystats.rotation",
 	"modules.keystats.export",
-	"keystats.metrics",
+	"metrics.engine.metrics",
 	"adapters.file_system",
 	"adapters.ledger_append",
 	"tests.support.keystats.absent_ledger_file_system",
@@ -91,7 +91,7 @@ local function run_unowned_case(failure)
 	package.loaded["modules.keystats.export"] = {
 		init = function() calls.export_init = calls.export_init + 1 end,
 	}
-	package.loaded["keystats.metrics"] = {}
+	package.loaded["metrics.engine.metrics"] = {}
 	package.loaded["adapters.file_system"] = {
 		read_with_status = function(path)
 			helpers.assert_true(path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX,
@@ -258,7 +258,7 @@ local function run_publication_case(failure)
 		get_device_short_id = function() return "" end,
 		get_sqlite_path = function() return "" end,
 	}
-	package.loaded["keystats.metrics"] = {}
+	package.loaded["metrics.engine.metrics"] = {}
 	package.loaded["adapters.file_system"] = {
 		read_with_status = function(path)
 			calls.classified_reads = calls.classified_reads + 1

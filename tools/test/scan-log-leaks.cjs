@@ -113,7 +113,7 @@ if (!fs.existsSync(dir)) {
 }
 const Redact = loadRedactor();
 const rules = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'redaction.json'), 'utf8')
 );
 const context = { home, user, config_dir: configDir || undefined, case_insensitive: folded };
 const raw = [];

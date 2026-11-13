@@ -13,7 +13,7 @@
 
 set -u
 cd "$(dirname "$0")/../.." || exit 2
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 # lua-lgi installs for the distro's Lua, not for LuaJIT. Without it the daemon
 # has no tooltip renderer, retires every prediction offer it cannot draw, and
 # the AI phase sees its accepting digit typed instead.

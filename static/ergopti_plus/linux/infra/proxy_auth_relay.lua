@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Linux Proxy Sign-In Relay Binding
 --- DESCRIPTION:
---- Binds the shared relay policy (network/proxy_auth_relay.lua) to the Linux
+--- Binds the shared relay policy (core/network/engine/proxy_auth_relay_core.lua) to the Linux
 --- installation: the contract read once through the native file owner, the
 --- relay executable beside the driver's launcher (bin/), the deadlines from the
 --- timings registry, and an owned probe child.
@@ -19,9 +19,9 @@
 local M = {}
 local Paths = require("infra.paths")
 local Reader = require("infra.regular_file_reader")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Timings = require("infra.timings")
-local SharedRelay = require("network.proxy_auth_relay")
+local SharedRelay = require("core.network.engine.proxy_auth_relay_core")
 
 -- The contract is about a kilobyte; a larger file is not the shipped one.
 local MAX_CONTRACT_BYTES = 8192
@@ -35,7 +35,7 @@ local initialized, policy, refusal = false, nil, nil
 function M.load()
 	if initialized then return policy, refusal end
 	initialized = true
-	local path = Paths.shared("modules/network/proxy_auth_relay.json")
+	local path = Paths.shared("core/network/data/proxy_auth_relay.json")
 	local file = path and Reader.open_source(path)
 	if not file then refusal = "proxy-auth-relay-unavailable"; return nil, refusal end
 	local bytes = file:read(MAX_CONTRACT_BYTES + 1)

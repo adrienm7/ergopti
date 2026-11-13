@@ -1,5 +1,5 @@
 {
-	"_comment": "Independent machine readings and the address each catalogue server must be probed at (_shared/lua/llm/local_server_ports.lua). ps is 'pid command line' rows, lsof is lsof -F pn output, ss is ss -Hltnp output; files maps an absolute path to its content. Expected values are authored, not derived from the resolver.",
+	"_comment": "Independent machine readings and the address each catalogue server must be probed at (_shared/ai/engine/local_servers/ports_core.lua). ps is 'pid command line' rows, lsof is lsof -F pn output, ss is ss -Hltnp output; files maps an absolute path to its content. Expected values are authored, not derived from the resolver.",
 	"version": 1,
 	"cases": [
 		{

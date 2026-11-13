@@ -20,7 +20,7 @@ local KEY, COMBO = "left_shift", "left_shift+right_shift"
 --- The ids the hold picker offers: the catalogue's holdable actions.
 local function holdable_ids()
 	local fh = assert(io.open(helpers.driver_root() .. "/platform/remap/data/actions.json", "rb"))
-	local actions = require("json").decode(fh:read("*a"))
+	local actions = require("core.text.engine.json").decode(fh:read("*a"))
 	fh:close()
 	local ids = {}
 	for _, action in ipairs(actions) do

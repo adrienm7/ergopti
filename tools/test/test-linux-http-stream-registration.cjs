@@ -36,8 +36,8 @@ const ROOT = path.resolve(__dirname, '../..');
 const NATIVE = 'tools/test/run-linux-http-stream-receipts.cjs';
 const CONTRACT = 'tools/test/test-linux-http-stream-registration.cjs';
 const SOURCES = [
-	'static/ergopti_plus/_shared/lua/network/proxy_policy.lua',
-	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'static/ergopti_plus/_shared/core/network/engine/proxy_policy_core.lua',
+	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
 	'static/ergopti_plus/linux/adapters/curl_http_client.lua',
 	'static/ergopti_plus/linux/adapters/system_proxy.lua',
 	'static/ergopti_plus/linux/infra/curl_identity.lua',
@@ -64,9 +64,9 @@ const SOURCES = [
 	'static/ergopti_plus/linux/modules/llm/api_remote.lua',
 	'static/ergopti_plus/linux/modules/llm/api_entries.lua',
 	'static/ergopti_plus/linux/modules/llm/local_server_catalogue.lua',
-	'static/ergopti_plus/_shared/lua/llm/local_server_auth.lua',
-	'static/ergopti_plus/_shared/modules/llm/local_servers.json',
-	'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua'
+	'static/ergopti_plus/_shared/ai/engine/local_servers/auth.lua',
+	'static/ergopti_plus/_shared/ai/data/local_servers.json',
+	'static/ergopti_plus/_shared/ai/engine/ollama/local_model_policy.lua'
 ];
 
 /** Verifies the actual declarations of one checkout without running its suites. */
@@ -213,7 +213,7 @@ function main() {
 	}
 	assert.equal(invocation[2].cwd, path.join(ROOT, 'static/ergopti_plus/linux'));
 	assert.equal(invocation[2].stdio, 'inherit');
-	assert(invocation[2].env.LUA_PATH.includes('../_shared/lua/?.lua'));
+	assert(invocation[2].env.LUA_PATH.includes('../_shared/?.lua'));
 	if (process.env.ERGOPTI_NATIVE_LUA_CPATH)
 		assert.equal(
 			invocation[2].env.LUA_CPATH,

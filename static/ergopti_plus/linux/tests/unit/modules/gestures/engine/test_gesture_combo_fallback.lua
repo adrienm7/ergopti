@@ -15,11 +15,11 @@ local Input = require("infra.input_event")
 --- @param body function Receives the exact actual-owner environment.
 local function with_environment(options, body)
 	options = options or {}
-	local names = { "logger.shim", "adapters.uinput_writer", "adapters.modifier_broker",
+	local names = { "core.logger.engine.shim", "adapters.uinput_writer", "adapters.modifier_broker",
 		"adapters.keyboard_hook", "modules.gestures.combo_emitter", "modules.gestures.manager" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	local original_execute = os.execute
 	local s = { rows = {}, commands = {}, opens = 0, closes = 0, ioctls = 0, emergency = 0 }
 	local ok, err = pcall(function()

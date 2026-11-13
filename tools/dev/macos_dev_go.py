@@ -5,7 +5,7 @@
 The proxy sign-in relay and the managed Ollama both compile with Go, and a
 maintainer's Mac has none: nothing asks for one, PATH stays as it is. The
 official archive of the repository's pin (go_version in
-_shared/modules/llm/managed_ollama_runtime.json) is downloaded once, admitted
+_shared/ai/data/managed_ollama_runtime.json) is downloaded once, admitted
 only when its SHA-256 and size equal the ones tools/dev/macos-dev-go.json pins
 for this architecture, and unpacked under build/macos-dev-go in the clone.
 
@@ -28,7 +28,7 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT = "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
+CONTRACT = "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json"
 GO_ARCHIVES = "tools/dev/macos-dev-go.json"
 GO_STATE = "build/macos-dev-go"
 DOWNLOAD_TIMEOUT_SECONDS = 1800

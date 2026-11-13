@@ -4,14 +4,14 @@
 --- MODULE: LLM Output Parser (Hammerspoon shim)
 --- DESCRIPTION:
 --- Hammerspoon-local re-export of the shared, platform-neutral LLM output parser
---- (_shared/lua/llm/parser.lua). The shared module is PURE; the only OS-specific
+--- (_shared/ai/engine/api/parser_core.lua). The shared module is PURE; the only OS-specific
 --- inputs it needs are the min/max word limits, which this shim resolves from the
 --- Hammerspoon settings store (falling back to the llm DEFAULT_STATE) and threads
 --- into process_prediction's opts. Every other function (strip_thinking,
 --- split_blocks) is re-exported unchanged — the same pattern as infra/text_utils.lua.
 --- ==============================================================================
 
-local Shared = require("llm.parser")
+local Shared = require("ai.engine.api.parser_core")
 local Storage = require("adapters.storage")
 
 -- Re-export the shared surface by delegation; only process_prediction is wrapped

@@ -38,7 +38,7 @@ const { shared } = require('../lib/paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const GENERATOR = path.join(ROOT, 'tools', 'codegen', 'codegen-layer-editor-data-js.cjs');
 const OUT = shared('ui', 'layer_editor', '_generated', 'layer_data.js');
-const LOCALES_DIR = shared('data', 'locales');
+const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 
 // Floors: a data file or a vocabulary that stopped being read would otherwise
 // pass with nothing compared.
@@ -81,12 +81,14 @@ vm.createContext(sandbox);
 vm.runInContext(committed, sandbox, { filename: OUT });
 const data = vm.runInContext('LAYER_EDITOR_DATA', sandbox);
 
-const vocabulary = TOML.parse(fs.readFileSync(shared('keymap', 'layer_actions.toml'), 'utf8'));
+const vocabulary = TOML.parse(
+	fs.readFileSync(shared('layouts', 'data', 'layer_actions.toml'), 'utf8')
+);
 const registry = JSON.parse(
-	fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+	fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
 );
 const recommendedDoc = TOML.parse(
-	fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8')
+	fs.readFileSync(shared('layouts', 'data', 'layers.recommended.toml'), 'utf8')
 );
 const OSES = vocabulary._meta.platforms;
 

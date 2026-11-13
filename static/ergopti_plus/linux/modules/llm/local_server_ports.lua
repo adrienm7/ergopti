@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local Server Port Scan (Linux)
 --- DESCRIPTION:
---- Reads the machine for the shared port policy (_shared/lua/llm/
+--- Reads the machine for the shared port policy (_shared/ai/engine/
 --- local_server_ports.lua): the command lines of the catalogue's processes
 --- from /proc, the servers' settings files, and ss for the listening TCP ports
 --- of a running server that gave no port by its command line or settings
@@ -30,16 +30,16 @@
 --- ==============================================================================
 
 local M = {}
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local ProcessRunner = require("adapters.process_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
-local Policy = require("llm.local_server_ports")
+local Policy = require("ai.engine.local_servers.ports_core")
 
-local LOG = "llm.local_server_ports"
+local LOG = "ai.engine.local_servers.ports_core"
 -- A settings file larger than this is not a server's port setting
 local MAX_SETTINGS_BYTES = 1048576
 -- Bytes of a command line read: ports and names sit well inside this

@@ -432,7 +432,7 @@ helpers.describe("Active API commands: canonical labels and retained owner", fun
 		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("uses the actual shared active commands in " .. locale, function()
 			helpers.with_fresh_modules(owned, function()
-				local file = assert(io.open(helpers.driver_root() .. "../_shared/data/locales/" .. locale .. ".json", "rb"))
+				local file = assert(io.open(helpers.driver_root() .. "../_shared/core/i18n/data/locales/" .. locale .. ".json", "rb"))
 				local raw = file:read("*a"); assert(file:close())
 				local labels = require("adapters.json_codec").decode(raw)
 				local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }

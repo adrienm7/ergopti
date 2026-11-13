@@ -25,9 +25,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local ShellRunner = require("adapters.shell_runner")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "modules.gestures.background_commands"
 

@@ -1,1 +1,1 @@
-{"schema_version":1,"go_version":"go1.26.8","goos":"windows","goarch":"amd64","source_fingerprint":"54ab1868abf29e71f5189cefee2473e0fd2320de5fe1c4434460d34e38159f15","exe_sha256":"44ca1b91a0b93984cbac63d335feae08c564d541b85fc4197256d3d9b835f502"}
+{"schema_version":1,"go_version":"go1.26.8","goos":"windows","goarch":"amd64","source_fingerprint":"aac7d96dcfb21427bf1d8fc89648f430c29394c1e91cec2e008803e2da0e01a6","exe_sha256":"44ca1b91a0b93984cbac63d335feae08c564d541b85fc4197256d3d9b835f502"}

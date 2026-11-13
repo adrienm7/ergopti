@@ -41,8 +41,8 @@
 
 local M = {}
 
-local Errors = require("adapter_errors")
-local Logger = require("logger.shim")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "gestures.touchpad_finder"
 

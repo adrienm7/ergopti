@@ -19,7 +19,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CATALOGUE = path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json');
+const CATALOGUE = path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json');
 
 // Wording that schedules work instead of describing the platform.
 const SCHEDULED =

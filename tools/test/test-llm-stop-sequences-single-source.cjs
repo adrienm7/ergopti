@@ -44,7 +44,7 @@ function check(label, filePath, pattern, mustMatch) {
 	}
 }
 
-const INFERENCE_JSON = path.join(EP, '_shared', 'modules', 'llm', 'inference.json');
+const INFERENCE_JSON = path.join(EP, '_shared', 'ai', 'data', 'inference.json');
 
 // inference.json must contain the stop_sequences section with unified keys
 check('inference.json has stop_sequences', INFERENCE_JSON, /"stop_sequences"\s*:/, true);
@@ -95,7 +95,7 @@ check(
 if (failures.length > 0) {
 	console.error('\x1b[31m[ERROR] LLM stop-sequences single-source violations:\x1b[0m');
 	for (const f of failures) console.error('  ' + f);
-	console.error('\n  Stop sequences must be read from _shared/modules/llm/inference.json.');
+	console.error('\n  Stop sequences must be read from _shared/ai/data/inference.json.');
 	console.error('  Do NOT re-inline literal arrays in backend adapter files.');
 	process.exit(1);
 }

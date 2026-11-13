@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local IBM = {
 	id = "ibm_fixture", label = "IBM fixture", base_url = "https://us-south.ml.cloud.ibm.com/ml/gateway/v1",
@@ -29,7 +29,7 @@ local MESSAGES = { { role = "system", content = "S" }, { role = "user", content 
 --- Runs body against the real api_remote over a scripted HTTP client and clock.
 --- @param body function body(remote, calls, clock)
 local function with_remote(body)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "logger.shim",
+	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "core.logger.engine.shim",
 		"adapters.timer_scheduler" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -73,13 +73,13 @@ local function with_remote(body)
 			logs[#logs + 1] = level .. ": " .. (formatted and text or tostring(fmt))
 		end
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	clock.logs = logs
 	package.loaded["modules.llm.api_remote"] = nil
 	local ok, err = pcall(function()
 		local remote = require("modules.llm.api_remote")
 		remote._reset_for_test()
-		local auth = assert(require("llm.api_token_exchange").parse({
+		local auth = assert(require("ai.engine.api.token_exchange").parse({
 			kind = "token_exchange", token_url = "https://iam.cloud.ibm.com/identity/token",
 			body = { grant_type = "urn:ibm:params:oauth:grant-type:apikey", apikey = "{key}" },
 			token_field = "access_token", expires_field = "expires_in",
@@ -426,7 +426,7 @@ helpers.describe("Access-token providers: the first request waits for the token 
 			helpers.assert_eq(result[1], "")
 			helpers.assert_eq(result[2],
 				"HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found")
-			helpers.assert_true(require("llm.failure_class").is_authentication_failure(result[2]),
+			helpers.assert_true(require("ai.engine.policy.failure_class").is_authentication_failure(result[2]),
 				"a 400 exchange is a refused credential: never retried")
 		end)
 	end)
@@ -436,7 +436,7 @@ helpers.describe("Access-token providers: the first request waits for the token 
 	-- failure was the bare reason, which the shared classifier cannot read, and
 	-- the engine spent its whole retry budget (AIS-001, access-refusal-status).
 	helpers.it("a refused exchange fails the chat as a refused credential (access-refusal-status)", function()
-		local FailureClass = require("llm.failure_class")
+		local FailureClass = require("ai.engine.policy.failure_class")
 		for _, status in ipairs({ 401, 403 }) do
 			with_remote(function(remote, calls)
 				local result

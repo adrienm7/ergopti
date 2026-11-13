@@ -31,7 +31,9 @@ const { pathToFileURL } = require('url');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const PAGE = path.join(SHARED, 'ui', 'changelog', 'index.html');
-const EN = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+const EN = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+);
 const INSTALLED = '0.0.0-dev.140';
 const RELEASES = ['v0.0.0-dev.142', 'v0.0.0-dev.141', 'v0.0.0-dev.140', 'v0.0.0-dev.139'].map(
 	(tag, index) => ({

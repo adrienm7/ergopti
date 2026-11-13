@@ -27,10 +27,10 @@ end
 helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 	helpers.it("deletes a non-ASCII suffix by codepoint rather than byte", function()
 		local saved_manager = package.loaded["modules.dynamic_hotstrings.manager"]
-		local saved_engine = package.loaded["dynamic_hotstrings"]
+		local saved_engine = package.loaded["hotstrings.engine.dynamic.core"]
 		local saved_injector = package.loaded["modules.hotstrings.injector"]
 		package.loaded["modules.dynamic_hotstrings.manager"] = nil
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 
 		local captured = nil
 		package.loaded["modules.hotstrings.injector"] = {
@@ -47,7 +47,7 @@ helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 				personal_info_path = "/definitely/missing/personal_info.toml",
 			})
 			manager.set_enabled(true)
-			local engine = require("dynamic_hotstrings")
+			local engine = require("hotstrings.engine.dynamic.core")
 			helpers.assert_true(engine.add_rule("été", "date", function() return "X" end))
 
 			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(manager, "zzété\\", "\\")
@@ -61,7 +61,7 @@ helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 		end, debug.traceback)
 
 		package.loaded["modules.hotstrings.injector"] = saved_injector
-		package.loaded["dynamic_hotstrings"] = saved_engine
+		package.loaded["hotstrings.engine.dynamic.core"] = saved_engine
 		package.loaded["modules.dynamic_hotstrings.manager"] = saved_manager
 		if not ok then error(err, 0) end
 	end)

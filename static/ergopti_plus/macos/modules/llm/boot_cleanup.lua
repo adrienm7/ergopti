@@ -39,7 +39,7 @@ local LOG         = "llm.boot_cleanup"
 function M.run_selective_cleanup(on_done)
 	assert(type(on_done) == "function", "on_done must be a function")
 	local ok_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
-	-- The MLX port is owned by api_mlx (_shared/modules/llm/mlx_server.json = 3460). Prefer
+	-- The MLX port is owned by api_mlx (_shared/ai/data/mlx_server.json = 3460). Prefer
 	-- the resolved port, then api_mlx's exposed canonical default; the trailing
 	-- literal is only ever reached if api_mlx itself failed to load, and it is the
 	-- canonical 3460 — NEVER mlx_lm.server's 8080 default, which is explicitly

@@ -4,7 +4,7 @@
 --- MODULE: Hotstring TOML Loader (Linux)
 --- DESCRIPTION:
 --- Loads hotstring definitions from TOML files that follow the schema defined
---- in static/ergopti_plus/_shared/modules/hotstrings/schema.md. Delegates all
+--- in static/ergopti_plus/_shared/hotstrings/data/catalogue/schema.md. Delegates all
 --- TOML parsing to the shared toml_codec.reader module so the two
 --- implementations cannot diverge.
 ---
@@ -13,7 +13,7 @@
 ---    Lua drivers), which soft-resolves lib.logger so it loads on this runtime.
 --- 2. The category is the FILE STEM, not the parent directory. This is the fix
 ---    for a defect that made the whole category menu wrong: the five shared packs
----    live flat in _shared/modules/hotstrings/ and install.sh copies them flat
+---    live flat in _shared/hotstrings/data/catalogue/ and install.sh copies them flat
 ---    into ~/.config/ergopti/hotstrings/, so deriving the group from the
 ---    directory collapsed magickey, autocorrection, rolls, sfbsreduction and
 ---    distancesreduction into ONE group literally named "hotstrings". Nothing
@@ -40,15 +40,15 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Reader = require("infra.toml.reader")
-local Priority = require("hotstring_priority")
+local Priority = require("hotstrings.engine.priority")
 local Paths  = require("infra.paths")
 local NativeDirectory = require("infra.native_directory")
-local CatalogueFiles = require("hotstrings.catalogue_files")
-local PersonalFiles = require("hotstrings.personal_files")
-local TableUtil = require("table_util")
-local NativePath = require("native_path")
+local CatalogueFiles = require("hotstrings.engine.catalogue.files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local TableUtil = require("core.text.engine.table_util")
+local NativePath = require("core.fs.engine.native_path")
 local OutputTokens = require("modules.hotstrings.output_tokens")
 
 local LOG = "modules.hotstrings.loader"
@@ -65,7 +65,7 @@ local _source_receipts = setmetatable({}, { __mode = "k" })
 --- hotstring never touches the filesystem for it.
 local _tiers = nil
 
---- Loads _shared/modules/hotstrings/priority.json, falling back to the module's
+--- Loads _shared/hotstrings/data/catalogue/priority.json, falling back to the module's
 --- own defaults. A missing file is logged, never silently absorbed: the tiers
 --- decide which of two colliding hotstrings the user actually gets.
 --- @return table The tier table.
@@ -73,10 +73,10 @@ local function tiers()
 	if _tiers then return _tiers end
 	_tiers = Priority.DEFAULT_TIERS
 	local ok, result = pcall(function()
-		local path = Paths.shared("modules/hotstrings/priority.json")
-		local raw, status = require("toml_codec.writer").read_classified(path)
+		local path = Paths.shared("hotstrings/data/catalogue/priority.json")
+		local raw, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 		if status ~= "ok" then return nil end
-		return require("json").decode(raw)
+		return require("core.text.engine.json").decode(raw)
 	end)
 	if not ok or type(result) ~= "table" then
 		Logger.warn(LOG, "priority.json unreadable — keeping the default tiers (%s).", tostring(result))
@@ -407,7 +407,7 @@ end
 --- is the menu index for the directory and defaults.toml holds the resolver's
 --- fallback values. Loading either as a pack produced an empty group sitting in
 --- the menu beside the real ones. The rule itself is shared with macOS
---- (_shared/lua/hotstrings/catalogue_files.lua), whose own copy lacked the
+--- (_shared/hotstrings/engine/catalogue/files.lua), whose own copy lacked the
 --- defaults.toml half.
 ---
 --- A pure predicate rather than an inline condition inside the scan, because the
@@ -614,7 +614,7 @@ end
 --- @return string|nil
 function M.read_file(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local text, status, detail = require("toml_codec.writer").read_classified(path)
+	local text, status, detail = require("core.text.engine.toml_codec.writer").read_classified(path)
 	if status == "ok" then return text end
 	if status == "absent" then return nil end
 	error("extension manifest is unreadable: " .. tostring(detail or status), 0)

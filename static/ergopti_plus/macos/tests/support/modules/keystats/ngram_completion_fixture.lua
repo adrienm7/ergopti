@@ -28,7 +28,7 @@ M.FAMILIES = {
 
 local OWNERS = {
 	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json",
+	"infra.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 
 --- Returns an iterator over the original row identities.

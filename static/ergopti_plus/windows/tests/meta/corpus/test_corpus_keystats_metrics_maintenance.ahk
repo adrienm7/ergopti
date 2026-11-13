@@ -7,7 +7,7 @@
 ; replays through the shared Lua helper, through the Windows owners: the
 ; tombstone and the Export name of modules/keystats/keystats_maintenance.ahk,
 ; the events_system row builder, and the reader's schema loader, which installs
-; _shared/data/db/purge_schema.sql.
+; _shared/metrics/data/db/purge_schema.sql.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The three devices' ledgers replay in each of their six orders into a store

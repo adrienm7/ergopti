@@ -113,8 +113,8 @@ end
 --- @param prompt function|nil Controlled prompt; nil uses the application chooser.
 --- @param body function Assertions while the actual owners and private source remain live.
 local function with_keyboard_slot_picker(prompt, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Writer = require("toml_codec.writer")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local source = '[shortcuts.keyboard]\nprimary_k = "none"\n[gesture_parameters]\nkeyboard__primary_k__open_url = "https://old.example"\n[unrelated]\nkeep = 42\n'
 	local ok, failure = pcall(function()
@@ -122,7 +122,7 @@ local function with_keyboard_slot_picker(prompt, body)
 			for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
 				"modules.shortcuts.manager", "modules.hotstrings.magic_key", "infra.program_binding_transaction",
 				"infra.manifest_menu" }) do package.loaded[name] = nil end
-			package.loaded["logger.shim"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
@@ -208,7 +208,7 @@ local function with_keyboard_slot_picker(prompt, body)
 				helpers.assert_not_nil(scene.picker, "clicking the production row must open the picker host")
 				body(scene)
 				helpers.assert_eq(publications, 1, "the actual retained owner publishes the joint candidate once")
-				local document = require("toml_codec").decode(Sandbox.read_bytes(path))
+				local document = require("core.text.engine.toml_codec").decode(Sandbox.read_bytes(path))
 				helpers.assert_eq(document.shortcuts.keyboard.primary_k, keyboard.get_action("primary_k"))
 				for key, value in pairs(gestures.get_all_action_parameters()) do
 					helpers.assert_eq(document.gesture_parameters[key], value, "disk and actual parameter owner agree")
@@ -226,7 +226,7 @@ end
 
 -- Own the genuine native translation cohort while exercising cold and warm trays.
 local function with_shortcut_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.builder" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local native, owner, receipt, acquired
 	local ok, detail = xpcall(function()

@@ -36,7 +36,7 @@ local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_root  = drivers_root .. "/_shared"
-local shared_lua   = shared_root .. "/lua"
+local shared_lua   = shared_root .. ""
 local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 
 package.path = table.concat({
@@ -53,7 +53,7 @@ package.path = table.concat({
 -- this harness cannot open the end-char path for a character the driver would
 -- leave alone. Deciding that here by hand is what made a correct engine look
 -- wrong against a correct vector.
-local terminators = require("keymap.terminators")
+local terminators = require("layouts.engine.layers.terminators")
 local Contract = require("tests.e2e.contract")
 local ChildCapture = require("tests.support.e2e.child_capture")
 
@@ -384,7 +384,7 @@ assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_A
 -- this driver ships and replayed exactly as a corpus vector.
 print("\n--- Shipped hotstring family samples ---")
 local static_root = drivers_root:match("^(.*)/[^/]+$")
-local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+local ok_samples, samples = pcall(require("tests.lua.hotstrings.family_samples").load, static_root)
 if not ok_samples then
 	fail("mandatory family samples", "resolved samples", tostring(samples))
 else
@@ -447,7 +447,7 @@ end
 
 local ok_sequences, sequences = pcall(function()
 	local handle = assert(io.open(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json", "r"))
-	local decoded = require("json").decode(handle:read("*a"))
+	local decoded = require("core.text.engine.json").decode(handle:read("*a"))
 	handle:close()
 	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
 	return decoded.vectors

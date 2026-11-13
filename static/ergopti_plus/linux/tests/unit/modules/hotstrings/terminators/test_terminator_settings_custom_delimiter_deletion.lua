@@ -42,7 +42,7 @@ helpers.describe("custom delimiter deletion consumes the shared command declarat
 				local initial = sandbox.read_bytes(path)
 				local rows, _, observed = menu_controls(Settings, false, false)
 				local row = assert(custom_delete_row(rows, custom_command_expected().i18n))
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local native_writer = Writer.batch_write
 				Writer.batch_write = function(...)
 					if verdict == "throw" then error("owned custom-delete writer refused") end
@@ -101,11 +101,11 @@ helpers.describe("custom delimiter Delete translations use the shared declaratio
 		local observed = {}
 		local passed, failure = pcall(function()
 			for _, locale in ipairs(locales) do
-				local path = require("infra.paths").shared("data/locales/" .. locale .. ".json")
+				local path = require("infra.paths").shared("core/i18n/data/locales/" .. locale .. ".json")
 				local file = assert(io.open(path, "rb"))
 				local raw = file:read("*a")
 				file:close()
-				local translations = assert(require("json").decode(raw))
+				local translations = assert(require("core.text.engine.json").decode(raw))
 				i18n.get = function(key) return translations[key] or previous_get(key) end
 				with_settings(SOURCE, function(Settings, _, _, Terminators)
 					assert(Settings.load())

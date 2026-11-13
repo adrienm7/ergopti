@@ -36,10 +36,10 @@ local Timings        = require("infra.timings")
 local dialog         = require("infra.dialog_util")
 local BackendLabels  = require("ui.menu.menu_llm.backend_labels")
 local CustomModels   = require("ui.menu.menu_llm.custom_models")
-local ModelCatalogue = require("llm.model_catalogue")
-local ModelIdentifier = require("llm.model_identifier")
-local ApiModelListing = require("llm.api_model_listing")
-local TextUtils      = require("text_utils")
+local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
+local ModelIdentifier = require("ai.engine.local_servers.model_identifier")
+local ApiModelListing = require("ai.engine.api.model_listing")
+local TextUtils      = require("core.text.engine.utils_core")
 
 local LOG = "model_selector_page"
 

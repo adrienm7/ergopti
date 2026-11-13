@@ -5,15 +5,15 @@
 --- DESCRIPTION:
 --- macOS kept the user's prompt profiles in its own [llm.profiles]
 --- user_profiles array while Windows and Linux store them in llm.user_profiles,
---- the versioned envelope of _shared/lua/llm/profile_registry_codec.lua. A
+--- the versioned envelope of _shared/ai/engine/settings/profile_registry_codec.lua. A
 --- config.toml carried between machines lost its profiles on the way. These
 --- tests pin the shared key and envelope on the macOS save and load.
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
-local Contract  = require("test.config_unused_keys_contract")
-local TomlCodec = require("toml_codec")
-local ProfileRegistry = require("llm.profile_registry_codec")
+local Contract  = require("tests.lua.settings.unused_keys_contract")
+local TomlCodec = require("core.text.engine.toml_codec")
+local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
 
 local Sandbox = Contract.sandbox
 

@@ -119,7 +119,7 @@ end)
 local function configuration_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
@@ -153,8 +153,8 @@ end
 local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
 local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
-require("test.configuration_parent_contract").register(helpers, configuration_parent_fixture,
-	assert(require("json").decode(configuration_parent_raw)), "linux")
+require("tests.lua.settings.configuration_parent_contract").register(helpers, configuration_parent_fixture,
+	assert(require("core.text.engine.json").decode(configuration_parent_raw)), "linux")
 
 
 
@@ -186,7 +186,7 @@ end
 local function language_callback_fixture(body)
 	local previous, original_safe = {}, rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do previous[name] = value end
-	for _, name in ipairs({ "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }) do
+	for _, name in ipairs({ "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }) do
 		rawset(package.loaded, name, nil)
 	end
 	local native, scope_held = nil, false
@@ -208,7 +208,7 @@ local function language_callback_fixture(body)
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())
-		local corpus = assert(require("json").decode(raw))
+		local corpus = assert(require("core.text.engine.json").decode(raw))
 		helpers.assert_eq(#corpus.locales, 21, "the existing independent original corpus remains complete")
 		local context, observed = {}, { redraws = 0 }
 		local function publish()

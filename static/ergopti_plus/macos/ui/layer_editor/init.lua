@@ -6,7 +6,7 @@
 --- Shows the shared navigation layer editor (_shared/ui/layer_editor) in a
 --- webview, answers its "ready" with the user's layers.toml, the legends of the
 --- current input source and the key whose hold enters the layer, and saves
---- what it sends. The shared host logic (_shared/lua/keymap/layer_editor.lua) checks
+--- what it sends. The shared host logic (_shared/layouts/engine/layers/editor.lua) checks
 --- the text against every OS's loader and publishes it through the atomic
 --- FileSystem adapter; the Karabiner rules are then regenerated, and every
 --- regeneration reads layers.toml again, so the edited layer applies. The
@@ -46,11 +46,11 @@ local Paths       = require("infra.paths")
 local ConfigPaths = require("infra.config_paths")
 local FileSystem  = require("adapters.file_system")
 local ui_builder  = require("ui.ui_builder")
-local Json        = require("json")
-local TomlCodec   = require("toml_codec")
-local TomlWriter  = require("toml_codec.writer")
-local Layers      = require("keymap.layers")
-local LayerEditor = require("keymap.layer_editor")
+local Json        = require("core.text.engine.json")
+local TomlCodec   = require("core.text.engine.toml_codec")
+local TomlWriter  = require("core.text.engine.toml_codec.writer")
+local Layers      = require("layouts.engine.layers.layers")
+local LayerEditor = require("layouts.engine.layers.editor")
 local Keycodes    = require("infra.keycodes")
 local NavLayer    = require("platform.remap.nav_layer")
 

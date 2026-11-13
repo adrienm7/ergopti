@@ -42,7 +42,7 @@ const SOURCES = JSON.parse(fs.readFileSync(path.join(REGISTRY, 'index.json'), 'u
 	})
 );
 const STRINGS = JSON.parse(
-	fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8').replace(/^﻿/, '')
+	fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8').replace(/^﻿/, '')
 );
 
 /** Loads the actual page with the recording bridge of this native host, composer open. */

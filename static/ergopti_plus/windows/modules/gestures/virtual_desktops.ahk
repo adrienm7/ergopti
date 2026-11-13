@@ -10,7 +10,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. One rule for the three drivers. DesktopNavigationTarget ports
-;    _shared/lua/desktop_navigation (the macOS and Linux drivers' rule) and the
+;    _shared/keyboard/engine (the macOS and Linux drivers' rule) and the
 ;    unit suite replays _shared/tests/corpus/desktop_navigation/vectors.json
 ;    against it.
 ; 2. The position comes from the registry Explorer keeps: VirtualDesktopIDs
@@ -39,7 +39,7 @@
 ; ======================================
 ; ======================================
 
-; The desktop one step lands on. Port of _shared/lua/desktop_navigation.
+; The desktop one step lands on. Port of _shared/keyboard/engine.
 ; @param {Integer} Index 0-based position of the current desktop.
 ; @param {Integer} Count Number of desktops (at least 1).
 ; @param {String} Direction "prev" or "next".

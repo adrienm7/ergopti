@@ -35,7 +35,7 @@ end
 --- @param test function Receives the provider, queued requests and logger records.
 local function isolated(test, real_logger)
 	local saved = {}
-	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "logger.shim" }) do
+	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }) do
 		saved[name] = package.loaded[name]
 	end
 	local calls, logs = {}, {}
@@ -46,7 +46,7 @@ local function isolated(test, real_logger)
 		end,
 		cancel = function() error("a settled callback must not cancel its successor") end,
 	}
-	local logger = real_logger and helpers.fresh_module("logger") or helpers.make_logger_stub()
+	local logger = real_logger and helpers.fresh_module("core.logger.engine") or helpers.make_logger_stub()
 	if real_logger then
 		logger.set_level("debug")
 		logger.set_sink(function(line) logs[#logs + 1] = line end)
@@ -55,7 +55,7 @@ local function isolated(test, real_logger)
 			logs[#logs + 1] = { owner = owner, message = message, detail = detail }
 		end
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	local ok, err = pcall(function()
 		local remote = helpers.load_module("modules.llm.api_remote")
 		remote._reset_for_test()
@@ -63,7 +63,7 @@ local function isolated(test, real_logger)
 		test(remote, calls, logs)
 	end)
 	for name, value in pairs(saved) do package.loaded[name] = value end
-	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "logger.shim" }) do
+	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }) do
 		if saved[name] == nil then package.loaded[name] = nil end
 	end
 	if not ok then error(err, 0) end

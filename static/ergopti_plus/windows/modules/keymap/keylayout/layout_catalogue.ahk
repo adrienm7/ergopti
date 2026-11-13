@@ -11,7 +11,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The decisions are the ones the macOS and Linux drivers take through
-;    _shared/lua/layouts/catalogue.lua, pinned by the shared vectors of
+;    _shared/layouts/engine/composer/catalogue.lua, pinned by the shared vectors of
 ;    _shared/tests/corpus/layouts/catalogue_vectors.json: conditional refresh
 ;    with the cached ETag, cache then shipped-index fallbacks with the exact
 ;    error, the installed record, and the offline installation of a layout
@@ -69,7 +69,7 @@ global LAYOUT_CATALOGUE_INSTALLED_SCHEMA := 1
 ; The platform name registry entries list when Windows can emulate them.
 global LAYOUT_CATALOGUE_PLATFORM := "windows"
 
-; The fields an update owns (INSTALLED_ENTRY_FIELDS of _shared/lua/layouts/catalogue.lua):
+; The fields an update owns (INSTALLED_ENTRY_FIELDS of _shared/layouts/engine/composer/catalogue.lua):
 ; the entry it installs replaces them as one, so one it omits is gone. Every other
 ; member of a recorded row has no owner in this build and stays source data.
 global LAYOUT_CATALOGUE_OWNED_FIELDS := ["id", "name", "family", "keyboard_name", "version", "file",
@@ -223,7 +223,7 @@ LayoutCatalogue_Entry(Index, Id) {
 
 /**
  * Whether a registry entry is an Ergopti layout: its family is the one
- * _shared/modules/layouts/defaults.json names (catalogue.is_ergopti on macOS
+ * _shared/layouts/data/defaults.json names (catalogue.is_ergopti on macOS
  * and Linux). The Ergopti-only hotstrings are written for its key positions.
  * @param Entry - Index or installed-record entry (anything else is not Ergopti).
  * @returns {boolean}

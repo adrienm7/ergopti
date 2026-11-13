@@ -47,7 +47,10 @@ const CORPUS_PATH = shared('tests', 'corpus', 'keymap_layers', 'vectors.json');
 const FIXTURE_DIR = shared('tests', 'corpus', 'layer_editor');
 const FIXTURE_TOML = path.join(FIXTURE_DIR, 'edited_layers.toml');
 const FIXTURE_EXPECTED = path.join(FIXTURE_DIR, 'expected.json');
-const RECOMMENDED_TEXT = fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8');
+const RECOMMENDED_TEXT = fs.readFileSync(
+	shared('layouts', 'data', 'layers.recommended.toml'),
+	'utf8'
+);
 
 // Floors: nothing compared must not read as everything agreeing.
 const MIN_CORPUS_VECTORS = 40;
@@ -105,10 +108,10 @@ if (corpus.length < MIN_CORPUS_VECTORS)
 	fail(`only ${corpus.length} corpus vectors read (floor ${MIN_CORPUS_VECTORS})`);
 let tomlInvalid = 0;
 for (const vector of corpus) {
-	// `file` names a shipped layer file under _shared/keymap/ in place of `toml`.
+	// `file` names a shipped layer file under _shared/layouts/data/ in place of `toml`.
 	const text =
 		vector.file !== undefined
-			? fs.readFileSync(shared('keymap', vector.file), 'utf8')
+			? fs.readFileSync(shared('layouts', 'data', vector.file), 'utf8')
 			: vector.toml;
 	if (text === null) continue;
 	const refused = vector.expected.errors.some((sig) => sig.startsWith('toml_invalid|'));
@@ -333,7 +336,15 @@ if (!fs.existsSync(FIXTURE_TOML) || !fs.existsSync(FIXTURE_EXPECTED)) {
 // =================================================================
 // =================================================================
 
-const LOCALES_DIR = path.join(path.dirname(FIXTURE_DIR), '..', '..', 'data', 'locales');
+const LOCALES_DIR = path.join(
+	path.dirname(FIXTURE_DIR),
+	'..',
+	'..',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 const locales = fs
 	.readdirSync(LOCALES_DIR)
 	.filter((f) => f.endsWith('.json'))

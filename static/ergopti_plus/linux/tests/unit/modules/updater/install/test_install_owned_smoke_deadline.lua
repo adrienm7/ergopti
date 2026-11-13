@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 local uv = require("luv")
 local Installer = require("modules.updater.installer")
 local Fixture = require("tests.support.modules.updater.installer_native_fixture")
-local Budget = require("updater.install_budget")
+local Budget = require("updater.engine.install_budget")
 
 local function now() return uv.hrtime() / 1e6 end
 

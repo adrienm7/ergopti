@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local DRIVER = helpers.driver_root()
 local REPO = DRIVER .. "../../../"
@@ -51,7 +51,7 @@ local function check_sources()
 	local pipe = assert(io.popen("ls '" .. DRIVER .. "infra/'field_check*.lua"))
 	for path in pipe:lines() do parts[#parts + 1] = read(path) end
 	pipe:close()
-	parts[#parts + 1] = read(DRIVER .. "../_shared/lua/network/field_check_network.lua")
+	parts[#parts + 1] = read(DRIVER .. "../_shared/core/network/engine/field_check_network.lua")
 	return table.concat(parts, "\n")
 end
 

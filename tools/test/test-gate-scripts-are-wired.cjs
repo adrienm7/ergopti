@@ -20,7 +20,7 @@
  * The worst of the five was `test-feature-read-sites.js`, which validates every
  * literal `Features[...]` read against the manifest-built map — five of them
  * inside `#HotIf` expressions, where an `UnsetItemError` is raised inside the
- * hotkey evaluator on the keystroke path. `_shared/modules/features/README.md`
+ * hotkey evaluator on the keystroke path. `_shared/settings/data/features/README.md`
  * documents it as a "CI gate": the documentation asserted a guarantee that did
  * not hold.
  *

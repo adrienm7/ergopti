@@ -45,7 +45,7 @@ local function with_world(body, public_policy)
 				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "r"))
 			local contents = file:read("*a")
 			assert(file:close())
-			local available = require("json").decode(contents)
+			local available = require("core.text.engine.json").decode(contents)
 			helpers.assert_type(available, "table", "the recorded published declaration must decode")
 			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
 			helpers.assert_eq(available.greyed_when_paused, true, "the historical pause policy is retained")
@@ -98,7 +98,7 @@ helpers.describe("Linux AI persistence rows under a configuration saved by a new
 		with_world(function(ctx, renderer)
 			local Preferences = require("infra.llm_preferences")
 			local Scope = require("infra.llm_scope")
-			local Migrate = require("config_migrate")
+			local Migrate = require("settings.engine.migration.migrate")
 			local I18n = require("infra.i18n")
 			local old_admit, old_apply, old_status = Preferences.admit, Scope.apply, Migrate.read_only_status
 			local old_toggle, native_build = ctx.llm.toggle, renderer.build

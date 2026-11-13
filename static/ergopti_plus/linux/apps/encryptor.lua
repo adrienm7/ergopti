@@ -53,7 +53,7 @@ end
 local function reveal(path)
 	local folder = path:match("^(.*)/[^/]*$")
 	if not folder or folder == "" then folder = "/" end
-	os.execute("xdg-open " .. require("text_utils").shell_quote(folder) .. " >/dev/null 2>&1 &")
+	os.execute("xdg-open " .. require("core.text.engine.utils_core").shell_quote(folder) .. " >/dev/null 2>&1 &")
 end
 
 --- Runs the program.
@@ -70,7 +70,7 @@ function M.main(argv)
 	local dialogs = require("apps.dialogs").new()
 	-- The private runtime's openssl, never a host copy (resolve: a child logs nothing).
 	local openssl = require("infra.owned_programs").resolve("openssl")
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local probe = openssl:sub(1, 1) == "/" and ("test -x " .. quote(openssl)) or ("command -v " .. quote(openssl) .. " >/dev/null")
 	if require("ui.native_dialog").exit_code(os.execute(probe)) ~= 0 then
 		dialogs.message("error", t("apps.encryptor.title_encrypt"), t("apps.encryptor.err_cipher_unavailable"))
@@ -82,7 +82,7 @@ function M.main(argv)
 	return 0
 end
 
-if type(arg) == "table" and type(arg[0]) == "string" and require("native_path").basename(arg[0]) == "encryptor.lua" then
+if type(arg) == "table" and type(arg[0]) == "string" and require("core.fs.engine.native_path").basename(arg[0]) == "encryptor.lua" then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
 	os.exit(M.main(argv))

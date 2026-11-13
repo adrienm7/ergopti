@@ -1,7 +1,7 @@
 """Convert any macOS .keylayout into an XKB symbols file and an XCompose file.
 
 This converter regenerates the shipped Ergopti files (generate_xkb_files.py) and
-is the reference the Linux driver's Lua converter (_shared/lua/layouts/
+is the reference the Linux driver's Lua converter (_shared/layouts/engine/
 xkb_converter.lua, which installs a registry layout on the user's machine) is
 compared with, byte for byte, on every registry and archived layout
 (tools/test/test-keylayout-canonical-parity.cjs). Change the two together. It
@@ -274,7 +274,7 @@ class Keylayout:
     def to_canonical(self) -> dict:
         """The schema-1 canonical form shared with the Lua parser.
 
-        The form is documented in _shared/lua/layouts/keylayout.lua; absent
+        The form is documented in _shared/layouts/engine/composer/keylayout.lua; absent
         fields are omitted, never null.
         """
         selects = []

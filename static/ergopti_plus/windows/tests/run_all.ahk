@@ -230,10 +230,10 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
 #Include ../infra/config_migrate.ahk
-#Include ../../_shared/modules/config/outdated.ahk
+#Include ../../_shared/settings/data/outdated.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
-; The layer-file loader reads _shared/keymap and the physical-key registry at run
+; The layer-file loader reads _shared/layouts/data and the physical-key registry at run
 ; time; meta/corpus/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
 #Include ../platform/remap/layers_loader.ahk
 ; The navigation layer's hotkey table, built from layer files; registration is
@@ -282,7 +282,7 @@ global _DefaultLogsDir := _LogsDir
 ; definitions at top level.
 #Include ../infra/config_io.ahk
 #Include ../infra/config_scope.ahk
-#Include ../../_shared/modules/hotstrings/scope_overrides.ahk
+#Include ../../_shared/hotstrings/data/catalogue/scope_overrides.ahk
 #Include ../infra/hotstrings/hotstrings_scope.ahk
 #Include ../infra/config_global_scope.ahk
 #Include ../ui/personal_toml_editor.ahk
@@ -301,10 +301,10 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_altgr.ahk
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
-#Include ../../_shared/modules/features/number_row_policy.ahk
-#Include ../../_shared/modules/features/layout_rows_policy.ahk
-#Include ../../_shared/modules/features/caps_word_auto_off_policy.ahk
-#Include ../../_shared/modules/features/pause_switch_policy.ahk
+#Include ../../_shared/settings/data/features/number_row_policy.ahk
+#Include ../../_shared/settings/data/features/layout_rows_policy.ahk
+#Include ../../_shared/settings/data/features/caps_word_auto_off_policy.ahk
+#Include ../../_shared/settings/data/features/pause_switch_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 #Include ../modules/keymap/layout/number_row_send.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
@@ -338,7 +338,7 @@ TestQualificationRegisterParser(JsonParse)
 #Include ../infra/program_actions.ahk
 #Include ../infra/user_actions.ahk
 #Include ../infra/sticky_modifiers.ahk
-#Include ../../_shared/modules/network/failure.ahk
+#Include ../../_shared/core/network/data/failure.ahk
 #Include ../adapters/network_failure_host.ahk
 #Include ../ui/download_window/session.ahk
 #Include ../ui/download_window/init.ahk
@@ -392,7 +392,7 @@ InstallHotstringHooks()
 #Include ../adapters/notify_icon.ahk
 #Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
-#Include ../../_shared/modules/actions/brightness.ahk
+#Include ../../_shared/shortcuts/data/actions/brightness.ahk
 #Include ../adapters/screen_brightness.ahk
 #Include ../adapters/crash_report_worker.ahk
 #Include ../modules/diagnostics/crash_reporter.ahk
@@ -736,14 +736,14 @@ _LogBootProgress("loading LLM modules")
 _LLM_Deps_State := "ready"
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
-#Include ..\..\_shared\modules\llm\local_server_auth.ahk
-#Include ..\..\_shared\modules\llm\api_url_template.ahk
-#Include ..\..\_shared\modules\llm\model_capabilities.ahk
-#Include ..\..\_shared\modules\llm\thinking_off.ahk
-#Include ..\..\_shared\modules\llm\local_server_fingerprint.ahk
-#Include ..\..\_shared\modules\llm\local_server_discovery.ahk
-#Include ..\..\_shared\modules\llm\local_server_ports.ahk
-#Include ../../_shared/modules/llm/local_server_menu.ahk
+#Include ..\..\_shared\ai\data\local_server_auth.ahk
+#Include ..\..\_shared\ai\data\api_url_template.ahk
+#Include ..\..\_shared\ai\data\model_capabilities.ahk
+#Include ..\..\_shared\ai\data\thinking_off.ahk
+#Include ..\..\_shared\ai\data\local_server_fingerprint.ahk
+#Include ..\..\_shared\ai\data\local_server_discovery.ahk
+#Include ..\..\_shared\ai\data\local_server_ports.ahk
+#Include ../../_shared/ai/data/local_server_menu.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include ../modules/llm/local_server_models.ahk
 #Include ../modules/llm/local_server_port_scan.ahk
@@ -1004,7 +1004,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/config.ahk
 ; Genuine gestures factory/registry and generated rows are already loaded.
 ; These source-image cases do not invoke actions or native output.
-#Include ../../_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk
+#Include ../../_shared/tap_hold/engine/buffered_data_snapshot_owner.ahk
 #Include unit/infra/test_buffered_data_snapshot_owner.ahk
 ; Load the definitions-only onboarding worker owner so its elevated-launch
 ; reservation can be exercised without constructing the wizard UI.
@@ -1708,11 +1708,11 @@ _LogBootProgress("keystats modules + tests included")
 ; shared cross-driver vectors.
 #Include ../_generated/prompt_builder.ahk
 #Include meta/corpus/test_corpus_prompt_builder.ahk
-; Chord notation corpus -- runs the shared _shared/lua/chord/vectors.json against
+; Chord notation corpus -- runs the shared _shared/keyboard/engine/chord/vectors.json against
 ; the AutoHotkey twin, plus the native-translation half that is supposed to differ.
 #Include ../infra/chord.ahk
 #Include ../adapters/hotkey_registrar.ahk
-#Include ../../_shared/modules/shortcuts/magic_editor.ahk
+#Include ../../_shared/shortcuts/data/magic_editor.ahk
 #Include ../infra/magic_editor.ahk
 #Include meta/platform/remap/key_combinations/test_chord_notation.ahk
 #Include unit/adapters/input/test_hotkey_registrar_transactions.ahk

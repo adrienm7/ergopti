@@ -9,14 +9,14 @@
 --- an undeclared slot would bind silently to nothing.
 ---
 --- The boundary vectors pin the shared classifier both drivers use
---- (_shared/lua/gestures/direction.lua) at its sector edges and its two
+--- (_shared/gestures/engine/direction.lua) at its sector edges and its two
 --- Manhattan minimums. macOS once put the diagonal boundary at 25 degrees and
 --- Linux at a 2:1 ratio (26.6 degrees), with a different travel gate, so the
 --- same swipe could name another slot on each.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read(relative)
 	local handle = assert(io.open(helpers.shared(relative), "rb"))
@@ -28,7 +28,7 @@ end
 helpers.describe("gesture direction vectors (macOS)", function()
 	local Geometry = require("modules.gestures.geometry")
 	local corpus = assert(Json.decode_lossless(read("tests/corpus/gestures/direction_vectors.json")))
-	local actions = read("modules/actions/actions.toml")
+	local actions = read("shortcuts/data/actions/actions.toml")
 	local scale = { swipe = 4 * Geometry.SWIPE_MIN, short = Geometry.SWIPE_MIN / 4 }
 
 	for _, fingers in ipairs(corpus.fingers) do
@@ -51,7 +51,7 @@ helpers.describe("gesture direction vectors (macOS)", function()
 		end
 	end
 
-	local Direction = require("gestures.direction")
+	local Direction = require("gestures.engine.direction")
 	local rule = corpus.boundary_rule
 	helpers.it("the boundary rule is the three-finger tuning in normalised units", function()
 		helpers.assert_true(#corpus.boundary_vectors >= 12, "boundary vectors")

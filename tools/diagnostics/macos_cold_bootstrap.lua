@@ -3,7 +3,7 @@ local config = assert(hs.json.read(assert(os.getenv("ERGOPTI_COLD_BOOTSTRAP_CONF
 local driver, shared = config.driver, config.shared
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 	.. shared .. "/?.lua;" .. shared .. "/?/init.lua;"
-	.. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
+	.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 
 local result = { version = 1, runtime = "native Hammerspoon", tasks = 0 }
 local owner = {}

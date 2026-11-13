@@ -25,14 +25,14 @@ local M = {}
 
 local hs               = hs
 local JsonCodec        = require("adapters.json_codec")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local Logger           = require("infra.logger")
 local fs_dir           = require("infra.fs_dir")
 local menu_paths       = require("infra.config_paths")
 local keymap           = require("modules.keymap")
 local hotstring_editor = require("ui.hotstring_editor")
 
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local Adoption = require("infra.personal_file_adoption")
 local LOG = "personal_hotstrings"
 local _inventory = {}
@@ -72,7 +72,7 @@ function M.load(ctx)
 
 	local personal_path = menu_paths.get("PersonalTomlPath")
 	-- Personal source-default priority, read from the shared single source
-	-- (_shared/modules/hotstrings/priority.json, copied into the bundle) so the editor
+	-- (_shared/hotstrings/data/catalogue/priority.json, copied into the bundle) so the editor
 	-- shows it as the priority field placeholder without hardcoding it. Falls back
 	-- to the engine value (kept identical to that file by the parity gate).
 	local personal_default_priority = keymap.source_priority and keymap.source_priority("personal") or nil

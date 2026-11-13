@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Validates lib.locale path resolution and translation lookup behavior.
 --- In particular, the resolver must work when hs.configdir points to the
---- default ~/.hammerspoon path (dev bootstrap), by deriving _shared/data/locales
+--- default ~/.hammerspoon path (dev bootstrap), by deriving _shared/core/i18n/data/locales
 --- from the module path.
 --- ============================================================================== 
 

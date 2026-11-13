@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
 

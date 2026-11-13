@@ -12,8 +12,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Json = require("json")
-local Store = require("keystats.app_category_store")
+local Json = require("core.text.engine.json")
+local Store = require("metrics.engine.apps.category_store")
 
 --- Runs a body with the config folder replaced by a scratch directory.
 --- @param body function Receives the file module, the file path and the directory.

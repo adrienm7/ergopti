@@ -15,16 +15,16 @@ local OWNED_MODULES = {
 	"modules.gestures.sticky_modifiers",
 	"adapters.modifier_injector",
 	"modules.keymap.control_sentinels",
-	"keymap.control_signals",
+	"layouts.engine.layers.control_signals",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"infra.key_event_health",
 	"adapters.event_clock",
 	"adapters.timer_scheduler",
 	"infra.logger",
-	"error_description",
-	"number_policy",
-	"keycodes",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
+	"platform.input.keycodes.core",
 }
 
 
@@ -89,7 +89,7 @@ local function with_fixture(callback)
 		}
 
 		local Sentinels = require("modules.keymap.control_sentinels")
-		local Keycodes = require("keycodes")
+		local Keycodes = require("platform.input.keycodes.core")
 		local Timer = require("adapters.timer_scheduler")
 		local Injector = require("adapters.modifier_injector")
 		local Sticky = require("modules.gestures.sticky_modifiers")

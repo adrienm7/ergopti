@@ -34,7 +34,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const PAGE = path.join(SHARED, 'ui', 'update_check');
-const LOCALES = path.join(SHARED, 'data', 'locales');
+const LOCALES = path.join(SHARED, 'core', 'i18n', 'data', 'locales');
 const LOCALE_COUNT = 21;
 
 // The reasons a host may give for a failed check; each is a locale key
@@ -516,8 +516,15 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 	const pairs = (text, pattern) => [...text.matchAll(pattern)].map((m) => [m[1], m[2]]);
 	const sorted = (values) => JSON.stringify([...values].sort());
 
-	const lua = read('static', 'ergopti_plus', '_shared', 'lua', 'updater', 'check_result.lua');
-	const session = read('static', 'ergopti_plus', '_shared', 'lua', 'updater', 'check_session.lua');
+	const lua = read('static', 'ergopti_plus', '_shared', 'updater', 'engine', 'check_result.lua');
+	const session = read(
+		'static',
+		'ergopti_plus',
+		'_shared',
+		'updater',
+		'engine',
+		'check_session.lua'
+	);
 	const ahk = read('static', 'ergopti_plus', 'windows', 'ui', 'update_check', 'init.ahk');
 	const page = read('static', 'ergopti_plus', '_shared', 'ui', 'update_check', 'script.js');
 

@@ -46,8 +46,8 @@ function Get-AdmittedWorkerDependencies {
     $digests = @{}
     # Bundle destinations are deliberately independent of repository paths.
     foreach ($pair in @(
-        @{ bundle = 'static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk';
-           source = 'static/ergopti_plus/_shared/modules/hotstrings/user_code.ahk' },
+        @{ bundle = 'static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk';
+           source = 'static/ergopti_plus/_shared/hotstrings/data/catalogue/user_code.ahk' },
         @{ bundle = 'vendor/ergopti_user_hotstrings.ahk';
            source = 'static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk' }
     )) {

@@ -8,12 +8,12 @@
 --- ==============================================================================
 
 local M = {}
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
-local Logger = require("logger.shim")
-local Policy = require("llm.local_server_auth")
-local PortPolicy = require("llm.local_server_ports")
-local Fingerprint = require("llm.local_server_fingerprint")
+local Logger = require("core.logger.engine.shim")
+local Policy = require("ai.engine.local_servers.auth")
+local PortPolicy = require("ai.engine.local_servers.ports_core")
+local Fingerprint = require("ai.engine.local_servers.fingerprint")
 local Reader = require("infra.regular_file_reader")
 
 --- Reads only admitted regular sources whose read and close both acknowledge.
@@ -41,7 +41,7 @@ end
 --- @return table identities Server id -> the address group and fingerprint of a
 ---         row whose default address another row shares (llm.local_server_fingerprint).
 function M.load(occupied)
-	local path = Paths.shared("modules/llm/local_servers.json")
+	local path = Paths.shared("ai/data/local_servers.json")
 	local raw = read_source(path)
 	local root = type(raw) == "string" and Json.decode(raw) or nil
 	if type(root) ~= "table" then
@@ -50,7 +50,7 @@ function M.load(occupied)
 	end
 	-- Storage and transport consult the same authoritative cloud identities.
 	-- A local descriptor cannot shadow a registered cloud provider.
-	local cloud_path = Paths.shared("modules/llm/api_providers.json")
+	local cloud_path = Paths.shared("ai/data/api_providers.json")
 	local cloud_raw = read_source(cloud_path)
 	local cloud = type(cloud_raw) == "string" and Json.decode(cloud_raw) or nil
 	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then
@@ -69,7 +69,7 @@ function M.load(occupied)
 		else Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that server is never probed.", reason) end
 	end
 	-- The family controls a local server carries, on top of request_fields
-	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	local dialect, dialect_reason = require("ai.engine.policy.thinking_off").parse_dialect(root.thinking_dialect)
 	if not dialect then
 		Logger.error("llm.local_server_catalogue", "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.",
 			tostring(dialect_reason))

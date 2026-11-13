@@ -93,7 +93,7 @@ $fixture = Join-Path $Scratch ('clone space ' + [char]0xe9)
 $developer = Join-Path $fixture 'tools\dev'
 # The clone holds the shared identifiers where the checkout does; their folder
 # comes from their own path, so it follows wherever the shared tree keeps them.
-$identifiersRelative = 'static\ergopti_plus\_shared\data\identifiers.json'
+$identifiersRelative = 'static\ergopti_plus\_shared\core\text\data\identifiers.json'
 $cloneIdentifiers = Join-Path $fixture $identifiersRelative
 [void][IO.Directory]::CreateDirectory($developer)
 [void][IO.Directory]::CreateDirectory((Split-Path $cloneIdentifiers))

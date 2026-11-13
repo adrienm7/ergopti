@@ -407,7 +407,7 @@ function receivingNetworkSource(fixturePolicy) {
 		// This exact existence port also keeps Git Bash paths independent of
 		// the host Lua file-name convention. No NetworkEnv method is replaced.
 		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end,
-			read_with_status = function(p) if p:match("/modules/network/route_origins%.json$") then return ${luaString(fs.readFileSync(path.join(root, 'static/ergopti_plus/_shared/modules/network/route_origins.json'), 'utf8'))}, "ok" end return nil, "missing" end }`,
+			read_with_status = function(p) if p:match("/core/network/data/route_origins%.json$") then return ${luaString(fs.readFileSync(path.join(root, 'static/ergopti_plus/_shared/core/network/data/route_origins.json'), 'utf8'))}, "ok" end return nil, "missing" end }`,
 		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		`local receiver = { path = ${luaString(shellPath(managedReceiver))}, source = ${luaString(fs.readFileSync(managedReceiver, 'utf8'))} }`
@@ -415,13 +415,13 @@ function receivingNetworkSource(fixturePolicy) {
 }
 function emittedOwners(fixturePolicy, python, binary) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
-	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		...receivingNetworkSource(fixturePolicy),
 		`local packet = require("tests.support.opaque_network_owner_fixture").capture(Network, ${luaString(shellPath(python))}, ${luaString(shellPath(binary))}, receiver)`,
-		'io.write(require("json").encode(packet))'
+		'io.write(require("core.text.engine.json").encode(packet))'
 	].join('; ');
 	const generated = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
 		cwd: root,
@@ -435,14 +435,14 @@ function emittedOwners(fixturePolicy, python, binary) {
 }
 function receiveOwners(fixturePolicy, bytes, code, mode, owner) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
-	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		...receivingNetworkSource(fixturePolicy),
-		`local bytes = require("json").decode(${luaString(JSON.stringify(bytes))})`,
+		`local bytes = require("core.text.engine.json").decode(${luaString(JSON.stringify(bytes))})`,
 		`local result = require("tests.support.opaque_network_owner_fixture").receive(Network, bytes, ${code}, ${mode ? luaString(mode) : 'nil'}, receiver, ${owner ? luaString(owner) : 'nil'})`,
-		'io.write(require("json").encode(result))'
+		'io.write(require("core.text.engine.json").encode(result))'
 	].join('; ');
 	const received = spawnSync(lua, ['-e', "assert(load(io.read('*a'), '=(command line)'))()"], {
 		cwd: root,
@@ -456,11 +456,11 @@ function receiveOwners(fixturePolicy, bytes, code, mode, owner) {
 }
 function receivePhase(chunks, code) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
-	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
-		'local Json = require("json")',
+		'local Json = require("core.text.engine.json")',
 		`local chunks = Json.decode(${luaString(JSON.stringify(chunks))})`,
 		'local phase = require("modules.llm.opaque_network_admission").new()',
 		'for _, chunk in ipairs(chunks) do phase.push(chunk) end',
@@ -504,7 +504,7 @@ assertLuaLiteralEncoding(lua);
 const bash = bashExecutable();
 function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
-	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const owner = shellPath(ownerRoot);
 	const networkSource = fs.readFileSync(path.join(macos, 'modules/llm/network_env.lua'), 'utf8');
 	const receiver = path.join(ownerRoot, 'platform/network/native_http.py');
@@ -531,7 +531,7 @@ function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 }
 function emittedPrelude(fixturePolicy) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
-	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
@@ -552,7 +552,7 @@ function emittedPrelude(fixturePolicy) {
 }
 function emittedManagedPrelude(fixturePolicy) {
 	const macos = path.join(root, 'static/ergopti_plus/macos').replace(/\\/g, '/');
-	const shared = path.join(root, 'static/ergopti_plus/_shared/lua').replace(/\\/g, '/');
+	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
@@ -586,10 +586,10 @@ fs.copyFileSync(
 	managedReceiver
 );
 // A shipped bundle carries the proxy override declaration every prelude reads.
-fs.mkdirSync(path.join(managedRoot, '../_shared/modules/network'), { recursive: true });
+fs.mkdirSync(path.join(managedRoot, '../_shared/core/network/data'), { recursive: true });
 fs.copyFileSync(
-	path.join(root, 'static/ergopti_plus/_shared/modules/network/proxy_override.json'),
-	path.join(managedRoot, '../_shared/modules/network/proxy_override.json')
+	path.join(root, 'static/ergopti_plus/_shared/core/network/data/proxy_override.json'),
+	path.join(managedRoot, '../_shared/core/network/data/proxy_override.json')
 );
 const managedCalls = path.join(temporary, 'managed-receiver-calls');
 const managedEnvironment = path.join(temporary, 'managed-receiver-environment');
@@ -1191,14 +1191,14 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 	fs.mkdirSync(path.join(bootstrapRoot, 'platform/network'), { recursive: true });
 	fs.mkdirSync(path.join(bootstrapRoot, 'modules/llm'), { recursive: true });
 	// A shipped bundle carries the shared proxy policy the guard's precedence is built from.
-	const bundledPolicy = path.join(bootstrapRoot, '../_shared/modules/network');
+	const bundledPolicy = path.join(bootstrapRoot, '../_shared/core/network/data');
 	fs.mkdirSync(bundledPolicy, { recursive: true });
 	fs.copyFileSync(
-		path.join(root, 'static/ergopti_plus/_shared/modules/network/proxy_policy.json'),
+		path.join(root, 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'),
 		path.join(bundledPolicy, 'proxy_policy.json')
 	);
 	fs.copyFileSync(
-		path.join(root, 'static/ergopti_plus/_shared/modules/network/proxy_override.json'),
+		path.join(root, 'static/ergopti_plus/_shared/core/network/data/proxy_override.json'),
 		path.join(bundledPolicy, 'proxy_override.json')
 	);
 	fs.copyFileSync(

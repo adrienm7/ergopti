@@ -15,7 +15,7 @@ _LDDP_WithLocale(Code, Body) {
 	HadCache := IsSet(_I18nCache), OldCache := HadCache ? _I18nCache : false
 	HadLoaded := IsSet(_I18nCacheLoaded), OldLoaded := HadLoaded ? _I18nCacheLoaded : false
 	try {
-		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 		_I18nCacheLoaded := true
 		Body.Call()
 	} finally {
@@ -169,7 +169,7 @@ _LDDP_ActualProductionCohort(Scenario) {
 			Target.Add(Label, Successor)
 		else if Scenario == "caption_cohort" {
 			global _I18nCache, _SharedDir
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\fr.json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\fr.json", "UTF-8"))
 		}
 		Before := TrayMenuSubmenuHandle(Target.Handle, 0)
 		AssertFalse(Publish.Call(Replacement), "a completed old native child cannot adopt the successor " . Scenario)

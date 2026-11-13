@@ -294,7 +294,7 @@ The prediction engine does not read the hotstring word buffer on Linux. The
 Linux `modules/hotstrings/engine.lua` wrapper reports each edit the shared
 engine applies (typed text, Backspace, `apply_expansion`, `reset`, a
 navigation) to the AI context of `modules/llm/context.lua`, a rolling window
-from `_shared/lua/llm/context_buffer.lua`, which macOS shares for its
+from `_shared/ai/engine/policy/context_buffer.lua`, which macOS shares for its
 navigation rule and pins with `context_buffer_vectors.json`. A navigation key,
 Escape, Enter, a click, a shortcut and a tap-hold command clear it only while
 `llm.generation.reset_on_nav` is on, whatever the `hotstrings.*_resets_word`
@@ -375,7 +375,7 @@ stale tree is held, not run. An E2E that clicks rows must click the tree the
 tray was handed (the appindicator stub's `set_menu`), then run `loop.onIdle()`
 before reading the menu again, as `tests/e2e/startup_child.lua` does for the
 delimiter rows. A switched-off feature notice is error-level by design
-(`_shared/lua/feature_notice.lua`), so the start-up child's error-dialog watch
+(`_shared/menu/engine/feature_notice.lua`), so the start-up child's error-dialog watch
 flags it unless the step names the notice it causes. A refused write through a
 read-only folder needs a non-root user: report it as SKIP under root.
 
@@ -978,7 +978,7 @@ run it on every change to AppRun, the stager or the build image.
 The AppImage deliberately does not bundle glibc or its loader (they must agree with the
 host's GTK, GL and NSS modules): it is built on the oldest supported LTS and
 `check-elf-needed-closure.cjs` refuses any ELF `NEEDED` entry that is neither in the image
-nor on `_shared/data/linux_appimage_recipient_libraries.json`. Action: a library the build
+nor on `_shared/updater/data/linux_appimage_recipient_libraries.json`. Action: a library the build
 host links by accident is staged, or listed there with a reason, never ignored.
 
 The catalogue's runner has GTK 3 but no libayatana, no StatusNotifier host and
@@ -1002,9 +1002,9 @@ The user XKB installer (`ergopti/linux/xkb_installation/user_layout_installer.py
 runs on Ergopti's own Python, never the host's python3 (maintainer decision, 1
 November): the python-build-standalone build of the shared managed Python
 release, pinned by SHA-256 and size per machine and C library in
-`_shared/data/linux_native_runtime.json` `managed_python` (the codegen refuses a
+`_shared/core/network/data/linux_native_runtime.json` `managed_python` (the codegen refuses a
 version, build or uv release that differs from
-`_shared/modules/llm/managed_python_release.json`). `modules/keymap/managed_python.lua`
+`_shared/ai/data/managed_python_release.json`). `modules/keymap/managed_python.lua`
 asks once (owned dialog), downloads through the managed HTTP client, checks size
 and digest, unpacks into `<root>.staging` and renames it into the versioned
 folder under `ConfigPaths.data()/runtime/python/`, so a versioned folder only ever

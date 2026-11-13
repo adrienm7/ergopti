@@ -10,7 +10,7 @@
 --- WHY NATIVE:
 --- xsel, the other X11 clipboard tool, cannot request an arbitrary target, so
 --- without xclip the copy went unchecked. libX11 is already one of the
---- driver's declared native libraries (_shared/data/linux_native_runtime.json).
+--- driver's declared native libraries (_shared/core/network/data/linux_native_runtime.json).
 ---
 --- FEATURES & RATIONALE:
 --- 1. One connection per read: a copy check reads twice, and a connection that

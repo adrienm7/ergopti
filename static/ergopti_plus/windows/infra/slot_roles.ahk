@@ -6,7 +6,7 @@
 ; Resolves the neutral slot ids of the one-shortcut model (PAR-41) to Windows
 ; modifiers and back. A slot id is modifier ROLES in a fixed order, then one key:
 ; primary_b, primary_shift_v, meta_space. Port of
-; _shared/lua/shortcuts/slot_roles.lua; the corpus
+; _shared/shortcuts/engine/slot_roles.lua; the corpus
 ; _shared/tests/corpus/shortcuts/neutral_slots.json replays both.
 ;
 ; FEATURES & RATIONALE:

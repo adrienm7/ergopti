@@ -4,7 +4,7 @@
 --- MODULE: Logger File Sink (Linux)
 --- DESCRIPTION:
 --- Installs the output channel that the shared logger core
---- (`_shared/lua/logger/init.lua`) deliberately does not provide. The core
+--- (`_shared/core/logger/engine/init.lua`) deliberately does not provide. The core
 --- formats a line, pushes it into a 200-entry ring buffer and then forwards it to
 --- an injected sink — so without a sink every `Logger.*` call on this driver was
 --- written nowhere: not to a file, not to stdout, not to the journal. Including
@@ -38,7 +38,7 @@
 ---    admitted before output. A missing policy or identity refuses startup;
 ---    directory/write failure still degrades to redacted stdout, never raw text.
 --- 8. Topical fan-out. A line that matches a pattern of _generated/
----    logger_sub_files.lua (declared once in _shared/modules/logger/sub_files.toml
+---    logger_sub_files.lua (declared once in _shared/core/logger/data/sub_files.toml
 ---    for all three drivers) is also appended to that topic's file, so "what did
 ---    the hotstrings do?" opens ErgoptiPlus_hotstrings.log here exactly as on the
 ---    other two drivers. Topical files carry no date in their name; like macOS,
@@ -51,7 +51,7 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 
 
@@ -63,15 +63,15 @@ local TextUtils = require("text_utils")
 -- ===============================
 
 --- Application folder and log file names, generated from
---- _shared/modules/paths/app_dirs.toml. The folder itself is resolved by
+--- _shared/core/fs/data/paths/app_dirs.toml. The folder itself is resolved by
 --- infra/config_paths (LogsDirPath, or ${XDG_STATE_HOME:-~/.local/state}/
 --- ergopti/logs).
-local AppDirs = require("app_dirs")
-local Redact = require("diagnostics.redact")
-local Json = require("json")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Redact = require("diagnostics.engine.reports.redact")
+local Json = require("core.text.engine.json")
 local NativeDirectory = require("infra.native_directory")
 
---- Topical routing table generated from _shared/modules/logger/sub_files.toml:
+--- Topical routing table generated from _shared/core/logger/data/sub_files.toml:
 --- an array of { name = "<file name>", patterns = { ... } }.
 local SUB_FILES = require("_generated.logger_sub_files")
 
@@ -166,7 +166,7 @@ local function admit_redaction(supplied)
 	local Paths = require("infra.paths")
 	local root = Paths.shared_root_from(Paths.driver_root())
 	assert(type(root) == "string" and root ~= "", "logger_sink: canonical privacy tree unavailable")
-	local file = require("infra.regular_file_reader").open_source(root .. "/modules/diagnostics/redaction.json")
+	local file = require("infra.regular_file_reader").open_source(root .. "/diagnostics/data/redaction.json")
 	assert(file, "logger_sink: canonical privacy policy unavailable")
 	local read_ok, raw = pcall(file.read, file, "*a")
 	local close_ok, closed = pcall(file.close, file)
@@ -338,7 +338,7 @@ end
 --- @param path string Refused mirror path.
 --- @param failure any Native or protected open refusal.
 local function report_mirror_refusal(path, failure)
-	local description = require("error_description").describe(failure)
+	local description = require("diagnostics.engine.reports.error_description").describe(failure)
 	pcall(function()
 		io.stderr:write(_redact("[logger_sink] errors channel could not be opened: " .. path
 			.. " (" .. description .. ") — mirror disabled; logging continues through main and stdout.\n"))
@@ -560,7 +560,7 @@ end
 
 --- Installs the file sink into the shared logger core.
 --- Idempotent: a second call is a no-op so a reload cannot double-write.
---- @param logger table The logger module returned by require("logger.shim").
+--- @param logger table The logger module returned by require("core.logger.engine.shim").
 --- @param opts table|nil { log_dir = string, redaction_context = table } directory or fixture identity dependencies.
 --- @return boolean True when a durable file sink is active, false when the sink
 ---   is installed but degraded to stdout-only.

@@ -12,7 +12,7 @@
 --- ==============================================================================
 local M = {}
 
-local NumberPolicy = require("number_policy")
+local NumberPolicy = require("core.text.engine.number_policy")
 
 --- @param luv table Native backend, passed explicitly to preserve dependency isolation.
 --- @param handle any Owned native timer.

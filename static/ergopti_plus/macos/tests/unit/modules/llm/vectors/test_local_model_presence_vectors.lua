@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_corpus()
 	local handle = assert(io.open(helpers.shared("tests/corpus/llm/local_model_presence.json"), "rb"))
@@ -25,7 +25,7 @@ local function expected_of(vector)
 end
 
 helpers.describe("local model presence vectors (macOS)", function()
-	local Policy = require("llm.local_model_policy")
+	local Policy = require("ai.engine.ollama.local_model_policy")
 	local corpus = read_corpus()
 
 	for _, vector in ipairs(corpus.normalization) do

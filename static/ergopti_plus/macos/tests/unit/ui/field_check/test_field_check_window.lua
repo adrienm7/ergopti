@@ -64,7 +64,7 @@ helpers.describe("field check menu rows", function()
 	end)
 
 	helpers.it("declares every Mac row once for macOS only, with a reason, and wires every row in the builder", function()
-		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+		local file = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
 		local rows = {}

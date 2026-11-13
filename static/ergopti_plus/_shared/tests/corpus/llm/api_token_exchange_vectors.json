@@ -1,5 +1,5 @@
 {
-	"_comment": "Token exchange of the providers whose requests carry a short-lived access token (api_providers.json auth): the blocks a catalogue may declare, the form each stored key gives (a service-account key's signed assertion uses the test keys of tests/corpus/crypto/rs256_vectors.json), the answers read, and when a cached token is refreshed. _shared/lua/llm/api_token_exchange.lua replays this corpus in the macOS and Linux unit suites.",
+	"_comment": "Token exchange of the providers whose requests carry a short-lived access token (api_providers.json auth): the blocks a catalogue may declare, the form each stored key gives (a service-account key's signed assertion uses the test keys of tests/corpus/crypto/rs256_vectors.json), the answers read, and when a cached token is refreshed. _shared/ai/engine/api/token_exchange.lua replays this corpus in the macOS and Linux unit suites.",
 	"min_expires_seconds": 60,
 	"max_expires_seconds": 86400,
 	"unix_now": 1700000000,

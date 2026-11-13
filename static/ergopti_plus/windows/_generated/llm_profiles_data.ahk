@@ -2,7 +2,7 @@
 
 ; ==========================================
 ; AUTO-GENERATED — do not edit manually
-; Sources: static/ergopti_plus/_shared/modules/llm/legacy_ids.json, static/ergopti_plus/_shared/modules/llm/profiles.json
+; Sources: static/ergopti_plus/_shared/ai/data/legacy_ids.json, static/ergopti_plus/_shared/ai/data/profiles.json
 ; Run: npm run codegen:llm-profiles-data:ahk
 ; ==========================================
 

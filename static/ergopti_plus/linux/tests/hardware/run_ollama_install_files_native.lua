@@ -17,7 +17,7 @@ package.path = native_driver .. "/?.lua;" .. native_shared .. "/?.lua;"
 local uv = require("luv")
 local Files = require("modules.llm.ollama_install_files")
 local Process = require("adapters.owned_process")
-local Installer = require("llm.ollama_archive_installer")
+local Installer = require("ai.engine.ollama.archive_installer")
 local passed = 0
 local process_serial = 0
 local function expect(value, message) assert(value, message) end

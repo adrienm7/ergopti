@@ -37,7 +37,7 @@
  *    so the class fails on Linux and macOS before the Windows lane runs: the
  *    AutoHotkey suite cannot run outside Windows.
  * 2. Names are resolved from the physical-key registry
- *    (_shared/data/keycodes/physical_keys.json: `ahk_send` → `ahk`), plus the
+ *    (_shared/layouts/data/keycodes/physical_keys.json: `ahk_send` → `ahk`), plus the
  *    AutoHotkey aliases and the fixed Windows virtual-key codes of those
  *    layout-independent keys. A character key (a one-character name or its
  *    virtual key) is any registry key without a fixed name; the AltGr rows of
@@ -72,6 +72,7 @@ const REGISTRY = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
+	'layouts',
 	'data',
 	'keycodes',
 	'physical_keys.json'

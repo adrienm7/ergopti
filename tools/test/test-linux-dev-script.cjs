@@ -25,7 +25,7 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/run-linux-dev.sh';
-const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 const DRIVER = 'static/ergopti_plus/linux';
 const LIBRARY = `${DRIVER}/bin/libergopti_archive_publication.so`;
 

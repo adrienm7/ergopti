@@ -10,9 +10,9 @@ helpers.describe("Physical editor native readiness", function()
 		local called, detail = pcall(function()
 			local noop=function()end
 			local event=nil
-			package.loaded['logger.shim']={debug=noop,success=noop,warn=noop,error=noop,info=function()if event then event()end end}
+			package.loaded['core.logger.engine.shim']={debug=noop,success=noop,warn=noop,error=noop,info=function()if event then event()end end}
 			package.loaded['infra.monotonic']={now_ms=function()return 0 end}
-			package.loaded['window_titles']={compose=function(v)return v end}
+			package.loaded['core.ui.engine.window_titles']={compose=function(v)return v end}
 			package.loaded['ui.webkit_host']={}
 			local file=assert(package.searchpath('ui.webview_manager', package.path))
 			local count=0
@@ -32,7 +32,7 @@ helpers.describe("Physical editor native readiness", function()
 			package.loaded.lgi={WebKit2={}};m.init();eq(m.native_available(),true,'Later successful reinit available')
 			event=function()event=nil;m.shutdown()end;m.init();eq(m.native_available(),false,'Synchronous shutdown during init cannot be overwritten')
 			m.init();event=function()error('private callback detail')end;local called=pcall(m.init);event=nil;eq(called,false,'Original logger throw propagated');eq(m.native_available(),false,'Thrown init never becomes available')
-			package.loaded['logger.shim'].success=function()m.shutdown()end;m.init();eq(m.native_available(),false,'Probe success callback shutdown remains authoritative')
+			package.loaded['core.logger.engine.shim'].success=function()m.shutdown()end;m.init();eq(m.native_available(),false,'Probe success callback shutdown remains authoritative')
 		end)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end

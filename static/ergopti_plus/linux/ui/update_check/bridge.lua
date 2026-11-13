@@ -11,7 +11,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The phases and actions are the shared session's
----    (_shared/lua/updater/check_session.lua), identical on macOS: "checking",
+---    (_shared/updater/engine/check_session.lua), identical on macOS: "checking",
 ---    then the answer of modules/updater/manager.lua's check, with every other
 ---    channel whose latest release is newer than the installed build.
 --- 2. Update downloads and installs the offered release through the updater,
@@ -32,9 +32,9 @@
 local M = {}
 M.bridge_name = "update_check_bridge"
 
-local Json         = require("json")
-local Logger       = require("logger.shim")
-local CheckSession = require("updater.check_session")
+local Json         = require("core.text.engine.json")
+local Logger       = require("core.logger.engine.shim")
+local CheckSession = require("updater.engine.check_session")
 local Installation = require("infra.installation")
 
 local LOG = "bridge.update_check"

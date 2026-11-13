@@ -12,11 +12,11 @@ local driver = root .. "/static/ergopti_plus/macos"
 -- Interpreter wrappers can inject host Lua modules before this fixture starts.
 -- Physical replay must remain runnable with only the repository's Lua sources.
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua"
+	.. root .. "/static/ergopti_plus/_shared/?.lua;"
+	.. root .. "/static/ergopti_plus/_shared/?/init.lua"
 package.cpath = ""
 
-local Json, Helpers = require("json"), require("tests.helpers")
+local Json, Helpers = require("core.text.engine.json"), require("tests.helpers")
 local RunloopTimers = require("tests.support.runloop_timers")
 
 local function rpc(message)

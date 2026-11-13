@@ -15,7 +15,7 @@ require("adapters.clipboard")
 
 local function with_session(options, body)
 	local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
-		"adapters.keyboard_layout", "logger.shim" }
+		"adapters.keyboard_layout", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { current = "saved", writes = {}, wire = {}, waits = {} }
@@ -49,7 +49,7 @@ local function with_session(options, body)
 		kind = function() return "x11" end,
 	}
 	package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function() return 47 end }
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	package.loaded["adapters.clipboard"] = nil
 	local ok, detail = xpcall(function()
 		local clipboard = require("adapters.clipboard")

@@ -36,7 +36,7 @@ local M = {}
 
 local FileSystem = require("adapters.file_system")
 local FieldCheckPorts = require("adapters.field_check_ports")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 -- Seconds an observation may take before it is a failure rather than an answer.
 local COMMAND_TIMEOUT = 5
@@ -252,7 +252,7 @@ function M.automatic_observer(notify)
 	local offered = false
 	-- A field run drives the install itself (infra/field_check_owned_activation.lua
 	-- install): a modal offer would hold the run, and the watch's reload would cut it.
-	local field_run = os.getenv(require("identifiers").field_report.environment) ~= nil
+	local field_run = os.getenv(require("core.text.engine.identifiers").field_report.environment) ~= nil
 		or require("infra.dev_source").is_active()
 	return function(state, reason)
 		if field_run then return notice(state, reason) end

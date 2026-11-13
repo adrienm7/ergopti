@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Chord Native-Mapping Single Source
  * DESCRIPTION:
- * The shared catalogue _shared/modules/actions/modifier_chords.json already says
+ * The shared catalogue _shared/shortcuts/data/actions/modifier_chords.json already says
  * what each OS calls each modifier and each key: `ahk_prefix` for the Windows
  * modifiers, `hammerspoon` for the macOS ones, `windows_key` / `macos_key` for
  * the keys AutoHotkey and Hammerspoon spell their own way. Three drivers read
@@ -46,12 +46,15 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const CATALOGUE = path.join(
 	ROOT,
-	'static/ergopti_plus/_shared/modules/actions/modifier_chords.json'
+	'static/ergopti_plus/_shared/shortcuts/data/actions/modifier_chords.json'
 );
 const AHK_ADAPTER = path.join(ROOT, 'static/ergopti_plus/windows/adapters/hotkey_registrar.ahk');
 const AHK_SLOTS = path.join(ROOT, 'static/ergopti_plus/windows/_generated/slot_roles.ahk');
-const SLOT_ROLES = path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/slot_roles.json');
-const LUA_CHORD = path.join(ROOT, 'static/ergopti_plus/_shared/lua/chord/init.lua');
+const SLOT_ROLES = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/shortcuts/data/actions/slot_roles.json'
+);
+const LUA_CHORD = path.join(ROOT, 'static/ergopti_plus/_shared/keyboard/engine/chord/init.lua');
 const HS_SLOTS = path.join(
 	ROOT,
 	'static/ergopti_plus/macos/modules/shortcuts/keyboard_shortcuts.lua'

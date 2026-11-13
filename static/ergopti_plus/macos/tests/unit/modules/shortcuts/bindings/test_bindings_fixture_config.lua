@@ -17,7 +17,7 @@ local function scenario(body)
 			error("fixture escaped to external configuration")
 		end
 		local read = function(path)
-			if path == helpers.shared("modules/actions/tap_keys.json") then return native_read(path) end
+			if path == helpers.shared("shortcuts/data/actions/tap_keys.json") then return native_read(path) end
 			return forbidden()
 		end
 		files.read_with_status, files.write_if_unchanged, files.write = read, forbidden, forbidden

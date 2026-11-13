@@ -38,7 +38,7 @@ end
 --- @return table menu, table counts
 local function menu_over(host)
 	local counts = { captured = 0, refused = 0 }
-	local menu = require("shortcuts.physical_editor_menu").new({
+	local menu = require("shortcuts.engine.physical_editor_menu").new({
 		host = function() return host end,
 		scope = function() counts.captured = counts.captured + 1 return {} end,
 		refused = function() counts.refused = counts.refused + 1 end,

@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix="ergopti-linux-metrics-") as temporary:
     database = pathlib.Path(temporary) / "synthetic.sqlite"
     with contextlib.closing(sqlite3.connect(database)) as connection:
         connection.executescript(
-            (root / "static/ergopti_plus/_shared/data/db/schema.sql").read_text()
+            (root / "static/ergopti_plus/_shared/metrics/data/db/schema.sql").read_text()
         )
         tables = [
             "ngram_chars",

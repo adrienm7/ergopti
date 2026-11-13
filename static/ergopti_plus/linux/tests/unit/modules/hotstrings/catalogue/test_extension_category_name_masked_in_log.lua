@@ -17,9 +17,9 @@ local helpers, user_folder, write, one_entry_pack, load_with_user_folder =
 helpers.describe("Config manager: a category name is masked in the log", function()
 	helpers.it("(category-name-log-mask) never prints the overridden category's name", function()
 		-- The loader logs through logger.shim, which binds the logger instance
-		-- that was current when it loaded; another test can leave package.loaded.logger
+		-- that was current when it loaded; another test can leave package.loaded["core.logger.engine"]
 		-- pointing at a newer one, so the sink goes on the shim's own instance.
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local lines = {}
 		local previous_level = Logger.get_level()
 		Logger.set_level("debug")
@@ -32,7 +32,7 @@ helpers.describe("Config manager: a category name is masked in the log", functio
 		Logger.set_sink(nil)
 		Logger.set_level(previous_level)
 		helpers.assert_true(ok, tostring(failure))
-		local placeholder = require("diagnostics.private_label").PLACEHOLDER
+		local placeholder = require("diagnostics.engine.private_label").PLACEHOLDER
 		local seen = false
 		for _, line in ipairs(lines) do
 			if line:find("user's copy of", 1, true) then
@@ -45,9 +45,9 @@ helpers.describe("Config manager: a category name is masked in the log", functio
 	end)
 
 	helpers.it("(category-name-log-mask) pins the placeholder to the redaction policy", function()
-		local file = assert(io.open(require("infra.paths").shared("modules/diagnostics/redaction.json"), "rb"))
-		local policy = require("json").decode(file:read("*a"))
+		local file = assert(io.open(require("infra.paths").shared("diagnostics/data/redaction.json"), "rb"))
+		local policy = require("core.text.engine.json").decode(file:read("*a"))
 		file:close()
-		require("test.private_label_contract")(helpers, policy)
+		require("tests.lua.private_label_contract")(helpers, policy)
 	end)
 end)

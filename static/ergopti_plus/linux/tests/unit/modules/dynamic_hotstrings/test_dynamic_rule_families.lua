@@ -358,7 +358,7 @@ helpers.describe("dynamic rule families: the rows", function()
 	helpers.it("shows today's date in the label, not the placeholder", function()
 		with_storage()
 		local dh = manager()
-		local Engine = require("dynamic_hotstrings")
+		local Engine = require("hotstrings.engine.dynamic.core")
 		local today = Engine.today_date_strings()
 
 		for _, family in ipairs(dh.rule_families()) do
@@ -408,7 +408,7 @@ end)
 
 helpers.describe("dynamic menu shared family order", function()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/dynamic_hotstrings/menu_vectors.json"), "rb"))
-	local corpus = assert(require("json").decode(file:read("*a")))
+	local corpus = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	helpers.it("keeps the independent published family metadata and returns detached records", function()
 		local menu = require("infra.manifest_menu")

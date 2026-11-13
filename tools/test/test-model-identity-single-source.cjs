@@ -12,7 +12,7 @@
  * installed lookup.
  *
  * ROOT CAUSE ENCODED:
- * The projection was extracted into _shared/lua/llm/model_catalogue.lua, but the
+ * The projection was extracted into _shared/ai/engine/local_servers/model_catalogue.lua, but the
  * Linux bridge kept a byte-identical private copy of the normaliser. Nothing
  * failed, because the copies agreed on the day they were written. That is
  * exactly the shape this repository has been bitten by before: two hand-
@@ -34,7 +34,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 
 // The one home for the rule.
-const SSOT = 'static/ergopti_plus/_shared/lua/llm/model_catalogue.lua';
+const SSOT = 'static/ergopti_plus/_shared/ai/engine/local_servers/model_catalogue.lua';
 
 // Every driver file that compares model identities and must borrow the rule.
 const CONSUMERS = ['static/ergopti_plus/linux/ui/model_browser/bridge.lua'];
@@ -44,7 +44,7 @@ const CONSUMERS = ['static/ergopti_plus/linux/ui/model_browser/bridge.lua'];
 const DRIVER_TREES = [
 	'static/ergopti_plus/linux',
 	'static/ergopti_plus/macos',
-	'static/ergopti_plus/_shared/lua'
+	'static/ergopti_plus/_shared'
 ];
 
 /**

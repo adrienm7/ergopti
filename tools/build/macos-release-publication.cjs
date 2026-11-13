@@ -22,7 +22,7 @@ const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex'
 /** Load the actual canonical policy without copying its names or order. */
 function bindings(defaults) {
 	return resolveArchives(
-		defaults ?? JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'))
+		defaults ?? JSON.parse(fs.readFileSync(shared('updater/data/defaults.json'), 'utf8'))
 	);
 }
 

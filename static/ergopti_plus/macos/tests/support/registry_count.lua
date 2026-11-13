@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local REGISTRY = (debug.getinfo(1, "S").source:sub(2):match("^(.*)/macos/tests/support/[^/]+$")
-	or error("registry_count is outside the macOS test tree")) .. "/_shared/modules/timings/constants.toml"
+	or error("registry_count is outside the macOS test tree")) .. "/_shared/core/timing/data/constants.toml"
 
 --- Reads one numeric `[section] key = value` of the registry.
 --- @param section string Registry section.

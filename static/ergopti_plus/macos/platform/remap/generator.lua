@@ -39,7 +39,7 @@ local M = {}
 local hs         = hs
 local Logger     = require("infra.logger")
 local KeyEventHealth = require("infra.key_event_health")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -49,14 +49,14 @@ local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
-local ControlSignals = require("keymap.control_signals")
-local LoneTap = require("tap_hold.lone_tap")
+local ControlSignals = require("layouts.engine.layers.control_signals")
+local LoneTap = require("tap_hold.engine.lone_tap")
 local NavLayer = require("platform.remap.nav_layer")
 local ScriptChordRules = require("platform.remap.script_chord_rules")
 local Defaults = require("platform.remap.defaults")
 local Layout = require("modules.keymap.layout")
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "karabiner"
 
@@ -89,7 +89,7 @@ M.REFUSAL_LEGACY_CONFLICTS = "legacy_conflicts"
 -- Which manifest features reach Karabiner, from what this generator reads: each
 -- state field M.build_karabiner_json reads, mapped to the features it feeds.
 -- This mapping is the single source of the macOS `karabiner` requirement
--- (_shared/modules/features/requirements.toml); test-feature-requirements.cjs
+-- (_shared/settings/data/features/requirements.toml); test-feature-requirements.cjs
 -- fails when the generator reads a field missing here, when a field here is no
 -- longer read, and when a feature's declared `requires.macos` disagrees.
 -- Selectors: `a.b` one feature, `a.b.*` a section's features, `a.b.**` all
@@ -204,7 +204,7 @@ local LAYER_EXIT_SENTINEL_NAME = Keycodes.to_name(Keycodes.F19_LAYER_NAV_EXITED)
 -- The untagged key led by every hold that presses Ctrl, Cmd or Option for a
 -- tap-hold key (tap_hold_modifier_marker). Read from the platform-neutral
 -- registry: hs.keycodes.map names no keycode 110, so to_name() cannot.
-local TAP_HOLD_MODIFIER_SENTINEL_NAME = require("keycodes").CONTEXT_MENU_KARABINER_NAME
+local TAP_HOLD_MODIFIER_SENTINEL_NAME = require("platform.input.keycodes.core").CONTEXT_MENU_KARABINER_NAME
 
 -- The tap-hold keys the navigation layer swallows while another key holds it,
 -- by key id, with the tap that makes them so (their hold being the layer):

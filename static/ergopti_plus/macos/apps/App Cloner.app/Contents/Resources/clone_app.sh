@@ -162,7 +162,7 @@ esac
 # Browsers get their own profile, as the catalogue's chromium and firefox
 # families do on Windows and Linux (BAP-002): matched by their macOS
 # executable names, lower-cased, which test-app-cloner-families.cjs holds to
-# _shared/data/app_cloner/families.json. Google Chrome ships a « Google Chrome
+# _shared/apps/data/app_cloner/families.json. Google Chrome ships a « Google Chrome
 # Framework », which the Chromium framework test above does not see.
 case "${SRC_EXE_NAME:l}" in
 	"google chrome"|"chromium"|"microsoft edge"|"brave browser"|"vivaldi"|"opera")

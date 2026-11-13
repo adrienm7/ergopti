@@ -16,7 +16,7 @@
 --- Exit 0 = assertions passed; 1 = regression; 2 = missing GTK/LGI/X11 environment.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 
 --- Refuses an environment that cannot exercise the native surface.
 --- @param message string

@@ -270,7 +270,7 @@ class PhysicalShortcutsWindow extends WebViewHost {
  * admission and the opening of one shared page.
  */
 class PhysicalShortcutsHost {
-	; The editor page id every driver names, from _shared/modules/shortcuts/physical_shortcuts.json.
+	; The editor page id every driver names, from _shared/shortcuts/data/physical_shortcuts.json.
 	static APP_ID => PhysicalShortcutsShared()["app_id"]
 	static Current := 0
 	; GUI readiness, replaceable by a test exactly as Linux replaces its

@@ -35,7 +35,7 @@ local helpers = require("tests.helpers")
 --- @return string html, table errors
 local function build(dir, name)
 	local host = helpers.load_module("ui.webkit_host")
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local original = logger.error
 	local errors = {}
 	logger.error = function(_tag, fmt, ...)

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Fails when the macOS and Linux keystats drivers spell the same SQL statement
  * by hand. A statement both Lua drivers run belongs in the named catalogue
- * (_shared/data/db/queries.sql) and is rendered by name, so one edit changes
+ * (_shared/metrics/data/db/queries.sql) and is rendered by name, so one edit changes
  * both and the query-results corpus proves it. The census of
  * tools/audit/keystats-sql-census.cjs counts catalogue call sites by name and
  * every other statement by its normalized text.
@@ -62,7 +62,7 @@ check('no statement is spelled by hand in both Lua drivers', () => {
 	assert.deepEqual(
 		shared.map(([text, drivers]) => `${text} <- ${[...drivers.values()].join(', ')}`),
 		[],
-		'move these statements into _shared/data/db/queries.sql and render them by name'
+		'move these statements into _shared/metrics/data/db/queries.sql and render them by name'
 	);
 });
 

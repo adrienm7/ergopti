@@ -14,15 +14,15 @@ local repository, port = assert(arg[1]), assert(tonumber(arg[2]))
 -- packet paths are evidence/fixture locations, never an implementation override.
 package.path = repository .. "/static/ergopti_plus/linux/?.lua;"
 	.. repository .. "/static/ergopti_plus/linux/?/init.lua;"
-	.. repository .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. repository .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+	.. repository .. "/static/ergopti_plus/_shared/?.lua;"
+	.. repository .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 local action = "download"
 assert(action == "download" or action == "start", "explicit expected runtime choice")
 local uv = require("luv")
 assert(type(uv.getuid()) == "number" and uv.getuid() > 0, "actual non-root native user identity")
 assert(uv.fs_lstat("/").uid == 0, "actual trusted root inode owner")
 print("NATIVE_IDENTITY uid=" .. tostring(uv.getuid()) .. " root_uid=" .. tostring(uv.fs_lstat("/").uid))
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 for _, level in ipairs({ "error", "warn", "info" }) do
 	local original = Logger[level]
 	Logger[level] = function(tag, format, ...)
@@ -88,10 +88,10 @@ Http.get_owned = function(url, headers, options, callback)
 	trace("http-start " .. host_of(url) .. (options.output_path and " archive" or ""))
 	local operation = original_get_owned(url, headers, options, function(result)
 		trace("http-end " .. host_of(url) .. " status=" .. tostring(type(result) == "table" and result.status or "?"))
-		local typed = require("llm.enable_admission").receipt(result)
+		local typed = require("ai.engine.settings.enable_admission_core").receipt(result)
 		if typed then
 			chronological[#chronological + 1] = { kind = "typed_version", engine = Engine.is_enabled(),
-				profile = Profiles.is_enabled(), version = require("json").decode(result.body).version }
+				profile = Profiles.is_enabled(), version = require("core.text.engine.json").decode(result.body).version }
 		end
 		return callback(result)
 	end)
@@ -174,7 +174,7 @@ Engine.init({ is_paused = function() return false end })
 -- source provenance and subsequent publication remain the actual owners.
 Profiles.init({ port = port })
 local Config = require("infra.config_paths").config("config.toml")
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 -- Control only WebKit presentation: actual bridge retains session ownership.
 local window_calls = { show = 0, hide = 0, evaluate = 0 }
 package.loaded["ui.webview_manager"] = {
@@ -184,8 +184,8 @@ package.loaded["ui.webview_manager"] = {
 	bring_to_front = function() return true end,
 	is_visible = function() return true end,
 }
-local Json = require("json")
-local Policy = require("llm.local_model_policy")
+local Json = require("core.text.engine.json")
+local Policy = require("ai.engine.ollama.local_model_policy")
 local Api = require("modules.llm.api_ollama")
 local Download = require("modules.llm.model_download")
 local Offer = require("modules.llm.local_model_offer")

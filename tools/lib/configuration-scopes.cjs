@@ -2,7 +2,7 @@
 
 'use strict';
 
-const schema = require('../../static/ergopti_plus/_shared/modules/features/manifest.schema.json');
+const schema = require('../../static/ergopti_plus/_shared/settings/data/features/manifest.schema.json');
 const parameterShape = schema.$defs.configuration_scope.properties.action_parameters;
 
 /**

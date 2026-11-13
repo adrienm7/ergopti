@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- The refusal store of these tests
 local REFUSED_FILE = os.tmpname()

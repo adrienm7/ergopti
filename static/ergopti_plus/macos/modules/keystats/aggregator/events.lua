@@ -12,7 +12,7 @@
 --- sub-module owns a clearly-bounded responsibility.
 ---
 --- The typing, app-switch and window-switch walks are the shared walker's
---- (_shared/lua/keystats/walker.lua); the system events below stay here
+--- (_shared/metrics/engine/walker/walker.lua); the system events below stay here
 --- because their physical and media channels are macOS producers.
 ---
 --- MIRRORS: windows/modules/keystats/keystats_walker_events.ahk
@@ -23,8 +23,8 @@ local M = {}
 local S = require("modules.keystats.aggregator.state")
 local C = require("modules.keystats.aggregator.core")
 local Physical = require("modules.keystats.aggregator.physical")
-local Walker = require("keystats.walker")
-local AggHelper = require("keystats.aggregator_helpers")
+local Walker = require("metrics.engine.walker.walker")
+local AggHelper = require("metrics.engine.aggregator.helpers")
 
 
 
@@ -37,7 +37,7 @@ local AggHelper = require("keystats.aggregator_helpers")
 -- ================================
 
 --- Replays a typing entry's per-keystroke array into S.agg_batch through the
---- shared walker (_shared/lua/keystats/walker.lua), the walk Linux runs too.
+--- shared walker (_shared/metrics/engine/walker/walker.lua), the walk Linux runs too.
 --- An entry without its own time of day bins to the moment it is walked, as
 --- the Windows walker does.
 --- @param entry table The decoded typing JSONL entry.
@@ -127,13 +127,13 @@ function M.walk_system_event(entry)
 	if not C.require_init("walk_system_event") then return end
 	C.ensure_batch()
 	if entry.action == "physical_media_press" then
-		require("keystats.media_store").replay(C.media_policy(), S.agg_batch, { entry }, C.HOLD_THRESHOLD_MS)
+		require("metrics.engine.media.store").replay(C.media_policy(), S.agg_batch, { entry }, C.HOLD_THRESHOLD_MS)
 		local ctx = C.get_app_ctx(entry.app)
 		-- Break only the physical channel; logical text continuity is separate.
 		if ctx.physical then Physical.advance_streak(nil, ctx.physical, nil) end
 		return
 	elseif entry.action == "physical_media_release" then
-		require("keystats.media_store").replay(C.media_policy(), S.agg_batch, { entry }, C.HOLD_THRESHOLD_MS)
+		require("metrics.engine.media.store").replay(C.media_policy(), S.agg_batch, { entry }, C.HOLD_THRESHOLD_MS)
 		return
 	end
 	if entry.action == "physical_press" then

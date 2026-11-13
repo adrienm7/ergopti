@@ -78,7 +78,7 @@ const REDACTORS = [
 // stringified, and a gate whose output is mostly noise is a gate that gets
 // skimmed. These directories are where a resolved @-tag can actually appear.
 const LUA_TREES = [
-	'_shared/lua/dynamic_hotstrings',
+	'_shared/hotstrings/engine/dynamic',
 	'linux/modules/dynamic_hotstrings',
 	'macos/modules/dynamic_hotstrings',
 	'linux/infra/personal_info_fields.lua',

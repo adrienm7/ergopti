@@ -4,7 +4,7 @@
 ; MODULE: Encryptor Core (Windows)
 ; DESCRIPTION:
 ; The Windows Encryptor's container and conversion: the port of macOS's
-; encryptor_convert.sh. The container is _shared/data/encryptor/format.json,
+; encryptor_convert.sh. The container is _shared/apps/data/encryptor/format.json,
 ; OpenSSL's enc envelope, so a file encrypted here opens with the macOS and
 ; Linux Encryptors (and `openssl enc -d`), and the other way round.
 ;
@@ -34,7 +34,7 @@
  * @returns {Map}
  */
 Encryptor_LoadFormat(SharedDir) {
-	Envelope := JsonParse(FileRead(SharedDir . "\data\encryptor\format.json", "UTF-8"))
+	Envelope := JsonParse(FileRead(SharedDir . "\apps\data\encryptor\format.json", "UTF-8"))
 	for Key in ["magic", "salt_bytes", "cipher", "kdf", "kdf_digest", "iterations", "key_bytes", "iv_bytes",
 			"encrypted_extension", "decrypted_fallback_suffix"] {
 		if !Envelope.Has(Key)

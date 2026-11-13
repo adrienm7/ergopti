@@ -32,26 +32,26 @@
 local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
-local NativePath = require("native_path")
-local TomlWriter = require("toml_codec.writer")
+local NativePath = require("core.fs.engine.native_path")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
 -- Use the constructor's captured checker, never a replaceable public getter.
 -- This is the same trusted normal-loader boundary as the shared writer; it
 -- does not authenticate arbitrary source-spoofing searchers or debug mutation.
-local SchemaOwner = require("config_migrate")
+local SchemaOwner = require("settings.engine.migration.migrate")
 local schema_factory = assert(rawget(SchemaOwner, "writer_admission_factory"))
-local SourceIdentity = require("module_source_identity")
+local SourceIdentity = require("core.fs.engine.module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
-local source_directory = require("module_source_directory").capture()
+local source_directory = require("core.fs.engine.module_source_directory").capture()
 local constructor_source = debug.getinfo(1, "S").source
 local schema_source = source_sibling(constructor_source, "infra/preferences.lua",
-	"../_shared/lua/config_migrate.lua", source_directory)
+	"../_shared/settings/engine/migration/migrate.lua", source_directory)
 assert(source_same(debug.getinfo(schema_factory, "S").source, schema_source, source_directory),
 	"preference schema owner is not canonical")
 local schema_origin, _, schema_reader = schema_factory()
 assert(rawequal(schema_origin, SchemaOwner) and type(schema_reader) == "function", "preference schema origin is invalid")
 local function capture_schema_read(path, file_adapter)
-	if not rawequal(rawget(package.loaded, "toml_codec.writer"), TomlWriter)
-		or not rawequal(rawget(package.loaded, "config_migrate"), SchemaOwner)
+	if not rawequal(rawget(package.loaded, "core.text.engine.toml_codec.writer"), TomlWriter)
+		or not rawequal(rawget(package.loaded, "settings.engine.migration.migrate"), SchemaOwner)
 		or not rawequal(rawget(SchemaOwner, "writer_admission_factory"), schema_factory) then return false end
 	return schema_reader(path, file_adapter)
 end
@@ -65,27 +65,27 @@ local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")
-local LEAF = require("config_keys").LEAF
-local HotstringLanguages = require("hotstrings.languages")
-local ConfigOutdated = require("config_outdated")
+local LEAF = require("settings.engine.keys").LEAF
+local HotstringLanguages = require("hotstrings.engine.languages")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
-local BindingIdentity = require("config_binding_identity")
-local BindingPublication = require("config_binding_publication")
-local PersonalFiles = require("hotstrings.personal_files")
+local BindingIdentity = require("settings.engine.publication.binding_identity")
+local BindingPublication = require("settings.engine.publication.binding_publication")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
-local Agent     = require("llm.agent")
-local AppProfileOverrides = require("llm.app_profile_overrides")
-local ProfileRegistry = require("llm.profile_registry_codec")
-local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
+local Agent     = require("ai.engine.agent.agent")
+local AppProfileOverrides = require("ai.engine.policy.app_profile_overrides")
+local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
+local NEVER_MS = require("ai.engine.request_plan.debounce").NEVER_MS
 local HotstringCore = require("infra.hotstring_engine")
-local WrapPreferences = require("menu.wrap_preferences")
-local UserModels = require("config_user_models")
-local CapsWordPolicy = require("caps_word.auto_off")
-local PauseSwitchPolicy = require("layout.pause_switch_policy")
-local RecordList = require("toml_codec.record_list")
+local WrapPreferences = require("menu.engine.wrap_preferences")
+local UserModels = require("settings.engine.publication.user_models")
+local CapsWordPolicy = require("keyboard.engine.caps_word_auto_off")
+local PauseSwitchPolicy = require("layouts.engine.layout.pause_switch_policy")
+local RecordList = require("core.text.engine.toml_codec.record_list")
 local LOG       = "preferences"
-local OperationReporter = require("diagnostics.operation_reporter")
-local ConfigKeys = require("config_keys")
+local OperationReporter = require("diagnostics.engine.operation_reporter")
+local ConfigKeys = require("settings.engine.keys")
 local MetricsState = require("infra.metrics_state_keys")
 
 
@@ -126,7 +126,7 @@ local KEY_MAP = {
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_user_code_enabled  = { sec = "hotstrings", path = "dynamic.user_code", key = "enabled" },
 	dynamichotstrings_user_code_time_activation_seconds = {
-		sec = "hotstrings", path = "dynamic.user_code", key = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS,
+		sec = "hotstrings", path = "dynamic.user_code", key = require("settings.engine.keys").LEAF.TIME_ACTIVATION_SECONDS,
 	},
 	-- The manifest keeps hotstrings.dynamic.date as a feature row: mapping the
 	-- boolean onto the row itself saved a bare `date = false` (field ledger L20).
@@ -185,7 +185,7 @@ local KEY_MAP = {
 	llm_agent_system1                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM1                     },
 	llm_agent_system2                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM2                     },
 	llm_agent_mode                       = { sec = "llm", key = ConfigKeys.LEAF.AGENT_MODE                        },
-	-- Per-application prompt profiles: the v1 text of _shared/lua/llm/app_profile_overrides.lua
+	-- Per-application prompt profiles: the v1 text of _shared/ai/engine/policy/app_profile_overrides.lua
 	llm_app_profile_overrides            = { sec = "llm", key = LEAF.APP_PROFILE_OVERRIDES          },
 	-- User prompt profiles: the v1 envelope Windows and Linux store at the same key,
 	-- decoded into the profile list at the persistence boundary (scalar_units).
@@ -214,7 +214,7 @@ local KEY_MAP = {
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
-	script_control_enabled               = { sec = "shortcuts", path = require("config_keys").LEAF.SCRIPT_CONTROL, key = "chords_enabled" },
+	script_control_enabled               = { sec = "shortcuts", path = require("settings.engine.keys").LEAF.SCRIPT_CONTROL, key = "chords_enabled" },
 	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS },
 	caps_word_terminators                = { sec = "shortcuts", path = "caps_word", key = "terminators" },
 
@@ -351,7 +351,7 @@ end
 --- @return table|nil ids Set of profile ids.
 --- @return table|nil legacy Set of legacy ids the active profile may hold.
 local function known_profile_ids(grouped)
-	local Selector = require("llm.profile_selector")
+	local Selector = require("ai.engine.settings.profile_selector")
 	local builtins = Selector.load_built_in_profiles()
 	if type(builtins) ~= "table" or #builtins == 0 then return nil, nil end
 	local ids, legacy = {}, {}
@@ -379,7 +379,7 @@ end
 --- the catalogue still offers.
 local OWNER_VALUE_RULES = {
 	gesture_sensitivities = function(value)
-		if require("gestures.sensitivity").coerce(value) ~= nil then return true end
+		if require("gestures.engine.sensitivity").coerce(value) ~= nil then return true end
 		return false, "the value is outside the supported sensitivity range"
 	end,
 	script_control_shortcuts = function(value)
@@ -402,7 +402,7 @@ end
 
 -- Built-in terminator keys, from the generated catalogue the registry loads.
 local BUILTIN_TERMINATORS = {}
-for _, def in ipairs(require("keymap.terminators_catalogue")) do
+for _, def in ipairs(require("layouts.engine.layers.terminators_catalogue")) do
 	if type(def.key) == "string" then BUILTIN_TERMINATORS[def.key] = true end
 end
 
@@ -501,7 +501,7 @@ end
 --- @return boolean
 local function section_orders_are_map(value, shapes)
 	if type(value) ~= "table" then return false end
-	local origin = require("toml_codec.leaf_rows").source_origin(value)
+	local origin = require("core.text.engine.toml_codec.leaf_rows").source_origin(value)
 	if origin then return not origin.array end
 	if shapes then return shapes.arrays[value] ~= true end
 	return #value == 0
@@ -514,7 +514,7 @@ end
 --- @return string|nil detail
 local function section_order_fits(value, shapes)
 	if type(value) ~= "table" then return false, "section order is not a list" end
-	local origin = require("toml_codec.leaf_rows").source_origin(value)
+	local origin = require("core.text.engine.toml_codec.leaf_rows").source_origin(value)
 	if (origin and not origin.array) or (shapes and shapes.arrays[value] ~= true) then
 		return false, "section order is not an array"
 	end
@@ -846,17 +846,17 @@ local function sparse_updates(flat)
 	local function visit(node, path)
 		for key, value in pairs(node) do
 			local leaf = path == "" and key or path .. "." .. key
-			local segments = require("toml_codec.key_path").parse(path, true)
+			local segments = require("core.text.engine.toml_codec.key_path").parse(path, true)
 			if segments and #segments == 3 and segments[1] == "hotstrings" and segments[2] == "modules"
 				and PersonalFiles.components(segments[3]) then
 				segments[#segments + 1] = key
-				leaf = require("toml_codec.key_path").render(segments)
+				leaf = require("core.text.engine.toml_codec.key_path").render(segments)
 			end
 			if type(value) == "table" and #value == 0 and next(value) ~= nil then
 				visit(value, leaf)
 			elseif type(value) ~= "table" or next(value) ~= nil or table_paths[leaf] then
 				local canonical = PersonalFiles.preference_default(leaf) ~= nil
-				local path_parts = canonical and require("toml_codec.key_path").parse(leaf, true)
+				local path_parts = canonical and require("core.text.engine.toml_codec.key_path").parse(leaf, true)
 				local id = path_parts and path_parts[3]
 				local personal = canonical and require("infra.personal_hotstrings").adoption(id)
 				if canonical and (not personal or not personal.admitted) then
@@ -864,7 +864,7 @@ local function sparse_updates(flat)
 				elseif personal and personal.admitted and personal.legacy_name and value == true then
 					assert(require("infra.personal_hotstrings").adoption_current(personal) == true,
 						"personal legacy source changed before preferences publication")
-					updates[#updates + 1] = require("hotstrings.personal_adoption").preference_row(personal,
+					updates[#updates + 1] = require("hotstrings.engine.catalogue.personal_adoption").preference_row(personal,
 						path_parts[2] == "modules" and path_parts[4] or nil, value)
 				elseif Manifest.has_default(leaf) then
 					updates[#updates + 1] = Manifest.sparse_operation(leaf, value)
@@ -1214,7 +1214,7 @@ local function roi_encryption_request(source)
 	if type(source) ~= "table" then return nil end
 	if source.status == "absent" then return false end
 	if source.status ~= "ok" or type(source.content) ~= "string" then return nil end
-	local called, document, shapes = pcall(require("toml_codec.leaf_rows").decode_source, source.content)
+	local called, document, shapes = pcall(require("core.text.engine.toml_codec.leaf_rows").decode_source, source.content)
 	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return nil end
 	local metrics = rawget(document, "metrics")
 	if metrics == nil then return false end
@@ -1390,7 +1390,7 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
-	local dec_ok, tbl, shapes = pcall(require("toml_codec.leaf_rows").decode_source, content)
+	local dec_ok, tbl, shapes = pcall(require("core.text.engine.toml_codec.leaf_rows").decode_source, content)
 	if not dec_ok or type(tbl) ~= "table" then
 		set_source_snapshot(prefs_file, nil)
 		-- Loud, and never silently overwritten. The user's settings are still on
@@ -1447,14 +1447,14 @@ function M.current_view(prefs_file, tolerate_outdated)
 		local current, refusal = classify_source(prefs_file)
 		if not current then return nil, nil, refusal end
 		if current.status == "absent" then return {}, current end
-		local decoded, shapes = require("toml_codec.leaf_rows").decode_source(current.content)
+		local decoded, shapes = require("core.text.engine.toml_codec.leaf_rows").decode_source(current.content)
 		if type(decoded) ~= "table" then return nil, nil, "undecodable" end
 		-- The very walk and admission load() applies: a value load leaves out as
 		-- outdated is left out here too, never refused by a second rule.
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
 		if next(outdated) ~= nil and tolerate_outdated ~= true then
-			return nil, nil, "outdated_keys", require("table_util").sorted_keys(outdated)[1]
+			return nil, nil, "outdated_keys", require("core.text.engine.table_util").sorted_keys(outdated)[1]
 		end
 		return flat, current
 	end)
@@ -1573,7 +1573,7 @@ end
 --- @param value any Value to clone.
 --- @return any clone
 local function clone_value(value)
-	return require("toml_codec.leaf_rows").clone_value(value)
+	return require("core.text.engine.toml_codec.leaf_rows").clone_value(value)
 end
 
 --- Reconciles leaf operations with existing inline gesture tables without
@@ -1582,7 +1582,7 @@ end
 --- @param updates table Owned set/delete leaf operations.
 --- @return table updates Equivalent strict-writer operations.
 function M.prepare_gesture_updates(source, updates)
-	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
+	local scanned, detail = require("core.text.engine.toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
 	if not scanned then return false, detail end
 	local decoded = TomlCodec.decode(source.content or "")
 	local disk_gestures = decoded.gestures or {}
@@ -1663,16 +1663,16 @@ end
 --- @param updates table Manifest-owned leaf operations.
 --- @return table rows Addressable operations with inline tables retained.
 local function prepare_inline_updates(source, updates, root)
-	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
+	local scanned, detail = require("core.text.engine.toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
 	assert(scanned, detail)
-	local LeafRows = require("toml_codec.leaf_rows")
+	local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 	local decoded = LeafRows.decode_source(source.content or "")
 	if root == "llm" and user_models_scalar_is_obsolete(decoded) then
 		local preserved = {}
 		for _, row in ipairs(updates) do
-			local path = require("toml_codec.key_path").parse(row.section, true)
+			local path = require("core.text.engine.toml_codec.key_path").parse(row.section, true)
 			if path then path[#path + 1] = row.key end
-			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == require("config_keys").LEAF.USER_MODELS then
+			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == require("settings.engine.keys").LEAF.USER_MODELS then
 				-- A scope's neutral list is not an explicit obsolete-entry cleanup.
 				assert(row.delete or type(row.value) == "table" and next(row.value) == nil,
 					"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
@@ -1683,7 +1683,7 @@ local function prepare_inline_updates(source, updates, root)
 	local inline, candidates, rows = {}, {}, {}
 	local function parts(path)
 		if root == "hotstrings" then
-			return assert(require("toml_codec.key_path").parse(path, true), "invalid semantic hotstring preference path")
+			return assert(require("core.text.engine.toml_codec.key_path").parse(path, true), "invalid semantic hotstring preference path")
 		end
 		local result = {}
 		for key in path:gmatch("[^.]+") do result[#result + 1] = key end
@@ -1693,7 +1693,7 @@ local function prepare_inline_updates(source, updates, root)
 		if root ~= "hotstrings" then return section == "" and key or section .. "." .. key end
 		local segments = section == "" and {} or parts(section)
 		segments[#segments + 1] = key
-		return require("toml_codec.key_path").render(segments)
+		return require("core.text.engine.toml_codec.key_path").render(segments)
 	end
 	for _, record in ipairs(scanned.records) do
 		if record.addressable then
@@ -1722,7 +1722,7 @@ local function prepare_inline_updates(source, updates, root)
 			if root == "hotstrings" then
 				local segments = parts(parent)
 				table.remove(segments)
-				parent = #segments > 0 and require("toml_codec.key_path").render(segments) or ""
+				parent = #segments > 0 and require("core.text.engine.toml_codec.key_path").render(segments) or ""
 			else parent = parent:match("^(.*)%.[^.]+$") or "" end
 		end
 		if path == ConfigKeys.KEY.LLM_PROFILES_SHORTCUTS and type(row.value) == "table" and next(row.value) == nil then
@@ -1751,7 +1751,7 @@ local function prepare_inline_updates(source, updates, root)
 	end
 	for path, candidate in pairs(candidates) do
 		local record = inline[path].record
-		local path_segments = assert(require("toml_codec.key_path").parse(record.section, true))
+		local path_segments = assert(require("core.text.engine.toml_codec.key_path").parse(record.section, true))
 		path_segments[#path_segments + 1] = record.key
 		local operation = next(candidate) == nil and { path = path_segments, delete = true }
 			or { path = path_segments, value = candidate }
@@ -1773,7 +1773,7 @@ function M.prepare_llm_updates(source, updates)
 end
 
 --- The existing native shortcut assignment-container owners.
-M.SHORTCUT_CONTAINERS = require("config_obsolete_parents").SHORTCUT_CONTAINERS
+M.SHORTCUT_CONTAINERS = require("settings.engine.migration.obsolete_parents").SHORTCUT_CONTAINERS
 
 --- Prepares declared shortcut leaves while preserving inline neighbors.
 --- Obsolete assignment parents stay on disk until explicit cleanup; only
@@ -1785,7 +1785,7 @@ M.SHORTCUT_CONTAINERS = require("config_obsolete_parents").SHORTCUT_CONTAINERS
 --- @return table Prepared writer operations.
 function M.prepare_shortcut_updates(source, updates, containers)
 	if containers ~= nil then
-		local Parents = require("config_obsolete_parents")
+		local Parents = require("settings.engine.migration.obsolete_parents")
 		updates = Parents.preserve(source.content or "", updates, Parents.shortcut_namespaces(containers))
 	end
 	return prepare_inline_updates(source, updates, "shortcuts")
@@ -1797,15 +1797,15 @@ end
 --- @param updates table Proposed leaf operations.
 --- @return table updates Source-preserving operations.
 local function prepare_order_updates(source, updates)
-	local KeyPath = require("toml_codec.key_path")
+	local KeyPath = require("core.text.engine.toml_codec.key_path")
 	local relevant = false
 	for _, row in ipairs(updates) do
 		local path = KeyPath.parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and path[1] == "hotstrings" and path[2] == require("config_keys").LEAF.ORDER_OVERRIDES then relevant = true end
+		if path and path[1] == "hotstrings" and path[2] == require("settings.engine.keys").LEAF.ORDER_OVERRIDES then relevant = true end
 	end
 	if not relevant then return updates end
-	local document, shapes = require("toml_codec.leaf_rows").decode_source(source.content or "")
+	local document, shapes = require("core.text.engine.toml_codec.leaf_rows").decode_source(source.content or "")
 	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
 	local orders = hotstrings.order_overrides
 	local malformed_parent = orders ~= nil and not section_orders_are_map(orders, shapes)
@@ -1822,10 +1822,10 @@ local function prepare_order_updates(source, updates)
 	for _, row in ipairs(updates) do
 		local path = KeyPath.parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and path[1] == "hotstrings" and path[2] == require("config_keys").LEAF.ORDER_OVERRIDES and #path == 2 and not row.delete then
+		if path and path[1] == "hotstrings" and path[2] == require("settings.engine.keys").LEAF.ORDER_OVERRIDES and #path == 2 and not row.delete then
 			assert(section_orders_are_map(row.value), "section orders candidate is not a table of settings")
 		end
-		if not path or path[1] ~= "hotstrings" or path[2] ~= require("config_keys").LEAF.ORDER_OVERRIDES then
+		if not path or path[1] ~= "hotstrings" or path[2] ~= require("settings.engine.keys").LEAF.ORDER_OVERRIDES then
 			prepared[#prepared + 1] = row
 		elseif #path == 2 and (row.delete or type(row.value) == "table" and next(row.value) == nil) then
 			if not malformed_parent and next(bad) == nil then
@@ -1836,7 +1836,7 @@ local function prepare_order_updates(source, updates)
 				end
 			end
 		elseif malformed_parent or #path == 2 and next(bad) ~= nil or bad[path[3]] then
-			if not row.delete then refuse(malformed_parent and { "hotstrings", require("config_keys").LEAF.ORDER_OVERRIDES } or path) end
+			if not row.delete then refuse(malformed_parent and { "hotstrings", require("settings.engine.keys").LEAF.ORDER_OVERRIDES } or path) end
 		else
 			assert(#path <= 3, "section order mutations must address a whole text list")
 			if not row.delete then
@@ -1865,13 +1865,13 @@ function M.prepare_hotstring_updates(source, updates)
 	updates = prepare_order_updates(source, updates)
 	local personal = {}
 	for _, row in ipairs(updates) do
-		local path = require("toml_codec.key_path").parse(row.section, true)
+		local path = require("core.text.engine.toml_codec.key_path").parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and PersonalFiles.preference_default(require("toml_codec.key_path").render(path)) ~= nil then
+		if path and PersonalFiles.preference_default(require("core.text.engine.toml_codec.key_path").render(path)) ~= nil then
 			personal[#personal + 1] = row
 		end
 	end
-	assert(require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal),
+	assert(require("hotstrings.engine.catalogue.personal_metadata").exact_rows_available(source.content or "", personal),
 		"canonical personal preferences have an ambiguous case alias")
 	return prepare_inline_updates(source, updates, "hotstrings")
 end
@@ -1922,12 +1922,12 @@ function M.personal_choices_available(changes)
 			local record = require("infra.personal_hotstrings").adoption(choice.group)
 			if not record or record.admitted ~= true
 				or require("infra.personal_hotstrings").adoption_current(record) ~= true then return false end
-			rows[#rows + 1] = { section = require("toml_codec.key_path").render(choice.section
+			rows[#rows + 1] = { section = require("core.text.engine.toml_codec.key_path").render(choice.section
 				and { "hotstrings", "modules", choice.group } or { "hotstrings", "groups" }),
 				key = choice.section or choice.group }
 		end
 	end
-	return require("hotstrings.personal_metadata").exact_rows_available(current.content or "", rows)
+	return require("hotstrings.engine.catalogue.personal_metadata").exact_rows_available(current.content or "", rows)
 end
 
 --- Publishes a domain owner's exact batch and advances the ordinary save baseline.
@@ -1995,7 +1995,7 @@ function M.project_hotstring_preferences(saved, groups, get_sections)
 				if PersonalFiles.components(name) and (not personal_record or personal_record.admitted ~= true) then
 					selected = false
 				end
-				if selected == nil then selected = Manifest.default_for(require("toml_codec.key_path").render(
+				if selected == nil then selected = Manifest.default_for(require("core.text.engine.toml_codec.key_path").render(
 					{ "hotstrings", "modules", name, section.name })) end
 				assert(type(selected) == "boolean", "hotstring section preference must be boolean")
 				projected[section.name] = selected
@@ -2230,7 +2230,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	local ok, updates = pcall(function()
 		local document, shapes
 		if expected_source.status == "ok" then
-			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
+			document, shapes = require("core.text.engine.toml_codec.leaf_rows").decode_source(expected_source.content)
 		end
 		stage("decode")
 		local source_parameters = document and type(document.gestures) == "table" and document.gestures.action_parameters
@@ -2255,7 +2255,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				assert(orders == nil or section_orders_are_map(orders, shapes),
 					"Obsolete section orders in '" .. prefs_file .. "' require manual source cleanup")
 				assert(old == nil or section_order_fits(old, shapes),
-					"Obsolete section order '" .. require("toml_codec.key_path").render({ "hotstrings", require("config_keys").LEAF.ORDER_OVERRIDES, id })
+					"Obsolete section order '" .. require("core.text.engine.toml_codec.key_path").render({ "hotstrings", require("settings.engine.keys").LEAF.ORDER_OVERRIDES, id })
 						.. "' in '" .. prefs_file .. "' requires manual source cleanup before replacement")
 				assert(section_order_fits(value), "section order candidate is not a text list")
 				-- Sparse array encoding omits an empty list. A user who clears an

@@ -204,7 +204,7 @@ try {
 			[
 				path.join(ROOT, 'tools/test/lib/app-cloner-log-cleanup-probe.py'),
 				'--palette',
-				path.join(ROOT, 'static/ergopti_plus/_shared/data/native_theme.toml'),
+				path.join(ROOT, 'static/ergopti_plus/_shared/core/ui/data/native_theme.toml'),
 				'--resources',
 				path.dirname(portedCloneScript),
 				'--shell',
@@ -400,7 +400,7 @@ try {
 				'--fixture',
 				path.join(fixtureRoot, 'identity'),
 				'--palette',
-				path.join(ROOT, 'static/ergopti_plus/_shared/data/native_theme.toml')
+				path.join(ROOT, 'static/ergopti_plus/_shared/core/ui/data/native_theme.toml')
 			],
 			{ encoding: 'utf8', timeout: PHYSICAL_CLI_PROBE_TIMEOUT_MS }
 		);

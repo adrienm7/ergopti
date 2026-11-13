@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shared Inference Policy (Linux)
 --- DESCRIPTION:
---- Reads _shared/modules/llm/inference.json, the file the macOS and Windows
+--- Reads _shared/ai/data/inference.json, the file the macOS and Windows
 --- backends read, for the rules the Linux engine applies to every sequential
 --- multi-prediction: the temperature of each variant when several predictions
 --- are asked for one after another, and the retry policy that bounds how many
@@ -19,10 +19,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
-local Temperature = require("llm.temperature")
+local Temperature = require("ai.engine.policy.temperature")
 
 local LOG = "modules.llm.inference"
 
@@ -32,9 +32,9 @@ local _policy = nil
 --- @return table
 local function policy()
 	if _policy then return _policy end
-	local path = Paths.shared("modules/llm/inference.json")
+	local path = Paths.shared("ai/data/inference.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	local root = status == "ok" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.diversity_temperature) ~= "table" then
 		error("inference.json is missing or malformed: " .. tostring(path), 0)
@@ -54,7 +54,7 @@ local function number(section, key)
 end
 
 --- Temperature of one variant of a sequential multi-prediction, through the
---- shared algorithm (_shared/lua/llm/temperature.lua) the macOS backends use.
+--- shared algorithm (_shared/ai/engine/policy/temperature.lua) the macOS backends use.
 --- The first keeps the user's setting; each next one is warmer, from a raised
 --- floor, so variants differ without drifting into nonsense.
 --- @param base number The user's temperature.
@@ -85,7 +85,7 @@ end
 --- @param temperature number The failed call's temperature.
 --- @return integer tokens, number temperature
 function M.retry_budget(tokens, temperature)
-	local TokenBudget = require("llm.request_plan.token_budget")
+	local TokenBudget = require("ai.engine.request_plan.token_budget")
 	local extra = math.floor(number("retry", "retry_extra_tokens"))
 	local ceiling = number("diversity_temperature", "max_temperature")
 	return TokenBudget.for_retry(tokens, extra),

@@ -7,7 +7,7 @@ if arg and arg[0] and arg[0]:match("test_rollover_settlement_restart%.lua$") the
  require("tests.support.keystats.rollover_marker_process")(); return
 end
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local source = assert(debug.getinfo(1, "S").source):gsub("^@", "")
 helpers.describe("rollover settlement survives process restart", function()
  for _, case in ipairs({ "reset_commit_refused", "release_refused_after_terminal" }) do

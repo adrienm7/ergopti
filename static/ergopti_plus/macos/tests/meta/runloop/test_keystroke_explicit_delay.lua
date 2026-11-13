@@ -19,7 +19,7 @@
 ---
 --- The driver already knew this: adapters/text_sender.lua's eraseChars/pressKey
 --- both coerce the delay to 0, gestures/actions.lua's postKeyStroke() helper
---- passes 0, and keymap/utils.lua's paste path passes 0. The invariant was simply
+--- passes 0, and layouts/engine/utils.lua's paste path passes 0. The invariant was simply
 --- applied per-site, and 49 sibling sites across gestures/actions.lua,
 --- shortcuts/actions/{text,apps,system}.lua and the text_sender paste path never
 --- got it — the recurring "one forgotten sibling" failure mode of this repo.

@@ -62,7 +62,7 @@ os.exit(identity and 0 or 1)
 LUA
 chmod 644 "${VERIFY_SCRIPT}"
 verify() { # root
-	as_user "LUA_PATH='${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/lua/?.lua;${LIB_ROOT}/_shared/lua/?/init.lua;;' \
+	as_user "LUA_PATH='${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/?.lua;${LIB_ROOT}/_shared/?/init.lua;;' \
 		LUA_CPATH='${LIB_ROOT}/linux/native_modules/?.so;;' luajit '${VERIFY_SCRIPT}' '$1' '${LIB_ROOT}'"
 }
 

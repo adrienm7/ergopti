@@ -20,7 +20,7 @@
  *     survivors also sorted alphabetically instead of canonically.
  *
  *   * modules/keystats/sqlite_writer.lua walked "../../../" for
- *     _shared/data/db/schema.sql — two levels too high — and fell back to a BARE
+ *     _shared/metrics/data/db/schema.sql — two levels too high — and fell back to a BARE
  *     RELATIVE path, making schema loading depend on the process's current
  *     directory rather than on where the driver is installed.
  *

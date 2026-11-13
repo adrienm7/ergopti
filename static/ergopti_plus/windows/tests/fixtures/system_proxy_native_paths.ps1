@@ -11,7 +11,7 @@ if ($Start -lt 0 -or $End -le $Start -or
 }
 $Body=[scriptblock]::Create($Source.Substring($Start,$End-$Start))
 $Directory=Join-Path ([IO.Path]::GetTempPath()) ('ergopti-native-pac-paths-'+[Guid]::NewGuid().ToString('N'))
-$Expected=Join-Path $Directory 'product/_shared/modules/updater/defaults.json'
+$Expected=Join-Path $Directory 'product/_shared/updater/data/defaults.json'
 $Directories=@($Directory,(Join-Path $Directory 'product'),(Join-Path $Directory 'product/windows'),
     (Join-Path $Directory 'product/windows/tests'),(Join-Path $Directory 'product/windows/vendor'))
 # The defaults' folders come from their own path, wherever the shared tree keeps them.

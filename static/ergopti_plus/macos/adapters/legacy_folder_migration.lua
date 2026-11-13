@@ -16,7 +16,7 @@
 --- 1. Before paths.toml: init.lua runs this before infra/config_paths reads
 ---    paths.toml (the launcher already exports the new path), so the first read
 ---    finds the moved file and the new configuration folder.
---- 2. Shared Rules: what moves and what is refused is _shared/lua/
+--- 2. Shared Rules: what moves and what is refused is _shared/
 ---    legacy_folder_migration.lua; this adapter resolves the folders from
 ---    app_dirs and owns the native effects (hs.fs and os.rename), none of
 ---    which replaces an existing destination.
@@ -30,9 +30,9 @@
 
 local M = {}
 
-local AppDirs = require("app_dirs")
-local Core = require("legacy_folder_migration")
-local NativePath = require("native_path")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Core = require("settings.engine.migration.legacy_folder_migration_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "legacy_folder_migration"
 

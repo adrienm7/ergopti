@@ -1,6 +1,6 @@
 --- tests/unit/adapters/processes/test_owned_process.lua
 
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 
 --- Creates a controllable native backend with independently acknowledged handles.
@@ -153,12 +153,12 @@ end)
 
 helpers.it("(context-async-private-output) private callback exceptions cannot enter diagnostics", function()
 	local native, state = backend()
-	local previous, logs = package.loaded["logger.shim"], {}
+	local previous, logs = package.loaded["core.logger.engine.shim"], {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(...) for index = 1, select("#", ...) do logs[#logs + 1] = tostring(select(index, ...)) end end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	local loaded, owner = pcall(load, native)
-	package.loaded["logger.shim"] = previous
+	package.loaded["core.logger.engine.shim"] = previous
 	if not loaded then error(owner, 0) end
 	local operation = owner.start("program", {}, { owner = "private-context", capture_output = false,
 		on_output = function() error("PRIVATE_TITLE_CANARY") end }, function() error("PRIVATE_TITLE_CANARY") end)
@@ -395,10 +395,10 @@ test("default process limit still refuses the measured archive names output", fu
 end)
 
 test("captured updater limit admits both measured listing outputs", function(owner, _, state)
- local path = assert(require("infra.paths").shared("modules/updater/defaults.json"))
+ local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
  local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
- local defaults = assert(require("json").decode(raw))
- local cap = assert(require("updater.install_budget").capture_listing(defaults))
+ local defaults = assert(require("core.text.engine.json").decode(raw))
+ local cap = assert(require("updater.engine.install_budget").capture_listing(defaults))
  local result
  local operation = owner.start("tar", { "-tvzf", "-" }, { owner = "listing-captured", max_output_bytes = cap },
   function(value) result = value end)
@@ -410,10 +410,10 @@ test("captured updater limit admits both measured listing outputs", function(own
 end)
 
 test("explicit updater listing ceiling still rejects one byte beyond its cap", function(owner, _, state)
- local path = assert(require("infra.paths").shared("modules/updater/defaults.json"))
+ local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
  local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
- local defaults = assert(require("json").decode(raw))
- local cap = assert(require("updater.install_budget").capture_listing(defaults))
+ local defaults = assert(require("core.text.engine.json").decode(raw))
+ local cap = assert(require("updater.engine.install_budget").capture_listing(defaults))
  local result
  local operation = owner.start("tar", { "-tzf", "-" }, { owner = "listing-bound", max_output_bytes = cap },
   function(value) result = value end)
@@ -478,7 +478,7 @@ end
 helpers.describe("Actual Private Tar Listing Options", function()
  helpers.it("names receive the scalar captured before later policy mutation", function()
   local policy = { release_install = { listing_max_output_bytes = 8388608 } }
-  local cap = assert(require("updater.install_budget").capture_listing(policy))
+  local cap = assert(require("updater.engine.install_budget").capture_listing(policy))
   policy.release_install.listing_max_output_bytes = 1
   assert(feeder_options("names", cap) == 8388608)
  end)

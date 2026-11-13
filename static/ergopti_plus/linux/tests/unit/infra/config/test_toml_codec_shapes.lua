@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("canonical TOML optional shape receipts", function()
 	helpers.it("retains exact nested and empty array identities separately from empty dictionaries", function()
@@ -76,7 +76,7 @@ helpers.describe("canonical TOML optional shape receipts", function()
 end)
 
 local Loader = require("platform.remap.tap_hold_loader")
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 
 
 helpers.describe("tap-hold candidate shape ownership", function()
@@ -124,4 +124,4 @@ helpers.describe("canonical special numeric source tokens", function()
 	end)
 end)
 
-require("test.toml_document_shapes_contract")(helpers)
+require("tests.lua.settings.toml_document_shapes_contract")(helpers)

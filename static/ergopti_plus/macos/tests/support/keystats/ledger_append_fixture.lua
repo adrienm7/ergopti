@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = { "tests.support.file_system_transaction_fixture", "adapters.file_system", "infra.fs_dir",
-	"infra.logger", "adapters.ledger_append", "infra.timings", "keystats.metrics", "modules.keystats.aggregator",
+	"infra.logger", "adapters.ledger_append", "infra.timings", "metrics.engine.metrics", "modules.keystats.aggregator",
 	"modules.keystats.export", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "adapters.timer_scheduler", "modules.keystats.timestamp", "lfs",
-	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "keystats.physical_release",
-	"toml_codec.record_scanner", "toml_codec.key_path", "diagnostics.operation_reporter", "infra.toml.reader",
-	"toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom", "text_utils", "compat.utf8" }
+	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "metrics.engine.capture.physical_release",
+	"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "diagnostics.engine.operation_reporter", "infra.toml.reader",
+	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8" }
 
 local function upvalue(fn, wanted)
 	for index = 1, math.huge do
@@ -75,7 +75,7 @@ function M.with_manager(scenario)
 				package.loaded["infra.logger"] = logger
 				package.loaded["adapters.file_system"] = adapter
 				package.loaded["infra.timings"] = { sec = function() return 1 end, ms = function() return 5000 end }
-				package.loaded["keystats.metrics"] = {}
+				package.loaded["metrics.engine.metrics"] = {}
 				package.loaded["modules.keystats.aggregator"] = {}
 				local export = helpers.load_with_stubs("modules.keystats.export")
 				package.loaded["modules.keystats.export"] = {

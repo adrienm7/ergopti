@@ -11,9 +11,9 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local APP_FOLDER = require("app_dirs").linux.folder_name
-local Json = require("json")
-local Policy = require("control.driver_control")
+local APP_FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
+local Json = require("core.text.engine.json")
+local Policy = require("diagnostics.engine.control_driver_control")
 local DriverControl = require("infra.driver_control")
 local Outcome = require("infra.reload_outcome")
 
@@ -26,7 +26,7 @@ local function read(path)
 	return text
 end
 
-local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver_control.json")))
+local SPEC = Policy.validate(Json.decode(read(shared .. "/diagnostics/data/control/driver_control.json")))
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
 local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/control"
 

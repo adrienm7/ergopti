@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Lists the keyboard layouts installed for the user, reports the active one
 ; and makes one active, for the automatic layout switch on a start, a pause, a
-; resume and a quit (_shared/modules/features/pause_switch_policy.ahk decides
+; resume and a quit (_shared/settings/data/features/pause_switch_policy.ahk decides
 ; which) and for Layout > « Input sources ».
 ;
 ; FEATURES & RATIONALE:

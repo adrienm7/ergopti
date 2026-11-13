@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local fixture_support = require("tests.support.mlx_download_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local M = {}
 
 --- Receives the emitted source and its exact independently published exit path.

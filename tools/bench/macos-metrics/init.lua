@@ -14,7 +14,7 @@ local function run()
 	local driver = config.repo_root .. "/static/ergopti_plus/macos"
 	local shared = config.repo_root .. "/static/ergopti_plus/_shared"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
+		.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 	-- Isolate infrastructure only; SQLite, schema owner and projections stay real.
 	local logger = {}
 	for _, name in ipairs({ "start", "success", "info", "warn", "debug", "trace", "done" }) do

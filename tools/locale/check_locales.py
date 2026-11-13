@@ -3,7 +3,7 @@
 ==============================================================================
 MODULE: Locale Consistency Checker
 DESCRIPTION:
-Verifies that every locale file under ``static/ergopti_plus/_shared/data/locales/``
+Verifies that every locale file under ``static/ergopti_plus/_shared/core/i18n/data/locales/``
 exposes exactly the same set of keys as ``en.json`` — no extra (stale) keys, no
 missing ones.
 
@@ -41,9 +41,9 @@ from tools.lib.paths import shared  # noqa: E402
 # ====================================
 # ====================================
 
-# Locale directory lives at <repo>/static/ergopti_plus/_shared/data/locales/ and the
+# Locale directory lives at <repo>/static/ergopti_plus/_shared/core/i18n/data/locales/ and the
 # canonical reference is en.json — every other file must mirror its key set exactly.
-LOCALES_DIR = shared("data/locales")
+LOCALES_DIR = shared("core/i18n/data/locales")
 REFERENCE = "en"
 
 

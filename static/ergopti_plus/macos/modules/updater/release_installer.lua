@@ -30,15 +30,15 @@
 
 local M = {}
 
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
-local NativePath  = require("native_path")
+local NativePath  = require("core.fs.engine.native_path")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
-local Archives    = require("updater.release_assets")
-local ProxyPolicy = require("network.proxy_policy")
+local Archives    = require("updater.engine.release_assets")
+local ProxyPolicy = require("core.network.engine.proxy_policy_core")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
@@ -231,7 +231,7 @@ local DETACH_SCRIPT = table.concat({
 --- Resolves the ordered native archive bindings from the shared updater defaults.
 --- @return table|nil identity Result of Archives.resolve().
 local function identity()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
 	local resolved, reason = Archives.resolve(decoded)
@@ -325,9 +325,9 @@ function M.stage(asset, done)
 		.. os.date("!%Y%m%d-%H%M%S") .. "-" .. tostring(stage_sequence)
 	-- The archive's absolute and idle bounds, declared once in the shared updater
 	-- defaults (decided by the maintainer on 2026-11-12, aligned on Windows).
-	local defaults_path = Paths.shared("modules/updater/defaults.json")
+	local defaults_path = Paths.shared("updater/data/defaults.json")
 	local defaults_raw = type(defaults_path) == "string" and FileSystem.read(defaults_path) or nil
-	local limits = require("updater.transfer_budget").archive_limits(
+	local limits = require("updater.engine.transfer_budget").archive_limits(
 		type(defaults_raw) == "string" and JsonCodec.decode(defaults_raw) or nil)
 	if not limits then
 		Logger.error(LOG, "Cannot stage %s: the shared release archive budget is unavailable.", tostring(asset.tag))
@@ -344,7 +344,7 @@ function M.stage(asset, done)
 	end
 	-- Read the shared proxy policy instead of maintaining another precedence.
 	-- Only the staging script's explicit-environment branch invokes curl.
-	local policy_path = Paths.shared("modules/network/proxy_policy.json")
+	local policy_path = Paths.shared("core/network/data/proxy_policy.json")
 	local raw = type(policy_path) == "string" and FileSystem.read(policy_path) or nil
 	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
 	local policy = ProxyPolicy.new(decoded)

@@ -9,7 +9,7 @@
 ;     CandPrio := Cand.HasOwnProp("Priority") ? Cand.Priority : 50
 ;
 ; 50 is HSE_PRIORITY_PERSONAL, the TOP tier. The source default in
-; _shared/modules/hotstrings/priority.json is common = 10, and the macOS
+; _shared/hotstrings/data/catalogue/priority.json is common = 10, and the macOS
 ; comparator has always used it (`a.priority or PRIORITY_COMMON`). So the two
 ; drivers ranked the same pair of same-length triggers differently whenever one
 ; side lacked the property — which is exactly the preview's prefix-index

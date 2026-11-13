@@ -4,7 +4,7 @@
 --- MODULE: Field Check, Local AI Servers
 --- DESCRIPTION:
 --- The field run's read-only look at every local server of
---- _shared/modules/llm/local_servers.json: the catalogue the driver loaded, then
+--- _shared/ai/data/local_servers.json: the catalogue the driver loaded, then
 --- one detection sweep (the AI menu's own: process, settings file, listening
 --- port, then the models endpoint) and, per server, where it was looked for and
 --- what answered. Nothing is installed, started, chosen or saved.
@@ -19,7 +19,7 @@
 ---    under test runs whichever servers its owner installed.
 --- ==============================================================================
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Logger = require("infra.logger")
 
 local M = {}

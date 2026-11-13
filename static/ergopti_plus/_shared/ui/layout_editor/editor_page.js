@@ -18,7 +18,7 @@
  * 2. Nothing is lost silently: an imported .keylayout stays verbatim until
  *    the user converts it, and the conversion lists what it drops; exports
  *    show the format owner's per-target report, refusals included.
- * 3. Every visible string is a locale key (21 locales, _shared/data/locales).
+ * 3. Every visible string is a locale key (21 locales, _shared/core/i18n/data/locales).
  * ==============================================================================
  */
 

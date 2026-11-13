@@ -6,9 +6,9 @@
 ; Decided by the maintainer on 2026-11-11: a raw row stores its instant in UTC
 ; and the local UTC offset in force when it was recorded; hours, night wakes
 ; and days are read in the local time the user lived. Covers the Windows port
-; of _shared/lua/keystats/local_time.lua, every raw-row writer, the purge
+; of _shared/metrics/engine/local_time.lua, every raw-row writer, the purge
 ; tombstone, the walker and the reader's replay and hourly rollups, and pins the
-; reader's migration statements to _shared/lua/keystats/utc_offset_column.lua.
+; reader's migration statements to _shared/metrics/engine/utc_offset_column.lua.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -294,11 +294,11 @@ Test("KMD-1: the reader's replay and rollups read each row shape in local time (
 ; ======================================
 
 ; The reader derives its statements from schema.sql and purge_schema.sql; they
-; are the ones _shared/lua/keystats/utc_offset_column.lua writes.
+; are the ones _shared/metrics/engine/utc_offset_column.lua writes.
 _KLUOR_MigrationMatchesSharedLua() {
 	global _SharedDir
 	_KLRDC_EnsureSharedDir()
-	Lua := FileRead(_SharedDir . "\lua\keystats\utc_offset_column.lua", "UTF-8")
+	Lua := FileRead(_SharedDir . "\metrics\engine\utc_offset_column.lua", "UTF-8")
 	AssertTrue(RegExMatch(Lua, "s)M\.TABLES = \{(.*?)\}", &Block) > 0, "the Lua module lists its tables")
 	LuaTables := []
 	Position := 1
@@ -310,7 +310,7 @@ _KLUOR_MigrationMatchesSharedLua() {
 		"the raw tables are the Lua module's, in its order")
 	; 9359288f59 builds the Lua definition from local_time.MAX_OFFSET_MIN; the
 	; Windows one must spell the same CHECK with the same bound.
-	LocalTime := FileRead(_SharedDir . "\lua\keystats\local_time.lua", "UTF-8")
+	LocalTime := FileRead(_SharedDir . "\metrics\engine\local_time.lua", "UTF-8")
 	AssertTrue(RegExMatch(LocalTime, "m)^M\.MAX_OFFSET_MIN = (\d+)$", &Bound) > 0, "local_time declares its widest offset")
 	Expected := "INTEGER CHECK (utc_offset_min IS NULL OR (typeof(utc_offset_min) = 'integer'"
 		. " AND utc_offset_min BETWEEN -" . Bound[1] . " AND " . Bound[1] . "))"
@@ -318,7 +318,7 @@ _KLUOR_MigrationMatchesSharedLua() {
 		"the Lua module bounds its CHECK by MAX_OFFSET_MIN")
 	AssertEqual(Expected, KLR_UtcOffsetShape()["definition"], "the column definition is the Lua module's")
 
-	Purge := FileRead(_SharedDir . "\data\db\purge_schema.sql", "UTF-8")
+	Purge := FileRead(_SharedDir . "\metrics\data\db\purge_schema.sql", "UTF-8")
 	Statements := KLR_UtcOffsetStatements(["events_av", "events_typing"], Purge)
 	Expected := ["ALTER TABLE events_av ADD COLUMN utc_offset_min " . KLR_UtcOffsetShape()["definition"] . ";",
 		"ALTER TABLE events_typing ADD COLUMN utc_offset_min " . KLR_UtcOffsetShape()["definition"] . ";",

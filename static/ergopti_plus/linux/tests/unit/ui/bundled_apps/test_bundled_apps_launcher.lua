@@ -11,14 +11,14 @@
 
 local helpers = require("tests.helpers")
 local Apps = require("ui.bundled_apps")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
 local function fake_deps(overrides)
 	local state = { spawned = {}, files = {} }
 	local deps = {
 		exepath = function() return "/opt/runtime/bin/luajit" end,
 		driver_root = function() return "/opt/ergopti/linux" end,
-		locales_dir = function() return "/opt/ergopti/_shared/data/locales" end,
+		locales_dir = function() return "/opt/ergopti/_shared/core/i18n/data/locales" end,
 		locale = function() return "fr" end,
 		text = function(key) return "[" .. key .. "]" end,
 		getenv = function(name) return ({ ERGOPTI_RUNTIME_PREFIX = "/opt/runtime" })[name] end,
@@ -47,7 +47,7 @@ helpers.describe("Linux bundled apps launcher", function()
 		local call = state.spawned[1]
 		helpers.assert_eq(call[1], "/opt/runtime/bin/luajit")
 		helpers.assert_eq(table.concat(call[2], " "),
-			"/opt/ergopti/linux/apps/app_cloner.lua --locales-dir /opt/ergopti/_shared/data/locales --locale fr")
+			"/opt/ergopti/linux/apps/app_cloner.lua --locales-dir /opt/ergopti/_shared/core/i18n/data/locales --locale fr")
 		helpers.assert_nil(next(state.files))
 	end)
 
@@ -70,7 +70,7 @@ helpers.describe("Linux bundled apps launcher", function()
 	-- the dialog command used to refuse every dialog for want of a driver root.
 	helpers.it("bundled apps: an app dialog opens under a relative module path", function()
 		local root = require("infra.paths").driver_root()
-		local code = 'package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"'
+		local code = 'package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;"'
 			.. ' .. package.path; io.write(require("ui.native_dialog").command())'
 		local pipe = assert(io.popen("cd " .. quote(root) .. " && " .. quote(require("luv").exepath())
 			.. " -e " .. quote(code) .. " 2>&1"))
@@ -112,7 +112,7 @@ helpers.describe("Linux bundled apps launcher", function()
 		local launcher = state.files["/home/u/.local/share/ergopti/apps/ergopti-encryptor.sh"]
 		helpers.assert_contains(launcher, "export ERGOPTI_RUNTIME_PREFIX='/opt/runtime'\n")
 		helpers.assert_contains(launcher, "exec '/opt/runtime/bin/luajit' '/opt/ergopti/linux/apps/encryptor.lua'"
-			.. " '--locales-dir' '/opt/ergopti/_shared/data/locales' '--locale' 'fr' -- \"$@\"\n")
+			.. " '--locales-dir' '/opt/ergopti/_shared/core/i18n/data/locales' '--locale' 'fr' -- \"$@\"\n")
 	end)
 
 	helpers.it("bundled apps: the generated launcher forwards dropped files after --", function()

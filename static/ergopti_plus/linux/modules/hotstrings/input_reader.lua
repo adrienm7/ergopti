@@ -4,7 +4,7 @@
 --- MODULE: Input Reader (Linux)
 --- DESCRIPTION:
 --- Translates kernel keycodes into the characters a layout produces. It is the
---- one place that owns _shared/data/keycodes/evdev.json, and every caller that
+--- one place that owns _shared/layouts/data/keycodes/evdev.json, and every caller that
 --- needs a character from a code goes through resolve_char().
 ---
 --- WHAT IT NO LONGER DOES:
@@ -18,7 +18,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source for layout data: the keycode maps live in
----    _shared/data/keycodes/evdev.json and are loaded once at require time.
+---    _shared/layouts/data/keycodes/evdev.json and are loaded once at require time.
 --- 2. Fail-fast: a missing or unreadable JSON is an assertion, not a fallback.
 ---    A silent inline copy is how the tables diverged the first time.
 --- 3. No device access: this module reads no file descriptor and holds no state
@@ -34,7 +34,7 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Paths  = require("infra.paths")
 
 local LOG = "modules.hotstrings.input_reader"
@@ -68,14 +68,14 @@ local LOG = "modules.hotstrings.input_reader"
 local LAYOUTS = nil
 
 local function _load_shared_layouts()
-	local ok_evdev, evdev = pcall(require, "keycodes.evdev")
+	local ok_evdev, evdev = pcall(require, "platform.input.keycodes.evdev")
 	if not ok_evdev or type(evdev) ~= "table" or type(evdev.load) ~= "function" then
-		return nil, "keycodes.evdev module unavailable"
+		return nil, "platform.input.keycodes.evdev module unavailable"
 	end
 
 	-- Keycode data is JSON, never executable Lua. Refuse a broken install
 	-- before handing an unavailable decoder to the shared loader.
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil, "no JSON decoder available"
 	end
@@ -106,11 +106,11 @@ else
 end
 
 -- No hardcoded fallback keycode tables. The single source of truth is
--- _shared/data/keycodes/evdev.json, loaded at module-init time via
+-- _shared/layouts/data/keycodes/evdev.json, loaded at module-init time via
 -- _load_shared_layouts(). If that load fails, the module errors out —
 -- keycode data MUST come from the shared source, never re-declared here.
 -- The inline tables used to be triplicates of evdev.json
-assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load — _shared/data/keycodes/evdev.json is the single source and must be readable")
+assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load — _shared/layouts/data/keycodes/evdev.json is the single source and must be readable")
 
 
 

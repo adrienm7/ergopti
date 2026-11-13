@@ -8,15 +8,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local handle = assert(io.open(helpers.shared("tests/corpus/metrics/widget_menu_vectors.json"), "rb"))
 local fixture = assert(Json.decode(handle:read("*a")))
 handle:close()
-handle = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+handle = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 local declared = assert(Json.decode(handle:read("*a"))).metrics_menu
 handle:close()
 
-require("test.metrics_widget_menu_contract").register(helpers, {
+require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 	fixture = fixture,
 	declared = declared,
 	translate = function(key) return require("infra.i18n").get(key) end,
@@ -70,13 +70,13 @@ end)
 -- Independent provider-template expectations retain the existing header decoration.
 helpers.describe("shared checked and section-header templates", function()
 	local function with_rows(platform, rows, callback)
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = platform,
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = Json.decode,
 			i18n = {
 				get = function(key) return key end,
-				section = function(key) return require("menu.labels").decorate_section(key) end,
+				section = function(key) return require("menu.engine.labels").decorate_section(key) end,
 			},
 			logger = { warn = function() end, error = function() end },
 		}))
@@ -160,7 +160,7 @@ helpers.describe("shared checked and section-header templates", function()
 	end
 
 	helpers.it("retains all sixteen existing id-less header declarations (template-header)", function()
-		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+		local file = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
 		local count = 0

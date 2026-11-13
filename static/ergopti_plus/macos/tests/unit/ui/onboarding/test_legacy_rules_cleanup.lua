@@ -174,7 +174,7 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 	end)
 
 	helpers.it("keeps the maintainer's reference wording (karabiner-legacy-cleanup)", function()
-		local locales = helpers.driver_root() .. "../_shared/data/locales/"
+		local locales = helpers.driver_root() .. "../_shared/core/i18n/data/locales/"
 		local fr = hs.json.decode(SourceFile.read(locales .. "fr.json"))
 		local en = hs.json.decode(SourceFile.read(locales .. "en.json"))
 		helpers.assert_eq(fr["karabiner.legacy_cleanup.remove"], "Retirer les anciennes règles")

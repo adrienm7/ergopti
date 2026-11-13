@@ -48,7 +48,16 @@ const swiftTests = read(
 const policyText = read(path.join(driver, 'modules', 'llm', 'network-retry.sh'));
 const proxyPolicy = JSON.parse(
 	read(
-		path.join(root, 'static', 'ergopti_plus', '_shared', 'modules', 'network', 'proxy_policy.json')
+		path.join(
+			root,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'core',
+			'network',
+			'data',
+			'proxy_policy.json'
+		)
 	)
 );
 const stages = JSON.parse(
@@ -58,8 +67,9 @@ const stages = JSON.parse(
 			'static',
 			'ergopti_plus',
 			'_shared',
-			'modules',
+			'core',
 			'network',
+			'data',
 			'native_http_failure_stages.json'
 		)
 	)
@@ -114,6 +124,9 @@ check('the Go transport replays every shared failure stage with an allowed reaso
 			'static',
 			'ergopti_plus',
 			'_shared',
+			'core',
+			'network',
+			'native',
 			'go',
 			'native_http',
 			'failure_stage_test.go'
@@ -133,7 +146,7 @@ check('the Go transport replays every shared failure stage with an allowed reaso
 
 check('the TCP list-walk deadline comes from the shared LLM timing', () => {
 	const timing = require('smol-toml').parse(
-		read(path.join(root, 'static/ergopti_plus/_shared/modules/timings/constants.toml'))
+		read(path.join(root, 'static/ergopti_plus/_shared/core/timing/data/constants.toml'))
 	).llm.managed_proxy_probe_timeout_ms;
 	const generated = read(path.join(sources, 'LauncherTimings.generated.swift'));
 	assert.ok(
@@ -403,7 +416,7 @@ try {
 
 	const shared = path.join(root, 'static', 'ergopti_plus', '_shared');
 	const sharedJson = (...parts) => JSON.parse(read(path.join(shared, ...parts)));
-	const origins = sharedJson('modules', 'network', 'route_origins.json');
+	const origins = sharedJson('core', 'network', 'data', 'route_origins.json');
 	const vectors = sharedJson('tests', 'corpus', 'network', 'route_plan_vectors.json');
 	const policyFile = posix(path.join(driver, 'modules', 'llm', 'network-retry.sh'));
 	const cleanEnvironment = () => {
@@ -460,13 +473,13 @@ try {
 	check('route_origins_for_client lists exactly the shared inventory', () => {
 		for (const [client, list] of Object.entries(origins.clients)) {
 			const run = sourced(
-				`route_origins_for_client '${client}' '${posix(path.join(shared, 'modules', 'network', 'route_origins.json'))}'`
+				`route_origins_for_client '${client}' '${posix(path.join(shared, 'core', 'network', 'data', 'route_origins.json'))}'`
 			);
 			assert.equal(run.status, 0, client);
 			assert.deepEqual(run.stdout.trim().split('\n'), list, client);
 		}
 		const unknown = sourced(
-			`route_origins_for_client nobody '${posix(path.join(shared, 'modules', 'network', 'route_origins.json'))}'`
+			`route_origins_for_client nobody '${posix(path.join(shared, 'core', 'network', 'data', 'route_origins.json'))}'`
 		);
 		assert.notEqual(unknown.status, 0, 'an unknown client is refused');
 	});
@@ -474,12 +487,13 @@ try {
 	check('the Ollama inventory names the registry the daemon pulls from', () => {
 		// The registry module derives its URL from the shared identifiers file.
 		assert.match(
-			read(path.join(shared, 'lua', 'llm', 'ollama_registry.lua')),
+			read(path.join(shared, 'ai', 'engine', 'ollama', 'registry.lua')),
 			/^M\.URL = "https:\/\/" \.\. Identifiers\.hosts\.ollama_registry$/m
 		);
 		const registry =
 			'https://' +
-			JSON.parse(read(path.join(shared, 'data', 'identifiers.json'))).hosts.ollama_registry;
+			JSON.parse(read(path.join(shared, 'core', 'text', 'data', 'identifiers.json'))).hosts
+				.ollama_registry;
 		assert.ok(origins.clients.ollama.includes(registry));
 	});
 

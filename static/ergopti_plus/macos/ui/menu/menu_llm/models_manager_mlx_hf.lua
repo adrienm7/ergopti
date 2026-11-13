@@ -21,7 +21,7 @@
 
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local RunningApplication = require("adapters.running_application")
 
 local hs            = hs
@@ -32,7 +32,7 @@ local Paths         = require("infra.paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Logger        = require("infra.logger")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "menu_llm.models.mlx_hf"
 

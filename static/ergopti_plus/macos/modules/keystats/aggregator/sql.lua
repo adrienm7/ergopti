@@ -22,8 +22,8 @@ local LOG     = "keystats.aggregator"
 
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Export       = require("modules.keystats.export")
-local AggHelper    = require("keystats.aggregator_helpers")
-local Queries      = require("keystats.queries")
+local AggHelper    = require("metrics.engine.aggregator.helpers")
+local Queries      = require("metrics.engine.queries")
 
 local S = require("modules.keystats.aggregator.state")
 local C = require("modules.keystats.aggregator.core")
@@ -181,7 +181,7 @@ function M.flush(db_override)
 	end
 
 	-- These unpositioned keys stay outside numeric heatmap/typing aggregates.
-	require("keystats.media_store").flush(S.agg_batch, S.device_id, exec)
+	require("metrics.engine.media.store").flush(S.agg_batch, S.device_id, exec)
 
 	for key, row in pairs(S.agg_batch.kc_ngram) do
 		local ok = exec(Queries.render("agg.ngram_keycode", "native", {

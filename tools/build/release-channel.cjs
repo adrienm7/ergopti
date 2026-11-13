@@ -5,7 +5,7 @@
  * MODULE: Release Channel Resolver
  * DESCRIPTION:
  * Prints the update channel that owns a release tag, as the shared registry
- * (_shared/modules/updater/channels.json) decides it through the canonical
+ * (_shared/updater/data/channels.json) decides it through the canonical
  * matcher (_shared/ui/update_channels.js). The release workflow stamps this id
  * into the Windows bundle, the macOS bundle and its Sparkle appcast.
  *
@@ -28,7 +28,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const REGISTRY_PATH = path.join(SHARED, 'modules', 'updater', 'channels.json');
+const REGISTRY_PATH = path.join(SHARED, 'updater', 'data', 'channels.json');
 const MATCHER_PATH = path.join(SHARED, 'ui', 'update_channels.js');
 
 /**

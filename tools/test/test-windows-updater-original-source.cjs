@@ -18,8 +18,7 @@ const collectorPath = 'tools/ci/run-windows-updater-original-diagnostic-cohort.c
 const modulePath = 'tools/ci/windows-updater-original-source.cjs';
 const sealerPath = 'tools/ci/seal-windows-updater-original-source.cjs';
 const sdkPath = 'tools/ci/windows-updater-sdk-auth.cjs';
-const sdkContractPath =
-	'static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json';
+const sdkContractPath = 'static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json';
 const inputPath = 'tools/ci/windows-updater-original-diagnostic-cohort-inputs.json';
 const oraclePath = 'tools/ci/windows-updater-original-label-oracle.json';
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');

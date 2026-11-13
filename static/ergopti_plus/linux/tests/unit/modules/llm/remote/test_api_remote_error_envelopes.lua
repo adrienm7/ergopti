@@ -8,12 +8,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 -- Load actual transitive dependencies before replacing the transport port.
 require("modules.llm.api_remote")
 
 local function isolated(body, logger)
-	local names = { "modules.llm.api_remote", "adapters.http_client", "logger.shim" }
+	local names = { "modules.llm.api_remote", "adapters.http_client", "core.logger.engine.shim" }
 	local saved, calls = {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	package.loaded["adapters.http_client"] = {
@@ -23,7 +23,7 @@ local function isolated(body, logger)
 		end,
 		cancel = function() return true end,
 	}
-	package.loaded["logger.shim"] = logger or helpers.make_logger_stub()
+	package.loaded["core.logger.engine.shim"] = logger or helpers.make_logger_stub()
 	local ok, detail = xpcall(function()
 		local remote = helpers.load_module("modules.llm.api_remote")
 		remote._reset_for_test()
@@ -70,7 +70,7 @@ helpers.describe("remote multi-step error envelopes", function()
 		helpers.assert_eq(describe(nil), "details withheld")
 	end)
 	helpers.it("does not log arbitrary keys in a malformed Backboard answer", function()
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)

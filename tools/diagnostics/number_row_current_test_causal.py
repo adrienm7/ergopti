@@ -12,7 +12,7 @@ from types import ModuleType
 
 OWNER_PATH = "tools/diagnostics/number_row_current_test_causal.py"
 NETWORK_PATH = "tools/diagnostics/number_row_current_network_causal.py"
-NETWORK_SHA = "b7ffb22ae11d1414cf465f55eb6a97e58f9badde6e96a804d64bc8ef7b683754"
+NETWORK_SHA = "b49cc969e1ebdf9c695adeab13cb4637e5f8e21946e1908356c1382c34b951a7"
 TEST_PATH = (
     "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"
 )
@@ -22,7 +22,7 @@ CURRENT_TEST_SHA = "105820510cbe3c5c13dee94d30d7ef1ea738fa9131907ae3cc12278dc10a
 CURRENT_TEST_BLOB = "e1879c6e7985d044c41dd0dc5af6329cb0b37be6"
 CURRENT_ASSERTION_LINE = 435
 ROSTER_PATH = "tools/diagnostics/fixtures/number-row-current-test/build-inputs.json.raw"
-ROSTER_SHA = "b34a6f3efec6b31c1b3b8ffd438aeb73b38aa3b8265bd383054bbc1353393492"
+ROSTER_SHA = "53c6f079dfd227387e5fbb3b49f47811d9e7c2224ea12ba8cecd4c0690756fc1"
 LAUNCHER = "static/ergopti_plus/macos/launcher/"
 TARGET_ROOTS = (
     LAUNCHER + "Sources/CPOSIXCompatibility/",

@@ -39,7 +39,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const STATIC = path.join(ROOT, 'static', 'ergopti_plus');
 const SHARED = path.join(STATIC, '_shared');
 const UI = path.join(SHARED, 'ui');
-const LOCALES = path.join(SHARED, 'data', 'locales');
+const LOCALES = path.join(SHARED, 'core', 'i18n', 'data', 'locales');
 const en = JSON.parse(fs.readFileSync(path.join(LOCALES, 'en.json'), 'utf8'));
 
 const failures = [];
@@ -276,9 +276,9 @@ function linuxBootDeliversCatalogue() {
 	try {
 		const fixtures = JSON.stringify({ cases: LINUX_BOOT_CASES, catalogue: LINUX_BOOT_CATALOGUE });
 		const source = `
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local Json = require("json")
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local Host = require("ui.webkit_host")
 local fixtures = assert(Json.decode([==[${fixtures}]==]))
 local scripts = {}
@@ -352,7 +352,7 @@ for (const builder of BUILDERS) {
 				`boot script. Its pages are inline and cannot fetch file:// locales, so they would ` +
 				`show raw keys.`
 		);
-	if (source && !source.includes('webview.i18n_seed'))
+	if (source && !source.includes('core.ui.engine.webview.i18n_seed'))
 		fail(`${builder.driver}: ${builder.rel} must build its seed through webview/i18n_seed.lua`);
 }
 const linuxShow = read('static/ergopti_plus/linux/ui/webview_manager.lua');
@@ -367,12 +367,12 @@ const shipped = new Set(
 );
 const required = [
 	'ergopti_plus/_shared/ui/i18n.js',
-	'ergopti_plus/_shared/lua/webview/i18n_seed.lua',
-	'ergopti_plus/_shared/lua/locale/core.lua',
+	'ergopti_plus/_shared/core/ui/engine/webview/i18n_seed.lua',
+	'ergopti_plus/_shared/core/i18n/engine/core.lua',
 	...fs
 		.readdirSync(LOCALES)
 		.filter((name) => name.endsWith('.json'))
-		.map((name) => `ergopti_plus/_shared/data/locales/${name}`),
+		.map((name) => `ergopti_plus/_shared/core/i18n/data/locales/${name}`),
 	...checkedPages.map((page) => `ergopti_plus/_shared/ui/${page}/index.html`)
 ];
 if (required.filter((rel) => rel.includes('/data/locales/')).length < 21)

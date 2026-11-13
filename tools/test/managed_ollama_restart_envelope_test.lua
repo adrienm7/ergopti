@@ -5,7 +5,7 @@ local root, production = assert(arg[1]), assert(arg[2])
 local Ports = assert(loadfile(root .. "/tools/test/fixtures/managed_ollama_foreground_ports.lua"))()
 local NONCE, BINARY, LOG, PORT, LAUNCH = Ports.NONCE, Ports.BINARY, Ports.LOG, Ports.PORT, Ports.LAUNCH
 -- The manual-service refusal is a closed adapter error id since PAR-84.
-local Errors = assert(loadfile(production .. "/static/ergopti_plus/_shared/lua/adapter_errors.lua"))()
+local Errors = assert(loadfile(production .. "/static/ergopti_plus/_shared/diagnostics/engine/adapter_errors.lua"))()
 local assertions, cases = 0, 0
 local function check(actual, expected) assert(actual == expected, "restart envelope receiving assertion failed"); assertions = assertions + 1 end
 local function case(run) cases = cases + 1; run() end

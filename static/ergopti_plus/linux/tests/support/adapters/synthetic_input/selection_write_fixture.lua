@@ -17,7 +17,7 @@ function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
 			"adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-			"adapters.keyboard_hook", "logger.shim", "modules.hotstrings.selected_output", "infra.monotonic" }
+			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "infra.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { allowed = true, guard = guard, field = field, wire = {}, held = {}, writes = {},
@@ -75,9 +75,9 @@ function M.with(body)
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local injector
 		local ok, err = pcall(function()
 			local layout = helpers.load_module("adapters.keyboard_layout")
@@ -109,7 +109,7 @@ function M.with(body)
 			state.authorized = function() boundary("authorized"); return state.allowed end
 			function state.staged(token, text, construct)
 				text = text or "☃"
-				state.inserted = { first = 0, last = assert(require("compat.utf8").len(text)), text = text }
+				state.inserted = { first = 0, last = assert(require("core.lifecycle.engine.compat.utf8").len(text)), text = text }
 				local called, committed, result = false, false, nil
 				local accepted = state.owner.replace_staged(token, text, state.authorized, construct or injector.prepare_selected, function(value, physical)
 					called, committed, result = true, value, physical
@@ -141,7 +141,7 @@ function M.with(body)
 			function state.replace(token, emit, text)
 				local called, committed = false, false
 				text = text or "☃"
-				state.inserted = { first = 0, last = assert(require("compat.utf8").len(text)), text = text }
+				state.inserted = { first = 0, last = assert(require("core.lifecycle.engine.compat.utf8").len(text)), text = text }
 				local construct = state.construct
 				if emit then
 					construct = function(value, publication)

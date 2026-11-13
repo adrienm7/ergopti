@@ -2,15 +2,15 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("_shared/lua/keycodes/evdev.lua", function()
+helpers.describe("_shared/platform/input/keycodes/evdev.lua", function()
 	helpers.it("module loads without error", function()
-		local ok, mod = pcall(require, "keycodes.evdev")
-		helpers.assert_true(ok, "require('keycodes.evdev') should succeed")
+		local ok, mod = pcall(require, "platform.input.keycodes.evdev")
+		helpers.assert_true(ok, "require('platform.input.keycodes.evdev') should succeed")
 		helpers.assert_true(type(mod) == "table", "should return a table")
 		helpers.assert_true(type(mod.load) == "function", "should expose load()")
 	end)
 
-	local evdev = require("keycodes.evdev")
+	local evdev = require("platform.input.keycodes.evdev")
 
 	helpers.it("load returns nil+error on missing json_decode", function()
 		local data, err = evdev.load(nil)
@@ -18,9 +18,9 @@ helpers.describe("_shared/lua/keycodes/evdev.lua", function()
 		helpers.assert_true(type(err) == "string", "should return error message")
 	end)
 
-	helpers.it("load succeeds with _shared/lua/json.lua decoder", function()
+	helpers.it("load succeeds with _shared/core/text/engine/json.lua decoder", function()
 		-- Use the project's own pure-Lua JSON decoder
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local ok, data = pcall(evdev.load, json.decode)
 		helpers.assert_true(ok, "load should not error")
 		if ok then
@@ -29,7 +29,7 @@ helpers.describe("_shared/lua/keycodes/evdev.lua", function()
 	end)
 
 	helpers.it("loaded data has qwerty and azerty layouts", function()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local data, err = evdev.load(json.decode)
 		helpers.assert_true(data ~= nil, "load should succeed")
 		if data then
@@ -39,7 +39,7 @@ helpers.describe("_shared/lua/keycodes/evdev.lua", function()
 	end)
 
 	helpers.it("each layout has unshifted and shifted maps", function()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local data, err = evdev.load(json.decode)
 		if data and data.qwerty then
 			helpers.assert_true(type(data.qwerty.unshifted) == "table", "qwerty.unshifted is table")
@@ -48,7 +48,7 @@ helpers.describe("_shared/lua/keycodes/evdev.lua", function()
 	end)
 
 	helpers.it("keycode maps use integer keys", function()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local data, err = evdev.load(json.decode)
 		if data and data.qwerty and data.qwerty.unshifted then
 			local u = data.qwerty.unshifted
@@ -60,7 +60,7 @@ helpers.describe("_shared/lua/keycodes/evdev.lua", function()
 	end)
 
 	helpers.it("azerty layout differs from qwerty (KEY_A position)", function()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local data, err = evdev.load(json.decode)
 		if data and data.azerty and data.qwerty then
 			local a_qwerty = data.qwerty.unshifted[30] or ""

@@ -443,9 +443,9 @@ local function catalogue_models(backend)
 	local path = require("infra.paths").shared_llm_path("models.json")
 	local text = path and require("adapters.file_system").read(path) or nil
 	if type(text) ~= "string" then return {} end
-	local ModelCatalogue = require("llm.model_catalogue")
+	local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 	local models = {}
-	for _, provider in ipairs(require("json").decode(text)) do
+	for _, provider in ipairs(require("core.text.engine.json").decode(text)) do
 		for _, family in ipairs(type(provider.families) == "table" and provider.families or {}) do
 			for _, model in ipairs(type(family.models) == "table" and family.models or {}) do
 				local runtime = ModelCatalogue.runtime_name(model, backend)

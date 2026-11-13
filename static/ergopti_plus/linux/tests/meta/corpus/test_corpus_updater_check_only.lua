@@ -12,10 +12,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local corpus_dir = helpers.driver_root() .. "/../_shared/tests/corpus/updater/"
-local channels_path = helpers.driver_root() .. "/../_shared/modules/updater/channels.json"
+local channels_path = helpers.driver_root() .. "/../_shared/updater/data/channels.json"
 
 local function read(path)
 	local handle = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -34,9 +34,9 @@ helpers.describe("updater check-only corpus: the public feed answer on Linux", f
 
 	for _, case in ipairs(corpus.cases) do
 		helpers.it("check-only vector " .. case.id, function()
-			local ReleaseSources = require("updater.release_sources")
-			local CheckResult = require("updater.check_result")
-			local registry = assert(require("updater.channels").load(Json.decode(read(channels_path))))
+			local ReleaseSources = require("updater.engine.release_sources")
+			local CheckResult = require("updater.engine.check_result")
+			local registry = assert(require("updater.engine.channels").load(Json.decode(read(channels_path))))
 			local list, reason = ReleaseSources.feed_release_list(read(corpus_dir .. corpus.feed), corpus.owner, corpus.repo)
 			helpers.assert_true(list ~= nil, "the feed must give a list: " .. tostring(reason))
 			local result = CheckResult.classify(list, {

@@ -83,7 +83,7 @@ def session(root):
                             env = dict(os.environ)
                             env.update(
                                 ERGOPTI_ATSPI_EXPECTED_ROLE=str(role),
-                                ERGOPTI_ATSPI_PACKAGE_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                                ERGOPTI_ATSPI_PACKAGE_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                             )
                             result = subprocess.run(
                                 ["luajit", *options, str(worker)],

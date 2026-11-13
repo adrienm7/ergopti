@@ -4,14 +4,14 @@
 --- MODULE: Script-Management Chords (Linux)
 --- DESCRIPTION:
 --- AltGr with Enter, Backspace, Delete or Escape, the four chords every driver
---- shares (_shared/modules/actions/script_chords.json), each running the action
+--- shares (_shared/shortcuts/data/actions/script_chords.json), each running the action
 --- of its slot of [shortcuts.script_control]: by default pause, reload, open
 --- the personal shortcuts and quit. The submenu's switch (chords_enabled) turns
 --- them all off and keeps every slot's action.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A chord belongs to the daemon only while its slot runs an action
----    (_shared/lua/script_chords.lua): an unassigned slot, every slot while the
+---    (_shared/keyboard/engine/layers/script_chords.lua): an unassigned slot, every slot while the
 ---    switch is off, and while paused every action outside script management
 ---    reach the application untouched, as on Windows and macOS.
 --- 2. Decided in the keyboard hook's consumption callback, the one place this
@@ -27,17 +27,17 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
-local Logger = require("logger.shim")
-local ShortcutCatalogue = require("shortcuts.catalogue")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ShortcutCatalogue = require("shortcuts.engine.catalogue")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
-local ScriptChords = require("script_chords")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local ConfigKeys = require("config_keys")
+local ScriptChords = require("keyboard.engine.layers.script_chords")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.script_chords"
 
@@ -50,7 +50,7 @@ local SWITCH_KEY = "chords_enabled"
 local BINDING_PREFIX = "script__"
 
 -- The shared catalogue, relative to the shared tree.
-local CATALOGUE_REL_PATH = "modules/actions/script_chords.json"
+local CATALOGUE_REL_PATH = "shortcuts/data/actions/script_chords.json"
 
 -- A chord is AltGr with the slot's key. Shift may ride along, as on Windows;
 -- any other modifier makes it another chord, which stays the application's.
@@ -110,9 +110,9 @@ function M.catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared(CATALOGUE_REL_PATH)
 	local body, status
-	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then error("script_chords: cannot read " .. tostring(path)) end
-	local ok, parsed = pcall(require("json").decode, body)
+	local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 	if not ok or type(parsed) ~= "table" then
 		error("script_chords: " .. tostring(path) .. " is malformed")
 	end
@@ -124,7 +124,7 @@ function M.catalogue()
 	local catalogue = ScriptChords.catalogue(parsed)
 	local binding = { prefix = "script__", slots = {} }
 	for _, slot in ipairs(catalogue.slots) do binding.slots[slot.id] = true end
-	require("config_binding_identity").script_binding_fits("script__", binding)
+	require("settings.engine.publication.binding_identity").script_binding_fits("script__", binding)
 	_catalogue, _binding_catalogue = catalogue, binding
 	return _catalogue
 end

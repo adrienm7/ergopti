@@ -31,7 +31,7 @@ WORKER_FLAG = "--managed-http-worker"
 
 
 # BEGIN GENERATED NATIVE HTTP FAILURE STAGES
-# Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+# Generated from static/ergopti_plus/_shared/core/network/data/native_http_failure_stages.json; do not edit this span.
 FAILURE_STAGES = {
     "native_policy_load": frozenset(["unavailable"]),
     "native_selection_bound": frozenset(["unavailable"]),
@@ -107,8 +107,8 @@ def _positive_timeout(value):
 
 
 def _dev_source_names(root):
-    """The developer source-mode names declared once in _shared/data/identifiers.json."""
-    path = root.parent / "_shared/data/identifiers.py"
+    """The developer source-mode names declared once in _shared/core/text/data/identifiers.json."""
+    path = root.parent / "_shared/core/text/data/identifiers.py"
     spec = importlib.util.spec_from_file_location("_ergopti_identifiers", path)
     if spec is None or spec.loader is None:
         raise NativeHTTPError("unavailable")

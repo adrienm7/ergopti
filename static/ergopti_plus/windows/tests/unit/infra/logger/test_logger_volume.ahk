@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Logger Volume Counters Tests
 ; DESCRIPTION:
-; The AHK replay of _shared/lua/test/logger_volume_contract.lua (spec section
+; The AHK replay of _shared/tests/lua/core/logger_volume_contract.lua (spec section
 ; 5.3): the same seven figures, in the same order, as the shared Lua core. Before
 ; this the Windows log had no figure at all for what the level threshold, the
 ; dedup and the collapser removed, so its volume could not be compared with the

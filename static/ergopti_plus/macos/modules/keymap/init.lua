@@ -42,7 +42,7 @@ local CoreStateM = require("modules.keymap.state")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local MagicKeySource = require("modules.keymap.magic_key_source")
 local LayoutEmulation = require("modules.keymap.layout_emulation")
-local Terminators = require("keymap.terminators")
+local Terminators = require("layouts.engine.layers.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
@@ -51,7 +51,7 @@ local UnicodeCarrier = require("adapters.unicode_carrier")
 local EventClock = require("adapters.event_clock")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local M   = {}
 local LOG = "keymap"
@@ -96,7 +96,7 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- Canonical defaults exposed to menu modules (single source of truth).
 --- Menu modules MUST read from here instead of re-declaring their own values.
 --- The hotstring/preview values are sourced from the shared features manifest
---- (`_shared/modules/features/manifest.toml` -> `_generated/features_manifest.lua`) via
+--- (`_shared/settings/data/features/manifest.toml` -> `_generated/features_manifest.lua`) via
 --- `lib.manifest_reader`, so they stay in lock-step with the AHK driver (which
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
@@ -105,7 +105,7 @@ M.DEFAULT_STATE = {
 	repeat_key_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED),
 	expansion_delay             = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY),
 	idle_reset_seconds          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_IDLE_RESET_SECONDS),
-	cascade_max_arrows          = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
+	cascade_max_arrows          = Manifest.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
 	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
 	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
 	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
@@ -957,7 +957,7 @@ M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, t
 M.reload_toml           = preview_fenced_registry_mutation(Registry.reload_toml, true)
 M.replace_personal_source = preview_fenced_registry_mutation(Registry.replace_personal_source, true)
 -- Exposed so the hotstring editor can show the personal source default (the
--- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
+-- single source kept in sync with _shared/hotstrings/data/catalogue/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
 M.personal_file_scope_binding = Registry.personal_file_scope_binding
@@ -1178,7 +1178,7 @@ function M.capture_user_hotstring(rule)
 	local destination = km_utils.capture_text_destination()
 	if not destination or CoreState.buffer:sub(-#rule.suffix) ~= rule.suffix
 		or M.has_registered_magic_action(CoreState.buffer) then return nil end
-	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("config_keys").LEAF.USER_CODE },
+	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("settings.engine.keys").LEAF.USER_CODE },
 		_user_hotstring_elapsed, 1) ~= true then return nil end
 	return { lifecycle = _user_hotstring_lifecycle, input = _user_hotstring_input,
 		epoch = SyntheticInput.current_action_epoch(), buffer = CoreState.buffer,
@@ -2920,7 +2920,7 @@ end
 --- @return table watch modules/keymap/tap_copy.lua owner.
 local function build_tap_copy()
 	local TapCopy = require("modules.keymap.tap_copy")
-	local CopyCheck = require("tap_hold.copy_check")
+	local CopyCheck = require("tap_hold.engine.copy_check")
 	local Clipboard = require("adapters.clipboard")
 	local log_name = "keymap.tap_copy"
 	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end

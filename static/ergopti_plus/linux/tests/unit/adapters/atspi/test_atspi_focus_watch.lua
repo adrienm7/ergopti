@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Watch = require("adapters.atspi_focus_watch")
 local Guard = require("modules.keystats.focus_guard")
 
@@ -464,7 +464,7 @@ end)
 
 helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 	helpers.it("focus-retirement-listener-native: retires real processes and FIFOs after observer refusal", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		-- The production transport uses LuaJIT FFI; both suite ABIs qualify that
 		-- actual driver runtime instead of fabricating a stock-Lua native backend.
@@ -474,7 +474,7 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 		if rawget(_G, "jit") then
 			-- Reuse the actual JIT interpreter and its admitted provider paths.
 			-- Minimal distributions build luv outside the interpreter defaults.
-			runtime = assert(require("process.interpreter").from_arguments(arg))
+			runtime = assert(require("core.process.interpreter").from_arguments(arg))
 			native_environment = " LUA_CPATH=" .. quote(package.cpath)
 		end
 		-- A stock-Lua parent cannot lend its foreign native-module ABI to JIT.
@@ -492,7 +492,7 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 				})
 				state.watch.on_change(function(snapshot) if snapshot == nil then error(failure) end end)
 				state.ready()
-				local Logger = require("logger.shim")
+				local Logger = require("core.logger.engine.shim")
 				local original_error, diagnostics = Logger.error, {}
 				Logger.error = function(_, template, detail) diagnostics[#diagnostics + 1] = { template, detail } end
 				local ok, result = pcall(function()

@@ -51,7 +51,7 @@ local TITLE_KEYS = {
 }
 
 local SEPARATOR = "---"
-local MANIFEST_RELATIVE = "modules/menu/menu_manifest.json"
+local MANIFEST_RELATIVE = "menu/data/menu_manifest.json"
 
 
 
@@ -165,7 +165,7 @@ end
 --- @return function The actual initialized language-row provider.
 local function native_language_provider()
 	return helpers.with_stub_scope({
-		"infra.i18n", "infra.locale", "locale.core", "menu.labels", "_generated.locale_table",
+		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
 		"adapters.storage", "adapters.timer_scheduler",
 	}, function()
 		helpers.load_with_stubs("infra.i18n")
@@ -451,7 +451,7 @@ end)
 
 helpers.describe("topology fixture owns genuine native Language data", function()
 	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
-		local names = { "infra.i18n", "infra.locale", "locale.core", "menu.labels", "_generated.locale_table",
+		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
 			"adapters.storage", "adapters.timer_scheduler", "infra.paths", "infra.logger" }
 		local saved, old_hs = {}, rawget(_G, "hs")
 		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
@@ -485,8 +485,8 @@ helpers.describe("Agent-only disabled macOS root composition", function()
 	helpers.it("does not build Agent actions and preserves neighboring provider model and prediction rows", function()
 		local source, detail = helpers.read_driver_unit("function M.generate(ctx, menu_mods, actions)")
 		helpers.assert_true(source ~= nil, "actual root source must exist: " .. tostring(detail))
-		local root = assert(require("json").decode(read_manifest_text()))
-		require("test.agent_menu_root").assert_disabled_root(helpers, "hs", source, root.top_level)
+		local root = assert(require("core.text.engine.json").decode(read_manifest_text()))
+		require("tests.lua.ai.agent_menu_root").assert_disabled_root(helpers, "hs", source, root.top_level)
 	end)
 end)
 

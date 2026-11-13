@@ -21,7 +21,7 @@
 ; ============================
 
 ; The tap-hold timing constants below are sourced from the shared cross-driver
-; registry (_shared/modules/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
+; registry (_shared/core/timing/data/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
 ; called once at boot from infra/boot.ahk. They start at the sentinel 0 only as a
 ; declaration placeholder. IMPORTANT: AHK v2 executes a file's top-level
 ; `global X := ...` assignments at its #Include POSITION in the auto-execute flow,
@@ -60,7 +60,7 @@ global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0
 ; How long (ms) a key whose hold is a modifier, pressed alone, still types its
 ; tap (tap_holds.lone_modifier_tap_max_ms; 0 = the strict tap-hold). The
 ; manifest default until the configuration sets it (TapHoldSetLoneTapMaxMs);
-; "" means not set yet. Same rule as _shared/lua/tap_hold/lone_tap.lua on
+; "" means not set yet. Same rule as _shared/tap_hold/engine/lone_tap.lua on
 ; macOS and Linux.
 global TAP_HOLD_LONE_TAP_MAX_MS := ""
 
@@ -1710,7 +1710,7 @@ _TapHoldFireAction(KeyId) {
 ; before Ctrl+C is sent, read again by a one-shot timer (never a Sleep on the
 ; hook thread), Ctrl+C is sent once more when it did not move, and the user is
 ; warned when it still did not. The states and outcomes are those of
-; _shared/lua/tap_hold/copy_check.lua, which the macOS and Linux drivers run.
+; _shared/tap_hold/engine/copy_check.lua, which the macOS and Linux drivers run.
 
 ; How many times a copy is sent again when the clipboard did not move.
 global TAP_COPY_RETRIES := 1

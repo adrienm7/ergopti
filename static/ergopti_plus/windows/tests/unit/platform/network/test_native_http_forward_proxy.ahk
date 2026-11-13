@@ -20,8 +20,8 @@ _NativeHttpForwardProxy_Controls() {
 				_DriverDir . "\tests\fixtures\native_http_forward_proxy.ps1",
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1",
-				"-PolicyPath", _SharedDir . "\modules\network\proxy_policy.json",
-				"-UpdaterDefaultsPath", _SharedDir . "\modules\updater\defaults.json"],
+				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json",
+				"-UpdaterDefaultsPath", _SharedDir . "\updater\data\defaults.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "The private native forward-proxy fixture must start")
 		Started := A_TickCount

@@ -26,13 +26,13 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "infra.app_identity_migration"
 
 -- The shared table (_shared/data/linux_app_identities.json, generated Lua).
-local Data = require("linux_app_identities_data")
+local Data = require("apps.engine.linux_app_identities_data")
 
 -- The marker storage.json holds once the lists were converted.
 M.MARKER_KEY = Data.marker

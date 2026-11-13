@@ -22,10 +22,10 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Composition = require("config_scope_composition")
-local Participant = require("config_scope_participant")
+local Composition = require("settings.engine.scope.composition")
+local Participant = require("settings.engine.scope.participant")
 local Logger = require("infra.logger")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "menu.global_scope"
 
 --- The remap engine's part of one scope, as an asynchronous participant: its

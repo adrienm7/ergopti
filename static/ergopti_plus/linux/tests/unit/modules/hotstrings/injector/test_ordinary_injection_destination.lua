@@ -6,7 +6,7 @@
 --- Executes Main's actual character-handler body with the real focus guard.
 --- An ordinary expansion must carry the owner captured before its match log.
 --- ==============================================================================
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.text_owner_fixture")
 
@@ -14,7 +14,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 	helpers.it("does not expand when its delay configuration raises (delay-resolution-refusal)", function()
 		fixture.with(function(guard, state)
 			local calls, logs = 0, {}
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_sink(function(line) logs[#logs + 1] = line end)
 			local environment = setmetatable({
 				secure_focus_guard = guard, script_actions = { is_paused = function() return false end },
@@ -51,7 +51,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 	helpers.it("does not log an expired private trigger (expired-trigger-privacy)", function()
 		fixture.with(function(guard, state)
 			local lines = {}
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("debug")
 			logger.set_sink(function(line) lines[#lines + 1] = line end)
 			local environment = setmetatable({
@@ -92,7 +92,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 			fixture.with(function(guard, state)
 				local calls, owner, captured_current, argc, count, text = 0, nil, nil, nil, nil, nil
 				local errors = {}
-				local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+				local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 				logger.set_sink(function(line)
 					if moved and line:find("Match fired", 1, true) then state.path = "/field/successor" end
 				end)

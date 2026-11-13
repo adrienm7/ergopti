@@ -7,12 +7,20 @@ const { scriptTokens } = require('./script-source.cjs');
 
 const SHARED_PATH = path.resolve(
 	__dirname,
-	'../..',
-	'static/ergopti_plus/_shared/lua/menu/frames/personal_info_source.lua'
+	'..',
+	'..',
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'menu',
+	'engine',
+	'frames',
+	'personal_info_source.lua'
 );
-const SHARED_IMPORT = 'local PersonalInfoSource = require("menu.frames.personal_info_source")';
+const SHARED_IMPORT =
+	'local PersonalInfoSource = require("menu.engine.frames.personal_info_source")';
 const PORT_BODY = 'return PersonalInfoSource.read(ManifestMenu)';
-const SHARED_COMMAND_IMPORT = 'local COMMAND = require("config_keys").COMMAND';
+const SHARED_COMMAND_IMPORT = 'local COMMAND = require("settings.engine.keys").COMMAND';
 const SHARED_PUBLIC_BODY = 'return read_source(renderer)';
 let sharedOverride = null;
 let sharedDisk = null;

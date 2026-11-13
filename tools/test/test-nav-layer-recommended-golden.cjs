@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Recommended Navigation Layer ⇄ Windows Layer (Golden)
  * DESCRIPTION:
- * `_shared/keymap/layers.recommended.toml` is Ergopti's navigation layer as
+ * `_shared/layouts/data/layers.recommended.toml` is Ergopti's navigation layer as
  * data, and the Windows layer that used to be written by hand in
  * windows/platform/remap/nav_layer.ahk is its canonical behaviour. That layer
  * is frozen, hotkey by hotkey, in windows/tests/fixtures/nav_layer_golden.json;
@@ -51,7 +51,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const NAV_LAYER_AHK = path.join(SP, 'windows', 'platform', 'remap', 'nav_layer.ahk');
 const GOLDEN_PATH = path.join(SP, 'windows', 'tests', 'fixtures', 'nav_layer_golden.json');
-const TAP_HOLD_DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'defaults.toml');
+const TAP_HOLD_DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
 
 // Floor: the hand-written layer bound 46 keys through 48 hotkeys. A fixture that
 // stopped being read would otherwise compare nothing.
@@ -300,11 +300,11 @@ const tapHold = TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS, 'utf8')).tap_hold 
 const pickerLayers = [...((tapHold.hold_picker || {}).layers || [])].sort();
 if (tapHold.layers !== undefined)
 	fail(
-		'_shared/tap_hold/defaults.toml declares [tap_hold.layers.*]: layer bindings live in _shared/keymap/layers.recommended.toml, and a second copy matches no driver'
+		'_shared/tap_hold/data/defaults.toml declares [tap_hold.layers.*]: layer bindings live in _shared/layouts/data/layers.recommended.toml, and a second copy matches no driver'
 	);
 const presetLayers = Object.keys(perOs.windows.layers || {}).sort();
 if (pickerLayers.length === 0)
-	fail('[tap_hold.hold_picker].layers could not be read from _shared/tap_hold/defaults.toml');
+	fail('[tap_hold.hold_picker].layers could not be read from _shared/tap_hold/data/defaults.toml');
 if (JSON.stringify(pickerLayers) !== JSON.stringify(presetLayers))
 	fail(
 		`the hold picker offers layers ${JSON.stringify(pickerLayers)} but the recommended file defines ${JSON.stringify(presetLayers)}`

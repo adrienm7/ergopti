@@ -9,9 +9,9 @@
 
 local helpers = require("tests.helpers")
 local OWNED = { "ui.physical_shortcuts", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-	"adapters.timer_scheduler", "infra.logger", "infra.paths", "infra.i18n", "webview.i18n_seed", "window_titles",
-	"adapters.file_system", "adapters.json_codec", "shortcuts.physical_slots", "shortcuts.physical_editor_window",
-	"shortcuts.physical_availability", "infra.locale", "locale.core", "webview.presentation", "hs.webview", "json" }
+	"adapters.timer_scheduler", "infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
+	"adapters.file_system", "adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
+	"shortcuts.engine.physical_availability", "infra.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "hs.webview", "core.text.engine.json" }
 
 --- Executes the actual diagnostic with individual retirement facts held back.
 --- @param blocked string|nil Boundary whose observed acknowledgement is withheld.
@@ -26,11 +26,11 @@ local function run(blocked, scenario)
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = { shared = function(path) return path end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["webview.i18n_seed"] = {}
-		package.loaded["window_titles"] = { compose = function(key) return key end }
+		package.loaded["core.ui.engine.webview.i18n_seed"] = {}
+		package.loaded["core.ui.engine.window_titles"] = { compose = function(key) return key end }
 		package.loaded["adapters.file_system"] = { read = function() return "{}" end }
-		package.loaded["shortcuts.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
-		package.loaded["shortcuts.physical_editor_window"] = { new = function() return {
+		package.loaded["shortcuts.engine.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
+		package.loaded["shortcuts.engine.physical_editor_window"] = { new = function() return {
 			retire = function() return true end, receive = function() return true end,
 		} end }
 		local function timer(delay, callback, diagnostic)

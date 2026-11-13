@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Features Manifest Reader (Linux)
 --- DESCRIPTION:
---- Binds the shared manifest reader (_shared/lua/manifest_reader.lua) to this
+--- Binds the shared manifest reader (_shared/menu/engine/manifest_reader_core.lua) to this
 --- driver: its logger and the generated manifest next to it. This is the Linux
 --- counterpart of `macos/infra/manifest_reader.lua` and
 --- `windows/infra/manifest_reader.ahk`.
@@ -24,15 +24,15 @@
 ---    without resolution hooks.
 --- ==============================================================================
 
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
 
 -- linux/infra/manifest_reader.lua -> linux -> _generated/features_manifest.lua.
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local infra_dir = NativePath.dirname(source) or source
 local driver_dir = NativePath.dirname(infra_dir) or infra_dir
 
-return require("manifest_reader").new({
+return require("menu.engine.manifest_reader_core").new({
 	logger = Logger,
 	log = "infra.manifest_reader",
 	manifest_path = driver_dir .. "/_generated/features_manifest.lua",

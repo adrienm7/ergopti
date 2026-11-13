@@ -20,13 +20,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads the shared redaction rules, the single source of the placeholders.
 --- @return table rules
 local function rules()
 	local Paths = require("infra.paths")
-	local path = Paths.shared_root_from(Paths.driver_root()) .. "/modules/diagnostics/redaction.json"
+	local path = Paths.shared_root_from(Paths.driver_root()) .. "/diagnostics/data/redaction.json"
 	local file = assert(io.open(path, "r"))
 	local raw = file:read("*a")
 	file:close()
@@ -48,7 +48,7 @@ local function with_sink(options, body)
 		get_config_dir = function() return options.config_dir or real_paths.default_config_dir() end,
 	}, { __index = real_paths })
 	local Sink = helpers.load_module("infra.logger_sink")
-	local Logger = helpers.load_module("logger")
+	local Logger = helpers.load_module("core.logger.engine")
 	local base = os.getenv("TMPDIR") or "/tmp"
 	local dir = base:gsub("/+$", "") .. "/ergopti_config_dir_redaction_" .. tostring(os.time()) .. "_" .. tostring(math.random(1e6))
 	os.execute("mkdir -p '" .. dir .. "'")

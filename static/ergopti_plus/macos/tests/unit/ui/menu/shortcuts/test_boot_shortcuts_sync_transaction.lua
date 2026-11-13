@@ -115,7 +115,7 @@ local function load_fixture(opts)
 		setMenu = function() return true end,
 		destroy = function() destroyed = destroyed + 1 end,
 	}
-	package.loaded["chord"] = { format = function() return "ctrl+x" end }
+	package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
 	package.loaded["adapters.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,

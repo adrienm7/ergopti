@@ -4,7 +4,7 @@
 --- MODULE: Tooltip Configuration
 --- DESCRIPTION:
 --- Hammerspoon-side loader for the cross-driver tooltip visual constants.
---- The canonical source of truth is _shared/modules/tooltip/constants.toml — every
+--- The canonical source of truth is _shared/core/ui/data/tooltip/constants.toml — every
 --- value exposed on M.* is read from that file at require-time. Missing file
 --- or key → error (fail fast). No driver-side fallback values.
 ---
@@ -46,13 +46,13 @@
 
 local M = {}
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
-local LlmLine = require("tooltip.llm_line")
-local KeyNames = require("keycodes.key_names")
-local HexColor = require("color.hex")
+local NativePath = require("core.fs.engine.native_path")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
+local KeyNames = require("platform.input.keycodes.key_names")
+local HexColor = require("core.ui.engine.color_hex")
 local LOG = "tooltip_config"
 
--- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
+-- Populated strictly from _shared/core/ui/data/tooltip/constants.toml at require-time (fail fast).
 M.fonts = {}
 M.sizes = {}
 M.layout = {}
@@ -196,13 +196,13 @@ end
 
 
 
--- ==============================================================================
--- ==============================================================================
--- ======= 3/ Bootstrap: load from _shared/modules/tooltip/constants.toml =======
--- ==============================================================================
--- ==============================================================================
+-- ===================================================================================
+-- ===================================================================================
+-- ======= 3/ Bootstrap: load from _shared/core/ui/data/tooltip/constants.toml =======
+-- ===================================================================================
+-- ===================================================================================
 
---- Reads _shared/modules/tooltip/constants.toml at require-time. Missing file, section,
+--- Reads _shared/core/ui/data/tooltip/constants.toml at require-time. Missing file, section,
 --- or key → error (fail fast — no driver-side fallback values).
 local function load_from_shared()
 	local toml_reader = require("infra.toml.reader")
@@ -218,7 +218,7 @@ local function load_from_shared()
 		return ergopti_plus .. "/_shared"
 	end)()
 
-	local toml_path = shared_path .. "/modules/tooltip/constants.toml"
+	local toml_path = shared_path .. "/core/ui/data/tooltip/constants.toml"
 	local c = toml_reader.parse(toml_path)
 	-- Emptiness, not type, is the real signal: TomlReader.parse returns a
 	-- well-formed but EMPTY result on both of its failure exits, so a type test can
@@ -326,7 +326,7 @@ local function load_from_shared()
 		inactive_align_char  = require_key("llm_ui", "inactive_align_char"),
 		footer_space_divider = require_key("llm_ui", "footer_space_divider"),
 		footer_combined_sep  = require_key("llm_ui", "footer_combined_separator"),
-		-- The shortcut column's modifiers (_shared/lua/tooltip/llm_line.lua), as
+		-- The shortcut column's modifiers (_shared/core/ui/engine/tooltip/llm_line.lua), as
 		-- the glyphs of the shared key name table.
 		shortcut_spec        = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
 			require_key("llm_ui", "shortcut_joiner_hs"), KeyNames.macos_symbol),

@@ -27,8 +27,8 @@ DEPENDENCIES = (
     "static/ergopti_plus/macos/infra/deferred_work.lua",
     "static/ergopti_plus/macos/adapters/webview_result.lua",
     "static/ergopti_plus/macos/ui/metrics_apps/init.lua",
-    "static/ergopti_plus/_shared/lua/webview/i18n_seed.lua",
-    "static/ergopti_plus/_shared/data/locales/fr.json",
+    "static/ergopti_plus/_shared/core/ui/engine/webview/i18n_seed.lua",
+    "static/ergopti_plus/_shared/core/i18n/data/locales/fr.json",
 )
 PAGE = "static/ergopti_plus/_shared/ui/metrics_apps/index.html"
 CALLER = "static/ergopti_plus/macos/ui/metrics_apps/init.lua"

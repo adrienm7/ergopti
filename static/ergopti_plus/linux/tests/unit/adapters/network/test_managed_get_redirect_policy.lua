@@ -9,15 +9,15 @@
 
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Json = require("json")
-local Shared = require("network.http_redirect")
+local Json = require("core.text.engine.json")
+local Shared = require("core.network.engine.http_redirect")
 
 local function read(relative)
 	local file = assert(io.open(assert(Paths.shared(relative)), "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
 	return Json.decode(bytes)
 end
-local law = assert(Shared.new(read("data/http/redirect_policy.json"), read("data/http/transport_policy.json")))
+local law = assert(Shared.new(read("core/network/data/http/redirect_policy.json"), read("core/network/data/http/transport_policy.json")))
 local corpus = read("tests/corpus/http/get_redirect_vectors.json")
 
 helpers.describe("independent canonical buffered GET redirect vectors", function()

@@ -33,10 +33,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Tint = require("tooltip.tint")
-local Layout = require("tooltip.layout")
-local LlmLine = require("tooltip.llm_line")
+local Logger = require("core.logger.engine.shim")
+local Tint = require("core.ui.engine.tooltip.tint")
+local Layout = require("core.ui.engine.tooltip.layout")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
 
 local LOG = "adapters.graphics_renderer"
 

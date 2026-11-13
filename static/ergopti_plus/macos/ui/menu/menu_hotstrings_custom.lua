@@ -11,20 +11,20 @@
 --- ==============================================================================
 
 local PersonalFileScope = require("infra.personal_file_scope")
-local PersonalFiles = require("hotstrings.personal_files")
-local PersonalFileMenu = require("menu.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local PersonalFileMenu = require("menu.engine.personal_files")
 local M = {}
 local i18n   = require("infra.i18n")
 local DeferredWork = require("infra.deferred_work")
 local ShellRunner = require("adapters.shell_runner")
 local Logger = require("infra.logger")
-local Labels = require("menu.labels")
+local Labels = require("menu.engine.labels")
 local text_utils = require("infra.text_utils")
 local dialog = require("infra.dialog_util")
-local Chord = require("chord")
+local Chord = require("keyboard.engine.chord")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local ManifestMenu = require("infra.manifest_menu")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 
 
@@ -48,7 +48,7 @@ local function resolve_desc(desc)
 	return type(desc) == "string" and desc or ""
 end
 
--- Thousands separator formatting lives in _shared/lua/menu/labels.lua, so the
+-- Thousands separator formatting lives in _shared/menu/engine/labels.lua, so the
 -- three drivers render the same count the same way. This file used to carry its
 -- own byte-identical copy.
 local fmt_count = Labels.fmt_count
@@ -258,7 +258,7 @@ end
 --- @return table Provider row.
 function M.all_sections_row(ctx, group_names, set_fn)
 	local all_on = M.all_sections_on(ctx, group_names)
-	local row = ManifestMenu.check_row("hotstring_scope_checkbox", require("config_keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
+	local row = ManifestMenu.check_row("hotstring_scope_checkbox", require("settings.engine.keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
 		{ hotstring_scope_all_sections = function() return false end },
 		{ hotstring_scope_all_on = function() return all_on end })
 	if not row then return nil end
@@ -488,8 +488,8 @@ function M.build_custom(ctx, counts)
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
 					local selected = (state.custom_default_section == sname) or nil
-					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
-						[require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("settings.engine.keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
+						[require("settings.engine.keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
 							state.custom_default_section = sname
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
@@ -509,7 +509,7 @@ function M.build_custom(ctx, counts)
 	end
 
 	local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {
-		[require("config_keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
+		[require("settings.engine.keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
 	}, {
 		["personal_default_unset"] = function() return not state.custom_default_section end,
 		["personal_default_boundary"] = function() return #cat_choices > 0 end,
@@ -554,7 +554,7 @@ function M.build_custom(ctx, counts)
 				local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl
 				-- The original factory only allocates this closure; native effects run on delivery.
 				local action = toggleSectionFn(ctx, group_name, sec.name, lbl, admission)
-				local row = ManifestMenu.check_row("hotstring_personal_section_choice", require("config_keys").COMMAND.PERSONAL_SECTION_TOGGLE, {
+				local row = ManifestMenu.check_row("hotstring_personal_section_choice", require("settings.engine.keys").COMMAND.PERSONAL_SECTION_TOGGLE, {
 					personal_section_toggle = action,
 				}, {
 					personal_section_label = function() return caption end,
@@ -588,7 +588,7 @@ function M.build_custom(ctx, counts)
 			if editor_ready() then pcall(ctx.hotstring_editor.open) end
 		end, "menu_hotstrings_custom.open_editor")
 	end
-	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
+	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("settings.engine.keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 		{ personal_hotstring_open_editor = open_editor },
 		{ personal_hotstring_editor_ready = editor_ready })
 	local close_action = function()
@@ -615,8 +615,8 @@ function M.build_custom(ctx, counts)
 		{ personal_default_caption = function() return cat_menu end })
 	if type(default_parent) ~= "table" or #default_parent ~= 1 then return nil end
 	local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
-		[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(toml_path_for_group(ctx, "personal")) end,
-		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
+		[require("settings.engine.keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(toml_path_for_group(ctx, "personal")) end,
+		[require("settings.engine.keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 	}, {
 		["hotstring_file_ready"] = function() return not paused end,
 		["personal_open_present"] = function() return true end,
@@ -624,7 +624,7 @@ function M.build_custom(ctx, counts)
 		["personal_controls_tail_boundary"] = function() return false end,
 		["personal_preferences_present"] = function() return true end,
 		["personal_controls_ready"] = function() return not paused end,
-		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return state.custom_close_on_add == true end,
+		[require("settings.engine.keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return state.custom_close_on_add == true end,
 	}, {
 		["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 		["personal_default_parent"] = function() return default_parent end,
@@ -643,8 +643,8 @@ function M.build_custom(ctx, counts)
 	local function scope_menu(names, file_rows, section_rows)
 		return ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, names, true),
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, names, false),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, names, true),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, names, false),
 			} }, {
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return section_rows end,
@@ -653,7 +653,7 @@ function M.build_custom(ctx, counts)
 	local function file_menu_for_group(gname, rows, check, readonly)
 		local path = toml_path_for_group(ctx, gname)
 		local file_rows = ManifestMenu.template_rows("hotstring_personal_file_frame", {
-			[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(path) end,
+			[require("settings.engine.keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(path) end,
 		}, {
 			["hotstring_file_ready"] = function() return true end,
 			["personal_file_open_present"] = function() return path ~= nil end,
@@ -666,8 +666,8 @@ function M.build_custom(ctx, counts)
 
 		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, { gname }, true, check),
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, { gname }, false, check),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, { gname }, true, check),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, { gname }, false, check),
 			} }, {
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return rows end,
@@ -677,7 +677,7 @@ function M.build_custom(ctx, counts)
 			local Controller = require("infra.personal_file_controls")
 			local Config = require("modules.hotstrings.hotstrings_config")
 			local binding = Controller.capture(gname)
-			local unavailable = binding and require("hotstrings.personal_metadata").readonly_fields(binding.record.content,
+			local unavailable = binding and require("hotstrings.engine.catalogue.personal_metadata").readonly_fields(binding.record.content,
 				nil, Config.get_user_override(gname, nil) or {}) or {}
 			personal_current = function() return not readonly and binding ~= nil and check ~= nil and check() == true
 				and binding.native.current() == true end

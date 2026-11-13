@@ -89,14 +89,14 @@ class ProductionServeControls(unittest.TestCase):
             "macos/platform/ollama_bootstrap_owner.py",
             "macos/platform/trusted_native_guardian.py",
             "macos/platform/ollama_daemon_authority.py",
-            "_shared/python/managed_ollama_bootstrap.py",
-            "_shared/python/managed_ollama_daemon_authority.py",
-            "_shared/python/managed_ollama_runtime.py",
-            "_shared/python/managed_ollama_pull.py",
-            "_shared/python/managed_source_alias.py",
-            "_shared/python/network_proxy_policy.py",
-            "_shared/modules/network/proxy_policy.json",
-            "_shared/modules/llm/managed_ollama_bootstrap.json",
+            "_shared/ai/adapters/python/managed_ollama_bootstrap.py",
+            "_shared/ai/adapters/python/managed_ollama_daemon_authority.py",
+            "_shared/ai/adapters/python/managed_ollama_runtime.py",
+            "_shared/ai/adapters/python/managed_ollama_pull.py",
+            "_shared/ai/adapters/python/managed_source_alias.py",
+            "_shared/core/network/adapters/python_network_proxy_policy.py",
+            "_shared/core/network/data/proxy_policy.json",
+            "_shared/ai/data/managed_ollama_bootstrap.json",
         ]
         for relative in dependencies:
             target = payload / relative
@@ -135,8 +135,8 @@ class ProductionServeControls(unittest.TestCase):
         catalogue = json.dumps(
             {
                 "repository_source_sha256": {
-                    "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json": hashlib.sha256(
-                        (payload / "_shared/modules/llm/managed_ollama_bootstrap.json").read_bytes()
+                    "static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json": hashlib.sha256(
+                        (payload / "_shared/ai/data/managed_ollama_bootstrap.json").read_bytes()
                     ).hexdigest()
                 }
             }
@@ -283,7 +283,7 @@ class ProductionServeControls(unittest.TestCase):
         self.assertEqual(self.native_calls, [])
 
     def test_modified_policy_refuses_before_runtime_acquisition(self):
-        path = self.subject.SHARED / "modules/llm/managed_ollama_bootstrap.json"
+        path = self.subject.SHARED / "ai/data/managed_ollama_bootstrap.json"
         path.write_bytes(path.read_bytes() + b" ")
         with self.assertRaisesRegex(RuntimeError, "policy"):
             self.prepare()

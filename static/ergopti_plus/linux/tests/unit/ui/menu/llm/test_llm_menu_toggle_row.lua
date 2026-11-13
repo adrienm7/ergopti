@@ -129,12 +129,12 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 				if row.title:find(head("menu.llm.reset_on_nav"), 1, true) then last = index end
 			end
 			helpers.assert_true(first ~= nil and last ~= nil, "the generation rows are drawn")
-			require("test.ai_menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
+			require("tests.lua.ai.menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
 				count = head("menu.llm.num_predictions_label"), min_words = head("menu.llm.min_words_label"),
 				max_words = head("menu.llm.max_words_label"), context = head("menu.llm.generation.context_length"),
 				clear_context = head("menu.llm.reset_on_nav"),
 			}, state)
-			require("test.ai_menu_layout_contract").assert_clean_separators(helpers, rows, state)
+			require("tests.lua.ai.menu_layout_contract").assert_clean_separators(helpers, rows, state)
 		end)
 	end
 
@@ -148,7 +148,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 				llm.get_current_model = function() return model or nil end
 				llm.get_prediction_model = llm.get_current_model
 				local rows = submenu_of(build(llm), "menu.llm.title")
-				require("test.ai_menu_layout_contract").assert_block(helpers, rows, {
+				require("tests.lua.ai.menu_layout_contract").assert_block(helpers, rows, {
 					profile = i18n.get("menu.profiles.profile_label_prefix"):match("^[^%%{]*"),
 					test = i18n.get("menu.llm.test_prediction"),
 					trigger = i18n.get("menu.llm.trigger_menu_title"),
@@ -279,8 +279,8 @@ local function with_slot_frame(locale, mutation, body)
 	local saved_i18n_safe = rawget(_G, "i18n_safe")
 	local ok, raised = pcall(function()
 		local Paths = require("infra.paths")
-		local json = require("json")
-		local file = assert(io.open(Paths.shared("data/locales/" .. locale .. ".json"), "rb"))
+		local json = require("core.text.engine.json")
+		local file = assert(io.open(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 		local catalogue = json.decode(file:read("*a"))
 		assert(file:close())
 		local state = { opened = {}, assigned = {}, accepts = true, catalogue = catalogue }
@@ -289,9 +289,9 @@ local function with_slot_frame(locale, mutation, body)
 		-- catalogue, so predecessor comparisons do not invent a locale failure.
 		package.loaded["infra.i18n"] = { get = translate, section = translate,
 			get_locale = function() return locale end }
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
 			i18n = { get = translate, section = translate },
 			logger = helpers.make_logger_stub(),
@@ -421,8 +421,8 @@ end)
 
 helpers.describe("Linux rendered AI source refusal", function()
 	helpers.it("disables the genuine toggle row and refuses a retained click after newer-schema boot (ai-readonly-admission)", function()
-		local Sandbox = require("test.config_unused_keys_contract").sandbox
-		local Migration = require("config_migrate")
+		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+		local Migration = require("settings.engine.migration.migrate")
 		local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
 		local source = '[_meta]\nschema_version = ' .. (registry.current + 1)
 			.. '\n[llm]\nenabled = false\n[private]\nkeep = "exact"\n'
@@ -434,7 +434,7 @@ helpers.describe("Linux rendered AI source refusal", function()
 					config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
 					-- The storage adapter keeps storage.json in the default configuration folder.
-					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("app_dirs").linux.folder_name end,
+					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end,
 				}
 				package.loaded["infra.llm_preferences"] = nil
 				local llm, calls = fake_llm(false)

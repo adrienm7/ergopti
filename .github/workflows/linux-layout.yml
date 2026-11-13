@@ -23,13 +23,13 @@ on:
     paths:
       - 'static/ergopti/linux/**'
       - 'static/layouts/registry/**'
-      - 'static/ergopti_plus/_shared/modules/layouts/**'
+      - 'static/ergopti_plus/_shared/layouts/data/**'
       - '.github/workflows/linux-layout.yml'
   pull_request:
     paths:
       - 'static/ergopti/linux/**'
       - 'static/layouts/registry/**'
-      - 'static/ergopti_plus/_shared/modules/layouts/**'
+      - 'static/ergopti_plus/_shared/layouts/data/**'
       - '.github/workflows/linux-layout.yml'
   workflow_dispatch:
 

@@ -103,7 +103,7 @@ function scriptFiles(dir) {
 	}
 	return out;
 }
-for (const file of [...scriptFiles(UI), ...scriptFiles(shared('modules', 'tooltip'))]) {
+for (const file of [...scriptFiles(UI), ...scriptFiles(shared('core', 'ui', 'data', 'tooltip'))]) {
 	const relative = path.relative(UI, file).split(path.sep).join('/');
 	for (const match of fs.readFileSync(file, 'utf8').matchAll(TOKEN_CALL)) {
 		used.add(`--theme-${match[1]}`);

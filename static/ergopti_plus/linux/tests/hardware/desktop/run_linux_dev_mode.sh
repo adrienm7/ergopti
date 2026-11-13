@@ -150,7 +150,7 @@ panel() {
 }
 # The daemon here speaks French (no locale configured), so its Reload row reads the fr label.
 RELOAD_LABEL="$("${PY}" -c 'import json, sys; print(json.load(open(sys.argv[1]))["menu.global.reload"])' \
-	"${DRIVER}/../_shared/data/locales/fr.json")"
+	"${DRIVER}/../_shared/core/i18n/data/locales/fr.json")"
 [ -n "${RELOAD_LABEL}" ] || { echo "ENVIRONMENT: no Reload label in fr.json" >&2; exit 2; }
 
 echo "developer run with the package installed"

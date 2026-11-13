@@ -75,7 +75,7 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 				helpers.provide_timings()
 				package.loaded["infra.paths"] = {
 					shared_llm_path = function()
-						return helpers.shared("modules/llm/models.json")
+						return helpers.shared("ai/data/models.json")
 					end,
 				}
 				package.loaded["modules.llm"] = {get_backend = function() return "ollama" end}

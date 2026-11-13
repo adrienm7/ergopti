@@ -41,7 +41,7 @@ local helpers = require("tests.helpers")
 local Record = helpers.load_module("tests.support.touchpad_record")
 
 local MANAGER, READER, FINDER = "modules.gestures.manager", "adapters.evdev_reader", "modules.gestures.touchpad_finder"
-local EMITTER, LOGGER = "modules.gestures.combo_emitter", "logger.shim"
+local EMITTER, LOGGER = "modules.gestures.combo_emitter", "core.logger.engine.shim"
 
 --- Reads and decodes a trace of tests/fixtures.
 --- @param name string

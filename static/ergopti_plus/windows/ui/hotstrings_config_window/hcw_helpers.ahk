@@ -84,7 +84,7 @@ _HCW_InitLocaleStrings() {
 	; ``rolls/sfbs/distancesreduction`` lost their hardcoded orange would
 	; now actively mislead. Colours are ordered along the standard hue wheel
 	; (warm → cool → neutral) so the picker reads naturally. The colours come from
-	; _shared/data/native_theme.toml, the palette macOS and Linux read too.
+	; _shared/core/ui/data/native_theme.toml, the palette macOS and Linux read too.
 	_HCW_COLOR_PRESETS := [Map("Label", t("hs_config.color_inherit"), "Hex", "")]
 	for Row in NativeThemeHotstringPalette()
 		_HCW_COLOR_PRESETS.Push(Map("Label", t(Row["I18n"]), "Hex", Row["Hex"]))

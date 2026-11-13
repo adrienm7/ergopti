@@ -5,7 +5,7 @@
 Update 2026-11-06: the maintainer asked for full layout emulation on the three
 OS (docs/memory/maintainer-decisions.md, « Layout emulation on the three OS »).
 macOS and Linux now also emulate the chosen layout over the system one through
-`_shared/lua/layouts/keylayout_emulation.lua`, which applies the number-row
+`_shared/layouts/engine/composer/keylayout_emulation.lua`, which applies the number-row
 options itself; the live rebuild below stays the route for a user who installs
 the layout as a system input source.
 
@@ -29,7 +29,7 @@ named machine before the slice that depends on it starts.
 
 Read in `windows/modules/keymap/layout/layout_shift_caps.ahk`,
 `number_row_send.ahk`, `modules/keymap/layout.ahk` and the shared policy
-`_shared/modules/features/number_row_policy.ahk`.
+`_shared/settings/data/features/number_row_policy.ahk`.
 
 - `layout.direct_access_digits` is an enum: `native` (default), `digits`,
   `symbols`. `layout.number_row_reorder_edges` is a boolean (default false).
@@ -241,7 +241,7 @@ already enabled bundle is selectable without the preferences route is exactly wh
 
 Implemented (30 October), macOS:
 
-- `_shared/lua/layouts/keylayout_rows.lua` applies the options to the `.keylayout` text
+- `_shared/layouts/engine/composer/keylayout_rows.lua` applies the options to the `.keylayout` text
   (base, Shift, Caps, Shift+Caps keyMaps of the default keyMapSet). A Cmd, Ctrl or Option
   press that selected one of those keyMaps (Ergo-L reaches Cmd and Ctrl through
   `defaultIndex`) is first routed to a verbatim copy of it, so shortcuts keep the layout's

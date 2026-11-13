@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- Public resolver keys intentionally covered by this regression
 local EXPECTED_PATH_COUNT = 7

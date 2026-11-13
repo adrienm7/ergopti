@@ -7,7 +7,7 @@
 ;
 ; BUGS ENCODED:
 ; F11 — _LoggerLoadSubFilesToml used a three-level relative path
-;        (..\..\..\_shared\modules\logger\sub_files.toml) instead of one level up or
+;        (..\..\..\_shared\core\logger\data\sub_files.toml) instead of one level up or
 ;        the canonical _SharedDir global, causing the TOML file to never be
 ;        found and silently falling back to the hardcoded list.
 ; F19a — The platform filter compared P against "autohotkey" but sub_files.toml
@@ -56,7 +56,7 @@ _LSFR_ReadSource(FileName) {
 _LSFR_CanonicalAhkNames() {
 	Raw := ""
 	try {
-		Raw := FileRead(A_ScriptDir . "\..\..\_shared\modules\logger\sub_files.toml", "UTF-8")
+		Raw := FileRead(A_ScriptDir . "\..\..\_shared\core\logger\data\sub_files.toml", "UTF-8")
 	} catch {
 		return []
 	}
@@ -82,7 +82,7 @@ _LSFR_CanonicalAhkNames() {
 _LSFR_GeneratedMatchesCanonical() {
 	Canonical := _LSFR_CanonicalAhkNames()
 	Assert(Canonical.Length > 0,
-		"the canonical _shared/modules/logger/sub_files.toml must be readable and declare at least one ahk entry, or this test asserts nothing")
+		"the canonical _shared/core/logger/data/sub_files.toml must be readable and declare at least one ahk entry, or this test asserts nothing")
 
 	Entries := LoggerSubFilesData()
 	Assert(Entries.Length > 0, "the generated routing table must not be empty")

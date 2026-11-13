@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(
-	path.join(__dirname, '../../static/ergopti_plus/_shared/modules/network/pac_helpers.js'),
+	path.join(__dirname, '../../static/ergopti_plus/_shared/core/network/data/pac_helpers.js'),
 	'utf8'
 );
 const clock = Date.parse('2026-01-02T23:30:15Z');

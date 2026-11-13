@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: WPM Readout Canon Loader (Linux)
 --- DESCRIPTION:
---- Reads _shared/modules/wpm_widget/constants.toml once, through the shared
+--- Reads _shared/metrics/data/wpm_widget/constants.toml once, through the shared
 --- model's loader, which checks every key the readouts draw with.
 ---
 --- FEATURES & RATIONALE:
@@ -15,10 +15,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Codec  = require("toml_codec")
+local Logger = require("core.logger.engine.shim")
+local Codec  = require("core.text.engine.toml_codec")
 local Paths  = require("infra.paths")
-local Model  = require("wpm_widget.model")
+local Model  = require("metrics.engine.wpm_widget_model")
 
 local LOG = "infra.wpm_constants"
 
@@ -29,7 +29,7 @@ local _constants = nil
 --- @return table|nil
 function M.load()
 	if _constants ~= nil then return _constants end
-	local path = Paths.shared("modules/wpm_widget/constants.toml")
+	local path = Paths.shared("metrics/data/wpm_widget/constants.toml")
 	local canon, err = Model.load(path, Codec.decode)
 	if not canon then
 		Logger.error(LOG, "The WPM readout canon is unusable (%s) — the readouts cannot draw.", tostring(err))

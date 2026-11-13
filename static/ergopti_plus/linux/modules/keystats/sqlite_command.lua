@@ -41,11 +41,11 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local PrivacyPolicy = require("infra.sqlite_privacy_policy")
 
 local Shell = require("adapters.shell_runner")
-local SqliteLiteral = require("sqlite.literal")
+local SqliteLiteral = require("core.fs.engine.sqlite.literal")
 
 
 

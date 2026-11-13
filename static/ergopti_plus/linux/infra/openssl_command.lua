@@ -10,7 +10,7 @@
 --- Existing exact-stdin framing and its argv budget remain intact.
 --- ==============================================================================
 
-local Heredoc = require("shell.heredoc")
+local Heredoc = require("core.process.shell_heredoc")
 
 local M = {}
 local next_id = 0

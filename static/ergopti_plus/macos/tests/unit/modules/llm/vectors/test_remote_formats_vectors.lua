@@ -5,18 +5,18 @@
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/remote_formats_vectors.json through the
 --- shared request and answer shapes of the "backboard" and "decisions" provider
---- formats (_shared/lua/llm/remote_formats.lua), which macOS and Linux use and
+--- formats (_shared/ai/engine/api/remote_formats.lua), which macOS and Linux use and
 --- the AutoHotkey port replays too.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Formats = require("llm.remote_formats")
-local Agent = require("llm.agent")
+local Formats = require("ai.engine.api.remote_formats")
+local Agent = require("ai.engine.agent.agent")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -62,7 +62,7 @@ end
 
 helpers.describe("remote formats replay the shared corpus", function()
 	local corpus = read_json("tests/corpus/llm/remote_formats_vectors.json")
-	local agent = read_json("modules/llm/agent.json")
+	local agent = read_json("ai/data/agent.json")
 
 	helpers.it("key headers", function()
 		local v = corpus.headers[1].expected

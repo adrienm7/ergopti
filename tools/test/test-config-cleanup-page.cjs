@@ -47,7 +47,9 @@ for (const match of html.matchAll(/<\w+[^>]*\bid="([^"]+)"[^>]*>/g)) {
 	elements[match[1]].disabled = /\bdisabled\b/.test(match[0]);
 }
 const messages = [];
-const strings = JSON.parse(fs.readFileSync(path.join(shared, 'data/locales/en.json'), 'utf8'));
+const strings = JSON.parse(
+	fs.readFileSync(path.join(shared, 'core/i18n/data/locales/en.json'), 'utf8')
+);
 const sandbox = {
 	document: {
 		getElementById: (id) => elements[id],
@@ -139,9 +141,11 @@ const localeKeys = new Set(
 	].map((match) => match[1])
 );
 for (const file of fs
-	.readdirSync(path.join(shared, 'data/locales'))
+	.readdirSync(path.join(shared, 'core/i18n/data/locales'))
 	.filter((file) => file.endsWith('.json'))) {
-	const locale = JSON.parse(fs.readFileSync(path.join(shared, 'data/locales', file), 'utf8'));
+	const locale = JSON.parse(
+		fs.readFileSync(path.join(shared, 'core/i18n/data/locales', file), 'utf8')
+	);
 	for (const key of localeKeys) assert.equal(typeof locale[key], 'string', file + ': ' + key);
 }
 delete sandbox._i18n_strings;

@@ -14,7 +14,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. One file format: the reader takes the line-oriented TOML subset every
- *    loader reads (_shared/keymap/layer_actions.toml, "File format") and
+ *    loader reads (_shared/layouts/data/layer_actions.toml, "File format") and
  *    refuses what they refuse as toml_invalid; the writer writes only that
  *    subset.
  * 2. An edit made on one OS never changes what another OS does: a binding is
@@ -68,7 +68,7 @@ var LayerModel = (function () {
 		'# Each [layers.<layer>.<section>] table binds physical keys, named by their',
 		'# W3C KeyboardEvent.code, while the layer is held. `all` applies on every',
 		'# system; a `windows`, `macos` or `linux` entry replaces it on that system.',
-		'# The values are the actions of _shared/keymap/layer_actions.toml.'
+		'# The values are the actions of _shared/layouts/data/layer_actions.toml.'
 	];
 
 	// The keys that type no character, by the locale key of their short name

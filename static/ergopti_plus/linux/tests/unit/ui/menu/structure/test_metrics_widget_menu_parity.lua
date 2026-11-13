@@ -8,15 +8,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/metrics/widget_menu_vectors.json", "rb"))
 local fixture = assert(Json.decode(handle:read("*a")))
 handle:close()
-handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json", "rb"))
+handle = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "rb"))
 local declared = assert(Json.decode(handle:read("*a"))).metrics_menu
 handle:close()
 
-require("test.metrics_widget_menu_contract").register(helpers, {
+require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 	fixture = fixture,
 	declared = declared,
 	translate = function(key) return require("infra.i18n").get(key) end,
@@ -51,7 +51,7 @@ helpers.describe("Metrics widget commands", function()
 		local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 		local rename, execute, notices, attempts = os.rename, os.execute, 0, 0
 		local ok, err = xpcall(function()
-			require("test.config_unused_keys_contract").sandbox.with_config("[metrics]\nenabled = false\n", function(path)
+			require("tests.lua.settings.unused_keys_contract").sandbox.with_config("[metrics]\nenabled = false\n", function(path)
 				package.loaded["infra.config_paths"] = { config = function() return path end }
 				package.loaded["infra.metrics_preferences"], package.loaded["modules.keystats.keystats"] = nil, nil
 				local stats = require("modules.keystats.keystats")
@@ -225,13 +225,13 @@ helpers.describe("declared inert Metrics migration statuses", function()
 	end
 
 	helpers.it("replays inert labels and platform hiding in all 21 locales (metrics-migration-label)", function()
-		local locales = read("data/locale_order.json").order
+		local locales = read("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read("data/locales/" .. code .. ".json")
+			local strings = read("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json" end,
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json" end,
 					json_decode = Json.decode,
 					i18n = { get = function(key) return assert(strings[key]) end, section = function(key) return assert(strings[key]) end },
 					logger = { error = function() end, warn = function() end, debug = function() end },
@@ -278,13 +278,13 @@ end)
 -- Independent provider-template expectations retain the existing header decoration.
 helpers.describe("shared checked and section-header templates", function()
 	local function with_rows(platform, rows, callback)
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = platform,
-			manifest_path = function() return helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json" end,
+			manifest_path = function() return helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json" end,
 			json_decode = Json.decode,
 			i18n = {
 				get = function(key) return key end,
-				section = function(key) return require("menu.labels").decorate_section(key) end,
+				section = function(key) return require("menu.engine.labels").decorate_section(key) end,
 			},
 			logger = { warn = function() end, error = function() end },
 		}))
@@ -368,7 +368,7 @@ helpers.describe("shared checked and section-header templates", function()
 	end
 
 	helpers.it("retains all sixteen existing id-less header declarations (template-header)", function()
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json", "rb"))
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
 		local count = 0
@@ -431,8 +431,8 @@ local function with_group_policy_rows(platform, row, callback)
 	local strings = { ["probe.group"] = "Mode: %s", ["probe.reason"] = "Unavailable： native detail" }
 	local i18n = { get = function(key) return strings[key] or key end,
 		section = function(key) return strings[key] or key end }
-	local renderer = assert(require("menu.renderer").new({ platform = platform,
-		manifest_path = function() return helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json" end,
+	local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+		manifest_path = function() return helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json" end,
 		json_decode = function() return { group_policy_probe = { row } } end,
 		i18n = i18n, logger = logger,
 	}))
@@ -539,7 +539,7 @@ end)
 local function metrics_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
@@ -576,7 +576,7 @@ local function metrics_parent_fixture(body)
 end
 local metrics_parent_file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/metrics_parent.json", "rb"))
 local metrics_parent_raw = metrics_parent_file:read("*a");metrics_parent_file:close()
-require("test.metrics_parent_contract").register(helpers,metrics_parent_fixture,assert(Json.decode(metrics_parent_raw)),"linux")
+require("tests.lua.metrics.parent_contract").register(helpers,metrics_parent_fixture,assert(Json.decode(metrics_parent_raw)),"linux")
 
 
 helpers.describe("Metrics absent native module keeps genuine shared status children", function()

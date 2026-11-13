@@ -12,15 +12,15 @@ local run_contract = function(helpers, load_host, load_builder)
   package.loaded['infra.logger']=logger
   package.loaded['infra.paths']={shared=function(p)return p end}
   package.loaded['infra.i18n']={get=function(k)return k end}
-  package.loaded['webview.i18n_seed']={}
+  package.loaded['core.ui.engine.webview.i18n_seed']={}
   package.loaded['infra.deferred_work']={after=function()return true end}
   package.loaded['adapters.timer_scheduler']=nil -- Exercise actual timer ownership through the native-shaped port.
   package.loaded['adapters.json_codec']=nil -- Use the actual codec over the controlled native JSON port.
-  package.loaded['window_titles']={compose=function(k)return k end}
-  package.loaded['json']={encode=function()return '{}'end}
+  package.loaded['core.ui.engine.window_titles']={compose=function(k)return k end}
+  package.loaded['core.text.engine.json']={encode=function()return '{}'end}
   package.loaded['adapters.file_system']={read=function()return c.catalogue or '{}'end}
-  package.loaded['shortcuts.physical_slots']={new=function(model)c.decoded_model=model;return{candidates=function()return{}end}end}
-  package.loaded['shortcuts.physical_editor_window']={new=function(options)
+  package.loaded['shortcuts.engine.physical_slots']={new=function(model)c.decoded_model=model;return{candidates=function()return{}end}end}
+  package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)
    local retired=false
    return{retire=function()
     retired=true;c.retired=c.retired+1
@@ -311,9 +311,9 @@ local run_contract = function(helpers, load_host, load_builder)
   for _,mode in ipairs({'throw','nil','false'})do
    helpers.it('(physical-editor-constructor) shared constructor refusal precedes native acquisition and permits retry: '..mode,function()
     fixture(function(host,c,options)
-     local provider=package.loaded['shortcuts.physical_editor_window'];local original_new=provider.new
+     local provider=package.loaded['shortcuts.engine.physical_editor_window'];local original_new=provider.new
      if mode=='throw'then
-      local genuine=assert(loadfile(helpers.shared('lua/shortcuts/physical_editor_window.lua')))()
+      local genuine=assert(loadfile(helpers.shared('shortcuts/engine/physical_editor_window.lua')))()
       provider.new=function(ports)
        local constructed,owner=pcall(genuine.new,ports)
        c.constructor_error=owner
@@ -347,11 +347,11 @@ local capture_fixture=run_contract(helpers,function()package.loaded['ui.physical
 -- lifecycle bodies/assertions above are unchanged; these use genuine shared ports.
 local function with_observer(body)
  capture_fixture(function(_,c,options)
-  local Json=assert(loadfile(helpers.shared('lua/json.lua')))()
-  package.loaded['json']=Json
-  package.loaded['shortcuts.physical_slots']=assert(loadfile(helpers.shared('lua/shortcuts/physical_slots.lua')))()
-  package.loaded['shortcuts.physical_editor_window']=assert(loadfile(helpers.shared('lua/shortcuts/physical_editor_window.lua')))()
-  local file=assert(io.open(helpers.shared('data/keycodes/physical_keys.json'),'r'))
+  local Json=assert(loadfile(helpers.shared('core/text/engine/json.lua')))()
+  package.loaded['core.text.engine.json']=Json
+  package.loaded['shortcuts.engine.physical_slots']=assert(loadfile(helpers.shared('shortcuts/engine/physical_slots.lua')))()
+  package.loaded['shortcuts.engine.physical_editor_window']=assert(loadfile(helpers.shared('shortcuts/engine/physical_editor_window.lua')))()
+  local file=assert(io.open(helpers.shared('layouts/data/keycodes/physical_keys.json'),'r'))
   c.catalogue=file:read('*a');file:close();c.native_model=assert(Json.decode(c.catalogue))
   c.receipt={};c.enrollments=0;c.cancellations=0;c.stops=0;c.available_calls=0;c.packets={};c.request_id=0
   options.gestures={get_action_label=function(action)return action end,is_assignable=function(action)return action=='none'end,

@@ -9,7 +9,7 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"adapters.http_client", "adapters.timer_scheduler", "infra.logger",
-	"error_description", "number_policy",
+	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
 --- Owns construction, delivery and final cleanup of the real adapters.

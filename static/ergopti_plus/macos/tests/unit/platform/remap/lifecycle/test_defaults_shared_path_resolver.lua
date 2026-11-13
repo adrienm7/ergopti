@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Karabiner Defaults — Shared-Path Resolution
 --- DESCRIPTION:
---- karabiner/defaults.lua reads _shared/tap_hold/defaults.toml at MODULE LOAD
+--- karabiner/defaults.lua reads _shared/tap_hold/data/defaults.toml at MODULE LOAD
 --- time, from the top level of its own body. It used to locate the file by a
 --- hand-rolled four-level parent walk from its own source path, while its
 --- sibling config.lua already asked infra.paths — the resolver that exists so
@@ -54,8 +54,8 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			shared_root = function() return "/probe/_shared" end,
 		}
 		local rollover_path = nil
-		local saved_catalog = package.loaded["tap_hold.key_catalog"]
-		package.loaded["tap_hold.key_catalog"] = {
+		local saved_catalog = package.loaded["tap_hold.engine.key_catalog"]
+		package.loaded["tap_hold.engine.key_catalog"] = {
 			load_rollover = function(path, platform)
 				rollover_path = path
 				helpers.assert_eq(platform, "hs")
@@ -85,7 +85,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		local ok, err = pcall(require, "platform.remap.defaults")
 
 		package.loaded["infra.timings"] = nil
-		package.loaded["tap_hold.key_catalog"] = saved_catalog
+		package.loaded["tap_hold.engine.key_catalog"] = saved_catalog
 		package.loaded["infra.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
 		package.loaded["platform.remap.defaults"] = nil
@@ -97,9 +97,9 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		helpers.assert_eq(ok, true, "the resolved reader fixture must complete defaults initialization")
 		helpers.assert_eq(rollover_path, parsed_path, "both readers must use the same resolved defaults path")
 		local ctx = ok and "" or (" — load raised: " .. tostring(err))
-		helpers.assert_eq("tap_hold/defaults.toml", asked_for,
+		helpers.assert_eq("tap_hold/data/defaults.toml", asked_for,
 			"defaults.lua must ask infra.paths for the shared-relative path, not walk up itself" .. ctx)
-		helpers.assert_eq("/probe/_shared/tap_hold/defaults.toml", parsed_path,
+		helpers.assert_eq("/probe/_shared/tap_hold/data/defaults.toml", parsed_path,
 			"the resolver's answer must be the path actually parsed — asking and then "
 				.. "ignoring it is the same bug with an extra call" .. ctx)
 	end)
@@ -131,8 +131,8 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		package.loaded["platform.remap.defaults"] = nil
 
 		local ctx = ok and "" or (" — load raised: " .. tostring(err))
-		helpers.assert_true(parsed_path ~= nil and parsed_path:find("_shared/tap_hold/defaults.toml", 1, true) ~= nil,
-			"the walk-up fallback must still produce a _shared/tap_hold path, got: "
+		helpers.assert_true(parsed_path ~= nil and parsed_path:find("_shared/tap_hold/data/defaults.toml", 1, true) ~= nil,
+			"the walk-up fallback must still produce a _shared/tap_hold/data path, got: "
 				.. tostring(parsed_path) .. ctx)
 	end)
 
@@ -163,7 +163,7 @@ helpers.describe("init.lua: the Karabiner require cannot abort boot", function()
 
 		helpers.assert_true(src:find('pcall%(require, "platform%.remap"%)') ~= nil,
 			"init.lua must load platform.remap through pcall — a bare require lets a "
-				.. "missing or truncated tap_hold/defaults.toml take the whole boot down")
+				.. "missing or truncated tap_hold/data/defaults.toml take the whole boot down")
 		helpers.assert_true(src:find('local karabiner%s*=%s*require%("platform%.remap"%)') == nil,
 			"a bare `local karabiner = require(\"platform.remap\")` is back — that is "
 				.. "exactly the form this guards against")

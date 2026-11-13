@@ -35,7 +35,7 @@ local MODULE_KEYS = {
 	"adapters.file_system",
 	"adapters.storage",
 	"adapters.tray_menu",
-	"chord",
+	"keyboard.engine.chord",
 	"adapters.hotkey_registrar",
 	"infra.termination_coordinator",
 	"infra.factory_reset_journal",
@@ -274,7 +274,7 @@ local function with_menu_fixture(options, callback)
 				return true
 			end
 		end
-		logger.LEVELS = require("logger").LEVELS
+		logger.LEVELS = require("core.logger.engine").LEVELS
 		logger.is_enabled = function() return false end
 		return logger
 	end
@@ -393,7 +393,7 @@ local function with_menu_fixture(options, callback)
 			return true
 		end,
 	}
-	package.loaded["chord"] = { format = function() return "ctrl+x" end }
+	package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
 	package.loaded["adapters.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,

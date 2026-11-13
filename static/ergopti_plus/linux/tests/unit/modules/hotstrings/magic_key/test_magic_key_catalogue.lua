@@ -15,7 +15,7 @@ local function ends_with(value, suffix)
 end
 
 local function pack(name)
-	return require("infra.paths").shared("modules/hotstrings/" .. name)
+	return require("infra.paths").shared("hotstrings/data/catalogue/" .. name)
 end
 
 helpers.describe("magic key: static catalogue ownership", function()
@@ -77,7 +77,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 		local ok, err = pcall(function()
 			local loaded = nil
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			local load = engine.load_mappings
 			engine.load_mappings = function(self, mappings) loaded = mappings; return load(self, mappings) end
 			helpers.assert_true(Config._set_config_file_for_test(choices_path))
@@ -118,7 +118,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 
 			loaded = nil
 			Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			local load = engine.load_mappings
 			engine.load_mappings = function(self, mappings) loaded = mappings; return load(self, mappings) end
 			helpers.assert_true(Config._set_config_file_for_test(choices_path))
@@ -256,16 +256,16 @@ helpers.describe("magic-key restoration after publication refusal", function()
 		write(rules, '[[probe]]\n"alpha★" = { output = "expanded", is_word = false, auto_expand = true }\n')
 		write(info, '[info]\nphone_number = "0750123456"\n')
 		local Preferences = require("infra.hotstring_preferences")
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local original_publish = Writer.publish_if_unchanged
-		local old_manager, old_engine = package.loaded["modules.dynamic_hotstrings.manager"], package.loaded.dynamic_hotstrings
+		local old_manager, old_engine = package.loaded["modules.dynamic_hotstrings.manager"], package.loaded["hotstrings.engine.dynamic.core"]
 		local old_user_code = package.loaded["modules.dynamic_hotstrings.user_code"]
 		local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local Config
 		local ok, err = xpcall(function()
 			assert(Preferences._set_file_for_test(path))
 			assert(Preferences.set("hotstrings.dynamic.enabled", true))
-			package.loaded.dynamic_hotstrings = nil
+			package.loaded["hotstrings.engine.dynamic.core"] = nil
 			package.loaded["modules.dynamic_hotstrings.user_code"] = nil
 			local Dynamic = helpers.load_module("modules.dynamic_hotstrings.manager")
 			assert(Dynamic.set_rule_enabled("phoneprefixes", true))
@@ -275,7 +275,7 @@ helpers.describe("magic-key restoration after publication refusal", function()
 			end }, { __index = Dynamic })
 			local Magic = require("modules.hotstrings.magic_key")
 			local menu, loaded, saw_candidate = nil, nil, false
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			local load = engine.load_mappings
 			engine.load_mappings = function(self, mappings) loaded = mappings; return load(self, mappings) end
 			Config = helpers.load_module("modules.hotstrings.hotstrings_config")
@@ -315,7 +315,7 @@ helpers.describe("magic-key restoration after publication refusal", function()
 		Writer.publish_if_unchanged = original_publish
 		if Config then Config._set_config_file_for_test(nil) end
 		Preferences._set_file_for_test(nil)
-		package.loaded["modules.dynamic_hotstrings.manager"], package.loaded.dynamic_hotstrings = old_manager, old_engine
+		package.loaded["modules.dynamic_hotstrings.manager"], package.loaded["hotstrings.engine.dynamic.core"] = old_manager, old_engine
 		package.loaded["modules.dynamic_hotstrings.user_code"] = old_user_code
 		package.loaded["modules.hotstrings.hotstrings_config"] = old_config
 		for _, name in ipairs({ path, rules, info, backup }) do os.remove(name) end

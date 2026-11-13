@@ -13,7 +13,7 @@ local PhaseStats = require("infra.phase_stats")
 
 -- The shared reader is resolved at every use, not captured: a caller that
 -- replaces it (a test, a reload) is honoured, as when it was required directly.
-local M = setmetatable({}, { __index = function(_, key) return require("toml_codec.reader")[key] end })
+local M = setmetatable({}, { __index = function(_, key) return require("core.text.engine.toml_codec.reader")[key] end })
 
 --- Parses one TOML file through the shared reader, recording the `toml.parse`
 --- phase. A thrown error still reaches the caller unchanged.
@@ -22,7 +22,7 @@ local M = setmetatable({}, { __index = function(_, key) return require("toml_cod
 --- @return boolean committed
 function M.parse(path)
 	local started = PhaseStats.now()
-	local document, committed = require("toml_codec.reader").parse(path)
+	local document, committed = require("core.text.engine.toml_codec.reader").parse(path)
 	PhaseStats.stop("toml.parse", started)
 	return document, committed
 end

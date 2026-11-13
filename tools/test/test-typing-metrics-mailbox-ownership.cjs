@@ -73,8 +73,8 @@ function controller(request, outcomes = [], admission = 'accepted') {
 		cwd: path.join(root, 'macos'),
 		encoding: 'utf8',
 		input: `
-package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
-local json=require('json')
+package.path=package.path..';../_shared/?.lua;../_shared/?/init.lua;./?.lua;./?/init.lua'
+local json=require('core.text.engine.json')
 local poll
 -- Paced projection slices are queued on 10 ms timers and run after the callbacks
 local slices={}

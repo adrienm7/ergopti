@@ -10,8 +10,8 @@ and the old folders migrated once at boot with a backup. Branch
 
 ## Target layout
 
-All folders come from `_shared/modules/paths/app_dirs.toml`.
-`tools/codegen/codegen-app-dirs.cjs` turns it into `_shared/lua/app_dirs.lua`,
+All folders come from `_shared/core/fs/data/paths/app_dirs.toml`.
+`tools/codegen/codegen-app-dirs.cjs` turns it into `_shared/core/fs/engine/app_dirs.lua`,
 `windows/_generated/app_dirs.ahk` and `AppDirs.generated.swift`; Node tools and
 tests read it through `tools/test/lib/app-dirs.cjs`; PowerShell and Python
 read the TOML itself.
@@ -47,7 +47,7 @@ ids `com.ergoptiplus.*` are not folder names and are unchanged.
 
 ## One-time migration
 
-The shared core is `_shared/lua/legacy_folder_migration.lua`, replayed from
+The shared core is `_shared/settings/engine/migration/legacy_folder_migration_core.lua`, replayed from
 `_shared/tests/corpus/paths/legacy_folder_migration_vectors.json` by the Lua
 contract (macOS, Linux) and by
 `windows/tests/unit/infra/config/migration/test_legacy_folder_migration.ahk`

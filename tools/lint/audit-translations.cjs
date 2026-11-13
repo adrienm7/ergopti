@@ -46,8 +46,8 @@ const { readManifestLabelRows, resolvedLabelKey } = require('../lib/manifest-lab
 
 const REPO_ROOT = path.resolve(__dirname, '../../');
 const DRIVERS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus');
-const LOCALES_DIR = shared('data/locales');
-const MANIFEST_PATH = shared('modules/menu/menu_manifest.json');
+const LOCALES_DIR = shared('core/i18n/data/locales');
+const MANIFEST_PATH = shared('menu/data/menu_manifest.json');
 const BASELINE_PATH = path.join(__dirname, 'audit-translations-unused-baseline.json');
 const IDENTICAL_ALLOWLIST_PATH = path.join(__dirname, 'locale-identical-to-english-allowlist.json');
 
@@ -221,7 +221,7 @@ function findMissingKeys(available) {
 		if (Array.isArray(node)) node.forEach(visit);
 		else if (typeof node === 'object' && node !== null) {
 			if (node.i18n && !available.has(node.i18n)) {
-				note(node.i18n, sharedRel('modules/menu/menu_manifest.json'));
+				note(node.i18n, sharedRel('menu/data/menu_manifest.json'));
 			}
 			Object.values(node).forEach(visit);
 		}
@@ -301,9 +301,7 @@ function readBaseline() {
 function requiredDynamicKeys() {
 	// The frequency rows build their key from the shared presets, so the keys come
 	// from the same list the drivers read instead of a copy of it.
-	const updaterDefaults = JSON.parse(
-		fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8')
-	);
+	const updaterDefaults = JSON.parse(fs.readFileSync(shared('updater/data/defaults.json'), 'utf8'));
 	const frequencyKeys = updaterDefaults.timing.check_interval_presets.map(
 		(preset) => `menu.about.frequency.${preset.code}`
 	);

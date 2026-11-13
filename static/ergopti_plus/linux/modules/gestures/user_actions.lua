@@ -7,7 +7,7 @@
 --- command line the user typed, run hidden or in a new terminal window, and a
 --- file or folder opened with its default application.
 --- modules/gestures/manager.lua dispatches both and decodes their parameter
---- through _shared/lua/user_action_parameter.lua.
+--- through _shared/shortcuts/engine/user_action_parameter.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Never blocks the daemon's event loop: a hidden command is a libuv child
@@ -27,13 +27,13 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local i18n = require("infra.i18n")
 local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
 local FileSystem = require("adapters.file_system")
-local Unicode = require("compat.utf8")
-local Parameter = require("user_action_parameter")
+local Unicode = require("core.lifecycle.engine.compat.utf8")
+local Parameter = require("shortcuts.engine.user_action_parameter")
 
 local LOG = "modules.gestures.user_actions"
 
@@ -178,7 +178,7 @@ end
 --- @return table|nil terminal One row of TERMINALS.
 function M.resolve_terminal(has_command, preferred)
 	if type(preferred) == "string" and preferred ~= "" then
-		local name = require("native_path").basename(preferred)
+		local name = require("core.fs.engine.native_path").basename(preferred)
 		for _, terminal in ipairs(M.TERMINALS) do
 			if terminal.binary == name and has_command(terminal.binary) then return terminal end
 		end

@@ -6,7 +6,7 @@
 --- Regression model-button-emoji-first. The maintainer replaced the model list
 --- with one tray button on 2026-10-27: the backend's emoji, then the model it
 --- runs — « 🦙 qwen3:4b », « 🚀 Qwen3-4B », « 🌐 OpenAI/gpt-4o-mini ». The emoji
---- comes from _shared/modules/llm/backends.json, which Windows, Linux and the
+--- comes from _shared/ai/data/backends.json, which Windows, Linux and the
 --- selector page read too; these cases read that real file.
 --- ==============================================================================
 
@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Decodes the shared brand file independently of the module under test.
 local function shared_brands()
 	local JsonCodec = require("adapters.json_codec")
-	local fh = assert(io.open(helpers.shared("modules/llm/backends.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/backends.json"), "r"))
 	local decoded = JsonCodec.decode(fh:read("*a"))
 	fh:close()
 	return decoded.backends

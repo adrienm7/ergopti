@@ -18,10 +18,10 @@ helpers.describe("shared-probe-native", function()
 			local base = os.tmpname()
 			os.remove(base)
 			local root = base .. "/driver"
-			local sibling = base .. "/_shared/data/locales/en.json"
-			local child = root .. "/_shared/data/locales/en.json"
-			assert(Shell.run("mkdir -p -- " .. Shell.quote(root .. "/_shared/data/locales")
-				.. " " .. Shell.quote(base .. "/_shared/data/locales")))
+			local sibling = base .. "/_shared/core/i18n/data/locales/en.json"
+			local child = root .. "/_shared/core/i18n/data/locales/en.json"
+			assert(Shell.run("mkdir -p -- " .. Shell.quote(root .. "/_shared/core/i18n/data/locales")
+				.. " " .. Shell.quote(base .. "/_shared/core/i18n/data/locales")))
 			local file = assert(io.open(child, "w"))
 			assert(file:write('{}')); assert(file:close())
 			if kind == "fifo" then assert(Shell.run("mkfifo -- " .. Shell.quote(sibling)))

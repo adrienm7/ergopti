@@ -809,7 +809,7 @@ list the probe's `#32770` windows rather than its hot lines.
 
 ### project-llm-tap-hold-tab-is-the-users-tab
 
-The recommended AltGr taps Tab (`_shared/tap_hold/defaults.toml`), and a
+The recommended AltGr taps Tab (`_shared/tap_hold/data/defaults.toml`), and a
 tap-hold's tap runs on its key's release, so Tab is never physically down and
 the old "physical Tab" policy refused it as synthetic: the Tab was typed over
 every prediction. `TapHoldDispatchTap` names the key whose tap it runs
@@ -1169,7 +1169,7 @@ parts as patterns), listed directory, page src/href closure and data-file path
 ships. It cannot see a path assembled from data it does not model, such as a
 helper joining folder names read from JSON. Action: before a new Windows read
 of a file under an excluded group (`_shared/core`, `_shared/modules/**/*.js`,
-`_shared/assets`, documentation, test vectors), move it out of the exclusion;
+`_shared/tray/data`, documentation, test vectors), move it out of the exclusion;
 build such paths from a literal the gate can see.
 
 ### project-ahk-unreadable-config-persists-defaults

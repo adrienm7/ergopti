@@ -63,7 +63,7 @@ session under bytecode was not run.
 ## macOS (measured 2026-11-11, round 3, off-Mac)
 
 Hammerspoon also compiles every module from source at each boot. Under Lua 5.4.6
-the whole macOS tree (890 files, 14 MB with `_shared/lua`) compiles in 331 ms
+the whole macOS tree (890 files, 14 MB with `_shared`) compiles in 331 ms
 and loads as bytecode (`string.dump`, debug info kept, 9.3 MB) in 38 ms. A
 headless boot's first two require stages (`Path: config dir + paths.toml`, 342
 modules, and `Config-dependent module requires`, 166) cost 287 and 105 ms of

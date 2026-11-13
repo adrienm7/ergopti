@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: The Shared Matcher Core and the macOS Matcher Agree
 --- DESCRIPTION:
---- TODO §2 is macOS adopting `_shared/lua/hotstring_engine/` — the 526-line
+--- TODO §2 is macOS adopting `_shared/hotstrings/engine/matcher/` — the 526-line
 --- matcher that reaches Linux alone today. This file is the step that has to come
 --- before the switch: replay the whole cross-driver corpus through BOTH matchers
 --- and require the same verdict on every vector.
@@ -46,16 +46,16 @@ local MIN_COMPARED = 20
 -- =============================================
 -- =============================================
 
---- Puts `_shared/lua/` on package.path and requires the core.
+--- Puts `_shared/` on package.path and requires the core.
 --- Returns nil when it cannot be loaded, so the assertions below can say so
 --- rather than erroring out of the whole file.
 --- @return table|nil
 local function load_shared_core()
-	local entry = helpers.shared("lua") .. "/?.lua"
+	local entry = helpers.shared("") .. "/?.lua"
 	if not package.path:find(entry, 1, true) then
 		package.path = entry .. ";" .. package.path
 	end
-	local ok, mod = pcall(require, "hotstring_engine")
+	local ok, mod = pcall(require, "hotstrings.engine.matcher")
 	if not ok or type(mod) ~= "table" or type(mod.new) ~= "function" then return nil end
 	return mod
 end

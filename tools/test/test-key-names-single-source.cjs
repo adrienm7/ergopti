@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Key Names Have One Source
  * DESCRIPTION:
- * `_shared/data/keycodes/key_names.json` is the one table naming a key or a
+ * `_shared/layouts/data/keycodes/key_names.json` is the one table naming a key or a
  * modifier in visible text. This holds it to the locales, to the ids the
  * drivers name keys by, and to its two projections.
  *
@@ -38,7 +38,7 @@ const errors = [];
 // ======= 1/ Locales ==================
 // =====================================
 
-const localesDir = shared('data', 'locales');
+const localesDir = shared('core', 'i18n', 'data', 'locales');
 const catalogues = fs
 	.readdirSync(localesDir)
 	.filter((name) => name.endsWith('.json'))
@@ -68,7 +68,7 @@ for (const { code, data } of catalogues)
 // ======= 2/ Driver ids ===============
 // =====================================
 
-const defaults = TOML.parse(fs.readFileSync(shared('tap_hold', 'defaults.toml'), 'utf8'));
+const defaults = TOML.parse(fs.readFileSync(shared('tap_hold', 'data', 'defaults.toml'), 'utf8'));
 const resolve = (spelling, where) => {
 	if (canonical(spelling) === null) errors.push(`${where} "${spelling}" has no key name`);
 };
@@ -98,13 +98,15 @@ for (const field of ['modifier_aliases', 'left_modifier_aliases'])
 		resolve(id, `[tap_hold.hold_picker] ${field} target`);
 	}
 
-const roles = JSON.parse(fs.readFileSync(shared('modules', 'actions', 'slot_roles.json'), 'utf8'));
+const roles = JSON.parse(
+	fs.readFileSync(shared('shortcuts', 'data', 'actions', 'slot_roles.json'), 'utf8')
+);
 for (const [name, role] of Object.entries(roles.roles))
 	for (const platform of TABLE.platforms)
 		if (role[platform] !== null) resolve(role[platform], `slot role ${name} on ${platform}`);
 
 const chords = JSON.parse(
-	fs.readFileSync(shared('modules', 'actions', 'modifier_chords.json'), 'utf8')
+	fs.readFileSync(shared('shortcuts', 'data', 'actions', 'modifier_chords.json'), 'utf8')
 );
 for (const [platform, data] of Object.entries(chords.platforms))
 	for (const modifier of data.modifiers) resolve(modifier.id, `modifier chord on ${platform}`);
@@ -127,10 +129,10 @@ for (const key of chords.keys) {
 }
 
 // A sticky label is a template its modifiers fill from this table
-// (_shared/lua/actions/sticky_label.lua): it spelled « Cmd+Shift » in every
+// (_shared/shortcuts/engine/actions/sticky_label.lua): it spelled « Cmd+Shift » in every
 // locale until 2026-11-03. sticky_hyper is named by its own word.
 const actionRows = TOML.parse(
-	fs.readFileSync(shared('modules', 'actions', 'actions.toml'), 'utf8')
+	fs.readFileSync(shared('shortcuts', 'data', 'actions', 'actions.toml'), 'utf8')
 ).sg_actions;
 const stickyIds = Object.keys(actionRows).filter((id) => id.startsWith('sticky_'));
 if (stickyIds.length < 15) errors.push(`only ${stickyIds.length} sticky actions found`);
@@ -155,7 +157,7 @@ for (const id of stickyIds) {
 // Every position a physical shortcut slot can hold is named, never shown as
 // its W3C code (`KeyA`): the rule of key_names.lua physical_label.
 const physicalKeys = JSON.parse(
-	fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+	fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
 ).keys;
 const MODIFIER_POSITIONS = /^(Shift|Control|Alt|Meta)(Left|Right)$|^CapsLock$/;
 const legends = TABLE.physical.legends;
@@ -186,7 +188,7 @@ expect('LCtrl', 'windows', 'key_name.left_ctrl');
 // ======= 3/ Projections ==============
 // =====================================
 
-const lua = fs.readFileSync(shared('lua', 'keycodes', 'key_names_data.lua'), 'utf8');
+const lua = fs.readFileSync(shared('platform', 'input', 'keycodes', 'key_names_data.lua'), 'utf8');
 const ahk = fs.readFileSync(shared('..', 'windows', '_generated', 'key_names.ahk'), 'utf8');
 for (const id of Object.keys(TABLE.keys)) {
 	const row = TABLE.platforms.map((p) => `${p} = "${i18n(id, p)}"`).join(', ');
@@ -203,7 +205,7 @@ for (const [id, entry] of Object.entries(TABLE.keys)) {
 // The AI tooltip's shortcut column names every modifier of its order from this
 // table: a glyph on macOS, a translated name elsewhere.
 const tooltip = TOML.parse(
-	fs.readFileSync(shared('modules', 'tooltip', 'constants.toml'), 'utf8')
+	fs.readFileSync(shared('core', 'ui', 'data', 'tooltip', 'constants.toml'), 'utf8')
 ).llm_ui;
 for (const modifier of tooltip.shortcut_modifier_order.split(',')) {
 	const id = canonical(modifier);

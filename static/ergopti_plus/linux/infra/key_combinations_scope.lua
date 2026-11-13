@@ -2,13 +2,13 @@
 
 --- Ordered-pair edits use the shared conditional publisher and acknowledged
 --- inverse. Pair input stays fenced until both source and delivery ACKs settle.
-local Transaction = require("config_scope_transaction")
-local Shared = require("tap_hold.key_combinations")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local KeyPath = require("toml_codec.key_path")
-local Updates = require("shortcuts.physical_availability")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Shared = require("tap_hold.engine.key_combinations")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Updates = require("shortcuts.engine.physical_availability")
+local ConfigKeys = require("settings.engine.keys")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
 require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)

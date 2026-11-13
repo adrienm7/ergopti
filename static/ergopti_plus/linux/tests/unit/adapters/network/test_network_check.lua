@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The Debug menu's « Test network (PAC, proxy, download) » over scripted
 --- collaborators:
---- 1. the shared steps (network/field_check_network.lua) report in the order
+--- 1. the shared steps (core/network/engine/field_check_network.lua) report in the order
 ---    macOS and Windows use, and a helper cannot add a step;
 --- 2. the Linux ports read the proxy kinds from the environment, GNOME and KDE,
 ---    run the route lookup and the managed request, and name each failure with
@@ -18,8 +18,8 @@
 
 local helpers = require("tests.helpers")
 
-local Shared = require("network.field_check_network")
-local Report = require("field_check_report")
+local Shared = require("core.network.engine.field_check_network")
+local Report = require("diagnostics.engine.field_check.report")
 local Ports = helpers.load_module("adapters.network_check_ports")
 
 local PAC_URL = "http://pac.intranet.example/proxy.pac"
@@ -370,12 +370,12 @@ end)
 --- @param body function(Window, world)
 local function with_window(ports, body)
 	local saved = {}
-	for _, name in ipairs({ "logger.shim", "ui.field_check.network_check", "ui.field_check.window" }) do saved[name] = package.loaded[name] end
+	for _, name in ipairs({ "core.logger.engine.shim", "ui.field_check.network_check", "ui.field_check.window" }) do saved[name] = package.loaded[name] end
 	local world = { evidence = {}, errors = {}, notes = {}, dialogs = {}, copies = {}, deferred = {}, click = "close" }
 	local logger = helpers.make_logger_stub()
 	logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
 	logger.error = function(_, message, ...) world.errors[#world.errors + 1] = string.format(message, ...) end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["ui.field_check.network_check"] = nil
 	package.loaded["ui.field_check.window"] = nil
 	local ok, err = xpcall(function()

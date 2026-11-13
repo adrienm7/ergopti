@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 helpers.describe("Graphical session lock ownership", function()
 	helpers.it("allows direct CLI startup without a launcher marker (session-lock-cli)", function()

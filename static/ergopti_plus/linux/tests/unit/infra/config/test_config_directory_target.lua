@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell, Json = require("adapters.shell_runner"), require("json")
+local Shell, Json = require("adapters.shell_runner"), require("core.text.engine.json")
 
 --- Runs actual persistence in a process with private XDG roots and inherited HOME.
 --- @param entry string Single setter, batch setter or paths editor.

@@ -24,7 +24,7 @@ local RESET_MODULES = {
 	"adapters.synthetic_input", "adapters.input_source_broker",
 	"infra.logger", "infra.timings",
 	"infra.manifest_reader", "infra.i18n", "infra.dialog_util",
-	"keystats.metrics", "modules.keymap",
+	"metrics.engine.metrics", "modules.keymap",
 }
 
 
@@ -130,7 +130,7 @@ local function load_timer_allocation_failure_fixture()
 		get_sqlite_path = function() return nil end,
 		get_db_rev = function() return 0 end,
 	}
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 0 end,
 	}
 
@@ -444,7 +444,7 @@ local function load_fixture()
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { alert = noop }
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 0 end,
 	}
 

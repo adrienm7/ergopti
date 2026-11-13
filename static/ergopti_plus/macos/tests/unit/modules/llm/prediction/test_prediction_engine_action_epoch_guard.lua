@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SharedParser = require("llm.parser")
+local SharedParser = require("ai.engine.api.parser_core")
 
 
 local DEFAULTS = {

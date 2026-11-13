@@ -1,7 +1,7 @@
 {
 	"caption_policy": "native helpers return original unprefixed translated title; existing receivers retain branding/urgency policy",
 	"captured_before_proposal": true,
-	"locale_order_sha256": "ced2aa13eadae6005222bc45f9ef3217c09c559bedcc50a15538c8b1ecca0c22",
+	"locale_order_sha256": "6af58e926745116893bcf770840bdc337dce67e053cda564b9ba987cbff56439",
 	"locales": {
 		"ar": {
 			"captions": {

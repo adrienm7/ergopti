@@ -19,7 +19,7 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "f58d15798aaaabbbbccccddddeeeeffff0000111"
 local SHARED = "/usr/lib/ergopti/_shared"
@@ -45,7 +45,7 @@ end
 --- @param body function
 --- @return table lines
 local function capture_logs(body)
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local lines = {}
 	local previous_level = Logger.get_level()
 	Logger.set_level(10)
@@ -145,7 +145,7 @@ describe("Driver version: infra/version.lua resolves the stamp", function()
 		local version, source = Version.resolve({ shared_root = SHARED, fs = fixture_fs({}) })
 		assert_eq(Version.LOCAL, version)
 		assert_eq(Version.SOURCE_LOCAL, source)
-		assert_eq("local", require("updater.version").normalize_tag(version),
+		assert_eq("local", require("updater.engine.version_core").normalize_tag(version),
 			"the updater's source-run branch compares against this exact token")
 	end)
 
@@ -213,7 +213,7 @@ describe("Driver version: the crash dump names the version and the app dir", fun
 			if not ok then error(err, 0) end
 			assert_true(err == true, "metadata dump must acknowledge its retained redacted output")
 			local body = table.concat(parts)
-			local report = require("json").decode(body)
+			local report = require("core.text.engine.json").decode(body)
 			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
 			assert_true(report.version == Version.VERSION, body)
 			assert_true(report.script_dir == redact(Paths.driver_root()), body)

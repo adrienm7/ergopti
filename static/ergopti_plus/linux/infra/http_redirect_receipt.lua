@@ -28,7 +28,7 @@ function M.attach(request, result)
 	local effective, redirected, bytes = tail:match("\n" .. MARKER .. "\n([^\n]*)\n([^\n]*)\n([^\n]*)\n$")
 	if not bytes or #bytes > request.single_hop_receipt_bytes
 		or #effective > request.single_hop_url_bytes or #redirected > request.single_hop_url_bytes then return result end
-	local loaded, json = pcall(require, "json")
+	local loaded, json = pcall(require, "core.text.engine.json")
 	if not loaded or type(json) ~= "table" then return result end
 	local decode = json.decode_lossless or json.decode
 	if type(decode) ~= "function" then return result end

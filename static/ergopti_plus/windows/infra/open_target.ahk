@@ -8,7 +8,7 @@
 ; its scheme, an IP address, localhost, a mail address, ms-settings:, shell:),
 ; a file or folder path, a registry key, a bare file name, or plain text to
 ; search the web for. The macOS and Linux drivers apply the same rule through
-; _shared/lua/open_target; both ports replay one corpus,
+; _shared/shortcuts/engine; both ports replay one corpus,
 ; _shared/tests/corpus/shortcuts/open_target_vectors.json.
 ;
 ; FEATURES & RATIONALE:

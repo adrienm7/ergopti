@@ -18,7 +18,7 @@ _GestureClearBootMarker(Scope, Mode, Outcome := "complete") {
 	TapPath := Fixture.directory . "\tap_hold.toml"
 	Assert(FSWriteDurable(TapPath, '[tap_hold.keys.space]`ntap_action = "open_url"`n'))
 	Fixture.options["tap_hold_path"] := TapPath
-	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 	Bundle := 0, Accepted := 0, Refusal := 0, Launches := 0, Backups := 0
 	Launch(Success, Borrowed, Refused) {
 		Bundle := Borrowed, Accepted := Success, Refusal := Refused, Launches += 1

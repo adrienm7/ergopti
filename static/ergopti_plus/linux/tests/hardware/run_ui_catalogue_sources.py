@@ -9,12 +9,12 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local paths = require("infra.paths")
 local original = paths.shared
 local kind, endpoint = os.getenv("UI_SOURCE_KIND"), os.getenv("UI_SOURCE_PATH")
-local target = kind == "catalogue" and require("onboarding_answers").CATALOGUE_PATH
-    or kind == "locale" and "data/locales/en.json" or "modules/llm/models.json"
+local target = kind == "catalogue" and require("onboarding.engine.answers").CATALOGUE_PATH
+    or kind == "locale" and "core/i18n/data/locales/en.json" or "ai/data/models.json"
 paths.shared = function(name) if name == target then return endpoint end return original(name) end
 local regular = os.getenv("UI_SOURCE_REGULAR") == "1"
 if kind == "catalogue" then
@@ -49,8 +49,8 @@ def main():
     args = parser.parse_args()
     sources = {
         "catalogue": "ui/_generated/onboarding_catalogue.json",
-        "locale": "data/locales/en.json",
-        "models": "modules/llm/models.json",
+        "locale": "core/i18n/data/locales/en.json",
+        "models": "ai/data/models.json",
     }
     total = 0
     with tempfile.TemporaryDirectory(prefix="ergopti-ui-sources-") as root_text:
@@ -95,7 +95,7 @@ def main():
                     UI_SOURCE_PATH=str(endpoint),
                     UI_SOURCE_REGULAR="1" if shape in ("regular", "file-link") else "0",
                     XDG_CONFIG_HOME=str(root / "config"),
-                    LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                    LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 )
                 try:
                     result = subprocess.run(

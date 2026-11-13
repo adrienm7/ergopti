@@ -20,7 +20,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# The shared crash document (_shared/lua/crash_report.lua): the fields in the order
+# The shared crash document (_shared/diagnostics/engine/reports/crash_report.lua): the fields in the order
 # the driver serialized them, two spaces deep, one line per field.
 function ConvertTo-CrashDocument {
 	param([Parameter(Mandatory = $true)]$Snapshot)

@@ -145,7 +145,7 @@ helpers.describe("remap layer fixture: conditional removal", function()
 			local callback_count = 0
 			local on_error = function() callback_count = callback_count + 1 end
 			local expected = { status = "ok", content = disk.files[LAYERS] }
-			helpers.assert_true(require("toml_codec.writer").remove_if_unchanged(LAYERS,
+			helpers.assert_true(require("core.text.engine.toml_codec.writer").remove_if_unchanged(LAYERS,
 				require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }))
 			helpers.assert_nil(disk.files[LAYERS])
 			helpers.assert_eq(#disk.removal_calls, 1)
@@ -170,7 +170,7 @@ helpers.describe("remap layer fixture: conditional removal", function()
 					helpers.assert_eq(category, "removal")
 					callback_count = callback_count + 1
 				end
-				helpers.assert_eq(require("toml_codec.writer").remove_if_unchanged(path,
+				helpers.assert_eq(require("core.text.engine.toml_codec.writer").remove_if_unchanged(path,
 					require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }), false)
 				helpers.assert_eq(disk.files[LAYERS], original)
 				helpers.assert_eq(disk.files[foreign], original)

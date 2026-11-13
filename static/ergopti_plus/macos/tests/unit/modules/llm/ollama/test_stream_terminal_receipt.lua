@@ -38,10 +38,10 @@ local function run_case(case)
 		"modules.llm.parser", "infra.logger" }, function()
 		-- The parser only reads the core's defaults. Keep that data port truthful
 		-- without booting unrelated backends or acquiring their module lifetimes.
-		local file = assert(io.open(helpers.shared("modules/llm/defaults.json"), "rb"))
+		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())
-		local defaults = assert(require("json").decode(raw))
+		local defaults = assert(require("core.text.engine.json").decode(raw))
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults }
 		package.loaded["modules.keystats"] = { log_llm = function() end }
 		local api = helpers.load_with_stubs("modules.llm.api_ollama")

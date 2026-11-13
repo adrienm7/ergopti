@@ -113,7 +113,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
 			local i18n = require("infra.i18n")
-			local HoldOptions = require("tap_hold.hold_options")
+			local HoldOptions = require("tap_hold.engine.hold_options")
 			local options = Manager.hold_options()
 			local shift = find(key_rows(section), i18n.get("key_name.left_shift"))
 			find(shift.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4)).fn()
@@ -225,18 +225,18 @@ helpers.describe("Linux Tap-Holds menu", function()
 	end)
 
 	helpers.it("has a label for every modifier of every hold in all 21 locales", function()
-		local HoldOptions = require("tap_hold.hold_options")
-		local Json = require("json")
+		local HoldOptions = require("tap_hold.engine.hold_options")
+		local Json = require("core.text.engine.json")
 		local Paths = require("infra.paths")
 		local picker = require("platform.remap.tap_hold_loader").load(DEFAULTS, nil).hold_picker
 		local options = HoldOptions.build(picker)
 		helpers.assert_true(#options > #picker.modifiers, "the shipped picker must be read, or this proves nothing")
-		local order_fh = assert(io.open(Paths.shared("data/locale_order.json"), "r"))
+		local order_fh = assert(io.open(Paths.shared("core/i18n/data/locale_order.json"), "r"))
 		local locales = Json.decode(order_fh:read("*a")).order
 		order_fh:close()
 		helpers.assert_eq(#locales, 21, "every shipped locale")
 		for _, code in ipairs(locales) do
-			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
+			local fh = assert(io.open(Paths.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 			local strings = Json.decode(fh:read("*a"))
 			fh:close()
 			local function translate(key)
@@ -249,7 +249,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 				if option.kind == "modifier" then
 					local expected = {}
 					for modifier in option.id:gmatch("[^+]+") do
-					expected[#expected + 1] = translate(require("keycodes.key_names").i18n(modifier, "linux"))
+					expected[#expected + 1] = translate(require("platform.input.keycodes.key_names").i18n(modifier, "linux"))
 				end
 					helpers.assert_true(#expected >= 1, code .. ": " .. option.id .. " names at least one modifier")
 					helpers.assert_eq(label, table.concat(expected, " + "), code .. ": " .. option.id)
@@ -362,7 +362,7 @@ helpers.describe("declared per-key native command", function()
 	end)
 
 	helpers.it("replays the independent platform captions and states in all 21 locales (tap-hold-key-native)", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local Paths = require("infra.paths")
 		local function read_json(relative)
 			local file = assert(io.open(Paths.shared(relative), "r"))
@@ -371,14 +371,14 @@ helpers.describe("declared per-key native command", function()
 			return Json.decode(text)
 		end
 		local corpus = read_json("tests/corpus/menus/tap_hold_key_native.json")
-		local locales = read_json("data/locale_order.json").order
+		local locales = read_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read_json("data/locales/" .. code .. ".json")
+			local strings = read_json("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({
+				local renderer = assert(require("menu.engine.renderer").new({
 					platform = platform,
-					manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+					manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 					json_decode = Json.decode,
 					i18n = { get = function(key) return assert(strings[key], code .. ": " .. key) end,
 						section = function(key) return assert(strings[key], code .. ": " .. key) end },
@@ -453,7 +453,7 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 			helpers.assert_eq(notices, 1, "native refusal still reaches its error owner")
 			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntap_action = "copy"\nhold_modifier = "ctrl"\n[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n[future]\nkeep = "neighbour"\n')
 			helpers.assert_nil(callback(), "success retains the original callback return policy")
-			local document = assert(require("toml_codec").decode(read()))
+			local document = assert(require("core.text.engine.toml_codec").decode(read()))
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.tap_action, "")
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.hold_modifier, "")
 			helpers.assert_eq(document.tap_hold.keys.left_shift.tap_action, "paste", "other key remains untouched")
@@ -550,19 +550,19 @@ helpers.describe("declared complete per-key head", function()
 	end)
 
 	helpers.it("replays full platform projection and literal captions in all 21 locales (tap-hold-key-head)", function()
-		local Json, Paths = require("json"), require("infra.paths")
+		local Json, Paths = require("core.text.engine.json"), require("infra.paths")
 		local function read(relative)
 			local file = assert(io.open(Paths.shared(relative), "r"))
 			local text = file:read("*a"); file:close()
 			return Json.decode(text)
 		end
-		local corpus, locales = read("tests/corpus/menus/tap_hold_key_head.json"), read("data/locale_order.json").order
+		local corpus, locales = read("tests/corpus/menus/tap_hold_key_head.json"), read("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read("data/locales/" .. code .. ".json")
+			local strings = read("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 					json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
 						section = function(key) return assert(strings[key]) end },
 					logger = { error = function() end, warn = function() end, debug = function() end } }))
@@ -624,20 +624,20 @@ end)
 
 helpers.describe("declared complete per-key delay tail", function()
 	helpers.it("replays handwritten delay projection and inherited state in all 21 locales (tap-hold-key-delay)", function()
-		local Json, Paths = require("json"), require("infra.paths")
+		local Json, Paths = require("core.text.engine.json"), require("infra.paths")
 		local function read(relative)
 			local file = assert(io.open(Paths.shared(relative), "r"))
 			local value = Json.decode(file:read("*a")); file:close(); return value
 		end
 		local corpus = read("tests/corpus/menus/tap_hold_key_delay.json")
-		local locales = read("data/locale_order.json").order
+		local locales = read("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read("data/locales/" .. code .. ".json")
+			local strings = read("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				for _, inherited in ipairs({ false, true }) do
-					local renderer = assert(require("menu.renderer").new({ platform = platform,
-						manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+					local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+						manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 						json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
 							section = function(key) return assert(strings[key]) end },
 						logger = { error = function() end, warn = function() end, debug = function() end } }))
@@ -756,7 +756,7 @@ helpers.describe("declared complete per-key delay tail", function()
 			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntime_activation_seconds = 0.2\n[tap_hold.keys.left_shift]\ntime_activation_seconds = 0.4\n[future]\nkeep = "neighbour"\n')
 			helpers.assert_eq(Manager.reload(), true, "the repaired source is the current editable configuration")
 			helpers.assert_eq(callback(), true, "only durable native acceptance acknowledges the chosen delay")
-			local document = assert(require("toml_codec").decode(read()))
+			local document = assert(require("core.text.engine.toml_codec").decode(read()))
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.time_activation_seconds, 0.375)
 			helpers.assert_eq(document.tap_hold.keys.left_shift.time_activation_seconds, 0.4)
 			helpers.assert_eq(document.future.keep, "neighbour")

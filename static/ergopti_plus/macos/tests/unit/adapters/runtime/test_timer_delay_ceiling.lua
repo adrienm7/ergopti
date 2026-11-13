@@ -60,7 +60,7 @@ local function sleep_replay(seconds)
 	return sleeps == 1, errors > 0
 end
 
-require("test.timer_delay_ceiling_contract").register(helpers, helpers.shared, {
+require("tests.lua.timer_delay_ceiling_contract").register(helpers, helpers.shared, {
 	{ name = "macos scheduler after", unit = "seconds", replay = scheduler_replay("after") },
 	{ name = "macos scheduler every", unit = "seconds", replay = scheduler_replay("every") },
 	{ name = "macos scheduler sleep_us", unit = "seconds", replay = sleep_replay,

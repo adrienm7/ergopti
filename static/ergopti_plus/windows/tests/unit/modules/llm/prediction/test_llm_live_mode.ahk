@@ -511,7 +511,7 @@ _LLV_LiveIsPartOfTheRequestIdentity() {
 		"a live request never shares a cache entry or callback with an ordinary one")
 	AssertThrows(() => _LLM_Engine_NormalizePromptOverride(
 		Map("profile_id", "basic", "live", "yes")), "the live flag is a Boolean")
-	Path := _SharedDir . "\modules\llm\live.json"
+	Path := _SharedDir . "\ai\data\live.json"
 	File := JsonParse(FileRead(Path, "UTF-8"))
 	AssertEqual(File["debounce_ms"], LLM_Live_Config()["debounce_ms"], "the debounce is live.json's")
 	AssertEqual(File["min_words"], LLM_Live_Config()["min_words"], "the word floor is live.json's")
@@ -947,7 +947,7 @@ _LLV_DeclaredOffLabelOwnsUniqueness() {
 			AssertEqual(21, Spec["locales"].Length, "the real locale corpus remains complete")
 			for Code in Spec["locales"] {
 				_I18nLocale := Code
-				_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+				_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 				_I18nCacheLoaded := true
 				Label := t(Spec["stop_notice_key"])
 				Assert(Label != "" && Label != Spec["stop_notice_key"], "the stop notice is translated: " . Code)

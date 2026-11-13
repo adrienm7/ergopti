@@ -2,7 +2,7 @@
 --- Real SQLite refusal/recovery through public collector and projection APIs.
 --- Owned software output and temporary schema obstructions only; no mocks or hardware claims.
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-manifest-receipt-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -91,7 +91,7 @@ end)
 Keystats.clear_cache()
 check("explicit cache clear still rebuilds the healthy native projection", function() assert(chars(payload()) == 3) end)
 check("a damaged app category file refuses the complete public dashboard", function()
-	local category_path = root .. "/config/ergopti/" .. require("keystats.app_category_store").FILE_NAME
+	local category_path = root .. "/config/ergopti/" .. require("metrics.engine.apps.category_store").FILE_NAME
 	local file = assert(io.open(category_path, "wb"))
 	assert(file:write("{ not a category document"))
 	assert(file:close())

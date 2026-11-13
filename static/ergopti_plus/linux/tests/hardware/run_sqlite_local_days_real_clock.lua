@@ -9,7 +9,7 @@
 -- Actual current clock and libc timezone conversion; process starts with TZ=OWN-24.
 -- Software public APIs, real owned SQLite, no clock/process/SQL/provider replacement.
 local uv = require('luv')
-require('compat.utf8').install()
+require('core.lifecycle.engine.compat.utf8').install()
 local original_date, original_time = os.date, os.time
 local root = assert(uv.fs_mkdtemp('/tmp/ergopti-real-local-days-XXXXXX'))
 for _, name in ipairs({'CONFIG','DATA','CACHE','STATE'}) do
@@ -22,7 +22,7 @@ assert(config:write('[metrics]\nenabled = true\n') and config:close())
 local K = require('modules.keystats.keystats')
 local W = require('modules.keystats.sqlite_writer')
 local R = require('modules.keystats.sqlite_reader')
-local Json = require('json')
+local Json = require('core.text.engine.json')
 local path, local_day, utc_day = root..'/metrics.sqlite',os.date('%Y-%m-%d'),os.date('!%Y-%m-%d')
 assert(local_day ~= utc_day,'OWN-24 must produce a distinct real local calendar day')
 print('real TZ='..tostring(os.getenv('TZ'))..'; local='..os.date('%Y-%m-%d %H:%M:%S')..'; UTC='..os.date('!%Y-%m-%d %H:%M:%S'))

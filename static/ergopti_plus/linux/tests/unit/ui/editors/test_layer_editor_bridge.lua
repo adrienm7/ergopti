@@ -28,9 +28,9 @@
 --- ==============================================================================
 
 local helpers     = require("tests.helpers")
-local Json        = require("json")
-local TomlCodec   = require("toml_codec")
-local Layers      = require("keymap.layers")
+local Json        = require("core.text.engine.json")
+local TomlCodec   = require("core.text.engine.toml_codec")
+local Layers      = require("layouts.engine.layers.layers")
 
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 local FIXTURE = SHARED_ROOT .. "/tests/corpus/layer_editor/edited_layers.toml"
@@ -102,7 +102,7 @@ end
 --- An XKB keymap typing, at level 1, each character of `layout` (code -> text)
 --- on its registry key: what `xkbcli dump-keymap` prints, cut to those keys.
 local function xkb_keymap(layout)
-	local Registry = Json.decode(read_file(SHARED_ROOT .. "/data/keycodes/physical_keys.json"))
+	local Registry = Json.decode(read_file(SHARED_ROOT .. "/layouts/data/keycodes/physical_keys.json"))
 	local keycodes, symbols = {}, {}
 	for code, text in pairs(layout) do
 		local evdev = Registry.keys[code].evdev
@@ -209,7 +209,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	end)
 
 	helpers.it("(leh-001-emulated-legends) shows the emulated layout's characters while one is emulated", function()
-		local registry = Json.decode(read_file(SHARED_ROOT .. "/data/keycodes/physical_keys.json"))
+		local registry = Json.decode(read_file(SHARED_ROOT .. "/layouts/data/keycodes/physical_keys.json"))
 		local dir = make_config_dir()
 		local world = make_state(dir)
 		local w_code = registry.keys.KeyW.evdev
@@ -234,15 +234,15 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 		local corpus = Json.decode(read_file(LEGENDS))
 		local Layout = helpers.load_module("adapters.keyboard_layout")
-		local LayerEditor = require("keymap.layer_editor")
+		local LayerEditor = require("layouts.engine.layers.editor")
 		-- The bridge, loaded over a logger that records its warnings.
 		local warnings = {}
 		local recorder = helpers.make_logger_stub()
 		recorder.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-		local previous_logger = package.loaded["logger.shim"]
-		package.loaded["logger.shim"] = recorder
+		local previous_logger = package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = recorder
 		local Recorded = helpers.load_module("ui.layer_editor.bridge")
-		package.loaded["logger.shim"] = previous_logger
+		package.loaded["core.logger.engine.shim"] = previous_logger
 		for _, case in ipairs(corpus.cases) do
 			local dir = make_config_dir()
 			local world = make_state(dir)
@@ -262,7 +262,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 			Manager._reset_for_test()
 			Manager.init({ keyboard_hook = hook, execute_action = function() end,
 				action_names = function() return {} end, on_text_injected = function() end,
-				defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+				defaults_path = SHARED_ROOT .. "/tap_hold/data/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 			world.state.tap_hold = Manager
 			world.state.keyboard_layout = Layout
 			Layout._load_keymap_for_test(xkb_keymap(case.layout))
@@ -327,7 +327,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		Manager._reset_for_test()
 		Manager.init({ keyboard_hook = hook, execute_action = function() end,
 			action_names = function() return {} end, on_text_injected = function() end,
-			defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+			defaults_path = SHARED_ROOT .. "/tap_hold/data/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 		local original = hook.engine
 		world.on_reload = Manager.reload
 		local text = read_file(FIXTURE)
@@ -370,7 +370,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		Manager._reset_for_test()
 		Manager.init({ keyboard_hook = hook, execute_action = function() end,
 			action_names = function() return {} end, on_text_injected = function() end,
-			defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+			defaults_path = SHARED_ROOT .. "/tap_hold/data/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 		local original, before_enabled = hook.engine, Manager.file_enabled()
 		world.on_reload = Manager.reload
 		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)

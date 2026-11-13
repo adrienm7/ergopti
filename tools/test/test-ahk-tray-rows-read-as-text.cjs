@@ -37,7 +37,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const WALKER = path.join(WINDOWS, 'tests', 'fixtures', 'tray_rows_walker.ahk');
 const FEATURES = path.join(WINDOWS, '_generated', 'features_manifest.ahk');
-const MENU_MANIFEST = path.join(WINDOWS, '..', '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MENU_MANIFEST = path.join(WINDOWS, '..', '_shared', 'menu', 'data', 'menu_manifest.json');
 const LOCALES = ['fr', 'en'];
 // A real tray holds hundreds of rows: fewer means the walk stopped early.
 const MIN_ROWS = 200;
@@ -77,7 +77,10 @@ function readIdentifiers() {
  */
 function labelValueRows(platform) {
 	const french = JSON.parse(
-		fs.readFileSync(path.join(WINDOWS, '..', '_shared', 'data', 'locales', 'fr.json'), 'utf8')
+		fs.readFileSync(
+			path.join(WINDOWS, '..', '_shared', 'core', 'i18n', 'data', 'locales', 'fr.json'),
+			'utf8'
+		)
 	);
 	const spelled = new Set();
 	const visit = (node) => {

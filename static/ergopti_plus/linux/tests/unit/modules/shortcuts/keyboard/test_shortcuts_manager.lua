@@ -81,13 +81,13 @@ helpers.describe("modules.shortcuts.manager", function()
   end)
 
   -- Regression + SSoT guard: the wrap catalogue must be derived from the shared
-  -- JSON (_shared/modules/wrap_symbols/wrap_symbols.json), never hardcoded. Build
+  -- JSON (_shared/keyboard/data/wrap_symbols/wrap_symbols.json), never hardcoded. Build
   -- the expected flattened lookup straight from the canonical JSON and deep-equal
   -- it against the module's catalogue, so any drift — or a revert to a hardcoded
   -- subset — fails here.
   helpers.it("wrap catalogue matches the shared wrap_symbols.json SSoT", function()
-    local json = require("json")
-    local path = helpers.driver_root() .. "/../_shared/modules/wrap_symbols/wrap_symbols.json"
+    local json = require("core.text.engine.json")
+    local path = helpers.driver_root() .. "/../_shared/keyboard/data/wrap_symbols/wrap_symbols.json"
     local fh = assert(io.open(path, "r"), "shared wrap_symbols.json must be readable")
     local raw = fh:read("*a")
     fh:close()
@@ -99,7 +99,7 @@ helpers.describe("modules.shortcuts.manager", function()
     for _, group in ipairs(data.groups) do
       for _, pair in ipairs(group.pairs or {}) do
         -- Every trigger form of both ends (bare and space-variant guillemets).
-        require("wrap_pair").register(expected, pair)
+        require("keyboard.engine.wrap_pair").register(expected, pair)
       end
     end
 
@@ -329,7 +329,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 			.. tostring(enabled) .. '\nfuture_mode = "kept" # preserve this comment\n[future]\nvalues = ["a", "b"]\n'
 		local file = assert(io.open(path, "wb"));assert(file:write(source));assert(file:close())
 		local prior = package.loaded["modules.shortcuts.manager"]
-		local writer, rename = require("toml_codec.writer"), os.rename
+		local writer, rename = require("core.text.engine.toml_codec.writer"), os.rename
 		local batch = writer.batch_write
 		local called, failure = pcall(function()
 			local manager = helpers.load_module("modules.shortcuts.manager")

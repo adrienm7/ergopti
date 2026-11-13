@@ -17,7 +17,7 @@ local helpers, Engine = Fixture.helpers, Fixture.Engine
 local Loader = require("platform.remap.tap_hold_loader")
 local Timings = require("infra.timings")
 
-local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/data/defaults.toml")
 
 local function write_file(path, text)
 	local fh = assert(io.open(path, "w"))
@@ -41,7 +41,7 @@ local function fresh_writer()
 		reload = function() state.reloads = state.reloads + 1; return true end,
 		is_tap_action = function(id) return id == "copy" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS_PATH, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS_PATH, nil).hold_picker)
 		end,
 	})
 	return writer, path, state, dir .. "/config.toml"
@@ -71,7 +71,7 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 				"the engine runs the stored timeout")
 		end
 		helpers.assert_true(writer.set_one_shot_timeout_ms(Loader.ONE_SHOT_TIMEOUT_DEFAULT_MS))
-		local stored = require("toml_codec").decode(assert(io.open(config_path, "r")):read("*a"))
+		local stored = require("core.text.engine.toml_codec").decode(assert(io.open(config_path, "r")):read("*a"))
 		helpers.assert_nil(stored.tap_holds and stored.tap_holds.sticky_timeout_ms, "the default is written as an absence")
 		helpers.assert_eq(state.reloads, 3, "each change is in force at once")
 		helpers.assert_nil(io.open(path, "r"), "tap_hold.toml is not written: the timeout is a config.toml row")
@@ -125,8 +125,8 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 		local writer, path = fresh_writer()
 		local preset = Loader.preset_keys(DEFAULTS_PATH)
 		local text = writer.render_scope("recommended",
-			require("toml_codec").decode("[tap_hold]\nsticky_timeout_ms = 4000\n"), {}, preset)
-		local decoded = require("toml_codec").decode(text)
+			require("core.text.engine.toml_codec").decode("[tap_hold]\nsticky_timeout_ms = 4000\n"), {}, preset)
+		local decoded = require("core.text.engine.toml_codec").decode(text)
 		helpers.assert_nil(decoded.tap_hold and decoded.tap_hold.sticky_timeout_ms, "the recommendation sets no timeout")
 		discard(path)
 	end)

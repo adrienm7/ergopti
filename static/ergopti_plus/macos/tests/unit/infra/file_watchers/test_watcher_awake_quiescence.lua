@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"infra.file_watchers", "ui.menu.menu_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
-	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate", "native_path",
-	"diagnostics.runtime_log", "adapters.timer_scheduler", "error_description", "number_policy",
+	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
+	"diagnostics.engine.runtime_log", "adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"adapters.storage", "infra.timings", "adapters.file_system",
 	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "ui.hotstring_editor",
 }

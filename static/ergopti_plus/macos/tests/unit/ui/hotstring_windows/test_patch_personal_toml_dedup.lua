@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local Fixture = require("tests.support.hotstrings_config_window_fixture")
-local Metadata = require("hotstrings.personal_metadata")
+local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 
 -- Check each real delegation edge instead of accepting a detached editor call.
 local edges = {
@@ -23,7 +23,7 @@ local edges = {
 	{ symbol = "MODULE: Personal File Metadata Controller",
 		call = "Config.prepare_personal_metadata(owner, binding.record, section, field, value)" },
 	{ symbol = "function M.prepare_personal_metadata(owner, record, section, field, value)",
-		call = 'require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)' },
+		call = 'require("hotstrings.engine.catalogue.personal_metadata").prepare(record.content, section, field, value, legacy)' },
 }
 for _, edge in ipairs(edges) do
 	local source, detail = helpers.read_driver_unit(edge.symbol)
@@ -63,7 +63,7 @@ print("[PASS] test_patch_personal_toml_dedup")
 
 helpers.describe("personal metadata complete-record ownership", function()
 	helpers.it("binds the shared planner to the canonical complete-record writer", function()
-		local writer, bound = require("toml_codec.writer"), false
+		local writer, bound = require("core.text.engine.toml_codec.writer"), false
 		local index = 1
 		while true do
 			local name, value = debug.getupvalue(Metadata.prepare, index)
@@ -105,11 +105,11 @@ helpers.describe("personal metadata complete-record ownership", function()
 				helpers.assert_eq(writes, 1)
 				helpers.assert_true(content:find(preserved, 1, true) ~= nil,
 					"nested continuation data belongs to its complete record")
-				local parsed, committed = require("toml_codec.reader").parse_text(content)
+				local parsed, committed = require("core.text.engine.toml_codec.reader").parse_text(content)
 				helpers.assert_eq(committed, true)
 				helpers.assert_eq(parsed.meta.delay, operation == "set_delay" and 0.75 or nil)
 				helpers.assert_eq(parsed.meta.description, "kept")
-				helpers.assert_eq(require("toml_codec").decode(content)._meta.future_matrix, { { 1, 2 } })
+				helpers.assert_eq(require("core.text.engine.toml_codec").decode(content)._meta.future_matrix, { { 1, 2 } })
 			end)
 		end)
 	end

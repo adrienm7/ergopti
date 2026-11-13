@@ -208,7 +208,7 @@ end
 --- @param key string i18n key.
 --- @return string text
 local function english_text(key)
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
 	local english = hs.json.decode(file:read("*a"))
 	file:close()
 	local text = english[key]

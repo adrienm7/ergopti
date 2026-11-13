@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local HOME = "/Users/test/" .. AppDirs.macos.support_relative .. "/RemapRuntime/VirtualHIDDevice/8.5.0"
 local DIGEST = "d73d6d9428f0f80b87b8a8ba8a1031f2cbc3bc1fa6b74842d1f1b764b2916fc9"

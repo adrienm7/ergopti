@@ -20,9 +20,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Rewrite = require("llm.rewrite")
-local SharedPromptBuilder = require("llm.prompt_builder")
+local json = require("core.text.engine.json")
+local Rewrite = require("ai.engine.prediction.rewrite")
+local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local ENTRY_ID = "e2e-cerebras"

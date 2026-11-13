@@ -21,7 +21,7 @@ local function run_case(family, change, route)
 	local previous_rules = saved.dynamic_hotstrings and saved.dynamic_hotstrings.get_rules()
 	for name in pairs(saved) do
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.") or name == "logger.shim" or name == "dynamic_hotstrings" then
+			or name:match("^platform%.") or name == "core.logger.engine.shim" or name == "hotstrings.engine.dynamic.core" then
 			package.loaded[name] = nil
 		end
 	end
@@ -123,7 +123,7 @@ local function run_case(family, change, route)
 					engine:load_mappings(mappings)
 					local scripts = require("modules.shortcuts.script_actions").new({ reset = function() engine:reset() end,
 						reload = function() error("unexpected reload") end, quit = function() error("unexpected quit") end })
-					local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+					local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 					logger.set_sink(function() end)
 					local metrics = setmetatable({ on_keydown = function(char)
 						if change == "metrics" and char == "★" then retire() end
@@ -132,7 +132,7 @@ local function run_case(family, change, route)
 						-- Bare keys: the shared expansion delay reads the held modifiers per key.
 						keyboard_hook = { held_modifiers = function() return {} end },
 						Monotonic = require("infra.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
-						terminators_mod = require("keymap.terminators"), RepeatKey = repeat_key,
+						terminators_mod = require("layouts.engine.layers.terminators"), RepeatKey = repeat_key,
 						MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = false },
 						_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod,
 						engine = engine, dyn_hotstrings = dynamic, injector = injector, Logger = logger,

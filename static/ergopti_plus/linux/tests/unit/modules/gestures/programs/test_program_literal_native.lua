@@ -8,7 +8,7 @@ local Native = require("luv")
 local function run_fixture(fixture, expected)
 	local path = require("infra.paths").driver_root() .. "/tests/hardware/" .. fixture
 	local code = "package.path = " .. string.format("%q", package.path)
-		.. "; require('compat.utf8').install(); dofile(" .. string.format("%q", path) .. ")"
+		.. "; require('core.lifecycle.engine.compat.utf8').install(); dofile(" .. string.format("%q", path) .. ")"
 	local stdout, stderr = assert(Native.new_pipe(false)), assert(Native.new_pipe(false))
 	local output, errors, status, signal = "", "", nil, nil
 	local ended, closed, timed_out = 0, 0, false

@@ -15,9 +15,9 @@ import tomllib
 # The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
 # boot creates it and the updater only sends conditional requests when it exists.
 FOLDER = tomllib.loads(
-    (pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml").read_text(
-        encoding="utf-8"
-    )
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
 )["app"]["linux_folder_name"]
 
 

@@ -25,9 +25,12 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const RECEIVER = 'static/ergopti_plus/macos/platform/network/native_http.py';
-const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.py';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.py';
 const DEV = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json'),
+		'utf8'
+	)
 ).dev_source;
 
 if (process.platform === 'win32') {

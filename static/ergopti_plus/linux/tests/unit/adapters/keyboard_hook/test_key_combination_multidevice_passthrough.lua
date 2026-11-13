@@ -26,7 +26,7 @@ local function with_manager(route, body)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	for name in pairs(saved) do
 		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
+			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "core.logger.engine.shim" then package.loaded[name] = nil end
 	end
 	local config_path, tap_path = os.tmpname(), os.tmpname()
 	local manager
@@ -66,7 +66,7 @@ local function with_manager(route, body)
 				execute_action = function(action) assert(scripts.handlers[action])() end,
 				action_names = function() return { "script_reload" } end,
 				on_text_injected = function() error("native pass-through cannot inject text") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path, config_path = config_path }))
+				defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = config_path }))
 			s.manager = manager
 			local snapshot = manager.configuration_snapshot()
 			helpers.assert_eq(snapshot.combinations.has_bindings(), route ~= "none")

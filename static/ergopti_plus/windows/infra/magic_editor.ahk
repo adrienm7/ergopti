@@ -30,7 +30,7 @@ MagicEditorPhysicalCatalogue(SharedRoot := unset) {
 		throw TypeError("The physical registry requires its actual shared source root.")
 	if Catalogues.Has(Root)
 		return Catalogues[Root]
-	Registry := JsonParse(FSReadStrict(Root . "\data\keycodes\physical_keys.json"))
+	Registry := JsonParse(FSReadStrict(Root . "\layouts\data\keycodes\physical_keys.json"))
 	if !(Registry is Map) || !(Registry.Get("keys", 0) is Map)
 		throw TypeError("The physical magic editor requires the actual key registry.")
 	Keys := []

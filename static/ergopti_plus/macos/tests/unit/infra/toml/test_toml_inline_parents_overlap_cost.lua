@@ -30,7 +30,7 @@ end
 
 helpers.describe("inline scalar parents: overlap detection", function()
 	helpers.it("lowercases a bounded number of segments per row", function()
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local rows = {}
 		for index = 1, 300 do
 			rows[index] = { section = "section_" .. index, key = "key", value = true }
@@ -44,7 +44,7 @@ helpers.describe("inline scalar parents: overlap detection", function()
 	end)
 
 	helpers.it("still withholds a parent whose rows nest through a case-folded path", function()
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local leaf = { section = "a.child", key = "first", value = true }
 		helpers.assert_eq(Writer.source_inline_scalar_parents(SOURCE, { leaf }), { ["a.child"] = true })
 		local nested = { section = "A", key = "CHILD", value = { first = true, second = false } }

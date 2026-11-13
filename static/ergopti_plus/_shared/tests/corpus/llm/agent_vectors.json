@@ -1,5 +1,5 @@
 {
-	"_comment": "Pins _shared/lua/llm/agent.lua and windows/modules/llm/agent.ahk against _shared/modules/llm/agent.json. Generated from the Lua oracle. A triage of {\"absent\": true} means nothing readable. The actions vectors use `tools` and a decoder whose JSON null is recognized as absent; `rejected` counts the refused actions. jev_answers follow the TypeSafe /v1/systemone answer shape (answers.<question_id>.choice and .probabilities).",
+	"_comment": "Pins _shared/ai/engine/agent/agent.lua and windows/modules/llm/agent.ahk against _shared/ai/data/agent.json. Generated from the Lua oracle. A triage of {\"absent\": true} means nothing readable. The actions vectors use `tools` and a decoder whose JSON null is recognized as absent; `rejected` counts the refused actions. jev_answers follow the TypeSafe /v1/systemone answer shape (answers.<question_id>.choice and .probabilities).",
 	"tools": ["Envoyer la facture", "Mode focus"],
 	"system1_prompt": [
 		{

@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/llm_prompt_vectors.json")
 
@@ -34,7 +34,7 @@ package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
 local _gestures = helpers.load_with_stubs("modules.gestures")
 local Actions = require("modules.gestures.actions")
-local PromptAction = require("llm.prompt_action")
+local PromptAction = require("ai.engine.prediction.prompt_action")
 
 helpers.describe("llm_prompt_prediction parameter replays the shared llm_prompt corpus", function()
 	local corpus = read_corpus()
@@ -63,7 +63,7 @@ end)
 
 helpers.describe("llm_prompt parameter: native prompt and refusal", function()
 	helpers.it("lists every prompt of the AI menu, built-ins first, then custom ones", function()
-		local Selector = require("llm.profile_selector")
+		local Selector = require("ai.engine.settings.profile_selector")
 		local builtins = Selector.load_built_in_profiles()
 		for _, profile in ipairs(builtins) do profile.label = "Label of " .. profile.id end
 		local custom = { id = "custom_42", label = "My {n} prompt{s}", system_single = "{context}" }

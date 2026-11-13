@@ -13,7 +13,7 @@
 local uv = require('luv')
 local Remote = require('modules.llm.api_remote')
 local VisionRequest = require('modules.llm.vision_request')
-local Vision = require('llm.vision')
+local Vision = require('ai.engine.prediction.vision')
 local Http = require('adapters.http_client')
 local origin = assert(os.getenv('LLM_CALLBACK_ORIGIN'))
 

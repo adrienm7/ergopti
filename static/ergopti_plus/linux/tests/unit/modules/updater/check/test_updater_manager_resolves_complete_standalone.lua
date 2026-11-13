@@ -48,10 +48,10 @@ helpers.describe("modules.updater.manager", function()
 		)
 		helpers.assert_eq(package_install.kind, "package",
 			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
-		helpers.assert_eq(package_install.reason, require("adapter_errors").UPDATER_PACKAGE_OWNED,
+		helpers.assert_eq(package_install.reason, require("diagnostics.engine.adapter_errors").UPDATER_PACKAGE_OWNED,
 			"a package refusal names its closed reason id, not a sentence")
 		helpers.assert_eq(Installer.resolve(nil, function() return true end).reason,
-			require("adapter_errors").UPDATER_SOURCE_PATH_RELATIVE)
+			require("diagnostics.engine.adapter_errors").UPDATER_SOURCE_PATH_RELATIVE)
 	end)
 
 	helpers.it("linux-native-cwd: updater shares the actual cwd owner for a relative source", function()
@@ -94,23 +94,23 @@ helpers.describe("modules.updater.manager", function()
 		local archive = base .. "/release.tar.gz"
 		helpers.assert_true(command_ok("mkdir -p " .. shell_quote(install_root .. "/linux/infra")
 			.. " " .. shell_quote(install_root .. "/linux/install")
-			.. " " .. shell_quote(install_root .. "/_shared/lua")
+			.. " " .. shell_quote(install_root .. "/_shared")
 			.. " " .. shell_quote(prefix .. "/bin")
 			.. " " .. shell_quote(payload .. "/linux/infra")
 			.. " " .. shell_quote(payload .. "/linux/install")
-			.. " " .. shell_quote(payload .. "/_shared/lua")
-			.. " " .. shell_quote(payload .. "/_shared/data/locales")
+			.. " " .. shell_quote(payload .. "/_shared")
+			.. " " .. shell_quote(payload .. "/_shared/core/i18n/data/locales")
 			.. " " .. shell_quote(payload .. "/bin")))
 
 		write_file(install_root .. "/linux/ergopti_hotstrings.lua", "print('old-driver')\n")
 		write_file(install_root .. "/linux/infra/version.lua", "return {}\n")
 		write_file(install_root .. "/_shared/build_stamp.txt", "commit=" .. string.rep("a", 40) .. "\nversion=3.0.0\n")
-		write_file(install_root .. "/_shared/lua/sentinel.lua", "return 'old-shared'\n")
+		write_file(install_root .. "/_shared/sentinel.lua", "return 'old-shared'\n")
 		write_file(payload .. "/linux/ergopti_hotstrings.lua", "print('new-driver')\n")
 		write_file(payload .. "/linux/infra/version.lua", "return {}\n")
 		write_file(payload .. "/_shared/build_stamp.txt", "commit=" .. string.rep("b", 40) .. "\nversion=4.0.0\n")
-		write_file(payload .. "/_shared/lua/sentinel.lua", "return 'new-shared'\n")
-		write_file(payload .. "/_shared/data/locales/en.json", "{}\n")
+		write_file(payload .. "/_shared/sentinel.lua", "return 'new-shared'\n")
+		write_file(payload .. "/_shared/core/i18n/data/locales/en.json", "{}\n")
 		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
 		-- The target need not ship the running updater's receipt implementation.
@@ -120,7 +120,7 @@ helpers.describe("modules.updater.manager", function()
 			assert(read_file(helpers.driver_root() .. "/install/ownership_schema.sh")))
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
 			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
-			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
+			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/sentinel.lua") .. "\n"
 			.. "test ! -e " .. shell_quote(install_root .. "/linux/linux") .. "\n"
 			.. "exec bash " .. shell_quote(install_root .. "/bin/ergopti-hotstrings") .. "\n")
 		helpers.assert_true(command_ok("chmod +x " .. shell_quote(wrapper)
@@ -141,7 +141,7 @@ helpers.describe("modules.updater.manager", function()
 		end
 		M._test_set_cached_release({ tag = "v4.0.0", prerelease = false })
 		M._test_set_verified_archive(archive)
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local real_error = logger.error
 		local errors = {}
 		logger.error = function(_tag, fmt, ...)
@@ -152,7 +152,7 @@ helpers.describe("modules.updater.manager", function()
 		logger.error = real_error
 
 		local new_version = read_file(install_root .. "/_shared/build_stamp.txt")
-		local new_shared = read_file(install_root .. "/_shared/lua/sentinel.lua")
+		local new_shared = read_file(install_root .. "/_shared/sentinel.lua")
 		local old_version = read_file(install_root .. ".old/_shared/build_stamp.txt")
 		local nested = read_file(install_root .. "/linux/linux/ergopti_hotstrings.lua")
 		local archive_left = read_file(archive)

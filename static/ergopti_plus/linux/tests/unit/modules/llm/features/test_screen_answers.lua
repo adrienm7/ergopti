@@ -23,9 +23,9 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local Json = require("json")
-local Base64 = require("compat.base64")
-local Vision = require("llm.vision")
+local Json = require("core.text.engine.json")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local Vision = require("ai.engine.prediction.vision")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 -- The bytes the fake capture writes: a PNG signature and a body
@@ -185,7 +185,7 @@ local function scenario(opts, body)
 		world.engine = engine
 		world.handlers = engine.action_handlers()
 		world.config = Json.decode(assert(io.open(helpers.driver_root()
-			.. "/../_shared/modules/llm/vision.json", "r")):read("*a"))
+			.. "/../_shared/ai/data/vision.json", "r")):read("*a"))
 
 		--- The remote server answers request `index` with an OpenAI-shaped `text`.
 		function world.respond(index, text)
@@ -218,7 +218,7 @@ helpers.it("vision configuration refuses a FIFO rather than blocking", function(
 	local uv = require("luv")
 	local Paths = require("infra.paths")
 	local original_shared, original_request = Paths.shared, package.loaded["modules.llm.vision_request"]
-	local source = assert(original_shared("modules/llm/vision.json"))
+	local source = assert(original_shared("ai/data/vision.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-vision-XXXXXX"))
 	local path = dir .. "/vision.json"
 	local made = os.execute("mkfifo '" .. path .. "'")
@@ -226,7 +226,7 @@ helpers.it("vision configuration refuses a FIFO rather than blocking", function(
 	package.loaded["modules.llm.vision_request"] = nil
 	local Request = require("modules.llm.vision_request")
 	Paths.shared = function(relative)
-		if relative == "modules/llm/vision.json" then return path end
+		if relative == "ai/data/vision.json" then return path end
 		return original_shared(relative)
 	end
 	local exited, process = false, nil

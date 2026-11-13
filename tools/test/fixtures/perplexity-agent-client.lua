@@ -10,11 +10,11 @@
 --- ==============================================================================
 
 local root, mode, value = arg[1], arg[2], arg[3]
-package.path = root .. "/_shared/lua/?.lua;" .. root .. "/linux/?.lua;" .. root .. "/linux/vendor/?.lua;" .. package.path
+package.path = root .. "/_shared/?.lua;" .. root .. "/linux/?.lua;" .. root .. "/linux/vendor/?.lua;" .. package.path
 
-local Json = require("json")
-local Formats = require("llm.remote_formats")
-local Classifier = require("llm.remote_response_classifier")
+local Json = require("core.text.engine.json")
+local Formats = require("ai.engine.api.remote_formats")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
 
 if mode == "body" then
 	io.write(Json.encode(Formats.agent_body({ model = "perplexity/sonar", system = "Reply with OK.", text = value,

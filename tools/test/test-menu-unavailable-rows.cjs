@@ -40,10 +40,10 @@ const assert = require('node:assert/strict');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const RENDERERS = [
-	path.join(SP, '_shared', 'lua', 'menu', 'renderer.lua'),
+	path.join(SP, '_shared', 'menu', 'engine', 'renderer.lua'),
 	path.join(SP, 'windows', 'infra', 'manifest_menu.ahk')
 ];
 

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Request Plan — Debounce, Rate Floor and Batching
 ; DESCRIPTION:
-; The AutoHotkey twin of _shared/lua/llm/request_plan/debounce.lua and
+; The AutoHotkey twin of _shared/ai/engine/request_plan/debounce.lua and
 ; batching.lua: the pure decisions of the prediction orchestration. The engine
 ; feeds it events and the clock, and owns the native timers and the backend calls.
 ;

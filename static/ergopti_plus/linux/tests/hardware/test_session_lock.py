@@ -25,7 +25,7 @@ class SessionLockTests(unittest.TestCase):
             # The logger shim is the first module Main loads past the lock;
             # compat.utf8 also serves the bootstrap record of a refusal.
             bootstrap.write_text(
-                "package.preload['logger.shim'] = function() os.exit(0) end\n",
+                "package.preload['core.logger.engine.shim'] = function() os.exit(0) end\n",
                 encoding="utf-8",
             )
             for marker in (None, "invalid", "2", "9"):
@@ -66,7 +66,7 @@ class SessionLockTests(unittest.TestCase):
             environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
             code = (
                 "package.path = "
-                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua"))
+                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
                 + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
                 + "if ok then lock.release() else io.stderr:write(reason .. '\\n') end; os.exit(ok and 0 or 78)"
             )
@@ -115,7 +115,7 @@ class SessionLockTests(unittest.TestCase):
             )
             code = (
                 "package.path = "
-                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua"))
+                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
                 + "; local lock = require('infra.session_lock'); "
                 + "local protected = lock.protect(); local acquired = protected and lock.acquire(); "
                 + "os.exit(acquired and 0 or 78)"
@@ -178,9 +178,7 @@ class SessionLockTests(unittest.TestCase):
                     environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
                     code = (
                         "package.path = "
-                        + repr(
-                            str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua")
-                        )
+                        + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
                         + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
                         + "if ok then lock.release() else io.stderr:write('[session_lock] ' .. reason .. '\\n') end; os.exit(ok and 0 or 78)"
                     )
@@ -297,7 +295,7 @@ class SessionLockTests(unittest.TestCase):
                     )
                     bootstrap = root / "bootstrap.lua"
                     bootstrap.write_text(
-                        "package.preload['compat.utf8'] = function()\n"
+                        "package.preload['core.lifecycle.engine.compat.utf8'] = function()\n"
                         "  assert(os.getenv('ERGOPTI_SESSION_LOCK_FD') == nil)\n"
                         "  local status = os.execute(os.getenv('TEST_CHILD_COMMAND'))\n"
                         "  assert(status == 0 or status == true)\n"

@@ -21,9 +21,9 @@
 local M = {}
 
 local text_utils = require("infra.text_utils")
-local AppDirs    = require("app_dirs")
+local AppDirs    = require("core.fs.engine.app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local Timings    = require("infra.timings")
 
 -- The daemon appends to the same dated file the logger names, so the prefix

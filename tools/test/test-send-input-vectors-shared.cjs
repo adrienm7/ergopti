@@ -6,13 +6,13 @@
  * DESCRIPTION:
  * Checks the corpus of the send_text, send_key and send_shortcut parameters,
  * _shared/tests/corpus/action_parameters/send_input_vectors.json, against the
- * vocabulary _shared/modules/actions/send_keys.json with a reference
+ * vocabulary _shared/shortcuts/data/actions/send_keys.json with a reference
  * implementation of its documented rules, checks the vocabulary itself (unique
  * ids and aliases, a name for every driver), and checks that each driver suite
  * replays the corpus.
  *
  * WHY:
- * The grammar is implemented twice (_shared/lua/send_input for macOS and Linux,
+ * The grammar is implemented twice (_shared/platform/input for macOS and Linux,
  * windows/infra/send_input_parameter.ahk) and read a third time by the shared
  * action picker. The corpus is what keeps them equal; a corpus whose
  * expectations disagree with its own rule, or that no suite replays, pins
@@ -35,8 +35,8 @@ const CORPUS = path.join(
 	'action_parameters',
 	'send_input_vectors.json'
 );
-const VOCABULARY = path.join(SP, '_shared', 'modules', 'actions', 'send_keys.json');
-const CATALOGUE = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
+const VOCABULARY = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'send_keys.json');
+const CATALOGUE = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
 
 const errors = [];
 let checks = 0;

@@ -28,7 +28,7 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local i18n         = require("infra.i18n")
 local toml_writer  = require("infra.toml.writer")
@@ -39,8 +39,8 @@ local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
-local Answers       = require("onboarding_answers")
-local Json          = require("json")
+local Answers       = require("onboarding.engine.answers")
+local Json          = require("core.text.engine.json")
 local LOG          = "onboarding"
 
 -- The catalogue platform this host reads and the id the config migration
@@ -78,7 +78,7 @@ local _publication = nil
 local function publication_owner()
 	if not _publication then
 		local native_write, native_read = toml_writer.batch_write, FileSystem.read_with_status
-		_publication = require("onboarding_publication").new({
+		_publication = require("onboarding.engine.publication").new({
 			files = FileSystem, write = native_write, current = function()
 				return rawequal(package.loaded["ui.onboarding"], M)
 					and rawequal(package.loaded["infra.toml.writer"], toml_writer)
@@ -232,7 +232,7 @@ end
 --- @param code string Locale code.
 --- @return table|nil strings
 local function locale_strings(code)
-	local text, detail = read_shared("data/locales/" .. tostring(code) .. ".json")
+	local text, detail = read_shared("core/i18n/data/locales/" .. tostring(code) .. ".json")
 	local strings = text and Json.decode(text) or nil
 	if type(strings) ~= "table" then
 		Logger.error(LOG, "Onboarding locale '%s' is unavailable (%s).", tostring(code),
@@ -396,7 +396,7 @@ function M._number_row_live() return require("modules.keymap.number_row_live") e
 --- @return string|nil order
 function M._number_row_order_written(rows)
 	for _, row in ipairs(rows or {}) do
-		if row.section == "layout" and row.key == require("config_keys").LEAF.DIRECT_ACCESS_DIGITS and type(row.value) == "string" then
+		if row.section == "layout" and row.key == require("settings.engine.keys").LEAF.DIRECT_ACCESS_DIGITS and type(row.value) == "string" then
 			return row.value
 		end
 	end
@@ -684,16 +684,16 @@ end
 --- @return boolean writable
 --- @return string|nil detail
 local function prepare_destination(path)
-	local ConfigMigrate = require("config_migrate")
+	local ConfigMigrate = require("settings.engine.migration.migrate")
 	-- The v22 step moves the tap-hold rows out of the tap_hold.toml beside it.
-	local tap_hold_path = (require("native_path").directory_prefix(path) or "")
-		.. require("tap_hold.shared_file").FILE_NAME
+	local tap_hold_path = (require("core.fs.engine.native_path").directory_prefix(path) or "")
+		.. require("tap_hold.engine.shared_file").FILE_NAME
 	local result = ConfigMigrate.boot({
 		path          = path,
 		driver        = MIGRATION_DRIVER,
 		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = FileSystem,
-		companions    = { [require("tap_hold.shared_file").FILE_NAME] = tap_hold_path },
+		companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] = tap_hold_path },
 	})
 	if result.read_only then return false, result.detail end
 	return true

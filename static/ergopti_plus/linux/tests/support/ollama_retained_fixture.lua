@@ -1,7 +1,7 @@
 --- static/ergopti_plus/linux/tests/support/ollama_retained_fixture.lua
 --- Independent controlled receipts for the actual retained installer branch.
 --- No fake child closure is claimed as native/kernel qualification.
-local Installer = require("llm.ollama_archive_installer")
+local Installer = require("ai.engine.ollama.archive_installer")
 local serial = 0
 return function()
  serial = serial + 1

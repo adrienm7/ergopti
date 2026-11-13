@@ -206,7 +206,7 @@ helpers.describe("gesture axis slots: no advertised slot is unreachable", functi
 
 	helpers.it("dispatches every slot the manager offers when only it is bound", function()
 		local slots
-		with_manager({}, nil, function(M) slots = require("table_util").sorted_keys(M.DEFAULT_GESTURES) end)
+		with_manager({}, nil, function(M) slots = require("core.text.engine.table_util").sorted_keys(M.DEFAULT_GESTURES) end)
 		helpers.assert_true(#slots > 0, "the manager offers gesture slots")
 		local axis = 0
 		for _, slot in ipairs(slots) do

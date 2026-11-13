@@ -16,16 +16,16 @@ local function corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/tap_hold/combination_labels.json"), "r"))
 	local text = file:read("*a")
 	file:close()
-	return require("json").decode(text)
+	return require("core.text.engine.json").decode(text)
 end
 
 helpers.describe("shared canonical combination label policy", function()
 	for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 		helpers.it("resolves independent ordered physical pairs for " .. platform, function()
-			local catalog = require("tap_hold.key_catalog").load(require("infra.paths").shared("tap_hold/defaults.toml"), platform)
+			local catalog = require("tap_hold.engine.key_catalog").load(require("infra.paths").shared("tap_hold/data/defaults.toml"), platform)
 			local native = {}
 			for _, key in ipairs(catalog) do native[key.key] = key.id end
-			local policy = require("tap_hold.combination_labels")
+			local policy = require("tap_hold.engine.combination_labels")
 			local count = 0
 			for _, vector in ipairs(corpus().vectors) do
 				local supported = false
@@ -46,8 +46,8 @@ helpers.describe("shared canonical combination label policy", function()
 	end
 
 	helpers.it("keeps physical family identities distinct when translations coincide", function()
-		local catalog = require("tap_hold.key_catalog").load(require("infra.paths").shared("tap_hold/defaults.toml"), "hs")
-		local policy = require("tap_hold.combination_labels")
+		local catalog = require("tap_hold.engine.key_catalog").load(require("infra.paths").shared("tap_hold/data/defaults.toml"), "hs")
+		local policy = require("tap_hold.engine.combination_labels")
 		local first = policy.resolve(catalog, "left_option", "caps_lock", function() return "same" end)
 		local second = policy.resolve(catalog, "right_option", "caps_lock", function() return "same" end)
 		helpers.assert_eq(first.group_label, second.group_label)
@@ -56,8 +56,8 @@ helpers.describe("shared canonical combination label policy", function()
 	end)
 
 	helpers.it("refuses unknown first or second physical keys and empty translations", function()
-		local catalog = require("tap_hold.key_catalog").load(require("infra.paths").shared("tap_hold/defaults.toml"), "hs")
-		local policy = require("tap_hold.combination_labels")
+		local catalog = require("tap_hold.engine.key_catalog").load(require("infra.paths").shared("tap_hold/data/defaults.toml"), "hs")
+		local policy = require("tap_hold.engine.combination_labels")
 		for _, pair in ipairs({ { "future_key", "caps_lock" }, { "left_option", "future_key" } }) do
 			local ok = pcall(policy.resolve, catalog, pair[1], pair[2], function(key) return key end)
 			helpers.assert_eq(ok, false, "an unknown key cannot get a guessed display identity")

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local uv = require("luv")
 
 --- Isolates the real profile registry and native window port.
@@ -187,7 +187,7 @@ helpers.describe("prompt editor profile round trips", function()
 			local saved = f.disk(original.id)
 			helpers.assert_eq(saved.raw_prompt, payload.prompt)
 			helpers.assert_eq(saved.system_single, original.system_single)
-			helpers.assert_eq(require("llm.profile_selector").resolve_system_prompt(saved, { context = "EXPANDED" }).system, payload.prompt)
+			helpers.assert_eq(require("ai.engine.settings.profile_selector").resolve_system_prompt(saved, { context = "EXPANDED" }).system, payload.prompt)
 			hidden_equal(saved, original)
 		end)
 	end)

@@ -197,7 +197,7 @@ print("display " .. display .. ", user tree " .. _scratch .. "/config/xkb")
 
 -- No session type: the layout manager installs from a Wayland or unknown session.
 setenv("XDG_SESSION_TYPE", nil)
-local shared = require("infra.paths").shared("modules/layouts/composer_check/")
+local shared = require("infra.paths").shared("layouts/data/composer_check/")
 local saved = await("the composer saves the shipped check composition", function(done)
 	Registry.composer_save({
 		declaration = read(shared .. "composition.json"),
@@ -208,7 +208,7 @@ end)
 check(saved[1] == true, "the compiled composition is installed: " .. tostring(saved[2]) .. " " .. tostring(saved[3]))
 
 local registry_dir = require("infra.paths").driver_root() .. "/../../layouts/registry/"
-local index = require("json").decode(read(registry_dir .. "index.json"))
+local index = require("core.text.engine.json").decode(read(registry_dir .. "index.json"))
 local ergol
 for _, entry in ipairs(index.layouts) do if entry.id == "ergol" then ergol = entry end end
 local ergol_text = read(registry_dir .. ergol.file)

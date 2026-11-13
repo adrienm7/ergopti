@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"infra.logger",
 	"modules.llm",
-	"chord",
+	"keyboard.engine.chord",
 	"adapters.hotkey_registrar",
 	"ui.menu.shortcut_utils",
 	"ui.menu.menu_llm.trigger_orchestrator",
@@ -40,7 +40,7 @@ local function with_fixture(body)
 				return true
 			end,
 		}
-		package.loaded["chord"] = {}
+		package.loaded["keyboard.engine.chord"] = {}
 		package.loaded["adapters.hotkey_registrar"] = {}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = nil

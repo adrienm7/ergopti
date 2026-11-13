@@ -7,8 +7,8 @@
 --- markers retain canonical source counts without claiming physical input.
 --- ==============================================================================
 
-require('compat.utf8').install()
-local uv=require('luv'); local Clock=require('infra.monotonic'); local J=require('json')
+require('core.lifecycle.engine.compat.utf8').install()
+local uv=require('luv'); local Clock=require('infra.monotonic'); local J=require('core.text.engine.json')
 local profile=assert(uv.fs_mkdtemp('/tmp/ergopti-backspace-native-XXXXXX'))
 for _,name in ipairs({'CONFIG','DATA','CACHE','STATE'}) do local dir=profile..'/'..name:lower(); assert(uv.fs_mkdir(dir,448)); assert(uv.os_setenv('XDG_'..name..'_HOME',dir)) end
 assert(uv.fs_mkdir(profile..'/config/ergopti',448))

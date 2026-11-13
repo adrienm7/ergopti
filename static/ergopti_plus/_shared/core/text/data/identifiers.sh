@@ -1,0 +1,33 @@
+#!/bin/sh
+# _shared/core/text/data/identifiers.sh
+# AUTO-GENERATED from _shared/core/text/data/identifiers.json.
+# DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
+
+# Application names, bundle ids, service labels, external hosts and the field
+# report names, for the shell tools and installers that source this file. Hosts
+# are bare names: build a URL as "https://${ERGOPTI_HOST_GITHUB}/...".
+ERGOPTI_APP_NAME="ErgoptiPlus"
+ERGOPTI_APP_AHK="ErgoptiPlus.ahk"
+ERGOPTI_APP_EXE="ErgoptiPlus.exe"
+ERGOPTI_APP_BUNDLE="ErgoptiPlus.app"
+ERGOPTI_BUNDLE_ID_LAUNCHER="com.ergoptiplus.app"
+ERGOPTI_BUNDLE_ID_HAMMERSPOON="com.ergoptiplus.app.hammerspoon"
+ERGOPTI_SIGNING_ID_RUNTIME_INSTALLER="com.ergoptiplus.app.runtime-installer"
+ERGOPTI_SIGNING_ID_INSTALLED_PHYSICAL_SOURCE="com.ergoptiplus.app.installed-physical-source"
+ERGOPTI_SIGNING_ID_REMAP_CORE="com.ergoptiplus.remap.core"
+ERGOPTI_SIGNING_ID_REMAP_CONSOLE="com.ergoptiplus.remap.console"
+ERGOPTI_SIGNING_ID_REMAP_CLI="com.ergoptiplus.remap.cli"
+ERGOPTI_SERVICE_LABEL_MACOS_CORE="com.ergoptiplus.runtime.core"
+ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN="com.ergoptiplus.remap-guardian"
+ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID="com.ergoptiplus.runtime.vhid"
+ERGOPTI_HOST_GITHUB="github.com"
+ERGOPTI_HOST_GITHUB_API="api.github.com"
+ERGOPTI_HOST_HUGGINGFACE="huggingface.co"
+ERGOPTI_HOST_OLLAMA="ollama.com"
+ERGOPTI_HOST_OLLAMA_REGISTRY="registry.ollama.ai"
+ERGOPTI_DEV_SOURCE_PLIST_KEY="ErgoptiDevSourceRoot"
+ERGOPTI_DEV_SOURCE_ENVIRONMENT="ERGOPTI_DEV_SOURCE_ROOT"
+ERGOPTI_FIELD_REPORT_BRANCH_PREFIX="field/"
+ERGOPTI_FIELD_REPORT_FOLDER="docs/field-reports"
+ERGOPTI_FIELD_REPORT_BASE_CONFIG_KEY="ergoptiFieldBase"
+ERGOPTI_FIELD_REPORT_ENVIRONMENT="ERGOPTI_FIELD_RUN_ROOT"

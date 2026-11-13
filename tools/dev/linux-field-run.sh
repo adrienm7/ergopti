@@ -6,7 +6,7 @@
 # DESCRIPTION:
 # Asks the running Linux daemon to run its Debug field checks with no window
 # (static/ergopti_plus/linux/infra/field_run.lua, on the shared protocol
-# static/ergopti_plus/_shared/data/field_run_protocol.json and the Linux steps
+# static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json and the Linux steps
 # file it names): it writes the request into the folder of the daemon that is
 # ready, waits for the done marker or a refusal, copies the
 # results into the report and prints one mark per step, the macOS collector's

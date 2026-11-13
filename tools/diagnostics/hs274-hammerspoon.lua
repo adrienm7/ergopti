@@ -21,7 +21,7 @@ end
 
 local function prepare_modules()
 	local driver = config.repo .. "/static/ergopti_plus/macos"
-	local shared = config.repo .. "/static/ergopti_plus/_shared/lua"
+	local shared = config.repo .. "/static/ergopti_plus/_shared"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 		.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 end

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Signs bytes with RSASSA-PKCS1-v1_5 and SHA-256 (JWT RS256) under an unencrypted
 ; PEM private key, PKCS#8 or PKCS#1: the Windows twin of the pure-Lua
-; _shared/lua/crypto/rsa_pkcs1.lua, replaying the same corpus and refusing with
+; _shared/core/crypto/engine/rsa_pkcs1.lua, replaying the same corpus and refusing with
 ; the same refusals (_shared/tests/corpus/crypto/rs256_vectors.json).
 ;
 ; FEATURES & RATIONALE:

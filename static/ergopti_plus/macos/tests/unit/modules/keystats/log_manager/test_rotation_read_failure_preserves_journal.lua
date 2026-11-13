@@ -28,7 +28,7 @@ local STUBBED_MODULES = {
 	"modules.keystats.aggregator",
 	"modules.keystats.rotation",
 	"modules.keystats.export",
-	"keystats.metrics",
+	"metrics.engine.metrics",
 	"adapters.file_system",
 	"adapters.ledger_append",
 	"adapters.timer_scheduler",
@@ -36,7 +36,7 @@ local STUBBED_MODULES = {
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"modules.keystats.physical_wire",
-	"keystats.physical_release",
+	"metrics.engine.capture.physical_release",
 	"infra.logger",
 }
 
@@ -273,7 +273,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			get_db_rev = function() return 0 end,
 			sync_foreign_data_sql = function() return {} end,
 		}
-		package.loaded["keystats.metrics"] = {}
+		package.loaded["metrics.engine.metrics"] = {}
 		package.loaded["adapters.file_system"] = {
 			-- This non-IO scenario begins with an existing user metrics ignore.
 			path_status = function(path)
@@ -468,7 +468,7 @@ helpers.describe("keystats rollover requires committed EOF", function()
 			"SELECT value FROM meta WHERE key='rollover_settlement_receipt';",
 			"SELECT value FROM meta WHERE key='aggregate_cache_revision'",
 			"SELECT value FROM meta WHERE key='ngram_ctx_json';",
-			require("keystats.queries").render("meta.rev_bump", "native"),
+			require("metrics.engine.queries").render("meta.rev_bump", "native"),
 			"INSERT OR REPLACE INTO meta(key,value) VALUES('rollover_settlement_receipt',",
 			"UPDATE meta SET value='0' WHERE key='today_log_offset';",
 			"UPDATE meta SET value='" .. result.reset_date .. "' WHERE key='today_log_date';",

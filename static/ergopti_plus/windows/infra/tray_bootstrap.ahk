@@ -13,7 +13,7 @@
 
 ; Generated shared authority is compiled before the first cold publication.
 ; This surface never claims admission of the mutable live manifest root.
-#Include ../../_shared/modules/menu/startup_tray_projection.ahk
+#Include ../../_shared/menu/data/startup_tray_projection.ahk
 
 /** Publishes real native lifecycle rows before exposing the tray icon. */
 _InstallNativeStartupTray(RequestFn, MenuObj := 0, RegisterFn := 0) {

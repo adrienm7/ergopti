@@ -205,7 +205,7 @@ local function with_paths_restart(mode, body)
     local environment = {
       LOG = "test.paths_restart", gestures = gestures,
       privacy_owners = { script_actions = state.controller },
-      Logger = require("logger.shim"), arg = state.args,
+      Logger = require("core.logger.engine.shim"), arg = state.args,
       shutdown = { request = function(reason) state.shutdowns = state.shutdowns + 1; state.reason = reason; return true end },
       require = function(name)
         if name ~= "infra.daemon_restart" then return actual_require(name) end
@@ -668,8 +668,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("utf8 compat shim", function()
     helpers.it("can be required", function()
-      local ok, utf8_mod = pcall(require, "compat.utf8")
-      helpers.assert_true(ok, "compat.utf8 module loads")
+      local ok, utf8_mod = pcall(require, "core.lifecycle.engine.compat.utf8")
+      helpers.assert_true(ok, "core.lifecycle.engine.compat.utf8 module loads")
       if ok then
         helpers.assert_true(type(utf8_mod.install) == "function",
           "utf8.install is a function")
@@ -677,7 +677,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("install returns true (already installed or freshly installed)", function()
-      local ok, utf8_mod = pcall(require, "compat.utf8")
+      local ok, utf8_mod = pcall(require, "core.lifecycle.engine.compat.utf8")
       if ok and utf8_mod.install then
         local result = utf8_mod.install()
         helpers.assert_true(result == true or result == false,
@@ -710,18 +710,18 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("shared modules (daemon dependencies)", function()
     local shared_mods = {
-      "logger.shim",
-      "compat.utf8",
-      "keymap.terminators",
-      "keystats.utils",
-      "keystats.metrics",
-      "keystats.aggregator_helpers",
-      "keycodes.evdev",
-      "json",
+      "core.logger.engine.shim",
+      "core.lifecycle.engine.compat.utf8",
+      "layouts.engine.layers.terminators",
+      "metrics.engine.utils",
+      "metrics.engine.metrics",
+      "metrics.engine.aggregator.helpers",
+      "platform.input.keycodes.evdev",
+      "core.text.engine.json",
       "tray.protocol",
-      "llm.prompt_builder",
+      "ai.engine.prediction.prompt_builder_core",
       "infra.llm_bridge",
-      "updater.version",
+      "updater.engine.version_core",
     }
     for _, name in ipairs(shared_mods) do
       helpers.it("require('" .. name .. "') loads", function()
@@ -927,9 +927,9 @@ for _, result in ipairs({ true, false }) do
 end
 
 helpers.it("metrics storage warning explains blocked collection in every locale", function()
-  local json = require("json")
+  local json = require("core.text.engine.json")
   for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-    local path = assert(require("infra.paths").shared("data/locales/" .. lang .. ".json"))
+    local path = assert(require("infra.paths").shared("core/i18n/data/locales/" .. lang .. ".json"))
     local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
     local message = assert(json.decode(text))["dialog.metrics.storage_unavailable"]
     helpers.assert_true(type(message) == "string" and message:find("SQLite", 1, true) ~= nil)

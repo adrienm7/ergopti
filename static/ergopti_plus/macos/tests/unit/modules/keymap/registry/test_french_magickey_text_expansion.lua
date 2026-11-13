@@ -45,7 +45,7 @@ end
 helpers.describe("french_magickey text_expansion through the macOS registry (macos-text-expansion)", function()
 	helpers.it("ships disabled and publishes its rules once enabled", function()
 		with_registry(function(state, Registry)
-			local path = assert(helpers.shared("modules/hotstrings/french/magickey.toml"))
+			local path = assert(helpers.shared("hotstrings/data/catalogue/french/magickey.toml"))
 			helpers.assert_eq(Registry.load_toml("french_magickey", path), true)
 			helpers.assert_eq(Registry.is_section_enabled("french_magickey", "text_expansion"), false)
 			helpers.assert_nil(outputs(state)["+m★"], "a disabled section publishes nothing")

@@ -34,8 +34,8 @@ helpers.describe("renderer scenario isolation (tooltip-renderer-scope)", functio
 				-- 11 + the three shortcut-column scenarios of f45a7ac1e7.
 				helpers.assert_eq(#scenarios, 14, "the complete native renderer corpus must be replayed")
 				for _, scenario in ipairs(scenarios) do
-					helpers.with_fresh_modules({ "toml_codec.record_scanner" }, function()
-						package.loaded["toml_codec.record_scanner"] = sentinel
+					helpers.with_fresh_modules({ "core.text.engine.toml_codec.record_scanner" }, function()
+						package.loaded["core.text.engine.toml_codec.record_scanner"] = sentinel
 						local before, native = {}, _G.hs
 						for name, value in pairs(package.loaded) do before[name] = value end
 						local original_assert = helpers.assert_eq
@@ -54,7 +54,7 @@ helpers.describe("renderer scenario isolation (tooltip-renderer-scope)", functio
 						for name, value in pairs(before) do
 							helpers.assert_true(rawequal(package.loaded[name], value), scenario[1] .. " removed " .. name)
 						end
-						helpers.assert_true(rawequal(package.loaded["toml_codec.record_scanner"], sentinel),
+						helpers.assert_true(rawequal(package.loaded["core.text.engine.toml_codec.record_scanner"], sentinel),
 							scenario[1] .. " did not restore the exact scanner owner")
 					end)
 				end

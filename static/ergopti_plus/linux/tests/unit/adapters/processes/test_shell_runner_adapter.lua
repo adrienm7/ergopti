@@ -173,7 +173,7 @@ end)
 helpers.describe("linux-shell-private-error-receipts", function()
 	for _, failure in ipairs({ "errno7", "errno24", "no errno", "open raised", "read raised", "close raised" }) do
 		helpers.it("linux-shell-private-error-receipts: " .. failure .. " cannot echo command arguments", function()
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local shell = helpers.fresh_module("adapters.shell_runner")
 			local previous_popen, previous_level = io.popen, Logger.get_level()
 			local canary = "SYNTHETIC_PRIVATE_PIPE_ARGUMENT"
@@ -530,7 +530,7 @@ end)
 
 helpers.describe("shell runner: exec_checked names a non-zero exit by a closed reason id", function()
 	helpers.it("returns command_exited_nonzero with the status instead of making callers match a sentence", function()
-		local Errors = require("adapter_errors")
+		local Errors = require("diagnostics.engine.adapter_errors")
 		local ok, _, message, reason, status = sh.exec_checked("exit 3")
 		helpers.assert_eq(ok, false)
 		helpers.assert_eq(reason, Errors.COMMAND_EXITED_NONZERO)

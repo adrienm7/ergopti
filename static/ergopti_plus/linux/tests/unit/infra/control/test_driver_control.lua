@@ -12,13 +12,13 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local APP_FOLDER = require("app_dirs").linux.folder_name
-local Json = require("json")
-local Policy = require("control.driver_control")
+local APP_FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
+local Json = require("core.text.engine.json")
+local Policy = require("diagnostics.engine.control_driver_control")
 local DriverControl = require("infra.driver_control")
 
 local shared = helpers.driver_root() .. "/../_shared"
-require("test.driver_control_contract").run(helpers, shared)
+require("tests.lua.core_lifecycle.driver_control_contract").run(helpers, shared)
 
 local function read(path)
 	local file = assert(io.open(path, "rb"))
@@ -27,7 +27,7 @@ local function read(path)
 	return text
 end
 
-local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver_control.json")))
+local SPEC = Policy.validate(Json.decode(read(shared .. "/diagnostics/data/control/driver_control.json")))
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
 local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/control"
 
@@ -37,7 +37,7 @@ if require("tests.win_compat").is_windows() then
 	end)
 else
 helpers.it("(linux-reload-cli-overlap) a second client cannot overwrite a pending request", function()
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local driver = helpers.driver_root()
 	local fixture = driver .. "/tests/fixtures/reload_cli_overlap.sh"
 	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
@@ -46,7 +46,7 @@ helpers.it("(linux-reload-cli-overlap) a second client cannot overwrite a pendin
 end)
 
 helpers.it("(linux-reload-cli-lock-types) refuses FIFO, symlink and directory locks without blocking", function()
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local driver = helpers.driver_root()
 	local fixture = driver .. "/tests/fixtures/reload_cli_lock_types.sh"
 	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
@@ -55,7 +55,7 @@ helpers.it("(linux-reload-cli-lock-types) refuses FIFO, symlink and directory lo
 end)
 
 helpers.it("(linux-reload-cli-decimal) accepts leading zeroes and refuses overflow before publication", function()
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local driver = helpers.driver_root()
 	local fixture = driver .. "/tests/fixtures/reload_cli_decimal.sh"
 	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
@@ -232,7 +232,7 @@ helpers.describe("Linux local driver control", function()
 			local parts = { "$" .. base }
 			for _, segment in ipairs(SPEC.folders[platform].segments) do
 				-- Each OS spells its own application folder (`Ergopti` on macOS).
-				parts[#parts + 1] = segment == "{app}" and require("app_dirs")[platform].folder_name or segment
+				parts[#parts + 1] = segment == "{app}" and require("core.fs.engine.app_dirs")[platform].folder_name or segment
 			end
 			return table.concat(parts, "/")
 		end
@@ -429,7 +429,7 @@ helpers.describe("driver-control-declaration", function()
 					elseif variant == "default-directory" then assert(uv.fs_mkdir(source, 448))
 					elseif variant ~= "default-missing" then
 						local file = assert(io.open(variant == "default-file-link" and target or source, "wb"))
-						assert(file:write(read(shared .. "/modules/control/driver_control.json"))); assert(file:close())
+						assert(file:write(read(shared .. "/diagnostics/data/control/driver_control.json"))); assert(file:close())
 					end
 					if variant:find("-link", 1, true) then assert(uv.fs_symlink(target, source)) end
 					if variant == "default-denied" then assert(uv.fs_chmod(source, 0)) end
@@ -438,7 +438,7 @@ helpers.describe("driver-control-declaration", function()
 local uv = require("luv")
 local paths = require("infra.paths")
 package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
- if relative == "modules/control/driver_control.json" then return %q end
+ if relative == "diagnostics/data/control/driver_control.json" then return %q end
  return paths.shared(relative)
 end }, { __index = paths })
 local getenv = os.getenv

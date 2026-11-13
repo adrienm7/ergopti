@@ -1,5 +1,5 @@
 ﻿; _generated/identifiers.ahk
-; AUTO-GENERATED from _shared/data/identifiers.json.
+; AUTO-GENERATED from _shared/core/text/data/identifiers.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 #Requires AutoHotkey v2.0
 

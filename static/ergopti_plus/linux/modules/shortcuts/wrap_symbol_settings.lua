@@ -7,7 +7,7 @@
 --- wrap a selection (`shortcuts.wrap_symbols.states`, keyed by the opening
 --- symbol, false for a pair switched off) and the pairs the user added
 --- (`shortcuts.wrap_symbols.custom`). macOS keeps the same section, through the
---- same shared projection and publication rows (_shared/lua/menu/wrap_preferences).
+--- same shared projection and publication rows (_shared/menu/wrap_preferences).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Same store as macOS, so a config.toml carried between the two keeps its
@@ -22,12 +22,12 @@
 --- ==============================================================================
 
 local M = {}
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local WrapPreferences = require("menu.wrap_preferences")
-local WrapPair = require("wrap_pair")
-local ConfigOutdated = require("config_outdated")
-local Logger = require("logger.shim")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local WrapPreferences = require("menu.engine.wrap_preferences")
+local WrapPair = require("keyboard.engine.wrap_pair")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "modules.shortcuts.wrap_symbol_settings"
 

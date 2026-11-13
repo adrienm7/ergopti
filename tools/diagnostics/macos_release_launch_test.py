@@ -339,12 +339,12 @@ class PublishedArchiveTests(unittest.TestCase):
                 "tools/build/macos-release-archives.cjs",
                 "tools/lib/owned-descriptor-read.cjs",
                 "tools/lib/paths.cjs",
-                "static/ergopti_plus/_shared/modules/updater/defaults.json",
+                "static/ergopti_plus/_shared/updater/data/defaults.json",
             ):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(original_root / relative, target)
-            config = root / "static/ergopti_plus/_shared/modules/updater/defaults.json"
+            config = root / "static/ergopti_plus/_shared/updater/data/defaults.json"
             with patch.object(
                 observer, "__file__", str(root / "tools/diagnostics/macos-release-launch.py")
             ):

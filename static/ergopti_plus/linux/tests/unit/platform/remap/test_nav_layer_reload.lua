@@ -32,7 +32,7 @@ helpers.describe("native navigation reload transactions", function()
 			write(dir .. "/config.toml", '[tap_holds]\nenabled = true\n')
 			Manager.init({ keyboard_hook = hook, execute_action = function() end,
 				action_names = function() return {} end, on_text_injected = function() end,
-				defaults_path = helpers.driver_root() .. "/../_shared/tap_hold/defaults.toml",
+				defaults_path = helpers.driver_root() .. "/../_shared/tap_hold/data/defaults.toml",
 				user_path = dir .. "/tap_hold.toml" })
 			local original = assert(hook.engine)
 			write(dir .. "/config.toml", '[tap_holds]\nenabled = false\n')
@@ -60,9 +60,9 @@ helpers.describe("outdated layers.toml entries (config-outdated-layers)", functi
 		local warnings = {}
 		local recorder = helpers.make_logger_stub()
 		recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-		local previous_logger = package.loaded["logger.shim"]
-		package.loaded["logger.shim"] = recorder
-		require("config_outdated").reset_for_tests()
+		local previous_logger = package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = recorder
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local ok, err = pcall(function()
 			write(dir .. "/layers.toml", table.concat({
 				"[_meta]", "schema_version = 1", "retired_field = 1",
@@ -72,9 +72,9 @@ helpers.describe("outdated layers.toml entries (config-outdated-layers)", functi
 			local NavLayer = helpers.load_module("platform.remap.nav_layer")
 			local shared_root = helpers.driver_root() .. "/../_shared"
 			local layer = NavLayer.load({ shared_root = shared_root, config_dir = dir })
-			local ctx = require("keymap.layers").load_context({ shared_root = shared_root,
-				json_decode = require("json").decode, toml_decode = require("toml_codec").decode,
-				read_file = require("keymap.layer_editor").read_shipped })
+			local ctx = require("layouts.engine.layers.layers").load_context({ shared_root = shared_root,
+				json_decode = require("core.text.engine.json").decode, toml_decode = require("core.text.engine.toml_codec").decode,
+				read_file = require("layouts.engine.layers.editor").read_shipped })
 			local key_j, home = ctx.registry.keys.KeyJ.evdev, ctx.registry.keys.Home.evdev
 			helpers.assert_eq(layer[key_j], { chords = { { mods = {}, keys = { home } } } },
 				"the valid binding of the same file still loads")
@@ -93,7 +93,7 @@ helpers.describe("outdated layers.toml entries (config-outdated-layers)", functi
 			helpers.assert_throws(function() NavLayer.load({ shared_root = shared_root, config_dir = dir }) end,
 				"a file of another layers schema is still refused as a whole")
 		end)
-		package.loaded["logger.shim"] = previous_logger
+		package.loaded["core.logger.engine.shim"] = previous_logger
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
 		if not ok then error(err, 0) end
@@ -170,13 +170,13 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 		os.remove(dir)
 		local made = os.execute('mkdir "' .. dir .. '"')
 		assert(made == true or made == 0)
-		local names = { "logger.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
+		local names = { "core.logger.engine.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local errors = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local Manager, NavLayer, compile
 		local hook = { key_text = function() return nil end,
 			held_modifiers = function() return {} end,
@@ -194,7 +194,7 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 				local initialized, detail = pcall(Manager.init, {
 					keyboard_hook = hook, execute_action = function() end,
 					action_names = function() return {} end, on_text_injected = function() end,
-					defaults_path = helpers.driver_root() .. "/../_shared/tap_hold/defaults.toml",
+					defaults_path = helpers.driver_root() .. "/../_shared/tap_hold/data/defaults.toml",
 					user_path = dir .. "/tap_hold.toml",
 				})
 				return { initialized = initialized, detail = detail }
@@ -203,11 +203,11 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 			if fault == "user_read" then
 				facts, state = with_read_fault(dir .. "/layers.toml", "open", initialize)
 			elseif fault == "shipped_read" then
-				facts, state = with_read_fault(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json", "open", initialize)
+				facts, state = with_read_fault(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json", "open", initialize)
 			elseif fault == "user_close_false" or fault == "user_close_nil" then
 				facts, state = with_read_fault(dir .. "/layers.toml", fault == "user_close_false" and "false" or "nil", initialize)
 			elseif fault == "shipped_close_false" then
-				facts, state = with_read_fault(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json", "false", initialize)
+				facts, state = with_read_fault(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json", "false", initialize)
 			else
 				if fault == "compile" then NavLayer.compile = function() error("owned native compilation refused") end end
 				state = initialize()
@@ -260,7 +260,7 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 				write(s.dir .. "/layers.toml", "[broken")
 				helpers.assert_eq(s.manager.reload(), false, "later malformed loads remain strict")
 				helpers.assert_true(s.hook.engine == repaired, "the last acknowledged engine remains installed")
-				helpers.assert_eq(s.manager.apply_configuration(require("toml_codec").decode(tap_text)), false,
+				helpers.assert_eq(s.manager.apply_configuration(require("core.text.engine.toml_codec").decode(tap_text)), false,
 					"a scope candidate cannot reuse boot isolation")
 				helpers.assert_true(s.hook.engine == repaired)
 				for name, expected in pairs({ ["layers.toml"] = "[broken", ["tap_hold.toml"] = tap_text }) do
@@ -397,7 +397,7 @@ helpers.describe("original configured Navigation source reservations", function(
 		local ok, err = pcall(function()
 			dir = os.tmpname()
 			assert(os.remove(dir))
-			quote = require("text_utils").shell_quote
+			quote = require("core.text.engine.utils_core").shell_quote
 			local made = os.execute("mkdir " .. quote(dir))
 			assert(made == true or made == 0)
 			made_directory = true
@@ -417,7 +417,7 @@ helpers.describe("original configured Navigation source reservations", function(
 					execute_action = function() hook.actions = hook.actions + 1 end,
 					action_names = require("modules.gestures.manager").get_executable_action_names,
 					on_text_injected = function() hook.typed = hook.typed + 1 end,
-					defaults_path = opts.shared_root .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
+					defaults_path = opts.shared_root .. "/tap_hold/data/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 			end
 			outcome = body({ nav = Nav, manager = Manager, dir = dir, opts = opts, hook = hook, start = start })
 		end)
@@ -492,12 +492,12 @@ helpers.describe("original configured Navigation source reservations", function(
 		owned(NAV_NONE, nil, function(s)
 			local map, issuance = s.nav.load(s.opts)
 			local frame = assert(s.nav.capture_source_observation(map, issuance, s.opts.shared_root, s.opts.config_dir))
-			local decode = require("json").decode
+			local decode = require("core.text.engine.json").decode
 			local ok, err = pcall(function()
-				require("json").decode = function(...) return decode(...) end
+				require("core.text.engine.json").decode = function(...) return decode(...) end
 				helpers.assert_eq(frame.current(), false); helpers.assert_eq(frame.sealed(), false)
 			end)
-			require("json").decode = decode
+			require("core.text.engine.json").decode = decode
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -538,7 +538,7 @@ helpers.describe("original configured Navigation source reservations", function(
 		owned(NAV_NONE, nil, function(s)
 			local healthy, issued = s.nav.load(s.opts)
 			helpers.assert_not_nil(s.nav.capture_source_observation(healthy, issued, s.opts.shared_root, s.opts.config_dir))
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local read, calls = Writer.read_classified, 0
 			Writer.read_classified = function(path, ...)
 				if path == s.dir .. "/layers.toml" then
@@ -563,7 +563,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			local frame = assert(s.manager.capture_collision_inventory())
 			helpers.assert_true(has_nav(frame)); helpers.assert_true(frame.current()); helpers.assert_true(frame.sealed())
 			helpers.assert_eq(s.hook.calls, before); helpers.assert_eq(s.hook.actions, 0); helpers.assert_eq(s.hook.typed, 0)
-			local free = require("shortcuts.physical_conflicts").conflicts({ slot = "physical_none_KeyK", action = "copy",
+			local free = require("shortcuts.engine.physical_conflicts").conflicts({ slot = "physical_none_KeyK", action = "copy",
 				code = 37, mods = {}, aliases = { k = true } }, frame.claims)
 			helpers.assert_eq(free, false, "a distinct native input remains free in the actual shared policy")
 			for _, claim in ipairs(frame.claims) do if claim.binding == "nav_layer__36" then claim.codes[1] = -1 end end

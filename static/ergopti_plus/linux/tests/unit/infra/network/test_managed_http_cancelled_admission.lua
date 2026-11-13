@@ -11,11 +11,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local module = helpers.fresh_module("infra.managed_http")
-local policy_module = helpers.fresh_module("network.proxy_policy")
-local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
+local policy_module = helpers.fresh_module("core.network.engine.proxy_policy_core")
+local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
 local data = Json.decode(file:read("*a")); file:close()
 
 helpers.describe("managed_http: synchronous cancelled successor admission", function()

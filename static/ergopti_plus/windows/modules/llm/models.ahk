@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Models Registry
 ; DESCRIPTION:
-; Loads the shared model catalogue from _shared/modules/llm/models.json and exposes the
+; Loads the shared model catalogue from _shared/ai/data/models.json and exposes the
 ; hierarchical (provider → family → model) and flat (display name → metadata)
 ; views the rest of the AHK stack needs.
 ;
@@ -34,16 +34,16 @@
 ; ==================================
 
 /**
- * Returns the absolute path to a file inside _shared/modules/llm/.
+ * Returns the absolute path to a file inside _shared/ai/data/.
  * Walks up from the current script location to find the _shared sibling.
- * @param {string} filename - Filename within _shared/modules/llm/ (e.g. "models.json").
+ * @param {string} filename - Filename within _shared/ai/data/ (e.g. "models.json").
  * @returns {string} Absolute path, or "" if not found.
  */
 LLM_GetSharedPath(filename) {
 	global _SharedDir
 	; so a single canonical path is enough; the legacy multi-candidate fallback
 	; was only useful when the script could be invoked from arbitrary cwds.
-	canonical := _SharedDir . "\modules\llm\" . filename
+	canonical := _SharedDir . "\ai\data\" . filename
 	if FileExist(canonical)
 		return canonical
 	return ""
@@ -309,7 +309,7 @@ _LLM_LoadPresets() {
 
 /**
  * The brand and emoji of every AI backend, read once from the shared
- * _shared/modules/llm/backends.json that macOS, Linux and the model selector
+ * _shared/ai/data/backends.json that macOS, Linux and the model selector
  * page read too. A missing or malformed file is a broken install: it throws.
  * @returns {Map} Backend id → Map("brand", "emoji", "kind").
  */
@@ -319,13 +319,13 @@ LLM_GetBackendBrands() {
 		return _LLM_BackendBrandsCache
 	Path := LLM_GetSharedPath("backends.json")
 	if (Path == "")
-		throw Error("_shared/modules/llm/backends.json is missing.")
+		throw Error("_shared/ai/data/backends.json is missing.")
 	Raw := FSRead(Path)
 	if !(Raw is String)
-		throw Error("_shared/modules/llm/backends.json could not be read.")
+		throw Error("_shared/ai/data/backends.json could not be read.")
 	Parsed := JsonParse(Raw)
 	if !(Parsed is Map) || !Parsed.Has("backends") || !(Parsed["backends"] is Map)
-		throw Error("_shared/modules/llm/backends.json has no backends table.")
+		throw Error("_shared/ai/data/backends.json has no backends table.")
 	for Id, Entry in Parsed["backends"] {
 		if !(Entry is Map) || !Entry.Has("brand") || !Entry.Has("emoji")
 				|| !(Entry["brand"] is String) || !(Entry["emoji"] is String)
@@ -375,7 +375,7 @@ LLM_ModelSelectorCaption(BackendId, ModelText) {
 /**
  * Whether an identifier typed in the model selector page to add a model is
  * well formed: an Ollama name ("qwen3:4b", "hf.co/owner/repo:Q4_K_M") or an
- * MLX Hugging Face repository id. AHK twin of _shared/lua/llm/model_identifier.lua
+ * MLX Hugging Face repository id. AHK twin of _shared/ai/engine/local_servers/model_identifier.lua
  * and of the page's validModelIdentifier(); all three pass
  * _shared/tests/corpus/llm/model_identifiers.json.
  * @param {String} Backend "ollama" or "mlx".

@@ -34,11 +34,11 @@
 
 local M = {}
 
-local NetworkTransitions = require("keystats.network_transitions")
-local LocalTime = require("keystats.local_time")
+local NetworkTransitions = require("metrics.engine.system.network_transitions")
+local LocalTime = require("metrics.engine.local_time")
 local hs      = hs
 local fs      = require("hs.fs")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local text_utils = require("infra.text_utils")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
@@ -46,8 +46,8 @@ local timer   = require("hs.timer")
 
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
-local Literal = require("sqlite.literal")
-local Queries = require("keystats.queries")
+local Literal = require("core.fs.engine.sqlite.literal")
+local Queries = require("metrics.engine.queries")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
@@ -57,7 +57,7 @@ local PowerSource = require("adapters.power_source")
 local LOG     = "keystats.log_manager"
 
 local TextCipher = require("modules.keystats.text_cipher")
-local TriggerRoi = require("keystats.trigger_roi")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 local RebuildSnapshot = require("modules.keystats.rebuild_snapshot")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Aggregator   = require("modules.keystats.aggregator")
@@ -66,7 +66,7 @@ local IngestTrace  = require("modules.keystats.ingest_trace")
 local Export       = require("modules.keystats.export")
 local LedgerReplay = require("modules.keystats.ledger_replay")
 local HostSignature = require("modules.keystats.host_signature")
-local Metrics      = require("keystats.metrics")
+local Metrics      = require("metrics.engine.metrics")
 
 
 
@@ -146,7 +146,7 @@ local _state = nil
 local _physical_sink_active, _physical_sink_generation = false, 0
 local PhysicalAccounting = require("modules.keystats.physical_accounting_mode")
 local PhysicalWire = require("modules.keystats.physical_wire")
-local PhysicalRelease = require("keystats.physical_release")
+local PhysicalRelease = require("metrics.engine.capture.physical_release")
 
 --- Device identity, read from / written to device.json.
 local _device_id  = nil
@@ -229,7 +229,7 @@ end
 -- Single-sourced in modules/keystats/timestamp.lua so the seconds and the .mmm
 -- fraction share one wall clock (F-L1).
 local Timestamp = require("modules.keystats.timestamp")
-local Maintenance = require("keystats.metrics_maintenance")
+local Maintenance = require("metrics.engine.maintenance")
 local _now_ts = Timestamp.now_ts
 
 --- Returns today's "YYYY-MM-DD" string.
@@ -975,8 +975,8 @@ function M.log_physical_media(action, row)
 		and row.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
 		"Invalid original physical media timestamp")
 	PhysicalWire.decimal(row.device, true)
-	local store = require("keystats.media_store")
-	local batch = require("keystats.aggregator_helpers").new_batch()
+	local store = require("metrics.engine.media.store")
+	local batch = require("metrics.engine.aggregator.helpers").new_batch()
 	local entry = { type = "system_event", action = action }
 	for _, name in ipairs({ "timestamp", "capture", "device", "app", "media_id", "hold_ms", "keycode", "scancode" }) do
 		entry[name] = row[name]
@@ -1005,7 +1005,7 @@ end
 --- @return boolean|nil accepted
 function M.log_clipboard_event(kind, app_name, meta)
 	if not _require_state("log_clipboard_event") then return end
-	local fields = require("keystats.clipboard_events").KINDS[kind]
+	local fields = require("metrics.engine.capture.clipboard_events").KINDS[kind]
 	assert(fields and type(meta) == "table", "not an events_clipboard row: " .. tostring(kind))
 	local entry = {
 		type = kind,

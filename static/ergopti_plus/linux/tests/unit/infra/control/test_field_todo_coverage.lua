@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local DRIVER = helpers.driver_root()
 local REPO = DRIVER .. "/../../.."

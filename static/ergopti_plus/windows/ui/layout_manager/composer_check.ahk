@@ -4,7 +4,7 @@
 ; MODULE: Composer Check (Windows)
 ; DESCRIPTION:
 ; The Debug menu's one-click « Test the composed layout »: builds a small
-; composition (the shipped _shared/modules/layouts/composer_check files),
+; composition (the shipped _shared/layouts/data/composer_check files),
 ; installs it through the composer's real save path, verifies the installed
 ; copy against its record, asks the emulation's reader whether it would accept
 ; it, removes it again, and writes one evidence record. The result window shows
@@ -56,7 +56,7 @@ global COMPOSER_CHECK_MAX_VALUE_LENGTH := 48
 global COMPOSER_CHECK_REDACTED := "redacted"
 
 ; The shipped composition, relative to _SharedDir.
-global COMPOSER_CHECK_FIXTURE_DIR := "modules\layouts\composer_check\"
+global COMPOSER_CHECK_FIXTURE_DIR := "layouts\data\composer_check\"
 
 ; At most one check runs at a time.
 global _ComposerCheckBusy := false

@@ -105,7 +105,7 @@ function indentOf(line) {
 
 const updaterDefaults = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'updater', 'defaults.json'),
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'updater', 'data', 'defaults.json'),
 		'utf8'
 	)
 );
@@ -445,8 +445,8 @@ const windowsLayoutAsset = JSON.parse(
 			'static',
 			'ergopti_plus',
 			'_shared',
-			'modules',
 			'layouts',
+			'data',
 			'windows_system_layout.json'
 		),
 		'utf8'

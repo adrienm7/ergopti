@@ -26,7 +26,16 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
 const windowsDir = path.join(root, 'static', 'ergopti_plus', 'windows');
-const localesDir = path.join(root, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const localesDir = path.join(
+	root,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 const errors = [];
 
 const FORMAT_OF_TRANSLATION = /\bFormat\(\s*t\(\s*["']([^"']+)["']\s*\)/g;

@@ -27,11 +27,11 @@
 
 local M = {}
 
-local Logger   = require("logger.shim")
-local Snapshot = require("diagnostics.snapshot")
+local Logger   = require("core.logger.engine.shim")
+local Snapshot = require("diagnostics.engine.snapshot")
 local Paths    = require("infra.paths")
 local FileSystem = require("adapters.file_system")
-local VersionLabel = require("updater.version_label")
+local VersionLabel = require("updater.engine.version_label")
 
 local LOG = "Version"
 

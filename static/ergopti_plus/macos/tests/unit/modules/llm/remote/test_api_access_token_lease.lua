@@ -20,10 +20,10 @@
 local helpers = require("tests.helpers")
 
 -- The shared logger keeps one process identity, as in the canonical runner.
-require("logger")
+require("core.logger.engine")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
 local TOKEN_URL = "https://iam.cloud.ibm.com/identity/token"
 
@@ -33,18 +33,18 @@ local function with_remote(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
 		"modules.shortcuts.script_control", "adapters.http_client",
-		"llm.remote_response_classifier", "modules.llm.local_servers",
+		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
 		"infra.logger", "adapters.timer_scheduler", "adapters.file_system",
 		"adapters.json_codec", "adapters.storage", "infra.manifest_reader",
-		"llm.provider_config_policy", "llm.remote_formats", "llm.profile_selector",
-		"llm.parser", "llm.prompt_builder", "llm.local_server_auth", "llm.thinking_off", "llm.local_server_discovery",
-		"llm.model_capabilities", "modules.llm.thinking_families",
-		"compat.utf8", "config_defaults", "diagnostics.operation_reporter",
-		"hotstrings.personal_files", "infra.fs_dir", "infra.toml.reader",
-		"json", "lfs", "logger.shim", "text_utils", "toml_codec.basic_string",
-		"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
+		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.policy.thinking_off", "ai.engine.local_servers.discovery",
+		"ai.engine.local_servers.model_capabilities", "modules.llm.thinking_families",
+		"core.lifecycle.engine.compat.utf8", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
+		"hotstrings.engine.catalogue.personal_files", "infra.fs_dir", "infra.toml.reader",
+		"core.text.engine.json", "lfs", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local pending, posts, timers = {}, {}, {}
 		package.loaded["infra.logger"] = {
@@ -94,7 +94,7 @@ local function with_remote(callback)
 		remote.PROVIDERS.ibm_fixture = {
 			label = "IBM fixture", base_url = "https://us-south.ml.cloud.ibm.com/ml/gateway/v1", default_model = "",
 			format = "openai", model_extras = {}, thinking_dialect = {},
-			auth = assert(require("llm.api_token_exchange").parse({
+			auth = assert(require("ai.engine.api.token_exchange").parse({
 				kind = "token_exchange", token_url = TOKEN_URL,
 				body = { grant_type = "urn:ibm:params:oauth:grant-type:apikey", apikey = "{key}" },
 				token_field = "access_token", expires_field = "expires_in",
@@ -122,7 +122,7 @@ local function exchanges(io)
 end
 
 local function reply(post, status, body)
-	post.done({ ok = status >= 200 and status < 300, status = status, body = require("json").encode(body) })
+	post.done({ ok = status >= 200 and status < 300, status = status, body = require("core.text.engine.json").encode(body) })
 end
 
 

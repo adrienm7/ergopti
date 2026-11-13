@@ -11,9 +11,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Configuration = require("healthcheck.configuration")
-local Toml = require("toml_codec")
+local Json = require("core.text.engine.json")
+local Configuration = require("diagnostics.engine.healthcheck.configuration")
+local Toml = require("core.text.engine.toml_codec")
 
 --- The shared corpus.
 --- @return table
@@ -53,7 +53,7 @@ helpers.describe("diagnostics configuration reducer", function()
 end)
 
 helpers.describe("diagnostics configuration sharing", function()
-	local Share = require("healthcheck.share")
+	local Share = require("diagnostics.engine.healthcheck.share")
 
 	--- Reads a shared JSON document.
 	--- @param rel string Path under _shared/.
@@ -65,8 +65,8 @@ helpers.describe("diagnostics configuration sharing", function()
 		return data
 	end
 
-	local schema = shared_json("modules/diagnostics/schema.json")
-	schema.export_strings = shared_json("data/locales/en.json")
+	local schema = shared_json("diagnostics/data/schema.json")
+	schema.export_strings = shared_json("core/i18n/data/locales/en.json")
 	local controls = shared_json("tests/corpus/healthcheck/configuration_share_vectors.json")
 
 	--- A minimal host snapshot carrying only the configuration sections.
@@ -185,14 +185,14 @@ local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
 --- @param body function
 local function with_stubs(replacement, timers, body)
 	local saved = {
-		configuration = package.loaded["healthcheck.configuration"],
+		configuration = package.loaded["diagnostics.engine.healthcheck.configuration"],
 		timers = package.loaded["adapters.timer_scheduler"],
 		probes = package.loaded["ui.healthcheck.probes"],
 	}
-	if replacement then package.loaded["healthcheck.configuration"] = replacement end
+	if replacement then package.loaded["diagnostics.engine.healthcheck.configuration"] = replacement end
 	if timers then package.loaded["adapters.timer_scheduler"] = timers; package.loaded["ui.healthcheck.probes"] = nil end
 	local ok, err = pcall(body)
-	package.loaded["healthcheck.configuration"] = saved.configuration
+	package.loaded["diagnostics.engine.healthcheck.configuration"] = saved.configuration
 	package.loaded["adapters.timer_scheduler"] = saved.timers
 	package.loaded["ui.healthcheck.probes"] = saved.probes
 	if not ok then error(err, 0) end

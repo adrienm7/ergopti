@@ -7,12 +7,12 @@
 --- checked against the catalogue or the installed layouts, and every refresh
 --- or operation pushes the page the same state on every driver
 --- (layout-manager-bridge). These tests drive the shared controller
---- (_shared/lua/layouts/manager_bridge.lua) with a fake registry client and
+--- (_shared/layouts/engine/manager_bridge.lua) with a fake registry client and
 --- record what it pushes, opens and closes.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ManagerBridge = require("layouts.manager_bridge")
+local ManagerBridge = require("layouts.engine.manager_bridge")
 
 local INDEX = {
 	layouts = {

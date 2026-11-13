@@ -4,7 +4,7 @@
 --- MODULE: Script Control
 --- DESCRIPTION:
 --- Manages the script-management chords every driver shares
---- (_shared/modules/actions/script_chords.json), AltGr (the right Option key)
+--- (_shared/shortcuts/data/actions/script_chords.json), AltGr (the right Option key)
 --- with Return, Backspace, Delete (fn+Delete on a Mac keyboard without the key)
 --- or Escape, each on its slot of [shortcuts.script_control]:
 ---   Return    → toggle pause / resume all modules.
@@ -19,7 +19,7 @@
 --- 2. Safe Pause: Uses pause_processing() rather than stop() on the keymap so
 ---    the script-control eventtap itself stays reachable while paused.
 --- 3. A chord belongs to the driver only while its slot runs an action
----    (_shared/lua/script_chords.lua): an unassigned slot, every slot while the
+---    (_shared/keyboard/engine/layers/script_chords.lua): an unassigned slot, every slot while the
 ---    submenu's switch is off, and while paused every action outside script
 ---    management leave the key combination to the system. Karabiner emits a
 ---    slot's sentinel only then (platform/remap/script_chord_rules.lua): this
@@ -43,10 +43,10 @@ local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
 local KeyState  = require("adapters.key_state")
 local KeyEventHealth = require("infra.key_event_health")
-local ScriptChords = require("script_chords")
+local ScriptChords = require("keyboard.engine.layers.script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "shortcuts.script_control"
 
@@ -171,7 +171,7 @@ local _pause_rollback_debt_steps = nil
 local _resume_rollback_debt_steps = nil
 
 --- An additive observer never replaces the existing pause-change singleton.
-local _physical_pause = require("keystats.physical_lifecycle_observation").new("pause", function()
+local _physical_pause = require("metrics.engine.capture.physical_lifecycle_observation").new("pause", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical pause observer retired: %s.", tostring(reason)) end)
 
@@ -1965,7 +1965,7 @@ local function sync_karabiner_chords()
 end
 
 --- Configures the action a chord slot runs.
---- @param slot_id string A slot of _shared/modules/actions/script_chords.json.
+--- @param slot_id string A slot of _shared/shortcuts/data/actions/script_chords.json.
 --- @param action string An action id, or "none" to leave the chord to the system.
 --- @return boolean committed
 function M.set_shortcut_action(slot_id, action)

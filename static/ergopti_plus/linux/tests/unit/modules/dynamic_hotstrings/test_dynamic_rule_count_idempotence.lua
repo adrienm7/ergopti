@@ -29,7 +29,7 @@ n = "last_name"
 
 		local ok, err = pcall(function()
 			local manager = helpers.load_module("modules.dynamic_hotstrings.manager")
-			local engine = require("dynamic_hotstrings")
+			local engine = require("hotstrings.engine.dynamic.core")
 
 			local function assert_snapshot(trigger, phase)
 				helpers.assert_true(manager.init({

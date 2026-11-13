@@ -9,4 +9,4 @@
 --- WKWebView navigation or the macOS download window.
 --- ==============================================================================
 
-require("test.document_lease_contract").register(require("tests.helpers"))
+require("tests.lua.document_lease_contract").register(require("tests.helpers"))

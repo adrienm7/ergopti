@@ -18,11 +18,11 @@
 
 local M = {}
 
-local LearningStore  = require("llm.agent_learning_store")
+local LearningStore  = require("ai.engine.agent.learning_store")
 local Logger         = require("infra.logger")
 local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "llm.agent_learning"
 

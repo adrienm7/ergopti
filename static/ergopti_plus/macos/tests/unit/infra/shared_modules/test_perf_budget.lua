@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PerfBudget = require("perf_budget")
+local PerfBudget = require("core.logger.engine.perf_budget")
 
 --- A logger warn function that records its calls.
 local function recorder()

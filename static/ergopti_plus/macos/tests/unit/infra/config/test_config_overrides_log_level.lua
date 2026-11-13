@@ -84,13 +84,13 @@ if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end
 
 helpers.describe("Expert known-value admission", function()
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "infra.logger", "logger.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local observed, warnings, errors, writes = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
-			logger.LEVELS = require("logger").LEVELS
+			logger.LEVELS = require("core.logger.engine").LEVELS
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			local controls = {}
 			local native = {
 				set = function(key, value)
@@ -102,7 +102,7 @@ helpers.describe("Expert known-value admission", function()
 			}
 			local owner = helpers.load_with_stubs("infra.config_overrides", { settings = native })
 			_G.hs.settings = native
-			local outdated = require("config_outdated")
+			local outdated = require("settings.engine.migration.outdated")
 			outdated.reset_for_tests()
 			local path = os.tmpname()
 			local function write(content)
@@ -140,7 +140,7 @@ helpers.describe("Expert known-value admission", function()
 				helpers.assert_eq(marks, { { "script", "KeptKey" } })
 				helpers.assert_eq(f.owner.apply(f.path), 1)
 				helpers.assert_eq(#f.warnings, 1, "boot, marks and repeated read share one exact rejection")
-				helpers.assert_contains(f.warnings[1], require("toml_codec.key_path").render({ "script", vector.key }))
+				helpers.assert_contains(f.warnings[1], require("core.text.engine.toml_codec.key_path").render({ "script", vector.key }))
 				helpers.assert_eq(f.errors, {})
 				helpers.assert_eq(f.read(), source)
 				helpers.assert_eq(f.codec.decode(f.read()), { script = { [vector.key] = vector.value, KeptKey = 7 }, future = { keep = "independent" } })
@@ -168,7 +168,7 @@ helpers.describe("Expert known-value admission", function()
 			local marks = {}
 			f.owner.mark_config_reads(f.codec.decode(source), function(...) marks[#marks + 1] = { ... } end)
 			helpers.assert_eq(marks, { { "script", "KeptKey" } })
-			local cleanup = require("config_unused_keys")
+			local cleanup = require("settings.engine.migration.unused_keys")
 			local scan = cleanup.find_in_source(source, function(document, mark)
 				f.owner.mark_config_reads(document, mark)
 			end)
@@ -184,7 +184,7 @@ helpers.describe("Expert known-value admission", function()
 	test("cleanup offers the exact rejected path even if another reader marks it", function()
 		local source = '[script]\nlog_level = true\nKeptKey = 7\n'
 		with_file(source, function(f)
-			local cleanup = require("config_unused_keys")
+			local cleanup = require("settings.engine.migration.unused_keys")
 			local scan = cleanup.find_in_source(source, function(document, mark)
 				f.owner.mark_config_reads(document, mark)
 				mark("script", "log_level")
@@ -205,7 +205,7 @@ helpers.describe("Expert known-value admission", function()
 			f.logger.LEVELS = {}
 			helpers.assert_eq(f.owner.apply(f.path), 1, "an empty catalogue is not retirement proof")
 			helpers.assert_eq(f.warnings, {})
-			f.logger.LEVELS = require("logger").LEVELS
+			f.logger.LEVELS = require("core.logger.engine").LEVELS
 			helpers.assert_eq(f.owner.apply(f.path), 0)
 			helpers.assert_eq(#f.warnings, 1)
 		end)
@@ -237,14 +237,14 @@ end)
 helpers.describe("Expert classified source admission", function()
 	local SOURCE = '[script]\nlog_level = "INFO"\n[future]\nkeep = "independent"\n'
 	local function with_file(body)
-		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "adapters.file_system", "infra.logger", "logger.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "adapters.file_system", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local observed, warnings, errors, debug_messages = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
-			logger.LEVELS = require("logger").LEVELS
+			logger.LEVELS = require("core.logger.engine").LEVELS
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			logger.debug = function(_, fmt, ...) debug_messages[#debug_messages + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			local native = {
 				set = function(key, value) observed[key] = value end,
 				get = function(key) return observed[key] end,
@@ -357,7 +357,7 @@ end)
 
 helpers.describe("Persisted native consent admission", function()
 	local function with_native(value, body)
-		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "infra.logger", "logger.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local stored = { ["ergopti.llm.enabled"] = value, ["ergopti.log_level"] = "ERROR",
 				["foreign.future"] = { keep = false, values = { 1, "future" } } }
 			local function detached(value)
@@ -369,10 +369,10 @@ helpers.describe("Persisted native consent admission", function()
 			local predecessor = detached(stored)
 			local warnings, writes = {}, 0
 			local logger = helpers.make_logger_stub()
-			logger.LEVELS = require("logger").LEVELS
+			logger.LEVELS = require("core.logger.engine").LEVELS
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.callback = function(_, _, callback) callback() end
-			package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
+			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			local native = {
 				set = function(key, replacement) writes = writes + 1; stored[key] = replacement end,
 				clear = function(key) writes = writes + 1; stored[key] = nil end,
@@ -381,7 +381,7 @@ helpers.describe("Persisted native consent admission", function()
 			local owner = helpers.load_with_stubs("infra.config_overrides", { settings = native })
 			_G.hs.settings = native
 			local storage = require("adapters.storage")
-			require("config_outdated").reset_for_tests()
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local manifest = require("infra.manifest_reader")
 			local entry = assert(manifest.find_declared_entry_by_path("llm.enabled"))
 			helpers.assert_eq(entry.type, "boolean", "the actual published declaration owns consent's type")

@@ -134,7 +134,7 @@ class _CurlCaptureNativeDownloadRun extends _UpdaterNativeDownloadRun {
 		this.Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(),
 			Url, this.Digest, this.NewExe, this.SwapPath, this.CurrentExe, UPDATER_MIN_EXE_SIZE_BYTES, 5000,
 			_VendorDir . "\ergopti_updater_download.ps1", this.DeadlineMs, this.StartedTick,
-			_SharedDir . "\modules\network\proxy_policy.json", _SharedDir . "\modules\updater\defaults.json", 524288)
+			_SharedDir . "\core\network\data\proxy_policy.json", _SharedDir . "\updater\data\defaults.json", 524288)
 		try {
 			_Updater_BindStagedArtifactTransport(this.Transport, this.StagingOwner)
 			_Updater_BindCurlCaptureTransport(this.Transport, this.Capture)
@@ -614,7 +614,7 @@ _CurlCaptureProductionJoinControls() {
 			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			Parent . "\staged.exe", Parent . "\swap.ps1", Parent . "\existing.exe", UPDATER_MIN_EXE_SIZE_BYTES,
 			5000, _VendorDir . "\ergopti_updater_download.ps1", 30000, A_TickCount,
-			_SharedDir . "\modules\network\proxy_policy.json", _SharedDir . "\modules\updater\defaults.json", 524288)
+			_SharedDir . "\core\network\data\proxy_policy.json", _SharedDir . "\updater\data\defaults.json", 524288)
 		_Updater_BindStagedArtifactTransport(Transport, Staged)
 		for Suffix, Identity in Map("_STAGING_DIRECTORY_ID", Staged.Identity(Staged.Directory),
 			"_STAGED_EXECUTABLE_ID", Staged.Identity(Staged.Files["NewExe"]), "_SWAP_WORKER_ID", Staged.Identity(Staged.Files["SwapScript"])) {

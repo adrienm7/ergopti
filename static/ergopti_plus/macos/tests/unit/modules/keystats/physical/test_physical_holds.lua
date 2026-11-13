@@ -367,9 +367,9 @@ helpers.describe("matched physical hold delivery", function()
 end)
 
 local function media_hold_policy()
-	local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local file = assert(io.open(helpers.shared("layouts/data/keycodes/metrics_media_keys.json"), "rb"))
 	local text = file:read("*a"); assert(file:close())
-	return require("keystats.media_identity").new(require("json").decode(text))
+	return require("metrics.engine.media.identity").new(require("core.text.engine.json").decode(text))
 end
 
 --- Builds a semantic media receiver with genuine baseline, clock and interval owners.

@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
+local codec = require("core.text.engine.toml_codec")
 
 --- Runs body against a preferences module backed by an in-memory config.toml.
 --- @param source string Initial file content.

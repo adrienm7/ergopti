@@ -11,8 +11,8 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"infra.logger", "toml_codec.reader", "toml_codec.bom", "toml_codec.basic_string",
-	"toml_codec.key_path", "toml_codec.record_scanner", "compat.utf8",
+	"infra.logger", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner", "core.lifecycle.engine.compat.utf8",
 }
 local A = '[[alpha]]\n"key" = { output = "CAPTURED" }\n'
 local B = '[[alpha]]\n"key" = { output = "FALLBACK" }\n'
@@ -25,7 +25,7 @@ local function with_reader(run)
 	local ok, detail = xpcall(function()
 		helpers.with_stub_scope(OWNED, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			local reader = require("toml_codec.reader")
+			local reader = require("core.text.engine.toml_codec.reader")
 			local state = { source = source, capture_calls = 0, reads = 0, stores = 0 }
 			function state.write(bytes)
 				local file = assert(io.open(source, "wb"))

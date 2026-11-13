@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Switches the desktop's keyboard layout when the script starts, pauses,
 --- resumes or quits, to the layouts the user chose in Layout > « Layout on pause /
---- resume ». The shared policy (_shared/lua/layout/pause_switch_policy.lua)
+--- resume ». The shared policy (_shared/layouts/engine/layout/pause_switch_policy.lua)
 --- decides which layout each event selects; the input source adapter switches.
 ---
 --- FEATURES & RATIONALE:
@@ -23,8 +23,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Policy = require("layout.pause_switch_policy")
+local Logger = require("core.logger.engine.shim")
+local Policy = require("layouts.engine.layout.pause_switch_policy")
 
 local LOG = "modules.keymap.pause_layout_switch"
 

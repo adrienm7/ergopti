@@ -24,9 +24,9 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 
-local PersonalFiles = require("hotstrings.personal_files")
-local PrivateLabel = require("diagnostics.private_label")
-local TableUtil = require("table_util")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local PrivateLabel = require("diagnostics.engine.private_label")
+local TableUtil = require("core.text.engine.table_util")
 local LOG = "keymap.registry"
 
 local _delay_resolver = nil
@@ -673,7 +673,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 		local toml_reader       = require("infra.toml.reader")
 		local ok, data, committed
 		if source_content ~= nil then
-			ok, data, committed = pcall(require("toml_codec.reader").parse_text, source_content)
+			ok, data, committed = pcall(require("core.text.engine.toml_codec.reader").parse_text, source_content)
 		else
 			ok, data, committed = pcall(toml_reader.parse, path)
 		end
@@ -835,7 +835,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 		::continue_sec::
 	end
 
-	for _, record in ipairs(require("toml_codec.reader").registration_order(data, name, registrations)) do
+	for _, record in ipairs(require("core.text.engine.toml_codec.reader").registration_order(data, name, registrations)) do
 		local section = registrations[record.section]
 		local registration = section and section[record.index]
 		if registration then
@@ -973,7 +973,7 @@ function M.replace_personal_source(name, path, candidate, publish, resolution)
 	local group = _state.groups[name]
 	if not group or group.path ~= path or not PersonalFiles.components(name)
 		or not PersonalFiles.is_descriptor(group.personal_source) or group.personal_source.id ~= name then return false end
-	local parsed, committed = require("toml_codec.reader").parse_text(candidate)
+	local parsed, committed = require("core.text.engine.toml_codec.reader").parse_text(candidate)
 	if committed ~= true or type(parsed) ~= "table" then return false end
 	local enabled, source = group.enabled, PersonalFiles.copy(group.personal_source)
 	return run_transaction("replace_personal_source:" .. name, function()

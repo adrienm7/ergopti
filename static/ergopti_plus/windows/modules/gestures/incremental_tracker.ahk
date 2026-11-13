@@ -14,7 +14,7 @@
 ;    units, and the touchpad's own descriptor (logical span over physical size)
 ;    converts it, so one sensitivity means the same distance on every system.
 ; 2. The shared step rule (modules/gestures/incremental.ahk, the port of
-;    _shared/lua/gestures/incremental.lua): the first action after the first
+;    _shared/gestures/engine/incremental.lua): the first action after the first
 ;    step, each further one after one more step; a shrinking distance keeps
 ;    the actions fired.
 ; 3. Reversal from the last fire: coming back half a first step rebases the

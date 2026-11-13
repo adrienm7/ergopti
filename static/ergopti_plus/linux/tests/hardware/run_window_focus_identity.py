@@ -97,7 +97,7 @@ def main():
             x11.XMapWindow(display, window)
             windows.append((window, child.pid))
         lua = """
-package.path = './?.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;' .. package.path
+package.path = './?.lua;../_shared/?.lua;../_shared/?/init.lua;' .. package.path
 local adapter = require('adapters.window_info')
 local lifecycle = require('adapters.process_lifecycle')
 local transitions = 0

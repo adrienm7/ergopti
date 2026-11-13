@@ -4,7 +4,7 @@
 --- MODULE: Keylayout Canonical Form for Code Generators
 --- DESCRIPTION:
 --- Prints the canonical form of one .keylayout as JSON so a Node code generator
---- converts what the shared reader (_shared/lua/layouts/keylayout.lua) reads,
+--- converts what the shared reader (_shared/layouts/engine/composer/keylayout.lua) reads,
 --- instead of owning a second .keylayout reader:
 --- `lua keylayout_canonical.lua <_shared dir> <file.keylayout>`.
 ---
@@ -20,10 +20,10 @@ if shared_dir == nil or keylayout_path == nil then
 	io.stderr:write("usage: lua keylayout_canonical.lua <_shared dir> <file.keylayout>\n")
 	os.exit(2)
 end
-package.path = shared_dir .. "/lua/?.lua;" .. shared_dir .. "/lua/?/init.lua;" .. package.path
+package.path = shared_dir .. "/?.lua;" .. shared_dir .. "/?/init.lua;" .. package.path
 
-local Json = require("json")
-local Keylayout = require("layouts.keylayout")
+local Json = require("core.text.engine.json")
+local Keylayout = require("layouts.engine.composer.keylayout")
 
 local handle, open_error = io.open(keylayout_path, "rb")
 if handle == nil then

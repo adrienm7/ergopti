@@ -37,7 +37,7 @@ const { shared } = require('../lib/paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const MODEL_PATH = shared('ui', 'layout_composer', 'composer_model.js');
 const REFERENCE_PATH = shared('ui', 'layout_composer', 'reference_layouts.js');
-const TABLE_PATH = shared('modules', 'layouts', 'mac_keycodes.json');
+const TABLE_PATH = shared('layouts', 'data', 'mac_keycodes.json');
 const DATA_PATH = shared('ui', 'layout_composer', '_generated', 'composer_data.js');
 const VECTORS_PATH = shared('tests', 'corpus', 'layouts', 'keylayout_vectors.json');
 const REGISTRY_DIR = path.join(ROOT, 'static', 'layouts', 'registry');
@@ -561,7 +561,7 @@ if (mixed) {
 }
 
 const registryIds = new Set(INDEX.layouts.map((entry) => entry.id));
-const DEFAULTS = JSON.parse(fs.readFileSync(shared('modules', 'layouts', 'defaults.json'), 'utf8'));
+const DEFAULTS = JSON.parse(fs.readFileSync(shared('layouts', 'data', 'defaults.json'), 'utf8'));
 check(
 	Composer.COMPOSED_ID === DEFAULTS.composer.id,
 	'COMPOSED_ID must be the id the shared layout defaults declare for the composer'

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/llm/model_capabilities_vectors.json, which the
 ; shared Lua module (macOS, Linux) replays too, through the AutoHotkey port
-; (_shared/modules/llm/model_capabilities.ahk): recorded OpenRouter, Anthropic
+; (_shared/ai/data/model_capabilities.ahk): recorded OpenRouter, Anthropic
 ; and Gemini listings, the controls they say a model lacks, the request bodies
 ; that follow through LLM_ThinkingOffApply, and the listing cache. Then pins
 ; that the driver consults the cache when it completes a body and fetches a

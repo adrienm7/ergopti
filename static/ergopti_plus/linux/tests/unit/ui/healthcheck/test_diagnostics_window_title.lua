@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
@@ -119,12 +119,12 @@ helpers.describe("shared application native window titles", function()
 				file:close()
 				return Json.decode(text)
 			end
-			local locales = read_json("data/locale_order.json").order
+			local locales = read_json("core/i18n/data/locale_order.json").order
 			local apps = read_json("ui/apps.manifest.json").apps
 			helpers.assert_eq(#locales, 21)
 			for _, locale in ipairs(locales) do
 				current_locale = locale
-				local strings = read_json("data/locales/" .. locale .. ".json")
+				local strings = read_json("core/i18n/data/locales/" .. locale .. ".json")
 				for app, entry in pairs(apps) do
 					local key = entry.title_key
 					label_key, label = key, strings[key]

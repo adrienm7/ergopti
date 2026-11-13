@@ -10,43 +10,43 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"compat.utf8",
+	"core.lifecycle.engine.compat.utf8",
 	-- The real logger and timer scheduler describe failures through this pure owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	-- The real logger's shared core and the phase counters it records into.
-	"logger",
+	"core.logger.engine",
 	"infra.phase_stats",
 	-- The phase counters' bookkeeping, shared with the Linux driver.
-	"phase_stats_core",
+	"metrics.engine.perf.phase_stats_core",
 	-- The real paths, logger and configuration owners split paths through this pure owner,
 	-- and the timer scheduler admits delays through the number policy.
-	"native_path",
-	"number_policy",
+	"core.fs.engine.native_path",
+	"core.text.engine.number_policy",
 	-- The real notifications owner focuses the clicked application through this adapter.
 	"adapters.running_application",
-	"program_parameter", "user_action_parameter",
-	"actions.assignable",
+	"settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
+	"shortcuts.engine.actions.assignable",
 	-- The chord and sticky labels name their keys through the key name table,
 	-- which loads with its data.
-	"actions.sticky_label", "keycodes.key_names", "keycodes.key_names_data",
+	"shortcuts.engine.actions.sticky_label", "platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data",
 	"_generated.action_catalogue",
 	-- The generated catalogue filters the shared data through this owner.
-	"actions.catalogue",
-	"actions.catalogue_data",
+	"shortcuts.engine.actions.catalogue",
+	"shortcuts.engine.actions.catalogue_data",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.
 	"infra.script_chord_catalogue",
-	"script_chords",
-	"app_parameter",
-	"brightness_actions",
-	"brightness_actions_data",
-	"config_binding_identity",
+	"keyboard.engine.layers.script_chords",
+	"apps.engine.parameter",
+	"shortcuts.engine.brightness_actions",
+	"shortcuts.engine.brightness_actions_data",
+	"settings.engine.publication.binding_identity",
 	-- Shared binding admission captures this real ordered-pair dependency.
-	"tap_hold.key_combinations",
-	"config_binding_publication",
-	"config_keyboard_publication",
+	"tap_hold.engine.key_combinations",
+	"settings.engine.publication.binding_publication",
+	"settings.engine.publication.keyboard_publication",
 	-- infra.notifications names the launcher bundle id through this shared table.
-	"identifiers",
+	"core.text.engine.identifiers",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.clipboard",
@@ -55,7 +55,7 @@ local OWNERS = {
 	"adapters.key_state",
 	"adapters.synthetic_input",
 	"adapters.timer_scheduler",
-	"desktop_navigation",
+	"keyboard.engine.desktop_navigation",
 	"infra.config_paths",
 	"infra.i18n",
 	"infra.logger",
@@ -67,17 +67,17 @@ local OWNERS = {
 	"infra.text_utils",
 	"infra.timings",
 	-- The driver bindings of the manifest reader and the timings registry build on these.
-	"manifest_reader",
-	"timings",
+	"menu.engine.manifest_reader_core",
+	"core.timing.engine.timings_core",
 	"infra.toml.reader",
-	"json",
-	"llm.profile_selector",
-	"llm.prompt_action",
-	"llm.tone",
-	"llm.translate",
-	"llm.vision",
+	"core.text.engine.json",
+	"ai.engine.settings.profile_selector",
+	"ai.engine.prediction.prompt_action",
+	"ai.engine.prediction.tone",
+	"ai.engine.prediction.translate",
+	"ai.engine.prediction.vision",
 	-- The shared vision request reads the API dialects from this pure owner.
-	"llm.remote_formats",
+	"ai.engine.api.remote_formats",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.native_app_switcher_action",
@@ -93,7 +93,7 @@ local OWNERS = {
 	"infra.gesture_frame_evidence",
 	"modules.gestures.sticky_modifiers",
 	-- The engine bounds incremental tab steps through the sensitivity owner.
-	"gestures.sensitivity",
+	"gestures.engine.sensitivity",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",
@@ -103,22 +103,22 @@ local OWNERS = {
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.script_control",
-	"send_input",
-	"text_utils",
+	"platform.input.send_input",
+	"core.text.engine.utils_core",
 	-- text_utils builds its case tables from this generated data at require time.
-	"unicode_case.data",
-	"toml_codec.basic_string",
-	"toml_codec.bom",
-	"toml_codec.key_path",
-	"toml_codec.reader",
-	"toml_codec.record_scanner",
+	"core.text.engine.unicode_case.data",
+	"core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.reader",
+	"core.text.engine.toml_codec.record_scanner",
 	-- The record scanner memoizes one text's scans through this owner.
-	"toml_codec.source_memo",
+	"core.text.engine.toml_codec.source_memo",
 	-- The real TOML reader opens its source through this shared owner.
-	"toml_codec.source_open",
+	"core.text.engine.toml_codec.source_open",
 	-- The shared ordered-pair policy copies tables through this owner.
-	"table_util",
-	"wrap_pair",
+	"core.text.engine.table_util",
+	"keyboard.engine.wrap_pair",
 }
 
 local function fresh_actions(options)
@@ -600,10 +600,10 @@ local function fresh_actions(options)
 		-- Only the send-input vocabulary is real: the send_* actions cannot parse
 		-- a value without it, and every other shared file stays missing.
 		read = function(path)
-			if type(path) ~= "string" or not path:find("modules/actions/send_keys.json", 1, true) then
+			if type(path) ~= "string" or not path:find("shortcuts/data/actions/send_keys.json", 1, true) then
 				return nil
 			end
-			local handle = assert(io.open(helpers.shared("modules/actions/send_keys.json"), "r"))
+			local handle = assert(io.open(helpers.shared("shortcuts/data/actions/send_keys.json"), "r"))
 			local body = handle:read("*a")
 			handle:close()
 			return body

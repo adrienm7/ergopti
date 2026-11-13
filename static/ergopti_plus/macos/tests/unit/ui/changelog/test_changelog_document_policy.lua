@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local with_changelog = require("tests.support.changelog_fixture").with_changelog
 
 local CHANGELOG_DIR = helpers.shared("ui/changelog/")

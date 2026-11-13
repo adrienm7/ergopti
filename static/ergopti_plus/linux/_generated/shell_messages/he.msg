@@ -1,5 +1,5 @@
 # linux/_generated/shell_messages/he.msg
-# AUTO-GENERATED from _shared/data/locales/he.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/he.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=מודול הרשת של LuaJIT נבנה מקוד המקור.
 build_luv.recipe_required=הבנייה המקורית של luv דורשת את מתכון המקור שלה.

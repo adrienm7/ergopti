@@ -3,8 +3,8 @@
 local root = assert(arg[1])
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = assert(source:match("^(.*)/tests/fixtures/native_logger_dst_retention%.lua$"))
-package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/lua/?.lua;"
-	.. driver .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
+	.. driver .. "/../_shared/?/init.lua;" .. package.path
 
 local time, date = os.time, os.date
 local now

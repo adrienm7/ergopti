@@ -6,8 +6,8 @@
 ; Versions config.toml at boot, before anything applies or saves it. It reads
 ; ``[_meta] schema_version``, runs the shared registry's steps for the ``ahk``
 ; driver in order, and publishes the migrated file once, after a verified
-; byte-exact backup. The Windows counterpart of _shared/lua/config_migrate.lua;
-; the registry is _shared/core/config_schema/migrations.toml and the decision
+; byte-exact backup. The Windows counterpart of _shared/settings/engine/migration/migrate.lua;
+; the registry is _shared/settings/data/config_schema/migrations.toml and the decision
 ; record docs/adr/009-config-versioning.md.
 ;
 ; FEATURES & RATIONALE:
@@ -53,7 +53,7 @@
 ; live in function statics so no include order can leave them unset.
 ConfigMigrateRegistryPath() {
 	global _SharedDir
-	static Relative := "core/config_schema/migrations.toml"
+	static Relative := "settings/data/config_schema/migrations.toml"
 	return _SharedDir . "\" . StrReplace(Relative, "/", "\")
 }
 

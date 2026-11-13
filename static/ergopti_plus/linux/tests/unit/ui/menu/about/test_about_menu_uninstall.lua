@@ -208,7 +208,7 @@ end)
 --- The genuine About producer owns its actual finished child and shared parent.
 local function about_parent_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/linux_about_parent.json", "rb"))
-	local result = assert(require("json").decode(assert(file:read("*a"))))
+	local result = assert(require("core.text.engine.json").decode(assert(file:read("*a"))))
 	assert(file:close())
 	return result
 end
@@ -222,8 +222,8 @@ local function with_about_parent(code, options, body)
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, detail = xpcall(function()
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "rb"))
-		local labels = assert(require("json").decode(assert(file:read("*a"))))
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "rb"))
+		local labels = assert(require("core.text.engine.json").decode(assert(file:read("*a"))))
 		assert(file:close())
 		package.loaded["infra.i18n"] = {
 			get = function(key) return labels[key] or key end,

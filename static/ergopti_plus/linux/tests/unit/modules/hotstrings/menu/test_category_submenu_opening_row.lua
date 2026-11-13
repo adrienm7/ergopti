@@ -440,7 +440,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
 				end,
 			}
-			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstrings.engine.matcher").new()
 			local changed = 0
 			assert(config._set_config_file_for_test(path))
 			assert(config.init(engine, directory, function() changed = changed + 1 end))
@@ -615,7 +615,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
 				end,
 			}
-			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstrings.engine.matcher").new()
 			local changed = 0
 			assert(config._set_config_file_for_test(path))
 			assert(config.init(engine, directory, function() changed = changed + 1 end))

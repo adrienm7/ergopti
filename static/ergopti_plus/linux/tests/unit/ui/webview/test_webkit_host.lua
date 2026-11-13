@@ -32,7 +32,7 @@ local DRIVER_ROOT = helpers.driver_root()
 
 helpers.describe("ui.webkit_host", function()
   helpers.it("provides the Base64 codec used by native response envelopes", function()
-    local Base64 = require("compat.base64")
+    local Base64 = require("core.lifecycle.engine.compat.base64")
     for plain, encoded in pairs({
       [""] = "",
       ["f"] = "Zg==",
@@ -142,7 +142,7 @@ helpers.describe("ui.webkit_host", function()
 		helpers.it("preserves native path bytes after successful probes (webview-native-path)", function()
 			local driver = '/tmp/ergopti\\checkout/linux'
 			local ui = driver .. "/../_shared/ui"
-			local locales = driver .. "/../_shared/data/locales"
+			local locales = driver .. "/../_shared/core/i18n/data/locales"
 			local reader = require("infra.regular_file_reader")
 			local original_open = reader.open_source
 			reader.open_source = function(path)
@@ -197,10 +197,10 @@ helpers.describe("ui.webkit_host", function()
   end)
 
   helpers.describe("resolve_locales_dir()", function()
-    helpers.it("resolves _shared/data/locales/ from the driver root", function()
+    helpers.it("resolves _shared/core/i18n/data/locales/ from the driver root", function()
       local dir = WH.resolve_locales_dir(DRIVER_ROOT)
       helpers.assert_true(dir ~= "", "resolves to non-empty path")
-      helpers.assert_true(dir:find("_shared/data/locales"), "contains expected path")
+      helpers.assert_true(dir:find("_shared/core/i18n/data/locales"), "contains expected path")
     end)
   end)
 
@@ -309,7 +309,7 @@ helpers.describe("ui.webkit_host", function()
 		helpers.it("encodes native filenames before embedding a file URI (webview-bootstrap-path)", function()
 			local script = WH.build_i18n_boot_script('/tmp/a"b\\c #?%é</script>/locales', "en", { greeting = "Hello" })
 			local literal = script:match('window%.__i18n_base=(.-);window%._i18n_locale=')
-			helpers.assert_eq(require("json").decode(literal),
+			helpers.assert_eq(require("core.text.engine.json").decode(literal),
 				"file:///tmp/a%22b%5Cc%20%23%3F%25%C3%A9%3C/script%3E/locales/",
 				"the URL must preserve native path bytes without breaking the boot script")
 			local _, closes = script:gsub("</script>", "")
@@ -502,7 +502,7 @@ helpers.describe("ui.webkit_host", function()
       -- "<" is escaped inside the seed, so the first "</script>" ends the boot script
       local seed_end = html:find(";</script>", seed_at, true)
       helpers.assert_true(seed_end ~= nil, "the seed statement must close the boot script")
-      local seeded = require("json").decode(html:sub(seed_at + #marker, seed_end - 1))
+      local seeded = require("core.text.engine.json").decode(html:sub(seed_at + #marker, seed_end - 1))
       local count = 0
       for _ in pairs(seeded) do count = count + 1 end
       helpers.assert_eq(count, expected, "the page must carry every string of the catalogue")

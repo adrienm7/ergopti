@@ -5,7 +5,7 @@
  * MODULE: Action Catalogue Codegen Guard
  * DESCRIPTION:
  * Pins the contract of tools/codegen/codegen-action-catalogue.cjs, which turns
- * _shared/modules/actions/actions.toml into one catalogue per driver.
+ * _shared/shortcuts/data/actions/actions.toml into one catalogue per driver.
  *
  * ROOT CAUSES ENCODED:
  * 1. Three runtime readers of one TOML file disagreed. The macOS line reader
@@ -52,10 +52,10 @@ const {
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE = fs.readFileSync(
-	path.join(SP, '_shared', 'modules', 'actions', 'actions.toml'),
+	path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml'),
 	'utf8'
 );
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const errors = [];
 let checks = 0;
@@ -397,7 +397,7 @@ const SITE_LOADER = fs.readFileSync(
 	'utf8'
 );
 check(
-	/ACTIONS_ROOT[\s\S]*?modules[/\\]actions/.test(SITE_LOADER) &&
+	/ACTIONS_ROOT[\s\S]*?shortcuts[/\\]data[/\\]actions/.test(SITE_LOADER) &&
 		/resolve\(ACTIONS_ROOT,\s*'actions\.toml'\)/.test(SITE_LOADER),
 	'the Ergopti+ site must read the canonical modules/actions/actions.toml registry'
 );

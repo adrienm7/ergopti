@@ -375,7 +375,7 @@ esac
 LIBRARY="$PREFIX/lib/ergopti"
 WRAPPER="$PREFIX/bin/ergopti-hotstrings"
 if [ -L "$LIBRARY" ] || [ -L "$WRAPPER" ] || [ ! -f "$LIBRARY/linux/ergopti_hotstrings.lua" ] \
-	|| [ ! -f "$LIBRARY/_shared/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
+	|| [ ! -f "$LIBRARY/_shared/core/i18n/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
 	ergopti_msg uninstall.incomplete_installation >&2
 	exit 1
 fi

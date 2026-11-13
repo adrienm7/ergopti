@@ -9,13 +9,13 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_agent_learning_source%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 
 local folder, kind, mode = assert(arg[1]), assert(arg[2]), assert(arg[3])
 local path, target = folder .. "/source", folder .. "/target"
 local Shell = require("adapters.shell_runner")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Learning = require("modules.llm.agent_learning")
 local function run(command) assert(Shell.run(command), "fixture command failed: " .. command) end
 local function write(candidate, bytes)
@@ -43,7 +43,7 @@ else error("unknown fixture kind") end
 Learning._reset_for_test({ path = original, scheduler = {
 	after = function() return { armed = true } end, cancel = function() return true end,
 } })
-local config = assert(Json.decode_lossless(read(root .. "/../_shared/modules/llm/agent.json")))
+local config = assert(Json.decode_lossless(read(root .. "/../_shared/ai/data/agent.json")))
 if writing then
 	local learned = Learning.record(config, "Mail", "calendar", true)
 	local saved = Learning.flush()

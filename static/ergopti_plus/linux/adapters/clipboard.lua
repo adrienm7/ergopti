@@ -38,7 +38,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local EvdevCodes = require("infra.evdev_codes")
@@ -250,7 +250,7 @@ local function formats_lost_by_text_restore(selected_backend)
 	if not ok then return false, {}, false end
 	local lost, offers_text = {}, false
 	for line in listing:gmatch("[^\r\n]+") do
-		local target = require("text_utils").trim(line)
+		local target = require("core.text.engine.utils_core").trim(line)
 		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target
 		elseif target ~= "" and not BOOKKEEPING_TARGETS[target] then offers_text = true end
 	end
@@ -270,7 +270,7 @@ local function read_all_targets(selected_backend)
 	if not ok then return nil end
 	local targets, seen, total = {}, {}, 0
 	for line in listing:gmatch("[^\r\n]+") do
-		local name = require("text_utils").trim(line)
+		local name = require("core.text.engine.utils_core").trim(line)
 		if name ~= "" and not BOOKKEEPING_TARGETS[name] and not seen[name] then
 			seen[name] = true
 			local read_ok, data = Shell.exec_checked(selected_backend.read_target(name))
@@ -784,7 +784,7 @@ end
 --- Reads the file manager's selection by copying it: the text/uri-list it
 --- publishes on Ctrl+C, then puts the clipboard's text back. xsel cannot ask
 --- for a target, so it has no route; the caller parses the list
---- (_shared/lua/file_selection).
+--- (_shared/core/fs/engine).
 --- @param emit_combo function combo -> boolean
 --- @param sleep_ms function Blocking millisecond wait.
 --- @return boolean ok

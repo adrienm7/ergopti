@@ -36,9 +36,9 @@ local CommandLines = require("tests.support.command_lines")
 local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
 
 -- package.path roots the driver injects at boot (init.lua:14-28), in search
--- order. "../_shared/lua" is the module root shared with the Windows and Linux
+-- order. "../_shared" is the module root shared with the Windows and Linux
 -- drivers, so a shared module resolves from the macOS tree too.
-local REQUIRE_ROOTS = { "", "modules/", "infra/", "platform/", "ui/", "adapters/", "../_shared/lua/" }
+local REQUIRE_ROOTS = { "", "modules/", "infra/", "platform/", "ui/", "adapters/", "../_shared/" }
 
 -- Provided by the Hammerspoon runtime rather than this repository, so their
 -- absence from the tree is expected and must not fail the scan.

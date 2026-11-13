@@ -129,7 +129,7 @@ local function load_fixture(legacy)
 		end,
 		destroy = function() return true end,
 	}
-	package.loaded["chord"] = {
+	package.loaded["keyboard.engine.chord"] = {
 		format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
 	}
 	package.loaded["adapters.hotkey_registrar"] = {

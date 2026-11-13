@@ -397,7 +397,7 @@ def registry_ms(section, key):
     and of the hot-path slow threshold."""
     import tomllib
 
-    path = ROOT / "static/ergopti_plus/_shared/modules/timings/constants.toml"
+    path = ROOT / "static/ergopti_plus/_shared/core/timing/data/constants.toml"
     return tomllib.loads(path.read_text())[section][key]
 
 

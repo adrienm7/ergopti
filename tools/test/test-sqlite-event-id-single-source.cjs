@@ -19,7 +19,7 @@ const { scriptTokens, stripComments } = require('../lib/script-source.cjs');
 
 const root = path.resolve(__dirname, '../../static/ergopti_plus');
 const policy = stripComments(
-	fs.readFileSync(path.join(root, '_shared/lua/sqlite/event_id_policy.lua'), 'utf8'),
+	fs.readFileSync(path.join(root, '_shared/core/fs/engine/sqlite/event_id_policy.lua'), 'utf8'),
 	'.lua'
 );
 assert.match(policy, /M\.MAX_EXACT_LUA_CURSOR\s*=\s*2\s*\^\s*53\s*-\s*1/);
@@ -63,7 +63,7 @@ for (const driver of ['linux', 'macos']) {
 	if (driver === 'linux') {
 		const withoutComments = stripComments(source, '.lua');
 		const binding = withoutComments.match(
-			/local\s+(\w+)\s*=\s*require\(["']sqlite\.event_id_policy["']\)/
+			/local\s+(\w+)\s*=\s*require\(["']core\.fs\.engine\.sqlite\.event_id_policy["']\)/
 		);
 		assert.ok(binding, 'Linux allocator must import the shared numeric policy');
 		assert.match(code, new RegExp('\\b' + binding[1] + '\\s*\\.\\s*MAX_EXACT_LUA_CURSOR\\b'));

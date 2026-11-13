@@ -3,8 +3,8 @@
 local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/managed_ollama_pull_adapter_test%.lua$"))
 package.path = root .. "/static/ergopti_plus/macos/?.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
-local Json = require("json")
+	.. root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
+local Json = require("core.text.engine.json")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
 local raw, removed, inode = "", false, 2
 local policy = "CURL_CONNECT_TIMEOUT_SEC=30\nCURL_STALL_SEC=60\nCURL_MAX_TIME_SEC=600\n"

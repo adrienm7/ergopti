@@ -21,7 +21,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local ErrorDescription = require("error_description")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "infra.teardown_transaction"
 

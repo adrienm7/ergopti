@@ -34,8 +34,8 @@ local MODULE_NAMES = {
 	"platform.remap.nav_layer",
 	"ui.menu.menu_paths",
 	"ui.onboarding",
-	"onboarding_publication",
-	"config_file_inverse",
+	"onboarding.engine.publication",
+	"settings.engine.migration.file_inverse",
 }
 
 -- Where the doubled path resolver puts the remap settings.
@@ -63,13 +63,13 @@ end
 --- @param scenario function
 --- @return any result
 function M.with_migration_reader(scenario)
-	local saved_migration = package.loaded["config_migrate"]
-	local saved_writer = package.loaded["toml_codec.writer"]
+	local saved_migration = package.loaded["settings.engine.migration.migrate"]
+	local saved_writer = package.loaded["core.text.engine.toml_codec.writer"]
 	local migration, boot
 	local ok, result = xpcall(function()
-		package.loaded["config_migrate"] = nil
-		package.loaded["toml_codec.writer"] = nil
-		migration = require("config_migrate")
+		package.loaded["settings.engine.migration.migrate"] = nil
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		migration = require("settings.engine.migration.migrate")
 		boot = migration.boot
 		migration.boot = function(options)
 			local controlled = {}
@@ -83,8 +83,8 @@ function M.with_migration_reader(scenario)
 		return scenario()
 	end, debug.traceback)
 	if migration then migration.boot = boot end
-	package.loaded["config_migrate"] = saved_migration
-	package.loaded["toml_codec.writer"] = saved_writer
+	package.loaded["settings.engine.migration.migrate"] = saved_migration
+	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	if not ok then error(result, 0) end
 	return result
 end
@@ -94,13 +94,13 @@ end
 --- @param scenario function Actual host Finish replay.
 --- @return any result
 local function with_native_configuration_context(scenario)
-	local saved_migration = package.loaded["config_migrate"]
-	local saved_writer = package.loaded["toml_codec.writer"]
-	package.loaded["config_migrate"] = nil
-	package.loaded["toml_codec.writer"] = nil
+	local saved_migration = package.loaded["settings.engine.migration.migrate"]
+	local saved_writer = package.loaded["core.text.engine.toml_codec.writer"]
+	package.loaded["settings.engine.migration.migrate"] = nil
+	package.loaded["core.text.engine.toml_codec.writer"] = nil
 	local called, result = xpcall(scenario, debug.traceback)
-	package.loaded["config_migrate"] = saved_migration
-	package.loaded["toml_codec.writer"] = saved_writer
+	package.loaded["settings.engine.migration.migrate"] = saved_migration
+	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	if not called then error(result, 0) end
 	return result
 end
@@ -281,13 +281,13 @@ function M.with_finish(opts, scenario)
 		if opts.canonical_files then
 			assert(opts.prepare_destination == nil, "native Finish must keep its actual boot preparation")
 			if opts.fresh_writer_after_inverse then
-				state.previous_shared_writer = require("toml_codec.writer")
-				state.retained_inverse_module = require("config_file_inverse")
-				package.loaded["toml_codec.writer"] = nil
-				state.current_shared_writer = require("toml_codec.writer")
+				state.previous_shared_writer = require("core.text.engine.toml_codec.writer")
+				state.retained_inverse_module = require("settings.engine.migration.file_inverse")
+				package.loaded["core.text.engine.toml_codec.writer"] = nil
+				state.current_shared_writer = require("core.text.engine.toml_codec.writer")
 				helpers.assert_true(not rawequal(state.previous_shared_writer, state.current_shared_writer),
 					"the canonical host must use a genuinely reloaded shared writer")
-				helpers.assert_eq(package.loaded["config_file_inverse"], state.retained_inverse_module,
+				helpers.assert_eq(package.loaded["settings.engine.migration.file_inverse"], state.retained_inverse_module,
 					"the genuine inverse module remains cached from the prior helper cohort")
 			end
 			package.loaded["infra.toml.writer"] = nil

@@ -25,7 +25,7 @@ local function with_installer(options, check)
 			local file = assert(io.open(path, "rb"))
 			local content = assert(file:read("a")); assert(file:close()); return content
 		end }
-		package.loaded["adapters.json_codec"] = require("json")
+		package.loaded["adapters.json_codec"] = require("core.text.engine.json")
 		package.loaded["adapters.shell_runner"] = {}
 		local installer = require("modules.updater.release_installer")
 		installer._getenv = function(name)
@@ -141,7 +141,7 @@ helpers.describe("physical detached arming handshake", function()
 			.. quote(helpers.driver_root() .. "tests/support/modules/updater/release_arming_fixture.py")
 			.. " " .. quote(helpers.driver_root()) .. " " .. quote(helpers.temp_dir())
 			.. " --hostile-interpreter 2>&1")
-		cases = assert(require("json").decode_lossless(table.concat(output, "\n")))
+		cases = assert(require("core.text.engine.json").decode_lossless(table.concat(output, "\n")))
 		helpers.assert_eq(#cases, 8, "every native refusal and healthy control must execute")
 		return cases
 	end
@@ -164,8 +164,8 @@ helpers.describe("physical detached arming handshake", function()
 			else
 				helpers.assert_true(result.status ~= 0, "a failed detached worker must fail the foreground receipt")
 				helpers.assert_eq(result.installed, "installed")
-				helpers.assert_eq(require("json").is_null(result.previous), true)
-				helpers.assert_eq(require("json").is_null(result.opened), true)
+				helpers.assert_eq(require("core.text.engine.json").is_null(result.previous), true)
+				helpers.assert_eq(require("core.text.engine.json").is_null(result.opened), true)
 			end
 		end)
 	end

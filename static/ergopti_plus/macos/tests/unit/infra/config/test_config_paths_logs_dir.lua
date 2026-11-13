@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The application folder name every override ends with.
 local APP = AppDirs.macos.folder_name

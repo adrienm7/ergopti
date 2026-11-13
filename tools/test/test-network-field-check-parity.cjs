@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The Debug menu's « Test network (PAC, proxy, download) » exists on every
  * driver: macOS and Linux run the shared Lua steps
- * (_shared/lua/network/field_check_network.lua), Windows runs the same steps in
+ * (_shared/core/network/engine/field_check_network.lua), Windows runs the same steps in
  * AutoHotkey (windows/ui/field_check/network_check.ahk). This gate pins what
  * keeps the three reports comparable when a maintainer pastes one back:
  * 1. the Lua and AutoHotkey step lists are the same identities in the same order
@@ -42,7 +42,7 @@ const check = (label, action) => {
 	passed++;
 };
 
-const luaSource = read('_shared', 'lua', 'network', 'field_check_network.lua');
+const luaSource = read('_shared', 'core', 'network', 'engine', 'field_check_network.lua');
 const ahkSource = read('windows', 'ui', 'field_check', 'network_check.ahk');
 
 /** The quoted identities of a Lua `{ "a", "b" }` or AutoHotkey `["a", "b"]` list. */
@@ -73,7 +73,7 @@ check('the Lua chain steps are a suffix of the full list', () => {
 });
 
 check('every step has a label in every locale', () => {
-	const dir = path.join(sp, '_shared', 'data', 'locales');
+	const dir = path.join(sp, '_shared', 'core', 'i18n', 'data', 'locales');
 	const locales = fs.readdirSync(dir).filter((file) => file.endsWith('.json'));
 	assert.equal(locales.length, 21);
 	for (const file of locales) {
@@ -92,7 +92,7 @@ check('every step has a label in every locale', () => {
 });
 
 check('the menu row is declared once, for every platform, without a platform reason', () => {
-	const manifest = JSON.parse(read('_shared', 'modules', 'menu', 'menu_manifest.json'));
+	const manifest = JSON.parse(read('_shared', 'menu', 'data', 'menu_manifest.json'));
 	const rows = [];
 	(function walk(node) {
 		if (Array.isArray(node)) node.forEach(walk);

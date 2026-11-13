@@ -42,7 +42,7 @@ function check(label, body) {
 
 // 1. The rows are unrestricted.
 check('manifest rows', () => {
-	const menu = JSON.parse(read(`${PLUS}/_shared/modules/menu/menu_manifest.json`));
+	const menu = JSON.parse(read(`${PLUS}/_shared/menu/data/menu_manifest.json`));
 	const rows = menu.metrics_menu;
 	for (const id of ['metrics_suspend', 'metrics_reset_session']) {
 		const row = rows.find((item) => item.id === id);

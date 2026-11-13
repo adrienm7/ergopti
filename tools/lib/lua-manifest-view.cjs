@@ -5,7 +5,7 @@
  * MODULE: Full Text Of A Lua Driver's Features Manifest
  * DESCRIPTION:
  * The macOS and Linux drivers share one generated manifest table
- * (_shared/lua/features/manifest_data.lua), and each driver's
+ * (_shared/settings/engine/features/manifest_data.lua), and each driver's
  * _generated/features_manifest.lua is a single projection call. The parity
  * tests parse the manifest as text, in the layout each driver used to commit,
  * so this returns that layout from the generator's model of the driver.

@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local function with_core(callback)
 	return helpers.with_stub_scope({ "modules.keystats", "modules.keystats.init",
 		"modules.keystats.physical_accounting_mode", "adapters.physical_observation_clock",
-		"keystats.physical_configuration_observation", "modules.keystats.text_cipher",
+		"metrics.engine.capture.physical_configuration_observation", "modules.keystats.text_cipher",
 		"modules.keystats.text_migration", "modules.keystats.kc_bridge" }, function()
 		local encrypted, available, migrating = false, true, false
 		package.loaded["modules.keystats.text_cipher"] = {

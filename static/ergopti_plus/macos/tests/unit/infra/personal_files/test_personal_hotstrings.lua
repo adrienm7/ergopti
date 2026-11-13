@@ -258,10 +258,10 @@ end)
 
 helpers.describe("personal-file descriptors: independent cross-driver corpus", function()
 	helpers.it("preserves exact relative components without borrowing mutable arrays", function()
-		local PersonalFiles = require("hotstrings.personal_files")
+		local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 		local handle = assert(io.open(helpers.shared("tests/corpus/hotstrings/personal_file_descriptors.json"), "r"))
 		local content = assert(handle:read("*a")); assert(handle:close())
-		local corpus = assert(require("json").decode(content))
+		local corpus = assert(require("core.text.engine.json").decode(content))
 		helpers.assert_eq(#corpus.vectors, 13, "the independent corpus must not become vacuous")
 		local identities = {}
 		for _, vector in ipairs(corpus.vectors) do

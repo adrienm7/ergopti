@@ -156,7 +156,7 @@ for (const [driver, source] of Object.entries(templates)) {
 	);
 }
 const policy = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/_shared/lua/layout/number_row_policy.lua'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/layouts/engine/layout/number_row_policy.lua'),
 	'utf8'
 );
 assert.match(policy, /return platform == "ahk" and/);

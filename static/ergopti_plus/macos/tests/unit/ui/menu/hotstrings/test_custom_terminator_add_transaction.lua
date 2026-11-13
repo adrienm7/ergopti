@@ -54,25 +54,25 @@ local function with_fixture(outcome, callback, locale)
 	return helpers.with_stub_scope({
 		"adapters.file_system", "infra.fs_dir", "infra.logger", "infra.preferences",
 		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
-		"infra.notifications", "modules.hotstrings.hotstrings_config", "keymap.terminators",
+		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 		"ui.hotstrings_config_window",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local FileSystem = require("adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { adds = 0, prompts = 0, consumes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
 		local translations = {}
 		if not locale then
-			local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
+			local file = assert(io.open(require("infra.paths").shared("core/i18n/data/locales/en.json"), "rb"))
 			local raw = file:read("*a")
 			file:close()
 			local english = assert(require("adapters.json_codec").decode(raw))
 			translations["button.ok"], translations["button.cancel"] = english["button.ok"], english["button.cancel"]
 		end
 		if locale then
-			local file = assert(io.open(require("infra.paths").shared("data/locales/" .. locale .. ".json"), "rb"))
+			local file = assert(io.open(require("infra.paths").shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 			local raw = file:read("*a")
 			file:close()
 			translations = assert(require("adapters.json_codec").decode(raw))
@@ -102,9 +102,9 @@ local function with_fixture(outcome, callback, locale)
 				return current_outcome == "consume_no" and translate("dialog.hotstrings.consume_no") or translate("dialog.hotstrings.consume_yes")
 			end,
 		}
-		local command_renderer = assert(require("menu.renderer").new({
+		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
 				local value = require("adapters.json_codec").decode(raw)
 				if outcome == "config_shared_label" and type(value.hotstrings_delays_menu) == "table" then
@@ -253,7 +253,7 @@ helpers.describe("custom delimiter Add declaration and acknowledged native owner
 				helpers.assert_eq(fixture.calls.saves, 1)
 				helpers.assert_eq(fixture.calls.writes, 1)
 				helpers.assert_eq(fixture.calls.updates, 1)
-				local decoded = require("toml_codec").decode(fixture.read())
+				local decoded = require("core.text.engine.toml_codec").decode(fixture.read())
 				helpers.assert_eq(decoded.foreign.keep, "untouched")
 				helpers.assert_eq(decoded.hotstrings.terminators[1].future.keep, 17)
 				helpers.assert_eq(decoded.hotstrings.terminators[2].char, custom_command_expected().target.char)
@@ -319,7 +319,7 @@ helpers.describe("custom delimiter Add uses actual supplied native button labels
 				helpers.assert_eq(runtime_has_definition(fixture), true, locale)
 				helpers.assert_eq(fixture.calls.writes, 1, locale)
 				helpers.assert_eq(fixture.calls.updates, 1, locale)
-				local decoded = require("toml_codec").decode(fixture.read())
+				local decoded = require("core.text.engine.toml_codec").decode(fixture.read())
 				helpers.assert_eq(decoded.hotstrings.terminators[1].future.keep, 17, locale)
 				helpers.assert_eq(decoded.foreign.keep, "untouched", locale)
 				admitted = admitted + 1
@@ -377,7 +377,7 @@ helpers.describe("declared delay configuration command: actual macOS provider", 
 					helpers.assert_eq(observations.callback_result, false)
 					helpers.assert_eq(fixture.read(), SOURCE, "refused refresh writes preserve the real physical source")
 				else
-					helpers.assert_eq(require("toml_codec").decode(fixture.read()).foreign.keep, "untouched")
+					helpers.assert_eq(require("core.text.engine.toml_codec").decode(fixture.read()).foreign.keep, "untouched")
 				end
 			end)
 		end)

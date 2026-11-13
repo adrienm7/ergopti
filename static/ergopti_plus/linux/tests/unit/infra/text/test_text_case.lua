@@ -8,11 +8,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local UnicodeCase = helpers.load_module("unicode_case")
+local UnicodeCase = helpers.load_module("core.text.engine.unicode_case")
 
 helpers.describe("Unicode case conversion", function()
 	helpers.it("folds fixed-width Unicode hotstring case pairs (hotstring-unicode-fold)", function()
-		local text = helpers.load_module("text_utils")
+		local text = helpers.load_module("core.text.engine.utils_core")
 		helpers.assert_eq(text.trig_lower("ÁΣ"), "áσ")
 		helpers.assert_eq(text.trig_upper("áσ"), { "ÁΣ" })
 		helpers.assert_eq(text.repl_upper("áσ"), "ÁΣ")

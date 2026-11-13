@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Tap-Hold Shared Defaults — Documented Lifecycle Guard
  * DESCRIPTION:
- * _shared/tap_hold/defaults.toml is read at runtime, on every boot, by all three
+ * _shared/tap_hold/data/defaults.toml is read at runtime, on every boot, by all three
  * drivers. The documentation said the opposite.
  *
  * ROOT CAUSE ENCODED:
@@ -50,7 +50,7 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const DEFAULTS = path.join(SP, '_shared/tap_hold/defaults.toml');
+const DEFAULTS = path.join(SP, '_shared/tap_hold/data/defaults.toml');
 
 const errors = [];
 const read = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
@@ -67,13 +67,13 @@ const LOADERS = [
 		// The boot wiring, not the loader's header comment: this is the line that
 		// actually hands the path to the tap-hold manager.
 		file: 'linux/ergopti_hotstrings.lua',
-		needle: 'shared("tap_hold/defaults.toml")',
+		needle: 'shared("tap_hold/data/defaults.toml")',
 		lifecycle:
 			'passes the shared defaults to the tap-hold manager at boot; the loader merges the user file on top per key'
 	},
 	{
 		file: 'macos/platform/remap/defaults.lua',
-		needle: 'tap_hold/defaults.toml',
+		needle: 'tap_hold/data/defaults.toml',
 		lifecycle: 'reads [hs_*] in its module body at require time, unconditionally'
 	}
 ];
@@ -99,7 +99,10 @@ for (const l of LOADERS) {
 // becomes legal again the day it becomes true.
 const loadersStillRead = errors.length === 0;
 
-const DOCS = ['_shared/core/config_schema/SCHEMA.md', '_shared/tap_hold/defaults.toml'];
+const DOCS = [
+	'_shared/settings/data/config_schema/SCHEMA.md',
+	'_shared/tap_hold/data/defaults.toml'
+];
 
 const FALSE_CLAIMS = [
 	/no runtime merge/i,
@@ -195,7 +198,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] all ${LOADERS.length} driver(s) read _shared/tap_hold/defaults.toml at runtime, ` +
+	`\x1b[32m[OK] all ${LOADERS.length} driver(s) read _shared/tap_hold/data/defaults.toml at runtime, ` +
 		`no document claims otherwise, and both namespaces cover the same ${KEY_MAP.length} physical key(s) ` +
 		`(${KNOWN_UNPAIRED.size} recorded as deliberately unpaired).\x1b[0m`
 );

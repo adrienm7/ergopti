@@ -32,13 +32,13 @@ local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local TerminatorSettings = require("modules.hotstrings.terminator_settings")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local Codec = require("toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local Codec = require("core.text.engine.toml_codec")
 local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "infra.legacy_hotstring_storage"
 

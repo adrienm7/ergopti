@@ -346,7 +346,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	helpers.it("the shared native admission policy preserves admitted scope and neighbor callbacks exactly", function()
 		helpers.with_stub_scope({ "infra.manifest_menu", "infra.i18n" }, function()
 			local Manifest = helpers.load_with_stubs("infra.manifest_menu")
-			local Policy = require("menu.personal_files")
+			local Policy = require("menu.engine.personal_files")
 			local i18n = require("infra.i18n")
 			local enabled, disabled, neighbor = function() return true end, function() return true end, function() return true end
 			local rows = Manifest.build("hotstring_category_menu", "Hotstrings", nil, nil, { commands = {
@@ -367,7 +367,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	helpers.it("the shared native admission policy closes only declared scope controls on strict owner refusal", function()
 		helpers.with_stub_scope({ "infra.manifest_menu", "infra.i18n" }, function()
 			local Manifest = helpers.load_with_stubs("infra.manifest_menu")
-			local Policy = require("menu.personal_files")
+			local Policy = require("menu.engine.personal_files")
 			local i18n = require("infra.i18n")
 			for _, refusal in ipairs({ { value = false }, { value = nil }, { value = 1 }, { value = true, readonly = true } }) do
 				local calls = 0
@@ -431,4 +431,4 @@ helpers.describe("About provider consumes its existing canonical caption declara
 	end
 end)
 
-require("test.menu_row_dialect_contract").register(helpers)
+require("tests.lua.menu.row_dialect_contract").register(helpers)

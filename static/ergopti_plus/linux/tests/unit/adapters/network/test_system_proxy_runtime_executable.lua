@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Loads the candidate with independent controllable native acknowledgements.
 --- @param config table|nil

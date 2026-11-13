@@ -55,7 +55,7 @@ end
 --- @param post table
 --- @param content string
 local function answer_local(post, content)
-	post.callback({ ok = true, status = 200, body = require("json").encode({ message = { content = content } }) })
+	post.callback({ ok = true, status = 200, body = require("core.text.engine.json").encode({ message = { content = content } }) })
 end
 
 --- Answers a captured local chat request with an HTTP failure.

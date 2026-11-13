@@ -8,13 +8,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"llm.bootstrap_budget", "llm.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "logger.shim", "infra.i18n", "llm.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "config_outdated", "toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "infra.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
 -- This suite tests native wiring contracts; the actual shared controller has its
 -- own independent causal suite. Capture only the ports sent to that owner.
-package.loaded['llm.runtime_repair']={new=function(ports,policy)return{ports=ports,policy=policy}end}
+package.loaded['ai.engine.local_servers.runtime_repair']={new=function(ports,policy)return{ports=ports,policy=policy}end}
 local Compose = helpers.load_module("modules.llm.runtime_composition")
 local ManagedEnvironment = helpers.load_module("modules.llm.managed_ollama_environment")
 local function eq(a,b)assert(a==b,'expected '..tostring(b)..' got '..tostring(a))end
@@ -104,9 +104,9 @@ test('stale logical HTTP response does not publish callback or erase capability'
 end)
 
 local function relay_policy()
-	local file=assert(io.open(assert(require('infra.paths').shared('modules/network/proxy_auth_relay.json')),'rb'))
+	local file=assert(io.open(assert(require('infra.paths').shared('core/network/data/proxy_auth_relay.json')),'rb'))
 	local bytes=file:read('*a');assert(file:close())
-	return assert(require('network.proxy_auth_relay').new(require('json').decode(bytes)))
+	return assert(require('core.network.engine.proxy_auth_relay_core').new(require('core.text.engine.json').decode(bytes)))
 end
 local function network(relay_executable)return{policy={route=function()return{mode='system',environment_exclusions={}}end,environment_names=function()return{}end,
 	selection=function()return nil end},lookup=function()end,timeout_ms=7,origins={'https://registry.ollama.ai'},

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 
 --- Normalizes a configuration directory through the canonical XDG default.
 --- @param config_paths table Configuration-path authority.

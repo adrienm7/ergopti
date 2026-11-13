@@ -47,7 +47,7 @@ const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const RESOLVER = 'static/ergopti_plus/windows/infra/manifest_descriptions.ahk';
-const LOCALE_DIR = 'static/ergopti_plus/_shared/data/locales';
+const LOCALE_DIR = 'static/ergopti_plus/_shared/core/i18n/data/locales';
 
 // Non-feature entries whose label does not resolve today. This number may only
 // go DOWN. It is not a target to be raised: every entry behind it is a menu

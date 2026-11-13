@@ -11,7 +11,7 @@ local M = {}
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local uv = require("luv")
 
 --- Opens one isolated original configuration stack.
@@ -47,10 +47,10 @@ function M.with_configuration(body)
 		end
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "infra.config_paths"
-				or name == "adapters.storage" or name == "toml_codec.writer" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
+				or name == "adapters.storage" or name == "core.text.engine.toml_codec.writer" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
 				or name == "ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end
-		local Json, Codec = require("json"), require("toml_codec")
+		local Json, Codec = require("core.text.engine.json"), require("core.text.engine.toml_codec")
 		local dirs = { a = root .. "/a", b = root .. "/b" }
 		local initial = {}
 		for id, dir in pairs(dirs) do
@@ -96,7 +96,7 @@ function M.with_configuration(body)
 			webview = host, on_quit = function() error("quit is outside this fixture") end }
 		local f = { paths = Paths, dirs = dirs, initial = initial, prompt = prompt, host = host,
 			preferences = require("infra.llm_preferences"), settings = require("modules.llm.settings"),
-			trigger = require("modules.llm.trigger_settings"), notifications = notifications, received = received, writer = require("toml_codec.writer") }
+			trigger = require("modules.llm.trigger_settings"), notifications = notifications, received = received, writer = require("core.text.engine.toml_codec.writer") }
 		function f.bytes(id) return read(dirs[id] .. "/config.toml") end
 		function f.document(id) return Codec.decode(f.bytes(id)) end
 		function f.switch(id)

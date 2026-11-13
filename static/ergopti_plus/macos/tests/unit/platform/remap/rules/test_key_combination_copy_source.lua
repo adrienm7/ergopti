@@ -5,7 +5,7 @@
 local h = require("tests.helpers")
 local with_fs = require("tests.support.file_system_transaction_fixture").with_fixture
 local with_remap = require("tests.support.remap_transaction_fixture")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 -- A macOS combination; config.toml names it by its pair id.
 local entries = { { id = "esc_tab" } }
 local PAIR = "escape_then_tab"
@@ -72,7 +72,7 @@ h.describe("chord copy actual fresh source producer", function()
    h.assert_eq(saved.config[PAIR].combo, "escape")
    h.assert_eq(saved.config[PAIR].hold, "layer")
    h.assert_eq(saved.enabled, false); h.assert_eq(saved.symmetric, true); h.assert_eq(saved.simultaneous_threshold_ms, 87)
-   h.assert_eq(require("config_file_inverse").restore(receipt, adapter), true)
+   h.assert_eq(require("settings.engine.migration.file_inverse").restore(receipt, adapter), true)
    h.assert_eq(read(path), SOURCE)
   end)
  end)
@@ -121,9 +121,9 @@ h.describe("chord copy actual fresh source producer", function()
    adapter.write_if_unchanged_admitted = real_write
    h.assert_eq(accepted, false); h.assert_eq(type(receipt.publication_cleanup), "function")
    h.assert_eq(read(path), plan.candidate)
-   h.assert_eq(require("config_file_inverse").restore(receipt, adapter), false)
+   h.assert_eq(require("settings.engine.migration.file_inverse").restore(receipt, adapter), false)
    h.assert_eq(cleanup_calls, 1); h.assert_eq(read(path), plan.candidate)
-   released = true; h.assert_eq(require("config_file_inverse").restore(receipt, adapter), true)
+   released = true; h.assert_eq(require("settings.engine.migration.file_inverse").restore(receipt, adapter), true)
    h.assert_eq(cleanup_calls, 2); h.assert_eq(read(path), SOURCE)
   end)
  end)
@@ -176,7 +176,7 @@ h.describe("chord copy session refusal registry", function()
  h.it("refuses a session write registration after preparation before native publication", function()
   scoped(function(Config, adapter, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    Writer.refuse_writes(path, "unsupported schema/session")
    local calls, native = 0, adapter.write_if_unchanged
    adapter.write_if_unchanged = function(...)
@@ -191,7 +191,7 @@ h.describe("chord copy session refusal registry", function()
  h.it("refuses a session write registration during the publication boundary", function()
   scoped(function(Config, adapter, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    local calls, native = 0, adapter.write_if_unchanged
    adapter.write_if_unchanged = function(...)
     calls = calls + 1
@@ -221,7 +221,7 @@ h.describe("chord copy final logical admission", function()
  h.it("checks registry registration during the real final native source read", function()
   scoped(function(Config, adapter, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    local native, reads = adapter.read_with_status, 0
    adapter.read_with_status = function(...)
     local bytes, status, detail = native(...); reads = reads + 1
@@ -287,7 +287,7 @@ h.describe("chord copy final criterion registry reentry", function()
  h.it("rechecks session refusal registered by the final caller criterion", function()
   scoped(function(Config, _, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    local criteria = 0
    local accepted = Config.publish_copy_taps_to_chords(plan, path, function()
     criteria = criteria + 1

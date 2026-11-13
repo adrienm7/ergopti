@@ -27,7 +27,7 @@ local Logger = require("infra.logger")
 local LOG = "llm.managed_pyobjc"
 
 --- The versionless link the installer publishes, as a tilde path.
-M.LINK = "~/" .. require("app_dirs").macos.support_relative .. "/native-bootstrap/app-cloner/python3"
+M.LINK = "~/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/native-bootstrap/app-cloner/python3"
 
 --- The installer, relative to the driver folder.
 M.INSTALLER = "modules/llm/ensure-managed-pyobjc.sh"

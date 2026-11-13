@@ -5,7 +5,7 @@
  * MODULE: Timing Registry Liveness Gate
  * DESCRIPTION:
  * Every key of the shared timing registry
- * (_shared/modules/timings/constants.toml) must have a reader, and every
+ * (_shared/core/timing/data/constants.toml) must have a reader, and every
  * literal reader call must name a key the registry has.
  *
  * ROOT CAUSE ENCODED:
@@ -54,7 +54,7 @@ const { PINS, SOURCE_PINS } = require('./test-keystats-timings-single-source.cjs
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const REGISTRY_REL = '_shared/modules/timings/constants.toml';
+const REGISTRY_REL = '_shared/core/timing/data/constants.toml';
 
 // Gates that compare a driver copy with `registry.<section>.<key>`.
 const PIN_GATES = ['tools/test/test-logger-scalars-single-source.cjs'];

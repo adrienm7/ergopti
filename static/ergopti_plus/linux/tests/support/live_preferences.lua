@@ -37,7 +37,7 @@ function M.daemon()
 	assert(Hotstrings.set_all_sections("daemon_keys", true), "the live catalogue must be explicitly selected")
 	assert(Files.write(Paths.config("tap_hold.toml"), require("tests.support.tap_hold_fixture").with_preset()),
 		"the live tap-hold fixture must explicitly import its preset")
-	local preset = require("keymap.layer_editor").read_shipped(require("infra.paths").shared("keymap/layers.recommended.toml"))
+	local preset = require("layouts.engine.layers.editor").read_shipped(require("infra.paths").shared("layouts/data/layers.recommended.toml"))
 	assert(Files.write(directory .. "/layers.toml", preset), "the live navigation fixture must explicitly import its preset")
 	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
 		assert(require("infra.llm_preferences").set_many({

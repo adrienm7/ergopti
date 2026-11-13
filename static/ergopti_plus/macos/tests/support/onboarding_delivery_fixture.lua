@@ -11,7 +11,7 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system", "infra.config_paths", "platform.remap", "json",
+		"adapters.file_system", "infra.config_paths", "platform.remap", "core.text.engine.json",
 		"modules.keymap.number_row_live" }, function()
 		-- No layout of ours types in the fixture: the number-row order is greyed.
 		package.loaded["modules.keymap.number_row_live"] = {
@@ -54,7 +54,7 @@ local function with_delivery(callback, native_timers)
 				state.titles[#state.titles + 1] = { view = view, title = title }
 				return true
 			end
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local shared_encode, native_encode = Json.encode, hs.json.encode
 			Json.encode = function(value)
 				if state.encode then return state.encode(value) end

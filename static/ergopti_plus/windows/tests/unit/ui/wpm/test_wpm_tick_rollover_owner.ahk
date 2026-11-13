@@ -77,7 +77,7 @@ _WPMR_Timings() {
 		HadWarn: IsSet(_HealthCheckWarnCount), Warn: IsSet(_HealthCheckWarnCount) ? _HealthCheckWarnCount : 0,
 		HadErrors: IsSet(_HealthCheckErrCount), Errors: IsSet(_HealthCheckErrCount) ? _HealthCheckErrCount : 0,
 		HadLast: IsSet(_HealthCheckLastError), Last: IsSet(_HealthCheckLastError) ? _HealthCheckLastError : 0}
-	Path := _SharedDir . "\modules\timings\constants.toml"
+	Path := _SharedDir . "\core\timing\data\constants.toml"
 	Raw := FSReadBytesStrict(Path)
 	try {
 		_ResetLogger()

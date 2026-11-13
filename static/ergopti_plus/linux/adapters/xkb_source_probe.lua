@@ -12,7 +12,7 @@ local M = {}
 local number_row_sources = setmetatable({}, { __mode = "k" })
 local asynchronous_number_row_sources = setmetatable({}, { __mode = "k" })
 local DisplayServer = require("infra.display_server")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "adapters.xkb_source_probe"
 local Runtime = require("_generated.native_runtime")
 

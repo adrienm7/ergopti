@@ -4,10 +4,10 @@
 local H = require("tests.helpers")
 
 local function fixture(body)
-	local previous = package.loaded.program_provider_picker
-	package.loaded.program_provider_picker = nil
-	local ok, failure = xpcall(function() body(require("program_provider_picker")) end, debug.traceback)
-	package.loaded.program_provider_picker = previous
+	local previous = package.loaded["apps.engine.program_provider_picker"]
+	package.loaded["apps.engine.program_provider_picker"] = nil
+	local ok, failure = xpcall(function() body(require("apps.engine.program_provider_picker")) end, debug.traceback)
+	package.loaded["apps.engine.program_provider_picker"] = previous
 	if not ok then error(failure, 0) end
 end
 

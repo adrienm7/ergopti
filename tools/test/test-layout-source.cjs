@@ -455,7 +455,7 @@ try {
 				shared(),
 				path.join(REPO_ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data'),
 				xmlPath,
-				shared('modules', 'layouts', 'mac_keycodes.json'),
+				shared('layouts', 'data', 'mac_keycodes.json'),
 				entry.keycode_convention,
 				entry.id,
 				document.layout.name,

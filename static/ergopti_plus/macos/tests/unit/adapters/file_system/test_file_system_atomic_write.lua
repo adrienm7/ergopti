@@ -525,7 +525,7 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 end)
 
 local noop_file = assert(io.open(helpers.shared("tests/corpus/config_noop/vectors.json"), "rb"))
-local noop_fixture = assert(require("json").decode(noop_file:read("*a")))
+local noop_fixture = assert(require("core.text.engine.json").decode(noop_file:read("*a")))
 noop_file:close()
 
 helpers.describe("FileSystem native no-op publication parity", function()
@@ -546,7 +546,7 @@ helpers.describe("FileSystem native no-op publication parity", function()
 					function() unlocks, held = unlocks + 1, false; return true end, nil, metadata)
 				local original_read = adapter.read_with_status
 				local original_open, original_rename = io.open, os.rename
-				local prepared, detail, candidate, source = require("toml_codec.writer").prepare_batch(path, {
+				local prepared, detail, candidate, source = require("core.text.engine.toml_codec.writer").prepare_batch(path, {
 					{ section = vector.section, key = vector.key, value = vector.value, delete = vector.delete },
 				}, adapter)
 				helpers.assert_eq(prepared, true, detail)

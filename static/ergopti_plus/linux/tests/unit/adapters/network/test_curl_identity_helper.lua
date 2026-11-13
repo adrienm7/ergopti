@@ -10,7 +10,7 @@
 --- Executes the actual helper with independent native/stdio ports.
 --- These are model receipts, not proof of a real child image or retirement.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local helper = helpers.driver_root() .. "/platform/network/system_proxy_probe.lua"
 

@@ -7,8 +7,8 @@
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver, shared = root .. '/static/ergopti_plus/macos', root .. '/static/ergopti_plus/_shared'
- package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
- local json = require('json')
+ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/?.lua;' .. shared .. '/?/init.lua;' .. package.path
+ local json = require('core.text.engine.json')
  local function request(message)
   message.kind = 'request'
   assert(io.stdout:write(json.encode(message) .. '\n')); assert(io.stdout:flush())
@@ -17,7 +17,7 @@ local function child()
  local sqlite = require('tests.support.keystats.rebuild_sqlite_bridge').new(request)
  local path = temporary .. '/db.sqlite'; local db = sqlite.open(path)
  for _, name in ipairs({ 'schema.sql', 'media_schema.sql', 'purge_schema.sql' }) do
-  local f = assert(io.open(shared .. '/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close())
+  local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close())
   assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
@@ -35,7 +35,7 @@ local function child()
  local typing = { type = 'typing', timestamp = '2026-11-06 09:00:00.000', app = 'Editor', text = 'a', events = { { 'a', 100, {} } } }
  -- The tombstone's UTC instant is its local time's, as metrics_maintenance renders it (KMD-1).
  local tombstone = { type = 'system_event', action = 'metrics_purge', timestamp = '2026-11-06 10:00:00.000',
-  utc = (require('keystats.local_time').from_local('2026-11-06 10:00:00.000')) }
+  utc = (require('metrics.engine.local_time').from_local('2026-11-06 10:00:00.000')) }
  local batches, offset = { { { entry = typing } }, { { entry = tombstone } } }, 0
  package.loaded['modules.keystats.rotation'] = { get_date = function() return '2026-11-06' end,
   get_offset = function() return offset end, set_offset = function(n) offset = n end,
@@ -81,7 +81,7 @@ local function child()
 end
 if arg and arg[0] and arg[0]:match('test_metrics_maintenance_ingest%.lua$') then child(); return end
 local helpers = require('tests.helpers')
-local quote = require('text_utils').shell_quote
+local quote = require('core.text.engine.utils_core').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('dashboard export and purge through the macOS ingest', function()
  helpers.it('metrics-maintenance-ingest: purge answers once its tombstone commits, export once the copy exists', function()

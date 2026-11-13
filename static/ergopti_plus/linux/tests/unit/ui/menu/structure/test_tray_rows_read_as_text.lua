@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local check = require("test.menu_row_text")
+local check = require("tests.lua.menu.row_text")
 
 local SHARED_ROOT = "../_shared"
 -- The whole tray holds many more; fewer means a builder gave up.
@@ -55,7 +55,7 @@ end
 --- @param locale string Locale code.
 --- @return table Rendered rows.
 local function tray(locale)
-	local decode = require("json").decode
+	local decode = require("core.text.engine.json").decode
 	local catalogue = check.catalogue(SHARED_ROOT, locale, decode)
 	local i18n = require("infra.i18n")
 	local previous = i18n.get
@@ -80,7 +80,7 @@ helpers.describe("the real Linux tray reads as text", function()
 			{ title = "LCtrl  :  Copier  /  Ctrl" }, { title = "Hold → lalt" },
 			{ title = "Ctrl gauche  :  Copier  /  Maj" },
 		} } }
-		local defects = check.defects(rows, SHARED_ROOT, require("json").decode)
+		local defects = check.defects(rows, SHARED_ROOT, require("core.text.engine.json").decode)
 		helpers.assert_eq(#defects, 6, "only the plain labels may pass: " .. table.concat(defects, " | "))
 	end)
 
@@ -92,14 +92,14 @@ helpers.describe("the real Linux tray reads as text", function()
 	end)
 
 	helpers.it("reaches every French submenu row joining a label to its value", function()
-		local decode = require("json").decode
+		local decode = require("core.text.engine.json").decode
 		local catalogue = check.catalogue(SHARED_ROOT, "fr", decode)
 		helpers.assert_eq(check.missing_label_value_rows(tray("fr"), SHARED_ROOT, decode, catalogue, "linux"), {})
 	end)
 
 	for _, locale in ipairs({ "fr", "en" }) do
 		helpers.it("shows no raw id in " .. locale, function()
-			local defects, rows = check.defects(tray(locale), SHARED_ROOT, require("json").decode, locale)
+			local defects, rows = check.defects(tray(locale), SHARED_ROOT, require("core.text.engine.json").decode, locale)
 			helpers.assert_true(rows >= MIN_ROWS, "the walk stopped early at " .. rows .. " rows")
 			helpers.assert_eq(defects, {}, "a row must read as text")
 		end)
@@ -108,7 +108,7 @@ helpers.describe("the real Linux tray reads as text", function()
 	--- The editor row of the English tray, and the head of the unqualified cause.
 	--- @return table|nil row, string head
 	local function editor_row()
-		local catalogue = check.catalogue(SHARED_ROOT, "en", require("json").decode)
+		local catalogue = check.catalogue(SHARED_ROOT, "en", require("core.text.engine.json").decode)
 		local label = catalogue["physical_shortcuts.window_title"]
 		local head = catalogue["physical_shortcuts.delivery_unqualified"]:match("^(.-):")
 		local found = nil

@@ -44,8 +44,8 @@ local function with_fixture(outcome, callback)
 		local Baseline = require("ui.menu.base_delay_transaction")
 		local MenuState = require("ui.menu.menu_state")
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("adapters.json_codec").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
 			logger = require("infra.logger"),

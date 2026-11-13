@@ -66,7 +66,7 @@ describe("macOS source-located paths keep their backslashes (posix-backslash-pat
 		end)
 		os.execute("rm -rf '" .. dir .. "'")
 		local base = html:match('window.__i18n_base="([^"]*)"')
-		assert_eq(base, "file:///x%5Cy%20%22z%22/_shared/data/locales/",
+		assert_eq(base, "file:///x%5Cy%20%22z%22/_shared/core/i18n/data/locales/",
 			"the backslash stays one filename byte and the quote cannot end the boot string")
 	end)
 

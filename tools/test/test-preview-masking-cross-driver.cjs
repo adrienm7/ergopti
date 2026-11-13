@@ -35,7 +35,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const CORPUS_REL = 'modules/personal_info/preview_vectors.toml';
+const CORPUS_REL = 'hotstrings/data/personal_info/preview_vectors.toml';
 const CORPUS = path.join(SHARED, CORPUS_REL.split('/').join(path.sep));
 
 // The corpus filename as a test would name it. A driver "consumes the corpus"

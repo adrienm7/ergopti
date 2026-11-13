@@ -3,11 +3,11 @@
 --- Native locking and close refusals are doubled; physical macOS remains separate.
 local helpers = require("tests.helpers")
 local with_files = require("tests.support.file_system_transaction_fixture").with_fixture
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local function with_native(body)
 	helpers.with_fresh_modules({ "modules.hotstrings.hotstrings_config",
-		"hotstrings.common_autocorrection_migration", "hotstrings.publication_recovery", "toml_codec.writer" }, function()
+		"hotstrings.engine.catalogue.common_autocorrection_migration", "hotstrings.engine.publication_recovery", "core.text.engine.toml_codec.writer" }, function()
 		with_files(function(native)
 			local f = { path = os.tmpname():gsub("\\", "/"), release = false, locks = 0,
 				unlocks = 0, closes = 0, renames = 0, handles = {} }

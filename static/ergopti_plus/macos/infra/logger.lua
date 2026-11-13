@@ -8,7 +8,7 @@
 --- a unified rotating file sink so every subsystem's output lands in one place.
 ---
 --- WHAT IS THIS MODULE'S, AND WHAT IS THE SHARED CORE'S.
---- _shared/lua/logger owns the canonical line format, the eight variants, the
+--- _shared/core/logger/engine owns the canonical line format, the eight variants, the
 --- 200-entry ring, the five-second dedup window and repeat collapsing — items 4,
 --- 5 and 8 below. This file owns the production in-memory handoff, topical
 --- routing policy, deferred console/notification delivery, the synchronous
@@ -52,10 +52,10 @@
 
 local M = {}
 
-local Redact = require("diagnostics.redact")
-local NativePath = require("native_path")
-local Json = require("json")
-local ErrorDescription = require("error_description")
+local Redact = require("diagnostics.engine.reports.redact")
+local NativePath = require("core.fs.engine.native_path")
+local Json = require("core.text.engine.json")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local PhaseStats = require("infra.phase_stats")
 local _redact_message = nil
 -- The configuration directory the user chose, followed for the redactor: its
@@ -122,7 +122,7 @@ local function private_line(line)
 	local prefix, message = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d %[[A-Z]+%] %[[^%]]*%] )(.*)$")
 	return prefix and (prefix .. M.redact_message(message)) or M.redact_message(line)
 end
-local _scope = require("scope_owner").new({ name = "infra.logger", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "infra.logger", module = M })
 
 -- socket.gettime() gives sub-second precision for the millisecond component.
 -- Loaded via pcall so headless unit tests that lack the hs sandbox still work.
@@ -130,10 +130,10 @@ local _ok_socket, _socket = pcall(require, "socket")
 local _gettime = (_ok_socket and _socket and _socket.gettime) or os.time
 
 -- Application folder name, default logs folder and log file-name prefixes,
--- generated from _shared/modules/paths/app_dirs.toml. This module is the one
+-- generated from _shared/core/fs/data/paths/app_dirs.toml. This module is the one
 -- resolver built on them: every consumer asks logs_dir(), today_log_path(),
 -- today_errors_path() or crash_reports_dir() rather than spelling a name.
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 local LogFolders = require("infra.log_folders")
 local LOG_FILES = AppDirs.files
 
@@ -198,7 +198,7 @@ local ERRORS_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.errors_prefix) ..
 -- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
 -- fan-out here in addition to the main unified file. Sub-files are ephemeral
 -- (today only) — they are a filtered view of the main log, not an archive.
--- Sub-file routing table, generated from _shared/modules/logger/sub_files.toml.
+-- Sub-file routing table, generated from _shared/core/logger/data/sub_files.toml.
 --
 -- This used to be a 120-line hand-rolled [[array_of_tables]] parser plus a
 -- hardcoded fallback list. Both were liabilities. The parser was one of TWO
@@ -243,7 +243,7 @@ end
 -- evicts it. Its ring and its dedup streak are therefore per PROCESS — which is
 -- also true of the running driver. A test that needs either one clean asks for
 -- it: ring_buffer_clear() / reset_dedup().
-local Core = require("logger")
+local Core = require("core.logger.engine")
 local LogTransport = require("adapters.log_transport")
 local LauncherEnvironment = require("infra.launcher_environment")
 

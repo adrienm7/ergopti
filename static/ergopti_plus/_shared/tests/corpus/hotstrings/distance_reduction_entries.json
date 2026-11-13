@@ -5,7 +5,7 @@
 	"feature_section": "hotstrings.distances_reduction",
 	"source": "common",
 	"reference_commit": "58c6b05cbe0d8f73e02b59bf1136d33a5466c008",
-	"reference_path": "static/ergopti_plus/_shared/modules/hotstrings/distancesreduction.toml",
+	"reference_path": "static/ergopti_plus/_shared/hotstrings/data/catalogue/distancesreduction.toml",
 	"meta": {
 		"delay": 0.5,
 		"show_tooltip": false,

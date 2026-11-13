@@ -462,7 +462,7 @@ _OSPC_Case(Mode) {
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
 	PreviousCritical := Critical("Off")
 	try {
-		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
+		Policy := FSReadStrict(_SharedDir . "\tap_hold\engine\one_shot_shift_core.lua")
 		PolicyMode := Mode == "escape-native" ? "escape" : Mode
 		DeclaredSpent := !!RegExMatch(Policy, "m)^local SPENT_UNSHIFTED\s*=\s*\{[^}\r\n]*\b" . PolicyMode . "\s*=\s*true")
 		AssertEqual(Mode != "left", DeclaredSpent,
@@ -536,7 +536,7 @@ _OSCF_Case(Mode) {
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
 	PreviousCritical := Critical("Off")
 	try {
-		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
+		Policy := FSReadStrict(_SharedDir . "\tap_hold\engine\one_shot_shift_core.lua")
 		AssertTrue(InStr(Policy, "without changing that key"), "The shared control policy must preserve the captured key's flags")
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := Creation is Integer && Creation == 1

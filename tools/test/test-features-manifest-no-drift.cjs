@@ -29,8 +29,8 @@
  * First the hand-written list became a scan of the three `_generated/` trees.
  * Better, but still a guess — and wrong for the generators that write OUTSIDE
  * those directories. Measured: build-domain.cjs writes twelve files, two of them
- * (`_shared/lua/keymap/terminators_catalogue.lua`,
- * `_shared/modules/menu/menu_manifest.json`) nowhere near a `_generated/`
+ * (`_shared/layouts/engine/layers/terminators_catalogue.lua`,
+ * `_shared/menu/data/menu_manifest.json`) nowhere near a `_generated/`
  * folder, and gen-architecture-diagram.cjs writes `docs/architecture.md`. Under
  * a directory-scoped gate those three would be overwritten in the working tree
  * and never restored — the identical bug, one layer up.
@@ -65,8 +65,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // The directory scan this replaced was already an improvement on a hand-written
 // two-file list, but it was still a guess — and a wrong one for the generators
 // that write outside _generated/: build-domain.cjs alone writes
-// _shared/lua/keymap/terminators_catalogue.lua and
-// _shared/modules/menu/menu_manifest.json, and gen-architecture-diagram.cjs
+// _shared/layouts/engine/layers/terminators_catalogue.lua and
+// _shared/menu/data/menu_manifest.json, and gen-architecture-diagram.cjs
 // writes docs/architecture.md. Under a directory-scoped gate those three would
 // be overwritten in the working tree and never restored — the same bug this
 // guard was fixed for once already, one layer up.
@@ -90,7 +90,7 @@ const EXPECTED_TARGETS = [
 	'static/ergopti_plus/linux/_generated/locale_table.lua',
 	'static/ergopti_plus/windows/_generated/locale_table.ahk',
 	'static/ergopti_plus/windows/_generated/config_migration_ops.ahk',
-	'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk'
+	'static/ergopti_plus/_shared/menu/data/startup_tray_projection.ahk'
 ];
 
 // ── Snapshot ────────────────────────────────────────────────────────────────

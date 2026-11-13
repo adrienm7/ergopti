@@ -16,7 +16,7 @@ end
 
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Command = require("modules.keystats.sqlite_command")
 local database, date, app = root .. "/metrics.sqlite", "2026-10-03", "owned café ' app"
 local checks, failures = 0, 0

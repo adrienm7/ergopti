@@ -30,7 +30,7 @@ local LITERAL = "Literal {Left} {U+0041}"
 --- @return any result First provider return value.
 local function rules_engine_user_preview()
 	local result
-	helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "dynamic_hotstrings",
+	helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "hotstrings.engine.dynamic.core",
 		"modules.dynamic_hotstrings.user_code", "modules.keystats", "modules.keystats.init" }, function()
 		local closed_keystats = {}
 		package.loaded["modules.keystats"] = closed_keystats

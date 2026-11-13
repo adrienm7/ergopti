@@ -11,7 +11,7 @@
 
 _ManagedNetwork_TestCorpus() {
 	global _SharedDir
-	Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+	Policy := JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\network\failure_vectors.json", "UTF-8"))
 	Contract := ManagedNetworkFailureContract(Policy)
 	AssertEqual(1, Corpus["schema_version"])
@@ -41,7 +41,7 @@ Test("Managed network failures: independent shared corpus", _ManagedNetwork_Test
 
 _ManagedNetwork_TestRetiredOwner() {
 	global _SharedDir
-	Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+	Policy := JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))
 	Contract := ManagedNetworkFailureContract(Policy)
 	Current := Map("owner_alive", true, "retry_available", true, "diagnostics_available", true)
 	AssertEqual("retry", Contract.Actions("unknown", Current)[1]["id"])
@@ -54,7 +54,7 @@ Test("Managed network failures: action click rechecks retired owner", _ManagedNe
 
 _ManagedNetwork_TestPolicyRefusals() {
 	global _SharedDir
-	Text := FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8")
+	Text := FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8")
 	for Kind in ["field", "vacuous", "capability"] {
 		Policy := JsonParse(Text)
 		if Kind == "field"
@@ -74,7 +74,7 @@ Test("Managed network failures: invalid canonical policy is refused", _ManagedNe
 
 _ManagedNetwork_TestAlternateCapabilities() {
 	global _SharedDir
-	Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+	Policy := JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\network\alternative_capability_vectors.json", "UTF-8"))
 	Contract := ManagedNetworkFailureContract(Policy)
 	AssertEqual(1, Corpus["schema_version"])

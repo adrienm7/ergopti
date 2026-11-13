@@ -11,8 +11,8 @@
 
 local M = {}
 
-local PromptBuilder = require("llm.prompt_builder")
-local Json = require("json")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
+local Json = require("core.text.engine.json")
 
 -- ============================================================================
 -- 1. Module Constants
@@ -36,7 +36,7 @@ M.OLLAMA_DELETE_PATH = "/api/delete"
 M.OLLAMA_DEFAULT_HOST = "127.0.0.1"
 
 --- Port of the Ollama Ergopti installs and runs itself. Mirrors the
---- cross-driver canonical _shared/modules/llm/defaults.json
+--- cross-driver canonical _shared/ai/data/defaults.json
 --- (llm_ollama_owned_port) — pinned equal by
 --- tools/test/test-linux-llm-defaults-single-source.cjs so it cannot drift.
 M.OLLAMA_OWNED_PORT = 11435

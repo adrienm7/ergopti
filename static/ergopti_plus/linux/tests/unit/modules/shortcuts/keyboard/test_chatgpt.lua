@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
 local SOURCE = '[shortcuts]\nchatgpt_url = "https://old.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
 

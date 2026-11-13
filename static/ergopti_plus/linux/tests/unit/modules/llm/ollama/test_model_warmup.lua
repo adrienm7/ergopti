@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
 local Timings = require("infra.timings")
-local LocalModelPolicy = require("llm.local_model_policy")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local INITIAL_SEC = Timings.ms("llm", "warmup_initial_delay_ms") / 1000
 local BASE_SEC = Timings.ms("llm", "warmup_retry_base_ms") / 1000
@@ -89,7 +89,7 @@ helpers.describe("Ollama model warmup chain", function()
 		local native = require("luv")
 		local Deadline = require("infra.managed_http_deadline")
 		local Monotonic = require("infra.monotonic")
-		local NumberPolicy = require("number_policy")
+		local NumberPolicy = require("core.text.engine.number_policy")
 		local ok, err = xpcall(function()
 			run(function(Warmup, world)
 				world.native_request = function()
@@ -294,7 +294,7 @@ helpers.describe("Ollama model warmup request", function()
 			helpers.assert_true(Api.warmup("http://127.0.0.1:11434", "qwen:2b", {},
 				function(...) outcomes[#outcomes + 1] = { ... } end).started)
 			helpers.assert_eq(sent[1].url, "http://127.0.0.1:11434/api/chat")
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local payload = Json.decode(sent[1].body)
 			helpers.assert_eq(payload.model, "qwen:2b")
 			helpers.assert_eq(payload.stream, false)

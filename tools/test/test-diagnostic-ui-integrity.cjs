@@ -161,9 +161,11 @@ const Model = (() => {
 	return sandbox.window.ErgoptiDiagnostics;
 })();
 const schema = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'schema.json'), 'utf8')
 );
-const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+const en = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+);
 const t = (key, ...args) => {
 	let index = 0;
 	return typeof en[key] === 'string' ? en[key].replace(/%s/g, () => String(args[index++])) : key;
@@ -366,7 +368,7 @@ report(
 // driver's probe module, which names it when it starts and finishes it
 {
 	const schema = JSON.parse(
-		fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+		fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'schema.json'), 'utf8')
 	);
 	const probeModules = {
 		windows: withoutComments(read('windows/ui/healthcheck/probes.ahk')),
@@ -392,7 +394,7 @@ report(
 	);
 }
 
-const collectionContract = JSON.parse(read('_shared/modules/diagnostics/collection.json'));
+const collectionContract = JSON.parse(read('_shared/diagnostics/data/collection.json'));
 for (const id of [
 	'hotstrings',
 	'ai',

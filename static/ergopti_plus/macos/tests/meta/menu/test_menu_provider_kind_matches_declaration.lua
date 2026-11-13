@@ -39,7 +39,7 @@ local DRIVER_ROOT = helpers.driver_root()  -- trailing slash
 --- Reads and decodes the shared menu manifest.
 --- @return table Decoded manifest.
 local function read_manifest()
-	local fh = io.open(DRIVER_ROOT .. "../_shared/modules/menu/menu_manifest.json", "r")
+	local fh = io.open(DRIVER_ROOT .. "../_shared/menu/data/menu_manifest.json", "r")
 	helpers.assert_true(fh ~= nil, "menu_manifest.json must be readable")
 	local raw = fh:read("*a")
 	fh:close()

@@ -168,7 +168,7 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
             "LUA_CPATH": ";;",
             "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
             "ERGOPTI_LITERAL_DRIVER_ROOT": str(driver),
-            "ERGOPTI_LITERAL_SHARED_ROOT": str(app / "_shared/lua"),
+            "ERGOPTI_LITERAL_SHARED_ROOT": str(app / "_shared"),
             "ERGOPTI_RUNTIME_PREFIX": str(usr),
         }
         for name in (
@@ -290,7 +290,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
                 "bus",
                 "/",
                 "0",
-                app / "_shared/lua",
+                app / "_shared",
                 str(os.getpid()),
                 "invalid",
             ],
@@ -311,7 +311,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
                 "0",
                 "0",
                 "0",
-                app / "_shared/lua",
+                app / "_shared",
             ],
             cwd=driver,
             env=env,
@@ -348,7 +348,7 @@ export ERGOPTI_LITERAL_DRIVER_ROOT="$1" ERGOPTI_LITERAL_SHARED_ROOT="$2"
 exec "$3" -e 'local d=os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT"); assert(os.getenv("ERGOPTI_LITERAL_NATIVE_MODULES")=="1"); assert(loadfile(d.."/infra/literal_module_loader.lua"))().install(d,os.getenv("ERGOPTI_LITERAL_SHARED_ROOT")); assert(type(require("luv").new_timer)=="function"); assert(type(require("lfs").attributes)=="function")'
 """
         run(
-            ["bash", "-c", admission, "native-test", driver, app / "_shared/lua", luajit],
+            ["bash", "-c", admission, "native-test", driver, app / "_shared", luajit],
             env=standalone,
         )
         direct_native = r"""
@@ -358,7 +358,7 @@ local ok,err=pcall(require,'lfs')
 assert(not ok and err:find('error loading',1,true), 'direct entry must retain host native errors')
 """
         direct_native_env = dict(
-            standalone, LITERAL_DRIVER=str(driver), LITERAL_SHARED=str(app / "_shared/lua")
+            standalone, LITERAL_DRIVER=str(driver), LITERAL_SHARED=str(app / "_shared")
         )
         run([luajit, "-e", direct_native], env=direct_native_env)
         lua = r"""
@@ -381,9 +381,9 @@ assert(not broken and native_err:find('literal_broken',1,true) and native_err:fi
 local ok,err=pcall(require,'literal_module_absent')
 assert(not ok and err:find('literal_module_absent',1,true))
 assert(owner.searchpath('infra.regular_file_reader',package.path))
-local stream= require('toml_codec.source_open').open(os.getenv('LITERAL_FIFO'))
+local stream= require('core.text.engine.toml_codec.source_open').open(os.getenv('LITERAL_FIFO'))
 assert(stream==nil, 'FIFO must be refused')
-local writer = require('toml_codec.writer')
+local writer = require('core.text.engine.toml_codec.writer')
 local written = writer.publish_if_unchanged(os.getenv('LITERAL_FIFO'), 'k=1\n', nil, {status='absent'})
 assert(not written, 'FIFO create-only publication must be refused')
 print('ok')

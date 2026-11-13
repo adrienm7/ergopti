@@ -4,11 +4,11 @@
  * ==============================================================================
  * MODULE: Field Run Protocol Tests
  * DESCRIPTION:
- * Pins static/ergopti_plus/_shared/data/field_run_protocol.json, the request
+ * Pins static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json, the request
  * and result files every driver and field report collector shares:
  * 1. the declaration is well formed: closed names, patterns that compile,
  *    one document key list per file, a steps file and a folder per driver
- *    under that driver's root of _shared/modules/paths/app_dirs.toml;
+ *    under that driver's root of _shared/core/fs/data/paths/app_dirs.toml;
  * 2. the macOS field run (macos/data/field_run.json, the first implementation)
  *    keeps every protocol key equal to the shared one, and its folder is the
  *    clone folder;
@@ -36,7 +36,7 @@ const path = require('node:path');
 const AppDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const PROTOCOL = 'static/ergopti_plus/_shared/data/field_run_protocol.json';
+const PROTOCOL = 'static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json';
 const MACOS = 'static/ergopti_plus/macos/data/field_run.json';
 // The keys the macOS declaration carries for the protocol, beside its steps.
 const SHARED_KEYS = [
@@ -159,7 +159,7 @@ check('the Windows driver implements the protocol from the declarations', () => 
 		.split('\n')
 		.filter((line) => !/^\s*;/.test(line))
 		.join('\n');
-	assert.match(code, /_SharedDir \. "\\data\\field_run_protocol\.json"/);
+	assert.match(code, /_SharedDir \. "\\diagnostics\\data\\field_run_protocol\.json"/);
 	assert.match(code, /Spec\["steps_file"\]\["windows"\]/);
 	assert.match(code, /Spec\["folder"\]\["clone"\]/);
 	// A kind key is read as such ("results" is both a key and its name).

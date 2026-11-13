@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local helper = helpers.driver_root() .. "/platform/network/system_proxy_probe.lua"
 
@@ -35,7 +35,7 @@ local function run(root)
 end
 
 -- The policy the helper reads, relative to the shared root.
-local POLICY = "modules/network/proxy_policy.json"
+local POLICY = "core/network/data/proxy_policy.json"
 
 --- Mirrors the real shared tree into `fake`: every entry is linked, except the
 --- folders on the way to `relative`, which are made, and `relative` itself, so

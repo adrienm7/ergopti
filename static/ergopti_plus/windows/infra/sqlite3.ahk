@@ -776,7 +776,7 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 ; reader filters all delegate here. sqlite3_prepare_v2 reads a NUL-terminated
 ; statement, and the data.sql reader translates CRLF and skips NUL bytes, so a
 ; raw NUL or CR would cut the statement or alter the stored value. Like the
-; shared policy (_shared/lua/sqlite/literal.lua), both are written as char()
+; shared policy (_shared/core/fs/engine/sqlite/literal.lua), both are written as char()
 ; concatenations, which store the exact original text.
 ; @param s {Any} Value converted to String.
 ; @returns {String} A complete SQL text expression.

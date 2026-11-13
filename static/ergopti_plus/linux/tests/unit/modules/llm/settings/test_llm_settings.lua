@@ -267,11 +267,11 @@ local function with_auto_menu(options, callback)
 	local profiles = require("modules.llm.profile_settings")
 	settings._reset()
 	profiles._reset()
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if root.llm_generation_menu then
 				if options.label then root.llm_generation_menu[2].i18n = options.label end
 				if options.auto_first then
@@ -280,7 +280,7 @@ local function with_auto_menu(options, callback)
 			end
 			return root
 		end,
-		i18n = require("infra.i18n"), logger = require("logger.shim"),
+		i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0 }
@@ -324,7 +324,7 @@ local function auto_raise_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/auto_raise_temperature.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM reset-on-navigation check", function()

@@ -10,16 +10,16 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 --- Models libwebview.m at packaged pin 1469832361b4c3687ec7d589c1b4efe4d3b742ee.
 --- @param scenario function Complete dialog and deferred native cleanup scenario.
 local function with_windows(scenario)
 	helpers.with_stub_scope({
 		"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "adapters.timer_scheduler", "infra.deferred_work",
-		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
-		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
+		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact",
+		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
+		"core.fs.engine.app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, script_refs = {}, deferred = {}, closed = 0 }

@@ -94,7 +94,10 @@ function launch(value) {
 }
 
 const en = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json'),
+		'utf8'
+	)
 );
 
 check('the launcher refuses in words without the managed Python link', () => {

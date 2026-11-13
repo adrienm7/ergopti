@@ -28,12 +28,12 @@ end
 local shared_root = arg[1]
 if type(shared_root) ~= "string" or shared_root == "" then os.exit(2) end
 if literal_driver then
-	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "/lua", ".lua" },
-		{ shared_root .. "/lua", "/init.lua" } })
+	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "", ".lua" },
+		{ shared_root .. "", "/init.lua" } })
 else
-	package.path = shared_root .. "/lua/?.lua;" .. shared_root .. "/lua/?/init.lua;" .. package.path
+	package.path = shared_root .. "/?.lua;" .. shared_root .. "/?/init.lua;" .. package.path
 end
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- Resolve the installed native module only from this helper's actual source.
 -- The helper keeps its existing one-argument shared-root contract.
@@ -83,7 +83,7 @@ end
 local function policy_limits()
 	local loaded, reader = pcall(require, "infra.regular_file_reader")
 	if not loaded or type(reader) ~= "table" or type(reader.open_source) ~= "function" then return nil end
-	local file = reader.open_source(shared_root .. "/modules/network/proxy_policy.json")
+	local file = reader.open_source(shared_root .. "/core/network/data/proxy_policy.json")
 	if not file then return nil end
 	local read_ok, bytes = pcall(file.read, file, 32769)
 	local close_ok, closed = pcall(file.close, file)
@@ -115,7 +115,7 @@ end
 --- The PAC bounds of the shared proxy policy (native_pac, redirects).
 --- @return table|nil limits
 local function pac_limits()
-	local bytes = shared_file("modules/network/proxy_policy.json", 32768)
+	local bytes = shared_file("core/network/data/proxy_policy.json", 32768)
 	local decoded, policy = pcall(Json.decode, bytes or "")
 	if not decoded or type(policy) ~= "table" or type(policy.native_pac) ~= "table"
 		or type(policy.redirects) ~= "table" then return nil end
@@ -193,8 +193,8 @@ end
 --- @return table receipt
 local function pac_lookup(url, pac_url, timeout_ms, backend)
 	local limits = pac_limits()
-	local helpers = limits and shared_file("modules/network/pac_helpers.js", limits.max_script_bytes)
-	local judged, PacCheck = pcall(require, "network.pac_check")
+	local helpers = limits and shared_file("core/network/data/pac_helpers.js", limits.max_script_bytes)
+	local judged, PacCheck = pcall(require, "core.network.engine.pac_check")
 	if not limits or not helpers or not judged or not PacRuntime then
 		return { ok = false, error = "proxy-policy-unavailable", backend = backend }
 	end

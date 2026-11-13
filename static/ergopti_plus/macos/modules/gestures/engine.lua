@@ -17,8 +17,8 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
-local ContactJoin = require("gestures.contact_join")
-local Direction = require("gestures.direction")
+local ContactJoin = require("gestures.engine.contact_join")
+local Direction = require("gestures.engine.direction")
 local FrameClock = require("modules.gestures.frame_clock")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
@@ -44,7 +44,7 @@ local _any_touch_hook = nil
 -- =========================================
 
 -- Timing constants come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [gestures]) so AHK and macOS stay in sync;
+-- (_shared/core/timing/data/constants.toml [gestures]) so AHK and macOS stay in sync;
 -- the spatial thresholds below it are driver-specific and stay local.
 local TAP_MAX_SEC    = Timings.sec("gestures", "tap_max_ms")   -- Capture slightly slow multi-finger taps
 -- Minimum centroid displacement (Manhattan distance) to confirm a swipe on commit.

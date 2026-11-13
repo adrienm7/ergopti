@@ -150,28 +150,28 @@ helpers.describe("linux test runner: unit module continuation", function()
 	end)
 end)
 
-require("test.runner_timing_contract").run(helpers)
+require("tests.lua.core.runner_timing_contract").run(helpers)
 
-require("test.runner_home_contract").run(helpers)
+require("tests.lua.core.runner_home_contract").run(helpers)
 
-require("test.runner_replay_contract").run(helpers, "linux")
+require("tests.lua.core.runner_replay_contract").run(helpers, "linux")
 
 helpers.describe("linux test runner: UTF-8 timing frames", function()
 	helpers.it("(runner-output-utf8) retains valid diagnostic names for malformed byte inputs", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local command = "cd " .. quote(root)
 			.. " && luajit tests/run.lua --only onboarding-linux-trigger 2>&1"
 		helpers.assert_eq(debug.getinfo(io.popen, "S").what, "C", "the capture must use native process I/O")
 		-- A private load cannot inherit another fixture's _set_runner seam.
 		local Shell = helpers.fresh_module("adapters.shell_runner")
-		local Errors = require("adapter_errors")
+		local Errors = require("diagnostics.engine.adapter_errors")
 		local function validate_output(output)
 			helpers.assert_type(output, "string")
 			helpers.assert_true(#output > 0, "an empty capture cannot prove timing coverage")
-			local utf8 = require("compat.utf8")
+			local utf8 = require("core.lifecycle.engine.compat.utf8")
 			helpers.assert_true(utf8.len(output) ~= nil, "the whole canonical output must be valid UTF-8")
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local prefix = "# lua_timing "
 			local case_count, module_count, unsafe_names = 0, 0, {}
 			for line in output:gmatch("[^\n]+") do

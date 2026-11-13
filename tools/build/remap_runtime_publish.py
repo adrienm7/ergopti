@@ -42,11 +42,11 @@ FILE_SUFFIX = ".tar.gz"
 RELEASE_TAG_PREFIX = "remap-runtime-v"
 # The GitHub owner and repository have one declaration, the updater defaults.
 SHARED = Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared"
-UPDATER_DEFAULTS = SHARED / "modules/updater/defaults.json"
+UPDATER_DEFAULTS = SHARED / "updater/data/defaults.json"
 # The GitHub host has one declaration too, the shared identifiers.
-GITHUB_HOST = json.loads((SHARED / "data/identifiers.json").read_text(encoding="utf-8"))["hosts"][
-    "github"
-]
+GITHUB_HOST = json.loads((SHARED / "core/text/data/identifiers.json").read_text(encoding="utf-8"))[
+    "hosts"
+]["github"]
 
 
 def _default_repository():

@@ -4,7 +4,7 @@
 ; MODULE: Error Window
 ; DESCRIPTION:
 ; Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
-; passes the shared policy (_shared/modules/diagnostics/error_policy.json):
+; passes the shared policy (_shared/diagnostics/data/error_policy.json):
 ; what went wrong, where it is logged, and the buttons to report it on GitHub,
 ; copy the report, open the errors file or close the window. Uncaught errors
 ; reach it too, through the ERROR the global error handler logs.
@@ -103,7 +103,7 @@ ErrorDialog_Init(Cache) {
 	}
 	LoggerStart("ErrorDialog", "Initialising the error window…")
 	try {
-		Policy := ErrorPolicy_Validate(JsonParse(FileRead(_SharedDir . "\modules\diagnostics\error_policy.json", "UTF-8")))
+		Policy := ErrorPolicy_Validate(JsonParse(FileRead(_SharedDir . "\diagnostics\data\error_policy.json", "UTF-8")))
 		Enabled := _ErrorDialog_ReadSetting(Cache)
 	} catch as Err {
 		LoggerError("ErrorDialog", "The error window cannot start: {1}", Err.Message)
@@ -252,7 +252,7 @@ _ErrorDialog_BuildReport(Record, SnapshotFn := HealthCheck_Run) {
 		"warn_count",    Issues.Get("warn_count", 0),
 		"err_count",     Issues.Get("err_count", 0))
 	; The recent warnings and errors of today's errors file, as many as the
-	; diagnostics window shows (_shared/modules/diagnostics/recent_issues.json)
+	; diagnostics window shows (_shared/diagnostics/data/recent_issues.json)
 	Recent := []
 	for Entry in Issues.Get("recent", [])
 		Recent.Push(String(Entry))
@@ -447,7 +447,7 @@ _ErrorDialog_Open(Record) {
 			return false
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
 		try WV.AddScriptToExecuteOnDocumentCreated(
-			"window.__i18n_base='https://" . ED_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
+			"window.__i18n_base='https://" . ED_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';")
 		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
 			return false
 		Subscription := WV.WebMessageReceived(_ErrorDialog_OnWebMessage.Bind(Epoch))

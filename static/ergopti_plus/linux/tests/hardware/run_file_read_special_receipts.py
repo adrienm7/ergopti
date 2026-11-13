@@ -78,7 +78,7 @@ def main():
                     env = dict(os.environ)
                     env.update(
                         XDG_CONFIG_HOME=str(root / "config"),
-                        LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                        LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                         ERGOPTI_FILE_SOURCE=str(source),
                         ERGOPTI_FILE_EXPECTED=str(expected),
                         ERGOPTI_FILE_PORT=port,

@@ -39,7 +39,8 @@ const MANIFEST = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
+	'settings',
+	'data',
 	'features',
 	'manifest.toml'
 );

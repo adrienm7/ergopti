@@ -70,7 +70,7 @@ helpers.describe("Native scratch directory paths", function()
 	if package.config:sub(1, 1) ~= "\\" then
 		helpers.it("(native-temp-dir) refuses a drive-qualified relative path on POSIX", function()
 			local provided = "C:/relative-on-posix"
-			helpers.assert_eq(require("native_path").is_absolute(provided), false,
+			helpers.assert_eq(require("core.fs.engine.native_path").is_absolute(provided), false,
 				"the real native path owner classifies the supplied value")
 			local original_getenv = os.getenv
 			os.getenv = function(name)

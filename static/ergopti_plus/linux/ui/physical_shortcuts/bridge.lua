@@ -2,13 +2,13 @@
 
 --- Native WebKit routing for the shared physical shortcut editor.
 local M = { bridge_name = "physical_shortcuts_bridge" }
-local Window = require("shortcuts.physical_editor_window")
-local Slots = require("shortcuts.physical_slots")
-local PhysicalAvailability = require("shortcuts.physical_availability")
-local Json = require("json")
+local Window = require("shortcuts.engine.physical_editor_window")
+local Slots = require("shortcuts.engine.physical_slots")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local I18n = require("infra.i18n")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local session = nil
 local APP = "physical_shortcuts"
 
@@ -50,9 +50,9 @@ function M.open(options)
 		rawget(Hook, "cancel_position"), rawget(Hook, "position_capture_available")
 	local current_epoch, page_current = rawget(Manager, "current_epoch"), rawget(Manager, "page_current")
 	local eval_js = rawget(Manager, "eval_js")
-	local path = Paths.shared("data/keycodes/physical_keys.json")
+	local path = Paths.shared("layouts/data/keycodes/physical_keys.json")
 	local bytes, status
-	if path then bytes, status = require("toml_codec.writer").read_classified(path) end
+	if path then bytes, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then
 		Logger.error(APP, "Physical key registry could not be read.")
 		return false

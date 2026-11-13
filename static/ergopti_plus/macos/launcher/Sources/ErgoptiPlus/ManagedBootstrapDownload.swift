@@ -506,7 +506,7 @@ enum ManagedBootstrapDownload {
 			input.append(contentsOf: buffer.prefix(count))
 		}
 		guard let request = ManagedBootstrapRequest.parse(input), request.timeoutMilliseconds == milliseconds else { return 64 }
-		let path = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/_shared/modules/network/proxy_policy.json")
+		let path = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/_shared/core/network/data/proxy_policy.json")
 		guard let bytes = try? Data(contentsOf: path), let policy = ManagedBootstrapPolicy.parse(bytes) else { return report("unavailable") }
 		return report(execute(request, policy: policy, started: started))
 	}

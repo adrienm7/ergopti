@@ -107,7 +107,7 @@ function M.new(deps)
 	for _, name in ipairs({ "now_ms", "start_process", "command", "display", "after", "reapply" }) do
 		assert(type(deps[name]) == "function", "missing " .. name)
 	end
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local owner = {}
 	-- idle, starting, watching, stopped (for the session).
 	local status = "idle"

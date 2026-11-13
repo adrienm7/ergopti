@@ -25,7 +25,7 @@ local function etag_response(result, endpoint, validator, conditional)
 	return result
 end
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Runs a body against a fresh manager bound to a temporary config.toml.
 local function with_config(initial, body)
@@ -53,7 +53,7 @@ end
 local function read_config(path)
 	local handle = io.open(path, "r")
 	if not handle then return nil end
-	local decoded = require("toml_codec").decode(handle:read("*a"))
+	local decoded = require("core.text.engine.toml_codec").decode(handle:read("*a"))
 	handle:close()
 	return decoded
 end

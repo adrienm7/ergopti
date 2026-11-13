@@ -8,7 +8,7 @@
 --- vpn_connected / vpn_disconnected with the same `adapter` sentinel.
 ---
 --- FEATURES & RATIONALE:
---- 1. Same kinds, reducer and sampler as Linux: _shared/lua/keystats/
+--- 1. Same kinds, reducer and sampler as Linux: _shared/metrics/engine/
 ---    network_transitions.lua; this module only supplies the macOS probes.
 --- 2. Nothing blocks the run loop and nothing needs a permission: the system
 ---    resolver answers the Windows NCSI host's reachability by callback, and
@@ -27,7 +27,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local Timings = require("infra.timings")
-local Transitions = require("keystats.network_transitions")
+local Transitions = require("metrics.engine.system.network_transitions")
 
 local LOG = "keystats.network_watcher"
 

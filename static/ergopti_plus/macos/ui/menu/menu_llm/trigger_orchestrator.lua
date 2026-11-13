@@ -26,10 +26,10 @@ local M = {}
 
 local Logger    = require("infra.logger")
 local llm_mod   = require("modules.llm")
-local Chord     = require("chord")
+local Chord     = require("keyboard.engine.chord")
 local Hotkeys   = require("adapters.hotkey_registrar")
 local shortcut_ui = require("ui.menu.shortcut_utils")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
 local VALID_MODIFIERS = {cmd = true, alt = true, ctrl = true, shift = true, option = true, control = true}

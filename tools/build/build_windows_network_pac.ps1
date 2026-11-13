@@ -8,8 +8,8 @@ $RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $BuildRoot = Join-Path $RepoRoot 'static\ergopti_plus\windows\build\native\network_pac'
 $Prepared = Join-Path $BuildRoot 'prepared'
 $NativeSource = Join-Path $RepoRoot 'static\ergopti_plus\windows\native'
-$SharedSource = Join-Path $RepoRoot 'static\ergopti_plus\_shared\native\network'
-$HelperSource = Join-Path $RepoRoot 'static\ergopti_plus\_shared\modules\network\pac_helpers.js'
+$SharedSource = Join-Path $RepoRoot 'static\ergopti_plus\_shared\core\network\native'
+$HelperSource = Join-Path $RepoRoot 'static\ergopti_plus\_shared\core\network\data\pac_helpers.js'
 $NativeBuilder = Join-Path $PSScriptRoot 'build_windows_nav_owner.ps1'
 New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
 
@@ -37,7 +37,7 @@ function Invoke-PacBuildCommand {
 	if ($LASTEXITCODE -ne 0) { throw 'Native PAC build or receiving failed.' }
 }
 
-$Catalog = Get-Content -LiteralPath (Join-Path $RepoRoot 'static\ergopti_plus\_shared\data\linux_native_runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$Catalog = Get-Content -LiteralPath (Join-Path $RepoRoot 'static\ergopti_plus\_shared\core\network\data\linux_native_runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $Pin = $Catalog.network_runtime.portable.flatpak_sources.duktape
 if ($Pin.sha256 -cnotmatch '^[0-9a-f]{64}$' -or $Pin.url -cnotmatch '^https://github\.com/svaarala/duktape/releases/download/') {
 	throw 'Canonical pinned Duktape source refused.'

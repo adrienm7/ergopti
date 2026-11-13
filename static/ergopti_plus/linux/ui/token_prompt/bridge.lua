@@ -25,7 +25,7 @@
 local M = {}
 M.bridge_name = "token_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.token"
 
 --- Builds the initial token/prompt data payload.

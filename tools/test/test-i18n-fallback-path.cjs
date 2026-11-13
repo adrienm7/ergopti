@@ -8,7 +8,7 @@
  * to a directory that actually exists. The two fallback branches (script-src
  * relative and location.href relative) are replayed here against the real
  * repository layout, so the resolved URL is proven to hit
- * _shared/data/locales/<code>.json.
+ * _shared/core/i18n/data/locales/<code>.json.
  *
  * ROOT CAUSE ENCODED:
  * The original fallback pointed at "../../../locales/" — a static/locales/
@@ -89,5 +89,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-	'\x1b[32m[OK] i18n browser fallback resolves to the real _shared/data/locales/ directory (both branches replayed).\x1b[0m'
+	'\x1b[32m[OK] i18n browser fallback resolves to the real _shared/core/i18n/data/locales/ directory (both branches replayed).\x1b[0m'
 );

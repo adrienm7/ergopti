@@ -30,8 +30,8 @@ helpers.describe("TOML reader quoted failure propagation", function()
 	for variant, quoted in ipairs({ '"PRIVATE_DETAIL\\q"', '"PRIVATE_DETAIL\\uD800"', '"PRIVATE_DETAIL' }) do
 		for index, recipe in ipairs(recipes) do
 			helpers.it("(reader-string-failure) rejects recognized string " .. variant .. "/" .. index, function()
-				helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-					local reader = require("toml_codec.reader")
+				helpers.with_fresh_modules({ "core.text.engine.toml_codec.reader" }, function()
+					local reader = require("core.text.engine.toml_codec.reader")
 					local empty = reader.parse_text("")
 					local parsed, committed = reader.parse_text('[[before]]\n"b" = { output = "B" }\n' .. recipe(quoted))
 					helpers.assert_eq(committed, false)
@@ -43,8 +43,8 @@ helpers.describe("TOML reader quoted failure propagation", function()
 
 	helpers.it("(reader-string-cache) closes rejected files and retries previews without cached partial results", function()
 		with_virtual_file(function(state)
-			helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-				local reader = require("toml_codec.reader")
+			helpers.with_fresh_modules({ "core.text.engine.toml_codec.reader" }, function()
+				local reader = require("core.text.engine.toml_codec.reader")
 				local stores = 0
 				reader.set_cache_provider({ load = function() return nil end,
 					capture_source = function() return {} end,
@@ -67,8 +67,8 @@ helpers.describe("TOML reader quoted failure propagation", function()
 	end)
 
 	helpers.it("(reader-string-empty) retains valid empty strings", function()
-		helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-			local reader = require("toml_codec.reader")
+		helpers.with_fresh_modules({ "core.text.engine.toml_codec.reader" }, function()
+			local reader = require("core.text.engine.toml_codec.reader")
 			local parsed, committed = reader.parse_text('[_meta]\ndescription = ""\nsections_order = ["s"]\n'
 				.. '[_meta.sections]\ns = { en = "" }\n[[s]]\n"a" = { output = "" }')
 			helpers.assert_eq(committed, true)

@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 -- Stateless generated constants every owner now reads; loaded before any snapshot so they are
 -- not mistaken for residue of the fixture under test.
-require("config_keys")
+require("settings.engine.keys")
 local Fixture = require("tests.support.gesture_actions_fixture")
 
 local function snapshot()
@@ -41,8 +41,8 @@ helpers.describe("Gesture actions fixture ownership", function()
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
-						"_generated.action_catalogue", "config_binding_identity", "tap_hold.key_combinations", "config_binding_publication", "config_keyboard_publication", "identifiers", "hs", "hs.timer",
-						"llm.translate", "manifest_reader", "timings", "toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
+						"_generated.action_catalogue", "settings.engine.publication.binding_identity", "tap_hold.engine.key_combinations", "settings.engine.publication.binding_publication", "settings.engine.publication.keyboard_publication", "core.text.engine.identifiers", "hs", "hs.timer",
+						"ai.engine.prediction.translate", "menu.engine.manifest_reader_core", "core.timing.engine.timings_core", "core.text.engine.toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
 					_G.hs = sentinel
@@ -52,7 +52,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					local constructions = 0
 					helpers.load_with_stubs = function(...)
 						local result = loader(...)
-						local scanner = package.loaded["toml_codec.record_scanner"]
+						local scanner = package.loaded["core.text.engine.toml_codec.record_scanner"]
 						helpers.assert_type(scanner, "table", "construction loads the real reader's scanner child")
 						helpers.assert_type(scanner.advance, "function")
 						local header = '[["owned#literal"]] # outside'
@@ -60,24 +60,24 @@ helpers.describe("Gesture actions fixture ownership", function()
 						helpers.assert_eq(depth, 0)
 						helpers.assert_nil(quote)
 						helpers.assert_eq(comment, header:find("# outside", 1, true))
-						local translation = package.loaded["llm.translate"]
+						local translation = package.loaded["ai.engine.prediction.translate"]
 						helpers.assert_type(translation, "table", "construction loads the real transitive translation owner")
 						helpers.assert_type(translation.is_language_text, "function")
 						helpers.assert_eq(translation.is_language_text("English"), true)
 						helpers.assert_eq(translation.is_language_text(" "), false)
-						local identity = package.loaded["config_binding_identity"]
-						local publication = package.loaded["config_binding_publication"]
+						local identity = package.loaded["settings.engine.publication.binding_identity"]
+						local publication = package.loaded["settings.engine.publication.binding_publication"]
 						helpers.assert_type(publication, "table", "construction loads the real accessor authority")
 						helpers.assert_type(publication.owner_is_current, "function")
 						helpers.assert_type(identity, "table", "construction loads the real shared admission owner")
 						helpers.assert_type(identity.gesture_binding_fits, "function")
-						local pair_policy = package.loaded["tap_hold.key_combinations"]
+						local pair_policy = package.loaded["tap_hold.engine.key_combinations"]
 						helpers.assert_type(pair_policy, "table", "construction loads the real ordered-pair dependency")
 						helpers.assert_nil(getmetatable(pair_policy), "the actual shared pair policy is a plain module")
 						helpers.assert_eq(pair_policy.PAIR_SEPARATOR, "_then_")
 						helpers.assert_type(pair_policy.pair, "function")
 						helpers.assert_eq(pair_policy.pair("space", "tab"), "space_then_tab")
-						local keyboard = package.loaded["config_keyboard_publication"]
+						local keyboard = package.loaded["settings.engine.publication.keyboard_publication"]
 						helpers.assert_type(keyboard, "table", "construction loads the real keyboard publication owner")
 						helpers.assert_type(keyboard.publish, "function")
 						helpers.assert_type(keyboard.current, "function")

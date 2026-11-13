@@ -11,19 +11,19 @@
 --- FEATURES & RATIONALE:
 --- 1. Storage-backed: the active locale is saved to ~/.config/ergopti/
 ---    storage.json on every change and loaded on init.
---- 2. Locale discovery: list_locales() scans _shared/data/locales/ for
+--- 2. Locale discovery: list_locales() scans _shared/core/i18n/data/locales/ for
 ---    available .json files so the language menu is always up-to-date.
 --- 3. Same surface as macOS: get(), get_locale(), set_locale().
 --- 4. Trigger provider passthrough: delegates to locale.set_trigger_provider().
 --- ==============================================================================
 
 local M = {}
-local _scope = require("scope_owner").new({ name = "infra.i18n", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "infra.i18n", module = M })
 
 local locale_mod = require("infra.locale")
-local Logger     = require("logger.shim")
+local Logger     = require("core.logger.engine.shim")
 -- The shared section-header decoration, the same one macOS and AutoHotkey draw.
-local Labels     = require("menu.labels")
+local Labels     = require("menu.engine.labels")
 local NativeDirectory = require("infra.native_directory")
 local RegularFileReader = require("infra.regular_file_reader")
 local LOG        = "i18n"
@@ -80,8 +80,8 @@ function M.detect_system_locale(available, getenv)
 	for _, code in ipairs(available) do
 		if code == language then return code end
 	end
-	-- Declared once in _shared/data/identifiers.json (locales.system_fallback).
-	return require("identifiers").locales.system_fallback
+	-- Declared once in _shared/core/text/data/identifiers.json (locales.system_fallback).
+	return require("core.text.engine.identifiers").locales.system_fallback
 end
 
 -- =========================================
@@ -91,12 +91,12 @@ end
 -- =========================================
 
 --- Reads the canonical language order shared with the other drivers and the
---- site (_shared/data/locale_order.json) and returns a {code -> rank} map, or
+--- site (_shared/core/i18n/data/locale_order.json) and returns a {code -> rank} map, or
 --- nil if it can't be read/decoded — the caller then falls back to code order.
 --- @param order_path string Absolute path of locale_order.json.
 --- @return table|nil Map of locale code to 1-based rank.
 local function _load_order(order_path)
-	local ok_j, json_mod = pcall(require, "json")
+	local ok_j, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_j or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil
 	end
@@ -112,7 +112,7 @@ local function _load_order(order_path)
 	return rank
 end
 
---- Scans _shared/data/locales/ for available .json files and returns the
+--- Scans _shared/core/i18n/data/locales/ for available .json files and returns the
 --- basename (without extension) as locale codes, in the canonical shared
 --- display order (falling back to code order if the order file is unreadable).
 --- @return table Array of locale code strings (e.g. {"en", "fr"}).
@@ -120,7 +120,7 @@ local function _scan_locales()
 	local codes = {}
 
 	local Paths = require("infra.paths")
-	local locales_dir = Paths.shared("data/locales")
+	local locales_dir = Paths.shared("core/i18n/data/locales")
 	assert(locales_dir, "i18n: shared locale directory is unavailable")
 	-- Availability is established only by a complete native enumeration. Shell
 	-- lines can invent names from legal LF bytes or publish failed partial output.
@@ -154,7 +154,7 @@ local function _scan_locales()
 	-- Same resolver: this line carried the same wrong depth, so the canonical
 	-- display order never loaded either and the two surviving locales sorted
 	-- alphabetically instead.
-	local rank = _load_order(Paths.shared("data/locale_order.json"))
+	local rank = _load_order(Paths.shared("core/i18n/data/locale_order.json"))
 	if rank then
 		table.sort(codes, function(a, b)
 			local ra, rb = rank[a] or math.huge, rank[b] or math.huge
@@ -334,7 +334,7 @@ end
 
 --- Wraps a section-header label in its "— … —" decoration.
 ---
---- The decoration itself is shared with macOS and AutoHotkey (menu/labels.lua),
+--- The decoration itself is shared with macOS and AutoHotkey (menu/engine/labels.lua),
 --- for the reason that module's own header gives: three drivers drew the same
 --- header three ways. This driver simply had no caller for it until the shared
 --- menu renderer arrived, which resolves every `section_header` row through it.
@@ -369,7 +369,7 @@ end
 local function scope_state()
 	return { locale = _locale, backend = locale_mod.current_locale(),
 		setter = locale_mod.set_locale, getter = locale_mod.current_locale, loader = locale_mod.all, backend_parent = package.loaded["infra.locale"],
-		core_parent = package.loaded["locale.core"] }
+		core_parent = package.loaded["core.i18n.engine.core"] }
 end
 
 --- Publishes one locale through the translation backend, raising on refusal.

@@ -4,12 +4,12 @@
 --- BRIDGE HANDLER: Error Window (Linux)
 --- DESCRIPTION:
 --- Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
---- passes the shared policy (_shared/modules/diagnostics/error_policy.json), and
+--- passes the shared policy (_shared/diagnostics/data/error_policy.json), and
 --- serves the page's actions: report on GitHub, copy the report, open the file the error
 --- is logged in, close.
 --- Bridge name: "error_dialog"
 --- The host-independent half (policy load, Debug switch, report, first
---- message) is _shared/lua/error_dialog/core.lua, shared with the other host.
+--- message) is _shared/core/ui/engine/error_dialog_core.lua, shared with the other host.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The shared logger core hands every emitted ERROR to M.on_error
@@ -32,14 +32,14 @@
 --- ==============================================================================
 
 local M = {}
-local _scope = require("scope_owner").new({ name = "ui.error_dialog.bridge", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "ui.error_dialog.bridge", module = M })
 M.bridge_name = "error_dialog"
 
-local Logger      = require("logger.shim")
-local Policy      = require("diagnostics.error_policy")
-local DialogCore  = require("error_dialog.core")
-local Redact      = require("diagnostics.redact")
-local ConfigKeys = require("config_keys")
+local Logger      = require("core.logger.engine.shim")
+local Policy      = require("diagnostics.engine.reports.error_policy")
+local DialogCore  = require("core.ui.engine.error_dialog_core")
+local Redact      = require("diagnostics.engine.reports.redact")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "bridge.error_dialog"
 
@@ -106,7 +106,7 @@ M.defer = function(fn, delay_ms) return require("adapters.event_loop").defer(fn,
 function M.init()
 	if not _scope.admit_change() then return false end
 	return DialogCore.init(Logger, LOG, _policy ~= nil,
-		function() return require("infra.paths").shared("modules/diagnostics/error_policy.json") end,
+		function() return require("infra.paths").shared("diagnostics/data/error_policy.json") end,
 		function(policy, decisions)
 			_policy, _decisions = policy, decisions
 			_enabled = M.is_enabled()
@@ -188,7 +188,7 @@ function M.report(record, complete, current)
 		if owned() then complete(false) end
 		return nil
 	end
-	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
+	local shared = require("diagnostics.engine.healthcheck.share").document(fields.snapshot, fields.documents.schema,
 		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
 	if not owned() then return nil end
 	return require("ui.healthcheck.report").perform(
@@ -206,7 +206,7 @@ local function init_message(session)
 	local function redact(text) return Redact.apply(text, rules, session.context) end
 	local message = DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
 	-- This pane promises the exact projected document used by Copy and Report.
-	message.text = require("healthcheck.share").document(session.snapshot, session.documents.schema,
+	message.text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
 		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
 	return message
 end
@@ -289,7 +289,7 @@ end
 local function push(message, expected)
 	local manager = require("ui.webview_manager")
 	if expected and (_session ~= expected or manager.current_epoch(APP) ~= expected.epoch) then return false end
-	local ok, json = pcall(require("json").encode, message)
+	local ok, json = pcall(require("core.text.engine.json").encode, message)
 	if not ok then
 		Logger.error(LOG, "An error window message could not be encoded: %s.", tostring(json))
 		return false
@@ -318,7 +318,7 @@ local function perform(name, context)
 	local action
 	local shared
 	if name == "copy" or name == "report" then
-		shared = require("healthcheck.share").document(session.snapshot, session.documents.schema,
+		shared = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
 			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
 	end
 	if name == "copy" then

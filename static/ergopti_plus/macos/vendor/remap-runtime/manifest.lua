@@ -6,7 +6,7 @@
 --- the artifact (tools/build/remap_runtime_publish.py writes it), and
 --- platform/remap/runtime_manifest.lua refuses a manifest with any field null.
 local JsonCodec = require("adapters.json_codec")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local source = debug.getinfo(1, "S").source:sub(2)
 local directory = assert(NativePath.directory_prefix(source), "Runtime manifest directory is unavailable")
 local file = assert(io.open(directory .. "manifest.json", "rb"))

@@ -4,7 +4,7 @@
 --- MODULE: TOML Hotstring Cache Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Disk-backed snapshot cache for the shared TOML hotstring parser. The parser
---- (_shared/lua/toml_codec/reader.lua) walks every source byte by hand, which is
+--- (_shared/core/text/engine/toml_codec/reader.lua) walks every source byte by hand, which is
 --- the single biggest contributor to the "Hotstring groups registered" boot
 --- phase (~200 ms for the bundled files). This adapter serialises each parsed
 --- result into a precompiled Lua chunk so that, on every boot where the source
@@ -33,7 +33,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local LOG    = "adapters.toml_cache"
 
 

@@ -60,9 +60,9 @@ local function receiving(body)
 			end,
 		}
 		package.loaded["infra.launcher_environment"] = nil
-		package.loaded["core.llm.ollama_runtime_choice"] = nil
+		package.loaded["core.lifecycle.engine.core.ollama_runtime_choice"] = nil
 		package.loaded["adapters.managed_ollama_bootstrap"] = nil
-		local choice = require("core.llm.ollama_runtime_choice")
+		local choice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 		local adapter = require("adapters.managed_ollama_bootstrap")
 		function state.issue(source, kind)
 			local decision = choice.new_migration(source or SOURCE, kind or "app", TARGET, state.models, function()
@@ -308,7 +308,7 @@ printf bootstrap > "$FIXTURE_ROOT/bootstrap-called"
 		helpers.assert_eq(executable, 0)
 		-- The copied network policy sits outside the checkout layout it locates
 		-- the shared route inventory from, so the fixture names the real file.
-		local origins = helpers.shared("modules/network/route_origins.json")
+		local origins = helpers.shared("core/network/data/route_origins.json")
 		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)
 			.. " ROUTE_ORIGINS_FILE=" .. quote(origins)
 			.. " HOME=" .. quote(root .. "/home") .. " ERGOPTI_BOOTSTRAP_PYTHON=" .. quote(root .. "/foreign-python")
@@ -711,7 +711,7 @@ helpers.describe("native installer run from its private snapshot", function()
 		write(root .. "/source/native_python_bootstrap.sh",
 			'native_bootstrap_python() { printf sourced > "$FIXTURE_ROOT/delegate-called"; return 78; }\n')
 		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)
-			.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("modules/network/route_origins.json"))
+			.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("core/network/data/route_origins.json"))
 			.. " HOME=" .. quote(root) .. " ERGOPTI_BOOTSTRAP_SCRIPT_DIR=" .. quote(root .. "/source")
 			.. " ERGOPTI_BOOTSTRAP_SNAPSHOT=" .. quote(snapshot_env(snapshot))
 			.. " ERGOPTI_BOOTSTRAP_TIMEOUT_MS=1000 /bin/bash " .. quote(snapshot))

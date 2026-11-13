@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local NativeCommand = require("modules.keystats.sqlite_command")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- Every table the schema declares for character sequences, and the code the
 -- dashboard envelope uses for each.

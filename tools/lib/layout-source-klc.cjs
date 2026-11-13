@@ -29,11 +29,9 @@ function exportKlc(document) {
 	const read = runLua('read', { xml: imported.text }, 'klc_runtime');
 	if (!read.ok) throw new Error(read.reason);
 	const tables = {
-		keycodes: JSON.parse(
-			fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')
-		),
+		keycodes: JSON.parse(fs.readFileSync(shared('layouts', 'data', 'mac_keycodes.json'), 'utf8')),
 		physicalKeys: JSON.parse(
-			fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+			fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
 		)
 	};
 	const exported = admitted(() =>

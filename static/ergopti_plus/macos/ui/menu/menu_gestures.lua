@@ -15,17 +15,17 @@
 local M = {}
 
 local gestures_mod  = require("modules.gestures")
-local Sensitivity = require("gestures.sensitivity")
+local Sensitivity = require("gestures.engine.sensitivity")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
-local LabelValue = require("locale.label_value")
+local LabelValue = require("core.i18n.engine.label_value")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("infra.logger")
 local DeferredWork   = require("infra.deferred_work")
-local ParameterLabel = require("action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil
@@ -371,10 +371,10 @@ function M.build(ctx)
 		local modeSubmenu
 		if slot:match("swipe") then
 			modeSubmenu = ManifestMenu.template_rows("gesture_slot_mode_commands", {
-				[require("config_keys").COMMAND.GESTURE_MODE_SINGLE] = function()
+				[require("settings.engine.keys").COMMAND.GESTURE_MODE_SINGLE] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
 				end,
-				[require("config_keys").COMMAND.GESTURE_MODE_INCREMENTAL] = function()
+				[require("settings.engine.keys").COMMAND.GESTURE_MODE_INCREMENTAL] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
 				end,
 			}, {
@@ -408,7 +408,7 @@ function M.build(ctx)
 			or  i18n.get("menu.gestures.mode_single")
 
 		local slot_commands = {
-			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
+			[require("settings.engine.keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
 				-- A refused schedule is reported; an accepted one only opens the
 				-- picker later, so it is not a publication receipt.
 				if DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
@@ -537,10 +537,10 @@ function M.build(ctx)
 			local pinch = gestures.system_pinch_enabled()
 			local open_settings = gestures.open_system_gestures
 			local children = ManifestMenu.template_rows("gesture_system_macos_children", {
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_ENABLED_PINCH] = function(...) return open_settings(...) end,
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_DISABLED_PINCH] = function(...) return open_settings(...) end,
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_PINCH] = function(...) return open_settings(...) end,
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_REFRESH] = function()
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_OPEN_ENABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_OPEN_DISABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_PINCH] = function(...) return open_settings(...) end,
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_REFRESH] = function()
 					return gestures.refresh_system_gestures(ctx.updateMenu)
 				end,
 			}, {
@@ -586,11 +586,11 @@ function M.build(ctx)
 	-- renderer builds them from the declaration, right after the switch, and
 	-- this driver registers only the behaviour.
 	render_ctx.commands = {}
-	render_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = toggle_gestures
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
-	render_ctx.commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
-	render_ctx.commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = cmd_recommended_info
+	render_ctx.commands[require("settings.engine.keys").COMMAND.GESTURES_TOGGLE] = toggle_gestures
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
+	render_ctx.commands[require("settings.engine.keys").COMMAND.GESTURE_RECOMMENDED_INFO] = cmd_recommended_info
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })

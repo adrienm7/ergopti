@@ -1,5 +1,5 @@
 {
-	"_comment": "Pins _shared/lua/llm/api_entry_names.lua and its AutoHotkey port in windows/ui/menu/menu_llm/menu_api_entries.ahk: the automatic name of a remote API entry, <provider>/<model>, told apart by host, then by order, when two entries share it. Each entry is given resolved: the model and base URL its requests use.",
+	"_comment": "Pins _shared/ai/engine/api/entry_names.lua and its AutoHotkey port in windows/ui/menu/menu_llm/menu_api_entries.ahk: the automatic name of a remote API entry, <provider>/<model>, told apart by host, then by order, when two entries share it. Each entry is given resolved: the model and base URL its requests use.",
 	"host": [
 		{
 			"url": "https://api.x.ai/v1",

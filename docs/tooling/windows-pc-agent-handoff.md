@@ -27,7 +27,7 @@ Branch `work/windows-port`:
 
 - Thinking off on every Windows LLM path (`api_remote.ahk`, vision, translate,
   agent, Ollama warmup `think:false`), replaying
-  `_shared/modules/llm/thinking_off_vectors.json`; 400 retry with persisted
+  `_shared/ai/data/thinking_off_vectors.json`; 400 retry with persisted
   refusal and `_LLM_Remote_RetryOf`; default-only sampling for recent Claude
   models.
 - Windows detection of every `local_servers.json` server and generic catalogue
@@ -154,7 +154,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 - Logger scalar gate on dev a9198f7f: the Vertex AI files landed with
   free-form reasons, `windows/modules/llm/api_token_exchange.ahk` (22, baseline 0) and `windows/modules/llm/rs256_signer.ahk` (19, baseline 0) in
   `tools/test/test-logger-scalars-single-source.cjs`. Use closed `reason`
-  values from `_shared/modules/logger/vocabulary.json` (add any missing one
+  values from `_shared/core/logger/data/vocabulary.json` (add any missing one
   there, then `npm run codegen:contracts`) and move the detail to the message.
 
 - Windows AHK lanes, run 41254356788 on dev 264b1ad9 (1 November, 00:16
@@ -190,14 +190,14 @@ readable through `archive/2026-10-31/<branch>`. Then:
 - Logger scalar gate red on dev since the PC batch of 2026-10-31 evening:
   `tools/test/test-logger-scalars-single-source.cjs` reports 3 free-form reason
   literals in `windows/infra/lifecycle.ahk` against a baseline of 2. Use a
-  closed `reason` from `_shared/modules/logger/vocabulary.json` (add it there
+  closed `reason` from `_shared/core/logger/data/vocabulary.json` (add it there
   deliberately, then `npm run codegen:contracts`) and put the detail in the
   message.
 
 - Two more shared gates are red on dev from Windows files:
   `tools/test/test-repo-url-single-source.cjs` refuses the typed repository URL
   in the `;@Ahk2Exe-Set Comments` directive of `windows/ErgoptiPlus.ahk:12`
-  (193250e0e7). The URL comes from `_shared/modules/updater/defaults.json`; a
+  (193250e0e7). The URL comes from `_shared/updater/data/defaults.json`; a
   compile-time directive cannot read it, so either drop the URL from the comment
   or give the gate a reviewed exemption for that one directive.
   `tools/test/test-config-key-literals.cjs` counts 7 hand-typed config keys in
@@ -242,7 +242,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 - Item 139 on Windows: `infra/toml/toml_loader.ahk` prints user-chosen pack and
   category names in clear (`LoggerDone` at lines 496 and 584) and the extension
   TOML path (`LoggerStart` at 638, `LoggerSuccess` at 755). macOS and Linux mask
-  them through `_shared/lua/diagnostics/private_label.lua` (placeholder pinned
+  them through `_shared/diagnostics/engine/private_label.lua` (placeholder pinned
   to `redaction.json` `config_name_placeholder`); Windows needs an AHK twin and
   a meta test.
 - Ollama digest mismatch on Windows: the macOS field run of 2026-10-31 saw a
@@ -307,8 +307,8 @@ downloaded again`). Ollama deletes that layer before it reports the
   `menu.llm.local_servers.none_detected` (all 21 locales), instead of
   `menu.llm.local_servers.none` with the eleven server labels; the names stay
   in the panel and the "other address" submenu. macOS and Linux read the
-  shared `_shared/lua/llm/local_server_menu.lua`. The Windows twin
-  `_shared/modules/llm/local_server_menu.ahk` (`Key := ... "menu.llm.local_servers.none"`
+  shared `_shared/ai/engine/local_servers/menu.lua`. The Windows twin
+  `_shared/ai/data/local_server_menu.ahk` (`Key := ... "menu.llm.local_servers.none"`
   with `Labels`) needs the same split: `searching` keeps the list,
   `none_detected` takes none; move `test_local_server_menu.ahk` line 88
   (`"menu.llm.local_servers.none|LM Studio, llama.cpp"`) to the new key. The
@@ -318,11 +318,11 @@ downloaded again`). Ollama deletes that layer before it reports the
   `docs/memory/maintainer-decisions.md`):
   - Build the timer-delay ceiling on Windows: a relative timer delay above
     2^53 ms, infinite or NaN is refused before `SetTimer`, as
-    `_shared/lua/number_policy.lua` `MAX_TIMER_DELAY_MS` does; replay
+    `_shared/core/text/engine/number_policy.lua` `MAX_TIMER_DELAY_MS` does; replay
     `_shared/tests/corpus/timer/delay_ceiling_vectors.json` in an AHK test.
   - Build the key-chord policy on Windows from
     `_shared/tests/corpus/tap_hold/key_combination_chords.json` (the macOS and
-    Linux replay is `_shared/lua/test/key_combination_chords_contract.lua`),
+    Linux replay is `_shared/tests/lua/core/key_combination_chords_contract.lua`),
     with an AHK test replaying the same cases.
   - Item 109, branded debug GUI: still blocked while AHK 2.0.26 has no
     supported invisible Variables/KeyHistory snapshot; yours to settle.
@@ -331,7 +331,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   - The `WH_KEYBOARD_LL` probe of `input_probe.ahk` stays in the release exe;
     nothing to remove.
 - Owned runtimes on Windows (decided 2026-10-31; rows with `os = "windows"`
-  and status `follow_up` in `_shared/data/owned_runtimes.json`): delete the
+  and status `follow_up` in `_shared/core/network/data/owned_runtimes.json`): delete the
   winget Ollama.Ollama fallback in `windows/modules/llm/ollama_deps_checker.ahk`
   (around lines 257 and 327-357); add a WebView2 Evergreen minimum-version
   check with a clear refusal (keeping the native fallback); check the Windows
@@ -349,8 +349,8 @@ downloaded again`). Ollama deletes that layer before it reports the
   on PATH, or `LUA=<path>`). A future first-boot copy in AHK copies the
   projected Windows file, never re-renders defaults.
 - Local-server fingerprints (2026-10-31; same data as macOS and Linux, no
-  `.ahk` touched): (1) port `_shared/lua/llm/local_server_fingerprint.lua` as
-  `_shared/modules/llm/local_server_fingerprint.ahk`: `Parse(Root, Order)`
+  `.ahk` touched): (1) port `_shared/ai/engine/local_servers/fingerprint.lua` as
+  `_shared/ai/data/local_server_fingerprint.ahk`: `Parse(Root, Order)`
   groups rows sharing a `base_url` (first in `server_order` is the default)
   and refuses a fingerprint on an unshared address, a duplicate in one group,
   a `model_field` outside `^[A-Za-z_][A-Za-z0-9_]*$` or an empty `equals`;
@@ -387,7 +387,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `windows/infra/hotpath_profiler.ahk` still compares the wall clock
   (`ElapsedMs > SlowMs`) and only prints `[excl …, nested …]` once that wall
   clock is over. macOS and Linux judge the exclusive time and bill a slow
-  child to itself, not to its parent, through `_shared/lua/hotpath_segments.lua`
+  child to itself, not to its parent, through `_shared/metrics/engine/perf/hotpath_segments.lua`
   `new_nesting` (an open stack, not a ring of closed segments), and log
   `Slow %s: %.2f ms own, %.2f ms total, parent %s (%d similar since the last line).`
   with the segment's rate gate. To do: keep a stack of open segments
@@ -396,7 +396,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   line (parent `none` at top level), drop `_HotPathNestedMs` and its ring, and
   replay `_shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json`
   (`slow` and `reports` per case, the Lua replay is
-  `_shared/lua/test/hotpath_nesting_replay.lua`) in a new test beside
+  `_shared/tests/lua/core/hotpath_nesting_replay.lua`) in a new test beside
   `tests/unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk`. The
   `slow_child_is_reported_with_its_parent_and_the_parent_is_not_billed` case
   fails on today's code.
@@ -408,7 +408,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   (`package.json` scripts, `tools/test/*.cjs`, the Windows CI lane, the docs
   that name them).
 - PAR-76 R23: rewrite `windows/modules/keymap/keylayout/keylayout_parser.ahk` to
-  the canonical form `_shared/lua/layouts/keylayout.lua` reads (this also
+  the canonical form `_shared/layouts/engine/composer/keylayout.lua` reads (this also
   closes the ".keylayout raw grammar" note above), and replay
   `_shared/tests/corpus/keylayout/` whole.
 - Keystats rename, the Windows test spellings: `windows/tests/unit/modules/keystats/test_keylogger_fire_publication_owner.ahk`
@@ -425,8 +425,8 @@ downloaded again`). Ollama deletes that layer before it reports the
   on a Mac, not the PC.
 - Config policy items 33 and 42 (Windows): the cleanup (`windows/infra/config_unused_keys.ahk`)
   still cannot offer bare root keys nor an unknown `[[x]]` generation, which the
-  Lua engine does (`_shared/lua/config_unused_keys.lua`, pinned by
-  `_shared/lua/test/config_cleanup_roots_contract.lua`: a dotted, an inline and
+  Lua engine does (`_shared/settings/engine/migration/unused_keys.lua`, pinned by
+  `_shared/tests/lua/settings/cleanup_roots_contract.lua`: a dotted, an inline and
   an array-of-tables obsolete root, each removed with its comment while
   `[_future]` and the literal and case-twin roots stay). Port the three images
   into an AHK test first. Then the physical keyboard slot parameters
@@ -491,7 +491,7 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
     sit where they did, with the same labels.
 - Same branch, follow-ups also written without AutoHotkey: `infra/manifest_menu.ahk`
   lost its `dynamic` branch (a stale `dynamic` row is now an unknown type), and
-  the tray menu moved to `_shared/modules/menu/menu.toml`. Run:
+  the tray menu moved to `_shared/menu/data/menu.toml`. Run:
   - `tests/unit/ui/menu/test_manifest_menu_declarations_are_read.ahk` (edited:
     a retired `dynamic` row is drawn as nothing and not dispatched);
   - `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk` (edited:
@@ -515,8 +515,8 @@ cannot reach (https, socks, credentials in the address), in words.
 macOS and Linux now have Debug > "Proxy for downloads…": empty (automatic, the
 default), `direct`, or one relay URL such as `http://proxy.example.com:3128`
 (http, https, socks5, socks5h, with a port). Its storage key and default are
-`_shared/modules/network/proxy_override.json`; the value grammar is
-`_shared/lua/network/proxy_override.lua` (a relay is valid exactly when
+`_shared/core/network/data/proxy_override.json`; the value grammar is
+`_shared/core/network/engine/proxy_override.lua` (a relay is valid exactly when
 `route_plan.lua` `valid_route` accepts it). The shared proxy policy applies it
 right after loopback and before an exported relay and the PAC/WPAD lookup
 (`proxy_policy.lua` `policy.route`, third argument). The menu row is in
@@ -534,7 +534,7 @@ change touched is the generated `windows/_generated/config_keys.ahk`
 - The menu row: add `"ahk"` to the row's platforms, drop its `reason_key`
   (and the locale key if nothing else uses it), and a handler with the same
   prompt, validation and the `proxy_override.*` messages.
-- AHK tests replaying `_shared/lua/test/network_proxy_override_contract.lua`'s
+- AHK tests replaying `_shared/tests/lua/core/network_proxy_override_contract.lua`'s
   vectors (accepted relays, refused values, precedence).
 
 ## bépo in the layout registry (31 October)
@@ -550,7 +550,7 @@ registry emulation tests over it.
 
 ## .keylayout raw grammar (31 October)
 
-The Lua reader (`_shared/lua/layouts/keylayout.lua`), the Python converter and
+The Lua reader (`_shared/layouts/engine/composer/keylayout.lua`), the Python converter and
 the web composer now read single-quoted attribute values and refuse a tag of
 an element they walk (`key`, `keyMap`, `action`, `when`…) that their grammar
 cannot read, instead of skipping it and losing keys. Two fixtures pin it in
@@ -579,7 +579,7 @@ The cloud finished the Lua, JS, shell, tools and Swift parts of PAR-79 to PAR-83
   `tools/lint/hex-literal-baseline.json` (shrink with
   `node tools/lint/lint-conventions.js --update-hex-baseline`), from the
   generated `windows/_generated/native_theme.ahk`. The 24 colours of
-  `_shared/modules/tooltip/constants.toml` and `wpm_widget/constants.toml` stay
+  `_shared/core/ui/data/tooltip/constants.toml` and `wpm_widget/constants.toml` stay
   literals until the three drivers' readers can resolve a theme token; that
   change starts with the AHK reader. The hotstring TOML category colours are user
   data and stay.
@@ -598,7 +598,7 @@ yours (no `.ahk` or `.ps1` edit was made).
 
 Already built, with Go tests (`npm run test:go-proxy-relay`):
 
-- `_shared/go/native_http/cmd/ergopti-proxy-relay`, standard library only.
+- `_shared/core/network/native/go/native_http/cmd/ergopti-proxy-relay`, standard library only.
   `GOOS=windows go vet` and `go test -c` pass; the SSPI path
   (`proxyrelay/sspi_windows.go`, `secur32.dll` through `syscall`, current logon,
   `Negotiate` then `NTLM`, service `HTTP/<proxy host>`) has never run on a real
@@ -608,7 +608,7 @@ Already built, with Go tests (`npm run test:go-proxy-relay`):
   `_shared/tests/corpus/network/proxy_auth_relay_probe_vectors.json`: exit 0
   `not_needed` or `required` with its scheme (the sign-in succeeded on the
   probe), exit 3 `refused` with a reason from
-  `_shared/modules/network/proxy_auth_relay.json`, exit 2 invalid arguments.
+  `_shared/core/network/data/proxy_auth_relay.json`, exit 2 invalid arguments.
 - `run --upstream URL --variable HTTPS_PROXY <deadlines> --idle-timeout-ms N
 -- ollama.exe serve` binds `127.0.0.1:0`, sets `HTTPS_PROXY` of the child to
   `http://ergopti:<per-run token>@127.0.0.1:<port>` and exits with the child's
@@ -667,7 +667,7 @@ the user moves to afterwards (`Logger.follow_config_dir` in
 `logger_sink.follow_config_dir` in `linux/infra/logger_sink.lua`, called by
 `linux/infra/config_paths.lua`). Every line then shows the folder as
 `config_placeholder` and each name below it as `config_name_placeholder` from
-`_shared/modules/diagnostics/redaction.json`, except `config_known_names`.
+`_shared/diagnostics/data/redaction.json`, except `config_known_names`.
 
 Windows still builds its redaction context without `config_dir`
 (`windows/infra/logger.ahk`, the `Context := Map("home", …, "user", …)` of the
@@ -692,7 +692,7 @@ service-account key file (`"type": "service_account"`) for an access token:
 after `iat`) with the key's `private_key`, and posts it as
 `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`. The key file's own
 `token_uri` is never followed. The signer is pure Lua
-(`_shared/lua/crypto/sha256.lua`, `crypto/rsa_pkcs1.lua`) and is sliced over
+(`_shared/core/crypto/engine/sha256.lua`, `crypto/rsa_pkcs1.lua`) and is sliced over
 timer ticks so the event loop is never held. No `.ahk` edit was made.
 
 To do on the PC, after the Windows token exchange itself (the TODO's
@@ -734,7 +734,7 @@ them with a small limb division before it signs.
 
 Branch `feat/action-parity` ported catalogue actions to macOS and Linux and gave
 every row that misses an OS a localized `reason_<os>` (table in
-`_shared/modules/actions/README.md`). These Windows rows point at an equivalent
+`_shared/shortcuts/data/actions/README.md`). These Windows rows point at an equivalent
 today, but Windows could run them itself; each one is a row of `actions.toml`
 (add `ahk` to `platform`, drop its `reason_ahk`/`equivalent_ahk`) plus a handler
 in `windows/modules/gestures/actions.ahk`:

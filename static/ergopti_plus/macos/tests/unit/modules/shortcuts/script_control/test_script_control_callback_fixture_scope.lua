@@ -15,7 +15,7 @@ local OWNERS = {
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 	"adapters.event_provenance", "adapters.synthetic_input", "adapters.timer_scheduler",
 	"adapters.key_state", "modules.shortcuts.script_control", "adapters.file_system",
-	"adapters.hotkey_registrar", "adapters.storage", "modules.shortcuts.keyboard_shortcuts", "chord",
+	"adapters.hotkey_registrar", "adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
 	"infra.config_paths", "infra.preferences",
 }
 

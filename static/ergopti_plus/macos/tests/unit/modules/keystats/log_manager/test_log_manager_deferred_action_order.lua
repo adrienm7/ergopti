@@ -33,7 +33,7 @@ local function load_fixture(options)
 	package.loaded["modules.keystats.sqlite_writer"] = nil
 	package.loaded["modules.keystats.aggregator"] = nil
 	package.loaded["modules.keystats.export"] = nil
-	package.loaded["keystats.metrics"] = nil
+	package.loaded["metrics.engine.metrics"] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.timer_scheduler"] = nil
 
@@ -81,7 +81,7 @@ local function load_fixture(options)
 	}
 
 	local wpm_calls = 0
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function()
 			wpm_calls = wpm_calls + 1
 			return 0
@@ -398,7 +398,7 @@ end)
 for _, name in ipairs({
 	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
-	"modules.keystats.export", "keystats.metrics", "infra.logger",
+	"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
 	"adapters.timer_scheduler",
 }) do
 	package.loaded[name] = nil

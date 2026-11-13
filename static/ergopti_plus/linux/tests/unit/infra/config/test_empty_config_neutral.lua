@@ -2,13 +2,13 @@
 
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
-local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
 
 helpers.describe("empty tap-hold configuration is neutral", function()
 	helpers.it("neutral-config: dynamic rule availability never grants activation", function()
 		local restore, path = require("tests.support.dynamic_hotstrings_fixture").route()
 		local ok, detail = pcall(function()
-			local _, status = require("toml_codec.writer").read_classified(path)
+			local _, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 			helpers.assert_eq(status, "absent", "neutral availability must read an actual empty configuration")
 			local module = helpers.load_module("modules.dynamic_hotstrings.manager")
 			helpers.assert_eq(module.is_enabled(), false)
@@ -62,4 +62,4 @@ helpers.describe("empty tap-hold configuration is neutral", function()
 	end)
 end)
 
-require("test.scope_sparse_contract")(helpers)
+require("tests.lua.settings.scope_sparse_contract")(helpers)

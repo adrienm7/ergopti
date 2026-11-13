@@ -39,8 +39,8 @@
 
 local M = {}
 
-local AppDirs = require("app_dirs")
-local NativePath = require("native_path")
+local AppDirs = require("core.fs.engine.app_dirs")
+local NativePath = require("core.fs.engine.native_path")
 
 local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
 -- Bootstrap storage key of the LogsDirPath override, from the shared registry.
@@ -162,7 +162,7 @@ local function prepare_config_directory(normalized)
 	local Shell = require("adapters.shell_runner")
 	local called, ready = pcall(Shell.run, "mkdir -p -- " .. Shell.quote(target) .. " 2>/dev/null")
 	if called and ready == true then return true end
-	require("logger.shim").error("infra.config_paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")
+	require("core.logger.engine.shim").error("infra.config_paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")
 	return false
 end
 

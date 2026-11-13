@@ -34,7 +34,17 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'menu', 'builder.lua');
-const EN = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales', 'en.json');
+const EN = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales',
+	'en.json'
+);
 
 // Measured at 30 calls when this landed. Set below that so ordinary growth does
 // not trip it, far enough above zero that a broken extraction fails loudly.

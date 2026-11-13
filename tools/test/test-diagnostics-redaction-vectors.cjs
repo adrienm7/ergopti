@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Replays _shared/tests/corpus/diagnostics/redaction_vectors.json through the
  * page-side redactor _shared/ui/redact.js, with the rules of
- * _shared/modules/diagnostics/redaction.json. The diagnostics page builds the
+ * _shared/diagnostics/data/redaction.json. The diagnostics page builds the
  * text that leaves the machine (clipboard, saved report, GitHub issue) and the
  * preview of it, so the page must remove exactly what the Lua and AHK ports
  * remove: the three replay the same file, byte for byte.
@@ -34,7 +34,7 @@ const Redact = (() => {
 	return sandbox.window.ErgoptiRedact;
 })();
 const rules = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'redaction.json'), 'utf8')
 );
 const corpus = JSON.parse(
 	fs.readFileSync(

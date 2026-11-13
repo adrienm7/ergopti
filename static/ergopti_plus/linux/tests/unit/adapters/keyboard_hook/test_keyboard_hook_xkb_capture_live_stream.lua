@@ -335,7 +335,7 @@ helpers.describe("keyboard_hook: a modifier the XKB options put on another key",
 	-- The capture of each event failed as well, and said so at every event
 	-- next to the role's one line (xkb-failure-once).
 	helpers.it("says once, not at every key, that XKB cannot tell a role or capture a key (xkb-options-modifier-role)", function()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, errors = Logger.error, {}
 		Logger.error = function(_, fmt, ...)
 			local line = string.format(fmt, ...)
@@ -811,7 +811,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 	helpers.it("joins the original Reader occurrence to the actual host and shared editor without writes", function()
 		with_position_capture(nil, function(s)
 			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
-				"infra.paths", "infra.i18n", "logger.shim" }
+				"infra.paths", "infra.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
 			local called, detail = pcall(function()
@@ -826,7 +826,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
 				package.loaded["infra.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
 				package.loaded["infra.i18n"] = { get = function(key) return key end }
-				package.loaded["logger.shim"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 				host = helpers.load_module("ui.physical_shortcuts.bridge")
 				local scope = { physical_delivery_available = function() return true end,
 					capture_editor_inventory = function() return { assignments = {}, parameters = {} }, receipt end,
@@ -840,7 +840,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 				s.edge("b", 42, 1, 10); s.edge("a", 36, 1, 20)
 				local json = sends[#sends]:match("^captured%((.*)%)$")
 				helpers.assert_true(type(json) == "string", "actual original Hook emits through the retained page controller")
-				local packet = require("json").decode(json)
+				local packet = require("core.text.engine.json").decode(json)
 				helpers.assert_eq(packet.code, "KeyJ", "original native36 crosses the shared registry")
 				helpers.assert_eq(packet.mods, { shift = true }, "another original physical source owns Shift")
 				helpers.assert_eq(packet.request_id, 7, "page request identity survives all producers")

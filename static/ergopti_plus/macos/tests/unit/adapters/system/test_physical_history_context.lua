@@ -3,8 +3,8 @@
 --- Portable controls: real History/Capture callsites and modeled native ports.
 --- C os.time/date exercise binding shape, not Hammerspoon/Mach qualification.
 local helpers = require("tests.helpers")
-local History = require("keystats.physical_permission_history")
-local Accepted = require("keystats.physical_accepted_context")
+local History = require("metrics.engine.capture.physical_permission_history")
+local Accepted = require("metrics.engine.capture.physical_accepted_context")
 local Fixture = require("tests.support.physical_capture_fixture")
 
 local function policy(capture_token, clock_token, current)

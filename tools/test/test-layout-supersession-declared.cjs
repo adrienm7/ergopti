@@ -34,9 +34,9 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
-const SCHEMA = path.join(SP, '_shared', 'modules', 'features', 'manifest.schema.json');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const SOURCE = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
+const SCHEMA = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.schema.json');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const GENERATED_AHK = path.join(SP, 'windows', '_generated', 'features_manifest.ahk');
 const CONSUMERS = [
 	{ file: path.join(SP, 'windows', 'infra', 'master_gates.ahk'), token: 'superseded_reason_key' },

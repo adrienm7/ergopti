@@ -4,7 +4,7 @@
 --- MODULE: Installed-Tree Bytecode Compiler
 --- DESCRIPTION:
 --- Compiles every application module of an installed tree (linux/ and
---- _shared/lua/, their test trees excepted) into <root>/.bytecode with the luajit that runs this script,
+--- _shared/, their test trees excepted) into <root>/.bytecode with the luajit that runs this script,
 --- which must be the one the daemon runs (infra/bytecode_package.lua). The
 --- installer runs it after writing the ownership receipt, the updater after a
 --- verified activation. A failure leaves no package, never a stale one: the
@@ -33,9 +33,9 @@ ffi.C.free(resolved)
 
 
 -- The tree's own shared helpers, through the tree's own roots.
-package.path = root .. "/linux/?.lua;" .. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;"
+package.path = root .. "/linux/?.lua;" .. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;"
 	.. package.path
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local package_owner = loadfile(root .. "/linux/infra/bytecode_package.lua")
 if not package_owner then refuse("owner_missing") end
 local BytecodePackage = package_owner()
@@ -43,8 +43,8 @@ local BytecodePackage = package_owner()
 -- One sha256sum run hashes every source; NUL-separated names never meet a
 -- shell. LuaJIT does not report a pipe's exit status, so the pipeline prints it.
 -- The test trees ship with the payload but the daemon never requires them.
-local script = "set -o pipefail; cd " .. quote(root) .. " && find linux _shared/lua"
-	.. " \\( -path linux/tests -o -path _shared/lua/test \\) -prune -o -type f -name '*.lua' -print0"
+local script = "set -o pipefail; cd " .. quote(root) .. " && find linux _shared"
+	.. " \\( -path linux/tests -o -path _shared/tests/lua \\) -prune -o -type f -name '*.lua' -print0"
 	.. " | LC_ALL=C sort -z | xargs -0 sha256sum --; printf '#exit %s\\n' \"$?\""
 local listing = io.popen("bash -c " .. quote(script))
 if not listing then refuse("listing_failed") end

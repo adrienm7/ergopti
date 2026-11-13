@@ -13,25 +13,25 @@
 ---    ignored by others (KDE among them); an icon is drawn by all of them, so
 ---    the number is painted into the icon itself.
 --- 2. Everything it decides is shared: the label, the colour, when to show —
----    _shared/lua/wpm_widget/model.lua, the same code the macOS menu bar
+---    _shared/metrics/engine/wpm_widget_model.lua, the same code the macOS menu bar
 ---    readout runs, from the same canon.
 --- 3. Two icon files, alternated. Panels cache an icon by its path, so writing
 ---    a new number to the same file does not always redraw it; a new path does.
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger    = require("logger.shim")
+local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local ConfigPaths = require("infra.config_paths")
 local Shell     = require("adapters.shell_runner")
-local Model     = require("wpm_widget.model")
+local Model     = require("metrics.engine.wpm_widget_model")
 local Widget    = require("ui.wpm.widget")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "ui.wpm.tray_readout"
 

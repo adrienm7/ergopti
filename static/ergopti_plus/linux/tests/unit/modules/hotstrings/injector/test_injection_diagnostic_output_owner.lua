@@ -15,13 +15,13 @@ local Fixture = require("tests.support.modifier_broker_fixture")
 --- @param change string Native writer replacement or broker replacement.
 local function scenario(mode, change)
 	local names = { "modules.hotstrings.device_finder", "adapters.evdev_reader", "adapters.uinput_writer",
-		"adapters.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "modules.hotstrings.injector", "logger.shim" }
+		"adapters.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "modules.hotstrings.injector", "core.logger.engine.shim" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector, successor, writer
 	local called, failure = pcall(function()
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("debug")
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		Fixture.with_session(nil, function(session)
 			writer = session.writer
 			local Broker = require("adapters.modifier_broker")

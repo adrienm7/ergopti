@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Network Field Check Ports (Linux)
 --- DESCRIPTION:
---- The ports of the shared network check (network/field_check_network.lua)
+--- The ports of the shared network check (core/network/engine/field_check_network.lua)
 --- bound to this driver: how the desktop's proxy settings are read, how a PAC
 --- file is downloaded, how one request runs through the managed transport
 --- (route lookup by GIO, then the managed curl engine, both owned and bounded) and
@@ -28,7 +28,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
 
 local LOG = "adapters.network_check_ports"
@@ -90,15 +90,15 @@ local function native()
 		end,
 		feed_url = function()
 			local Paths = require("infra.paths")
-			local Json = require("json")
-			local handle = require("infra.regular_file_reader").open_source(Paths.shared("modules/updater/defaults.json"))
+			local Json = require("core.text.engine.json")
+			local handle = require("infra.regular_file_reader").open_source(Paths.shared("updater/data/defaults.json"))
 			if not handle then return nil end
 			local raw = handle:read("*a")
 			local closed = handle:close()
 			if type(raw) ~= "string" or not closed then return nil end
 			local ok, defaults = pcall(Json.decode, raw)
 			if not ok then return nil end
-			local sources = require("updater.release_sources").resolve(defaults)
+			local sources = require("updater.engine.release_sources").resolve(defaults)
 			return sources and sources.feed_url or nil
 		end,
 	}

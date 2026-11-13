@@ -24,8 +24,8 @@ local M = {}
 local ChoicePrompt = require("ui.choice_prompt")
 local TextPrompt = require("ui.text_prompt")
 local I18n = require("infra.i18n")
-local Parameter = require("user_action_parameter")
-local Logger = require("logger.shim")
+local Parameter = require("shortcuts.engine.user_action_parameter")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.user_action_editor"
 

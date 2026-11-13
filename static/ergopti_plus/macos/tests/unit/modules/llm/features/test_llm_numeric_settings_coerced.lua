@@ -159,8 +159,8 @@ package.loaded["modules.shortcuts.script_control"] = {
 -- THE point of this file: the REAL Hammerspoon shim over the REAL shared
 -- prompt_builder, not the arithmetic-free stub used by test_prediction_engine.
 package.loaded["modules.llm.prompt_builder"] = nil
-package.loaded["llm.prompt_builder"]         = nil
-local SharedPromptBuilder = require("llm.prompt_builder")
+package.loaded["ai.engine.prediction.prompt_builder_core"]         = nil
+local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 local HsPromptBuilder     = require("modules.llm.prompt_builder")
 
 local PE = require("modules.llm.prediction_engine")
@@ -182,7 +182,7 @@ PE.init({ buffer = "bonjour le mon", mappings = {}, DELAYS = { llm_prediction = 
 helpers.describe("numeric coercion regression exercises the real prompt_builder", function()
 	helpers.it("the shared prompt_builder is loaded, not a stub", function()
 		helpers.assert_true(type(SharedPromptBuilder.build_params) == "function",
-			"the REAL shared llm.prompt_builder must be loaded — a stub would make every assertion below meaningless")
+			"the REAL shared ai.engine.prediction.prompt_builder_core must be loaded — a stub would make every assertion below meaningless")
 		helpers.assert_eq(SharedPromptBuilder.GREEDY_TEMP_THRESHOLD, 0.15,
 			"shared prompt_builder constants must be the real ones")
 	end)

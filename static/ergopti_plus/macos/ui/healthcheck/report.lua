@@ -32,13 +32,13 @@ local M = {}
 
 local hs          = hs
 local Logger      = require("infra.logger")
-local IssueLink   = require("diagnostics.issue_link")
-local Redact      = require("diagnostics.redact")
-local Share       = require("healthcheck.share")
-local ReportRunner = require("healthcheck.report")
-local ConfigKeys = require("config_keys")
+local IssueLink   = require("diagnostics.engine.reports.issue_link")
+local Redact      = require("diagnostics.engine.reports.redact")
+local Share       = require("diagnostics.engine.healthcheck.share")
+local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ConfigKeys = require("settings.engine.keys")
 
-local LOG = "healthcheck.report"
+local LOG = "diagnostics.engine.healthcheck.report"
 
 -- The executable that reveals a file in Finder and opens folders and URLs
 local OPEN_BIN = "/usr/bin/open"

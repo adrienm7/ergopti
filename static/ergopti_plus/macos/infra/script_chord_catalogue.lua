@@ -4,8 +4,8 @@
 --- MODULE: Script Chord Catalogue (macOS)
 --- DESCRIPTION:
 --- Reads the four script-management chords every driver shares
---- (_shared/modules/actions/script_chords.json) through the shared rule module
---- (_shared/lua/script_chords.lua), and answers what an empty configuration
+--- (_shared/shortcuts/data/actions/script_chords.json) through the shared rule module
+--- (_shared/keyboard/engine/layers/script_chords.lua), and answers what an empty configuration
 --- holds for them: each slot on its manifest default, which is its preset, and
 --- the submenu's switch on its default.
 ---
@@ -20,15 +20,15 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local Paths        = require("infra.paths")
-local Json         = require("json")
-local ScriptChords = require("script_chords")
-local ConfigKeys = require("config_keys")
+local Json         = require("core.text.engine.json")
+local ScriptChords = require("keyboard.engine.layers.script_chords")
+local ConfigKeys = require("settings.engine.keys")
 
 -- The shared catalogue, relative to the shared tree.
-local CATALOGUE_REL_PATH = "modules/actions/script_chords.json"
+local CATALOGUE_REL_PATH = "shortcuts/data/actions/script_chords.json"
 
 -- The manifest section holding the slots and the switch.
 local SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
@@ -66,7 +66,7 @@ function M.get()
 	local catalogue = ScriptChords.catalogue(decoded)
 	local binding = { prefix = "script__", slots = {} }
 	for _, slot in ipairs(catalogue.slots) do binding.slots[slot.id] = true end
-	require("config_binding_identity").script_binding_fits("script__", binding)
+	require("settings.engine.publication.binding_identity").script_binding_fits("script__", binding)
 	_catalogue, _binding_catalogue = catalogue, binding
 	return _catalogue
 end

@@ -566,7 +566,7 @@ spends context and creates stale authorities.
 
 `AGENTS.md` owns rules that apply to every code change; the strict convention
 lint owns mechanical style, and
-`static/ergopti_plus/_shared/modules/logger/SPEC.md` owns the logger contract.
+`static/ergopti_plus/_shared/core/logger/data/SPEC.md` owns the logger contract.
 Adapter files such as `.github/copilot-instructions.md` only route clients to
 those authorities. Skills must link to the owner rather than inventing numbered
 adapter sections.

@@ -33,15 +33,15 @@ local Logger      = require("infra.logger")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
 local Paths       = require("infra.paths")
-local KeyCatalog  = require("tap_hold.key_catalog")
-local CombinationLabels = require("tap_hold.combination_labels")
-local LoneTap     = require("tap_hold.lone_tap")
+local KeyCatalog  = require("tap_hold.engine.key_catalog")
+local CombinationLabels = require("tap_hold.engine.combination_labels")
+local LoneTap     = require("tap_hold.engine.lone_tap")
 local Manifest    = require("infra.manifest_reader")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
-local WindowTitles = require("window_titles")
-local ConfigKeys = require("config_keys")
+local WindowTitles = require("core.ui.engine.window_titles")
+local ConfigKeys = require("settings.engine.keys")
 
 
 
@@ -429,7 +429,7 @@ end
 -- =========================================
 
 -- The macOS column of the shared key catalogue ([tap_hold.catalog] in
--- _shared/tap_hold/defaults.toml): which keys this submenu lists, in which
+-- _shared/tap_hold/data/defaults.toml): which keys this submenu lists, in which
 -- order, under which hand and with which label. Read once, on first use.
 --
 -- It replaces a reader of a `tap_hold_keys_catalog` menu-manifest key that
@@ -444,7 +444,7 @@ local _key_catalog = nil
 --- @return table Array of { id, key, hand, label_key } in tray order.
 local function key_catalog()
 	if _key_catalog == nil then
-		_key_catalog = KeyCatalog.load(Paths.shared("tap_hold/defaults.toml"), "hs")
+		_key_catalog = KeyCatalog.load(Paths.shared("tap_hold/data/defaults.toml"), "hs")
 	end
 	return _key_catalog
 end

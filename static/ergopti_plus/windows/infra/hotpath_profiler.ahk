@@ -26,7 +26,7 @@
 ;    generation counter exists because of it), and the largest number this
 ;    profiler ever reported was produced by it: 112.86 ms for a one-row tooltip
 ;    that benches at ~7 ms. The attribution and the line are those of macOS and
-;    Linux (_shared/lua/hotpath_segments.lua new_nesting); the shared vectors in
+;    Linux (_shared/metrics/engine/perf/hotpath_segments.lua new_nesting); the shared vectors in
 ;    _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json bind all three.
 ; ==============================================================================
 
@@ -41,7 +41,7 @@ global _HOTPATH_QPC_FREQ := 0
 ; Keystrokes whose hot-path processing exceeds this many milliseconds are logged
 ; at WARNING. 5 ms is below the threshold of perceptible single-keystroke lag yet
 ; high enough that a healthy keystroke (sub-millisecond) never trips it.
-; Single source: _shared/modules/timings/constants.toml [logger] hotpath_slow_ms,
+; Single source: _shared/core/timing/data/constants.toml [logger] hotpath_slow_ms,
 ; assigned by HotPath_LoadTimings. Declared unset on purpose: every reader already
 ; skips an unset threshold (a message-pumping Bundle_Init reaches the profiler
 ; before this file's initializers), so a sample taken before the registry is read
@@ -158,7 +158,7 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 
 /**
  * The open segments of the one AutoHotkey thread stack; the port of
- * _shared/lua/hotpath_segments.lua new_nesting. Threads interrupt one another
+ * _shared/metrics/engine/perf/hotpath_segments.lua new_nesting. Threads interrupt one another
  * last in, first out, so a stack fits even when a pump runs a whole callback
  * inside a segment. A span closed without a limit (a sub-step, or a sample taken
  * before the thresholds exist) is transparent: its time stays its enclosing
@@ -325,13 +325,13 @@ class HotPathNesting {
 }
 
 /**
- * The rate limiter of the slow-segment WARNING, as in hotpath_segments.lua
+ * The rate limiter of the slow-segment WARNING, as in metrics/engine/perf/hotpath_segments.lua
  * new_slow_gate: a segment that stays slow is slow on every keystroke, so one
  * line per segment per window keeps the first occurrence and the log readable.
  * The latency summaries keep counting every occurrence.
  */
 class HotPathSlowGate {
-	; The window of LOG_WINDOW_MS in _shared/lua/hotpath_segments.lua, which
+	; The window of LOG_WINDOW_MS in _shared/metrics/engine/perf/hotpath_segments.lua, which
 	; AutoHotkey cannot load; test_hotpath_nesting_vectors.ahk compares the two.
 	static SLOW_LINE_WINDOW_MS := 10000
 

@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Keylayout Canonical Parity
  * DESCRIPTION:
- * The shared Lua parser (_shared/lua/layouts/keylayout.lua) and the Linux
+ * The shared Lua parser (_shared/layouts/engine/composer/keylayout.lua) and the Linux
  * converter's Python parser (keylayout_to_xkb.py) must read every shipped
  * .keylayout into the same canonical form, and the shared Lua converter
  * (layouts/xkb_converter.lua) must write the same XKB and XCompose files as the
@@ -27,7 +27,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const GENERATION = path.join(ROOT, 'static', 'ergopti', 'linux', 'xkb_generation');
 const REGISTRY = path.join(ROOT, 'static', 'layouts', 'registry');
-const KEYCODES = path.join(SHARED, 'modules', 'layouts', 'mac_keycodes.json');
+const KEYCODES = path.join(SHARED, 'layouts', 'data', 'mac_keycodes.json');
 
 const LUA_DUMP = path.join(__dirname, 'fixtures', 'keylayout-canonical-dump.lua');
 const CONVERT_PROBE = path.join(__dirname, 'fixtures', 'keylayout-xkb-convert.lua');

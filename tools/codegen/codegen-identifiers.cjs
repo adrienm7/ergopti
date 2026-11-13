@@ -4,8 +4,8 @@
  * ==============================================================================
  * MODULE: Identifiers and Hosts Codegen
  * DESCRIPTION:
- * Emits _shared/lua/identifiers.lua, the shell, Python, Swift, AutoHotkey and
- * browser counterparts from _shared/data/identifiers.json: the
+ * Emits _shared/core/text/engine/identifiers.lua, the shell, Python, Swift, AutoHotkey and
+ * browser counterparts from _shared/core/text/data/identifiers.json: the
  * ErgoptiPlus file and bundle names, the bundle ids, the service labels and the
  * external hosts (GitHub, Ollama, Hugging Face) that the macOS and Linux Lua
  * drivers used to spell in dozens of files, and the field report names the
@@ -28,11 +28,11 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared/data/identifiers.json');
-const OUTPUT = path.join(SP, '_shared/lua/identifiers.lua');
+const SOURCE = path.join(SP, '_shared/core/text/data/identifiers.json');
+const OUTPUT = path.join(SP, '_shared/core/text/engine/identifiers.lua');
 const OUTPUT_JS = path.join(SP, '_shared/ui/_generated/identifiers.js');
-const OUTPUT_SH = path.join(SP, '_shared/data/identifiers.sh');
-const OUTPUT_PY = path.join(SP, '_shared/data/identifiers.py');
+const OUTPUT_SH = path.join(SP, '_shared/core/text/data/identifiers.sh');
+const OUTPUT_PY = path.join(SP, '_shared/core/text/data/identifiers.py');
 const OUTPUT_AHK = path.join(SP, 'windows/_generated/identifiers.ahk');
 const OUTPUT_SWIFT = path.join(
 	SP,
@@ -106,8 +106,8 @@ function emitGroup(group) {
 	return `\t${group} = {\n${rows.join('\n')}\n\t},`;
 }
 
-const lua = `--- _shared/lua/identifiers.lua
---- AUTO-GENERATED from _shared/data/identifiers.json.
+const lua = `--- _shared/core/text/engine/identifiers.lua
+--- AUTO-GENERATED from _shared/core/text/data/identifiers.json.
 --- DO NOT EDIT BY HAND — run \`npm run codegen:identifiers\` to refresh.
 
 --- ==============================================================================
@@ -124,7 +124,7 @@ ${GROUPS.map(emitGroup).join('\n')}
 `;
 
 const BANNER = (comment) =>
-	`${comment} AUTO-GENERATED from _shared/data/identifiers.json.\n` +
+	`${comment} AUTO-GENERATED from _shared/core/text/data/identifiers.json.\n` +
 	`${comment} DO NOT EDIT BY HAND — run \`npm run codegen:identifiers\` to refresh.`;
 
 /** The upper-case shell prefix of a group. */
@@ -139,7 +139,7 @@ const SHELL_PREFIX = {
 };
 
 const shell = `#!/bin/sh
-# _shared/data/identifiers.sh
+# _shared/core/text/data/identifiers.sh
 ${BANNER('#')}
 
 # Application names, bundle ids, service labels, external hosts and the field
@@ -152,7 +152,7 @@ ${PROJECTED_GROUPS.flatMap((group) =>
 ).join('\n')}
 `;
 
-const python = `# _shared/data/identifiers.py
+const python = `# _shared/core/text/data/identifiers.py
 ${BANNER('#')}
 """Application names, bundle ids, service labels and external hosts.
 

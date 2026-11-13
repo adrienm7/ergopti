@@ -77,8 +77,8 @@ const { hotstringOrderMenuSource } = require('../lib/menu-hotstring-order-bindin
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
 
@@ -1048,7 +1048,7 @@ const OPENS_SUBMENU = {
 			native_sources: { linux: 'linux/ui/menu/builder.lua' }
 		}
 	],
-	// The AI agent submenu (_shared/modules/llm/agent.json), on every driver.
+	// The AI agent submenu (_shared/ai/data/agent.json), on every driver.
 	agent_disabled_apps: {
 		menu: 'agent_excluded_apps_frame',
 		platforms: ['hs'],
@@ -1433,7 +1433,7 @@ OPENS_SUBMENU.hotstring_order_children = [
 // and the returned native rows. Mutations exercise the actual producer text.
 {
 	const assert = require('node:assert/strict');
-	const shared = readSourceFile(path.join(SP, '_shared/lua/hotstrings/section_order.lua'));
+	const shared = readSourceFile(path.join(SP, '_shared/hotstrings/engine/section_order.lua'));
 	for (const platform of ['hs', 'linux']) {
 		const source = readSourceFile(
 			path.join(SP, sectionOrderOwner('', '').native_sources[platform])
@@ -1441,8 +1441,8 @@ OPENS_SUBMENU.hotstring_order_children = [
 		assert(hotstringOrderMenuSource(source, shared), `${platform}: shared section order reached`);
 		for (const changed of [
 			source.replace(
-				'local SectionOrder = require("hotstrings.section_order")',
-				'-- local SectionOrder = require("hotstrings.section_order")'
+				'local SectionOrder = require("hotstrings.engine.section_order")',
+				'-- local SectionOrder = require("hotstrings.engine.section_order")'
 			),
 			source.replaceAll('SectionOrder.menu(', 'UnownedOrder.menu('),
 			source.replaceAll(
@@ -1457,8 +1457,8 @@ OPENS_SUBMENU.hotstring_order_children = [
 			source + '\nManifestMenu = Foreign\n',
 			source + '\nManifestMenu.template_rows = Foreign\n',
 			source.replace(
-				'local SectionOrder = require("hotstrings.section_order")',
-				'if false then local SectionOrder = require("hotstrings.section_order") end'
+				'local SectionOrder = require("hotstrings.engine.section_order")',
+				'if false then local SectionOrder = require("hotstrings.engine.section_order") end'
 			)
 		])
 			assert.equal(
@@ -1469,8 +1469,8 @@ OPENS_SUBMENU.hotstring_order_children = [
 		for (const [from, to] of [
 			['pcall(template_rows, ...)', 'pcall(other_renderer, ...)'],
 			[
-				'local COMMAND = require("config_keys").COMMAND',
-				'local COMMAND = require("config_keys").COMMAND\nCOMMAND = Foreign'
+				'local COMMAND = require("settings.engine.keys").COMMAND',
+				'local COMMAND = require("settings.engine.keys").COMMAND\nCOMMAND = Foreign'
 			],
 			['hotstring_order_up_ready = function()', 'unused_up_ready = function()'],
 			['hotstring_order_down_ready = function()', 'unused_down_ready = function()'],
@@ -3426,16 +3426,16 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			'withdraw native include',
 			mutateSource(
 				helper,
-				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
-				'; #Include ../../_shared/modules/menu/startup_tray_projection.ahk'
+				'#Include ../../_shared/menu/data/startup_tray_projection.ahk',
+				'; #Include ../../_shared/menu/data/startup_tray_projection.ahk'
 			)
 		],
 		[
 			'quoted include decoy',
 			mutateSource(
 				helper,
-				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
-				'QuotedInclude := "#Include ../../_shared/modules/menu/startup_tray_projection.ahk"'
+				'#Include ../../_shared/menu/data/startup_tray_projection.ahk',
+				'QuotedInclude := "#Include ../../_shared/menu/data/startup_tray_projection.ahk"'
 			)
 		],
 		[
@@ -3521,13 +3521,13 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		],
 		[
 			'foreign source policy',
-			"shared('modules/menu/startup_tray.toml')",
-			"shared('modules/menu/foreign.toml')"
+			"shared('menu/data/startup_tray.toml')",
+			"shared('menu/data/foreign.toml')"
 		],
 		[
 			'foreign output owner',
-			"shared('modules/menu/startup_tray_projection.ahk')",
-			"shared('modules/menu/foreign.ahk')"
+			"shared('menu/data/startup_tray_projection.ahk')",
+			"shared('menu/data/foreign.ahk')"
 		],
 		[
 			'fake produced result',
@@ -4070,7 +4070,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 		replacements.push(
 			[
 				'linux/ui/menu/builder.lua',
-				'local NumberRowPolicy = require("layout.number_row_policy")',
+				'local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")',
 				'local NumberRowPolicy = require("foreign.owner")'
 			],
 			[
@@ -5462,7 +5462,9 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 										? Boolean(
 												hotstringOrderMenuSource(
 													readSourceFile(path.join(SP, file)),
-													readSourceFile(path.join(SP, '_shared/lua/hotstrings/section_order.lua'))
+													readSourceFile(
+														path.join(SP, '_shared/hotstrings/engine/section_order.lua')
+													)
 												)
 											)
 										: opened.completed_parent?.[platform] === 'llm'
@@ -5890,7 +5892,7 @@ function driverSource(root) {
 	walk(root);
 	return {
 		src: out,
-		delegated: delegatedMenuSources(sources, path.join(SP, '_shared', 'lua'))
+		delegated: delegatedMenuSources(sources, path.join(SP, '_shared'))
 	};
 }
 
@@ -5910,7 +5912,7 @@ function numberRowGetterSource(source) {
 			'symbol:=',
 			'identifier:require',
 			'symbol:(',
-			'string:layout.number_row_policy',
+			'string:layouts.engine.layout.number_row_policy',
 			'symbol:)'
 		]) ||
 		!contains(source, [
@@ -5942,7 +5944,9 @@ function numberRowGetterSource(source) {
 	// A driver that applies the rows live (Linux) passes its owner as a third
 	// argument; the shared policy then answers the choice from that owner's getter.
 	if (callTail(['symbol:,', 'symbol:{'])) {
-		const shared = readSourceFile(path.join(SP, '_shared/lua/layout/number_row_policy.lua'));
+		const shared = readSourceFile(
+			path.join(SP, '_shared/layouts/engine/layout/number_row_policy.lua')
+		);
 		if (
 			!contains(source, ['identifier:get_order', 'symbol:=', 'identifier:function']) ||
 			!contains(shared, [
@@ -5990,7 +5994,9 @@ function numberRowGetterSource(source) {
 		])
 	)
 		return '';
-	const sharedSource = readSourceFile(path.join(SP, '_shared/lua/layout/number_row_policy.lua'));
+	const sharedSource = readSourceFile(
+		path.join(SP, '_shared/layouts/engine/layout/number_row_policy.lua')
+	);
 	if (
 		!contains(sharedSource, [
 			'identifier:function',
@@ -6038,7 +6044,7 @@ function numberRowGetterSource(source) {
 // any existing getter checks or menu floors. Comments and quoted code are inert.
 {
 	const assert = require('node:assert/strict');
-	const binding = 'local NumberRowPolicy = require("layout.number_row_policy")';
+	const binding = 'local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")';
 	const call = 'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)';
 	const command = 'render_ctx.commands["number_row_mode"] = function() return false end';
 	assert(
@@ -6503,9 +6509,7 @@ function languageParentSource(source, driver) {
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'debug'),
 		[{ type: 'group', id: 'debug', i18n: 'menu.debug.title', rows: [] }]
@@ -6515,7 +6519,7 @@ function languageParentSource(source, driver) {
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
 		// The row joins its label to its value through the locale's common.label_value; it
@@ -6763,9 +6767,7 @@ function languageParentSource(source, driver) {
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'configuration'),
 		[
@@ -6782,7 +6784,7 @@ function languageParentSource(source, driver) {
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.configuration.title']);
 		assert.deepEqual(hand[code].children, [
@@ -7037,9 +7039,7 @@ function languageParentSource(source, driver) {
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'metrics'),
 		[
@@ -7058,7 +7058,7 @@ function languageParentSource(source, driver) {
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code], locale['menu.metrics.title']);
 	}
@@ -7316,9 +7316,7 @@ function languageParentSource(source, driver) {
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	const hand = JSON.parse(
 		readSourceFile(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'))
 	);
@@ -7359,7 +7357,7 @@ function languageParentSource(source, driver) {
 	);
 	for (const [code, prior] of Object.entries(hand.locales)) {
 		const labels = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(labels['menu.about.title'], prior.about_parent);
 		assert.equal(labels['menu.about.changelog'], prior.changelog);

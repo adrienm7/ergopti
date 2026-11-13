@@ -552,7 +552,7 @@ local function display_events_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("prediction tooltip: canonical progressive display", function()
@@ -592,7 +592,7 @@ end)
 --- Original AI owners over acknowledged files; external effects are recording ports.
 local function with_configured_prediction(source, body, options)
 	options = options or {}
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local open = io.open
 	local ok, failure = pcall(function()
@@ -748,7 +748,7 @@ helpers.describe("Configured prediction shortcut collision reservations", functi
 			helpers.assert_eq(engine.is_enabled(), false)
 			helpers.assert_eq(engine.capture_collision_inventory(), nil)
 			local profile
-			for _, item in ipairs(require("llm.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
+			for _, item in ipairs(require("ai.engine.settings.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
 			helpers.assert_true(profile ~= nil, "use the actual shared raw profile")
 			engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 }, { profile = profile, num_predictions = 1 })
 			helpers.assert_eq(observed.requests, 1, "controlled external provider receives the original direct request")
@@ -788,7 +788,7 @@ helpers.describe("Prediction collision source admission controls", function()
 		with_configured_prediction(source, function(engine, _, observed)
 			helpers.assert_eq(engine.is_enabled(), false)
 			local profile
-			for _, item in ipairs(require("llm.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
+			for _, item in ipairs(require("ai.engine.settings.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
 			helpers.assert_true(profile ~= nil)
 			engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 }, { profile = profile, num_predictions = 1 })
 			helpers.assert_eq(observed.requests, 1)

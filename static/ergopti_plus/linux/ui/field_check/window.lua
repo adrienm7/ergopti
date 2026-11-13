@@ -13,7 +13,7 @@
 --- 1. One click, no arguments: the menu row names the check; nothing else is
 ---    asked of the user.
 --- 2. The same text goes to the window and the clipboard, built from the same
----    privacy-safe result as the log line (field_check_report.lua).
+---    privacy-safe result as the log line (diagnostics/engine/field_check/report.lua).
 --- 3. One run at a time per check: a second click while a check is pending only
 ---    says so.
 --- 4. The dialog is a native question whose two buttons are « Copy report » and
@@ -24,12 +24,12 @@
 
 local M = {}
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 
 --- The logger, looked up on every use (a suite swaps it per case).
 --- @return table
 local function logger()
-	return require("logger.shim")
+	return require("core.logger.engine.shim")
 end
 
 --- Native services, replaceable by tests.
@@ -44,7 +44,7 @@ local function native(spec)
 		notify = function(message) return require("adapters.application_notifier").send(message, { level = "info" }) end,
 		--- Shows the report; returns true when the user asked to copy it.
 		dialog = function(title, text, copy_label, close_label)
-			local command = require("ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("window_titles").compose(title))
+			local command = require("ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("core.ui.engine.window_titles").compose(title))
 				.. " --text=" .. Shell.quote(text)
 				.. " --ok-label=" .. Shell.quote(copy_label)
 				.. " --cancel-label=" .. Shell.quote(close_label)

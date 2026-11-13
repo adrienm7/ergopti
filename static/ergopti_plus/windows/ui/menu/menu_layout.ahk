@@ -51,7 +51,7 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
 
 /**
  * Layout > « Disposition à émuler »: the same choices as macOS and Linux
- * (_shared/lua/layouts/emulation_menu.lua): none, the built-in Ergopti
+ * (_shared/layouts/engine/emulation/menu.lua): none, the built-in Ergopti
  * variants, then the registry layouts the app lists or the layout manager
  * installed. A choice goes through the layout manager's acknowledged handoff,
  * which restarts the driver on the new selection. A registry layout that is not

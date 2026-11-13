@@ -5,7 +5,7 @@
  * MODULE: FileSystem Port Spec Wiring Gate
  * DESCRIPTION:
  * The three drivers' file-system owners must check themselves against the shared
- * lease and atomic write spec (_shared/lua/file_system/ports.lua) when they load,
+ * lease and atomic write spec (_shared/core/fs/engine/ports.lua) when they load,
  * as the last statement of their file, and the spec's method lists must be the
  * ones the corpus names. A driver that drops the call would again learn of a
  * missing method inside a publication.
@@ -29,7 +29,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = ['macos', 'linux'].map((driver) =>
 	path.join(ROOT, 'static', 'ergopti_plus', driver, 'adapters', 'file_system.lua')
 );
-const CALL = 'require("file_system.ports").check_owner(M)';
+const CALL = 'require("core.fs.engine.ports").check_owner(M)';
 
 /**
  * Whether a Lua text ends with the root-level check followed only by the return.
@@ -94,7 +94,7 @@ assert(
 const { parseSpec, render, TARGET } = require('../codegen/codegen-file-system-ports.cjs');
 const spec = parseSpec(
 	fs.readFileSync(
-		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'file_system', 'ports.lua'),
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'core', 'fs', 'engine', 'ports.lua'),
 		'utf8'
 	)
 );

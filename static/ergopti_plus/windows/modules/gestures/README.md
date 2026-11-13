@@ -14,7 +14,7 @@ Maps user-configurable gesture slots (3-finger tap, 4-finger tap, left/right/up/
 | `TimerScheduler`  | Debounce timer for window-cycle focus events                          |
 | `WindowInfo`      | `WinGetList` / `WinActivate` for the window-cycle action              |
 
-## Shared data (`_shared/modules/actions/`)
+## Shared data (`_shared/shortcuts/data/actions/`)
 
 `actions.toml` — catalogue of all assignable action identifiers. The driver never parses it: it loads `_generated/action_catalogue.ahk`, generated from it by `npm run codegen:action-catalogue`.
 

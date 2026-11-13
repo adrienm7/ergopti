@@ -70,12 +70,12 @@ local function load_settings(options)
 	}
 
 	local previous = {
-		logger = package.loaded["logger.shim"],
+		logger = package.loaded["core.logger.engine.shim"],
 		manifest = package.loaded["infra.manifest_reader"],
 		storage = package.loaded["adapters.storage"],
 		settings = package.loaded["infra.script_settings"],
 	}
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["infra.manifest_reader"] = manifest
 	package.loaded["adapters.storage"] = storage
 	package.loaded["infra.script_settings"] = nil
@@ -83,8 +83,8 @@ local function load_settings(options)
 	local original_set = settings.set
 	settings.set = function(value)
 		local saved_scope, saved_settings = package.loaded["infra.script_scope"], package.loaded["infra.script_settings"]
-		local saved_shim, saved_logger = package.loaded["logger.shim"], package.loaded["logger"]
-		package.loaded["infra.script_settings"], package.loaded["logger.shim"], package.loaded["logger"] = settings, logger, logger
+		local saved_shim, saved_logger = package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"]
+		package.loaded["infra.script_settings"], package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = settings, logger, logger
 		package.loaded["infra.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
 			if not storage.set(key, level) then return false end
 			local token = { pending = function() return false end }
@@ -96,11 +96,11 @@ local function load_settings(options)
 		end }
 		local ok, result = pcall(original_set, value)
 		package.loaded["infra.script_scope"], package.loaded["infra.script_settings"] = saved_scope, saved_settings
-		package.loaded["logger.shim"], package.loaded["logger"] = saved_shim, saved_logger
+		package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = saved_shim, saved_logger
 		if not ok then error(result, 0) end
 		return result
 	end
-	package.loaded["logger.shim"] = previous.logger
+	package.loaded["core.logger.engine.shim"] = previous.logger
 	package.loaded["infra.manifest_reader"] = previous.manifest
 	package.loaded["adapters.storage"] = previous.storage
 	package.loaded["infra.script_settings"] = previous.settings

@@ -81,7 +81,7 @@ global CHANGELOG_HOST_ACCESS_ALLOW := 1
 ; Release sources, tried in order: the REST API, then the public Atom feed on
 ; github.com, which corporate proxies usually leave reachable when they block
 ; or throttle api.github.com. Mirrors release_sources in
-; _shared/modules/updater/defaults.json (pinned by
+; _shared/updater/data/defaults.json (pinned by
 ; tools/test/test-changelog-network-resilience.cjs).
 global CHANGELOG_API_URL_TEMPLATE  := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=20"
 global CHANGELOG_FEED_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB . "/{owner}/{repo}/releases.atom"
@@ -1374,12 +1374,12 @@ _CLW_HtmlUrl() {
 }
 
 /**
- * Returns the https:// virtual-host URL for _shared/data/locales/ (trailing slash).
+ * Returns the https:// virtual-host URL for _shared/core/i18n/data/locales/ (trailing slash).
  * @returns {string}
  */
 _CLW_LocalesUrl() {
 	global CHANGELOG_VHOST
-	return "https://" . CHANGELOG_VHOST . "/data/locales/"
+	return "https://" . CHANGELOG_VHOST . "/core/i18n/data/locales/"
 }
 
 /**
@@ -1389,7 +1389,7 @@ _CLW_LocalesUrl() {
  */
 _CLW_I18nApplyScript() {
 	global _SharedDir, _I18nLocale
-	json_path := _SharedDir . "\data\locales\" . _I18nLocale . ".json"
+	json_path := _SharedDir . "\core\i18n\data\locales\" . _I18nLocale . ".json"
 	json_str  := "{}"
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

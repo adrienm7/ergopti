@@ -49,7 +49,7 @@ const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MANIFEST = path.join(DRIVERS, '_shared', 'menu', 'data', 'menu_manifest.json');
 
 // Floors — a scan that finds nothing must not pass for free.
 const MIN_SOURCES = 400; // 533 non-test driver sources today (tests are excluded below).
@@ -148,7 +148,7 @@ if (sources.length < MIN_SOURCES) {
 }
 
 // Shared policy is a reader only through a real native method delegation.
-sources.push(...delegatedMenuSources(sources, path.join(DRIVERS, '_shared', 'lua')));
+sources.push(...delegatedMenuSources(sources, path.join(DRIVERS, '_shared')));
 
 // This owner captured every source before querying fields and sections. Keep
 // that exact ordered snapshot, splitting and excluding full-line comments once.
@@ -373,7 +373,7 @@ assert.deepEqual(
 	'absent actual compiler cannot read a section'
 );
 const nullPolicy = require('smol-toml').parse(
-	fs.readFileSync(path.join(DRIVERS, '_shared', 'modules', 'menu', 'startup_tray.toml'), 'utf8')
+	fs.readFileSync(path.join(DRIVERS, '_shared', 'menu', 'data', 'startup_tray.toml'), 'utf8')
 );
 assert.deepEqual(
 	startupReaderSections({ ...startup, policy: nullPolicy }),
@@ -739,7 +739,10 @@ for (const withdrawn of [
 	const { platformReadViolations } = require('../lib/feature-platform-reads.cjs');
 	const featureManifest = parseToml(
 		fs
-			.readFileSync(path.join(DRIVERS, '_shared', 'modules', 'features', 'manifest.toml'), 'utf8')
+			.readFileSync(
+				path.join(DRIVERS, '_shared', 'settings', 'data', 'features', 'manifest.toml'),
+				'utf8'
+			)
 			.replace(
 				/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 				(_match, section) => `[[entries]]\nsection = "${section}"`

@@ -113,10 +113,10 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 	end)
 
 	helpers.it("every locale words the three refusal texts with the component slot (owned-runtimes-gui-stack)", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no",
 			"pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-			local fh = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "r"))
+			local fh = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "r"))
 			local catalogue = Json.decode(fh:read("*a"))
 			fh:close()
 			helpers.assert_eq(type(catalogue["startup.linux_gui_stack_title"]), "string", code)

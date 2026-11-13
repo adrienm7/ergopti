@@ -12,9 +12,9 @@
 --- timer retirement are explicit native ports; no native-wire proof is inferred.
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Json = require("json")
-local Policy = dofile(assert(Paths.shared("lua/network/proxy_policy.lua")))
-local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
+local Json = require("core.text.engine.json")
+local Policy = dofile(assert(Paths.shared("core/network/engine/proxy_policy_core.lua")))
+local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
 local policy = assert(Policy.new(Json.decode(assert(file:read("*a")))))
 assert(file:close())
 

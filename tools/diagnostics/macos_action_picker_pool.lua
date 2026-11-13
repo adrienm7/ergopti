@@ -8,11 +8,11 @@ function M.run(config, done)
 	local root = assert(config.production_root)
 	assert(config.expected_version == hs.processInfo.version and type(config.nonce) == "string")
 	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
-		.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path
+		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
 	local directory = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
 	local Observer = assert(dofile(directory .. "/macos_action_picker_pool_observer.lua"))
 	local Logger = require("infra.logger")
-	local policy = assert(io.open(root .. "/_shared/modules/diagnostics/redaction.json", "rb"))
+	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
 	assert(package.loaded["ui.action_picker"] == nil, "ActionPicker was already loaded")
@@ -51,7 +51,7 @@ function M.run(config, done)
 		[Scheduler.activeCount] = "/macos/adapters/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")
 	end
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local Result = require("adapters.webview_result")
 	local state = { entries = {}, timers = {}, evaluations = {}, errors = {}, finished = false }
 	local baseline, started = Scheduler.activeCount(), hs.timer.absoluteTime()

@@ -81,7 +81,7 @@ assert.match(save.uses, /^actions\/cache\/save@/);
 assert.equal(save.with.key, '${{ steps.flatpak-builder-cache.outputs.cache-primary-key }}');
 for (const input of [
 	'tools/build/build-linux-flatpak.sh',
-	'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+	'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 	'tools/codegen/codegen-linux-native-runtime.cjs'
 ]) {
 	assert.ok(restore.with.key.includes(`'${input}'`), `the module cache key must hash ${input}`);

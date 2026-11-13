@@ -22,9 +22,9 @@
 
 local helpers = require("tests.helpers")
 -- The shared logger is a process singleton; Scope preserves its exact identity.
-require("logger")
-local json = require("json")
-local Rewrite = require("llm.rewrite")
+require("core.logger.engine")
+local json = require("core.text.engine.json")
+local Rewrite = require("ai.engine.prediction.rewrite")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
 local ENTRY_ID = "tone-cerebras"
@@ -375,7 +375,7 @@ end
 local function case(name, scenario)
 	helpers.it(name, function()
 		return helpers.with_fresh_modules({
-			"modules.llm.tone_rewrite", "adapters.event_provenance", "llm.translate",
+			"modules.llm.tone_rewrite", "adapters.event_provenance", "ai.engine.prediction.translate",
 			"tests.support.modules.llm.selection_translation_destination",
 		}, function()
 			return Scope.run(scenario)

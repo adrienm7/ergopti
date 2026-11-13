@@ -5,11 +5,11 @@
 ; DESCRIPTION:
 ; Turns a personal_info value into what a NON-TYPING sink may carry — the
 ; preview bubble on screen (Section 3) and a persisted metrics record
-; (Section 4). The AHK port of _shared/lua/personal_info/mask.lua — AutoHotkey
+; (Section 4). The AHK port of _shared/hotstrings/engine/personal_info/mask.lua — AutoHotkey
 ; cannot require the shared Lua, so the ALGORITHM is re-implemented here while
 ; the POLICY (which fields are secrets, how much of one stays visible) is read
-; at runtime from _shared/modules/personal_info/fields.toml. The two halves are
-; pinned together by _shared/modules/personal_info/preview_vectors.toml, which
+; at runtime from _shared/hotstrings/data/personal_info/fields.toml. The two halves are
+; pinned together by _shared/hotstrings/data/personal_info/preview_vectors.toml, which
 ; every driver's suite replays byte for byte;
 ; tests/unit/modules/hotstrings/personal/test_personal_info_mask_vectors.ahk is this driver's consumer of
 ; that corpus.
@@ -50,7 +50,7 @@
 ; ========================================
 
 ; Where the shared declaration lives, relative to _SharedDir.
-global PI_MASK_DECLARATION_REL := "\modules\personal_info\fields.toml"
+global PI_MASK_DECLARATION_REL := "\hotstrings\data\personal_info\fields.toml"
 
 ; U+2022 BULLET — what a hidden position is drawn as when the declaration itself
 ; could not be read, so the fail-closed path owes nothing to the file it failed
@@ -372,7 +372,7 @@ _PIMaskFieldIsMasked(Keys) {
 	return !(Value is TOML_Bool && !Value.Value)
 }
 
-; Parse _shared/modules/personal_info/fields.toml into the shape above.
+; Parse _shared/hotstrings/data/personal_info/fields.toml into the shape above.
 ;
 ; The TOML parser flattens `[fields.iban]` to the section name "fields.iban", so
 ; the field name is the part after the prefix. A field entry with no `masked`

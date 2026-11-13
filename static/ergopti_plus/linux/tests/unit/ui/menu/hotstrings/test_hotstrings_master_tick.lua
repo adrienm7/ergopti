@@ -19,7 +19,7 @@
 local helpers = require("tests.helpers")
 local Choices = require("tests.support.hotstring_choices")
 
-local Answers = require("onboarding_answers")
+local Answers = require("onboarding.engine.answers")
 
 
 
@@ -145,14 +145,14 @@ local function with_wizard(answer, scenario)
 		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		Choices.with_file(Config, nil, function(path)
 			if #rows > 0 then
-				helpers.assert_true(require("toml_codec.writer").batch_write(path, rows) == true,
+				helpers.assert_true(require("core.text.engine.toml_codec.writer").batch_write(path, rows) == true,
 					"the wizard batch must commit")
 			end
 			local world = { Config = Config, path = path, page = page, dyn = dyn_double(false) }
 			--- Starts one session from the file, as a reload does.
 			function world.boot()
 				world.published = {}
-				local engine = require("hotstring_engine").new()
+				local engine = require("hotstrings.engine.matcher").new()
 				local load = engine.load_mappings
 				engine.load_mappings = function(self, published)
 					local committed = load(self, published)

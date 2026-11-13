@@ -34,8 +34,8 @@ helpers.describe("managed-network-children: the HTTPS route precedence is the sh
 	helpers.it("builds the bootstrap guard from proxy_policy.json, not from a typed list", function()
 		package.loaded["modules.llm.network_env"] = nil
 		local NetworkEnv = require("modules.llm.network_env")
-		local Json = require("json")
-		local file = assert(io.open(helpers.shared("modules/network/proxy_policy.json"), "rb"))
+		local Json = require("core.text.engine.json")
+		local file = assert(io.open(helpers.shared("core/network/data/proxy_policy.json"), "rb"))
 		local policy = assert(Json.decode(file:read("*a"))); file:close()
 		local expected = ""
 		for index = #policy.environment_precedence.https, 1, -1 do

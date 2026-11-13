@@ -4,7 +4,7 @@
 --- MODULE: Hotstring Output Tokens (Linux)
 --- DESCRIPTION:
 --- Reads a hotstring output through the shared grammar (send_input.parse_output)
---- over the shared vocabulary (_shared/modules/actions/send_keys.json), which
+--- over the shared vocabulary (_shared/shortcuts/data/actions/send_keys.json), which
 --- holds each key's evdev code.
 ---
 --- FEATURES & RATIONALE:
@@ -17,9 +17,9 @@
 local M = {}
 
 local Paths = require("infra.paths")
-local SendInput = require("send_input")
+local SendInput = require("platform.input.send_input")
 
-local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"
+local SEND_KEYS_REL_PATH = "shortcuts/data/actions/send_keys.json"
 
 local _vocabulary = nil
 
@@ -28,9 +28,9 @@ local function vocabulary()
 	if _vocabulary then return _vocabulary end
 	local path = Paths.shared(SEND_KEYS_REL_PATH)
 	local body, status
-	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then error("output_tokens: cannot read " .. tostring(path)) end
-	local ok, parsed = pcall(require("json").decode, body)
+	local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table" then
 		error("output_tokens: " .. tostring(path) .. " is not a send-input vocabulary")
 	end

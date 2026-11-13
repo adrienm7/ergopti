@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
-    "pull_owner", ROOT / "static/ergopti_plus/_shared/python/managed_ollama_pull.py"
+    "pull_owner", ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_pull.py"
 )
 PULL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PULL)

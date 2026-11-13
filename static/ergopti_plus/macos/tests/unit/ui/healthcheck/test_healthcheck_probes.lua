@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
@@ -133,7 +133,7 @@ end
 --- @return table run, table answers
 local function start(Probes, paths, options)
 	options = options or {}
-	local schema = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+	local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("infra.paths").shared).schema
 	local answers = {}
 	local snapshot = {
 		detailed = options.detailed == true,
@@ -284,10 +284,10 @@ helpers.describe("diagnostics probes (macOS)", function()
 			helpers.assert_eq(answer_of(answers, "github_api").result.state, "timeout")
 			helpers.assert_true(world.cancelled_requests >= 1, "a timed-out request must be stopped")
 			-- A probe the schema declares and nothing starts reads "checking…" forever
-			local schema = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+			local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("infra.paths").shared).schema
 			local declared = 0
 			for id, probe in pairs(schema.probes) do
-				if require("healthcheck.snapshot").applies(probe, "macos") then
+				if require("diagnostics.engine.healthcheck.snapshot").applies(probe, "macos") then
 					declared = declared + 1
 					helpers.assert_true(answer_of(answers, id) ~= nil, "the " .. id .. " probe never answered")
 				end
@@ -432,7 +432,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 
 	helpers.it("Cancel retries archived cohort capabilities before releasing their cleanup owner", function()
 		with_retained_actor(function(run, answers, controls)
-			local Cleanup = require("healthcheck.cleanup")
+			local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
 			local session = { probes = run, snapshot = { probes = run.results } }
 			Cleanup.archive(session)
 			helpers.assert_true(session.probes == nil)

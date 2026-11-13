@@ -9,7 +9,7 @@
 
 local M = {}
 local Helper = require("platform.remap.lease_helper")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Logger = require("infra.logger")
 local hs = hs
 local LOG = "adapters.owned_program_runner"

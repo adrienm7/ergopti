@@ -193,11 +193,11 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		{ allowed_schemes = { 42 } }, { allowed_schemes = { "HTTP" } },
 		{ allowed_schemes = { "http", "http" } }, { allowed_schemes = { http = true } } }) do
 		helpers.it("linux-http-transport-policy: refuses malformed shared inventory " .. index, function()
-			local previous_json, previous_binding = package.loaded["json"], package.loaded["infra.http_transport_policy"]
-			package.loaded["json"] = { decode = function() return policy end }
+			local previous_json, previous_binding = package.loaded["core.text.engine.json"], package.loaded["infra.http_transport_policy"]
+			package.loaded["core.text.engine.json"] = { decode = function() return policy end }
 			package.loaded["infra.http_transport_policy"] = nil
 			local ok, binding = pcall(require, "infra.http_transport_policy")
-			package.loaded["json"], package.loaded["infra.http_transport_policy"] = previous_json, previous_binding
+			package.loaded["core.text.engine.json"], package.loaded["infra.http_transport_policy"] = previous_json, previous_binding
 			helpers.assert_true(ok and type(binding) == "table" and type(binding.resolve) == "function", tostring(binding))
 			local protocols, err = binding.resolve("https://example.invalid")
 			helpers.assert_nil(protocols)
@@ -301,11 +301,11 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		{ forbidden_bytes = { 0, 256 } }, { forbidden_bytes = { [0] = 13, [1] = 0 } },
 		{ forbidden_bytes = { 0, 10.5, 13 } } }) do
 		helpers.it("linux-http-header-policy: rejects malformed inventory " .. index, function()
-			local previous_json, previous_binding = package.loaded["json"], package.loaded["infra.http_header_policy"]
-			package.loaded["json"] = { decode = function() return policy end }
+			local previous_json, previous_binding = package.loaded["core.text.engine.json"], package.loaded["infra.http_header_policy"]
+			package.loaded["core.text.engine.json"] = { decode = function() return policy end }
 			package.loaded["infra.http_header_policy"] = nil
 			local ok, binding = pcall(require, "infra.http_header_policy")
-			package.loaded["json"], package.loaded["infra.http_header_policy"] = previous_json, previous_binding
+			package.loaded["core.text.engine.json"], package.loaded["infra.http_header_policy"] = previous_json, previous_binding
 			helpers.assert_true(ok and type(binding) == "table" and type(binding.validate) == "function", tostring(binding))
 			local allowed, err = binding.validate("X-Native", "literal")
 			helpers.assert_nil(allowed)
@@ -603,12 +603,12 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		{ sensitive_headers = { 42 } }, { sensitive_headers = { "AUTHORIZATION" } },
 		{ sensitive_headers = { "authorization", "authorization" } }, { sensitive_headers = { authorization = true } } }) do
 		helpers.it("linux-http-redirect-policy: rejects malformed shared inventory " .. index, function()
-			local previous_json = package.loaded["json"]
+			local previous_json = package.loaded["core.text.engine.json"]
 			local previous_policy = package.loaded["infra.http_redirect_policy"]
-			package.loaded["json"] = { decode = function() return policy end }
+			package.loaded["core.text.engine.json"] = { decode = function() return policy end }
 			package.loaded["infra.http_redirect_policy"] = nil
 			local ok, binding = pcall(require, "infra.http_redirect_policy")
-			package.loaded["json"] = previous_json
+			package.loaded["core.text.engine.json"] = previous_json
 			package.loaded["infra.http_redirect_policy"] = previous_policy
 			helpers.assert_true(ok and type(binding) == "table" and type(binding.allows_native_follow) == "function", tostring(binding))
 			local allowed, err = binding.allows_native_follow({ Accept = "application/json" })

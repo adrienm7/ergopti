@@ -24,7 +24,7 @@ local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local TimerScheduler = require("adapters.timer_scheduler")
-local TriggerRoi = require("keystats.trigger_roi")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 local AXResponsiveness = require("adapters.accessibility_permission")
 local LOG    = "keystats.context_tracker"
 local M      = {}
@@ -50,12 +50,12 @@ local _last_win_title       = nil
 local _last_win_time        = 0
 
 -- Incognito / private browsing window title markers. The list itself lives in
--- _shared/lua/keystats/private_window.lua: "drop keystrokes typed in a private
+-- _shared/metrics/engine/view/private_window.lua: "drop keystrokes typed in a private
 -- window" is one of the four categories of the shared no-persist corpus, so it
 -- cannot be one driver's private variable — the Linux driver had no such filter
 -- at all precisely because this list was never shared.
-local PrivateWindow = require("keystats.private_window")
-local ConfigKeys = require("config_keys")
+local PrivateWindow = require("metrics.engine.view.private_window")
+local ConfigKeys = require("settings.engine.keys")
 
 local function get_private_keywords()
 	local localized = i18n.get("keystats.category_private")
@@ -229,7 +229,7 @@ local function bind_context_observer(owner, capacity, receive, on_refused, may_p
 		return M.unbind_physical_context_observer(exact_owner, exact_token)
 	end
 	local clock_port = require("adapters.physical_observation_clock").now
-	binding.channel = require("keystats.physical_context_observation").new(capacity,
+	binding.channel = require("metrics.engine.capture.physical_context_observation").new(capacity,
 		function()
 			local guard = binding.sample_guard
 			if guard and guard() ~= true then error("Physical context sample clock owner unavailable", 0) end

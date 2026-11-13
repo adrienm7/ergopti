@@ -89,7 +89,7 @@ const RECOMMENDED_SET = {
  * @returns {Map<string, string>} slot -> action.
  */
 function manifestDefaults(platform) {
-	const raw = read('_shared/modules/features/manifest.toml').replace(
+	const raw = read('_shared/settings/data/features/manifest.toml').replace(
 		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 		(_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
 	);
@@ -264,7 +264,7 @@ for (const [slot, action] of manifestDefaults('linux')) {
 		);
 }
 const linuxDefaults = (() => {
-	const entries = parseToml(read('_shared/modules/features/manifest.toml')).features.gestures;
+	const entries = parseToml(read('_shared/settings/data/features/manifest.toml')).features.gestures;
 	return entries.filter((entry) => (entry.platforms || []).includes('linux'));
 })();
 for (const entry of linuxDefaults) {
@@ -293,7 +293,7 @@ const SWIPE_MINIMUMS = {
 	pair_scroll_travel_mm: 10.0,
 	touchpad_fallback_units_per_mm: 12
 };
-const registryGestures = parseToml(read('_shared/modules/timings/constants.toml')).gestures || {};
+const registryGestures = parseToml(read('_shared/core/timing/data/constants.toml')).gestures || {};
 for (const [key, value] of Object.entries(SWIPE_MINIMUMS))
 	if (registryGestures[key] !== value)
 		errors.push(
@@ -309,7 +309,7 @@ const gestureSources = (dir) =>
 				.map((name) => path.join(dir, name))
 		: [];
 for (const rel of [
-	...gestureSources('_shared/lua/gestures'),
+	...gestureSources('_shared/gestures/engine'),
 	...gestureSources('macos/modules/gestures'),
 	...gestureSources('linux/modules/gestures'),
 	...gestureSources('windows/modules/gestures')

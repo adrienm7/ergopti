@@ -5,7 +5,7 @@
  * MODULE: Tooltip Timing Single Source
  * DESCRIPTION:
  * The tooltip duration decrement and floor are declared once, in
- * _shared/modules/tooltip/constants.toml [timing], and reach every engine from
+ * _shared/core/ui/data/tooltip/constants.toml [timing], and reach every engine from
  * there.
  *
  * ROOT CAUSE ENCODED:
@@ -54,7 +54,7 @@ const RETIRED_TIMINGS_COPIES = [
 ];
 
 // 1. One declaration.
-const timing = parse(read('_shared/modules/tooltip/constants.toml')).timing;
+const timing = parse(read('_shared/core/ui/data/tooltip/constants.toml')).timing;
 for (const key of KEYS) {
 	assert.equal(typeof timing?.[key], 'number', `tooltip/constants.toml [timing] declares ${key}`);
 	assert.ok(timing[key] > 0, `[timing] ${key} is positive`);
@@ -76,9 +76,9 @@ function tomlFiles(directory, out = []) {
 	}
 	return out;
 }
-for (const file of tomlFiles(path.join(SP, '_shared', 'modules'))) {
+for (const file of tomlFiles(path.join(SP, '_shared'))) {
 	const relative = path.relative(SP, file).replaceAll('\\', '/');
-	if (relative === '_shared/modules/tooltip/constants.toml') continue;
+	if (relative === '_shared/core/ui/data/tooltip/constants.toml') continue;
 	const source = fs.readFileSync(file, 'utf8');
 	for (const key of [...KEYS, ...RETIRED_TIMINGS_COPIES]) {
 		assert.ok(
@@ -90,7 +90,10 @@ for (const file of tomlFiles(path.join(SP, '_shared', 'modules'))) {
 
 // 2. No engine default.
 const DEFAULT_ASSIGNMENT = /\b\w*TIMEOUT_(?:DECREMENT|FLOOR)_SEC\s*=\s*[\d.]+/;
-for (const relative of ['_shared/modules/tooltip/dequeue.js', 'macos/ui/tooltip/dequeue.lua']) {
+for (const relative of [
+	'_shared/core/ui/data/tooltip/dequeue.js',
+	'macos/ui/tooltip/dequeue.lua'
+]) {
 	const source = read(relative);
 	const match = DEFAULT_ASSIGNMENT.exec(source);
 	assert.equal(
@@ -100,7 +103,7 @@ for (const relative of ['_shared/modules/tooltip/dequeue.js', 'macos/ui/tooltip/
 	);
 	assert.ok(!/\bor\s+DEFAULT_|\?\?\s*DEFAULT_/.test(source), `${relative} falls back to a default`);
 }
-const dequeue = loadCjsModule(path.join(SP, '_shared/modules/tooltip/dequeue.js'));
+const dequeue = loadCjsModule(path.join(SP, '_shared/core/ui/data/tooltip/dequeue.js'));
 assert.deepEqual(
 	Object.keys(dequeue).filter((name) => /TIMEOUT/.test(name)),
 	[],

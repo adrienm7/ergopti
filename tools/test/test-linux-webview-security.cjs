@@ -65,7 +65,17 @@ const host = fs.readFileSync(
 );
 // The document policy is shared with macOS; Linux must publish it, not its own.
 const documentCsp = fs.readFileSync(
-	path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'webview', 'document_csp.lua'),
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'_shared',
+		'core',
+		'ui',
+		'engine',
+		'webview',
+		'document_csp.lua'
+	),
 	'utf8'
 );
 for (const required of [
@@ -78,7 +88,7 @@ for (const required of [
 		fail(`document_csp.lua is missing security invariant: ${required}`);
 }
 for (const required of [
-	'require("webview.document_csp")',
+	'require("core.ui.engine.webview.document_csp")',
 	'DocumentCsp.apply(html, nonce)',
 	'function M.bridge_for_app(app_name)'
 ]) {

@@ -161,8 +161,7 @@ function restoreArchive(
  */
 function createArchives(application, output, options = {}) {
 	const defaults =
-		options.defaults ??
-		JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'));
+		options.defaults ?? JSON.parse(fs.readFileSync(shared('updater/data/defaults.json'), 'utf8'));
 	const archives = resolveArchives(defaults);
 	const app = directory(application);
 	const destination = directory(output);
@@ -276,8 +275,7 @@ function createArchives(application, output, options = {}) {
 /** Return canonical CI bindings without introducing another archive policy. */
 function ciBindings(options) {
 	const defaults =
-		options.defaults ??
-		JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'));
+		options.defaults ?? JSON.parse(fs.readFileSync(shared('updater/data/defaults.json'), 'utf8'));
 	const archives = resolveArchives(defaults);
 	const basename = archives[0].name.slice(0, -FORMATS.get(archives[0].format).length);
 	if (

@@ -11,7 +11,7 @@
 --- Exit 0 = every phase acquired and released the inhibitor; 1 = a failure.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 
 local CHILD = arg[1] == "--child"

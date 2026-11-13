@@ -743,7 +743,7 @@ try {
 				configLua,
 				[
 					'-e',
-					'package.path="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"..package.path; io.write(require("infra.config_paths").config_home())'
+					'package.path="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;"..package.path; io.write(require("infra.config_paths").config_home())'
 				],
 				{
 					cwd: path.join(root, 'static/ergopti_plus/linux'),

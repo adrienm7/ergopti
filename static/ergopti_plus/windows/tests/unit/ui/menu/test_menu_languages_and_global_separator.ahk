@@ -133,7 +133,7 @@ _MLG_WithLocale(Code, Body) {
 	HadCache := IsSet(_I18nCache), OldCache := HadCache ? _I18nCache : false
 	HadLoaded := IsSet(_I18nCacheLoaded), OldLoaded := HadLoaded ? _I18nCacheLoaded : false
 	try {
-		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 		_I18nCacheLoaded := true
 		Body.Call()
 	} finally {

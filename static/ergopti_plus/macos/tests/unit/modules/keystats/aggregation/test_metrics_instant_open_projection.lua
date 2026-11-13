@@ -115,7 +115,7 @@ end)
 
 helpers.describe("metrics-instant-open: incremental projection", function()
 	local owners = { "modules.keystats.sqlite_reader", "infra.logger", "hs.sqlite3", "hs.json",
-		"ui.metrics_typing.projection", "infra.paced_json", "json" }
+		"ui.metrics_typing.projection", "infra.paced_json", "core.text.engine.json" }
 
 	local function load(tables)
 		local sqlite = FakeSqlite.new(tables)
@@ -172,7 +172,7 @@ helpers.describe("metrics-instant-open: incremental projection", function()
 				.range("2026-09-27", TODAY, nil)
 			-- One read of 2026-09-29 for the history, one of today's slice
 			helpers.assert_eq(historical_reads(sqlite) - before, 2, "only the day that became past is read")
-			local decoded = require("json").decode(payload)
+			local decoded = require("core.text.engine.json").decode(payload)
 			assert_same_dict(reader.read_ngrams("/fake/db.sqlite", "2026-09-27", "2026-09-29", nil),
 				decoded.historical, "extended")
 		end)

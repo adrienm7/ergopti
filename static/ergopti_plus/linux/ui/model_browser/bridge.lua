@@ -12,9 +12,9 @@
 local M = {}
 M.bridge_name = "model_browser_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
-local ModelCatalogue = require("llm.model_catalogue")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
+local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 local Paths = require("infra.paths")
 local Shell = require("adapters.shell_runner")
 
@@ -25,9 +25,9 @@ local _catalogue = nil
 local _projection, _page_epoch = nil, nil
 -- The menu's transactions and dialogs for the page (bind()).
 local _bound = nil
-local ModelIdentifier = require("llm.model_identifier")
+local ModelIdentifier = require("ai.engine.local_servers.model_identifier")
 local BackendBrands = require("modules.llm.backend_brands")
-local ApiModelListing = require("llm.api_model_listing")
+local ApiModelListing = require("ai.engine.api.model_listing")
 
 -- Borrowed, never re-implemented: ModelCatalogue.build decides which row is
 -- ACTIVE with this exact rule, and the lookup below decides which rows are
@@ -37,7 +37,7 @@ local normalise_name = ModelCatalogue.normalise_name
 
 local function load_catalogue()
 	if _catalogue then return _catalogue end
-	local path = Paths.shared("modules/llm/models.json")
+	local path = Paths.shared("ai/data/models.json")
 	local body = path and require("infra.regular_file_reader").read_source(path) or nil
 	if not body then return nil end
 	local ok, decoded = pcall(Json.decode, body)

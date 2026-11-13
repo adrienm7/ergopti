@@ -4,7 +4,7 @@
 --- MODULE: Tone Ladder Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/tone_vectors.json through the shared tone
---- ladder (_shared/lua/llm/tone.lua), which the macOS tone actions run and the
+--- ladder (_shared/ai/engine/prediction/tone.lua), which the macOS tone actions run and the
 --- AutoHotkey port replays too: the next register, which text a step rewrites,
 --- and how the model's answer is read.
 ---
@@ -15,12 +15,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 
 local CORPUS = helpers.shared("tests/corpus/llm/tone_vectors.json")
 

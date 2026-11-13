@@ -26,8 +26,8 @@ local SHIPPED_ROOT = "@shipped/"
 --- @return boolean
 local function shipped(relative)
 	return relative == "ui/_generated/onboarding_catalogue.json"
-		or relative == "core/config_schema/migrations.toml"
-		or relative:match("^data/locales/[a-z][a-z]%.json$") ~= nil
+		or relative == "settings/data/config_schema/migrations.toml"
+		or relative:match("^core/i18n/data/locales/[a-z][a-z]%.json$") ~= nil
 end
 
 --- Routes the shipped data through the already loaded path and file doubles.

@@ -27,8 +27,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "$PWD")"
 REPO_ROOT="${REPO_ROOT%.}"
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 
 fail() { printf '[owned-runtime-reset] REFUSED: %s\n' "$*" >&2; exit 1; }
 log() { printf '[owned-runtime-reset] %s\n' "$*"; }

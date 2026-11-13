@@ -28,7 +28,10 @@ const {
 	refuseDeveloperSource
 } = require('../build/macos-dev-source-guard.cjs');
 const KEY = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json'),
+		'utf8'
+	)
 ).dev_source.plist_key;
 
 let checks = 0;

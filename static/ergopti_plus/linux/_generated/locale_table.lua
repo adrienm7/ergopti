@@ -1,5 +1,5 @@
 --- _generated/locale_table.lua
---- AUTO-GENERATED from _shared/data/locale_order.json + locale_names.json.
+--- AUTO-GENERATED from _shared/core/i18n/data/locale_order.json + locale_names.json.
 --- DO NOT EDIT BY HAND — run `npm run codegen:locale-tables` to refresh.
 
 --- ==============================================================================
@@ -7,8 +7,8 @@
 --- DESCRIPTION:
 --- The language menu rows, in canonical display order.
 ---
---- The display ORDER comes from _shared/data/locale_order.json and the native
---- names from _shared/data/locale_names.json. Both are shared, because three
+--- The display ORDER comes from _shared/core/i18n/data/locale_order.json and the native
+--- names from _shared/core/i18n/data/locale_names.json. Both are shared, because three
 --- hand-maintained copies is how the Linux table came to hold 16 of 21 locales
 --- — its five missing rows rendered as bare two-letter codes in the menu.
 --- ==============================================================================

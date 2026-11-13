@@ -32,9 +32,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Engine = require("dynamic_hotstrings")
-local TextUtils = require("text_utils")
+local Logger = require("core.logger.engine.shim")
+local Engine = require("hotstrings.engine.dynamic.core")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "modules.dynamic_hotstrings.prefix_rules"
 
@@ -140,7 +140,7 @@ function M.build(info, is_section_enabled, magic_key)
 	end
 
 	if magic_key == nil then
-		magic_key = require("infra.manifest_reader").default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+		magic_key = require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 	end
 	local phone  = field(info, "phone_number")
 	local fphone = field(info, "phone_number_clean")

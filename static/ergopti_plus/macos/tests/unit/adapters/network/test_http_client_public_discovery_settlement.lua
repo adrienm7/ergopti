@@ -11,13 +11,13 @@ local SourceFile = require("tests.support.source_file")
 
 local OWNED_MODULES = {
 	"modules.llm.api_remote", "modules.llm.local_servers", "adapters.http_client",
-	"adapters.timer_scheduler", "infra.logger", "error_description", "number_policy",
-	"adapters.json_codec", "llm.local_server_auth", "llm.local_server_discovery",
-	"llm.provider_config_policy", "json", "modules.llm.provider_uses",
+	"adapters.timer_scheduler", "infra.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
+	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
 	"infra.timings", "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
-	"modules.llm.api_common", "llm.prompt_builder", "modules.llm.api_token_crypto",
+	"modules.llm.api_common", "ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto",
 	"modules.llm.progressive_reveal", "modules.llm.remote_response_classifier",
-	"llm.remote_formats", "modules.keystats", "adapters.file_system", "infra.http_header_policy",
+	"ai.engine.api.remote_formats", "modules.keystats", "adapters.file_system", "infra.http_header_policy",
 }
 
 --- Reads an existing declared backend seam, without production test hooks.
@@ -65,8 +65,8 @@ local function isolated(scenario)
 		-- These owners are outside detection; their module state is explicitly
 		-- scoped and none substitutes the detector, shared sweep or HTTP adapter.
 		for _, name in ipairs({ "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
-			"llm.prompt_builder", "modules.llm.api_token_crypto", "modules.llm.progressive_reveal",
-			"modules.llm.remote_response_classifier", "llm.remote_formats", "modules.keystats" }) do
+			"ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto", "modules.llm.progressive_reveal",
+			"modules.llm.remote_response_classifier", "ai.engine.api.remote_formats", "modules.keystats" }) do
 			package.loaded[name] = {}
 		end
 		package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1 end }

@@ -378,7 +378,7 @@ function navEffective(text, os) {
 }
 
 test('the navigation layer converts both ways without changing a binding on any OS', () => {
-	const recommended = fs.readFileSync(shared('keymap', 'layers.recommended.toml'), 'utf8');
+	const recommended = fs.readFileSync(shared('layouts', 'data', 'layers.recommended.toml'), 'utf8');
 	const doc = IO.withNavLayer(IO.create('a', 'A'), recommended, ['CapsLock'], DATA);
 	const nav = doc.layers.find((layer) => layer.id === 'nav');
 	assert.deepEqual(plain(nav.required), ['nav']);

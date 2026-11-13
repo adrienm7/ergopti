@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local SCHEMA_PATH = "../_shared/modules/diagnostics/schema.json"
+local SCHEMA_PATH = "../_shared/diagnostics/data/schema.json"
 
 -- The input-section ids the schema declares for the counters, in its order
 local COUNTER_IDS = {

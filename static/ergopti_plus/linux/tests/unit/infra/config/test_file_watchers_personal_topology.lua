@@ -613,7 +613,7 @@ helpers.describe("file_watchers Personal topology", function()
 	end
 	helpers.it("(linux-watch-root-anchor) native ignores distinct parent siblings without recursive scans", function()
 		session("native", function(s)
-			local logger = require("logger.shim")
+			local logger = require("core.logger.engine.shim")
 			local held_success, reported = logger.success, nil
 			logger.success = function(_, format, ...)
 				local message = string.format(format, ...)
@@ -637,7 +637,7 @@ helpers.describe("file_watchers Personal topology", function()
 		session("native", function(s)
 			local path = s.file(s.personal .. "/rules.toml")
 			s.start_refused = s.root
-			local logger, warnings = require("logger.shim"), {}
+			local logger, warnings = require("core.logger.engine.shim"), {}
 			local held_warn = logger.warn
 			logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 			local called, detail = pcall(s.start)
@@ -691,7 +691,7 @@ helpers.describe("file_watchers Personal topology", function()
 			local anchor
 			for _, record in ipairs(s.callbacks) do if record.path == s.root then anchor = record end end
 			helpers.assert_true(anchor ~= nil)
-			local logger, warnings = require("logger.shim"), {}
+			local logger, warnings = require("core.logger.engine.shim"), {}
 			local held_warn = logger.warn
 			logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 			local called, detail = pcall(anchor.callback, "controlled native parent error", nil, nil)

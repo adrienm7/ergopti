@@ -40,7 +40,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const DATA = path.join(SP, '_shared', 'data');
+const DATA = path.join(SP, '_shared');
 const SITE_LOADER = fs.readFileSync(
 	path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'),
 	'utf8'
@@ -48,8 +48,12 @@ const SITE_LOADER = fs.readFileSync(
 
 const errors = [];
 
-const order = JSON.parse(fs.readFileSync(path.join(DATA, 'locale_order.json'), 'utf8')).order;
-const names = JSON.parse(fs.readFileSync(path.join(DATA, 'locale_names.json'), 'utf8')).locales;
+const order = JSON.parse(
+	fs.readFileSync(path.join(DATA, 'core/i18n/data/locale_order.json'), 'utf8')
+).order;
+const names = JSON.parse(
+	fs.readFileSync(path.join(DATA, 'core/i18n/data/locale_names.json'), 'utf8')
+).locales;
 
 if (
 	!/LOCALE_NAMES_PATH[\s\S]*?locale_names\.json/.test(SITE_LOADER) ||
@@ -92,7 +96,7 @@ for (const code of Object.keys(names)) {
 // ── 2. Every shipped locale file is covered ─────────────────────────────────
 
 const shipped = fs
-	.readdirSync(path.join(DATA, 'locales'))
+	.readdirSync(path.join(DATA, 'core/i18n/data/locales'))
 	.filter((f) => f.endsWith('.json'))
 	.map((f) => f.replace(/\.json$/, ''))
 	.sort();
@@ -150,7 +154,7 @@ for (const driver of ['macos', 'linux', 'windows']) {
 		if (hits.length >= 2) {
 			errors.push(
 				`${rel} spells out locale native names (${hits.join(', ')}). They come from ` +
-					'_shared/data/locale_names.json through _generated/locale_table.*; a hand-written ' +
+					'_shared/core/i18n/data/locale_names.json through _generated/locale_table.*; a hand-written ' +
 					'copy is how the Linux table came to hold 16 of 21.'
 			);
 		}

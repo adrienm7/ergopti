@@ -20,7 +20,7 @@
 
 local helpers = require("tests.helpers")
 
-local SCHEMA = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+local SCHEMA = require("diagnostics.engine.healthcheck.snapshot").load_config(require("infra.paths").shared).schema
 
 --- The real core over a counted network adapter.
 --- @param body function(Core, world)
@@ -136,7 +136,7 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			helpers.assert_nil(snapshot.sections.developer.modules_ok, "phase A ran the module contract check")
 			helpers.assert_nil(snapshot.sections.network.wifi_signal, "phase A filled the Wi-Fi signal")
 			helpers.assert_eq(snapshot.probes.local_state.state, "pending", "the probe owns them")
-			local undeclared = require("healthcheck.snapshot").check_fields(snapshot, Core.config().schema)
+			local undeclared = require("diagnostics.engine.healthcheck.snapshot").check_fields(snapshot, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "phase A fields stay declared")
 		end)
 	end)
@@ -171,7 +171,7 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			helpers.assert_true(completed.sections.versions.commit ~= nil, "the steps fill the versions")
 			helpers.assert_true(completed.sections.input.shift ~= nil, "the steps fill the keyboard state")
 			helpers.assert_eq(#completed.sections.peripherals.items, 1, "the steps list the USB devices")
-			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
+			local undeclared = require("diagnostics.engine.healthcheck.snapshot").check_fields(completed, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
 		end)
 	end)
@@ -203,7 +203,7 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			for _, item in ipairs(completed.sections.permissions.items) do ids[#ids + 1] = item.id end
 			helpers.assert_eq(ids, { "accessibility", "input_monitoring", "login_items", "screen_recording" },
 				"the schema's order is kept")
-			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
+			local undeclared = require("diagnostics.engine.healthcheck.snapshot").check_fields(completed, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
 		end)
 	end)

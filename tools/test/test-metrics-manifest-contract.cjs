@@ -20,7 +20,7 @@ const vm = require('vm');
 const root = path.resolve(__dirname, '..', '..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const contract = JSON.parse(
-	read('static/ergopti_plus/_shared/data/metrics_manifest_contract.json')
+	read('static/ergopti_plus/_shared/metrics/data/metrics_manifest_contract.json')
 );
 const typingSource = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
 const appsSource = read('static/ergopti_plus/_shared/ui/metrics_apps/state.js');

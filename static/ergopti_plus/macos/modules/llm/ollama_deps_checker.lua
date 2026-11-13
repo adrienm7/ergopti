@@ -116,8 +116,8 @@ local _observed_failure_marker = nil
 local _active_tasks = {}
 
 -- The bootstrap's named timers (initial, hide, deadline), owned from request
--- to native settlement by the shared slots (_shared/lua/owned_timer_slots.lua).
-local _timers = require("owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
+-- to native settlement by the shared slots (_shared/core/timing/engine/owned_timer_slots.lua).
+local _timers = require("core.timing.engine.owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
 local _owned_timers = _timers.slots
 local _task_owner = nil
 local _resume_intent = nil
@@ -859,7 +859,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		end
 
 		local external_runtime = native_choice == nil and resolved_bin ~= nil
-			and require("core.llm.ollama_runtime_choice").classify(resolved_source) == "foreign"
+			and require("core.lifecycle.engine.core.ollama_runtime_choice").classify(resolved_source) == "foreign"
 		local function finish_provisioning(daemon_ready)
 		if not owner_is_current() then return false end
 

@@ -66,7 +66,7 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
 const LINUX_BUILDER = path.join(SP, 'linux', 'ui', 'menu', 'builder.lua');
 
 // The separator id, which carries no identity and cannot be compared by name.
@@ -545,7 +545,10 @@ for (const locale of [
 	'zh'
 ]) {
 	const dictionary = JSON.parse(
-		fs.readFileSync(path.join(SP, '_shared', 'data', 'locales', locale + '.json'), 'utf8')
+		fs.readFileSync(
+			path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', locale + '.json'),
+			'utf8'
+		)
 	);
 	if (
 		typeof dictionary['menu.agent.not_ready'] !== 'string' ||

@@ -16,7 +16,7 @@ local M = {}
 local hs       = hs
 local Logger   = require("infra.logger")
 local SyntheticInput = require("adapters.synthetic_input")
-local Terminators = require("keymap.terminators")
+local Terminators = require("layouts.engine.layers.terminators")
 local LOG      = "personal_info"
 
 -- Safely require the UI editor module to prevent crashes
@@ -26,9 +26,9 @@ if not ok_editor then ui_editor = nil end
 local ok_kl, keystats = pcall(require, "modules.keystats")
 if not ok_kl then keystats = nil end
 local FileSystem = require("adapters.file_system")
-local BasicString = require("toml_codec.basic_string")
-local TomlCodec = require("toml_codec.codec")
-local UnicodeCase = require("unicode_case")
+local BasicString = require("core.text.engine.toml_codec.basic_string")
+local TomlCodec = require("core.text.engine.toml_codec.codec")
+local UnicodeCase = require("core.text.engine.unicode_case")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -68,8 +68,8 @@ local _refresh_personal_data = nil
 local _active_start_token = nil
 local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 -- The magic key as declared in the shared feature manifest. Named once here so
 -- the three sites below cannot drift apart from each other or from the manifest.
@@ -119,7 +119,7 @@ local function rollback_start(token, reason)
 	return false
 end
 
-local SharedDefaults = require("personal_info.defaults")
+local SharedDefaults = require("hotstrings.engine.personal_info.defaults")
 
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the

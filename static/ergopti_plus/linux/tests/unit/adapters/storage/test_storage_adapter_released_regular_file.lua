@@ -15,8 +15,8 @@
 --- nested value was dropped and its inner keys leaked to the top level. The
 --- encoder also serialised Lua arrays as string-keyed objects. Any non-flat
 --- stored value was therefore corrupted on reload. The fix routes encode/decode
---- through the shared _shared/lua/json.lua codec; this test fails (nested/array
---- fields come back nil) against the bespoke codec and passes against json.lua.
+--- through the shared _shared/core/text/engine/json.lua codec; this test fails (nested/array
+--- fields come back nil) against the bespoke codec and passes against core/text/engine/json.lua.
 --- ==============================================================================
 
 package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
@@ -196,7 +196,7 @@ helpers.describe("script storage retired journal roots", function()
 			-- Retain the exact private journal that the native publication closure
 			-- keeps as a JIT constant; no synthetic journal is substituted.
 			-- The map is the receipts upvalue of the shared owned-alias protocol
-			-- (storage_owned.lua), which forget_owned is.
+			-- (core/fs/engine/storage_owned.lua), which forget_owned is.
 			local records, slot = nil, 1
 			while true do
 				local name, value = debug.getupvalue(storage.forget_owned, slot)

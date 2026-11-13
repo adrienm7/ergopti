@@ -33,7 +33,7 @@ package.loaded["infra.config_paths"] = SAVED_PATHS
 helpers.describe("shared Tap-Hold guidance retains actual native admission and owners", function()
 	helpers.it("keeps the handwritten native guardian state order (tap-hold-guidance)", function()
 		local file = assert(io.open(helpers.shared("tests/corpus/menus/tap_hold_guidance.json"), "r"))
-		local corpus = require("json").decode(file:read("*a")); file:close()
+		local corpus = require("core.text.engine.json").decode(file:read("*a")); file:close()
 		local known = {}
 		for _, key in ipairs({ "menu.tapholds.guardian_requires_approval", "menu.tapholds.guardian_unavailable",
 			"menu.tapholds.show_login_items_steps", "menu.tapholds.open_login_items" }) do known[key] = true end
@@ -148,18 +148,18 @@ end)
 
 helpers.describe("shared Tap-Hold guidance independent locale/platform projection", function()
 	helpers.it("preserves all six captions and inert/action policy in all21 languages (tap-hold-guidance)", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local function read(relative)
 			local file = assert(io.open(helpers.shared(relative), "r"))
 			local value = Json.decode(file:read("*a")); file:close(); return value
 		end
-		local corpus, locales = read("tests/corpus/menus/tap_hold_guidance.json"), read("data/locale_order.json").order
+		local corpus, locales = read("tests/corpus/menus/tap_hold_guidance.json"), read("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read("data/locales/" .. code .. ".json")
+			local strings = read("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 					json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
 						section = function(key) return assert(strings[key]) end },
 					logger = { error = function() end, warn = function() end, debug = function() end } }))

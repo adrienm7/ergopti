@@ -6,7 +6,7 @@
 --- Builds the real macOS prediction engine (real gesture action registry,
 --- streaming handler, LLM core dispatcher, remote backend, shared parser and
 --- profile registry) on recording fakes of its three ports and exposes it to
---- the shared transcript runner (_shared/lua/test/llm_engine_transcript.lua):
+--- the shared transcript runner (_shared/tests/lua/ai/engine_transcript.lua):
 --- the TimerScheduler is the adapter the engine arms its debounce on, the
 --- HttpClient is the remote backend's inference client, the TooltipRenderer is
 --- the prediction tooltip behind adapters.prediction_tooltip_port. What each port is
@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local PromptBuilder = require("llm.prompt_builder")
-local InfoBar = require("llm.request_plan.info_bar")
+local json = require("core.text.engine.json")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
+local InfoBar = require("ai.engine.request_plan.info_bar")
 
 local M = {}
 

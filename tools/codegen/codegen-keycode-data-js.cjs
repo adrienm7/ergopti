@@ -5,7 +5,7 @@
  * MODULE: Keycode Data JS Codegen (DC-1)
  * DESCRIPTION:
  * Generates `_shared/ui/metrics_typing/_generated/keycode_data.js` from the
- * shared canon `_shared/data/keycodes/azerty.json` — the macOS virtual-keycode
+ * shared canon `_shared/layouts/data/keycodes/azerty.json` — the macOS virtual-keycode
  * to finger/hand/home mapping used by the typing-heatmap dashboard.
  *
  * FEATURES & RATIONALE:
@@ -37,10 +37,10 @@ const OUT_PATH = path.resolve(
 	ROOT,
 	'static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js'
 );
-const AZERTY_JSON_PATH = shared('data/keycodes/azerty.json');
-const AZERTY_JSON_REL = sharedRel('data/keycodes/azerty.json');
-const MEDIA_JSON_PATH = shared('data/keycodes/metrics_media_keys.json');
-const MEDIA_JSON_REL = sharedRel('data/keycodes/metrics_media_keys.json');
+const AZERTY_JSON_PATH = shared('layouts/data/keycodes/azerty.json');
+const AZERTY_JSON_REL = sharedRel('layouts/data/keycodes/azerty.json');
+const MEDIA_JSON_PATH = shared('layouts/data/keycodes/metrics_media_keys.json');
+const MEDIA_JSON_REL = sharedRel('layouts/data/keycodes/metrics_media_keys.json');
 
 // ==================================================
 // ==================================================

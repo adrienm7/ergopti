@@ -27,7 +27,7 @@ M.bridge_name = "metrics_typing_bridge"
 
 local AppsBridge = require("ui.metrics_apps.bridge")
 local Flush = require("ui.metrics_flush_bridge")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.metrics_typing"
 
 local APP_NAME = "metrics_typing"

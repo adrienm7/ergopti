@@ -18,11 +18,11 @@
 --- ==============================================================================
 
 local M = {}
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local Logger = require("infra.logger")
 local LOG    = "hotstring_counter"
-local Labels = require("menu.labels")
-local Extensions = require("hotstrings.extensions")
+local Labels = require("menu.engine.labels")
+local Extensions = require("hotstrings.engine.extensions")
 
 --- Invalidates the hotstring count cache.
 --- Preserved for API compatibility (called by save_prefs in init.lua). Every

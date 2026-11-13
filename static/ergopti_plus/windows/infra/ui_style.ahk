@@ -4,7 +4,7 @@
 ; MODULE: UI Style Constants
 ; DESCRIPTION:
 ; AHK-side consumer of the cross-driver tooltip visual constants.  The canonical
-; source of truth is static/ergopti_plus/_shared/modules/tooltip/constants.toml — all
+; source of truth is static/ergopti_plus/_shared/core/ui/data/tooltip/constants.toml — all
 ; values are loaded at boot by UiStyle_LoadSharedConst() (fail-fast; any missing
 ; key aborts startup).  Do NOT edit the numbers below; edit constants.toml.
 ;
@@ -101,7 +101,7 @@ global UI_LLM_CURSOR_HEX     := ""
 global UI_LLM_CMD_DIM_HEX    := ""
 global UI_AI_LOADING_HEX     := ""
 
-; ── LLM tooltip UI chrome (_shared/modules/tooltip/constants.toml [llm_ui]) ───────────
+; ── LLM tooltip UI chrome (_shared/core/ui/data/tooltip/constants.toml [llm_ui]) ───────────
 global UI_LLM_ACTIVE_PREFIX         := ""
 global UI_LLM_SLOT_PLACEHOLDER      := ""
 global UI_LLM_INACTIVE_ALIGN_CHAR   := ""
@@ -127,11 +127,11 @@ global UI_TIMEOUT_FLOOR_SEC     := 0
 
 
 
-; =============================================================================
-; =============================================================================
-; ======= 2/ Runtime loader from _shared/modules/tooltip/constants.toml =======
-; =============================================================================
-; =============================================================================
+; ==================================================================================
+; ==================================================================================
+; ======= 2/ Runtime loader from _shared/core/ui/data/tooltip/constants.toml =======
+; ==================================================================================
+; ==================================================================================
 
 _UiStyleFatal(section, key, detail := "") {
 	msg := Format(t("dialog.fatal_error.toml_key_missing"), section, key)
@@ -158,7 +158,7 @@ _UiStyleRequireHex(c, section, key) {
 	return val
 }
 
-/** * Reads _shared/modules/tooltip/constants.toml at startup and assigns every tooltip
+/** * Reads _shared/core/ui/data/tooltip/constants.toml at startup and assigns every tooltip
  * global from the TOML single source of truth. Uses _SharedDir (set by the
  * main entry point) + ParseTomlFile + IniCacheGet.
  * Missing file or missing key → MsgBox + ExitApp (fail fast).
@@ -166,10 +166,10 @@ _UiStyleRequireHex(c, section, key) {
  */
 UiStyle_LoadSharedConst() {
 	global _SharedDir
-	path := _SharedDir . "\modules\tooltip\constants.toml"
+	path := _SharedDir . "\core\ui\data\tooltip\constants.toml"
 	c := ParseTomlFile(path)
 	if !c.Count {
-		LoggerError("UiStyle", "_shared/modules/tooltip/constants.toml not found — cannot start.")
+		LoggerError("UiStyle", "_shared/core/ui/data/tooltip/constants.toml not found — cannot start.")
 		Ui_MsgBox(t("dialog.fatal_error.toml_not_found") . "`n" . t("dialog.fatal_error.cannot_start"), "", 16)
 		ExitApp()
 	}

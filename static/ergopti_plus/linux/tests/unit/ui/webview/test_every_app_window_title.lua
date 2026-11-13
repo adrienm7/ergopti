@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads one shared JSON document.
 --- @param relative string Path under the shared tree.
@@ -22,7 +22,7 @@ local function read_shared(relative)
 end
 
 local MANIFEST = read_shared("ui/apps.manifest.json")
-local LOCALES = read_shared("data/locale_order.json").order
+local LOCALES = read_shared("core/i18n/data/locale_order.json").order
 
 --- Asserts that a caption is the brand once, then the translated window name.
 --- @param caption string The native caption.

@@ -2,9 +2,9 @@
 --- Real manager/adapter receiving over controlled ports, never native authority.
 local root = assert(arg[1])
 package.path = root .. "/static/ergopti_plus/macos/?.lua;" .. root .. "/static/ergopti_plus/macos/?/init.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/static/ergopti_plus/_shared/?.lua;" .. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 local with_fixture = require("tests.support.ollama_pull_fixture").with_fixture
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local ORIGINAL = "12345678-abcd-4321-abcd-123456789abc"
 local FRESH = "abcdef12-abcd-4321-abcd-123456789abc"
 local assertions, cases = 0, 0

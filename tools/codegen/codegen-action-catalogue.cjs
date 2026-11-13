@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Action Catalogue Codegen
  * DESCRIPTION:
- * Turns the shared action registry, _shared/modules/actions/actions.toml, into
+ * Turns the shared action registry, _shared/shortcuts/data/actions/actions.toml, into
  * one generated catalogue per driver: the ordered picker items (headings with
  * their level and i18n key, actions, the modifier-chord block), the metadata of
  * every action the driver claims (label key, parameter kind, confirmation,
@@ -13,9 +13,9 @@
  *
  * WHY ONE FILE FOR THE TWO LUA DRIVERS:
  * The macOS and Linux catalogues shared four lines in five. They load one
- * generated file, _shared/lua/actions/catalogue_data.lua, whose every item and
+ * generated file, _shared/shortcuts/engine/actions/catalogue_data.lua, whose every item and
  * action names the Lua drivers that keep it (with the heading pruning already
- * decided per driver here); _shared/lua/actions/catalogue.lua filters it at
+ * decided per driver here); _shared/shortcuts/engine/actions/catalogue.lua filters it at
  * load. Each driver's _generated/action_catalogue.lua is then only that call
  * and what that driver alone declares. Windows keeps its own AHK data file.
  *
@@ -36,7 +36,7 @@
  * there (`equivalent_<driver>`). The generator refuses a missing reason, a
  * reason on a driver the row claims, an equivalent the driver does not offer
  * and a reason key with no English text, then writes the action x OS table of
- * _shared/modules/actions/README.md from them.
+ * _shared/shortcuts/data/actions/README.md from them.
  *
  * WHY STRICT:
  * Every field, platform token, parameter kind and requirement token is checked.
@@ -57,11 +57,11 @@ const { escapeTableCell: cell } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const CATALOGUE = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
-const ENGLISH_LOCALE = path.join(SP, '_shared', 'data', 'locales', 'en.json');
+const CATALOGUE = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
+const ENGLISH_LOCALE = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json');
 
 /** The action README whose availability table this generator owns. */
-const README_OUTPUT = 'static/ergopti_plus/_shared/modules/actions/README.md';
+const README_OUTPUT = 'static/ergopti_plus/_shared/shortcuts/data/actions/README.md';
 const README_BEGIN =
 	'<!-- BEGIN GENERATED availability: tools/codegen/codegen-action-catalogue.cjs; do not edit -->';
 const README_END = '<!-- END GENERATED availability -->';
@@ -85,7 +85,7 @@ const PLATFORMS = ['ahk', 'hs', 'linux'];
 const LUA_PLATFORMS = ['hs', 'linux'];
 
 /** The shared catalogue data of the Lua drivers, relative to the repository root. */
-const SHARED_LUA_OUTPUT = 'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua';
+const SHARED_LUA_OUTPUT = 'static/ergopti_plus/_shared/shortcuts/engine/actions/catalogue_data.lua';
 
 /** Locale key prefix every picker heading resolves through. */
 const HEADER_KEY_PREFIX = 'sg_actions.sg_order.header.';
@@ -453,7 +453,7 @@ function buildModel(data, platform) {
 
 /**
  * The PC spelling of each macOS remap action id that names a PC action under
- * another id, for the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md): the
+ * another id, for the shared tap_hold.toml (_shared/tap_hold/data/SCHEMA.md): the
  * file holds the id Windows and Linux bind, macOS translates. Sources are the
  * one-to-one equivalents (`equivalent_hs` of a PC row, `equivalent_ahk` and
  * `equivalent_linux` of a macOS row) and [karabiner_aliases]. A spelling must
@@ -576,8 +576,8 @@ function buildSharedLuaModel(data) {
  */
 function renderSharedLua(shared, refresh) {
 	const out = [];
-	out.push('--- _shared/lua/actions/catalogue_data.lua');
-	out.push('--- AUTO-GENERATED from _shared/modules/actions/actions.toml.');
+	out.push('--- _shared/shortcuts/engine/actions/catalogue_data.lua');
+	out.push('--- AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.');
 	out.push(`--- DO NOT EDIT BY HAND — run \`${refresh}\` to refresh.`);
 	out.push('');
 	out.push('--- ==============================================================================');
@@ -630,19 +630,23 @@ function renderLua(model, refresh) {
 	const label = model.platform === 'hs' ? 'macOS' : 'Linux';
 	const out = [];
 	out.push('--- _generated/action_catalogue.lua');
-	out.push('--- AUTO-GENERATED from _shared/modules/actions/actions.toml.');
+	out.push('--- AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.');
 	out.push(`--- DO NOT EDIT BY HAND — run \`${refresh}\` to refresh.`);
 	out.push('');
 	out.push('--- ==============================================================================');
 	out.push(`--- MODULE: Action Catalogue (${label})`);
 	out.push('--- DESCRIPTION:');
 	out.push(`--- Every action the ${label} driver offers: the catalogue the two Lua drivers`);
-	out.push('--- share (_shared/lua/actions/catalogue_data.lua) filtered to this platform');
+	out.push(
+		'--- share (_shared/shortcuts/engine/actions/catalogue_data.lua) filtered to this platform'
+	);
 	out.push('--- when it loads, plus what only this driver declares. The driver loads this');
 	out.push('--- table instead of parsing the shared TOML at runtime.');
 	out.push('--- ==============================================================================');
 	out.push('');
-	out.push(`return require("actions.catalogue").for_platform(${luaQ(model.platform)}, {`);
+	out.push(
+		`return require("shortcuts.engine.actions.catalogue").for_platform(${luaQ(model.platform)}, {`
+	);
 	if (model.karabinerAliases) {
 		out.push('\tkarabiner_aliases = {');
 		for (const alias of Object.keys(model.karabinerAliases).sort()) {
@@ -678,7 +682,7 @@ function renderLua(model, refresh) {
 function renderAhk(model, refresh) {
 	const out = [];
 	out.push('﻿; _generated/action_catalogue.ahk');
-	out.push('; AUTO-GENERATED from _shared/modules/actions/actions.toml.');
+	out.push('; AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.');
 	out.push(`; DO NOT EDIT BY HAND — run \`${refresh}\` to refresh.`);
 	out.push('#Requires AutoHotkey v2.0');
 	out.push('');
@@ -766,7 +770,7 @@ function renderAvailability(data, english) {
 		const text = localeText(english, `sg_actions.${id}`) ?? localeText(english, `ax_actions.${id}`);
 		if (text === undefined) return id;
 		// A sticky label is a template its modifiers fill from the key name
-		// table (_shared/lua/actions/sticky_label.lua); the table names them as
+		// table (_shared/shortcuts/engine/actions/sticky_label.lua); the table names them as
 		// macOS does.
 		const sticky = KeyNames.stickyModifiers(id);
 		if (sticky === null) return text;

@@ -1,7 +1,7 @@
 --- tests/unit/ui/menu/gestures_and_apps/test_gesture_scope.lua
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
 local FileSystem = require("adapters.file_system")
 

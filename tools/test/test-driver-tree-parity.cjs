@@ -191,7 +191,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    ui/field_check/, so the path is shared on all three. The
 //                    measurement had also carried two paths of slack (38 against
 //                    36); tightened to the measurement.
-const BASELINE_SHARED = 39;
+const BASELINE_SHARED = 42;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -397,7 +397,7 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // a missing module. Raised the same day it was measured: leaving it at 16 would
 // hand the ratchet exactly one feature of slack, which is the failure the note
 // above condemns and would silently undo the tightening it describes.
-const BASELINE_CANONICAL_ON_ALL = 17;
+const BASELINE_CANONICAL_ON_ALL = 20;
 
 if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
 	errors.push(

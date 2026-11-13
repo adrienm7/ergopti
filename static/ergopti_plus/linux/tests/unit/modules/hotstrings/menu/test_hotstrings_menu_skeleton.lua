@@ -230,7 +230,7 @@ helpers.describe("shared personal editor command", function()
 		helpers.assert_eq(calls, 1)
 	end)
 
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local Paths = require("infra.paths")
 	local file = assert(io.open(Paths.shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
 	local text = assert(file:read("*a"))

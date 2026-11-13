@@ -80,7 +80,7 @@ local function source_pins()
     end
 end
 package.path = input.source_root .. "/static/ergopti_plus/macos/?.lua;"
-    .. input.source_root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
+    .. input.source_root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
 local callback_note, nil_note, default_note
 local callback = function() callback_invocations = callback_invocations + 1 end
 owned_callbacks[callback] = true

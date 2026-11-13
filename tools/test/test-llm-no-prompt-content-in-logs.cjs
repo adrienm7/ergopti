@@ -46,7 +46,7 @@ const SCAN_DIRS = [
 	path.join(DRIVERS, 'macos', 'modules', 'llm'),
 	path.join(DRIVERS, 'macos', 'ui', 'menu', 'menu_llm'),
 	path.join(DRIVERS, 'linux', 'modules', 'llm'),
-	path.join(DRIVERS, '_shared', 'lua', 'llm')
+	path.join(DRIVERS, '_shared', 'ai', 'engine')
 ];
 
 const EXTS = new Set(['.ahk', '.lua']);

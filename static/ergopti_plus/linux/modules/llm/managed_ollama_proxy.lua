@@ -9,7 +9,7 @@
 --- cannot evaluate a PAC itself, so without these entries a pull behind a
 --- PAC-only network is refused. The environment/loopback/selection rules are
 --- the shared proxy policy and the per-origin aggregation is the shared route
---- plan (network/route_plan.lua), the same ones macOS applies.
+--- plan (core/network/engine/route_plan.lua), the same ones macOS applies.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A proxy the user exported (HTTPS_PROXY and friends) wins: the daemon
@@ -43,7 +43,7 @@
 ---    so the daemon starts under it. A refused sign-in starts the daemon without
 ---    the proxy, as Windows does: the models on disk keep working, and the result
 ---    carries the relay's closed reason, which refuses only the pull.
---- 7. The user's proxy override (network/proxy_override.lua, which the policy
+--- 7. The user's proxy override (core/network/engine/proxy_override.lua, which the policy
 ---    binding applies) wins over everything above: "direct" bypasses every relay
 ---    the daemon would inherit, the sign-in relay included; a relay URL becomes
 ---    the daemon's HTTPS_PROXY as given, and is probed like a planned relay, so
@@ -52,12 +52,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local RoutePlan = require("network.route_plan")
+local Logger = require("core.logger.engine.shim")
+local RoutePlan = require("core.network.engine.route_plan")
 local LOG = "modules.llm.managed_ollama_proxy"
 
 --- The registry the Ollama daemon pulls from (one source for every driver).
-M.REGISTRY_URL = require("llm.ollama_registry").URL
+M.REGISTRY_URL = require("ai.engine.ollama.registry").URL
 
 --- The relay variable the daemon reads for its HTTPS registry and blob traffic.
 M.VARIABLE = "HTTPS_PROXY"
@@ -127,7 +127,7 @@ end
 --- Builds the proxy port of the runtime repair.
 --- @param deps table { policy, lookup, environment, timeout_ms, owner, origins, relay,
 ---   probe, relay_address, probe_timeout_ms }
----   relay = { policy (network/proxy_auth_relay.lua), probe(upstream, authority,
+---   relay = { policy (core/network/engine/proxy_auth_relay_core.lua), probe(upstream, authority,
 ---   options, callback) -> operation|nil, reason, timeout_ms }: the sign-in relay.
 ---   probe = fn(host, port, timeout_ms, callback) -> child (adapters/tcp_probe.lua),
 ---   relay_address = fn(relay) -> host, port: the PAC list walk.
@@ -263,7 +263,7 @@ function M.new(deps)
 			end)
 			if not child then
 				Logger.error(LOG, "Managed Ollama proxy relay probe not started: %s", tostring(probe_error))
-				refuse_sign_in(require("network.proxy_auth_relay").UNAVAILABLE)
+				refuse_sign_in(require("core.network.engine.proxy_auth_relay_core").UNAVAILABLE)
 				return
 			end
 			if step == mine then inner = child end

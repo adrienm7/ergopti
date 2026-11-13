@@ -4,7 +4,7 @@
 --- MODULE: Logger Sink Regression Test (Linux driver)
 --- DESCRIPTION:
 --- Regression guard for the blocker where the Linux daemon wrote NO log anywhere.
---- `require("logger.shim")` resolves to the shared core (because _shared/lua is on
+--- `require("core.logger.engine.shim")` resolves to the shared core (because _shared is on
 --- package.path), the core only emits through a sink injected via
 --- `M.set_sink()`, and nothing ever called it. Every Logger.* call — including
 --- `Logger.error("No keyboard device found")` and
@@ -132,7 +132,7 @@ helpers.describe("linux-logger-probe-receipts", function()
 		local shell = require("adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit") and shell.has_command("mktemp"),
 			"native logger probe receipts require Python, LuaJIT and the real mktemp")
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_logger_probe_exit.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
@@ -553,7 +553,7 @@ end)
 helpers.describe("logger sink — output reaches disk", function()
 	helpers.it("an info line is written to the daily file", function()
 		local Sink   = helpers.load_module("infra.logger_sink")
-		local Logger = helpers.load_module("logger")
+		local Logger = helpers.load_module("core.logger.engine")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
 
@@ -575,7 +575,7 @@ helpers.describe("logger sink — output reaches disk", function()
 
 	helpers.it("an error line is mirrored into the errors-only file", function()
 		local Sink   = helpers.load_module("infra.logger_sink")
-		local Logger = helpers.load_module("logger")
+		local Logger = helpers.load_module("core.logger.engine")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
 
@@ -600,7 +600,7 @@ helpers.describe("logger sink — output reaches disk", function()
 
 	helpers.it("install arms repeat collapsing once and uninstall disarms it", function()
 		local Sink   = helpers.load_module("infra.logger_sink")
-		local Logger = helpers.load_module("logger")
+		local Logger = helpers.load_module("core.logger.engine")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
 
@@ -628,7 +628,7 @@ helpers.describe("logger sink — output reaches disk", function()
 
 	helpers.it("uninstall clears the sink so the core stops emitting", function()
 		local Sink   = helpers.load_module("infra.logger_sink")
-		local Logger = helpers.load_module("logger")
+		local Logger = helpers.load_module("core.logger.engine")
 		local dir    = temp_dir()
 		local date   = os.date("%Y-%m-%d")
 
@@ -712,7 +712,7 @@ end)
 --- @param options table Controlled admission/channel failure.
 --- @param body function Receives the actual sink and observed port effects.
 local function with_private_log_sink(options, body)
-	local policy_path = require("infra.paths").shared("modules/diagnostics/redaction.json")
+	local policy_path = require("infra.paths").shared("diagnostics/data/redaction.json")
 	local policy = assert(read_file(policy_path))
 	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
 	local saved_stdout, saved_stderr = io.stdout, io.stderr
@@ -759,7 +759,7 @@ local function with_private_log_sink(options, body)
 	io.stderr = { write = function(_, line) state.diagnostics[#state.diagnostics + 1] = line; return true end }
 	local open_file = function(path, mode)
 		if mode == "rb" then
-			helpers.assert_eq(path, "/owned-shared/modules/diagnostics/redaction.json")
+			helpers.assert_eq(path, "/owned-shared/diagnostics/data/redaction.json")
 			if options.missing_policy then return nil, "owned policy read refusal" end
 			return { read = function()
 				state.policy_reads = state.policy_reads + 1
@@ -917,9 +917,9 @@ end)
 
 helpers.describe("linux-logger-privacy metadata", function()
 	helpers.it("linux-logger-privacy: actual core metadata survives account collisions and multiline message redaction", function()
-		local previous = package.loaded["logger"]
-		package.loaded["logger"] = nil
-		local Core = require("logger")
+		local previous = package.loaded["core.logger.engine"]
+		package.loaded["core.logger.engine"] = nil
+		local Core = require("core.logger.engine")
 		Core.timestamp_fn = function() return "2026-10-10 12:00:00:000" end
 		local ok, err = xpcall(function()
 			for _, user in ipairs({ "2026", "ERROR", "logger" }) do
@@ -939,7 +939,7 @@ helpers.describe("linux-logger-privacy metadata", function()
 			end
 		end, debug.traceback)
 		Core.set_sink(nil)
-		package.loaded["logger"] = previous
+		package.loaded["core.logger.engine"] = previous
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -994,7 +994,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 
 	local function with_sink(name, body)
 		local Sink   = helpers.load_module("infra.logger_sink")
-		local Logger = helpers.load_module("logger")
+		local Logger = helpers.load_module("core.logger.engine")
 		local dir    = topical_dir(name)
 		local ok, err = xpcall(function()
 			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
@@ -1049,7 +1049,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 
 	helpers.it("linux-logger-topical-fan-out: a topic file from an earlier day starts over, today's is appended", function()
 		local Sink   = helpers.load_module("infra.logger_sink")
-		local Logger = helpers.load_module("logger")
+		local Logger = helpers.load_module("core.logger.engine")
 		local dir    = topical_dir("rotate")
 		local stale  = io.open(dir .. "/ErgoptiPlus_llm.log", "w")
 		stale:write("2000-01-01 10:00:00:000 [INFO] [modules.llm.inference] marker-yesterday\n")
@@ -1098,7 +1098,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 	end)
 
 	helpers.it("linux-logger-topical-fan-out: the generated table is exactly sub_files.toml's linux entries", function()
-		local raw = read_file(DRIVER_ROOT .. "/../_shared/modules/logger/sub_files.toml")
+		local raw = read_file(DRIVER_ROOT .. "/../_shared/core/logger/data/sub_files.toml")
 		helpers.assert_not_nil(raw, "the canonical routing file must be readable")
 		local expected = {}
 		local current
@@ -1135,7 +1135,7 @@ helpers.describe("linux-bootstrap-log", function()
 		local ok, err = xpcall(function()
 			helpers.assert_true(Bootstrap.append("privacy_admission_refused", { dir = dir }))
 			helpers.assert_true(Bootstrap.append("second_instance_yielded", { dir = dir }))
-			local content = read_file(dir .. "/" .. require("app_dirs").files.bootstrap_log)
+			local content = read_file(dir .. "/" .. require("core.fs.engine.app_dirs").files.bootstrap_log)
 			helpers.assert_not_nil(content, "the pre-configuration log must exist")
 			helpers.assert_contains(content, "[ERROR] [bootstrap] Privacy initialization refused; daemon not started.")
 			helpers.assert_contains(content, "this start yielded")
@@ -1162,7 +1162,7 @@ helpers.describe("linux-bootstrap-log", function()
 	end)
 
 	helpers.it("linux-bootstrap-log: the file name is the shared declaration the Windows driver reads too", function()
-		local name = require("app_dirs").files.bootstrap_log
+		local name = require("core.fs.engine.app_dirs").files.bootstrap_log
 		helpers.assert_eq(name, "bootstrap.log")
 		local logger = read_file(DRIVER_ROOT .. "/../windows/infra/logger.ahk")
 		helpers.assert_contains(logger, "AppDirsLogBootstrapName()")

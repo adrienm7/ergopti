@@ -13,7 +13,7 @@ local tests_dir = assert(self_path:match("^(.*)/hardware/run_fd_sha256_native%.l
 	"the native fixture needs its tests directory")
 local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
-	.. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. driver_root .. "/../_shared/?.lua;" .. driver_root .. "/../_shared/?/init.lua;" .. package.path
 assert(type(jit) == "table" and jit.os == "Linux", "Actual Linux LuaJIT required for native FD digest")
 assert(require("luv").os_uname().sysname == "Linux", "Actual Linux libuv required for native FD digest")
 

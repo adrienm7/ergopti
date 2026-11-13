@@ -26,7 +26,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local MODULES = { "infra.logger", "infra.field_run", "infra.termination_coordinator", "infra.emergency_exit" }
 local FOLDER = "/repo/build/field-run"
@@ -282,7 +282,7 @@ helpers.describe("field run: developer source mode only", function()
 		local source = assert(helpers.read_driver_unit('require("infra.field_run").start('))
 		-- The installed signed app takes the clone only from ERGOPTI_FIELD_RUN_ROOT, which its launcher admits.
 		local root = source:find('local field_run_root = require("infra.dev_source").is_active() and '
-			.. 'require("infra.dev_source").root()\n\tor os.getenv(require("identifiers").field_report.environment)', 1, true)
+			.. 'require("infra.dev_source").root()\n\tor os.getenv(require("core.text.engine.identifiers").field_report.environment)', 1, true)
 		helpers.assert_not_nil(root, "the root must come from developer source mode or the collector's variable only")
 		local gate = source:find('if type(field_run_root) == "string" and field_run_root ~= "" then', 1, true)
 		local start = source:find('require("infra.field_run").start(', 1, true)
@@ -1042,7 +1042,7 @@ helpers.describe("field run: pure helpers", function()
 	helpers.it("picks the smallest pullable catalogue model per backend", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
-			local catalogue = Json.decode(read(helpers.shared("modules/llm/models.json")))
+			local catalogue = Json.decode(read(helpers.shared("ai/data/models.json")))
 			for _, backend in ipairs({ "ollama", "mlx" }) do
 				local chosen = FieldRun.smallest_model(catalogue, backend)
 				helpers.assert_not_nil(chosen, "no " .. backend .. " model")
@@ -1069,7 +1069,7 @@ helpers.describe("field run: pure helpers", function()
 	helpers.it("prefers an installed model over a smaller one it would have to download", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
-			local catalogue = Json.decode(read(helpers.shared("modules/llm/models.json")))
+			local catalogue = Json.decode(read(helpers.shared("ai/data/models.json")))
 			local smallest = FieldRun.smallest_model(catalogue, "mlx")
 			local installed_name = nil
 			local largest = 0

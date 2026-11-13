@@ -1787,7 +1787,7 @@ FSUtf8Bytes(Content) {
 ; ==================================================
 ; ==================================================
 
-; The methods of _shared/lua/file_system/ports.lua. AutoHotkey has no multiple
+; The methods of _shared/core/fs/engine/ports.lua. AutoHotkey has no multiple
 ; return, so a result is a Map: read_with_status gives content, status and
 ; detail, a publication gives committed and detail.
 global FS_STATUS_OK := "ok"

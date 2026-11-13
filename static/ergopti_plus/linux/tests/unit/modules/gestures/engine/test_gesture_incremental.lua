@@ -205,7 +205,7 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 	-- GSD-3 (decided by the maintainer on 2026-11-11): a pair decides its
 	-- direction from the shared 3.0 mm minimum, as macOS; three fingers 1.5 mm.
 	helpers.it("incremental: a pair needs the shared pair minimum before it counts (pair-incremental-minimum)", function()
-		local Direction = require("gestures.direction")
+		local Direction = require("gestures.engine.direction")
 		local Timings = require("infra.timings")
 		helpers.assert_eq(Direction.minimums_mm(2, { swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
 			pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
@@ -283,7 +283,7 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 	helpers.it("incremental: the cleanup keeps the saved modes and steps (gesture-slot-settings-cleanup)", function()
 		local source = "[gestures.modes]\nswipe_3_left = \"x1\"\nswipe_3_up = \"fast\"\n\n"
 			.. "[gestures.sensitivities]\nswipe_3_up = 12.0\n"
-		local scan = require("config_unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
 		local offered = {}
 		for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
 		table.sort(offered)

@@ -44,7 +44,7 @@ _TrayRootBuilderBodies() {
 _DG_ManifestTopLevel() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	ManifestPath := EpDir . "\_shared\modules\menu\menu_manifest.json"
+	ManifestPath := EpDir . "\_shared\menu\data\menu_manifest.json"
 	Root := JsonParse(FileRead(ManifestPath, "UTF-8"))
 	Assert((Root is Map) && Root.Has("top_level") && (Root["top_level"] is Array),
 		"menu_manifest.json must carry a top_level array")
@@ -635,7 +635,7 @@ _DG_DeclaredStageOriginalCaptions() {
 	Languages := 0
 	try {
 		for Code, Expected in Corpus["captions"] {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			_DG_CheckDeclaredStageLocale(Expected, Corpus)
 			Languages += 1

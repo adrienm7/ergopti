@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 
 --- The business-timing fixture delegates the actual new template ABI and retains native row dialect.
 local function actual_layout_binding()
-	local Json, Paths = require("json"), require("infra.paths")
-	local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+	local Json, Paths = require("core.text.engine.json"), require("infra.paths")
+	local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 	local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
 	local i18n = require("infra.i18n")
 	i18n.get = function(key) return labels[key] or key end

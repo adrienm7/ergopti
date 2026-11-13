@@ -11,17 +11,17 @@
 --- These are causal ownership models, not native GIO/curl acceptance.
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Managed = require("infra.managed_http")
-local Shared = require("network.http_redirect")
-local Routing = require("network.proxy_policy")
+local Shared = require("core.network.engine.http_redirect")
+local Routing = require("core.network.engine.proxy_policy_core")
 
 local function data(relative)
 	local file = assert(io.open(assert(Paths.shared(relative)), "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close()); return Json.decode(bytes)
 end
-local law = assert(Shared.new(data("data/http/redirect_policy.json"), data("data/http/transport_policy.json")))
-local routing = assert(Routing.new(data("modules/network/proxy_policy.json")))
+local law = assert(Shared.new(data("core/network/data/http/redirect_policy.json"), data("core/network/data/http/transport_policy.json")))
+local routing = assert(Routing.new(data("core/network/data/proxy_policy.json")))
 local INITIAL, TARGET = "https://updates.example/start?part=one", "https://cdn.example/file?part=two"
 
 local function redirect(target)

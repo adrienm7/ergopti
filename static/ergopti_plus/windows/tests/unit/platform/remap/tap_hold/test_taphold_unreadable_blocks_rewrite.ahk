@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Regression — an unreadable tap_hold.toml must block the rewrite
 ; DESCRIPTION:
-; LoadTapHoldToml merges the shipped _shared/tap_hold/defaults.toml UNDER the
+; LoadTapHoldToml merges the shipped _shared/tap_hold/data/defaults.toml UNDER the
 ; user file. When the user file exists but cannot be READ, the parse contributes
 ; nothing and the merged map is byte-for-byte what a user who customised nothing
 ; produces — the shipped defaults.

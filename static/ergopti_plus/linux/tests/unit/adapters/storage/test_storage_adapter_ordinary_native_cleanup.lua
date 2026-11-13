@@ -15,8 +15,8 @@
 --- nested value was dropped and its inner keys leaked to the top level. The
 --- encoder also serialised Lua arrays as string-keyed objects. Any non-flat
 --- stored value was therefore corrupted on reload. The fix routes encode/decode
---- through the shared _shared/lua/json.lua codec; this test fails (nested/array
---- fields come back nil) against the bespoke codec and passes against json.lua.
+--- through the shared _shared/core/text/engine/json.lua codec; this test fails (nested/array
+--- fields come back nil) against the bespoke codec and passes against core/text/engine/json.lua.
 --- ==============================================================================
 
 package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
@@ -200,15 +200,15 @@ helpers.describe("storage final ordinary publication admission", function()
 	helpers.it("ordinary-native-debt: refuses a codec replacement during Writer final source read", function()
 		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
 			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
-			local json, reader = require("json"), require("infra.regular_file_reader")
+			local json, reader = require("core.text.engine.json"), require("infra.regular_file_reader")
 			local open, samples = reader.open, 0
 			reader.open = function(name, ...)
 				local handle, detail, errno = open(name, ...)
-				if name == path then samples = samples + 1; if samples == 2 then package.loaded["json"] = {} end end
+				if name == path then samples = samples + 1; if samples == 2 then package.loaded["core.text.engine.json"] = {} end end
 				return handle, detail, errno
 			end
 			local okay, committed = pcall(storage.set, "foreign", true)
-			reader.open, package.loaded["json"] = open, json
+			reader.open, package.loaded["core.text.engine.json"] = open, json
 			helpers.assert_true(okay); helpers.assert_eq(committed, false); helpers.assert_eq(samples, 2)
 			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
 			helpers.assert_true(storage.set("foreign", true))
@@ -295,15 +295,15 @@ helpers.describe("storage released ordinary source publication", function()
 	helpers.it("released-source: refuses codec changes during final read and permits exact capability repair", function()
 		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
 			storage.get("a")
-			local json, reader = require("json"), require("infra.regular_file_reader")
+			local json, reader = require("core.text.engine.json"), require("infra.regular_file_reader")
 			local open, samples = reader.open, 0
 			reader.open = function(name, ...)
 				local handle, detail, errno = open(name, ...)
-				if name == path then samples = samples + 1; if samples == 2 then package.loaded["json"] = {} end end
+				if name == path then samples = samples + 1; if samples == 2 then package.loaded["core.text.engine.json"] = {} end end
 				return handle, detail, errno
 			end
 			local okay, result = pcall(storage.set, "a", true)
-			reader.open, package.loaded["json"] = open, json
+			reader.open, package.loaded["core.text.engine.json"] = open, json
 			helpers.assert_true(okay); helpers.assert_eq(result, false)
 			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
 			helpers.assert_nil(read(helpers.stage_path(path))); helpers.assert_true(storage.set("a", true))
@@ -526,7 +526,7 @@ helpers.describe("storage ordinary initialization lifetime", function()
 	end
 	helpers.it("held-load: throwing recovery logger releases initialization lifetime without hiding the exception", function()
 		storage_cohort_fixture('{malformed unclaimed source', function(storage, _, path, _, _, read)
-			local logger = require("logger.shim"); local error_log = logger.error
+			local logger = require("core.logger.engine.shim"); local error_log = logger.error
 			local owner, observed = {}, {}
 			logger.error = function()
 				observed.acquire = storage.acquire_owned(owner, { "a" })
@@ -606,7 +606,7 @@ helpers.describe("first owned native storage publication", function()
 			helpers.assert_eq(reentry[1], false); helpers.assert_eq(reentry[2], false); helpers.assert_nil(reentry[3])
 			helpers.assert_eq(calls, { backup, path })
 			helpers.assert_eq(read(path), '{"a":true}')
-			local saved = require("json").decode_lossless(read(backup))
+			local saved = require("core.text.engine.json").decode_lossless(read(backup))
 			helpers.assert_eq(saved.source, { status = "absent" }); helpers.assert_eq(saved.cells, { a = { present = false } })
 			helpers.assert_eq(storage.pending_owned(owner, receipt), false)
 			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_nil(read(path))
@@ -655,7 +655,7 @@ helpers.describe("first owned native storage publication", function()
 			helpers.assert_eq(read(path), successor); helpers.assert_nil(read(backup)); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
 			inject(nil)
 			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
-			helpers.assert_true(require("json").is_array(require("json").decode_lossless(read(path)).foreign))
+			helpers.assert_true(require("core.text.engine.json").is_array(require("core.text.engine.json").decode_lossless(read(path)).foreign))
 			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_eq(read(path), successor)
 			helpers.assert_true(storage.release_owned(owner))
 		end)

@@ -32,7 +32,10 @@ function currentSchemaVersion() {
 	const { parse: parseToml } = require('smol-toml');
 	return parseToml(
 		fs.readFileSync(
-			path.join(__dirname, '../../static/ergopti_plus/_shared/core/config_schema/migrations.toml'),
+			path.join(
+				__dirname,
+				'../../static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml'
+			),
 			'utf8'
 		)
 	).registry.current_version;
@@ -209,11 +212,11 @@ const COLD_SOURCE_PATHS = [
 	'macos/adapters/native_bootstrap_pty.lua',
 	'macos/adapters/python_interpreter.lua',
 	'macos/platform/network/native_http.py',
-	'_shared/python/network_proxy_policy.py',
-	'_shared/lua/core/llm/native_pty_receipt.lua',
-	'_shared/modules/network/proxy_policy.json',
-	'_shared/modules/llm/managed_python_release.json',
-	'_shared/data/identifiers.sh',
+	'_shared/core/network/adapters/python_network_proxy_policy.py',
+	'_shared/core/lifecycle/engine/core/native_pty_receipt.lua',
+	'_shared/core/network/data/proxy_policy.json',
+	'_shared/ai/data/managed_python_release.json',
+	'_shared/core/text/data/identifiers.sh',
 	'macos/uv.lock',
 	'macos/pyproject.toml'
 ];

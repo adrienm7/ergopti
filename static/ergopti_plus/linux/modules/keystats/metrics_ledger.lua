@@ -38,9 +38,9 @@
 
 local M = {}
 
-local Json = require("json")
-local Queries = require("keystats.queries")
-local ClipboardEvents = require("keystats.clipboard_events")
+local Json = require("core.text.engine.json")
+local Queries = require("metrics.engine.queries")
+local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 
 local LOG = "keystats.metrics_ledger"
@@ -507,7 +507,7 @@ function M.native_ports()
 	local FileSystem = require("adapters.file_system")
 	local NativeDirectory = require("infra.native_directory")
 	local uv = require("luv")
-	local shell_quote = require("text_utils").shell_quote
+	local shell_quote = require("core.text.engine.utils_core").shell_quote
 	local ports = { write = FileSystem.write, write_new = FileSystem.write_new, append = FileSystem.append }
 	local function lstat(path)
 		local called, stat, _, code = pcall(uv.fs_lstat, path)

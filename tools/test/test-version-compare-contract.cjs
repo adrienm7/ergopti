@@ -5,14 +5,14 @@
  * MODULE: Cross-Driver Version-Compare Parity Gate (JS side)
  * DESCRIPTION:
  * The semver comparison algorithm is hand-ported into three runtimes — JS
- * (_shared/modules/updater/version.js compareVersions), AHK
+ * (_shared/updater/data/version.js compareVersions), AHK
  * (windows/modules/updater/core.ahk _Updater_CompareVersions) and macOS
  * (macos/modules/updater/init.lua compare_versions). version.js's header has always
  * mandated they agree, but nothing enforced it and the non-semver fallback had
  * already drifted (AHK/JS lexicographic vs macOS fail-closed) — D-1.
  *
  * This is the JS third of the gate: it drives compareVersions over the SHARED
- * vector table (_shared/modules/updater/version_vectors.json) and asserts each
+ * vector table (_shared/updater/data/version_vectors.json) and asserts each
  * result equals the table's `expect`. The AHK and macOS suites read the SAME
  * file (test_updater.ahk, test_updater_version_compare.lua), so a divergence in
  * any driver — especially a re-introduced lexicographic non-semver fallback —
@@ -32,11 +32,11 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const versionUrl = pathToFileURL(
-	path.join(ROOT, 'static/ergopti_plus/_shared/modules/updater/version.js')
+	path.join(ROOT, 'static/ergopti_plus/_shared/updater/data/version.js')
 ).href;
 const vectorsPath = path.join(
 	ROOT,
-	'static/ergopti_plus/_shared/modules/updater/version_vectors.json'
+	'static/ergopti_plus/_shared/updater/data/version_vectors.json'
 );
 const pagePortPath = path.join(ROOT, 'static/ergopti_plus/_shared/ui/version_order.js');
 

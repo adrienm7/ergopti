@@ -28,7 +28,7 @@
 
 local M = {}
 
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 local LogFolders = require("infra.log_folders")
 
 -- The stage that opens a new trail; every other stage appends to it

@@ -179,8 +179,8 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		"infra.dialog_util",
 		"infra.i18n",
 		"infra.manifest_menu",
-		"menu.renderer",
-		"json",
+		"menu.engine.renderer",
+		"core.text.engine.json",
 		"ui.action_picker",
 		"ui.menu.shortcut_utils",
 		"infra.logger",
@@ -226,10 +226,10 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		}
 		-- Forward the child-template port to the actual shared renderer; the
 		-- fixture still captures provider data for its original mutation assertions.
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
 		}))
 		package.loaded["infra.manifest_menu"] = {

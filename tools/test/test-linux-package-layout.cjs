@@ -34,7 +34,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 // Canonical runtime layout every Linux packager must agree on.
-const SHARED_LUA_EXPR = '$DRIVER_ROOT/_shared/lua'; // LUA_PATH shared root, relative to the driver root
+const SHARED_LUA_EXPR = '$DRIVER_ROOT/_shared'; // LUA_PATH shared root, relative to the driver root
 const SERVICE_UNIT = 'usr/lib/systemd/user/ergopti-hotstrings.service'; // systemd user unit path
 const SERVICE_EXEC = 'ExecStart=/usr/bin/ergopti'; // the unit must boot via the wrapper
 
@@ -540,7 +540,7 @@ for (const rel of UNIT_SOURCES) {
 // tools/build to `.sh`, which a file named PKGBUILD is not.
 //
 // The two halves are independent and both fatal: a package with no driver, and
-// a wrapper that cannot resolve `require("logger.shim")` because LUA_PATH was
+// a wrapper that cannot resolve `require("core.logger.engine.shim")` because LUA_PATH was
 // never set.
 
 const PKGBUILD = 'tools/build/PKGBUILD';
@@ -574,12 +574,12 @@ if (!/cp -r \"\$bundle\/linux\/\.\"\s/.test(pkgbuildSrc)) {
 	);
 }
 
-// The shared tree, whole. _shared/lua alone is not enough: the keycode tables,
+// The shared tree, whole. _shared alone is not enough: the keycode tables,
 // the hotstring packs, the locales and the resolver defaults live in
 // _shared/data and _shared/modules, and the resolver fails fast without them.
 if (!/cp -r \"\$bundle\/_shared\/\.\"\s/.test(pkgbuildSrc)) {
 	errors.push(
-		`${PKGBUILD}: must copy the whole _shared tree — _shared/lua alone omits the ` +
+		`${PKGBUILD}: must copy the whole _shared tree — _shared alone omits the ` +
 			`keycode tables, the hotstring packs, the locales and defaults.toml, and the ` +
 			`daemon fails fast on the last of those.`
 	);

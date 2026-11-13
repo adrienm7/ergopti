@@ -47,11 +47,11 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 	helpers.it("the SQLite helper process resolves without the logger it cannot load (owned-runtimes-programs)", function()
 		local Owned = helpers.load_module("infra.owned_programs")
 		Owned._reset_for_test()
-		local loaded, preload = package.loaded["logger.shim"], package.preload["logger.shim"]
-		package.loaded["logger.shim"] = nil
-		package.preload["logger.shim"] = function() error("the worker has only the driver tree on package.path") end
+		local loaded, preload = package.loaded["core.logger.engine.shim"], package.preload["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = nil
+		package.preload["core.logger.engine.shim"] = function() error("the worker has only the driver tree on package.path") end
 		local ok, program = pcall(Owned.resolve, "sqlite3", env(nil))
-		package.loaded["logger.shim"], package.preload["logger.shim"] = loaded, preload
+		package.loaded["core.logger.engine.shim"], package.preload["core.logger.engine.shim"] = loaded, preload
 		helpers.assert_true(ok, tostring(program))
 		helpers.assert_eq(program, "sqlite3")
 	end)

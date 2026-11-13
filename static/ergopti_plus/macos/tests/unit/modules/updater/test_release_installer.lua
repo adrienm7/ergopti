@@ -97,8 +97,8 @@ helpers.describe("release_installer: the authenticated asset", function()
 	end)
 
 	helpers.it("names the declared macOS archive from the shared defaults", function()
-		local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
-		local defaults = require("json").decode(handle:read("*a"))
+		local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
+		local defaults = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()
 		helpers.assert_eq(defaults.release_assets.macos_bundle, IDS.asset)
 	end)
@@ -564,10 +564,10 @@ end)
 
 helpers.describe("release_installer: declared archive preference and historical compatibility", function()
 	local Installer = fresh_installer()
-	local Archives = require("updater.release_assets")
+	local Archives = require("updater.engine.release_assets")
 
 	helpers.it("uses actual shared declarations against independent exact release records", function()
-		local corpus = require("json").decode(assert(read(helpers.shared("tests/corpus/updater/release_archives.json"))))
+		local corpus = require("core.text.engine.json").decode(assert(read(helpers.shared("tests/corpus/updater/release_archives.json"))))
 		helpers.assert_eq(#corpus.cases, 14, "the independent refusal corpus is complete")
 		for _, case in ipairs(corpus.cases) do
 			local selected = Installer.find_asset(case.release)
@@ -579,7 +579,7 @@ helpers.describe("release_installer: declared archive preference and historical 
 	end)
 
 	helpers.it("preserves other platform assets and requires declared format-key bindings", function()
-		local defaults = require("json").decode(assert(read(helpers.shared("modules/updater/defaults.json"))))
+		local defaults = require("core.text.engine.json").decode(assert(read(helpers.shared("updater/data/defaults.json"))))
 		helpers.assert_eq(defaults.release_assets.linux_bundle, "ergopti-plus-linux.tar.gz")
 		helpers.assert_eq(defaults.release_assets.macos_bundle, "ErgoptiPlus.app.zip", "current producers retain ZIP")
 		local identity = assert(Archives.resolve(defaults))
@@ -599,7 +599,7 @@ helpers.describe("release_installer: declared archive preference and historical 
 			function(value) value.release_install.macos_archives.future = {} end,
 			function(value) value.github.owner = "../foreign" end,
 		}) do
-			local changed = require("json").decode(assert(read(helpers.shared("modules/updater/defaults.json"))))
+			local changed = require("core.text.engine.json").decode(assert(read(helpers.shared("updater/data/defaults.json"))))
 			mutate(changed)
 			helpers.assert_nil(Archives.resolve(changed), "malformed policy never selects a fallback")
 		end
@@ -655,8 +655,8 @@ helpers.describe("release_installer: the native stage request", function()
 		helpers.assert_eq(request.sha256, DIGEST)
 		helpers.assert_eq(request.output, captured.args[6] .. "/release.tar.xz")
 		-- (release-archive-budget) the shared bounds, aligned on Windows.
-		local limits = require("updater.transfer_budget").archive_limits(require("adapters.json_codec").decode(
-			assert(io.open(require("infra.paths").shared("modules/updater/defaults.json"), "rb")):read("*a")))
+		local limits = require("updater.engine.transfer_budget").archive_limits(require("adapters.json_codec").decode(
+			assert(io.open(require("infra.paths").shared("updater/data/defaults.json"), "rb")):read("*a")))
 		helpers.assert_eq(request.timeout_ms, limits.absolute_ms)
 		helpers.assert_eq(request.idle_timeout_ms, limits.idle_ms)
 		helpers.assert_eq(captured.environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS, string.format("%d", limits.absolute_ms))
@@ -697,7 +697,7 @@ helpers.describe("release_installer: filesystem publication admission", function
 			write(source, assert(helpers.read_driver_unit("M.SWAP_SCRIPT = table.concat({")))
 			local status, output = sh("python3 -B " .. quote(probe) .. " controls " .. quote(source) .. " " .. quote(dir .. "/controls"))
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(#receipt.parser_refusals, 25, "the literal parser must refuse every malformed authority")
 			helpers.assert_eq(#receipt.cases, 8, "all independent physical refusals and healthy controls execute")
 			local emitted, program = sh("python3 -B " .. quote(probe) .. " emit " .. quote(source))
@@ -717,7 +717,7 @@ helpers.describe("release_installer: concurrent filesystem publication", functio
 			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
 			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root()) .. " " .. quote(dir))
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(#receipt.cases, 4, "all three native boundaries and the two-installer transaction execute")
 			local names = {}
 			for _, case in ipairs(receipt.cases) do names[#names + 1] = case.name end
@@ -797,7 +797,7 @@ helpers.describe("release_installer: explicit native script observation", functi
 				.. " " .. quote(helpers.driver_root()) .. " " .. quote(dir)
 			local status, output = sh(command .. " --emission-source strict-source")
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(receipt.emission_source, "strict-source")
 			helpers.assert_eq(receipt.execution_scope, "script-only/source-parser")
 			helpers.assert_eq(#receipt.cases, 4, "the explicit observer must still execute every physical boundary")
@@ -816,7 +816,7 @@ helpers.describe("release_installer: explicit native script observation", functi
 			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root())
 				.. " " .. quote(dir) .. " --emission-controls")
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(receipt.emission_source, "actual-lua-compared-with-strict-source")
 			helpers.assert_eq(#receipt.commands, 3, "each complete argv and both scripts must match real Lua")
 			helpers.assert_eq(#receipt.parser_refusals, 10, "every malformed detach authority must refuse")
@@ -834,9 +834,9 @@ end)
 
 helpers.describe("updater version comparison parity", function()
 	helpers.it("replays the shared version vectors, including malformed suffixes", function()
-		local raw = assert(read(helpers.shared("modules/updater/version_vectors.json")))
-		local vectors = require("json").decode(raw).vectors
-		local version = require("updater.version")
+		local raw = assert(read(helpers.shared("updater/data/version_vectors.json")))
+		local vectors = require("core.text.engine.json").decode(raw).vectors
+		local version = require("updater.engine.version_core")
 		for _, vector in ipairs(vectors) do
 			helpers.assert_eq(version.compare_versions(vector.a, vector.b), vector.expect, vector.id)
 		end

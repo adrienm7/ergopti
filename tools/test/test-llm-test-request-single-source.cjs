@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The Test-API probe (minimal end-to-end completion both drivers send
  * verbatim from their Test-active-entry action) lives in exactly ONE place —
- * _shared/modules/llm/api_providers.json (test_request). Both drivers read
+ * _shared/ai/data/api_providers.json (test_request). Both drivers read
  * the prompt, temperature and token budget from there; neither may restate
  * the probe text, or the two buttons stop proving the same thing.
  *
@@ -30,8 +30,8 @@ const SSOT_FILE = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
-	'llm',
+	'ai',
+	'data',
 	'api_providers.json'
 );
 

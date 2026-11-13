@@ -4,12 +4,12 @@
 --- MODULE: Tooltip Tint Contract Tests
 --- DESCRIPTION:
 --- Validates the Hammerspoon tooltip tint-mixing algorithm against the canonical
---- test vectors defined in static/ergopti_plus/_shared/modules/tooltip/tint.js. Every vector
+--- test vectors defined in static/ergopti_plus/_shared/core/ui/data/tooltip/tint.js. Every vector
 --- describes an input accent color and its expected tinted output hex string;
 --- these tests assert that renderer.apply_tint() produces exactly that output.
 ---
 --- RATIONALE:
---- The shared _shared/modules/tooltip/tint.js defines the canonical HSL-based tint
+--- The shared _shared/core/ui/data/tooltip/tint.js defines the canonical HSL-based tint
 --- algorithm used by both AHK and Hammerspoon. Any algorithmic drift between the
 --- JS reference and the HS implementation (e.g. a rounding difference, a hue
 --- computation bug, or an off-by-one in the HSL-to-RGB conversion) is caught
@@ -103,7 +103,7 @@ end
 -- ==============================================
 
 --- Hard-coded cross-driver tint test vectors, mirroring tintTestVectors() from
---- static/ergopti_plus/_shared/modules/tooltip/tint.js. Values are computed by the JS
+--- static/ergopti_plus/_shared/core/ui/data/tooltip/tint.js. Values are computed by the JS
 --- reference implementation at DEFAULT_LIGHTNESS=0.10 / DEFAULT_SATURATION=0.40.
 --- When the algorithm constants change, these expected values must be regenerated.
 local TINT_VECTORS = {
@@ -179,7 +179,7 @@ helpers.describe("Tooltip: tint contract vectors", function()
 		end, debug.traceback)
 		package.loaded["modules.hotstrings.hotstrings_config"] = original
 		if not ok then error(err, 0) end
-		local parse = require("color.hex").parse
+		local parse = require("core.ui.engine.color_hex").parse
 		for _, invalid in ipairs({ "#abcd0", "#1234567", "#12xz", "##abc" }) do
 			helpers.assert_nil(parse(invalid), "invalid CSS hexadecimal color: " .. invalid)
 		end

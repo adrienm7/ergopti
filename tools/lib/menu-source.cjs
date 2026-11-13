@@ -5,7 +5,7 @@
  * MODULE: Tray Menu Source Reader
  * DESCRIPTION:
  * The one place a tool reads the hand-edited tray-menu source,
- * _shared/modules/menu/menu.toml, whose [menu] tables build-menu-manifest.js
+ * _shared/menu/data/menu.toml, whose [menu] tables build-menu-manifest.js
  * compiles into menu_manifest.json. The tables lived in the feature manifest
  * until 2026-10-31; a tool that still needs both reads the feature manifest for
  * features and this module for the menu.

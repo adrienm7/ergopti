@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 

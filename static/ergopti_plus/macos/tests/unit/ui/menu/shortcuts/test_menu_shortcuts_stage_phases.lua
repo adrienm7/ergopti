@@ -20,7 +20,7 @@ local names = {
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
-	"infra.paths", "menu.renderer", "infra.phase_stats",
+	"infra.paths", "menu.engine.renderer", "infra.phase_stats",
 }
 
 helpers.describe("menu_shortcuts: each provider records a named phase (menu-shortcuts-stage-phases)", function()

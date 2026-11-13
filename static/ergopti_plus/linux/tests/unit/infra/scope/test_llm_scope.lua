@@ -1,9 +1,9 @@
 --- tests/unit/infra/scope/test_llm_scope.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local SOURCE = '[llm]\nenabled = true\nunknown = "keep"\n[llm.generation]\ntemperature = 0.9\n'
 	.. '[llm.trigger]\nsecure_filter_enabled = false\nurl_bar_filter_enabled = false\ndebounce_ms = 600\n'
 	.. '[llm.models]\nollama = "private-model"\n[llm.profiles]\nnum_predictions = 1\n'
@@ -28,7 +28,7 @@ local function with_scope(body)
 			package.loaded["infra.config_paths"] = { config = function() return path end,
 				config_home = function() return path .. ".home" end,
 				-- The storage adapter keeps storage.json in the default configuration folder.
-				default_config_dir = function() return path .. ".home/" .. require("app_dirs").linux.folder_name end }
+				default_config_dir = function() return path .. ".home/" .. require("core.fs.engine.app_dirs").linux.folder_name end }
 			package.loaded["adapters.secure_field_detector"] = { isSecureField = function() return false end,
 				isUrlBar = function() return false end }
 			package.loaded["adapters.http_client"] = {
@@ -351,7 +351,7 @@ helpers.describe("LLM private native claims", function()
 			local Preferences = require("infra.llm_preferences")
 			local public, claim, primary = {}, {}, nil
 			claim.pending = function() return primary.pending() end
-			primary = require("config_scope_transaction").new({ path = path, backup_path = backup,
+			primary = require("settings.engine.scope.transaction").new({ path = path, backup_path = backup,
 				files = { read_with_status = function(target) return Writer.read_classified(target) end,
 					write = function() error("unconditional publication") end,
 					write_if_unchanged = function(target, content, expected)
@@ -373,7 +373,7 @@ helpers.describe("LLM private native claims", function()
 					return port(token)
 				end
 			end
-			local owner = require("config_scope_fenced_transaction").new({ owner = public, native_token = claim,
+			local owner = require("settings.engine.scope.fenced_transaction").new({ owner = public, native_token = claim,
 				transaction = primary, scope = "llm", available = function() return true end,
 				fences = { { acquire = Preferences.acquire, release = native_release("preferences", Preferences.release) },
 					{ acquire = engine.acquire_configuration, release = native_release("engine", engine.release_configuration) } } })
@@ -587,9 +587,9 @@ helpers.describe("LLM retained native release and stop debt", function()
 			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
 				revert = function(done) done(true) end, release = function() end,
 				pending = function() return false end, retry_restore = function(done) done(true) end }
-			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { hotstrings = before, llm = actual, metrics = after } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)

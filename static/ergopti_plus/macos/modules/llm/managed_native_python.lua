@@ -9,7 +9,7 @@
 
 local M = {}
 local Interpreter = require("adapters.python_interpreter")
-local Locator = require("core.llm.managed_python_locator")
+local Locator = require("core.lifecycle.engine.core.managed_python_locator")
 local Probe = require("adapters.native_python_probe")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Budget = require("modules.llm.bootstrap_retry_generated")
@@ -62,7 +62,7 @@ function M.resolve(remaining_seconds)
 		return nil, Probe.cancel() ~= true and "pending" or nil
 	end
 	local relative = Locator[arch]
-	local root = home:gsub("/+$", "") .. "/" .. require("app_dirs").macos.support_relative .. "/native-bootstrap/python/"
+	local root = home:gsub("/+$", "") .. "/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/native-bootstrap/python/"
 	local installation = relative:match("^([^/]+)/bin/python%d+%.%d+$")
 	return Probe.get(root .. relative, root .. installation .. "/", arch, remaining_seconds, deadline)
 end

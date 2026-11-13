@@ -84,7 +84,7 @@ assert.equal(
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
 
 // Frozen baselines — declared rows with no handler named, on 2026-08-01.
 // 2026-08-04: hs 20 → 16, linux 27 → 10. Two different kinds of progress, and
@@ -636,7 +636,7 @@ function nativeFunctionReferenceKeys(source) {
 	const { nativeLayoutRowOwnership } = require('../lib/menu-native-layout-binding.cjs');
 	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'), 'utf8');
 	const english = JSON.parse(
-		fs.readFileSync(path.join(SP, '_shared/data/locales/en.json'), 'utf8')
+		fs.readFileSync(path.join(SP, '_shared/core/i18n/data/locales/en.json'), 'utf8')
 	);
 	const caption = (key) => (Object.hasOwn(english, key) ? english[key] : undefined);
 	const behavior = [
@@ -1041,7 +1041,7 @@ function nativeFunctionReferenceKeys(source) {
 }
 
 const layoutEnglish = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared/data/locales/en.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared/core/i18n/data/locales/en.json'), 'utf8')
 );
 const canonicalLayoutCaption = (key) =>
 	Object.hasOwn(layoutEnglish, key) ? layoutEnglish[key] : undefined;
@@ -1144,7 +1144,7 @@ for (const { key, driver, ext } of PLATFORMS) {
 			}
 		}
 	})(base);
-	const delegated = delegatedMenuSources(nativeSources, path.join(SP, '_shared', 'lua'));
+	const delegated = delegatedMenuSources(nativeSources, path.join(SP, '_shared'));
 	const sharedHandlers = new Set(delegated.flatMap((source) => [...source.handlers]));
 	const nativeReferences =
 		ext === '.lua'

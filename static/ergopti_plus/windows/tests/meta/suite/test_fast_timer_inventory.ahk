@@ -183,7 +183,7 @@ _FTI_ResolvePeriod(Src, Expr) {
 	; This exact native getter exposes one owned field of the shared brightness
 	; policy. Arbitrary local Maps and other shared fields remain unresolved.
 	if Expr == 'ScreenBrightnessData()["worker_poll_ms"]' {
-		Policy := JsonParse(FileRead(_SharedDir . "\modules\actions\brightness.json", "UTF-8"))
+		Policy := JsonParse(FileRead(_SharedDir . "\shortcuts\data\actions\brightness.json", "UTF-8"))
 		if !(Policy is Map)
 			throw ValueError("Invalid shared brightness timer policy.")
 		Period := Policy.Get("worker_poll_ms", 0)

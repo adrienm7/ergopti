@@ -13,9 +13,9 @@ local driver = assert(os.getenv("ERGOPTI_HTTP_STAGE"))
 local shared = driver .. "/../_shared"
 local repository = assert(os.getenv("ERGOPTI_HTTP_REPOSITORY"))
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
+	.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local input = Json.decode(assert(io.stdin:read("*a")))
 local spawn = uv.spawn
 local pids = {}

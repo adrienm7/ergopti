@@ -220,11 +220,11 @@ class MainDiagnosticTests(unittest.TestCase):
             shutil.copyfile(SOURCE, source)
             for name in ("run_native_subreaper.py", "run_ollama_runtime_acceptance.lua"):
                 shutil.copyfile(REPOSITORY / relative / name, hardware / name)
-            shared = repository / "static/ergopti_plus/_shared/modules/llm"
+            shared = repository / "static/ergopti_plus/_shared/ai/data"
             shared.mkdir(parents=True)
             for name in ("models.json", "ollama_release.json"):
                 shutil.copyfile(
-                    REPOSITORY / "static/ergopti_plus/_shared/modules/llm" / name, shared / name
+                    REPOSITORY / "static/ergopti_plus/_shared/ai/data" / name, shared / name
                 )
             for native_source in (
                 "tools/build/build-linux-native-output.sh",

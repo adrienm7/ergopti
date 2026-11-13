@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The update channels (which tags a channel owns, how a persisted value maps to
  * a channel, which releases a channel's Versions view lists, which candidate an
- * update check offers) are declared once, in _shared/modules/updater/
+ * update check offers) are declared once, in _shared/updater/data/
  * channels.json, and interpreted by one port per runtime.
  *
  * ROOT CAUSE ENCODED:
@@ -18,7 +18,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. The canonical JavaScript matcher (_shared/ui/update_channels.js) replays
- *    _shared/modules/updater/channel_vectors.json; the Lua and AHK suites
+ *    _shared/updater/data/channel_vectors.json; the Lua and AHK suites
  *    replay the same file through their ports.
  * 2. A malformed registry is refused at creation, never degraded to a default.
  * 3. Every channel names locale keys present and non-empty in all 21 locales.
@@ -46,10 +46,10 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const REGISTRY_PATH = path.join(SHARED, 'modules', 'updater', 'channels.json');
-const VECTORS_PATH = path.join(SHARED, 'modules', 'updater', 'channel_vectors.json');
+const REGISTRY_PATH = path.join(SHARED, 'updater', 'data', 'channels.json');
+const VECTORS_PATH = path.join(SHARED, 'updater', 'data', 'channel_vectors.json');
 const MATCHER_PATH = path.join(SHARED, 'ui', 'update_channels.js');
-const LOCALES_DIR = path.join(SHARED, 'data', 'locales');
+const LOCALES_DIR = path.join(SHARED, 'core', 'i18n', 'data', 'locales');
 const WORKFLOW_PATH = path.join(ROOT, '.github', 'workflows', 'ci.yml');
 const RELEASE_CHANNEL_TOOL = path.join(ROOT, 'tools', 'build', 'release-channel.cjs');
 // The one expression every release step reads the published channel from.
@@ -57,7 +57,7 @@ const pipeline = require('./ci-pipeline.cjs');
 const CALLER_CHANNEL_OUTPUT = '${{ needs.validate.outputs.channel }}';
 const RELEASE_CHANNEL_OUTPUT = '${{ needs.publication-plan.outputs.channel }}';
 const GENERATOR_PATH = path.join(ROOT, 'tools', 'codegen', 'codegen-update-channels.cjs');
-const VERSION_PATH = path.join(SHARED, 'modules', 'updater', 'version.js');
+const VERSION_PATH = path.join(SHARED, 'updater', 'data', 'version.js');
 const PAGE_DATA_PATH = path.join(SHARED, 'ui', '_generated', 'update_channel_registry.js');
 const SWIFT_FEEDS_PATH = path.join(
 	ROOT,
@@ -547,12 +547,12 @@ const CHANNEL_CONSUMERS = [
 	'linux/modules/updater/manager.lua',
 	'linux/ui/changelog/bridge.lua',
 	'linux/ui/menu/builder.lua',
-	'_shared/lua/updater/channels.lua',
-	'_shared/lua/updater/release_parser.lua',
+	'_shared/updater/engine/channels.lua',
+	'_shared/updater/engine/release_parser.lua',
 	'_shared/ui/update_channels.js',
 	'_shared/ui/changelog/script.js',
 	'_shared/ui/changelog/atom_feed.js',
-	'_shared/modules/updater/version.js'
+	'_shared/updater/data/version.js'
 ];
 
 /** Whether a source line is a comment in any of the consumers' languages. */

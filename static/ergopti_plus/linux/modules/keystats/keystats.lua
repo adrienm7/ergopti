@@ -17,7 +17,7 @@
 --- 3. JSON export: export_session() returns a JSON-serializable snapshot of
 ---    all accumulated metrics — suitable for the shared healthcheck or WPM widget.
 --- 4. SQLite persistence: flush() writes the current session into the
----    canonical SQLite schema (_shared/data/db/schema.sql) via the sqlite_writer
+---    canonical SQLite schema (_shared/metrics/data/db/schema.sql) via the sqlite_writer
 ---    module (sqlite3 CLI wrapper). The shared metrics dashboard reads the same
 ---    schema across macOS, Windows, and Linux.
 --- 5. Graceful degradation: when the sqlite3 binary is absent, flush() writes a
@@ -25,13 +25,13 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
-local TableUtil = require("table_util")
-local StrictUtf8 = require("compat.utf8")
-local ErrorDescription = require("error_description")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
+local TableUtil = require("core.text.engine.table_util")
+local StrictUtf8 = require("core.lifecycle.engine.compat.utf8")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local Calendar = require("modules.keystats.calendar")
 
-local Logger   = require("logger.shim")
+local Logger   = require("core.logger.engine.shim")
 local Monotonic = require("infra.monotonic")
 local Perf = require("infra.perf_counters")
 local Timings   = require("infra.timings")
@@ -39,20 +39,20 @@ local EvdevCodes = require("infra.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
 local Manifest      = require("infra.manifest_reader")
-local PrivateWindow = require("keystats.private_window")
+local PrivateWindow = require("metrics.engine.view.private_window")
 -- WPM ring cap single-sourced from the shared keystats metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
-local SharedMetrics    = require("keystats.metrics")
-local Utils            = require("keystats.utils")
-local TokenEncoding    = require("keystats.token_encoding")
+local SharedMetrics    = require("metrics.engine.metrics")
+local Utils            = require("metrics.engine.utils")
+local TokenEncoding    = require("metrics.engine.privacy.token_encoding")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 -- The WPM readouts' live speed and last source, the same tracker macOS reads.
 -- Counted here because every character that reaches the page passes here —
 -- typed, expanded or generated — and only here is it known which it was.
-local LiveWpm = require("keystats.live_wpm")
+local LiveWpm = require("metrics.engine.wpm.live_wpm")
 local PointerMetrics = require("modules.keystats.pointer_metrics")
-local AppCategoryStore = require("keystats.app_category_store")
+local AppCategoryStore = require("metrics.engine.apps.category_store")
 local AppCategoryFile = require("modules.keystats.app_category_file")
 local function new_live_tracker()
 	return LiveWpm.new({
@@ -63,12 +63,12 @@ local function new_live_tracker()
 	})
 end
 local _live = new_live_tracker()
-local Roi = { owner = require("keystats.trigger_roi"), pending = {} }
+local Roi = { owner = require("metrics.engine.privacy.trigger_roi"), pending = {} }
 Roi.state = Roi.owner.new(Monotonic.now_ms(), false)
 
 -- The typing session's start and end and its idle spans (events_session), the
 -- state machine macOS and Windows run, ticked by the periodic flush.
-local SessionEvents = require("keystats.session_events")
+local SessionEvents = require("metrics.engine.system.session_events")
 local function new_session_tracker()
 	return SessionEvents.new({
 		micro_idle_ms = Timings.ms("keystats", "micro_idle_timeout_ms"),
@@ -119,7 +119,7 @@ local TextCipher = require("modules.keystats.text_cipher")
 local TextMigration = require("modules.keystats.text_migration")
 -- The per-device data.sql the macOS and Windows drivers import.
 local MetricsLedger = require("modules.keystats.metrics_ledger")
-local MigrationPlan = require("keystats.text_migration")
+local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
 local SystemMetrics = nil
@@ -128,7 +128,7 @@ if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
 
 -- The nine n-gram families, over the shared driver-agnostic accumulators.
 local AggregateWalker = require("modules.keystats.aggregate_walker")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "modules.keystats.keystats"
 
@@ -327,8 +327,8 @@ local _suspended = false
 -- relaxed silently tightened again, which is the harmless direction. The master
 -- switch is the other direction: off means off, and it did not stay off.
 local Preferences = require("infra.metrics_preferences")
-local KEY  = require("config_keys").KEY
-local LEAF = require("config_keys").LEAF
+local KEY  = require("settings.engine.keys").KEY
+local LEAF = require("settings.engine.keys").LEAF
 
 --- Persists a boolean, or clears it when it matches the shipped default.
 --- @param key string A config_keys.KEY value.
@@ -397,7 +397,7 @@ local _secure_field = false
 -- text automation is is_context_protected, which no metrics switch turns off
 -- (ADD-1, decided by the maintainer on 2026-11-11). The "coverage must never
 -- narrow" guard in tests/unit/modules/keystats/core/test_keystats.lua locks it.
-local _SECURE_APPS = require("secure_apps").linux_fragments()
+local _SECURE_APPS = require("apps.engine.secure_apps").linux_fragments()
 
 -- OS-level authentication prompts. Gated by metrics.system_auth_filter_enabled,
 -- matching the "system_auth" category of the shared no-persist corpus.
@@ -740,7 +740,7 @@ LedgerSetup.start_import = function(identity, metrics_dir)
 	local LedgerImport = require("modules.keystats.ledger_import")
 	local LedgerRebuild = require("modules.keystats.ledger_rebuild")
 	local Paths = require("infra.paths")
-	local schema_path = Paths.shared("data/db/schema.sql")
+	local schema_path = Paths.shared("metrics/data/db/schema.sql")
 	local schema = schema_path and require("adapters.file_system").read(schema_path)
 	local Digest = require("infra.openssl_digest")
 	if type(schema) ~= "string" or not Digest.streaming then
@@ -1092,10 +1092,10 @@ end
 local function media_policy()
 	if _media_policy == nil then
 		local ok, policy = pcall(function()
-			local path = assert(require("infra.paths").shared("data/keycodes/metrics_media_keys.json"))
+			local path = assert(require("infra.paths").shared("layouts/data/keycodes/metrics_media_keys.json"))
 			local body, status = require("adapters.file_system").read_with_status(path)
 			assert(status == "ok" and type(body) == "string", "the media catalogue is unreadable")
-			return require("keystats.media_store").policy(require("json").decode(body))
+			return require("metrics.engine.media.store").policy(require("core.text.engine.json").decode(body))
 		end)
 		if not ok then
 			Logger.error(LOG, "The media key catalogue was refused; media keys are not counted: %s.",
@@ -1614,7 +1614,7 @@ end
 --- @param fields table|nil Metadata; only the kind's own keys are kept.
 function M.record_network_event(kind, fields)
 	if not may_record() then return end
-	local allowed = require("keystats.network_transitions").KINDS[kind]
+	local allowed = require("metrics.engine.system.network_transitions").KINDS[kind]
 	assert(allowed, "not an events_network kind: " .. tostring(kind))
 	-- Windows' KL_AppendLog refuses every entry while the focused app is
 	-- filtered, connectivity included: the row would name that app.
@@ -1640,7 +1640,7 @@ end
 function M.record_clipboard_chord(app_id, action, now_ms, excluded)
 	assert(action == "copy" or action == "paste", "not a clipboard chord: " .. tostring(action))
 	assert(type(now_ms) == "number", "a clipboard chord needs its time")
-	local ClipboardEvents = require("keystats.clipboard_events")
+	local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
 	_clipboard.tracker = _clipboard.tracker
 		or ClipboardEvents.new({ window_ms = Timings.ms("keystats", "paste_burst_window_ms") })
 	if excluded == true or not may_record() or type(app_id) ~= "string" or app_id == ""
@@ -1665,8 +1665,8 @@ end
 function M.record_topology_event(kind, fields)
 	if not may_record() then return end
 	-- The raw family of each kind: events_window_topo or events_av.
-	local family, allowed = "window_topo", require("keystats.window_topology").KINDS[kind]
-	if not allowed then family, allowed = "av", require("keystats.capture_presence").KINDS[kind] end
+	local family, allowed = "window_topo", require("metrics.engine.system.window_topology").KINDS[kind]
+	if not allowed then family, allowed = "av", require("metrics.engine.capture_presence").KINDS[kind] end
 	assert(allowed, "not a window-topology or capture-presence kind: " .. tostring(kind))
 	local app = M.last_app() or "unknown"
 	if M.is_unrecorded_app(app) then return end
@@ -2142,7 +2142,7 @@ function M.is_context_protected(app_id, title)
 	-- A password manager is a secure field as a whole, as on macOS and Windows,
 	-- whatever the metrics filters say: the verdict also gates hotstrings, AI
 	-- requests and clipboard borrowers through the focus guard (ADD-1).
-	if require("secure_apps").is_secure_app("linux", app_id) then return true end
+	if require("apps.engine.secure_apps").is_secure_app("linux", app_id) then return true end
 	return M.is_password_app(app_id) or (_private_filter_enabled and PrivateWindow.matches(title))
 end
 
@@ -2739,7 +2739,7 @@ local OPEN_WALK_FIELDS = {
 --- @param contexts table Walk contexts by application id.
 --- @return string encoded JSON array without raw NUL or newline.
 local function encode_open_walk(contexts)
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local function cursor(value, fields)
 		if type(value) ~= "table" then return "null" end
 		local parts = {}
@@ -2767,7 +2767,7 @@ end
 --- @param encoded string Record text read from the database.
 --- @return table|nil contexts { date, app, current_session?, current_burst? } list; nil when malformed.
 decode_open_walk = function(encoded)
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local ok, records = pcall(Json.decode, encoded)
 	if not ok or type(records) ~= "table" or (next(records) ~= nil and #records == 0) then return nil end
 	local function cursor(value, fields)
@@ -3678,7 +3678,7 @@ end
 --- Takes the Export copy of the settled store.
 --- @param request table The owned request.
 function _maintenance.export(request)
-	local Maintenance = require("keystats.metrics_maintenance")
+	local Maintenance = require("metrics.engine.maintenance")
 	local folder, reason = Maintenance.downloads_dir(os.getenv)
 	if not folder then
 		Logger.error(LOG, "Metrics export has no destination: %s.", reason)
@@ -3689,7 +3689,7 @@ function _maintenance.export(request)
 		return _maintenance.finish(request, false)
 	end
 	local path = folder .. "/" .. Maintenance.export_file_name(os.time())
-	local sql = require("keystats.queries").render("export.vacuum_into", "cli_json", { path = path })
+	local sql = require("metrics.engine.queries").render("export.vacuum_into", "cli_json", { path = path })
 	local copied = SqliteWriter.exec_sql(sql) == true
 	_maintenance.finish(request, copied, copied and path or nil)
 end
@@ -3717,7 +3717,7 @@ function _maintenance.advance()
 			end
 			return _maintenance.finish(request, _last_flush_committed == true)
 		end
-		local Maintenance = require("keystats.metrics_maintenance")
+		local Maintenance = require("metrics.engine.maintenance")
 		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)
 		-- Linux rows stamp ts in UTC; the writer stores the offset of that
 		-- instant, from which the purge reads the tombstone's local time (KMD-1).
@@ -3740,7 +3740,7 @@ end
 --- @param complete function Receives success and, for an Export, its path.
 --- @return boolean accepted Whether this request owns its completion.
 function M.request_metrics_maintenance(kind, complete)
-	if not require("keystats.metrics_maintenance").KINDS[kind] or type(complete) ~= "function" then
+	if not require("metrics.engine.maintenance").KINDS[kind] or type(complete) ~= "function" then
 		Logger.error(LOG, "Metrics maintenance needs a known kind and a completion callback.")
 		return false
 	end

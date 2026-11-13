@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"infra.logger", "adapters.log_transport", "tests.stubs.hs", "hs", "logger",
+	"infra.logger", "adapters.log_transport", "tests.stubs.hs", "hs", "core.logger.engine",
 	"infra.launcher_environment", "_generated.logger_sub_files", "socket",
 }
 

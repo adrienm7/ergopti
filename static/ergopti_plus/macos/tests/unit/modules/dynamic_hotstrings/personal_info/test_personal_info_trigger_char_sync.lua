@@ -31,13 +31,13 @@ local active_fixture = nil
 local function with_dynamic_fixture(body)
 	helpers.with_stub_scope({ "modules.dynamic_hotstrings", "modules.dynamic_hotstrings.rules_engine",
 		"modules.dynamic_hotstrings.personal_info", "modules.dynamic_hotstrings.user_code",
-		"dynamic_hotstrings", "dynamic_hotstrings.user_source", "adapters.synthetic_input",
+		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
 		"adapters.file_system", "infra.config_paths", "adapters.application_notifier" }, function()
 		local previous = active_fixture
 		local fixture = { captures = 0, factory_loads = 0 }
 		active_fixture = fixture
-		local Source = require("dynamic_hotstrings.user_source")
+		local Source = require("hotstrings.engine.dynamic.user_source")
 		local load = Source.load
 		Source.load = function(...)
 			fixture.factory_loads = fixture.factory_loads + 1

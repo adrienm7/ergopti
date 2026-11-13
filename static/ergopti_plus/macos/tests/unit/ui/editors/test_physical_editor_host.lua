@@ -2,13 +2,13 @@
 
 --- Checks the actual native host through controlled constructor and cleanup ports.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 helpers.describe("Physical shortcut native host ownership", function()
 	helpers.it("(physical-editor-ui) refuses stale pages and retains failed native cleanup", function()
 		local loaded, original_hs = {}, _G.hs
 		for name, value in pairs(package.loaded) do loaded[name] = value end
 		local called, detail = pcall(function()
-			require("test.physical_editor_host_contract")(helpers, Json,
+			require("tests.lua.layouts.physical_editor_host_contract")(helpers, Json,
 				function(relative) return helpers.shared(relative) end,
 				function() package.loaded["ui.physical_shortcuts"] = nil; return require("ui.physical_shortcuts") end, "macos")
 		end)

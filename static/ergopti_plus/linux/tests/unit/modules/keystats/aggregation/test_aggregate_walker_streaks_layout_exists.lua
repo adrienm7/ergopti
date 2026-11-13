@@ -56,7 +56,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		end
 	end)
 
-	local FingerMap = helpers.load_module("keystats.finger_map")
+	local FingerMap = helpers.load_module("metrics.engine.finger_map")
 
 	--- Whether the shared keycode catalogue could be read at all.
 	---
@@ -68,11 +68,11 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		local Paths = helpers.load_module("infra.paths")
 		local root = Paths.shared_root()
 		helpers.assert_not_nil(root, "the shared tree must be findable")
-		local handle = io.open(root .. "/data/keycodes/azerty.json", "r")
+		local handle = io.open(root .. "/layouts/data/keycodes/azerty.json", "r")
 		helpers.assert_not_nil(handle, "the shared keycode catalogue must exist")
 		local body = handle:read("*a")
 		handle:close()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		FingerMap._reset()
 		local lookup = FingerMap.load("qwerty", function() return body end, Json.decode, "x")
 		helpers.assert_not_nil(lookup, "the catalogue must decode into a finger lookup")
@@ -505,7 +505,7 @@ end)
 -- the Windows and macOS walkers too, so the three drivers keep one definition of
 -- the n-grams around a correction. Each flush is one walk over a carried context.
 helpers.describe("aggregate walker: shared correction sequence corpus", function()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local file = assert(io.open(assert(require("infra.paths").shared(
 		"tests/corpus/keystats/correction_sequence_vectors.json")), "rb"))
 	local data = Json.decode(assert(file:read("*a")))
@@ -563,7 +563,7 @@ helpers.it("refuses a FIFO finger catalogue without blocking aggregation", funct
 	local uv = require("luv")
 	local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-finger-fifo-XXXXXX"))
 	local fifo, script = directory .. "/catalogue", directory .. "/child.lua"
-	local made = os.execute("mkfifo " .. require("text_utils").shell_quote(fifo))
+	local made = os.execute("mkfifo " .. require("core.text.engine.utils_core").shell_quote(fifo))
 	assert(made == 0 or made == true)
 	local file = assert(io.open(script, "wb"))
 	assert(file:write(string.format([[
@@ -571,16 +571,16 @@ package.path = %q
 local paths = require("infra.paths")
 local previous = paths.shared
 paths.shared = function(name)
-  if name == "data/keycodes/azerty.json" then return arg[1] end
+  if name == "layouts/data/keycodes/azerty.json" then return arg[1] end
   return previous(name)
 end
-require("keystats.finger_map")._reset()
+require("metrics.engine.finger_map")._reset()
 local ok, err = pcall(require("modules.keystats.aggregate_walker").walk,
   {}, "2026-01-01", "app", nil, { physical_layout = "qwerty" })
 assert(not ok and tostring(err):find("finger catalogue is unavailable", 1, true))
 ]], package.path)))
 	assert(file:close())
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local status = os.execute("timeout 3 " .. quote(assert(uv.exepath())) .. " " .. quote(script) .. " " .. quote(fifo))
 	assert(uv.fs_unlink(script)); assert(uv.fs_unlink(fifo)); assert(uv.fs_rmdir(directory))
 	helpers.assert_true(status == 0 or status == true, "a special catalogue must be refused before a blocking read")

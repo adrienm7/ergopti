@@ -81,7 +81,7 @@ _NetworkPAC_SourceContractAcceptance() {
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\pac_source_contract.ps1", "-WorkerPath",
 				_VendorDir . "\ergopti_network_pac.ps1", "-PolicyPath",
-				_SharedDir . "\modules\network\proxy_policy.json"],
+				_SharedDir . "\core\network\data\proxy_policy.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "the production-source PAC contract fixture must start")
 		Started := A_TickCount

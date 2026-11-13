@@ -20,17 +20,17 @@ local function eq(actual, expected)
 end
 
 local function policy()
-	local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
+	local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
 	local bytes = file:read("*a")
 	assert(file:close())
-	return assert(require("network.proxy_policy").new(require("json").decode(bytes)))
+	return assert(require("core.network.engine.proxy_policy_core").new(require("core.text.engine.json").decode(bytes)))
 end
 
 local function relay_policy()
-	local file = assert(io.open(assert(Paths.shared("modules/network/proxy_auth_relay.json")), "rb"))
+	local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_auth_relay.json")), "rb"))
 	local bytes = file:read("*a")
 	assert(file:close())
-	return assert(require("network.proxy_auth_relay").new(require("json").decode(bytes)))
+	return assert(require("core.network.engine.proxy_auth_relay_core").new(require("core.text.engine.json").decode(bytes)))
 end
 
 local ORIGINS = assert(require("infra.route_origins").client("ollama"))
@@ -98,7 +98,7 @@ local function world(options)
 end
 
 it("the shipped inventory starts with the registry and names its blob host", function()
-	eq(ORIGINS[1], require("llm.ollama_registry").URL)
+	eq(ORIGINS[1], require("ai.engine.ollama.registry").URL)
 	assert(#ORIGINS >= 2, "the blob redirect host must be looked up too")
 end)
 
@@ -232,7 +232,7 @@ it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemo
 		-- (linux-pac-evaluation) a PAC the lookup child ran and that raised.
 		["proxy-pac-evaluation-failed"] = "native_pac_evaluation" }) do
 		local warnings = {}
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local original = Logger.warn
 		Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 		local ok, result = pcall(function()
@@ -253,7 +253,7 @@ end)
 -- The WARNING was never logged on Linux before (container proof 2026-11-10).
 it("(pac-download-direct) a DIRECT answer for an undownloadable PAC warns and records the stage", function()
 	local warnings = {}
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local original = Logger.warn
 	Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 	local ok, result = pcall(function()
@@ -275,7 +275,7 @@ end)
 
 it("(pac-download-direct) a PAC that answered DIRECT itself warns nothing", function()
 	local warnings = {}
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local original = Logger.warn
 	Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 	local ok, result = pcall(function() return world({ receipt = { ok = true, proxies = { "direct://" } } }):run() end)
@@ -401,7 +401,7 @@ end)
 
 it("no origin URL and no proxy ever reach the log", function()
 	local seen = {}
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local originals = { info = Logger.info, error = Logger.error, warn = Logger.warn }
 	for _, level in ipairs({ "info", "error", "warn" }) do
 		Logger[level] = function(_, message, ...) seen[#seen + 1] = string.format(message, ...) end
@@ -467,7 +467,7 @@ it("(proxy-auth-relay) a refused sign-in starts without the proxy and carries th
 end)
 
 it("(proxy-auth-relay) a relay that is not installed keeps the proxy as named, with a warning", function()
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local warned = {}
 	local original = Logger.warn
 	Logger.warn = function(_, message) warned[#warned + 1] = message end
@@ -761,7 +761,7 @@ it("handles inline settlement and an uncertain observer registration without dup
 end)
 
 it("retires real native handles when both observers and diagnostics throw (pac-observer-logger)", function()
-	local logger, uv = require("logger.shim"), require("luv")
+	local logger, uv = require("core.logger.engine.shim"), require("luv")
 	local old_error = logger.error
 	logger.error = function() error("controlled logger failure") end
 	local tested, reason = pcall(function()

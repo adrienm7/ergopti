@@ -107,8 +107,8 @@ local function dynamic_personal_scope_fixture(enabled, outcome, absent)
 	package.loaded["infra.preferences"] = nil
 	local preferences = require("infra.preferences")
 	preferences.load("config")
-	local shared = assert(require("toml_codec").decode(require("tests.support.source_file").read(
-		helpers.driver_root() .. "../_shared/modules/hotstrings/_index.toml")))
+	local shared = assert(require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(
+		helpers.driver_root() .. "../_shared/hotstrings/data/catalogue/_index.toml")))
 	local observations, starts, updates, saves = {}, 0, 0, 0
 	registry.start = function() starts = starts + 1; return true end
 	local ctx = { state = menu_state, paused = true, keymap = registry, personal_info = personal,

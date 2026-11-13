@@ -7,7 +7,7 @@
 --- latency: per-key hot path stages, menu build items, boot sub-stages, config
 --- parses, child processes. The bookkeeping (counts, totals, maxima, the
 --- attribution ring and the per-family evidence lines) is the shared
---- _shared/lua/phase_stats_core.lua, which the Linux driver runs as well; this
+--- _shared/metrics/engine/perf/phase_stats_core.lua, which the Linux driver runs as well; this
 --- module adds what is specific to Hammerspoon: the nanosecond clock and the
 --- periodic flush timer.
 ---
@@ -24,7 +24,7 @@
 ---    and reject a second start, like every stateful module.
 --- ==============================================================================
 
-local Core = require("phase_stats_core")
+local Core = require("metrics.engine.perf.phase_stats_core")
 
 local LOG = "phase_stats"
 

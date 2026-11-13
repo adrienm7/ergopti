@@ -14,7 +14,7 @@
 #   - wine (9.0 or later) on PATH, with an initialised WINEPREFIX;
 #   - an X display in DISPLAY (Xvfb is enough: AHK creates hidden windows);
 #   - the AutoHotkey v2 interpreter pinned in
-#     static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json,
+#     static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json,
 #     extracted from its release zip after checking that file's sha256.
 #
 # Usage:

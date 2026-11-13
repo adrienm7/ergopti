@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Terminators = require("keymap.terminators")
+local Terminators = require("layouts.engine.layers.terminators")
 
 helpers.describe("word expander consumption rows", function()
 	helpers.it("the choice flips without touching the on/off switch", function()

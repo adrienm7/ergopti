@@ -28,7 +28,7 @@ local function abort(message)
 end
 
 if not os.getenv("DISPLAY") then abort("no display server") end
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local ok_lgi, lgi = pcall(require, "lgi")
 if not ok_lgi then abort("lgi is not installed") end
 local Gtk = lgi.require("Gtk", "3.0")
@@ -38,7 +38,7 @@ if not Surface.is_available() then abort("the widget surface cannot bind GTK") e
 
 require("infra.i18n").init()
 local Monotonic = require("infra.monotonic")
-local Model = require("wpm_widget.model")
+local Model = require("metrics.engine.wpm_widget_model")
 local Constants = require("infra.wpm_constants")
 local Timings = require("infra.timings")
 local Widget = require("ui.wpm.widget")

@@ -35,7 +35,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CONTRACT = 'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json';
+const CONTRACT = 'static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json';
 const CATALOGUE = 'managed_ollama_release.json';
 const OFFICIAL_RECEIPT = 'official-input-receipt.json';
 const PRODUCER_LOG = 'managed-ollama-producer-build.log';

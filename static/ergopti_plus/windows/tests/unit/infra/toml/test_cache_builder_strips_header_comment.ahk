@@ -44,12 +44,12 @@ _CBHC_CommentedHeaderKeepsItsEntries() {
 	; An isolated shared tree so the real bundled TOMLs are untouched. Only one
 	; bundled category exists here; the builder skips the rest via FileExist.
 	Base := A_Temp . "\ergopti_cache_header_comment_test"
-	HsDir := Base . "\modules\hotstrings"
+	HsDir := Base . "\hotstrings\data\catalogue"
 	PrevShared := IsSet(_SharedDir) ? _SharedDir : ""
 	try DirCreate(HsDir)
 	TomlPath := HsDir . "\magickey.toml"
 	IndexPath := HsDir . "\_index.toml"
-	FileCopy(PrevShared . "\modules\hotstrings\_index.toml", IndexPath, true)
+	FileCopy(PrevShared . "\hotstrings\data\catalogue\_index.toml", IndexPath, true)
 	_SharedDir := Base
 	try {
 		try FileDelete(TomlPath)

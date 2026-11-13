@@ -7,7 +7,7 @@
 --- _sql_num() with no fallback:
 ---   _sql_num(e.is_fullscreen), _sql_num(e.in_meeting),
 --- _sql_num(nil) returns the literal string "NULL", both columns are declared
---- INTEGER NOT NULL in _shared/data/db/schema.sql, and the statement is
+--- INTEGER NOT NULL in _shared/metrics/data/db/schema.sql, and the statement is
 --- INSERT OR IGNORE — so the constraint violation did NOT raise. SQLite quietly
 --- skipped the row and the ENTIRE typing event (text, per-keystroke events_json,
 --- wpm, timings) was discarded with nothing logged anywhere.
@@ -65,7 +65,7 @@ local TIMESTAMP = "2026-07-21 12:34:56.000"
 local function parse_not_null_columns()
 	local driver_root = helpers.driver_root()
 	local shared_root = driver_root:gsub("[/\\]macos[/\\]?$", "") .. "/_shared"
-	local path        = shared_root .. "/data/db/schema.sql"
+	local path        = shared_root .. "/metrics/data/db/schema.sql"
 
 	local fh = io.open(path, "r")
 	helpers.assert_true(fh ~= nil, "schema.sql must be readable at " .. path)

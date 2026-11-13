@@ -2,7 +2,7 @@
 --- Owns the daemon lifecycle actions exposed through gesture/shortcut bindings,
 --- and the pause state every other dispatcher consults.
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local M = {}
 local LOG = "ScriptActions"
@@ -31,7 +31,7 @@ function M.is_script_action(action_name)
 end
 
 --- Whether an action still runs while the driver is paused: the shared
---- `paused_actions` list of `_shared/modules/actions/script_chords.json`, the
+--- `paused_actions` list of `_shared/shortcuts/data/actions/script_chords.json`, the
 --- one Windows and macOS read, so a pause lets through the same actions on the
 --- three drivers (SCD-1, decided by the maintainer on 2026-11-11).
 --- @param action_name any

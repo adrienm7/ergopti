@@ -3,11 +3,11 @@
 --- ==============================================================================
 --- MODULE: Locale Files Resolve In Every Shipped Layout
 --- DESCRIPTION:
---- infra/locale.lua used to find _shared/data/locales by cutting three levels
+--- infra/locale.lua used to find _shared/core/i18n/data/locales by cutting three levels
 --- off its OWN chunk name. The test runner loads it through an absolute
 --- checkout path, where that happens to work, so the suite was green while:
 ---   - the .deb and .rpm (/usr/lib/ergopti/infra/locale.lua) read
----     /usr/lib/_shared/data/locales — a directory no package owns;
+---     /usr/lib/_shared/core/i18n/data/locales — a directory no package owns;
 ---   - a checkout launch ("./infra/locale.lua") read nothing at all.
 --- Every lookup then returned its raw key: the tray menu said
 --- "menu.global.reload" and the first-run notification its key names.
@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 --- @return table The locale module.
 local function load_as(chunk_path)
 	local source = assert(helpers.read_module_source("infra.locale"))
-	package.loaded["locale.core"] = nil
+	package.loaded["core.i18n.engine.core"] = nil
 	local chunk = assert((loadstring or load)(source, "@" .. chunk_path))
 	return chunk()
 end
@@ -32,7 +32,7 @@ end
 --- @return string
 local function english(key)
 	local Paths = helpers.load_module("infra.paths")
-	local fh = assert(io.open(Paths.shared("data/locales/en.json"), "r"))
+	local fh = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "r"))
 	local text = fh:read("*a")
 	fh:close()
 	local value = text:match('"' .. key:gsub("%.", "%%.") .. '":%s*"([^"]*)"')
@@ -50,7 +50,7 @@ helpers.describe("locale: the catalogue is found in every layout", function()
 			Locale.set_locale("en")
 			local key = "menu.global.reload"
 			local got = Locale.get(key)
-			package.loaded["locale.core"] = nil
+			package.loaded["core.i18n.engine.core"] = nil
 			helpers.assert_eq(got, english(key),
 				"a raw key here is what every tray label showed on an installed package")
 		end)

@@ -18,7 +18,7 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("healthcheck_bridge", function()
     local handler = helpers.load_module("ui.healthcheck.bridge")
     local state = build_mock_state()
-    local Snapshot = helpers.load_module("healthcheck.snapshot")
+    local Snapshot = helpers.load_module("diagnostics.engine.healthcheck.snapshot")
 
     -- The probes run curl and child processes; these cases answer the page
     -- without starting any.
@@ -35,7 +35,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
 
     -- The shared page reads the version 2 snapshot of
-    -- _shared/modules/diagnostics/schema.json by section and field id, and
+    -- _shared/diagnostics/data/schema.json by section and field id, and
     -- renders nothing for a field the schema does not declare.
     helpers.it("'ready' answers the page's configuration and a snapshot the schema declares", function()
       without_probes(function()

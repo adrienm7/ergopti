@@ -117,8 +117,9 @@ function M.build(ports)
 end
 return M`;
 const entry =
-	'local Policy = require("menu.programmable_hotstrings")\nreturn Policy.build_entry_rows(Manifest, child)';
-const child = 'local Policy = require("menu.programmable_hotstrings")\nreturn Policy.build(ports)';
+	'local Policy = require("menu.engine.programmable_hotstrings")\nreturn Policy.build_entry_rows(Manifest, child)';
+const child =
+	'local Policy = require("menu.engine.programmable_hotstrings")\nreturn Policy.build(ports)';
 const resolve = (sources, shared = fixture) =>
 	delegatedMenuSources(
 		sources.map((src, index) => ({ rel: `native${index}.lua`, src })),
@@ -151,34 +152,34 @@ assert.deepStrictEqual(
 );
 
 assert.deepStrictEqual(names(resolve([entry, child])), [
-	'menu.programmable_hotstrings.build',
-	'menu.programmable_hotstrings.build_entry',
-	'menu.programmable_hotstrings.build_entry_rows'
+	'menu.engine.programmable_hotstrings.build',
+	'menu.engine.programmable_hotstrings.build_entry',
+	'menu.engine.programmable_hotstrings.build_entry_rows'
 ]);
 assert(handlers(resolve([entry, child])).has('open_user_hotstring_source'));
 assert.deepStrictEqual(names(resolve([entry])), [
-	'menu.programmable_hotstrings.build_entry',
-	'menu.programmable_hotstrings.build_entry_rows'
+	'menu.engine.programmable_hotstrings.build_entry',
+	'menu.engine.programmable_hotstrings.build_entry_rows'
 ]);
 assert(
 	!handlers(resolve([entry])).has('open_user_hotstring_source'),
 	'a parent import cannot credit unused child commands'
 );
-assert.deepStrictEqual(names(resolve([child])), ['menu.programmable_hotstrings.build']);
+assert.deepStrictEqual(names(resolve([child])), ['menu.engine.programmable_hotstrings.build']);
 assert(
 	!resolve([child]).some((record) => record.src.includes('"programmable_hotstring_entry"')),
 	'an actual child call cannot credit an unused entry'
 );
 
 for (const inactive of [
-	'local Policy = require("menu.programmable_hotstrings")',
-	'local Policy = require("menu.programmable_hotstrings")\n-- Policy.build(ports)',
-	'local Policy = require("menu.programmable_hotstrings")\nlocal prose = "Policy.build(ports)"',
-	'-- local Policy = require("menu.programmable_hotstrings")\nPolicy.build(ports)',
-	'local prose = [[local Policy = require("menu.programmable_hotstrings")]]\nPolicy.build(ports)',
+	'local Policy = require("menu.engine.programmable_hotstrings")',
+	'local Policy = require("menu.engine.programmable_hotstrings")\n-- Policy.build(ports)',
+	'local Policy = require("menu.engine.programmable_hotstrings")\nlocal prose = "Policy.build(ports)"',
+	'-- local Policy = require("menu.engine.programmable_hotstrings")\nPolicy.build(ports)',
+	'local prose = [[local Policy = require("menu.engine.programmable_hotstrings")]]\nPolicy.build(ports)',
 	'local Policy = require("menu.unowned")\nPolicy.build(ports)',
-	'local Policy = require("menu.programmable_hotstrings")\nOther.build(ports)',
-	'local Policy = require("menu.programmable_hotstrings")\nPolicy.not_a_method(ports)'
+	'local Policy = require("menu.engine.programmable_hotstrings")\nOther.build(ports)',
+	'local Policy = require("menu.engine.programmable_hotstrings")\nPolicy.not_a_method(ports)'
 ])
 	assert.deepStrictEqual(
 		resolve([inactive]),
@@ -209,17 +210,18 @@ function M.directory_unavailable(manifest)
  return manifest.build("personal_directory_unavailable")
 end
 return M`;
-const personalCall = 'local Personal = require("menu.personal_files")\nPersonal.build(ports)';
+const personalCall =
+	'local Personal = require("menu.engine.personal_files")\nPersonal.build(ports)';
 assert.deepStrictEqual(names(resolve([personalCall], personal)), [
-	'menu.personal_files.build',
-	'menu.personal_files.unavailable'
+	'menu.engine.personal_files.build',
+	'menu.engine.personal_files.unavailable'
 ]);
 assert.deepStrictEqual(
 	names(resolve([personalCall + '\nPersonal.directory_unavailable(manifest)'], personal)),
 	[
-		'menu.personal_files.build',
-		'menu.personal_files.directory_unavailable',
-		'menu.personal_files.unavailable'
+		'menu.engine.personal_files.build',
+		'menu.engine.personal_files.directory_unavailable',
+		'menu.engine.personal_files.unavailable'
 	]
 );
 console.log(
@@ -238,10 +240,10 @@ function M.menu_rows(resolver, opts)
 end
 return M`;
 	const binding =
-		'local Shared = require("keymap.magic_key_source")\nlocal ManifestMenu = require("infra.manifest_menu")';
+		'local Shared = require("layouts.engine.layers.magic_key_source")\nlocal ManifestMenu = require("infra.manifest_menu")';
 	const call = 'Shared.menu_rows(resolver, {manifest=ManifestMenu})';
 	assert.deepStrictEqual(names(resolve([binding + '\n' + call], shared)), [
-		'keymap.magic_key_source.menu_rows'
+		'layouts.engine.layers.magic_key_source.menu_rows'
 	]);
 	assert(handlers(resolve([binding + '\n' + call], shared)).has('magic_key_source_capture'));
 	assert(handlers(resolve([binding + '\n' + call], shared)).has('magic_key_source_automatic'));
@@ -250,7 +252,7 @@ return M`;
 		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")'
 	);
 	assert.deepStrictEqual(names(resolve([protectedBinding + '\n' + call], shared)), [
-		'keymap.magic_key_source.menu_rows'
+		'layouts.engine.layers.magic_key_source.menu_rows'
 	]);
 	assert.deepStrictEqual(
 		resolve(
@@ -305,7 +307,7 @@ function M.menu_rows(resolver, opts)
 end
 return M`;
 	const prefix =
-		'local ManifestMenu = require("infra.manifest_menu")\nlocal Shared = require("keymap.magic_key_source")\n';
+		'local ManifestMenu = require("infra.manifest_menu")\nlocal Shared = require("layouts.engine.layers.magic_key_source")\n';
 	const reached = (options) =>
 		resolve([prefix + 'Shared.menu_rows(resolver, {' + options + '})'], shared);
 	for (const options of [
@@ -346,7 +348,7 @@ function M.menu_rows(resolver, opts)
 end
 return M`;
 	const native =
-		'local ManifestMenu=require("infra.manifest_menu")\nlocal Shared=require("keymap.magic_key_source")\n';
+		'local ManifestMenu=require("infra.manifest_menu")\nlocal Shared=require("layouts.engine.layers.magic_key_source")\n';
 	for (const alias of [
 		String.raw`"\109anifest"`,
 		String.raw`"\x6danifest"`,

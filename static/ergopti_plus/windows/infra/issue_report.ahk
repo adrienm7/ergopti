@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Bug Report Text
 ; DESCRIPTION:
-; AHK port of _shared/lua/diagnostics/issue_report.lua: the full diagnostics
+; AHK port of _shared/diagnostics/engine/reports/issue_report.lua: the full diagnostics
 ; as Markdown, copied to the clipboard and prefilled into the GitHub issue
 ; form. Both ports replay
 ; _shared/tests/corpus/diagnostics/issue_report_vectors.json.

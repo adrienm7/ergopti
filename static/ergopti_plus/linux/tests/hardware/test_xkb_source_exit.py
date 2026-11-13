@@ -15,8 +15,8 @@ import unittest
 PROBE = r"""
 local root = arg[1]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
-  .. root .. '/../_shared/lua/?.lua;' .. root .. '/../_shared/lua/?/init.lua;' .. package.path
-require('compat.utf8').install()
+  .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
+require('core.lifecycle.engine.compat.utf8').install()
 assert(require('ffi').os == 'Linux' and jit ~= nil)
 local display = require('infra.display_server')
 display._set_for_test('wayland', '')
@@ -24,7 +24,7 @@ local capture = require('adapters.xkb_capture')
 local layout = require('adapters.keyboard_layout')
 local loaded = layout.refresh()
 local hit = layout.resolve('a')
-print('XKB_SOURCE_RESULT ' .. require('json').encode({
+print('XKB_SOURCE_RESULT ' .. require('core.text.engine.json').encode({
   loaded = loaded, ready = layout.is_ready(), capture_ready = capture.is_ready(),
   source = layout.source() or '', keycode = hit and hit.keycode or -1,
   text = capture.is_ready() and capture.peek_text(30) or '',

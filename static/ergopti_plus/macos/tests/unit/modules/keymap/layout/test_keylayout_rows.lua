@@ -4,7 +4,7 @@
 --- MODULE: Shared Keylayout Number-Row Options
 --- DESCRIPTION:
 --- The macOS driver installs a .keylayout that already types the number-row
---- options (layouts/keylayout_rows.lua). tools/test/test-keylayout-row-options.cjs
+--- options (layouts/engine/composer/keylayout_rows.lua). tools/test/test-keylayout-row-options.cjs
 --- proves the cells against the Linux converter; these cases pin what that
 --- differential cannot see: a refusal changes nothing and says why, a versioned
 --- build carries its name and id, and the read-back the driver compares with the
@@ -12,9 +12,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Rows = require("layouts.keylayout_rows")
-local Keylayout = require("layouts.keylayout")
+local Json = require("core.text.engine.json")
+local Rows = require("layouts.engine.composer.keylayout_rows")
+local Keylayout = require("layouts.engine.composer.keylayout")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 
@@ -29,7 +29,7 @@ local function read(path)
 end
 
 local function codes(convention)
-	return assert(Rows.key_codes(Json.decode(read(helpers.shared("modules/layouts/mac_keycodes.json"))), convention))
+	return assert(Rows.key_codes(Json.decode(read(helpers.shared("layouts/data/mac_keycodes.json"))), convention))
 end
 
 -- A two-keyMap layout whose key 18 (the 1 key) holds its digit only with Shift.

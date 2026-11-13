@@ -68,7 +68,8 @@ const MANIFEST = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
+	'settings',
+	'data',
 	'features',
 	'manifest.toml'
 );
@@ -220,7 +221,10 @@ function readCoverage(src) {
 		throw new Error('the coverage source is missing the [menu] tables');
 	validateMenuAvailability(parsed.menu);
 	const english = JSON.parse(
-		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json'),
+			'utf8'
+		)
 	);
 	validateChildTemplates(parsed.menu, (key) =>
 		Object.hasOwn(english, key) ? english[key] : undefined

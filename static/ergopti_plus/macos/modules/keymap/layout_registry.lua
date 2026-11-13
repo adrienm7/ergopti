@@ -10,7 +10,7 @@
 --- ~/Library/Keyboard Layouts and adds it to the enabled input sources.
 ---
 --- FEATURES & RATIONALE:
---- 1. The catalogue decisions are shared with Linux (_shared/lua/layouts/
+--- 1. The catalogue decisions are shared with Linux (_shared/layouts/engine/
 ---    catalogue.lua): conditional refresh with the cached ETag, cache and
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the app.
@@ -30,14 +30,14 @@ local ConfigPaths  = require("infra.config_paths")
 local FileSystem   = require("adapters.file_system")
 local HttpClient   = require("adapters.http_client")
 local Crypto       = require("adapters.crypto")
-local Json         = require("json")
-local TomlCodec    = require("toml_codec")
-local Registry     = require("layouts.registry")
-local Catalogue    = require("layouts.catalogue")
-local Extension    = require("layouts.extension")
-local Composer     = require("layouts.composer")
-local SourceStore  = require("layouts.source_store")
-local RegistryStore = require("layouts.registry_store")
+local Json         = require("core.text.engine.json")
+local TomlCodec    = require("core.text.engine.toml_codec")
+local Registry     = require("layouts.engine.registry.registry_core")
+local Catalogue    = require("layouts.engine.composer.catalogue")
+local Extension    = require("layouts.engine.composer.extension")
+local Composer     = require("layouts.engine.composer.composer")
+local SourceStore  = require("layouts.engine.composer.source_store")
+local RegistryStore = require("layouts.engine.registry.store")
 
 local M = {}
 
@@ -137,7 +137,7 @@ local function read_shared_json(rel)
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
 	local known = _shared_json[path]
 	if known ~= nil and known.raw == raw then return known.decoded, nil end
-	-- The shared json.lua answers nil to invalid JSON rather than raising.
+	-- The shared core/text/engine/json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
 	_shared_json[path] = { raw = raw, decoded = decoded }
@@ -148,9 +148,9 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.settings()
-	local layouts, layouts_err = read_shared_json("modules/layouts/defaults.json")
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
 	if not layouts then return nil, layouts_err end
-	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
+	local updater, updater_err = read_shared_json("updater/data/defaults.json")
 	if not updater then return nil, updater_err end
 	return Registry.resolve(layouts, updater, require("modules.updater").installed_channel())
 end
@@ -557,7 +557,7 @@ local function publish_update(deps, entry, text, previous)
 	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
 	local encoded_ok, encoded = pcall(function() return deps.encode_json(Catalogue.with_installed(current, entry)) end)
 	if not encoded_ok or type(encoded) ~= "string" then return nil, M.FAILURE_RECORD, "cannot encode the installed layout record" end
-	local loaded, inverse_module = pcall(require, "config_file_inverse")
+	local loaded, inverse_module = pcall(require, "settings.engine.migration.file_inverse")
 	local factory = loaded and type(inverse_module) == "table" and inverse_module.for_current_writer or nil
 	if type(factory) ~= "function" then return nil, M.FAILURE_WRITE, "layout compensation owner is unavailable" end
 	local built, inverse, writer = pcall(factory)
@@ -582,9 +582,9 @@ local function publish_update(deps, entry, text, previous)
 		return replace(path, content, expected, on_error)
 	end
 	local function current_owner()
-		return rawequal(package.loaded["config_file_inverse"], inverse_module)
+		return rawequal(package.loaded["settings.engine.migration.file_inverse"], inverse_module)
 			and rawequal(inverse_module.for_current_writer, factory)
-			and rawequal(package.loaded["toml_codec.writer"], writer)
+			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], writer)
 			and rawequal(writer.publish_if_unchanged, publish_exact)
 			and rawequal(writer.read_classified, read_classified)
 			and rawequal(writer.remove_if_unchanged, remove_conditional)
@@ -1004,12 +1004,12 @@ function M.install_local(entry, text, on_done, deps)
 	return true
 end
 
---- The composer's ports over this module (see layouts/composer.lua).
+--- The composer's ports over this module (see layouts/engine/composer/composer.lua).
 --- @param deps table
 --- @return table|nil operations
 --- @return string|nil error
 local function composer_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = Composer.settings(layout_defaults)
 	if not settings then return nil, settings_err end
@@ -1058,7 +1058,7 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.composer_settings()
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	return Composer.settings(layout_defaults)
 end
@@ -1148,7 +1148,7 @@ function M.composer_save(payload, on_done, deps)
 end
 
 --- Stores a layout source for the layout emulation alone: nothing is installed
---- in the system (layouts/composer.lua store).
+--- in the system (layouts/engine/composer/composer.lua store).
 --- @param payload table { source, keylayout [, emulation] }
 --- @param on_done function on_done(ok, code, detail, id)
 --- @param deps table|nil
@@ -1181,12 +1181,12 @@ function M.composer_remove(on_done, deps)
 	return true
 end
 
---- The layout editor's file store over this module (see layouts/source_store.lua).
+--- The layout editor's file store over this module (see layouts/engine/composer/source_store.lua).
 --- @param deps table Resolved collaborators.
 --- @return table|nil operations
 --- @return string|nil error
 local function source_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = SourceStore.settings(layout_defaults)
 	if not settings then return nil, settings_err end

@@ -9,7 +9,7 @@
  * here. Windows and Linux ship three recommended "tap while another key is held"
  * pairs (AltGr then LAlt, AltGr then CapsLock, LAlt then CapsLock) declared once
  * in the feature manifest. macOS declares its pairs under `[hs_combos]` of
- * _shared/tap_hold/defaults.toml, keyed by the Mac key names; a Mac bottom row
+ * _shared/tap_hold/data/defaults.toml, keyed by the Mac key names; a Mac bottom row
  * carries command where a PC carries alt, so the correspondence is by position:
  * AltGr is the right Command key, LAlt the left Command key.
  *
@@ -69,7 +69,7 @@ async function main() {
 	const parse = (source) => tomlOwnData(parseSource(source));
 	const manifest = parse(
 		fs
-			.readFileSync(paths.shared('modules/features/manifest.toml'), 'utf8')
+			.readFileSync(paths.shared('settings/data/features/manifest.toml'), 'utf8')
 			.replace(
 				/^\[\[features\.([^\]]+)\]\]$/gm,
 				(_match, section) => `[[entries]]\nsection = "${section}"`
@@ -79,7 +79,7 @@ async function main() {
 		(entry) => entry.section === 'shortcuts.key_combination_taps'
 	);
 	assert.equal(pairs.length, 3, 'the three recommended pairs are the whole shipped set');
-	const rows = macosCombos(fs.readFileSync(paths.shared('tap_hold/defaults.toml'), 'utf8'));
+	const rows = macosCombos(fs.readFileSync(paths.shared('tap_hold/data/defaults.toml'), 'utf8'));
 	assert(rows.size > 100, 'the full macOS combination matrix must be loaded');
 
 	const expectedMacos = new Map();

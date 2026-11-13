@@ -21,9 +21,9 @@
 ---    report.
 --- ==============================================================================
 
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Probes = require("infra.field_check_probes")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local M = {}
 
@@ -36,9 +36,9 @@ local TELEMETRY_COUNT_TIMEOUT = 20
 --- The tables read, each with its report prefix and its shared kind list.
 --- @type table { { table, prefix, kinds } } in report order
 M.TABLES = {
-	{ table = "events_window_topo", prefix = "topo", kinds = require("keystats.window_topology").KINDS },
-	{ table = "events_av", prefix = "av", kinds = require("keystats.capture_presence").KINDS },
-	{ table = "events_network", prefix = "network", kinds = require("keystats.network_transitions").KINDS },
+	{ table = "events_window_topo", prefix = "topo", kinds = require("metrics.engine.system.window_topology").KINDS },
+	{ table = "events_av", prefix = "av", kinds = require("metrics.engine.capture_presence").KINDS },
+	{ table = "events_network", prefix = "network", kinds = require("metrics.engine.system.network_transitions").KINDS },
 }
 
 --- The query: one "prefix:kind|count" line per kind present.

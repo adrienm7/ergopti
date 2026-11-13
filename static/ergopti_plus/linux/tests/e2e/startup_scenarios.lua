@@ -190,12 +190,12 @@ local function judge(output, action, wizard)
 end
 
 --- The keys the shipped recommended layer binds on one OS: its `all` table
---- and that OS's table (_shared/keymap/layers.recommended.toml).
+--- and that OS's table (_shared/layouts/data/layers.recommended.toml).
 --- @param shared string The _shared folder.
 --- @param os_name string "macos" or "linux".
 --- @return integer keys
 local function recommended_layer_keys(shared, os_name)
-	local fh = assert(io.open(shared .. "/keymap/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
+	local fh = assert(io.open(shared .. "/layouts/data/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
 	local keys, count, scope = {}, 0, nil
 	for line in fh:lines() do
 		local header = line:match("^%[layers%.[%w_]+%.([%w_]+)%]")

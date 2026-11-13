@@ -18,7 +18,7 @@ local function with_editor(body, logger)
 	require("modules.llm.profile_settings")
 	local names = {
 		"infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings",
-		"ui.webview_manager", "ui.prompt_editor.bridge", "logger.shim",
+		"ui.webview_manager", "ui.prompt_editor.bridge", "core.logger.engine.shim",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -34,7 +34,7 @@ local function with_editor(body, logger)
 	for key, value in pairs(previous["infra.config_paths"]) do paths[key] = value end
 	paths.config = function() return path end
 	package.loaded["infra.config_paths"] = paths
-	if logger then package.loaded["logger.shim"] = logger end
+	if logger then package.loaded["core.logger.engine.shim"] = logger end
 	local profiles = helpers.load_module("modules.llm.profile_settings")
 	package.loaded["infra.llm_preferences"] = nil
 	local seen = { epoch = 0, visible = false, notices = {}, candidates = {}, closes = 0 }
@@ -79,7 +79,7 @@ end
 
 helpers.describe("prompt editor save error ownership", function()
 	helpers.it("(prompt-private-exception) withholds the saved prompt from callback errors", function()
-		local logger, lines = require("logger.shim"), {}
+		local logger, lines = require("core.logger.engine.shim"), {}
 		local original = logger.error
 		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
 		local ok, err = pcall(function()
@@ -194,7 +194,7 @@ helpers.describe("prompt editor save error ownership", function()
 	end)
 
 	helpers.it("rechecks native page ownership after the real error logger sink", function()
-		local logger = dofile(helpers.driver_root() .. "/../_shared/lua/logger/init.lua")
+		local logger = dofile(helpers.driver_root() .. "/../_shared/core/logger/engine/init.lua")
 		with_editor(function(f)
 			local warnings = 0
 			local payload, context = f.open(function() return false end)

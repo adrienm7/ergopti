@@ -5,7 +5,7 @@
  * MODULE: Logger Scalars Single-Source Guard
  * DESCRIPTION:
  * Ten logger scalars are declared once per driver rather than once. This gate
- * pins every copy to _shared/modules/timings/constants.toml [logger]:
+ * pins every copy to _shared/core/timing/data/constants.toml [logger]:
  *
  *   retention_days         14      AHK reads it (LoggerLoadTimings) · Linux reads it ·
  *                                  HS max_age_days (×2)
@@ -44,7 +44,7 @@
  * The same gate holds the logger's other shared contract, its words. Every
  * `reason`, `phase`, `[TAG]` and evidence-record field a driver writes must be
  * a member of the closed enums in _shared/core/ports/contracts.json (projected
- * from _shared/modules/logger/vocabulary.json). An unknown value fails: a reason
+ * from _shared/core/logger/data/vocabulary.json). An unknown value fails: a reason
  * spelt `save_failure` on one driver and `save_failed` on another is two
  * diagnoses of one event, and a log reader filtering for one never sees the
  * other. Prose and runtime-built values cannot be enum members; their count per
@@ -73,7 +73,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
 const registry = toml.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/timings/constants.toml'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared/core/timing/data/constants.toml'), 'utf8')
 );
 
 const errors = [];
@@ -81,7 +81,7 @@ let vocabularyCount = 0;
 
 if (!registry.logger) {
 	console.error(
-		'\x1b[31m[ERROR] _shared/modules/timings/constants.toml has no [logger] section.\x1b[0m'
+		'\x1b[31m[ERROR] _shared/core/timing/data/constants.toml has no [logger] section.\x1b[0m'
 	);
 	process.exit(1);
 }
@@ -275,7 +275,7 @@ check(
 	registry.logger.ring_buffer_size
 );
 check(
-	'_shared/lua/logger/init.lua',
+	'_shared/core/logger/engine/init.lua',
 	'RING_CAPACITY',
 	/\bRING_CAPACITY\s*=\s*(\d+)/g,
 	registry.logger.ring_buffer_size
@@ -303,7 +303,7 @@ mustNotDeclare(
 );
 
 check(
-	'_shared/lua/logger/init.lua',
+	'_shared/core/logger/engine/init.lua',
 	'DEDUP_WINDOW_SEC',
 	/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/g,
 	registry.logger.dedup_window_ms / 1000,
@@ -323,7 +323,7 @@ check(
 		(read('macos/infra/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
 	);
 	const coreSec = Number(
-		(read('_shared/lua/logger/init.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
+		(read('_shared/core/logger/engine/init.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
 	);
 	if (Number.isFinite(ms) && Number.isFinite(sec) && ms !== sec * 1000) {
 		errors.push(
@@ -365,7 +365,7 @@ check(
 	registry.logger.repeat_window_ms
 );
 check(
-	'_shared/lua/logger/init.lua',
+	'_shared/core/logger/engine/init.lua',
 	'REPEAT_WINDOW_SEC',
 	/\bREPEAT_WINDOW_SEC\s*=\s*(\d+)/g,
 	registry.logger.repeat_window_ms / 1000,
@@ -378,7 +378,7 @@ check(
 	registry.logger.repeat_streak_capacity
 );
 check(
-	'_shared/lua/logger/init.lua',
+	'_shared/core/logger/engine/init.lua',
 	'REPEAT_CAPACITY',
 	/\bREPEAT_CAPACITY\s*=\s*(\d+)/g,
 	registry.logger.repeat_streak_capacity
@@ -419,7 +419,7 @@ mustNotDeclare(
 {
 	const ahkSrc = read('windows/infra/logger.ahk');
 	const ahkMatch = /LOGGER_REPEAT_KEY_BY\s*:=\s*Map\(([\s\S]*?)\)\s*\n/.exec(ahkSrc);
-	const coreSrc = read('_shared/lua/logger/init.lua');
+	const coreSrc = read('_shared/core/logger/engine/init.lua');
 	const coreMatch = /local REPEAT_KEY_BY\s*=\s*\{([\s\S]*?)\}/.exec(coreSrc);
 	if (!ahkMatch || !coreMatch) {
 		errors.push('could not locate LOGGER_REPEAT_KEY_BY (AHK) or REPEAT_KEY_BY (shared core).');
@@ -649,17 +649,19 @@ function vocabularyViolations(hits, enums, baseline) {
 
 {
 	const contracts = JSON.parse(read('_shared/core/ports/contracts.json'));
-	const vocabulary = JSON.parse(read('_shared/modules/logger/vocabulary.json'));
+	const vocabulary = JSON.parse(read('_shared/core/logger/data/vocabulary.json'));
 	const enums = contracts.enums || {};
 	for (const kind of LogVocabulary.KINDS) {
 		if (JSON.stringify(enums[kind]) !== JSON.stringify(vocabulary[kind]))
 			errors.push(
-				`contracts.json enums.${kind} differs from _shared/modules/logger/vocabulary.json — run npm run codegen:contracts`
+				`contracts.json enums.${kind} differs from _shared/core/logger/data/vocabulary.json — run npm run codegen:contracts`
 			);
 	}
 	// Every declared hot-path segment is a phase the profiler records (`hotpath.<segment>`).
 	const segmentNames = [
-		...read('_shared/lua/hotpath_segments.lua').matchAll(/\{ name = "([a-z._]+)", drivers/g)
+		...read('_shared/metrics/engine/perf/hotpath_segments.lua').matchAll(
+			/\{ name = "([a-z._]+)", drivers/g
+		)
 	].map((m) => m[1]);
 	if (segmentNames.length < 10)
 		errors.push('the hot-path segment declaration was not found; the phase check stopped matching');
@@ -675,7 +677,7 @@ function vocabularyViolations(hits, enums, baseline) {
 	// No baseline: code that branches on a sentence breaks silently when the sentence is reworded.
 	for (const m of matchers)
 		errors.push(
-			`${m.file}:${m.line}: code compares a reason, error or phase with the sentence ${JSON.stringify(m.value)} — compare an id of _shared/lua/adapter_errors.lua (add it to vocabulary.json adapter_errors)`
+			`${m.file}:${m.line}: code compares a reason, error or phase with the sentence ${JSON.stringify(m.value)} — compare an id of _shared/diagnostics/engine/adapter_errors.lua (add it to vocabulary.json adapter_errors)`
 		);
 	for (const m of missingFormatters)
 		errors.push(`declared evidence-record formatter ${m} was not found or writes no field`);
@@ -700,7 +702,7 @@ function vocabularyViolations(hits, enums, baseline) {
 	const { unknown, grown, stale } = vocabularyViolations(hits, enums, baseline);
 	for (const u of unknown)
 		errors.push(
-			`${u} — use a listed value, or add it deliberately to _shared/modules/logger/vocabulary.json`
+			`${u} — use a listed value, or add it deliberately to _shared/core/logger/data/vocabulary.json`
 		);
 	for (const g of grown)
 		errors.push(`${g} — use a closed-enum value and put the detail in the message`);
@@ -715,7 +717,7 @@ if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] logger scalars have drifted from the shared registry:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
 	console.error(
-		'    Registry: static/ergopti_plus/_shared/modules/timings/constants.toml [logger]'
+		'    Registry: static/ergopti_plus/_shared/core/timing/data/constants.toml [logger]'
 	);
 	process.exit(1);
 }

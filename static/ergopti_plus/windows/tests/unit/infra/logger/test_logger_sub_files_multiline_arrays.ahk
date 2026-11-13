@@ -70,7 +70,7 @@ _LSFM_HasTag(Entry, Tag) {
 
 _LSFM_MultiLineArrayKeepsEveryPattern() {
 	global LOGGER_SUB_FILES, _SharedDir
-	TomlPath := _SharedDir . "\modules\logger\sub_files.toml"
+	TomlPath := _SharedDir . "\core\logger\data\sub_files.toml"
 	Assert(FileExist(TomlPath) != "",
 		"prerequisite: the shipped sub_files.toml must be readable, otherwise the parser silently uses LOGGER_SUB_FILES_FALLBACK and this test proves nothing")
 

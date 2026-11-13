@@ -4,7 +4,7 @@
 --- factory/installer join requires its own composite runtime qualification.
 --- No filesystem descriptor/path is opened or treated as authority here.
 local M = {}
-local Budget = require("updater.transfer_budget")
+local Budget = require("updater.engine.transfer_budget")
 
 local function method(object, name)
  return type(object) == "table" and rawget(object, name) or nil

@@ -10,12 +10,12 @@
 
 local helpers = require("tests.helpers")
 -- Preserve the process-wide logger identity while scoping its shared adapter.
-require("logger")
+require("core.logger.engine")
 
 local function with_destination(callback, real_detector)
 	helpers.with_stub_scope({
-		"modules.keymap.utils", "keymap.utils", "infra.text_utils", "text_utils", "compat.utf8",
-		"infra.logger", "logger.shim", "infra.timings", "adapters.timer_scheduler",
+		"modules.keymap.utils", "layouts.engine.utils", "infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
+		"infra.logger", "core.logger.engine.shim", "infra.timings", "adapters.timer_scheduler",
 		"adapters.synthetic_input", "adapters.secure_field_detector",
 	}, function()
 		local f = { now = 100, window = 42, element = {}, secure = false, title = "Editor",

@@ -69,7 +69,16 @@ const ARROW_STEPS = new Map([
 // from the physical-key registry every driver shares.
 const REGISTRY = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'keycodes', 'physical_keys.json'),
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'layouts',
+			'data',
+			'keycodes',
+			'physical_keys.json'
+		),
 		'utf8'
 	)
 );

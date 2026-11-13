@@ -84,7 +84,7 @@ _HESO_Case(Mode) {
 	try {
 		for Relative in ["64bit", "shared", "extensions", "personal"]
 			FSCreateDirectoryExclusiveStrict(Directory . "\" . Relative)
-		IndexRelative := "modules\hotstrings\_index.toml"
+		IndexRelative := "hotstrings\data\catalogue\_index.toml"
 		_EDOT_CreateParents(Directory . "\shared", [IndexRelative])
 		SourceIndex := _SharedDir . "\" . IndexRelative
 		IndexHash := CryptoSha256Bytes(FSReadBytesStrict(SourceIndex))

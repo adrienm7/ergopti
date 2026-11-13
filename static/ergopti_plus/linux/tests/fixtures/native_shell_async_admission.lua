@@ -10,7 +10,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_shell_async_admission%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local Shell = require("adapters.shell_runner")
 local checks, failures = 0, 0
@@ -142,7 +142,7 @@ check("actual oversized argv retains safe E2BIG without exposing caller bytes", 
 	local private_marker = "PRIVATE_OVERSIZED_ARGUMENT_NEVER_LOG"
 	-- Exceed the native single-argument bound on both 4 KiB and 64 KiB pages
 	local oversized_bytes = 4 * 1024 * 1024
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local token, error_message = Shell.run_async("/usr/bin/printf", { string.rep(private_marker, math.ceil(oversized_bytes / #private_marker)) },
 		{ timeout_ms = 1000 }, function() state.callbacks = state.callbacks + 1 end)
 	assert(token == nil and state.pid == nil and state.process == nil and state.spawn_code == "E2BIG",

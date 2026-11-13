@@ -6,10 +6,10 @@ require("infra.logger")
 local M = {}
 local OWNED = {
 	"modules.shortcuts.actions.apps", "adapters.synthetic_input", "adapters.event_provenance",
-	"adapters.timer_scheduler", "adapters.storage", "adapters.clipboard", "infra.logger", "logger.shim", "tests.stubs.hs", "hs",
+	"adapters.timer_scheduler", "adapters.storage", "adapters.clipboard", "infra.logger", "core.logger.engine.shim", "tests.stubs.hs", "hs",
 	"adapters.window_info", "adapters.window_manager", "adapters.app_launcher", "adapters.shell_runner",
 	"infra.notifications", "infra.i18n", "infra.text_utils",
-	"text_utils", "compat.utf8",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
 function M.with_world(options, callback)
 	return helpers.with_stub_scope(OWNED, function()

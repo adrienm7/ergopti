@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local OpenAI-Compatible Servers (macOS)
 --- DESCRIPTION:
---- Drives the real catalogue (_shared/modules/llm/local_servers.json), the
+--- Drives the real catalogue (_shared/ai/data/local_servers.json), the
 --- detection (modules/llm/local_servers.lua), the remote backend that sends
 --- their requests (modules/llm/api_remote.lua), the API entry persistence
 --- (modules/llm/init.lua) and the AI menus (local_server_panel, agent_panel),

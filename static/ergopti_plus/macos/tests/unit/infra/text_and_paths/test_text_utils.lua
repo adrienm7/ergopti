@@ -107,7 +107,7 @@ helpers.describe("text_utils.replace_utf8_tail", function()
 			string.char(0xF4, 0x90, 0x80, 0x80),
 			string.char(0xF5, 0x80, 0x80, 0x80),
 		}
-		local compat_utf8 = require("compat.utf8")
+		local compat_utf8 = require("core.lifecycle.engine.compat.utf8")
 		for _, value in ipairs(invalid_sequences) do
 			local native_length = utf8.len(value)
 			local compat_length = compat_utf8.len(value)
@@ -116,11 +116,11 @@ helpers.describe("text_utils.replace_utf8_tail", function()
 		end
 
 		local saved_utf8 = _G.utf8
-		local saved_text_utils = package.loaded["text_utils"]
+		local saved_text_utils = package.loaded["core.text.engine.utils_core"]
 		_G.utf8 = nil
-		package.loaded["text_utils"] = nil
+		package.loaded["core.text.engine.utils_core"] = nil
 		local ok, err = xpcall(function()
-			local compat_text_utils = require("text_utils")
+			local compat_text_utils = require("core.text.engine.utils_core")
 			for _, value in ipairs(invalid_sequences) do
 				local invalid_buffer = compat_text_utils.replace_utf8_tail(value, 0, "X")
 				local invalid_replacement = compat_text_utils.replace_utf8_tail("ok", 0, value)
@@ -128,13 +128,13 @@ helpers.describe("text_utils.replace_utf8_tail", function()
 				helpers.assert_nil(invalid_replacement)
 			end
 		end, debug.traceback)
-		package.loaded["text_utils"] = saved_text_utils
+		package.loaded["core.text.engine.utils_core"] = saved_text_utils
 		_G.utf8 = saved_utf8
 			if not ok then error(err, 0) end
 	end)
 
 	helpers.it("keeps valid scalar boundary sequences on the LuaJIT path", function()
-		local compat_utf8 = require("compat.utf8")
+		local compat_utf8 = require("core.lifecycle.engine.compat.utf8")
 		for _, value in ipairs({
 			string.char(0xC2, 0x80),
 			string.char(0xE0, 0xA0, 0x80),

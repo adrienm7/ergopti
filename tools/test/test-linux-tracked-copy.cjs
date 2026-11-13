@@ -350,7 +350,7 @@ try {
 	fs.writeFileSync(
 		runtime,
 		'#!/bin/sh\nprintf "%s\\n" "$*" >> "$SMOKE_CALLS"\n' +
-			'case "$*" in *"\'keycodes.evdev\'"*) [ "$SMOKE_FAILURE" != shared ] ;; *) exit 0 ;; esac\n',
+			'case "$*" in *"\'platform.input.keycodes.evdev\'"*) [ "$SMOKE_FAILURE" != shared ] ;; *) exit 0 ;; esac\n',
 		{ mode: 0o755 }
 	);
 	fs.mkdirSync(path.join(scratch, 'linux'), { recursive: true });
@@ -381,9 +381,12 @@ try {
 		1,
 		'package-smoke-shared-failure: shared module refusal must fail assembly'
 	);
-	assert.match(sharedFailure.stdout, /require\('keycodes\.evdev'\) failed/);
+	assert.match(sharedFailure.stdout, /require\('platform\.input\.keycodes\.evdev'\) failed/);
 	assert.doesNotMatch(sharedFailure.stdout, /assembled successfully/);
-	assert.match(fs.readFileSync(smokeCalls, 'utf8'), /pcall\(require, 'keycodes\.evdev'\)/);
+	assert.match(
+		fs.readFileSync(smokeCalls, 'utf8'),
+		/pcall\(require, 'platform\.input\.keycodes\.evdev'\)/
+	);
 	const successfulSmoke = smoke('none');
 	assert.equal(successfulSmoke.status, 0, successfulSmoke.stderr);
 	assert.match(successfulSmoke.stdout, /all [1-9][0-9]* shared modules load/);
@@ -456,7 +459,7 @@ try {
 			'bundle?source'
 		]) {
 			const buildRoot = path.join(scratch, name);
-			const moduleFile = path.join(buildRoot, '_shared/lua/packaging_path_probe.lua');
+			const moduleFile = path.join(buildRoot, '_shared/packaging_path_probe.lua');
 			fs.mkdirSync(path.dirname(moduleFile), { recursive: true });
 			fs.writeFileSync(moduleFile, 'return "exact staged bytes"\n');
 			const checked = spawnSync(bashExecutable(), ['-s', '--', buildRoot], {

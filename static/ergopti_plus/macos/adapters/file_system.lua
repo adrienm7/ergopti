@@ -25,10 +25,10 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
-local OperationReporter = require("diagnostics.operation_reporter")
+local OperationReporter = require("diagnostics.engine.operation_reporter")
 local FsDir  = require("infra.fs_dir")
 local TextUtils = require("infra.text_utils")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local WriteLockPath = require("adapters.write_lock_path")
 
@@ -2645,6 +2645,6 @@ end
 
 -- The owner is checked against the shared spec when it loads: a missing method
 -- or a half-offered capability would otherwise fail late, inside a publication.
-require("file_system.ports").check_owner(M)
+require("core.fs.engine.ports").check_owner(M)
 
 return M

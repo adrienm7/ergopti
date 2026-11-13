@@ -1055,11 +1055,11 @@ assertReplayChildTimeoutWiring();
 const SNAPSHOT16_FILTER = 'windows91 snapshots:';
 const SNAPSHOT16_RUNNER = 'static/ergopti_plus/windows/tests/run_all.ahk';
 const SNAPSHOT16_OWNER =
-	'static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk';
+	'static/ergopti_plus/_shared/tap_hold/engine/buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_TEST =
 	'static/ergopti_plus/windows/tests/unit/infra/test_buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_FIXED_IMAGES = {
-	[SNAPSHOT16_OWNER]: 'b7a9e55e56e12e9ece64927d289cd3ecabaf36e909e6b8df90390ffef2fbfc26',
+	[SNAPSHOT16_OWNER]: '624b5eb2956eda1e622785c8c1e6175a6fbc6e2bf027ec6b13197314226d9b1a',
 	[SNAPSHOT16_TEST]: 'e660b8b031b7f3e4597dae0db279097bfae225a70abb39d274d6306a3ac0edbb'
 };
 const SNAPSHOT16_NAMES = [

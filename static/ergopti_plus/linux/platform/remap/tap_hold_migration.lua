@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Tap-Hold File Migration (Linux)
 --- DESCRIPTION:
---- Binds the shared tap-hold migrator (_shared/lua/tap_hold/migrate.lua) to this
---- driver: the registry is _shared/tap_hold/migrations.toml, the table dialect
+--- Binds the shared tap-hold migrator (_shared/tap_hold/engine/migrate.lua) to this
+--- driver: the registry is _shared/tap_hold/data/migrations.toml, the table dialect
 --- is tap_hold_shapes, and the retired delays are the Linux column of
 --- ``[tap_hold.retired_delays]`` in the shared defaults.
 ---
@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Migrate = require("tap_hold.migrate")
+local Migrate = require("tap_hold.engine.migrate")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local Paths = require("infra.paths")
 
@@ -32,7 +32,7 @@ local _registry = nil
 --- The validated shared registry, read once.
 --- @return table registry See migrate.parse_registry.
 function M.registry()
-	if _registry == nil then _registry = Migrate.load_registry(Paths.shared("tap_hold/migrations.toml")) end
+	if _registry == nil then _registry = Migrate.load_registry(Paths.shared("tap_hold/data/migrations.toml")) end
 	return _registry
 end
 

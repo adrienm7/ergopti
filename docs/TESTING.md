@@ -113,7 +113,7 @@ of the `test:js` feature lots; the release waits for all of them.
 `Common / Unit tests (Hotstring TOML formatting)`.
 Run it after touching any hotstring `.toml`.
 
-**Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,
+**Adding a feature flag?** Edit only `static/ergopti_plus/_shared/settings/data/features/manifest.toml`,
 then `npm run codegen`, then commit the regenerated `_generated/` files. If you
 read it in AHK as `Features["<section>"]["<id>"]`,
 `test:feature-read-sites` proves the path is backed by the manifest — a mismatch
@@ -131,7 +131,7 @@ comments and do not count as executed or passed. `--only` does not override
 this admission rule. The runner calls `ExitApp` when execution finishes.
 
 Run the suite on the interpreter the release exe ships, named by
-`static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json`
+`static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json`
 (`runtime.version`): the hook's prefix-key and key-up rules differ between
 AutoHotkey releases, and a runtime-contract case fails on any other version.
 

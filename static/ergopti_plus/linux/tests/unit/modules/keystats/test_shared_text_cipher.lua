@@ -4,7 +4,7 @@
 --- MODULE: Shared Typed-Text Cipher Policy Tests (Linux)
 --- DESCRIPTION:
 --- Pins the policy both drivers' text ciphers share
---- (_shared/lua/keystats/text_cipher.lua) with a scripted primitive: disabled
+--- (_shared/metrics/engine/privacy/text_cipher_core.lua) with a scripted primitive: disabled
 --- encryption spawns nothing, raw text is sealed even when it already looks
 --- like an envelope, an encryption that cannot happen answers nil instead of
 --- plaintext, a failed
@@ -13,8 +13,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Cipher = require("keystats.text_cipher")
-local TextCrypto = require("keystats.text_crypto")
+local Cipher = require("metrics.engine.privacy.text_cipher_core")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local KEY = string.rep("ab", 32)
 

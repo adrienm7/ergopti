@@ -17,7 +17,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = path.join(ROOT, 'static/ergopti_plus/linux');
-const LUA_PATH = './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;';
+const LUA_PATH = './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;';
 
 /** Runs the native fixture or explicitly defers it to gating Linux CI. */
 function run({

@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local Engine = require("hotstring_engine")
+local Engine = require("hotstrings.engine.matcher")
 
 --- Builds an engine from mappings (auto_expand unless stated).
 --- @param mappings table Array of mapping tables.
@@ -331,7 +331,7 @@ local function corpus_vectors()
 	local file = assert(io.open(path, "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus = assert(require("json").decode(raw), "cascade_vectors.json must be valid JSON")
+	local corpus = assert(require("core.text.engine.json").decode(raw), "cascade_vectors.json must be valid JSON")
 	assert(#corpus.vectors > 0, "cascade_vectors.json must hold vectors")
 	return corpus.vectors
 end

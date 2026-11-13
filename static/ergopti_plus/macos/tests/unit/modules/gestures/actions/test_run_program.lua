@@ -2,7 +2,7 @@
 
 --- Real action, preference and native task owners with explicit test-owned tasks.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 local DIGEST = string.rep("a", 64)
 
@@ -415,7 +415,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("preserves unrelated outdated parameters while executing the acknowledged program", function()
 		with_program(function(actions, _, preferences, _, tasks, path, scalar)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local content = '[gestures]\ntap_3 = "run_program"\n[gestures.action_parameters]\n'
 				.. '"tap_3__run_program" = ' .. Json.encode(scalar) .. '\n"old__send_text" = 42\n'
 			local file = assert(io.open(path, "wb")); file:write(content); file:close()

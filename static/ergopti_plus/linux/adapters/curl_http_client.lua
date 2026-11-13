@@ -10,11 +10,11 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 -- A caught callback failure is described without running its __tostring.
-local ErrorDescription = require("error_description")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local BodyPipe = require("infra.http_body_pipe")
@@ -26,7 +26,7 @@ local Timings = require("infra.timings")
 local ProcessGroup = require("infra.libuv_process_group")
 local RedirectPolicy = require("infra.http_redirect_policy")
 local HeaderPolicy = require("infra.http_header_policy")
-local HeaderSnapshot = require("network.http_headers")
+local HeaderSnapshot = require("core.network.engine.http_headers")
 local TransportPolicy = require("infra.http_transport_policy")
 local LOG = "adapters.http_client"
 

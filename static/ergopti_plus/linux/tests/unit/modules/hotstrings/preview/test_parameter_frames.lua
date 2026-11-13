@@ -8,9 +8,9 @@ local function with_frames(body, paused, mutate)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = pcall(function()
 		local i18n = require("infra.i18n")
-		local renderer = assert(require("menu.renderer").new({ platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode, i18n = i18n, logger = require("logger.shim"),
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = require("core.logger.engine.shim"),
 		}))
 		local root = renderer.get_root()
 		if mutate then mutate(root) end

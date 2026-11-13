@@ -263,13 +263,13 @@ _LEH_MessagesRouteToTheirAction() {
 }
 Test("layer editor host: save, cancel and unknown messages", _LEH_MessagesRouteToTheirAction)
 
-; The macOS and Linux hosts share _shared/lua/keymap/layer_editor.lua; this host
+; The macOS and Linux hosts share _shared/layouts/engine/layers/editor.lua; this host
 ; must refuse the same sizes and name its refusals with the same codes.
 _LEH_ContractMatchesTheLuaHosts() {
-	Source := FileRead(_LEH_SharedDir() . "\lua\keymap\layer_editor.lua", "UTF-8")
+	Source := FileRead(_LEH_SharedDir() . "\layouts\engine\layers\editor.lua", "UTF-8")
 	AssertTrue(InStr(Source, 'M.MAX_TEXT_BYTES = Timings.count("limits", "layer_file_bytes")') > 0,
 		"the Lua hosts read [limits] layer_file_bytes")
-	Registry := ParseTomlFile(_LEH_SharedDir() . "\modules\timings\constants.toml")
+	Registry := ParseTomlFile(_LEH_SharedDir() . "\core\timing\data\constants.toml")
 	MaxBytes := Integer(IniCacheGet(Registry, "limits", "layer_file_bytes"))
 	AssertEqual(TimingsGet("limits", "layer_file_bytes"), MaxBytes, "the host reads the registry value")
 	Refused := LayerEditor_Validate(Format("{:" . (MaxBytes + 1) . "}", ""), Map())
@@ -427,7 +427,7 @@ Test("layer editor host: a legend is printable text", _LEH_LegendTextRefusesTheU
 
 _LEH_LayerKeysFollowTheTapHolds() {
 	Corpus := _LEH_Corpus()
-	Shipped := LayerEditor_LayerKeys(LoadTapHoldToml(_LEH_SharedDir() . "\tap_hold\defaults.toml"))
+	Shipped := LayerEditor_LayerKeys(LoadTapHoldToml(_LEH_SharedDir() . "\tap_hold\data\defaults.toml"))
 	Want := ""
 	for Index, Code in Corpus["recommended_layer_keys"]["windows"]
 		Want .= (Index == 1 ? "" : ",") . Code

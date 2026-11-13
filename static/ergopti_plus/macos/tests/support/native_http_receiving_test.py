@@ -30,7 +30,9 @@ def load(name, path):
 
 
 NATIVE = load("receiving_native", NETWORK / "native_http.py")
-POLICY = load("receiving_policy", ROOT.parent / "_shared/python/network_proxy_policy.py")
+POLICY = load(
+    "receiving_policy", ROOT.parent / "_shared/core/network/adapters/python_network_proxy_policy.py"
+)
 
 
 HELPER = r"""

@@ -10,10 +10,10 @@
 
 local helpers = require("tests.helpers")
 local PortFakes = require("tests.support.port_fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- Keep the process-wide shared logger identity outside native fixture scopes.
-require("logger")
+require("core.logger.engine")
 
 local MODULES = {
 	"modules.llm.screen_answer", "modules.llm.prediction_engine", "modules.llm",
@@ -24,16 +24,16 @@ local MODULES = {
 	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
 	"adapters.json_codec", "adapters.storage", "adapters.timer_scheduler",
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
-	"ui.tooltip", "llm.vision", "llm.rewrite", "llm.prompt_action", "llm.translate",
-	"text_utils", "compat.utf8", "modules.llm.api_token_crypto", "adapters.http_client",
-	"llm.remote_response_classifier", "modules.llm.local_servers",
+	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "modules.llm.api_token_crypto", "adapters.http_client",
+	"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 	"modules.llm.provider_uses", "modules.llm.progressive_reveal", "modules.llm.parser",
-	"infra.manifest_reader", "llm.provider_config_policy", "llm.remote_formats",
-	"llm.profile_selector", "llm.parser", "llm.prompt_builder", "llm.local_server_auth",
-	"llm.local_server_discovery", "config_defaults", "diagnostics.operation_reporter",
-	"hotstrings.personal_files", "infra.fs_dir", "infra.toml.reader", "lfs", "logger.shim",
-	"toml_codec.basic_string", "toml_codec.bom", "toml_codec.key_path",
-	"toml_codec.reader", "toml_codec.record_scanner",
+	"infra.manifest_reader", "ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats",
+	"ai.engine.settings.profile_selector", "ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth",
+	"ai.engine.local_servers.discovery", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
+	"hotstrings.engine.catalogue.personal_files", "infra.fs_dir", "infra.toml.reader", "lfs", "core.logger.engine.shim",
+	"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 }
 
 local function with_capture(callback)

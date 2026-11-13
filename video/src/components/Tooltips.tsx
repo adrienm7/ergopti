@@ -1,7 +1,7 @@
 // video/src/components/Tooltips.tsx
 //
 // The driver's caret tooltips, drawn from its own spec
-// (_shared/modules/tooltip/constants.toml): panel colour and tint, radius,
+// (_shared/core/ui/data/tooltip/constants.toml): panel colour and tint, radius,
 // padding, border, and the LLM line colours.
 
 import React from 'react';

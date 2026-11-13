@@ -5,9 +5,9 @@
  * MODULE: Locale Resolution Single-Source Guard
  * DESCRIPTION:
  * Verifies that the locale resolution cascade is single-sourced:
- *   - The shared module _shared/lua/locale/core.lua exists and is consumed by
+ *   - The shared module _shared/core/i18n/engine/core.lua exists and is consumed by
  *     both macOS (macos/infra/locale.lua) and Linux (linux/infra/locale.lua)
- *     drivers via `require("locale.core")`.
+ *     drivers via `require("core.i18n.engine.core")`.
  *   - The cross-driver corpus _shared/tests/corpus/locale/resolution_vectors.json
  *     exists and has at least one vector.
  *   - macOS has a corpus consumer test (test_corpus_locale_resolution.lua).
@@ -47,24 +47,30 @@ function read(rel) {
 }
 
 // ── 1. Shared locale.core must exist ──────────────────────────────────────
-if (!fileExistsSP('_shared/lua/locale/core.lua')) {
-	errors.push('_shared/lua/locale/core.lua: missing — locale resolution must be single-sourced');
+if (!fileExistsSP('_shared/core/i18n/engine/core.lua')) {
+	errors.push(
+		'_shared/core/i18n/engine/core.lua: missing — locale resolution must be single-sourced'
+	);
 }
 
 // ── 2. macOS must consume it ───────────────────────────────────────────────
 const macLocale = fileExistsSP('macos/infra/locale.lua')
 	? read('static/ergopti_plus/macos/infra/locale.lua')
 	: '';
-if (!macLocale.includes('require("locale.core")')) {
-	errors.push('macos/infra/locale.lua: must require("locale.core") — not a hand-rolled copy');
+if (!macLocale.includes('require("core.i18n.engine.core")')) {
+	errors.push(
+		'macos/infra/locale.lua: must require("core.i18n.engine.core") — not a hand-rolled copy'
+	);
 }
 
 // ── 3. Linux must consume it ───────────────────────────────────────────────
 const lnxLocale = fileExistsSP('linux/infra/locale.lua')
 	? read('static/ergopti_plus/linux/infra/locale.lua')
 	: '';
-if (!lnxLocale.includes('require("locale.core")')) {
-	errors.push('linux/infra/locale.lua: must require("locale.core") — not a hand-rolled copy');
+if (!lnxLocale.includes('require("core.i18n.engine.core")')) {
+	errors.push(
+		'linux/infra/locale.lua: must require("core.i18n.engine.core") — not a hand-rolled copy'
+	);
 }
 
 // ── 4. Neither driver may re-implement the cascade inline ───────────────────

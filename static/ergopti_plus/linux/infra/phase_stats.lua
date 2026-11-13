@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Open-named phase timing for work that PerfCounters' closed enum cannot hold:
 --- one phase per child program (process.<program>), boot sub-stages, config
---- parses. The bookkeeping is the shared _shared/lua/phase_stats_core.lua, the
+--- parses. The bookkeeping is the shared _shared/metrics/engine/perf/phase_stats_core.lua, the
 --- same code the macOS driver runs; this module adds the Linux clock, the
 --- evidence sink and the flush cadence.
 ---
@@ -20,8 +20,8 @@
 ---    command line, which can carry user text in a heredoc, never reaches it.
 --- ==============================================================================
 
-local Core      = require("phase_stats_core")
-local Logger    = require("logger.shim")
+local Core      = require("metrics.engine.perf.phase_stats_core")
+local Logger    = require("core.logger.engine.shim")
 local Monotonic = require("infra.monotonic")
 
 local LOG = "phase_stats"

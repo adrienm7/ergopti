@@ -192,7 +192,7 @@ helpers.describe("developer source mode: boot wiring", function()
 	helpers.it("watches the clone's shared Lua only in a developer app", function()
 		local init = source("DevSource.payload_searcher(payload, loadfile, package.loadlib)")
 		helpers.assert_contains(init,
-			'shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil')
+			'shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "") or nil')
 		helpers.assert_contains(source("ctx.shared_source_dir ~= nil"),
 			'acquire_watcher(ctx.shared_source_dir, project_changed, "Shared source watcher", false)')
 	end)

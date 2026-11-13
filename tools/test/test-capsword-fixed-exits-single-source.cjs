@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Escape, Delete, the arrows, Home/End, Page Up/Down and F1-F12 always end
  * CapsWord (maintainer decision of 2026-11-06, aligned on macOS). The shared
- * policy's FIXED_EXIT_KEYS (_shared/lua/caps_word/auto_off.lua) is the list;
+ * policy's FIXED_EXIT_KEYS (_shared/keyboard/engine/caps_word_auto_off.lua) is the list;
  * this test pins the three driver copies to it: the macOS Karabiner anchor's
  * kept exits (capsword.json), the Windows virtual-key map
  * (CAPSWORD_FIXED_EXIT_VKS) and the Linux hook's control-key names.
@@ -44,7 +44,7 @@ function sorted(list) {
  * @returns {string[]}
  */
 function sharedKeys() {
-	const source = read('_shared/lua/caps_word/auto_off.lua');
+	const source = read('_shared/keyboard/engine/caps_word_auto_off.lua');
 	const match = source.match(/M\.FIXED_EXIT_KEYS = \{([^}]*)\}/);
 	if (!match) throw new Error('FIXED_EXIT_KEYS is missing from the shared CapsWord policy');
 	return [...match[1].matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]);

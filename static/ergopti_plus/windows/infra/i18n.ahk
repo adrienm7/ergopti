@@ -19,7 +19,7 @@
 ; 3. Language selector: ``I18nBuildLanguageMenu`` populates any AHK ``Menu``
 ;    object with one item per supported locale, with a check mark on the active
 ;    one. Callers pass their ``Menu`` object and the submenu is ready to use.
-; 4. Shared locale files: the JSON files live in ``_shared/data/locales/`` and
+; 4. Shared locale files: the JSON files live in ``_shared/core/i18n/data/locales/`` and
 ;    are the single source of truth shared with the Hammerspoon driver.
 ; ==============================================================================
 
@@ -43,7 +43,7 @@
 ; Ordered list of supported locales: { Code, Tag, Name }.
 ;
 ; Filled at init from _generated/locale_table.ahk, itself generated from
-; _shared/data/locale_order.json (order) and locale_names.json (native names).
+; _shared/core/i18n/data/locale_order.json (order) and locale_names.json (native names).
 ; Three hand-maintained copies is how the Linux table came to hold 16 of the 21
 ; shipped locales, its five missing rows rendering as bare two-letter codes.
 ;
@@ -269,7 +269,7 @@ _MakeLocaleSetter(Code) {
 
 ; Returns a copy of I18N_LOCALES in canonical display order. The table above is
 ; already declared in that order — single-sourced from
-; _shared/data/locale_order.json and pinned to it by the parity test — so this
+; _shared/core/i18n/data/locale_order.json and pinned to it by the parity test — so this
 ; hands back a cached shallow copy without sorting. Every locale menu shares the
 ; one order and can never desync from the other drivers or the site.
 _I18nSortedLocales() {
@@ -290,7 +290,7 @@ _I18nSortedLocales() {
 ; List provider for the manifest's ``language_menu`` row: one row per supported
 ; locale, with the flag this driver draws beside it. The rows are DATA — the
 ; renderer builds the items — so the menu the user sees is described in
-; _shared/modules/features/manifest.toml like every other, which it was not until
+; _shared/settings/data/features/manifest.toml like every other, which it was not until
 ; 2026-08-07: three drivers listed the same twenty-one locales from the same
 ; shared catalogue into a menu nothing declared.
 I18n_LocaleRows() {

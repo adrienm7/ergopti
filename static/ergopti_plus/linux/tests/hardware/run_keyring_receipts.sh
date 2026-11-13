@@ -44,5 +44,5 @@ openbox >/dev/null 2>&1 &
 PASSWORD="ergopti-keyring-proof"
 # --unlock reads the password up to end of input: no trailing newline.
 eval "$(printf '%s' "${PASSWORD}" | gnome-keyring-daemon --unlock --components=secrets 2>/dev/null)"
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 luajit tests/hardware/run_keyring_receipts.lua "${PASSWORD}"

@@ -45,8 +45,8 @@
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
-local OneShotShift = require("tap_hold.one_shot_shift")
-local LoneTap = require("tap_hold.lone_tap")
+local OneShotShift = require("tap_hold.engine.one_shot_shift_core")
+local LoneTap = require("tap_hold.engine.lone_tap")
 local InputEvent = require("infra.input_event")
 
 local M = {}
@@ -113,7 +113,7 @@ local UP, DOWN, REPEAT = 0, 1, 2
 
 -- evdev codes of the keys a tap-hold can be configured on (the Windows set).
 -- Their order in the tray and their hand are the shared key catalogue's
--- ([tap_hold.catalog] in _shared/tap_hold/defaults.toml, its `linux` column),
+-- ([tap_hold.catalog] in _shared/tap_hold/data/defaults.toml, its `linux` column),
 -- which the manager holds to exactly these keys.
 M.KEY_CODES = {
 	escape = 1, tab = 15, caps_lock = 58, left_shift = 42, left_ctrl = 29,

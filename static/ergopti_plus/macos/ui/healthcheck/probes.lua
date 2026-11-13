@@ -6,7 +6,7 @@
 --- The asynchronous half of the diagnostics snapshot: every fact that needs a
 --- subprocess or the network. Each probe runs off the main run loop (hs.task
 --- through adapters.shell_runner, hs.http through adapters.http_client), is
---- bounded by its timeout in _shared/modules/diagnostics/schema.json, and
+--- bounded by its timeout in _shared/diagnostics/data/schema.json, and
 --- answers exactly once: its result, a timeout or an error.
 ---
 --- FEATURES & RATIONALE:
@@ -266,7 +266,7 @@ end
 --- @return function Probe body.
 local function proxy_pac()
 	return function(done, on_cancel)
-		local PacCheck = require("network.pac_check")
+		local PacCheck = require("core.network.engine.pac_check")
 		run_task(SCUTIL, { "--proxy" }, on_cancel, function(stdout)
 			local url = PacCheck.url_from_scutil(stdout)
 			if not url then
@@ -449,7 +449,7 @@ local function configuration(schema, overrides)
 		local Timers = require("adapters.timer_scheduler")
 		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
-			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			local ok, result, sections = pcall(require("diagnostics.engine.healthcheck.configuration").probe, context)
 			if not ok then
 				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
 				return

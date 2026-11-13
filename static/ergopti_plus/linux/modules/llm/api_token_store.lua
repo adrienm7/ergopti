@@ -22,7 +22,7 @@
 ---    silent 1 is confirmed with `search`, which never prompts and still lists
 ---    a locked item: listed means locked, not absent, and not cleared.
 --- 5. Items carry two attributes, the application name of
----    _shared/data/identifiers.json and "<entry id>#<revision>", so `secret-tool
+---    _shared/core/text/data/identifiers.json and "<entry id>#<revision>", so `secret-tool
 ---    search application ErgoptiPlus` lists every key this driver stored. Each
 ---    store is a new revision: a changed key never overwrites the one the file
 ---    still names until the file is published.
@@ -39,9 +39,9 @@
 
 local M = {}
 
-local Logger      = require("logger.shim")
+local Logger      = require("core.logger.engine.shim")
 local ShellRunner = require("adapters.shell_runner")
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 
 local LOG = "modules.llm.api_token_store"
 
@@ -83,7 +83,7 @@ end
 --- @param remove_owned function Cleanup bound to the created file.
 --- @return string|nil text Nil when the result cannot be read safely.
 local function take_file(path, remove_owned)
-	local text, status = require("toml_codec.writer").read_classified(path)
+	local text, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	local called, removed = pcall(remove_owned)
 	if status ~= "ok" or not called or removed ~= true then return nil end
 	return text
@@ -396,7 +396,7 @@ local function run_async(program, args, env, timeout_ms, callback)
 	}, function(result)
 		if type(result) ~= "table" then callback(nil, "", "", "no process result") return end
 		local reason = result.error
-		if reason == require("adapter_errors").PROCESS_EXITED_UNSUCCESSFULLY then reason = nil end
+		if reason == require("diagnostics.engine.adapter_errors").PROCESS_EXITED_UNSUCCESSFULLY then reason = nil end
 		callback(reason == nil and result.exit_code or nil, result.stdout or "", result.stderr or "", reason)
 	end)
 	if not called or type(operation) ~= "table" then

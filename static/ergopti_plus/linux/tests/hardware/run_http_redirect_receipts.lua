@@ -105,7 +105,7 @@ check("a colon in a caller field name cannot smuggle credentials into a redirect
 end)
 
 check("a non-finite registry body limit cannot admit curl", function()
-	local Reader, Timings = require("toml_codec.reader"), require("timings")
+	local Reader, Timings = require("core.text.engine.toml_codec.reader"), require("core.timing.engine.timings_core")
 	local timings = Timings.new({ logger = { info = function() end }, log = "test", loaded_level = "info",
 		shared_path = function() return "/fixture/constants.toml" end,
 		parse = function() return Reader.parse_text("[limits]\nrelease_list_body_bytes = nan\n") end })

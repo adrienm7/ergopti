@@ -7,7 +7,7 @@
 ; network, and the processor load, which needs two samples. Each network probe
 ; is a native child owned by the process tree (CurlAsyncRequest, WinHTTP), reached
 ; through the Windows proxy the browser uses, harvested by a SetTimer poll and
-; bounded by its timeout in _shared/modules/diagnostics/schema.json; every
+; bounded by its timeout in _shared/diagnostics/data/schema.json; every
 ; probe answers exactly once.
 ;
 ; FEATURES & RATIONALE:

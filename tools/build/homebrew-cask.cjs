@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Writes the Homebrew cask of one released macOS build into a tap checkout:
  * Casks/ergoptiplus.rb for the most stable channel of the shared registry
- * (_shared/modules/updater/channels.json), Casks/ergoptiplus@<id>.rb for every
+ * (_shared/updater/data/channels.json), Casks/ergoptiplus@<id>.rb for every
  * other channel. The release workflow runs it after publishing a release and
  * pushes the result to the tap repository.
  *

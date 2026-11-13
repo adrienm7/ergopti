@@ -14,15 +14,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Agent = require("llm.agent")
-local Json = require("json")
+local Agent = require("ai.engine.agent.agent")
+local Json = require("core.text.engine.json")
 
 local TOOLS_DIR = "/home/user/.config/ergopti/agent_tools"
 local PRIVATE_DIR = "/run/user/1000/ergopti-agent.TEST"
 
 --- @return table config Decoded agent.json.
 local function config()
-	local fh = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+	local fh = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 	local text = fh:read("*a")
 	fh:close()
 	return assert(Json.decode(text))

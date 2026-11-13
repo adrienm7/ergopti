@@ -48,9 +48,9 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Json = require("json")
-local Report = require("field_check_report")
-local ModelCatalogue = require("llm.model_catalogue")
+local Json = require("core.text.engine.json")
+local Report = require("diagnostics.engine.field_check.report")
+local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Guided = require("infra.field_run_guided")
 
@@ -314,7 +314,7 @@ end
 --- A model already installed wins over a smaller one that is not: the
 --- maintainer's shared connection paid 20 minutes for 0.38 GB on 2026-10-30,
 --- and an installed model exercises the same pull and serve path for free.
---- @param catalogue table Decoded _shared/modules/llm/models.json.
+--- @param catalogue table Decoded _shared/ai/data/models.json.
 --- @param backend string "ollama" or "mlx".
 --- @param installed function|nil fn(model) -> boolean, true for an installed model.
 --- @return table|nil model { name, runtime_name, download_gb }

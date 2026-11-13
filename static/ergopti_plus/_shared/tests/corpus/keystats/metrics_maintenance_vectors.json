@@ -1,5 +1,5 @@
 {
-	"_description": "Dashboard Export and Purge (maintainer decision 2026-11-06). The tombstone is the events_system row a Purge appends to the owning writer's ledger; _shared/data/db/purge_schema.sql applies it while any ledger replays. The macOS/Linux helper (_shared/lua/keystats/metrics_maintenance.lua) and the Windows module (modules/keystats/keystats_maintenance.ahk) render these values; the replay cases run against the shared schema in every order a sync can deliver the ledgers.",
+	"_description": "Dashboard Export and Purge (maintainer decision 2026-11-06). The tombstone is the events_system row a Purge appends to the owning writer's ledger; _shared/metrics/data/db/purge_schema.sql applies it while any ledger replays. The macOS/Linux helper (_shared/metrics/engine/maintenance.lua) and the Windows module (modules/keystats/keystats_maintenance.ahk) render these values; the replay cases run against the shared schema in every order a sync can deliver the ledgers.",
 	"tombstone": {
 		"action": "metrics_purge",
 		"epoch": 1793959200.25,

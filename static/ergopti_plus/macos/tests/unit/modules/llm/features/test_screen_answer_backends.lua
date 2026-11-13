@@ -18,8 +18,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Vision = require("llm.vision")
+local json = require("core.text.engine.json")
+local Vision = require("ai.engine.prediction.vision")
 
 local USER = Vision.answer_user_text("Salut, on se voit demain ?")
 
@@ -39,7 +39,7 @@ end
 --- The prompt of the first answer of vision.json.
 --- @return string
 local function answer_prompt()
-	local fh = assert(io.open(helpers.shared("modules/llm/vision.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/vision.json"), "r"))
 	local config = json.decode(fh:read("*a"))
 	fh:close()
 	return Vision.fill_language(config.answers[1].prompt, "fr")

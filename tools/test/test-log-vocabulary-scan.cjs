@@ -101,7 +101,7 @@ assert.equal(Scan.formatterFields('function M.other() end', 'M.fmt'), null);
 // Every formatter the vocabulary declares must still resolve to fields.
 const vocabulary = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/logger/vocabulary.json'),
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/logger/data/vocabulary.json'),
 		'utf8'
 	)
 );

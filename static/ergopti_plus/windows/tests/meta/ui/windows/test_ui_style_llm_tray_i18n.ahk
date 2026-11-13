@@ -16,7 +16,7 @@ _MetaUiStyleAndLlmTrayI18n() {
 	Src := _DriverSourceNoComments()
 
 	; infra/ui_style.ahk must not hardcode the French fatal-error strings.
-	Assert(!InStr(Src, "Erreur fatale : _shared/modules/tooltip/constants.toml"),
+	Assert(!InStr(Src, "Erreur fatale : _shared/core/ui/data/tooltip/constants.toml"),
 		'infra/ui_style.ahk must not hardcode the French fatal-error message — use t("dialog.fatal_error.*")')
 	Assert(!InStr(Src, "ne peut pas démarrer"),
 		'infra/ui_style.ahk must not hardcode "ne peut pas démarrer" — use t("dialog.fatal_error.cannot_start")')

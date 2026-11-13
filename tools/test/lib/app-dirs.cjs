@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Application Folders for Node Tools
  * DESCRIPTION:
- * Reads _shared/modules/paths/app_dirs.toml, the one declaration of the
+ * Reads _shared/core/fs/data/paths/app_dirs.toml, the one declaration of the
  * Ergopti folders, for the Node tests and tools that must name a folder of a
  * driver (a startup smoke's logs, a fixture home) without spelling it.
  *
@@ -28,7 +28,9 @@ const APP_DIRS = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
+	'core',
+	'fs',
+	'data',
 	'paths',
 	'app_dirs.toml'
 );

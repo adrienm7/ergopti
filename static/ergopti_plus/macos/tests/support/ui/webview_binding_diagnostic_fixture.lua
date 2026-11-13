@@ -10,15 +10,15 @@
 local helpers = require("tests.helpers")
 
 local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.logger",
-	"adapters.json_codec", "adapters.timer_scheduler", "infra.locale", "json", "locale.core",
-	"webview.i18n_seed", "webview.presentation", "window_titles", "adapters.webview_result", "hs.json", "lfs" }
+	"adapters.json_codec", "adapters.timer_scheduler", "infra.locale", "core.text.engine.json", "core.i18n.engine.core",
+	"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "adapters.webview_result", "hs.json", "lfs" }
 
 --- Runs one diagnostic transaction with native messages and completions held apart.
 --- @param scenario function Assertions over the controlled observation.
 local function with_diagnostic(scenario)
 	local previous_lfs = rawget(_G, "lfs")
 	local scoped, scope_error = pcall(helpers.with_stub_scope, OWNED, function()
-		local json, lfs = require("json"), require("lfs")
+		local json, lfs = require("core.text.engine.json"), require("lfs")
 		local output = os.tmpname()
 		assert(os.remove(output)); assert(lfs.mkdir(output))
 		local driver = helpers.driver_root()

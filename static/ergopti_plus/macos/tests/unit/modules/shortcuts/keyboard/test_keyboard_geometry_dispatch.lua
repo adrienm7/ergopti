@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function with_geometry(callback)
 	helpers.with_stub_scope({ "adapters.keyboard_geometry", "modules.shortcuts.tap_keys",

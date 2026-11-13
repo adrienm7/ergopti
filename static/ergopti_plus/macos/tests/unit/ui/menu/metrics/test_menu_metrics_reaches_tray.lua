@@ -40,7 +40,7 @@ end)
 --- Replays the genuine Metrics owner without changing its completed child route.
 --- @param body function Structural source and parent assertions.
 local function metrics_parent_fixture(body)
-	local names = { "ui.menu.menu_metrics", "infra.manifest_menu", "infra.i18n", "infra.locale", "locale.core", "hs.fs" }
+	local names = { "ui.menu.menu_metrics", "infra.manifest_menu", "infra.i18n", "infra.locale", "core.i18n.engine.core", "hs.fs" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	package.loaded["hs.fs"] = hs.fs
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
@@ -62,5 +62,5 @@ local function metrics_parent_fixture(body)
 end
 local metrics_parent_file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/metrics_parent.json", "rb"))
 local metrics_parent_raw = metrics_parent_file:read("*a");metrics_parent_file:close()
-require("test.metrics_parent_contract").register(helpers, metrics_parent_fixture,
+require("tests.lua.metrics.parent_contract").register(helpers, metrics_parent_fixture,
 	assert(require("adapters.json_codec").decode(metrics_parent_raw)), "hs")

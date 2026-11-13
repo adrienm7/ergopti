@@ -6,7 +6,7 @@ description: Apply the shared logging contract and lifecycle pairing. Use when a
 # Logging
 
 The normative reference is the shared
-[`SPEC.md`](../../../static/ergopti_plus/_shared/modules/logger/SPEC.md): it owns
+[`SPEC.md`](../../../static/ergopti_plus/_shared/core/logger/data/SPEC.md): it owns
 the eight variants, the importance/lifecycle grid, punctuation, and driver
 conformance contract. `AGENTS.md` owns the universal English and fail-fast
 rules. This skill covers how to apply and verify that contract in practice.

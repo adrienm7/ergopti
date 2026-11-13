@@ -15,7 +15,7 @@ local provenance_fixture = require("tests.support.keystats_provenance_fixture")
 -- Own the real tracker dependency caches across construction, callbacks and teardown.
 local function scoped_tracker_case(callback)
 	return function()
-		return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector", "native_path", "error_description", "number_policy", "adapters.synthetic_input", "adapters.event_provenance" }, callback)
+		return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "adapters.synthetic_input", "adapters.event_provenance" }, callback)
 	end
 end
 

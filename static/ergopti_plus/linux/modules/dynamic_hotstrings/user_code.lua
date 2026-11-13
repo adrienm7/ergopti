@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Programmable Hotstrings (Linux)
 --- DESCRIPTION:
---- Binds the shared programmable-hotstring lifecycle (_shared/lua/
---- dynamic_hotstrings/user_code_driver.lua) to this driver: user callbacks are
+--- Binds the shared programmable-hotstring lifecycle (_shared/
+--- hotstrings/engine/dynamic/user_code_driver.lua) to this driver: user callbacks are
 --- deferred through libuv under the daemon-owned source, cursor and lifecycle
 --- receipts. Static previews never evaluate source callbacks.
 ---
@@ -14,11 +14,11 @@
 --- 2. The daemon owns the activation interval: it travels with every capture
 ---    instead of being set on the native owner (no apply_time port).
 --- ==============================================================================
-local Driver = require("dynamic_hotstrings.user_code_driver")
+local Driver = require("hotstrings.engine.dynamic.user_code_driver")
 local FileSystem = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Notifier = require("adapters.application_notifier")
 local I18n = require("infra.i18n")
 local Manifest = require("infra.manifest_reader")
@@ -64,7 +64,7 @@ end
 
 return Driver.new({
 	logger = Logger,
-	log = "dynamic_hotstrings.user_code",
+	log = "hotstrings.engine.dynamic.user_code_core",
 	platform = "linux",
 	-- Resolved at call time: a collaborator replaced after load is still the one used.
 	read = function(path) return FileSystem.read_with_status(path) end,

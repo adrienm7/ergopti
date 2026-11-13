@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
-require("logger")
+require("core.logger.engine")
 
 local OWNED = {
 	"modules.llm.agent_runner", "modules.llm.agent_learning", "modules.llm.agent_connectors",
-	"llm.agent", "llm.agent_learning", "adapters.system_info", "infra.locale",
-	"infra.dialog_util", "modules.llm.local_model_offer", "locale.core", "modules.shortcuts.script_control",
+	"ai.engine.agent.agent", "llm.agent_learning", "adapters.system_info", "infra.locale",
+	"infra.dialog_util", "modules.llm.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
 }
 
 --- Keeps the complete real requester and every native callback in one scope.

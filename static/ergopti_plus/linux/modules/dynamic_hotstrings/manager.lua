@@ -13,7 +13,7 @@
 ---    and registers one rule per letter shortcut (e.g. "@p" → first_name).
 --- 2. Date rules: td → 2026_07_08, dt → 08/07/2026, date → long French.
 --- 3. Shared engine: delegates all matching logic to the canonical
----    _shared/lua/dynamic_hotstrings/init.lua module — zero duplication.
+---    _shared/hotstrings/engine/dynamic/core.lua module — zero duplication.
 --- 4. Trigger-agnostic: the caller supplies the trigger character (default
 ---    "★") so the engine matches regardless of which key the user configured.
 --- 5. Injection: when a match fires, delegates to modules.hotstrings.injector
@@ -21,18 +21,18 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local UnicodeCase = require("unicode_case")
+local TableUtil = require("core.text.engine.table_util")
+local UnicodeCase = require("core.text.engine.unicode_case")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local ManifestReader = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local UserCode = require("modules.dynamic_hotstrings.user_code")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local KEY = require("config_keys").KEY
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local KEY = require("settings.engine.keys").KEY
 
 local LOG = "modules.dynamic_hotstrings.manager"
 
@@ -90,7 +90,7 @@ local _info_edits = setmetatable({}, { __mode = "k" })
 local native_utf8 = rawget(_G, "utf8")
 local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
 	and native_utf8.codes and native_utf8.char)
-	and native_utf8 or require("compat.utf8")
+	and native_utf8 or require("core.lifecycle.engine.compat.utf8")
 
 local function strict_codepoint_length(value)
 	if type(value) ~= "string" then return nil end
@@ -123,7 +123,7 @@ end
 --- Serialises the shared first-boot placeholders as a personal_info.toml source.
 --- @return string content
 local function _first_boot_source()
-	local Defaults = require("personal_info.defaults")
+	local Defaults = require("hotstrings.engine.personal_info.defaults")
 	local function quoted(value) return '"' .. value:gsub('[\\"]', "\\%0") .. '"' end
 	local function section(name, values)
 		local keys = TableUtil.sorted_keys(values)
@@ -156,7 +156,7 @@ local function _seed_missing_source(path)
 	-- A fresh install starts before anything created the configuration folder:
 	-- the exclusive create then failed with ENOENT, and the editor had no source.
 	local Shell = require("adapters.shell_runner")
-	local directory = require("native_path").dirname(path)
+	local directory = require("core.fs.engine.native_path").dirname(path)
 	if not directory or not Shell.run("mkdir -p -- " .. Shell.quote(directory) .. " 2>/dev/null") then
 		Logger.error(LOG, "Could not create the configuration folder for personal_info.toml — the editor has no source.")
 		return false
@@ -238,7 +238,7 @@ function M.init(opts)
 	local info_path = options.personal_info_path or require("infra.config_paths").config("personal_info.toml")
 
 	-- Load shared engine.
-	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
+	local ok_eng, Engine = pcall(require, "hotstrings.engine.dynamic.core")
 	if not ok_eng or not Engine then
 		Logger.warn(LOG, "Shared dynamic_hotstrings engine not available — disabled.")
 		_enabled = false
@@ -568,7 +568,7 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication, within_de
 	if strict_codepoint_length(t) ~= 1 or buffer:sub(-#t) ~= t then return false end
 
 	-- Injector loaded once at init; stored via closure below.
-	local Engine = require("dynamic_hotstrings")
+	local Engine = require("hotstrings.engine.dynamic.core")
 	if not Engine then return false end
 
 	-- The shared engine matches the buffer SUFFIX (without the trigger char
@@ -680,7 +680,7 @@ function M.preview_candidates(buffer, start_is_boundary)
 	-- the combo and the programmable source, so it is the one row offered. The
 	-- static matcher never holds these rules: without this row "@p" and "td"
 	-- expanded on the magic key with no bubble at all.
-	local match = require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled,
+	local match = require("hotstrings.engine.dynamic.core").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled,
 		start_is_boundary)
 	if match then
 		local suffix = match.rule.suffix
@@ -704,7 +704,7 @@ function M.preview_candidates(buffer, start_is_boundary)
 	local user = UserCode.preview(buffer)
 	if user then
 		rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
-			group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
+			group = DYNAMIC_GROUP, section = require("settings.engine.keys").LEAF.USER_CODE, fires = true }
 	end
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end
 
@@ -747,7 +747,7 @@ function M.preview(buffer, start_is_boundary)
 	if not M.is_enabled() then return nil end
 	if type(buffer) ~= "string" or buffer == "" then return nil end
 
-	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
+	local ok_eng, Engine = pcall(require, "hotstrings.engine.dynamic.core")
 	if not ok_eng or not Engine then return nil end
 
 	-- The same guard as the match path. A preview that offers what the engine
@@ -964,8 +964,8 @@ end
 ---
 --- `id` is the manifest id under `hotstrings.dynamic`; `section` is what the
 --- shared engine registers the rule under, and the two differ because the locale
---- catalogue folds underscores away. `_shared/modules/features/manifest.toml`
---- and `_shared/data/locales/*.json` are those two spellings' sources.
+--- catalogue folds underscores away. `_shared/settings/data/features/manifest.toml`
+--- and `_shared/core/i18n/data/locales/*.json` are those two spellings' sources.
 ---
 --- Windows and macOS offer one toggle per family; Linux offered only the
 --- category gate, and the plan recorded the blocker as "the shared engine
@@ -1005,7 +1005,7 @@ local function _family_label(family)
 	local field = family.date_field
 	if not field or not label:find("{date}", 1, true) then return label end
 
-	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
+	local ok_eng, Engine = pcall(require, "hotstrings.engine.dynamic.core")
 	if not ok_eng or not Engine then return label end
 	local today = Engine.today_date_strings()
 	local value = today and today[field]

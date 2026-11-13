@@ -99,7 +99,7 @@ helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 
 	helpers.it("logs a repeating slow segment once per window and reports what it withheld", function()
 		reset_capture()
-		local Segments = require("hotpath_segments")
+		local Segments = require("metrics.engine.perf.hotpath_segments")
 		local function slow_at(at_ms)
 			NS = at_ms * NS_PER_MS
 			local t0 = hot.now()
@@ -157,7 +157,7 @@ helpers.describe("infra.hotpath_profiler nesting attribution", function()
 		NS = t0 + 9 * NS_PER_MS
 		hot.log_if_slow("hotstring.expand", t0)
 		helpers.assert_eq(#captured, 1)
-		local Segments = require("hotpath_segments")
+		local Segments = require("metrics.engine.perf.hotpath_segments")
 		for _, value in ipairs(captured[1].args) do
 			helpers.assert_true(type(value) == "number" or Segments.is_declared(value) or value == Segments.NO_PARENT,
 				"a log argument outside the closed vocabulary: " .. tostring(value))
@@ -186,4 +186,4 @@ hs.timer.absoluteTime = orig_abs
 package.loaded["infra.logger"] = _real_logger
 package.loaded["adapters.timer_scheduler"] = nil
 
-require("test.adapter_errors_contract").register(helpers)
+require("tests.lua.diagnostics.adapter_errors_contract").register(helpers)

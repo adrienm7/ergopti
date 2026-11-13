@@ -15,7 +15,7 @@
 --- loop nothing called, and would otherwise be written down a second time here.
 ---
 --- FEATURES & RATIONALE:
---- 1. Identity, not layout. `_shared/data/keycodes/evdev.json` maps codes to the
+--- 1. Identity, not layout. `_shared/layouts/data/keycodes/evdev.json` maps codes to the
 ---    characters a layout produces and is the single source for that. This file
 ---    is the disjoint question — which physical key is this — and the two must
 ---    not be conflated: a modifier has no character, and asking the layout table

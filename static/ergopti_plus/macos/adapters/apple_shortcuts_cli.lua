@@ -19,7 +19,7 @@
 --- 3. Cancellation stops the command-line tool. Shortcuts runs a shortcut in
 ---    its own service, which may finish the actions already handed to it: the
 ---    owner's automation receipt here is the tool's exit, and the README says
----    so (security notes of _shared/modules/actions).
+---    so (security notes of _shared/shortcuts/data/actions).
 --- 4. Payload-free native logging: shortcut names, identifiers and the text a
 ---    run receives or returns never reach the log.
 --- ==============================================================================
@@ -30,8 +30,8 @@ local Shell = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Owner = require("adapters.apple_shortcuts")
 local Native = require("adapters.apple_shortcuts_native")
-local Parameter = require("program_parameter")
-local Json = require("json")
+local Parameter = require("settings.engine.program_parameter")
+local Json = require("core.text.engine.json")
 
 --- The system tool every transport of the owner names.
 M.SHORTCUTS_BIN = "/usr/bin/shortcuts"

@@ -5,7 +5,7 @@
  * MODULE: GitHub Issue Forms And Their Registry
  * DESCRIPTION:
  * The app opens the forms of .github/ISSUE_TEMPLATE/ and prefills them by
- * field id from static/ergopti_plus/_shared/modules/diagnostics/issue_templates.json.
+ * field id from static/ergopti_plus/_shared/diagnostics/data/issue_templates.json.
  * GitHub silently ignores a prefill whose id the form does not declare, so a
  * renamed field would leave every report without its version or diagnostics
  * and nothing would fail. This test holds the registry and the forms together:
@@ -44,10 +44,10 @@ const IssueLink = (() => {
 })();
 
 const registry = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'issue_templates.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'issue_templates.json'), 'utf8')
 );
 const defaults = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'updater', 'data', 'defaults.json'), 'utf8')
 );
 const repository = defaults.github;
 

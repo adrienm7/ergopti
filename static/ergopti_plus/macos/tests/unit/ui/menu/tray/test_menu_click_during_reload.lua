@@ -47,7 +47,7 @@ helpers.describe("menubar click during a reload (menu-click-reload-handoff)", fu
 		helpers.assert_true(require("ui.menu.init").stop_watchers())
 		local stored = require("adapters.storage").get(REPLAY_KEY, nil)
 		helpers.assert_type(stored, "string", "the held click is handed to the reloaded menu")
-		local record = require("json").decode(stored)
+		local record = require("core.text.engine.json").decode(stored)
 		helpers.assert_eq(#record.clicks, 1)
 		helpers.assert_eq(record.clicks[1].path, { "Features", "Preview" })
 		helpers.assert_eq(record.clicks[1].desired, true, "the click asks for the opposite of the checkmark")
@@ -55,7 +55,7 @@ helpers.describe("menubar click during a reload (menu-click-reload-handoff)", fu
 
 	helpers.it("(menu-click-reload-replayed) replays a handed-off click once in the successor", function()
 		local switch = { on = false, runs = 0 }
-		local record = require("json").encode({ schema = 1, at = os.time(),
+		local record = require("core.text.engine.json").encode({ schema = 1, at = os.time(),
 			clicks = { { path = { "Features", "Preview" }, desired = true } } })
 		local fixture = boot_with_row(switch, function()
 			helpers.assert_true(require("adapters.storage").set(REPLAY_KEY, record))
@@ -69,7 +69,7 @@ helpers.describe("menubar click during a reload (menu-click-reload-handoff)", fu
 
 	helpers.it("(menu-click-reload-intent-skip) skips a handed-off click whose row already shows its state", function()
 		local switch = { on = true, runs = 0 }
-		local record = require("json").encode({ schema = 1, at = os.time(),
+		local record = require("core.text.engine.json").encode({ schema = 1, at = os.time(),
 			clicks = { { path = { "Features", "Preview" }, desired = true } } })
 		local fixture = boot_with_row(switch, function()
 			helpers.assert_true(require("adapters.storage").set(REPLAY_KEY, record))

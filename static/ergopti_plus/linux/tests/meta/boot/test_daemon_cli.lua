@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local NoticeRecorder = require("tests.support.notice_recorder")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 helpers.describe("ergopti_hotstrings CLI", function()
 

@@ -46,7 +46,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local Timings     = require("infra.timings")
 local FileSystem  = require("adapters.file_system")
 local Manifest    = require("infra.manifest_reader")
-local TomlWriter  = require("toml_codec.writer")
+local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
 	write = FileSystem.write_if_unchanged, read = FileSystem.read_with_status,
 	load = NavLayer.load, observe = NavLayer.capture_configured_inputs }
@@ -109,7 +109,7 @@ local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems
 
 -- Data JSONs live alongside this module under data/; Karabiner-Elements is
 -- macOS-exclusive so there is no reason to put these files in _shared/.
-local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
+local _DATA_DIR = (require("core.fs.engine.native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
@@ -3804,7 +3804,7 @@ function M.set_enabled(value, on_done, onboarding_gate)
 				local bytes, status = TomlWriter.read_classified(file.path, FileSystem)
 				restored = status == "ok" and bytes == file.candidate
 			else
-				local called, result = pcall(require("config_file_inverse").restore, file, FileSystem)
+				local called, result = pcall(require("settings.engine.migration.file_inverse").restore, file, FileSystem)
 				restored = called and result == true
 			end
 			if restored ~= true then return false end
@@ -4422,11 +4422,11 @@ retry_bulk_settings_recovery = function()
 	-- must settle before a no-write or sibling shortcut can retire this owner.
 	if transaction.backup_cleanup ~= nil
 		and TomlWriter.retry_publication_cleanup(transaction.backup_cleanup) ~= true then return false end
-	if transaction.file ~= nil and require("config_file_inverse").settle_publication(transaction.file) ~= true then return false end
+	if transaction.file ~= nil and require("settings.engine.migration.file_inverse").settle_publication(transaction.file) ~= true then return false end
 	if transaction.phase == "rollback-persistence" then
 		Logger.warn(LOG, "Retrying retained %s inverse persistence.", transaction.label)
 		if transaction.file ~= nil then
-			if require("config_file_inverse").restore(transaction.file, FileSystem) ~= true then return false end
+			if require("settings.engine.migration.file_inverse").restore(transaction.file, FileSystem) ~= true then return false end
 			if transaction.detached ~= true then publish_settings_state(transaction.snapshot) end
 		elseif not persist_and_publish_settings(
 			transaction.snapshot,
@@ -4944,7 +4944,7 @@ end
 function M.set_tap_timeout(key_id, ms)
 	if not require_state("set_tap_timeout") then return false end
 	local value = ms == nil and nil or tonumber(ms)
-	if ms ~= nil and (not require("number_policy").within_timer_ceiling(value)
+	if ms ~= nil and (not require("core.text.engine.number_policy").within_timer_ceiling(value)
 		or (value > 0 and value % 1 ~= 0)) then
 		Logger.error(LOG, "set_tap_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
@@ -5073,13 +5073,13 @@ end
 function M.set_tap_hold_timeout(ms)
 	if not require_state("set_tap_hold_timeout") then return false end
 	local value = tonumber(ms)
-	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
+	if not require("core.text.engine.number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
 		Logger.error(LOG, "set_tap_hold_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_TIMEOUT_MS)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
 	return committed
 end
@@ -5097,14 +5097,14 @@ end
 --- @param ms number 0 (the strict tap-hold) or a positive whole number of milliseconds.
 function M.set_lone_modifier_tap_max_ms(ms)
 	if not require_state("set_lone_modifier_tap_max_ms") then return false end
-	local valid, value = pcall(require("tap_hold.lone_tap").validate, ms)
+	local valid, value = pcall(require("tap_hold.engine.lone_tap").validate, ms)
 	if not valid then
 		Logger.error(LOG, "set_lone_modifier_tap_max_ms: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.lone_modifier_tap_max_ms = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
 	if committed then Logger.debug(LOG, "Lone modifier tap window: %d ms.", value) end
 	return committed
 end
@@ -5122,13 +5122,13 @@ end
 function M.set_sticky_timeout(ms)
 	if not require_state("set_sticky_timeout") then return false end
 	local value = tonumber(ms)
-	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
+	if not require("core.text.engine.number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
 		Logger.error(LOG, "set_sticky_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
 	return committed
 end
@@ -5146,13 +5146,13 @@ end
 function M.set_simultaneous_threshold(ms)
 	if not require_state("set_simultaneous_threshold") then return false end
 	local value = tonumber(ms)
-	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
+	if not require("core.text.engine.number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
 		Logger.error(LOG, "set_simultaneous_threshold: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
-	end, nil, require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
 	return committed
 end
@@ -5174,7 +5174,7 @@ function M.set_combo_symmetric(value)
 	local normalized = value == true
 	local committed = commit_state_mutation(function(candidate)
 		candidate.combo_symmetric = normalized
-	end, nil, require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
+	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_SYMMETRIC)
 	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
 	return committed
 end
@@ -5202,7 +5202,7 @@ function M.set_tap_holds_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED)
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5356,7 +5356,7 @@ function M.set_mod_combos_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_enabled = value
-	end, nil, require("config_keys").KEY.MOD_COMBOS_ENABLED)
+	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_ENABLED)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5982,7 +5982,7 @@ end
 -- The bulk scope of the Tap-Hold submenu. The key combinations are drawn in
 -- the Shortcuts group with a switch of their own, so the Tap-Hold restore and
 -- clear rows must leave them, and that switch, as the user set them.
-local BULK_SCOPE_TAP_HOLDS = require("config_keys").KEY.TAP_HOLDS
+local BULK_SCOPE_TAP_HOLDS = require("settings.engine.keys").KEY.TAP_HOLDS
 
 --- Resolves a bulk command's scope, refusing an unknown one through its callback.
 --- @param label string Stable operation label.
@@ -6056,7 +6056,7 @@ end
 
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
-local REMAP_SCOPE_SECTIONS = { tap_holds = require("config_keys").KEY.TAP_HOLDS, shortcuts = require("config_keys").KEY.MOD_COMBOS, key_combinations = require("config_keys").KEY.MOD_COMBOS }
+local REMAP_SCOPE_SECTIONS = { tap_holds = require("settings.engine.keys").KEY.TAP_HOLDS, shortcuts = require("settings.engine.keys").KEY.MOD_COMBOS, key_combinations = require("settings.engine.keys").KEY.MOD_COMBOS }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
 --- verified backup of tap_hold.toml, a save that only replaces those
@@ -6089,13 +6089,13 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local sibling = request.scope == require("config_keys").KEY.TAP_HOLDS and request.mode == "recommended"
+	local sibling = request.scope == require("settings.engine.keys").KEY.TAP_HOLDS and request.mode == "recommended"
 		and require("platform.remap.scope_layer").import() or nil
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-		if section == require("config_keys").KEY.MOD_COMBOS then
+		if section == require("settings.engine.keys").KEY.MOD_COMBOS then
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then
@@ -6108,11 +6108,11 @@ function M.apply_scope(request, on_done)
 		end
 		-- The manifest rows of the scope, each with its state field.
 		local fields = {
-			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
+			[require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
 			-- config-key-literal-ok: the value is the remap state field, named like its leaf
-			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+			[require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
 			-- config-key-literal-ok: the value is the remap state field, named like its leaf
-			[require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = "sticky_timeout_ms",
+			[require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = "sticky_timeout_ms",
 		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
@@ -6525,7 +6525,7 @@ function M.regenerate(
 
 	-- Ensure the parent directory of the KC physical log exists before Karabiner
 	-- starts writing to it via shell_command echo redirects
-	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and require("native_path").dirname(Generator.KE_PHYSICAL_KC_LOG)
+	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and require("core.fs.engine.native_path").dirname(Generator.KE_PHYSICAL_KC_LOG)
 	if kc_parent and not _kc_parent_ensured then
 		-- POSIX single-quoting, not Lua's %q. %q escapes for a LUA literal — it leaves
 		-- $, backticks and ! untouched — so a config dir containing any of them was
@@ -6537,7 +6537,7 @@ function M.regenerate(
 		-- the boot regeneration).
 		local ok_mode, mode = pcall(hs.fs.attributes, kc_parent, "mode")
 		if not (ok_mode and mode == "directory") then
-			pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+			pcall(hs.execute, "mkdir -p " .. require("core.text.engine.utils_core").shell_quote(kc_parent))
 		end
 		_kc_parent_ensured = true
 	end

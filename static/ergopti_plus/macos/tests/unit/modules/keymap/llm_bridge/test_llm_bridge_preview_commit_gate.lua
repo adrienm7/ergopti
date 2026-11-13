@@ -629,7 +629,7 @@ helpers.describe("personal-file identity reaches the deferred native preview own
 		helpers.assert_true(Registry.init(state))
 		Registry.set_group_context("personal_ext_memory")
 		Registry.add("abc", "replacement", { auto_expand = false, is_case_sensitive_strict = true,
-			personal_source = require("hotstrings.personal_files").describe({ "Équipe", "mémoire.toml" }) })
+			personal_source = require("hotstrings.engine.catalogue.personal_files").describe({ "Équipe", "mémoire.toml" }) })
 		helpers.assert_eq(#state.mappings, 1)
 		Registry.set_group_context(nil)
 		local mapping = state.mappings[1]

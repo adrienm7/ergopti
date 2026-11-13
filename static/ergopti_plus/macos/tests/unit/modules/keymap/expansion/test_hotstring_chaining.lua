@@ -49,7 +49,7 @@ local function fresh_engine(entries)
 		end
 	end
 	package.loaded["infra.text_utils"]           = nil
-	package.loaded["text_utils"]                 = nil
+	package.loaded["core.text.engine.utils_core"]                 = nil
 
 	local R = require("modules.keymap.registry")
 	local E = require("modules.keymap.expander")

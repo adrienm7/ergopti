@@ -13,11 +13,11 @@
 --- Exit 0 = every check held.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 local uv = require("luv")
 if os.getenv("ERGOPTI_LIVE_DEBUG") then
-	require("logger").set_sink(function(line) io.stderr:write(line, "\n") end)
+	require("core.logger.engine").set_sink(function(line) io.stderr:write(line, "\n") end)
 end
 local ffi = require("ffi")
 ffi.cdef("int setenv(const char *, const char *, int); int unsetenv(const char *);")
@@ -77,7 +77,7 @@ local Reapply = require("modules.keymap.x11_layout_reapply")
 
 print("=== the daemon keeps Bépo against " .. tostring(os.getenv("XDG_CURRENT_DESKTOP")) .. " under X11 ===")
 local registry_dir = "../../layouts/registry/"
-local index = require("json").decode(read(registry_dir .. "index.json"))
+local index = require("core.text.engine.json").decode(read(registry_dir .. "index.json"))
 local entry
 for _, candidate in ipairs(index.layouts) do if candidate.id == "bepo" then entry = candidate end end
 local session = os.getenv("XDG_SESSION_TYPE")

@@ -5,7 +5,7 @@
  * MODULE: Number-Row Tap Keys Single-Source Gate
  * DESCRIPTION:
  * The three number-row tap keys are declared once, in
- * _shared/modules/actions/tap_keys.json (id and each driver's key identity),
+ * _shared/shortcuts/data/actions/tap_keys.json (id and each driver's key identity),
  * with their defaults in the features manifest (shortcuts.tap_keys.<id>). This
  * gate checks the two agree, that the Windows driver's static hotkeys and its
  * scancode table name the same keys in the same order, that those hotkeys are
@@ -28,13 +28,13 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const KEYS = path.join(SP, '_shared', 'modules', 'actions', 'tap_keys.json');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
+const KEYS = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'tap_keys.json');
+const MANIFEST = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
 const AHK_LOGIC = path.join(SP, 'windows', 'infra', 'tap_keys.ahk');
 const AHK_HOTKEYS = path.join(SP, 'windows', 'modules', 'shortcuts', 'tap_keys.ahk');
 const AHK_ENTRY = path.join(SP, 'windows', 'ErgoptiPlus.ahk');
 const AHK_WIN = path.join(SP, 'windows', 'modules', 'shortcuts', 'win.ahk');
-const EN = path.join(SP, '_shared', 'data', 'locales', 'en.json');
+const EN = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json');
 
 const errors = [];
 let checks = 0;

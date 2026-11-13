@@ -4,9 +4,9 @@
 --- MODULE: Diagnostic Snapshot Collector (macOS)
 --- DESCRIPTION:
 --- Gathers the environment facts of the cross-driver diagnostic snapshot
---- (_shared/modules/logger/diagnostic_snapshot.json) and logs them as one INFO
+--- (_shared/core/logger/data/diagnostic_snapshot.json) and logs them as one INFO
 --- line once per session, after boot. Formatting is shared with Linux through
---- _shared/lua/diagnostics/snapshot.lua; the OS probes live in
+--- _shared/diagnostics/engine/snapshot.lua; the OS probes live in
 --- adapters/system_info.lua.
 ---
 --- FEATURES & RATIONALE:
@@ -19,8 +19,8 @@
 local M = {}
 
 local Logger      = require("infra.logger")
-local NativePath = require("native_path")
-local Snapshot    = require("diagnostics.snapshot")
+local NativePath = require("core.fs.engine.native_path")
+local Snapshot    = require("diagnostics.engine.snapshot")
 
 M.DRIVER = "macos"
 

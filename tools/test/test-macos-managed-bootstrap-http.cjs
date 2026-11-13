@@ -20,7 +20,7 @@ function receiveNativeHTTPFailureStages() {
 	const ROOT = path.resolve(__dirname, '../..');
 	const { render, rewrite, OUTPUTS } = require('../codegen/codegen-native-http-failure-stages.cjs');
 	const authority = fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json')
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/network/data/native_http_failure_stages.json')
 	);
 	const expected = [
 		['policyLoad', 'native_policy_load', ['unavailable']],

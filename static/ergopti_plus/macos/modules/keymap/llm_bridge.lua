@@ -47,9 +47,9 @@ local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local Timings          = require("infra.timings")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local LlmContext       = require("modules.keymap.llm_context")
-local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
+local ContextBuffer    = require("ai.engine.policy.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -1058,7 +1058,7 @@ local function update_preview_body(buf)
 				rows[#rows + 1] = {
 					-- Masked when the value is a declared secret, in full otherwise.
 					-- Which fields are secrets, and how much of one stays visible, is
-					-- _shared/modules/personal_info/fields.toml — read at runtime, so
+					-- _shared/hotstrings/data/personal_info/fields.toml — read at runtime, so
 					-- this driver holds no opinion of its own about it.
 					text          = masked_for_preview(m),
 					personal_source_id = m.mapping and m.mapping.personal_source and m.mapping.personal_source.id or nil,

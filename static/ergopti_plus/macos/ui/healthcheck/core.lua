@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Healthcheck Core
 --- DESCRIPTION:
---- The version 2 diagnostics snapshot (_shared/modules/diagnostics/schema.json)
+--- The version 2 diagnostics snapshot (_shared/diagnostics/data/schema.json)
 --- and the window that shows it. The window loads the shared page
 --- (_shared/ui/healthcheck/); the page renders the snapshot, keeps the preview
 --- of what is shared and asks for every action by message.
@@ -29,12 +29,12 @@ local hs       = hs
 local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
 local Paths    = require("infra.paths")
-local Snapshot = require("healthcheck.snapshot")
-local Cleanup = require("healthcheck.cleanup")
-local Actions  = require("healthcheck.actions")
+local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
+local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
+local Actions  = require("diagnostics.engine.healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
@@ -883,7 +883,7 @@ end
 local function collect_issues()
 	local recent, source = {}, "unavailable"
 	local ok, err = pcall(function()
-		local limits = Snapshot.load_recent_issue_limits(Paths.shared("modules/diagnostics/recent_issues.json"))
+		local limits = Snapshot.load_recent_issue_limits(Paths.shared("diagnostics/data/recent_issues.json"))
 		recent, source = Snapshot.collect_recent_issues(Logger.today_errors_path(), Logger.ring_buffer_snapshot() or {},
 			limits)
 	end)
@@ -1005,7 +1005,7 @@ function M.run(opts)
 	-- A report from the Debug menu has no page to keep responsive: its
 	-- configuration is collected now, after phase A was measured
 	if opts.complete_local == true then
-		local err = require("healthcheck.configuration").complete(snapshot,
+		local err = require("diagnostics.engine.healthcheck.configuration").complete(snapshot,
 			H.configuration_context(schema, opts.configuration))
 		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
 		complete_local_state(snapshot)
@@ -1099,17 +1099,17 @@ local function perform_action(session, action, documents)
 	Cleanup.refresh(session)
 	if _session ~= session or _window ~= session.webview or session.action_epoch ~= epoch then return end
 	if action.action == "export_snapshot" then
-		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+		if not require("diagnostics.engine.healthcheck.share").capture_page_checks(session.snapshot, action) then
 			send(session, { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence })
 			return
 		end
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
-			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
+			share_text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, documents.schema,
 				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
 	elseif action.action == "day_log" then
 		-- Opt-in: ticking collects and redacts today's log; unticking drops it
-		local DayLogHost = require("healthcheck.day_log")
+		local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 		if not action.enabled then
 			DayLogHost.discard(session.snapshot)
 			send(session, { type = "action", action = "day_log", ok = true, state = "off" })

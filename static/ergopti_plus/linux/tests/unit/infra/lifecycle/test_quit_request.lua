@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 local QuitRequest = require("infra.quit_request")
 
-require("test.quit_admission_contract")(helpers)
+require("tests.lua.core_lifecycle.quit_admission_contract")(helpers)
 
 --- Builds a handler over recording ports.
 --- @param state table Mutable facts: requested, reload, writer, publication, abandon_fails.

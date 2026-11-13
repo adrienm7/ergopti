@@ -98,7 +98,7 @@ h.describe("original retirement inside acknowledged synthetic output", function(
 	end)
 
 	h.it("stale or refused initial output views return no custody instead of throwing", function()
-		local Custody = require("input.modifier_custody")
+		local Custody = require("platform.input.modifier_custody")
 		for _, view in ipairs({ function() return nil end, function() error("refused") end,
 			function() return { down = { unexpected = true }, write_epoch = 0 } end }) do
 			local ok, result = pcall(Custody.new, { output_view = view }, {})

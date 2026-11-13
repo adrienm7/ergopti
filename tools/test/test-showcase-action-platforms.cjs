@@ -29,7 +29,10 @@ const { parse: parseToml } = require('smol-toml');
 const ROOT = path.resolve(__dirname, '..', '..');
 const HELPER = path.join(ROOT, 'src/routes/ergopti-plus/action-platforms.js');
 const PAGE = path.join(ROOT, 'src/routes/ergopti-plus/KeyboardPower.svelte');
-const CATALOGUE = path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/actions.toml');
+const CATALOGUE = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/shortcuts/data/actions/actions.toml'
+);
 const DRIVERS = ['ahk', 'hs', 'linux'];
 
 (async () => {
@@ -88,7 +91,7 @@ const DRIVERS = ['ahk', 'hs', 'linux'];
 		resolve: path.resolve,
 		parseToml,
 		ACTIONS_ROOT: path.dirname(CATALOGUE),
-		LOCALES_ROOT: path.join(ROOT, 'static/ergopti_plus/_shared/data/locales')
+		LOCALES_ROOT: path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales')
 	});
 	const loaded = groups.flatMap((group) => group.sections.flatMap((section) => section.actions));
 	const dispatchable = doc.sg_order.items.filter(

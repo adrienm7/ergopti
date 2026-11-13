@@ -41,7 +41,7 @@ local function isolated(body)
 		assert(uv.fs_rmdir(path))
 	end
 	local ok, why = xpcall(function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local Paths = require("infra.config_paths")
 		assert(uv.fs_mkdir(Paths.config_home(), 448))
 		assert(uv.fs_mkdir(Paths.get_config_dir(), 448))

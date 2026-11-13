@@ -42,7 +42,7 @@ const SP = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus');
 const read = (rel) => readSourceFile(path.join(SP, rel));
 
 const manifest = parseToml(
-	read('_shared/modules/features/manifest.toml').replace(
+	read('_shared/settings/data/features/manifest.toml').replace(
 		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 		(_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
 	)
@@ -78,7 +78,7 @@ for (const platform of ['ahk', 'hs', 'linux'])
 	);
 
 // 3. The menu says why and how to avoid the double action, behind « Infos… ».
-const en = JSON.parse(read('_shared/data/locales/en.json'));
+const en = JSON.parse(read('_shared/core/i18n/data/locales/en.json'));
 // The menu rows live in the tray-menu source, beside the generated manifest.
 const doc = { menu: require('../lib/menu-source.cjs').readMenuTables(parseToml) };
 const gesturesMenu = (doc.menu && doc.menu.gestures_menu) || [];
@@ -123,7 +123,7 @@ assert.match(en['menu.gestures.recommended_reason_macos'], /four-finger swipes/)
 assert.match(en['menu.gestures.recommended_reason_macos'], /turn them off/);
 // Every row the Gestures menu declares itself stays a short menu caption.
 const MENU_CAPTION_MAX_UNITS = 80;
-const localeDir = path.join(SP, '_shared', 'data', 'locales');
+const localeDir = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const localeFiles = fs.readdirSync(localeDir).filter((name) => name.endsWith('.json'));
 assert.ok(localeFiles.length >= 21, 'every locale is checked');
 for (const file of localeFiles) {
@@ -391,7 +391,7 @@ for (const owner of DIALOG_OWNERS) {
 }
 
 // 4. One debounce.
-const defaults = JSON.parse(read('_shared/modules/llm/defaults.json'));
+const defaults = JSON.parse(read('_shared/ai/data/defaults.json'));
 const debounce = entries.find((e) => e.path_prefix === 'llm.trigger' && e.id === 'debounce_ms');
 assert.ok(debounce, 'llm.trigger.debounce_ms is declared');
 assert.equal(debounce.recommended_per_platform, undefined, 'no per-platform recommended debounce');

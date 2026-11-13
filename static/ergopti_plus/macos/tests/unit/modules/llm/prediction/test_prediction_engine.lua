@@ -919,7 +919,7 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 
 	helpers.it("app-profile: the profile mapped to the focused application is the one the backend runs", function()
 		local core = package.loaded["modules.llm"]
-		local Overrides = require("llm.app_profile_overrides")
+		local Overrides = require("ai.engine.policy.app_profile_overrides")
 		local previous_fetch, previous_find = core.fetch_llm_prediction, core.find_profile
 		local sent
 		core.find_profile = function(id) return id == "formal" and { id = "formal", label = "Formal" } or nil end

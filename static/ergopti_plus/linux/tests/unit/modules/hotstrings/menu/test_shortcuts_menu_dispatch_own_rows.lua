@@ -602,7 +602,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 						local expected = source:gsub("chords_enabled = " .. tostring(initial), "chords_enabled = " .. tostring(not initial), 1)
 						if not initial then expected = source:gsub("chords_enabled = false\n", "", 1) end
 						helpers.assert_eq(read(path), expected, "only the owned sparse switch leaf changes")
-						local decoded = require("toml_codec").decode(read(path))
+						local decoded = require("core.text.engine.toml_codec").decode(read(path))
 						if not initial then helpers.assert_nil(decoded.shortcuts.script_control.chords_enabled, "the true default is a deletion") end
 						package.loaded["modules.shortcuts.script_chords"] = nil
 						local reloaded = require("modules.shortcuts.script_chords")
@@ -731,7 +731,7 @@ helpers.describe("Shortcut frame genuine translated hierarchy", function()
 				local path = require("infra.paths").shared("tests/corpus/menus/shortcut_presentation_frames.json")
 				local file = assert(io.open(path, "rb"))
 				local bytes = assert(file:read("*a")); assert(file:close())
-				local expected = assert(require("json").decode(bytes))[language]
+				local expected = assert(require("core.text.engine.json").decode(bytes))[language]
 				local state, writes, redraws = false, 0, 0
 				local log, shortcuts = {}, fake_shortcuts()
 				shortcuts.wrap_selection = function(left, right) log.wrapped = left .. right end

@@ -331,7 +331,7 @@ function M.storage(opts)
 
 	-- This is an in-memory ownership model, never a native persistence receipt.
 	local gates, aliases, generations, receipts, epoch = {}, {}, {}, setmetatable({}, { __mode = "k" }), 0
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local function copy(value)
 		if value == nil then return nil end
 		local bytes = assert(json.encode(value))
@@ -458,7 +458,7 @@ function M.storage(opts)
 	end
 
 	-- The store's file, which the configuration backup copies.
-	function fake.path() return opts.path or ("/fake/" .. require("app_dirs").linux.folder_name .. "/storage.json") end
+	function fake.path() return opts.path or ("/fake/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/storage.json") end
 
 	function fake.set(key, value)
 		if opts.writes_fail or aliases[key] ~= nil then return false end
@@ -858,9 +858,9 @@ function M.sqlite_writer(opts)
 		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
 		if media_policy then return true end
 		local ok, store, policy = pcall(function()
-			local shared = require("keystats.media_store")
-			local json = require("json")
-			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
+			local shared = require("metrics.engine.media.store")
+			local json = require("core.text.engine.json")
+			local path = require("tests.helpers").driver_root() .. "/../_shared/layouts/data/keycodes/metrics_media_keys.json"
 			local file = assert(io.open(path, "rb"))
 			local read, body = pcall(file.read, file, "*a")
 			local closed, acknowledged = pcall(file.close, file)
@@ -896,7 +896,7 @@ function M.sqlite_writer(opts)
 				assert(type(events[index]) == "table")
 				local row = {}; for key, value in pairs(events[index]) do row[key] = value end
 				rows[index] = row
-				media_store.raw_sql(device_id, index, row, require("json").encode)
+				media_store.raw_sql(device_id, index, row, require("core.text.engine.json").encode)
 			end
 			local aggregate = previous and copy(previous.batch) or { media_ngram = {}, media_hold = {} }
 			media_store.replay(media_policy, aggregate, rows, threshold_ms)

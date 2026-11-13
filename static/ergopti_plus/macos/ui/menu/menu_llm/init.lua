@@ -19,9 +19,9 @@ local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
-local LabelValue = require("locale.label_value")
-local KeyNames = require("keycodes.key_names")
-local TextUtils     = require("text_utils")
+local LabelValue = require("core.i18n.engine.label_value")
+local KeyNames = require("platform.input.keycodes.key_names")
+local TextUtils     = require("core.text.engine.utils_core")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
@@ -39,7 +39,7 @@ local ModelSelectorPage = require("ui.menu.menu_llm.model_selector_page")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local ActivationPauseOwner = require("ui.menu.menu_llm.activation_pause_owner")
-local EnableAdmission = require("llm.enable_admission")
+local EnableAdmission = require("ai.engine.settings.enable_admission_core")
 local OllamaEnableProbe = require("ui.menu.menu_llm.ollama_enable_probe")
 -- Single source of truth for the MLX server address — the health probe reads the
 -- configured port from here rather than hardcoding it.
@@ -154,7 +154,7 @@ local is_apple_silicon = BackendPanel.is_apple_silicon()
 
 M.DEFAULT_STATE = {
 		llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
-		llm_backend           = Manifest.default_for(require("config_keys").KEY.LLM_MODELS_SELECTED),
+		llm_backend           = Manifest.default_for(require("settings.engine.keys").KEY.LLM_MODELS_SELECTED),
 		llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
 		llm_min_request_interval = llm_mod.DEFAULT_STATE.llm_min_request_interval,
 		llm_model             = is_apple_silicon and llm_mod.DEFAULT_STATE.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_ollama,
@@ -173,8 +173,8 @@ M.DEFAULT_STATE = {
 		llm_user_models       = {},
 		llm_disabled_apps          = {},
 		llm_app_profile_overrides  = "",
-		llm_url_bar_filter_enabled        = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED),
-		llm_secure_field_filter_enabled   = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED),
+		llm_url_bar_filter_enabled        = Manifest.default_for(require("settings.engine.keys").KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED),
+		llm_secure_field_filter_enabled   = Manifest.default_for(require("settings.engine.keys").KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
@@ -186,10 +186,10 @@ M.DEFAULT_STATE = {
 		llm_inline_autotype     = llm_mod.DEFAULT_STATE.llm_inline_autotype,
 		-- The AI agent's settings (modules/llm/agent_runner.lua); its top-level
 		-- menu is built by ui/menu/menu_llm/agent_panel.lua
-		llm_agent_system1       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM1),
-		llm_agent_system2       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM2),
-		llm_agent_mode          = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_MODE),
-		llm_while_hotstring_tooltip = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP),
+		llm_agent_system1       = Manifest.default_for(require("settings.engine.keys").KEY.LLM_AGENT_SYSTEM1),
+		llm_agent_system2       = Manifest.default_for(require("settings.engine.keys").KEY.LLM_AGENT_SYSTEM2),
+		llm_agent_mode          = Manifest.default_for(require("settings.engine.keys").KEY.LLM_AGENT_MODE),
+		llm_while_hotstring_tooltip = Manifest.default_for(require("settings.engine.keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP),
 		llm_agent_disabled_apps = {},
 }
 
@@ -1107,7 +1107,7 @@ local function create_menu(deps)
 				-- manifest rows when the file refuses writes, and recheck it on a click.
 				local function config_reason()
 						return ConfigGuard.reason_key(require("ui.menu.menu_paths").get("ConfigTomlPath"),
-								require("config_migrate"))
+								require("settings.engine.migration.migrate"))
 				end
 				local blocked_reason = config_reason()
 				--- Builds one native parent over a submenu that writes config.toml.
@@ -1305,7 +1305,7 @@ local function create_menu(deps)
 				for _, row in ipairs(count_rows) do generation_rows[#generation_rows + 1] = row end
 				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
 					local reset_rows = ManifestMenu.template_rows("llm_generation_count_reset_control", {
-						[require("config_keys").COMMAND.LLM_GENERATION_COUNT_RESET] = function()
+						[require("settings.engine.keys").COMMAND.LLM_GENERATION_COUNT_RESET] = function()
 										return settings_mgr.apply_setting_transaction({
 												key = "llm_num_predictions",
 												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
@@ -1328,15 +1328,15 @@ local function create_menu(deps)
 				local default_max_display = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0)
 					and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
 				local generation_commands = {
-					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT] = settings_mgr.set_context_length,
-					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT_RESET] = settings_mgr.reset_context_length,
-					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS] = settings_mgr.set_min_words,
-					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS_RESET] = settings_mgr.reset_min_words,
-					[require("config_keys").COMMAND.LLM_GENERATION_MAX_WORDS] = settings_mgr.set_max_words,
-					[require("config_keys").COMMAND.LLM_GENERATION_MAX_WORDS_RESET] = settings_mgr.reset_max_words,
-					[require("config_keys").COMMAND.LLM_RESET_ON_NAV] = function()
+					[require("settings.engine.keys").COMMAND.LLM_GENERATION_CONTEXT] = settings_mgr.set_context_length,
+					[require("settings.engine.keys").COMMAND.LLM_GENERATION_CONTEXT_RESET] = settings_mgr.reset_context_length,
+					[require("settings.engine.keys").COMMAND.LLM_GENERATION_MIN_WORDS] = settings_mgr.set_min_words,
+					[require("settings.engine.keys").COMMAND.LLM_GENERATION_MIN_WORDS_RESET] = settings_mgr.reset_min_words,
+					[require("settings.engine.keys").COMMAND.LLM_GENERATION_MAX_WORDS] = settings_mgr.set_max_words,
+					[require("settings.engine.keys").COMMAND.LLM_GENERATION_MAX_WORDS_RESET] = settings_mgr.reset_max_words,
+					[require("settings.engine.keys").COMMAND.LLM_RESET_ON_NAV] = function()
 						return settings_mgr.apply_setting_transaction({
-							key = require("config_keys").COMMAND.LLM_RESET_ON_NAV,
+							key = require("settings.engine.keys").COMMAND.LLM_RESET_ON_NAV,
 							value = not state.llm_reset_on_nav,
 							runtime_fn = "set_llm_reset_on_nav",
 							publish_setting = false,
@@ -1446,7 +1446,7 @@ local function create_menu(deps)
 				local function configuration_writable()
 					local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
 					return type(path) == "string" and path ~= ""
-						and require("config_migrate").read_only_reason(path) == nil
+						and require("settings.engine.migration.migrate").read_only_reason(path) == nil
 				end
 				local toggle_ready = not paused
 					and configuration_writable()
@@ -1965,14 +1965,14 @@ local function create_menu(deps)
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
-											[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+											[require("settings.engine.keys").COMMAND.LLM_TEST_PREDICTION] = function()
 												if not keymap or type(keymap.test_prediction) ~= "function" then
 													Logger.error(LOG, "Test prediction refused: the keymap is unavailable.")
 													return false
 												end
 												return keymap.test_prediction()
 											end,
-											[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+											[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()
 												-- A retained row rechecks what greyed it when it was built.
 												-- A pause does not grey it: a pause stops typing, not
 												-- configuration (EDD-1, maintainer decision 2026-11-12).
@@ -1990,11 +1990,11 @@ local function create_menu(deps)
 												llm_scope_ready  = function() return configuration_writable() end,
 												config_newer_schema = function()
 													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
-													return require("config_migrate").read_only_status(path) == "newer"
+													return require("settings.engine.migration.migrate").read_only_status(path) == "newer"
 												end,
 												config_older_schema = function()
 													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
-													return require("config_migrate").read_only_status(path) == "unsupported"
+													return require("settings.engine.migration.migrate").read_only_status(path) == "unsupported"
 												end,
 										},
 								}
@@ -2095,7 +2095,7 @@ local function create_menu(deps)
 					return true
 				end
 				local rows = template_owner("llm_download_shortcut_frame", {
-					[require("config_keys").COMMAND.LLM_DOWNLOAD_SHORTCUT] = function()
+					[require("settings.engine.keys").COMMAND.LLM_DOWNLOAD_SHORTCUT] = function()
 								if _dw and type(_dw.focus) == "function" then
 										pcall(_dw.focus)
 								elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then

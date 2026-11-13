@@ -21,7 +21,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "modules",
 	DRIVER_ROOT .. "infra",
 	DRIVER_ROOT .. "adapters",
-	helpers.shared("lua"),
+	helpers.shared(""),
 }
 local ROW_ITERATOR = "^%s*for%s.-%sin%s+[%w_%.]*db:[nu]?rows%("
 

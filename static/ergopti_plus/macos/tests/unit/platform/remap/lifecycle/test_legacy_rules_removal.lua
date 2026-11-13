@@ -117,7 +117,7 @@ local function with_remap(files, run)
 		"platform.remap.generator",
 		"modules.keymap.layout_registry",
 		"platform.remap.managed_rule_removal",
-		"toml_codec",
+		"core.text.engine.toml_codec",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.config_paths"] = {
@@ -132,7 +132,7 @@ local function with_remap(files, run)
 			F19_LAYER_NAV_EXITED    = 80,
 		}
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-		package.loaded["toml_codec"] = toml_stub
+		package.loaded["core.text.engine.toml_codec"] = toml_stub
 		package.loaded["infra.toml.codec"] = toml_stub
 		local fs = memory_file_system(files)
 		package.loaded["adapters.file_system"] = fs

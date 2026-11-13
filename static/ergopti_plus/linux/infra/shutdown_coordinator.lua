@@ -10,7 +10,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "infra.shutdown_coordinator"
 

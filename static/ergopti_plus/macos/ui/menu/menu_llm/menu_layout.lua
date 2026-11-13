@@ -12,7 +12,7 @@
 --- file prevents.
 ---
 --- MOVED 2026-08-07: the rows used to live in a spec file of their own
---- (_shared/modules/llm/menu_layout.json). One menu therefore had TWO shared
+--- (_shared/ai/data/menu_layout.json). One menu therefore had TWO shared
 --- descriptions — that file and the manifest's ``llm_menu`` key, which described
 --- a two-row menu only the Linux driver drew — and neither mentioned the other.
 --- They are one description now, in the manifest, alongside the rest of the menu

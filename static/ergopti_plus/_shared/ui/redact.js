@@ -10,11 +10,11 @@
  * the folder and file names under the configuration directory and e-mail
  * addresses. The diagnostics page builds that text and shows a
  * preview of it, so the page redacts it; the rules are data in
- * _shared/modules/diagnostics/redaction.json, handed over by the host.
+ * _shared/diagnostics/data/redaction.json, handed over by the host.
  *
  * FEATURES & RATIONALE:
  * 1. One algorithm, three languages: the Lua port
- *    (_shared/lua/diagnostics/redact.lua) and the AHK port
+ *    (_shared/diagnostics/engine/reports/redact.lua) and the AHK port
  *    (windows/infra/redact.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/redaction_vectors.json).
  * 2. Secrets first, so a token that happens to contain the account name is
@@ -466,7 +466,7 @@
 	/**
 	 * Redacts diagnostic text before it leaves the machine.
 	 * @param {string} text
-	 * @param {object} rules Decoded _shared/modules/diagnostics/redaction.json.
+	 * @param {object} rules Decoded _shared/diagnostics/data/redaction.json.
 	 * @param {{home?: string, user?: string, case_insensitive?: boolean}} context
 	 *   The platform's home folder, account name, and whether its paths compare
 	 *   case-insensitively.

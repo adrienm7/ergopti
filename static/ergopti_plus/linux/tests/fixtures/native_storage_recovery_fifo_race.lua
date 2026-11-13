@@ -3,9 +3,9 @@
 local root = assert(arg[1])
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = assert(source:match("^(.*)/tests/fixtures/native_storage_recovery_fifo_race%.lua$"))
-package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/lua/?.lua;"
-	.. driver .. "/../_shared/lua/?/init.lua;" .. package.path
-local path = root .. "/" .. require("app_dirs").linux.folder_name .. "/storage.json"
+package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
+	.. driver .. "/../_shared/?/init.lua;" .. package.path
+local path = root .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/storage.json"
 local backup = path .. ".corrupt"
 local function write(target, bytes)
 	local file = assert(io.open(target, "wb")); assert(file:write(bytes)); assert(file:close())

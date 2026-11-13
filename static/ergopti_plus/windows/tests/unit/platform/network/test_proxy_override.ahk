@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Proxy Override Setting Controls
 ; DESCRIPTION:
-; The vectors of _shared/lua/test/network_proxy_override_contract.lua replayed on
+; The vectors of _shared/tests/lua/core/network_proxy_override_contract.lua replayed on
 ; the Windows twin, and the route owners of the adapter under each choice. The real
 ; workers through the fake network are tools/test/test-windows-proxy-override-e2e.cjs.
 ; ==============================================================================

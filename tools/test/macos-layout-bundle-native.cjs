@@ -86,7 +86,9 @@ function iconicSource(source) {
 function plan(document, report) {
 	// The physical key table: `hs` is the ANSI-numbered macOS code, `macos_iso`
 	// the code an ISO-convention layout gives the two keys Apple numbers apart.
-	const keys = JSON.parse(fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'))).keys;
+	const keys = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'))
+	).keys;
 	const macCode = (code, convention) => {
 		const row = keys[code];
 		assert.ok(row && Number.isInteger(row.hs), `no macOS code for ${code}`);

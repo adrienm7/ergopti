@@ -9,12 +9,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local FailureClass = require("llm.failure_class")
+local FailureClass = require("ai.engine.policy.failure_class")
 
 local function read_vectors()
 	local path = SHARED .. "tests/corpus/llm/auth_failure_vectors.json"
@@ -42,18 +42,18 @@ end)
 -- backboard-creation-refusal).
 helpers.describe("Backboard creation refusal stays a refused credential (backboard-creation-refusal)", function()
 	helpers.it("a 401 or 403 creation fails as a refused credential, a 500 does not (backboard-creation-refusal)", function()
-		local names = { "modules.llm.api_remote", "adapters.http_client", "logger.shim" }
+		local names = { "modules.llm.api_remote", "adapters.http_client", "core.logger.engine.shim" }
 		local saved, calls = {}, {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		package.loaded["adapters.http_client"] = {
 			post = function(url, _, _, callback) calls[#calls + 1] = { url = url, callback = callback }; return true end,
 			cancel = function() return true end,
 		}
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		local ok, detail = xpcall(function()
 			local remote = helpers.load_module("modules.llm.api_remote")
 			remote._reset_for_test()
-			local FailureClass = require("llm.failure_class")
+			local FailureClass = require("ai.engine.policy.failure_class")
 			local entry = { provider = "backboard", token = "owned-fixture-token", model = "openai/fixture",
 				base_url = "http://127.0.0.1:1234" }
 			for status, refused in pairs({ [401] = true, [403] = true, [500] = false }) do

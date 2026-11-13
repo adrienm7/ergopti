@@ -4,7 +4,7 @@
 --- MODULE: AI Agent Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/agent_vectors.json through the shared agent
---- helpers (_shared/lua/llm/agent.lua), which macOS and Linux use and the
+--- helpers (_shared/ai/engine/agent/agent.lua), which macOS and Linux use and the
 --- AutoHotkey port replays too: the System 1 and System 2 prompts, the triage of
 --- a chat model and of Jev, the local times, the validation of the actions a
 --- model proposes, their labels and the files the connectors hand to the system.
@@ -12,12 +12,12 @@
 
 local helpers = require("tests.helpers")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local json = require("json")
-local Agent = require("llm.agent")
-local Vision = require("llm.vision")
+local json = require("core.text.engine.json")
+local Agent = require("ai.engine.agent.agent")
+local Vision = require("ai.engine.prediction.vision")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -64,7 +64,7 @@ end
 
 helpers.describe("agent helpers replay the shared agent corpus", function()
 	local corpus = read_json("tests/corpus/llm/agent_vectors.json")
-	local config = read_json("modules/llm/agent.json")
+	local config = read_json("ai/data/agent.json")
 
 	for _, v in ipairs(corpus.system1_prompt) do
 		helpers.it("system1 prompt '" .. v.id .. "'", function()
@@ -151,7 +151,7 @@ helpers.describe("agent helpers replay the shared agent corpus", function()
 	end
 	for _, v in ipairs(corpus.resolve_model) do
 		helpers.it("resolve model '" .. v.id .. "'", function()
-			local providers = read_json("modules/llm/api_providers.json")
+			local providers = read_json("ai/data/api_providers.json")
 			helpers.assert_eq(Agent.resolve_model(Vision.parse(v.value), config, providers), v.expected.model, v.id)
 		end)
 	end
@@ -171,7 +171,7 @@ end)
 
 helpers.describe("agent actions stay inside the closed schema", function()
 	helpers.it("treats decoded optional null as absent and rejects null required values", function()
-		local config = read_json("modules/llm/agent.json")
+		local config = read_json("ai/data/agent.json")
 		local actions, rejected = Agent.parse_actions(config,
 			'ACTIONS: [{"type":"calendar","title":"Meeting","start":"2026-10-01T14:00","location":null},{"type":"reminder","title":null}]',
 			json.decode_lossless, { tools = {}, is_null = json.is_null })
@@ -181,7 +181,7 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		helpers.assert_eq(#rejected, 1)
 	end)
 	helpers.it("encodes reserved characters in calendar attendee addresses", function()
-		local config = read_json("modules/llm/agent.json")
+		local config = read_json("ai/data/agent.json")
 		local action = assert(Agent.validate_action(config, {
 			type = "calendar", title = "Meeting", start = "2026-10-01T14:00",
 			attendees = { "alice?tag@example.com", "bob#team@example.com", "carol+work@example.com" },
@@ -193,7 +193,7 @@ helpers.describe("agent actions stay inside the closed schema", function()
 	end)
 
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
-		local config = read_json("modules/llm/agent.json")
+		local config = read_json("ai/data/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }
 		local _, unknown_type = Agent.validate_action(config, { type = "shell", command = "rm -rf /" }, opts)
 		helpers.assert_contains(unknown_type, "unknown type")

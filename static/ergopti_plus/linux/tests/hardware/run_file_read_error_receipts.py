@@ -45,7 +45,7 @@ def main():
                 ERGOPTI_READ_SOURCE=str(source),
                 ERGOPTI_READ_PORT=port,
                 XDG_CONFIG_HOME=str(root / "config"),
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
             )
             reference = root / (port + "-reference.trace")
             probe = run(interpreter, reference, env)

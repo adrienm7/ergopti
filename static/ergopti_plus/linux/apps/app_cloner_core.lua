@@ -11,7 +11,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Nothing of the source is copied or patched, as on macOS: the launcher
 ---    passes the profile through the program's own options, chosen by its family
----    in _shared/data/app_cloner/families.json (Chromium and Electron
+---    in _shared/apps/data/app_cloner/families.json (Chromium and Electron
 ---    --user-data-dir, Firefox --profile, VS Code with the shared extensions).
 --- 2. A program of no family gets separate XDG base directories instead
 ---    (configuration, data, cache, state), which every toolkit honours, so its
@@ -25,9 +25,9 @@
 
 local M = {}
 
-local Json = require("json")
-local NativePath = require("native_path")
-local TextUtils = require("text_utils")
+local Json = require("core.text.engine.json")
+local NativePath = require("core.fs.engine.native_path")
+local TextUtils = require("core.text.engine.utils_core")
 
 local quote = TextUtils.shell_quote
 
@@ -44,7 +44,7 @@ local quote = TextUtils.shell_quote
 --- @param path string|nil Absolute path; the shared tree's by default.
 --- @return table catalogue
 function M.load_families(path)
-	path = path or require("infra.paths").shared("data/app_cloner/families.json")
+	path = path or require("infra.paths").shared("apps/data/app_cloner/families.json")
 	assert(type(path) == "string", "the shared App Cloner families are unavailable")
 	local file = assert(io.open(path, "rb"), "cannot read " .. path)
 	local raw = file:read("*a")

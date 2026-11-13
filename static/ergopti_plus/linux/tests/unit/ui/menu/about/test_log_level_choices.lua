@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads expectations that are independent of the generated menu manifest.
 --- @return table corpus
@@ -52,7 +52,7 @@ end
 --- @param receipt string Storage refusal mode.
 --- @return function setter, table observations
 local function native_owner(receipt)
-	local previous = { storage = package.loaded["adapters.storage"], logger = package.loaded["logger.shim"],
+	local previous = { storage = package.loaded["adapters.storage"], logger = package.loaded["core.logger.engine.shim"],
 		settings = package.loaded["infra.script_settings"] }
 	local observed = { selected = "INFO", durable = { ["script.log_level"] = "INFO", future = 42 }, rebuilds = 0 }
 	local source = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
@@ -61,10 +61,10 @@ local function native_owner(receipt)
 	local body = assert(raw:match("on_set_log_level = function%(lvl%)(.-)\n\t\t\tend,"),
 		"the actual daemon log-level callback must be captured")
 	local logger = { info = function() end, error = function() end, warn = function() end,
-		level_of = require("logger.shim").level_of,
+		level_of = require("core.logger.engine.shim").level_of,
 		set_level = function(value) observed.threshold = value end,
 		get_level = function() return observed.threshold end }
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	local storage = {
 		get = function(key, default) local value = observed.durable[key]; if value == nil then return default end; return value end,
 		set = function(key, value)
@@ -82,13 +82,13 @@ local function native_owner(receipt)
 	local factory = assert(load("return function(ScriptSettings, Logger, rebuild_tray_menu) local LOG = 'menu'; return function(lvl)"
 		.. body .. "\nend end", "actual-daemon-log-level"))()
 	local callback = factory(settings, logger, function() observed.rebuilds = observed.rebuilds + 1 end)
-	for key, name in pairs({ storage = "adapters.storage", logger = "logger.shim", settings = "infra.script_settings" }) do
+	for key, name in pairs({ storage = "adapters.storage", logger = "core.logger.engine.shim", settings = "infra.script_settings" }) do
 		package.loaded[name] = previous[key]
 	end
 	return function(value)
 		local saved_scope, saved_settings = package.loaded["infra.script_scope"], package.loaded["infra.script_settings"]
-		local saved_shim, saved_logger = package.loaded["logger.shim"], package.loaded["logger"]
-		package.loaded["infra.script_settings"], package.loaded["logger.shim"], package.loaded["logger"] = settings, logger, logger
+		local saved_shim, saved_logger = package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"]
+		package.loaded["infra.script_settings"], package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = settings, logger, logger
 		-- The transaction owns persistence followed by publication to the real settings owner.
 		package.loaded["infra.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
 			if storage.set(key, level) ~= true then return false end
@@ -101,7 +101,7 @@ local function native_owner(receipt)
 		end }
 		local ok, result = pcall(callback, value)
 		package.loaded["infra.script_scope"], package.loaded["infra.script_settings"] = saved_scope, saved_settings
-		package.loaded["logger.shim"], package.loaded["logger"] = saved_shim, saved_logger
+		package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = saved_shim, saved_logger
 		if not ok then error(result, 0) end
 		observed.selected = settings.current()
 		return result
@@ -119,7 +119,7 @@ helpers.describe("Linux shared Debug log choices", function()
 				helpers.assert_eq(row.menu[index].title, level.label)
 				helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 				if level.value == state.selected then
-					helpers.assert_eq(row.title, require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
+					helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
 				end
 				helpers.assert_eq(row.menu[index].fn(), true)
 			end
@@ -180,7 +180,7 @@ end)
 local function debug_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
@@ -214,7 +214,7 @@ end
 local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
 local debug_parent_raw = debug_parent_file:read("*a")
 debug_parent_file:close()
-require("test.debug_parent_contract").register(helpers, debug_parent_fixture,
-	assert(require("json").decode(debug_parent_raw)), "linux")
+require("tests.lua.debug_parent_contract").register(helpers, debug_parent_fixture,
+	assert(require("core.text.engine.json").decode(debug_parent_raw)), "linux")
 
 return true

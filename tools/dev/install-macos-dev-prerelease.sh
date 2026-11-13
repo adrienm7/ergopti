@@ -26,8 +26,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "$PWD")"
 REPO_ROOT="${REPO_ROOT%.}"
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 
 fail() { printf '[dev-prerelease] REFUSED: %s\n' "$*" >&2; exit 1; }
 log() { printf '[dev-prerelease] %s\n' "$*"; }
@@ -35,7 +35,7 @@ log() { printf '[dev-prerelease] %s\n' "$*"; }
 [ "$(uname -s)" = Darwin ] || fail "a Mac is required."
 APP="/Applications/$ERGOPTI_APP_BUNDLE"
 # The repository comes from the updater defaults, the one source of every GitHub link.
-DEFAULTS="$REPO_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json"
+DEFAULTS="$REPO_ROOT/static/ergopti_plus/_shared/updater/data/defaults.json"
 repository="$(/usr/bin/python3 -c 'import json,sys; g=json.load(open(sys.argv[1]))["github"]; print(g["owner"] + "/" + g["repo"])' "$DEFAULTS")" \
 	|| fail "the updater defaults name no GitHub repository."
 ARCHIVE="$ERGOPTI_APP_BUNDLE.zip"

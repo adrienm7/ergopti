@@ -28,7 +28,7 @@ local function with_fixture(options, callback)
 		helpers.with_stub_scope({ "ui.ui_builder", "infra.paths", "adapters.webview_result" }, function()
 			local native = _G.hs
 			local saved_json, saved_webview = native.json, native.webview
-			local json = require("json")
+			local json = require("core.text.engine.json")
 			local state = { views = {}, bridges = {}, deletes = 0, save_callbacks = {} }
 			local editor_port = package.loaded["ui.prompt_editor"]
 			local saved_open, saved_idle = editor_port.open, editor_port.scope_idle

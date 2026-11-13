@@ -272,9 +272,9 @@ end)
 
 helpers.describe("toml_writer: no synchronous formatter", function()
 	helpers.it("shared writer does not invoke the cosmetic Python formatter", function()
-		local shared_writer_path = helpers.shared("lua/toml_codec/writer.lua")
+		local shared_writer_path = helpers.shared("core/text/engine/toml_codec/writer.lua")
 		local fh = io.open(shared_writer_path, "r")
-		helpers.assert_true(fh ~= nil, "_shared/lua/toml_codec/writer.lua must be readable")
+		helpers.assert_true(fh ~= nil, "_shared/core/text/engine/toml_codec/writer.lua must be readable")
 		local src = fh:read("*a"); fh:close()
 		helpers.assert_true(
 			src:find("format_toml.py", 1, true) == nil and src:find("os.execute", 1, true) == nil,

@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 local CHANNEL = require("modules.updater.manager").installed_channel()
@@ -29,7 +29,7 @@ local LOCAL_DIR = "/cfg/layouts/"
 local SHIPPED_DIR = "/pkg/linux/static/layouts/registry/"
 local CONVERTER_DATA = "/pkg/linux/xkb_generation/data"
 local DATA_SOURCE = helpers.driver_root() .. "/../../ergopti/linux/xkb_generation/data/"
-local KEYCODES_PATH = "/pkg/_shared/modules/layouts/mac_keycodes.json"
+local KEYCODES_PATH = "/pkg/_shared/layouts/data/mac_keycodes.json"
 local INSTALLER = "/pkg/linux/xkb_installation/user_layout_installer.py"
 
 --- Reads a file of the repository registry byte for byte.
@@ -79,7 +79,7 @@ local function manager(options)
 		handle:close()
 	end
 	do
-		local handle = assert(io.open(require("infra.paths").shared("modules/layouts/mac_keycodes.json"), "rb"))
+		local handle = assert(io.open(require("infra.paths").shared("layouts/data/mac_keycodes.json"), "rb"))
 		state.files[KEYCODES_PATH] = handle:read("*a")
 		handle:close()
 	end
@@ -195,7 +195,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local Paths = require("infra.paths")
 		local saved_registry = package.loaded["modules.keymap.layout_registry"]
 		local saved_config = package.loaded["infra.config_paths"]
-		local saved_logger = package.loaded["logger.shim"]
+		local saved_logger = package.loaded["core.logger.engine.shim"]
 		local errors = {}
 		local recorder = helpers.make_logger_stub()
 		recorder.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
@@ -207,7 +207,7 @@ helpers.describe("layout manager (Linux): installing", function()
 			home = function() return "/private/user" end,
 			get_config_dir = function() return "/private/xdg/ergopti" end,
 		}
-		package.loaded["logger.shim"] = recorder
+		package.loaded["core.logger.engine.shim"] = recorder
 		local Fresh = helpers.load_module("infra.paths")
 		local ok, roots = pcall(function()
 			Fresh.extension_roots()
@@ -215,7 +215,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		end)
 		package.loaded["modules.keymap.layout_registry"] = saved_registry
 		package.loaded["infra.config_paths"] = saved_config
-		package.loaded["logger.shim"] = saved_logger
+		package.loaded["core.logger.engine.shim"] = saved_logger
 		package.loaded["infra.paths"] = Paths
 		helpers.assert_true(ok, "a damaged record never stops the daemon: " .. tostring(roots))
 		helpers.assert_eq(roots[#roots - 1], { pack = "/driver/layouts/registry/ergopti" })
@@ -246,14 +246,14 @@ helpers.describe("layout manager (Linux): installing", function()
 	end)
 
 	helpers.it("names the shared defaults file it cannot decode (layout-registry-convert)", function()
-		-- The shared json.lua answers nil to invalid JSON instead of raising, so a
+		-- The shared core/text/engine/json.lua answers nil to invalid JSON instead of raising, so a
 		-- reader that only checks the pcall status loses the reason.
 		local FileSystem = require("adapters.file_system")
 		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
 		local original_read = FileSystem.read
 		local served = 0
 		FileSystem.read = function(path)
-			if type(path) == "string" and path:find("modules/layouts/defaults.json", 1, true) then
+			if type(path) == "string" and path:find("layouts/data/defaults.json", 1, true) then
 				served = served + 1
 				return "{ not json"
 			end
@@ -264,7 +264,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(called, "settings() must report, not raise: " .. tostring(settings))
 		helpers.assert_eq(served, 1, "the malformed defaults file must be the one read")
 		helpers.assert_nil(settings)
-		helpers.assert_contains(tostring(err), "modules/layouts/defaults.json is not valid JSON")
+		helpers.assert_contains(tostring(err), "layouts/data/defaults.json is not valid JSON")
 	end)
 
 	helpers.it("reports, not raises, when the optional updater cannot load (layout-registry-convert)", function()
@@ -667,9 +667,9 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		local warnings = {}
 		local recorder = helpers.make_logger_stub()
 		recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-		local previous_logger = package.loaded["logger.shim"]
-		package.loaded["logger.shim"] = recorder
-		require("config_outdated").reset_for_tests()
+		local previous_logger = package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = recorder
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local ok, err = pcall(function()
 			local roots = LayoutRegistry.extension_roots(deps)
 			helpers.assert_eq(#roots, 1, "the valid layout's extension still loads at startup")
@@ -682,7 +682,7 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 			helpers.assert_eq(Json.decode(state.files[LOCAL_DIR .. "installed.json"]).layouts.ergopti_v1, stale,
 				"a write keeps the entry the user was told to fix")
 		end)
-		package.loaded["logger.shim"] = previous_logger
+		package.loaded["core.logger.engine.shim"] = previous_logger
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -862,7 +862,7 @@ helpers.describe("layout manager (Linux): what the package ships", function()
 	end)
 end)
 
-require("test.layout_installed_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -872,7 +872,7 @@ require("test.layout_installed_manager_contract")(helpers, Json, {
 	install_receipt = INSTALLED_RUN,
 })
 
-require("test.layout_installed_update_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_update_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -882,7 +882,7 @@ require("test.layout_installed_update_manager_contract")(helpers, Json, {
 	install_receipt = INSTALLED_RUN,
 })
 
-require("test.layout_installed_extension_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_extension_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1022,7 +1022,7 @@ helpers.describe("registry workflows lose publication authority at terminal shut
 	end)
 end)
 
-require("test.layout_composer_contract")(helpers, Json, {
+require("tests.lua.layouts.composer_contract")(helpers, Json, {
 	name = "Linux",
 	platform = "linux",
 	shortcuts = "single",
@@ -1051,7 +1051,7 @@ require("test.layout_composer_contract")(helpers, Json, {
 	end,
 })
 
-require("test.composer_check_contract")(helpers, Json, {
+require("tests.lua.layouts.composer_check_contract")(helpers, Json, {
 	name = "Linux",
 	manager = manager,
 	files = shipped_files,

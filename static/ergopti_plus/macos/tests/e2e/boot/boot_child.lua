@@ -36,7 +36,7 @@ local SHARED = RESOURCES .. "/_shared"
 -- modules (the hs stub and this harness) come from the repository.
 package.path = table.concat({
 	DRIVER .. "/?.lua", DRIVER .. "/?/init.lua",
-	SHARED .. "/lua/?.lua", SHARED .. "/lua/?/init.lua",
+	SHARED .. "/?.lua", SHARED .. "/?/init.lua",
 	package.path,
 }, ";")
 table.insert(package.searchers, 2, function(name)
@@ -201,8 +201,8 @@ elseif ACTION == "type_for_wpm" then
 	local stats = require("modules.keystats").get_live_stats()
 	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
 	local visible, recovered = 0, false
-	local config = require("toml_codec").decode(require("tests.support.source_file").read(
-		SHARED .. "/modules/wpm_widget/constants.toml"))
+	local config = require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(
+		SHARED .. "/metrics/data/wpm_widget/constants.toml"))
 	local compact = config.compact
 	local screen = hs.screen.mainScreen():fullFrame()
 	for _, canvas in ipairs(hs.canvas.__instances) do

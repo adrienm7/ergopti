@@ -113,9 +113,9 @@ _WPMZ_Canon() {
 		HadWarn: IsSet(_HealthCheckWarnCount), Warn: IsSet(_HealthCheckWarnCount) ? _HealthCheckWarnCount : 0,
 		HadErrors: IsSet(_HealthCheckErrCount), Errors: IsSet(_HealthCheckErrCount) ? _HealthCheckErrCount : 0,
 		HadLast: IsSet(_HealthCheckLastError), Last: IsSet(_HealthCheckLastError) ? _HealthCheckLastError : 0}
-	Path := _SharedDir . "\modules\timings\constants.toml"
+	Path := _SharedDir . "\core\timing\data\constants.toml"
 	Raw := FSReadBytesStrict(Path)
-	VisualPath := _SharedDir . "\modules\wpm_widget\constants.toml"
+	VisualPath := _SharedDir . "\metrics\data\wpm_widget\constants.toml"
 	VisualRaw := FSReadBytesStrict(VisualPath)
 	try {
 		_ResetLogger()

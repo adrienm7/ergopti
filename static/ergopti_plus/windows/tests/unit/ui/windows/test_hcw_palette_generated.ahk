@@ -4,7 +4,7 @@
 ; MODULE: Hotstrings Window Palette Source Tests
 ; DESCRIPTION:
 ; The settings window's colour picker offers the palette generated from
-; _shared/data/native_theme.toml, like the macOS and Linux windows. It used to
+; _shared/core/ui/data/native_theme.toml, like the macOS and Linux windows. It used to
 ; type the 14 colours again and a node gate compared the copies; a generated
 ; palette has no copy to compare. test-drift-guard keeps the generated file
 ; current, these tests keep the window reading it.

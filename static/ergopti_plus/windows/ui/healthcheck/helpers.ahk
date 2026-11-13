@@ -4,7 +4,7 @@
 ; MODULE: Healthcheck / Collectors
 ; DESCRIPTION:
 ; The synchronous half of the diagnostics snapshot (version 2 of
-; _shared/modules/diagnostics/schema.json): one collector per section, each
+; _shared/diagnostics/data/schema.json): one collector per section, each
 ; returning that section's fields as a Map. The asynchronous probes (network
 ; and AI backend) live in ui/healthcheck/probes.ahk.
 ;
@@ -340,7 +340,7 @@ _HealthCheck_Features(LlmSnapshotFn := 0, KeystatsSnapshotFn := 0) {
 ; The features this platform lacks, from the generated manifest: the only
 ; place a user can ask why a menu row they read about is not in their menu.
 ; Every absence is listed, explained or not, as the Lua drivers'
-; _shared/lua/healthcheck/unavailable.lua does: a list of only the explained
+; _shared/diagnostics/engine/healthcheck/unavailable.lua does: a list of only the explained
 ; ones would look complete while hiding the ones that matter most.
 ; @param Unavailable {Array|Integer} Manifest absences (tests replace them).
 ; @returns {Map} { items: Array of { feature, platforms, reason } }
@@ -543,7 +543,7 @@ _HealthCheck_RecentIssueLimits() {
 	static Loaded := 0
 	if (Loaded is Map)
 		return Loaded
-	Path := _SharedDir . "\modules\diagnostics\recent_issues.json"
+	Path := _SharedDir . "\diagnostics\data\recent_issues.json"
 	Data := JsonParse(FileRead(Path, "UTF-8"))
 	Limits := Map(
 		"tail_max_bytes", Data.Get("errors_tail_max_bytes", 0),
@@ -588,7 +588,7 @@ _HealthCheck_DecodeTail(Bytes, Length) {
 }
 
 ; Turns the tail of an errors file into its WARNING and ERROR entries: the AHK
-; copy of the shared parse_errors_tail (_shared/lua/healthcheck/snapshot.lua),
+; copy of the shared parse_errors_tail (_shared/diagnostics/engine/healthcheck/snapshot.lua),
 ; pinned by _shared/tests/corpus/healthcheck/errors_tail_vectors.json.
 ; @param Chunk {String} Text read from the end of the file.
 ; @param AtFileStart {Boolean} True when the read began at byte 0.

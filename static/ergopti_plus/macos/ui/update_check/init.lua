@@ -14,7 +14,7 @@
 ---    offered channel to the launcher (adapters/update_launcher.lua), whose
 ---    Sparkle controller verifies, downloads, installs and relaunches.
 --- 2. The page's actions and phases are the shared session's
----    (_shared/lua/updater/check_session.lua), identical on Linux; this module
+---    (_shared/updater/engine/check_session.lua), identical on Linux; this module
 ---    only creates the window, forwards messages and wires the driver's owners.
 --- 3. Singleton: a second click focuses the open window and checks again, over
 ---    the owners of the menu session that asked. Only the exact window this
@@ -33,8 +33,8 @@ local Logger         = require("infra.logger")
 local DeferredWork   = require("infra.deferred_work")
 local i18n           = require("infra.i18n")
 local Paths          = require("infra.paths")
-local Json           = require("json")
-local CheckSession   = require("updater.check_session")
+local Json           = require("core.text.engine.json")
+local CheckSession   = require("updater.engine.check_session")
 local Updater        = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local WebviewResult  = require("adapters.webview_result")

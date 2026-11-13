@@ -537,7 +537,7 @@ helpers.describe("personal-file descriptor transport through the real registry",
 		assert(handle:close())
 		local ok, err = pcall(function()
 			local state, R = fresh_registry()
-			local PersonalFiles = require("hotstrings.personal_files")
+			local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 			local source = PersonalFiles.describe({ "Équipe", "mémoire.toml" })
 			helpers.assert_true(R.load_toml("personal_ext_memory", path, nil, source))
 			helpers.assert_eq(#state.mappings, 1)

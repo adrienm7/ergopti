@@ -22,7 +22,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "adapters.file_system"
 local ENOENT = 2 -- Native Linux errno: a failed unlink proves absence only here.
@@ -40,7 +40,7 @@ end
 --- @return string status
 --- @return string|nil detail
 function M.read_with_status(path)
-	return require("toml_codec.writer").read_classified(path)
+	return require("core.text.engine.toml_codec.writer").read_classified(path)
 end
 
 --- Publishes through the shared atomic writer after its exact source check.
@@ -51,7 +51,7 @@ end
 --- @return boolean committed
 --- @return string|nil detail
 function M.write_if_unchanged(path, content, expected)
-	return require("toml_codec.writer").publish_if_unchanged(path, content, nil, expected)
+	return require("core.text.engine.toml_codec.writer").publish_if_unchanged(path, content, nil, expected)
 end
 
 --- Publishes exact source bytes with a captured final logical admission.
@@ -63,7 +63,7 @@ end
 --- @return string|nil detail
 function M.write_if_unchanged_admitted(path, content, expected, on_error, admission)
 	if type(admission) ~= "function" then return false, "publication admission required" end
-	return require("toml_codec.writer").publish_if_unchanged(path, content, nil, expected, on_error, admission)
+	return require("core.text.engine.toml_codec.writer").publish_if_unchanged(path, content, nil, expected, on_error, admission)
 end
 
 -- LuaFileSystem is optional — present on most LuaJIT installations.
@@ -373,6 +373,6 @@ end
 
 -- The owner is checked against the shared spec when it loads: a missing method
 -- or a half-offered capability would otherwise fail late, inside a publication.
-require("file_system.ports").check_owner(M)
+require("core.fs.engine.ports").check_owner(M)
 
 return M

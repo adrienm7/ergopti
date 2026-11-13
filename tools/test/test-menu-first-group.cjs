@@ -43,8 +43,8 @@ const MANIFEST = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
 	'menu',
+	'data',
 	'menu_manifest.json'
 );
 

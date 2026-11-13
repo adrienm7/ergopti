@@ -140,7 +140,7 @@ local function manager()
 		execute_action = function() end,
 		on_text_injected = function() end,
 		action_names = function() return {} end,
-		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"),
 		user_path = user_path,
 		config_path = user_path .. ".config.toml",
 	})

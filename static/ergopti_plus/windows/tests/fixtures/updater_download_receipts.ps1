@@ -41,7 +41,7 @@ try {
         $Result.native_errno_domain -eq 'win32' -and $Result.native_errno -eq '5') 'Actual owned file denial was not preserved.'
     $Passed++
 
-    $PolicyPath = Join-Path (Split-Path -Parent (Split-Path -Parent $HelperPath)) '../_shared/modules/network/managed_network.json'
+    $PolicyPath = Join-Path (Split-Path -Parent (Split-Path -Parent $HelperPath)) '../_shared/core/network/data/managed_network.json'
     $Policy = Get-Content -LiteralPath $PolicyPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $NativeNames = [Enum]::GetNames([System.Net.WebExceptionStatus])
     Require ($NativeNames.Count -eq $Policy.fields.dotnet_web_status.values.Count) 'Canonical .NET status inventory differs from the documented runtime enum.'

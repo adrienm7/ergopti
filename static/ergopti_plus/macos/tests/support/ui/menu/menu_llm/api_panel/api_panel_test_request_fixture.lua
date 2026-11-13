@@ -81,9 +81,9 @@ local function install_doubles(args)
 			return true
 		end,
 	}
-	local command_renderer = assert(require("menu.renderer").new({
+	local command_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = require("adapters.json_codec").decode,
 		i18n = {
 			get = package.loaded["infra.i18n"].get,
@@ -112,7 +112,7 @@ end
 
 
 local function with_api_add_locale(scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired

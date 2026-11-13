@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Forbids any backend adapter from re-declaring the output-token cap default as
  * a bare numeric literal. The cap has exactly ONE source — the domain constant
- * DEFAULT_MAX_TOKENS in _shared/core/domain/PromptBuilder.js, propagated by
+ * DEFAULT_MAX_TOKENS in _shared/core/text/data/domain/PromptBuilder.js, propagated by
  * codegen to PB_DEFAULT_MAX_TOKENS (AHK) and read as SharedPromptBuilder
  * .DEFAULT_MAX_TOKENS (Lua). The engine threads that value into every backend;
  * an unset/out-of-range value must resolve to the shared constant, never to a
@@ -40,6 +40,8 @@ const SSOT_FILE = path.join(
 	'ergopti_plus',
 	'_shared',
 	'core',
+	'text',
+	'data',
 	'domain',
 	'PromptBuilder.js'
 );

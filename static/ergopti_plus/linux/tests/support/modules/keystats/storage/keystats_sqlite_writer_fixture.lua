@@ -140,7 +140,7 @@ local function with_meta_value_output(value, status, test)
 		elseif is_media_schema_startup(command) or is_utc_offset_probe(command) then
 			content, code = "", 0
 		elseif command:find("SELECT json_quote(value)", 1, true) then
-			content = value == nil and "" or require("json").encode(value) .. "\n"
+			content = value == nil and "" or require("core.text.engine.json").encode(value) .. "\n"
 		elseif command:find("SELECT value FROM meta", 1, true) then
 			-- sqlite3's raw TEXT printer stops at NUL; scalar Lua framing stops at LF.
 			content = value == nil and "" or (value:match("^[^%z]*") .. "\n")
@@ -178,7 +178,7 @@ local function with_burst_histogram_statement(row, test)
 			helpers.assert_eq(type(statement), "string")
 			local encoded = statement:match("VALUES %('owned%-device','2000%-01%-01','owned%-app',0,0,0,'(.-)',0,0,0%)")
 			helpers.assert_eq(type(encoded), "string", "existing counter defaults remain zero")
-			local decoded = require("json").decode((encoded:gsub("''", "'")))
+			local decoded = require("core.text.engine.json").decode((encoded:gsub("''", "'")))
 			helpers.assert_eq(type(decoded), "table", "SQLite receives a JSON object")
 			test(decoded)
 		end)

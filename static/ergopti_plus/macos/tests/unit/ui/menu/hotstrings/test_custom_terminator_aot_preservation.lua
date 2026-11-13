@@ -49,13 +49,13 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"adapters.file_system", "infra.fs_dir", "infra.logger", "infra.preferences",
 		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
-		"infra.notifications", "modules.hotstrings.hotstrings_config", "keymap.terminators",
+		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_state", "ui.menu.menu_hotstrings_management",
 		"ui.menu.preferences_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Transaction = require("ui.menu.preferences_transaction")
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { writes = 0, updates = 0 }
 		package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {
@@ -181,7 +181,7 @@ helpers.describe("hand-written delimiter records through the management owner", 
 				helpers.assert_eq(fixture.calls.writes, 1)
 				helpers.assert_eq(fixture.calls.updates, 1)
 				local disk = fixture.read()
-				local decoded = require("toml_codec").decode(disk)
+				local decoded = require("core.text.engine.toml_codec").decode(disk)
 				local records = decoded.hotstrings.terminators
 				helpers.assert_eq(#records, action == "add_custom" and 3 or 1)
 				if action == "add_custom" then
@@ -209,7 +209,7 @@ helpers.describe("hand-written delimiter records through the management owner", 
 				helpers.assert_eq(fixture.calls.updates, 0)
 				fixture.calls.refuse_write = false
 				helpers.assert_eq(row.action(), true, "the same retained action can recover")
-				assert_neighbor(require("toml_codec").decode(fixture.read()).hotstrings.terminators, NEIGHBOR)
+				assert_neighbor(require("core.text.engine.toml_codec").decode(fixture.read()).hotstrings.terminators, NEIGHBOR)
 				helpers.assert_eq(fixture.calls.updates, 1)
 			end)
 		end)

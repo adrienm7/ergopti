@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: WPM Widget Canon Tests
 ; DESCRIPTION:
-; The widget's look comes from _shared/modules/wpm_widget/constants.toml, the
+; The widget's look comes from _shared/metrics/data/wpm_widget/constants.toml, the
 ; canon macOS and Linux draw from too, and its colours follow the same rules:
 ; the AI's text paints it in the AI colour — pill and curve alike — neutral
 ; categories never colour it, and a group without a usable colour takes the

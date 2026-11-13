@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; The one warning the Windows driver writes when a measured operation (the
 ; boot, an AI request) took longer than its budget of the [budgets] section of
-; _shared/modules/timings/constants.toml: the AutoHotkey port of
-; _shared/lua/perf_budget.lua, with the same line, so one search and
+; _shared/core/timing/data/constants.toml: the AutoHotkey port of
+; _shared/core/logger/engine/perf_budget.lua, with the same line, so one search and
 ; tools/dev/field-log-analyse.py read every OS's overruns alike.
 ;
 ; FEATURES & RATIONALE:

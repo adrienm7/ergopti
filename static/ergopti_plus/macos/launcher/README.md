@@ -34,7 +34,7 @@ asks for Accessibility and Input Monitoring again unless the build is signed
 with the stable certificate (`MACOS_SIGNING_CERTIFICATE_BASE64`).
 
 The build records the clone root in the launcher `Info.plist` under the key
-`dev_source.plist_key` of `_shared/data/identifiers.json`, before signing. The
+`dev_source.plist_key` of `_shared/core/text/data/identifiers.json`, before signing. The
 launcher then points `MJConfigFile` at `<clone>/static/ergopti_plus/macos/init.lua`,
 logs `developer source mode; Lua runs from <clone>` in `launcher.log`, hands the
 root to the runtime as `dev_source.environment`, and starts no Sparkle. The Lua
@@ -42,7 +42,7 @@ driver treats that runtime as a source run (`Updater.is_local_source()`), so its
 update checks, channel switch, in-app installs and uninstall stay off. If the
 clone's `init.lua` is gone, the launcher refuses to start and names the missing
 file. A saved `.lua` edit under `static/ergopti_plus/macos` or
-`static/ergopti_plus/_shared/lua` reloads the driver (the existing source
+`static/ergopti_plus/_shared` reloads the driver (the existing source
 watcher, plus a shared-tree watcher armed only in this mode); the menu's Reload
 row and the AltGr+Backspace script chord reload on demand.
 

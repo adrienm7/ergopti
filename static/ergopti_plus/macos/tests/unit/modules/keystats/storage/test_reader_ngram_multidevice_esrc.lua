@@ -17,9 +17,9 @@ local helpers = require("tests.helpers")
 local src = helpers.read_driver_source("function M.read_range_split_today")
 helpers.assert_true(src ~= nil, "modules/keystats/sqlite_reader.lua source must be locatable")
 
--- The manifest SQL is rendered from the shared catalogue (_shared/data/db/queries.sql),
+-- The manifest SQL is rendered from the shared catalogue (_shared/metrics/data/db/queries.sql),
 -- so its statements are checked as the reader runs them, not as source text.
-local Queries = require("keystats.queries")
+local Queries = require("metrics.engine.queries")
 local manifest_sql = {}
 for _, name in ipairs(Queries.names()) do
 	if name:match("^manifest%.") then

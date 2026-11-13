@@ -220,7 +220,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			setMenu = function() return true end,
 			destroy = noop,
 		}
-		package.loaded["chord"] = { format = function() return "ctrl+x" end }
+		package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
 		package.loaded["adapters.hotkey_registrar"] = {
 			bind = function() return {} end,
 			setEnabled = function() return true end,
@@ -341,8 +341,8 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local startup_ctx = nil
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
-		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-		local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 		assert(locale_file:close())
 		package.loaded["infra.i18n"] = { get = function(key)
 			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
@@ -426,10 +426,10 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			row_disabled = function() return false end,
 			title_health_dot = function() return nil end,
 		}
-		local profile_renderer = assert(require("menu.renderer").new({
+		local profile_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = {get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get},
 			logger = package.loaded["infra.logger"],
 		}))

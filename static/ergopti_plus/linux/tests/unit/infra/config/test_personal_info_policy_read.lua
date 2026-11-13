@@ -16,7 +16,7 @@ local Shell = require("adapters.shell_runner")
 --- @param stream table Read and close operations with Lua file receipt shapes.
 --- @param body function Receives the loader and captured error lines.
 local function with_stream(stream, body)
-	local names = { "infra.personal_info_fields", "infra.paths", "infra.regular_file_reader", "logger.shim" }
+	local names = { "infra.personal_info_fields", "infra.paths", "infra.regular_file_reader", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local original_open = io.open
@@ -24,7 +24,7 @@ local function with_stream(stream, body)
 	local policy_path = "/personal-info-policy-receipt.toml"
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, text) errors[#errors + 1] = text end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["infra.paths"] = { shared = function() return policy_path end }
 	package.loaded["infra.regular_file_reader"] = { open_source = function() return stream end }
 	package.loaded["infra.personal_info_fields"] = nil
@@ -45,12 +45,12 @@ local function with_native_declaration(contents, body)
 	local path = os.tmpname()
 	local file = assert(io.open(path, "w"))
 	assert(file:write(contents)); assert(file:close())
-	local names = { "infra.personal_info_fields", "infra.paths", "logger.shim" }
+	local names = { "infra.personal_info_fields", "infra.paths", "core.logger.engine.shim" }
 	local saved, errors = {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, text) errors[#errors + 1] = text end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["infra.paths"] = { shared = function() return path end }
 	package.loaded["infra.personal_info_fields"] = nil
 	local ok, detail = pcall(function() body(require("infra.personal_info_fields"), errors) end)
@@ -91,7 +91,7 @@ assert(fields.for_preview("0750399576", "phone_number") ~= "0750399576", "the pr
 		helpers.assert_eq(exit_signal, 0, "a killed loader must never count as successful masking")
 	end)
 
-	local handle = assert(io.open(require("infra.paths").shared("modules/personal_info/fields.toml"), "r"))
+	local handle = assert(io.open(require("infra.paths").shared("hotstrings/data/personal_info/fields.toml"), "r"))
 	local valid_policy = assert(handle:read("*a"))
 	assert(handle:close())
 

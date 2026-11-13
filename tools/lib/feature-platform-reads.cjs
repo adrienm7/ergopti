@@ -38,7 +38,7 @@ function entryPlatforms(manifest, entry) {
 
 /**
  * Drops full-line comments of Lua, AutoHotkey and JavaScript, and module names:
- * require("network.proxy_override") is a file, not the key of the same spelling.
+ * require("core.network.engine.proxy_override") is a file, not the key of the same spelling.
  */
 function codeLines(source) {
 	return source

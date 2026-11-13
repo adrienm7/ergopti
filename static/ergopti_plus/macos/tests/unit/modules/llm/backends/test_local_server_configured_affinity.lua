@@ -171,8 +171,8 @@ helpers.describe("Configured nondefault discovery views (local-configured-views)
 				helpers.assert_eq(probes[id] and probes[id].url, entry.base_url .. "/models", "the configured port must be probed")
 				helpers.assert_eq(probes[id].headers.Authorization, nil)
 				-- A configured view never joins the catalogue order
-				local file = assert(io.open(helpers.shared("modules/llm/local_servers.json"), "r"))
-				local shipped = require("json").decode(file:read("*a")).server_order
+				local file = assert(io.open(helpers.shared("ai/data/local_servers.json"), "r"))
+				local shipped = require("core.text.engine.json").decode(file:read("*a")).server_order
 				file:close()
 				helpers.assert_eq(table.concat(servers.ORDER, ","), table.concat(shipped, ","))
 				helpers.assert_eq(api.PROVIDERS[id], nil, "a view never becomes a registered API provider")
@@ -258,7 +258,7 @@ helpers.describe("Local discovery native ownership and availability (local-confi
 				for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do probes[id].callback({ ok = false, status = 0, body = "" }) end
 				helpers.assert_eq(servers.result("omlx").status, servers.STATUS_UNAVAILABLE)
 				helpers.assert_eq(servers.result("omlx").models, {}); helpers.assert_eq(servers.detected(), {})
-				local rows = require("llm.local_server_menu").rows({ order = servers.view_order(), servers = servers.view_servers(),
+				local rows = require("ai.engine.local_servers.menu").rows({ order = servers.view_order(), servers = servers.view_servers(),
 					detected = servers.detected(), result = servers.result, backend = "api", paused = false,
 					tr = function(key) return key end, format = function(key) return key end,
 					actions = { select = function() end, address = function() end, key = function() end, rescan = function() end } })
@@ -282,7 +282,7 @@ helpers.describe("Local discovery native ownership and availability (local-confi
 				helpers.assert_eq(servers.result("omlx").status, vector.expected)
 				helpers.assert_eq(servers.result("omlx").models, {})
 				if vector.expected == "up" then
-					local rows = require("llm.local_server_menu").rows({ order = servers.view_order(), servers = servers.view_servers(),
+					local rows = require("ai.engine.local_servers.menu").rows({ order = servers.view_order(), servers = servers.view_servers(),
 						detected = servers.detected(), result = servers.result, backend = "api", paused = false,
 						tr = function(key) return key end, format = function(key) return key end,
 						actions = { select = function() error("empty list must not select") end, address = function() end, key = function() end, rescan = function() end } })

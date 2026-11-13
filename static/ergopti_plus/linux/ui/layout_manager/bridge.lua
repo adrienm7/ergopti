@@ -5,18 +5,18 @@
 --- DESCRIPTION:
 --- Implements the protocol of _shared/ui/layout_manager/script.js on Linux.
 --- Bridge name: "layout_manager_bridge". The message rules and the page state
---- are shared with macOS (_shared/lua/layouts/manager_bridge.lua); this file
+--- are shared with macOS (_shared/layouts/engine/manager_bridge.lua); this file
 --- wires them to the Linux registry client, the WebKitGTK window and xdg-open.
 --- ==============================================================================
 
 local M = {}
 M.bridge_name = "layout_manager_bridge"
 
-local Json          = require("json")
-local Logger        = require("logger.shim")
+local Json          = require("core.text.engine.json")
+local Logger        = require("core.logger.engine.shim")
 local Paths         = require("infra.paths")
 local FileSystem    = require("adapters.file_system")
-local ManagerBridge = require("layouts.manager_bridge")
+local ManagerBridge = require("layouts.engine.manager_bridge")
 
 local LOG = "bridge.layout_manager"
 local APP_NAME = "layout_manager"

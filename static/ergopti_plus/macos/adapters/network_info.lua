@@ -37,7 +37,7 @@ local hs          = hs
 local Logger      = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Crypto      = require("adapters.crypto")
-local NumberPolicy = require("number_policy")
+local NumberPolicy = require("core.text.engine.number_policy")
 
 local LOG = "adapters.network_info"
 

@@ -4,7 +4,7 @@
 --- MODULE: Diversity Temperature Corpus (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/temperature_vectors.json through the shared
---- algorithm (_shared/lua/llm/temperature.lua), then proves the macOS backends'
+--- algorithm (_shared/ai/engine/policy/temperature.lua), then proves the macOS backends'
 --- entry point, ApiCommon.get_diversity_temperature, answers what the shared
 --- algorithm answers for the shipped inference.json policy.
 ---
@@ -16,12 +16,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 local ApiCommon = helpers.load_with_stubs("modules.llm.api_common")
-local Temperature = require("llm.temperature")
+local Temperature = require("ai.engine.policy.temperature")
 
 local TOLERANCE = 1e-9
 
@@ -46,7 +46,7 @@ end
 
 helpers.describe("diversity temperature corpus (macOS)", function()
 	local corpus = read_json("tests/corpus/llm/temperature_vectors.json")
-	local shipped = read_json("modules/llm/inference.json").diversity_temperature
+	local shipped = read_json("ai/data/inference.json").diversity_temperature
 
 	helpers.it("the corpus holds the base thresholds, the floor and the clamp", function()
 		helpers.assert_true(#corpus.vectors >= 12, "vectors")

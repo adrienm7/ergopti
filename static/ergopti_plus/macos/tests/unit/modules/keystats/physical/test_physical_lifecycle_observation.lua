@@ -13,7 +13,7 @@ local MODULE_NAMES = {
 	"modules.keystats.context_tracker",
 	"modules.keystats.log_manager",
 	"modules.keystats.watchers",
-	"keystats.physical_lifecycle_observation",
+	"metrics.engine.capture.physical_lifecycle_observation",
 	"adapters.physical_observation_clock",
 }
 
@@ -272,7 +272,7 @@ local function last(records) return records[#records] end
 
 local function actor_fixture(capacity, callback, clock)
 	local now, records, refused = 0, {}, {}
-	local actor = require("keystats.physical_lifecycle_observation").new("engine", clock or function()
+	local actor = require("metrics.engine.capture.physical_lifecycle_observation").new("engine", clock or function()
 		now = now + 1; return now
 	end, function(reason) refused[#refused + 1] = reason end)
 	local owner = {}
@@ -331,7 +331,7 @@ describe("Dormant physical lifecycle actor", function()
 	end)
 	it("unbound actor performs no clock or snapshot queries", function()
 		local queries = 0
-		local actor = require("keystats.physical_lifecycle_observation").new("engine", function() error("extra clock") end, function() end)
+		local actor = require("metrics.engine.capture.physical_lifecycle_observation").new("engine", function() error("extra clock") end, function() end)
 		local result = actor.run("start", function() return false end, function() queries = queries + 1 end)
 		helpers.assert_eq(result, false); helpers.assert_eq(queries, 0)
 	end)
@@ -368,7 +368,7 @@ describe("Dormant physical lifecycle actor", function()
 		helpers.assert_eq(#records, 2)
 	end)
 	it("literal true acknowledgement rejects truthy values", function()
-		local actor = require("keystats.physical_lifecycle_observation").new("engine", function() return 1 end, function() end)
+		local actor = require("metrics.engine.capture.physical_lifecycle_observation").new("engine", function() return 1 end, function() end)
 		local token = actor.bind({}, 10, function() return 1 end)
 		helpers.assert_eq(token, nil)
 	end)
@@ -541,7 +541,7 @@ end)
 
 local root_fixture = require("tests.unit.modules.keystats.lifecycle.test_activation_callback_fail_closed")
 local function with_root(options, scenario)
-	local names={"adapters.event_provenance","adapters.input_source_broker","adapters.keyboard_hook","adapters.physical_observation_clock","adapters.process_lifecycle","adapters.synthetic_input","infra.config_paths","infra.dialog_util","infra.logger","infra.manifest_reader","keystats.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
+	local names={"adapters.event_provenance","adapters.input_source_broker","adapters.keyboard_hook","adapters.physical_observation_clock","adapters.process_lifecycle","adapters.synthetic_input","infra.config_paths","infra.dialog_util","infra.logger","infra.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
 	helpers.with_stub_scope(names,function()
 		local original=helpers.load_with_stubs
 		local records,owner,token,clock= {},{},nil,0

@@ -19,11 +19,11 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local Settings = require("layouts.emulation_settings")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Settings = require("layouts.engine.emulation.settings")
 local LOG = "infra.layout_emulation_preferences"
 
 --- Reads config.toml and its exact source.
@@ -36,7 +36,7 @@ function M.snapshot()
 end
 
 --- The emulation settings in force.
---- @return table settings layouts/emulation_settings.lua's resolve result.
+--- @return table settings layouts/engine/emulation/settings.lua's resolve result.
 function M.settings()
 	return Settings.resolve((M.snapshot()), Manifest.default_for,
 		function(segments, detail) ConfigOutdated.report(segments, detail, Logger) end)

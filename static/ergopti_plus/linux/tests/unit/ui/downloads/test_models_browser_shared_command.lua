@@ -16,11 +16,11 @@ local helpers = require("tests.helpers")
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
 	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "infra.paths", "infra.i18n",
-		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
-		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
+		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
+		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
-		"ui.text_prompt", "llm.trigger_policy", "infra.version", "infra.installation",
-		"updater.version_label", "updater.schedule", "ui.model_browser.bridge" }
+		"ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "infra.installation",
+		"updater.engine.version_label", "updater.engine.schedule", "ui.model_browser.bridge" }
 	local saved = {}
 	for _, name in ipairs(names) do
 		saved[name] = package.loaded[name]
@@ -38,10 +38,10 @@ local function with_browser(callback)
 			driver_root = function() return driver end,
 		}
 		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
-		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
+		local header_file = assert(io.open(driver .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local header_raw = header_file:read("*a")
 		assert(header_file:close())
-		local header_labels = assert(require("json").decode(assert(header_raw)))
+		local header_labels = assert(require("core.text.engine.json").decode(assert(header_raw)))
 		local header_brand = assert(header_labels["menu.builder.active_brand"])
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
 		package.loaded["infra.i18n"] = {
@@ -187,7 +187,7 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 	local function installed(f)
 		-- The fixture's blank dialog owners: the question runs inline, titled as given.
 		package.loaded["ui.modal"].run = function(fn) return fn() end
-		package.loaded["window_titles"].compose = function(title) return title end
+		package.loaded["core.ui.engine.window_titles"].compose = function(title) return title end
 		local deletes = {}
 		f.ctx.llm.is_enabled = function() return true end
 		f.ctx.llm.get_models = function() return { "qwen:2b", "gemma:1b" } end

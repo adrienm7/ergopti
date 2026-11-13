@@ -9,19 +9,19 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"compat.utf8",
+	"core.lifecycle.engine.compat.utf8",
 	"adapters.webview_result",
-	"diagnostics.operation_reporter",
+	"diagnostics.engine.operation_reporter",
 	-- The real dashboard resolves application icons through this adapter.
 	"adapters.running_application",
 	-- It also tells whether its own window is focused through this adapter.
 	"adapters.own_window",
 	"adapters.file_system", "adapters.metadata_command_stats", "adapters.write_lock_path", "adapters.timer_scheduler", "infra.logger", "infra.paths",
-	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",
-	"hs.fs", "hs.json", "json", "ui.ui_builder", "ui.metrics_typing",
+	"infra.i18n", "infra.fs_dir", "infra.text_utils", "core.text.engine.utils_core",
+	"hs.fs", "hs.json", "core.text.engine.json", "ui.ui_builder", "ui.metrics_typing",
 	"modules.keystats.log_manager", "modules.keystats.sqlite_reader",
 	-- The dashboard and the reader name the shared metric keys through this table.
-	"keystats.manifest_keys",
+	"metrics.engine.view.manifest_keys",
 	"infra.paced_job", "infra.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
 }
 

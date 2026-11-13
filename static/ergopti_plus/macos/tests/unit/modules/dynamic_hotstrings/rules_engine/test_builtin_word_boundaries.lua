@@ -3,11 +3,11 @@
 --- Registered builtin boundary checks; all native ports are closed recording fixtures.
 
 local helpers = require("tests.helpers")
-require("test.dynamic_word_boundary_contract")(helpers)
+require("tests.lua.dynamic_word_boundary_contract")(helpers)
 
 local MAGIC = "★"
 local function with_rules_engine(body, personal)
-    helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "dynamic_hotstrings",
+    helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "hotstrings.engine.dynamic.core",
         "modules.dynamic_hotstrings.user_code", "modules.keystats", "modules.keystats.init" }, function()
         local closed_keystats = {}
         package.loaded["modules.keystats"] = closed_keystats
@@ -84,7 +84,7 @@ helpers.describe("Mac builtin dynamic boundary owners", function()
     end)
     helpers.it("refuses update in both actual provider and interceptor before resolution", function()
         with_rules_engine(function(_, fixture, event)
-            local Engine = require("dynamic_hotstrings")
+            local Engine = require("hotstrings.engine.dynamic.core")
             for _, rule in ipairs(Engine.get_rules()) do
                 local resolver = rule.resolver
                 rule.resolver = function() fixture.calls = fixture.calls + 1; return resolver() end
@@ -127,7 +127,7 @@ helpers.describe("Mac builtin dynamic boundary owners", function()
     end)
     helpers.it("registers every personal prefix through the actual ordinary word gate", function()
         with_rules_engine(function(_, fixture)
-            local Core = require("hotstring_engine")
+            local Core = require("hotstrings.engine.matcher")
             helpers.assert_eq(#fixture.mappings, 10)
             for _, entry in ipairs(fixture.mappings) do
                 helpers.assert_true(entry.options.is_word == true)

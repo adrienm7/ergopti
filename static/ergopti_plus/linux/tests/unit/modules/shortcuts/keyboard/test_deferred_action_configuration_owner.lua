@@ -8,31 +8,31 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
 --- Runs an actual owner over a private TOML file and acknowledged manual queue.
 --- @param domain string Tap key or script-control chord.
 --- @param body function body(context)
 local function with_owner(domain, body)
 	local module_name = domain == "tap" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_chords"
-	local names = { "infra.config_paths", "modules.gestures.manager", "logger.shim", "modules.shortcuts.script_chords", module_name }
+	local names = { "infra.config_paths", "modules.gestures.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local source = '[shortcuts.tap_keys]\nnumber_row_left = "screen_capture"\n'
 		.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "screen_capture"\n'
 	local called, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local ctx = { deferred = {}, executed = {}, paused = false, path = path }
-			local Logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local Logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			Logger.set_level("debug")
 			Logger.set_sink(function(line)
 				if line:find("fired", 1, true) and ctx.on_log then ctx.on_log() end
 			end)
-			package.loaded["logger.shim"] = Logger
+			package.loaded["core.logger.engine.shim"] = Logger
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			-- Each persist revalidates every slot, so the catalogue also accepts
 			-- the manifest defaults of the slots the source leaves unset.
 			local assignable = { screen_capture = true, send_text = true, script_pause_toggle = true }
-			local Manifest, section = require("infra.manifest_reader"), require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL
+			local Manifest, section = require("infra.manifest_reader"), require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL
 			for _, slot in ipairs(require("modules.shortcuts.script_chords").slots()) do
 				assignable[Manifest.default_for(section .. "." .. slot.id)] = true
 			end

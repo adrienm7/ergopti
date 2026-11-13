@@ -38,7 +38,10 @@ const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const CORPUS = path.join(SHARED, 'tests', 'corpus');
 // The family contracts: in each folder, the Lua files whose names match. The
 // ledger names each contract by its repository path.
-const FAMILY = [[['lua', 'test'], /^(config_scope|toml_|menu_)/]];
+const FAMILY = [
+	[['tests', 'lua', 'menu'], /^(?!feature_notice_contract)/],
+	[['tests', 'lua', 'settings'], /^(scope_(?!owner_|sparse_)|toml_)/]
+];
 const EXPECT_KEYS = new Set([
 	'ok',
 	'content',
@@ -205,14 +208,14 @@ const LUA_COUNTS = {
 	},
 	toml_inline_scalar(corpus) {
 		return replayerCounts(
-			'static/ergopti_plus/_shared/lua/test/toml_inline_scalar_vectors_contract.lua',
+			'static/ergopti_plus/_shared/tests/lua/settings/toml_inline_scalar_vectors_contract.lua',
 			corpus.vectors.length,
 			'inline scalar'
 		);
 	},
 	toml_hotstring_reader(corpus) {
 		return replayerCounts(
-			'static/ergopti_plus/_shared/lua/test/toml_hotstring_reader_vectors_contract.lua',
+			'static/ergopti_plus/_shared/tests/lua/settings/toml_hotstring_reader_vectors_contract.lua',
 			corpus.vectors.length,
 			'hotstring reader'
 		);
@@ -234,7 +237,7 @@ const LUA_COUNTS = {
 	menu_numbered_caption(corpus) {
 		const match = fs
 			.readFileSync(
-				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/menu_numbered_caption_contract.lua'),
+				path.join(ROOT, 'static/ergopti_plus/_shared/tests/lua/menu/numbered_caption_contract.lua'),
 				'utf8'
 			)
 			.match(
@@ -250,7 +253,7 @@ const LUA_COUNTS = {
 	config_scope_plan(corpus) {
 		const match = fs
 			.readFileSync(
-				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/config_scope_plan_contract.lua'),
+				path.join(ROOT, 'static/ergopti_plus/_shared/tests/lua/settings/scope_plan_contract.lua'),
 				'utf8'
 			)
 			.match(

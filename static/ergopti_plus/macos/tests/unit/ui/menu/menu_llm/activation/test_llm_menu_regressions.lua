@@ -9,7 +9,7 @@ local codec   = helpers.load_with_stubs("infra.toml.codec")
 local with_count_menu = require("tests.support.llm_count_menu_fixture")
 
 local function contract_path()
-	return helpers.shared("modules/llm/menu_persistence_contract.json")
+	return helpers.shared("ai/data/menu_persistence_contract.json")
 end
 
 local function load_contract_entry(id)
@@ -183,7 +183,7 @@ helpers.describe("Generation groups (ai-generation-groups)", function()
 
 	helpers.it("draws the count and the words, one separator, then the context", function()
 		with_count_menu(function(menu)
-			require("test.ai_menu_layout_contract").assert_generation(helpers, generation_rows(menu), captions, "defaults")
+			require("tests.lua.ai.menu_layout_contract").assert_generation(helpers, generation_rows(menu), captions, "defaults")
 		end)
 	end)
 
@@ -191,7 +191,7 @@ helpers.describe("Generation groups (ai-generation-groups)", function()
 		with_count_menu(function(menu, state)
 			state.llm_num_predictions, state.llm_context_length = 7, 321
 			state.llm_min_words, state.llm_max_words = 2, 9
-			require("test.ai_menu_layout_contract").assert_generation(helpers, generation_rows(menu), captions, "resets")
+			require("tests.lua.ai.menu_layout_contract").assert_generation(helpers, generation_rows(menu), captions, "resets")
 		end)
 	end)
 end)

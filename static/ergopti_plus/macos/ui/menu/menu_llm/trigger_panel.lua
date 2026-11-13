@@ -21,11 +21,11 @@ local i18n         = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local Logger       = require("infra.logger")
 
-local PrivacyPolicy = require("llm.trigger_policy")
+local PrivacyPolicy = require("ai.engine.policy.trigger_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local Manifest = require("infra.manifest_reader")
 
 local LOG = "menu_llm.trigger_panel"

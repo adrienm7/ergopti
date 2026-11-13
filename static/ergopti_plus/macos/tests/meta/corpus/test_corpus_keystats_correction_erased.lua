@@ -43,7 +43,7 @@ local function fresh_aggregator()
 	return agg
 end
 
-require("test.keystats_correction_erased_contract")(helpers, data, function(vec)
+require("tests.lua.metrics.correction_erased_contract")(helpers, data, function(vec)
 	local agg = fresh_aggregator()
 	for index, flush in ipairs(vec.flushes) do
 		local events = {}

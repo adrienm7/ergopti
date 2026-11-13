@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 local function with_editor(scenario)
 	local prior_lfs = rawget(_G, "lfs")
@@ -18,9 +18,9 @@ local function with_editor(scenario)
 		return helpers.with_stub_scope({
 			"ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "adapters.webview_result",
 			"infra.deferred_work", "infra.paths", "infra.logger", "infra.locale", "infra.log_folders",
-			"locale.core", "json", "adapters.json_codec", "diagnostics.redact", "window_titles",
-			"webview.presentation", "infra.launcher_environment", "adapters.log_transport", "app_dirs",
-			"_generated.logger_sub_files", "webview.i18n_seed", "tests.support.native_webview_close_fixture",
+			"core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact", "core.ui.engine.window_titles",
+			"core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport", "core.fs.engine.app_dirs",
+			"_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed", "tests.support.native_webview_close_fixture",
 		}, function()
 			local h = { windows = {}, retained = {}, deferred = {}, callbacks = {}, bridges = {}, saves = 0, unbinds = 0, errors = {}, native_delete_calls = 0 }
 			local logger = helpers.make_logger_stub()

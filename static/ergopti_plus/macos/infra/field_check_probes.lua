@@ -51,11 +51,11 @@
 ---    (adapters/field_probe_ports.lua), so the portable suite drives each step.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
-local Json = require("json")
-local NativePath = require("native_path")
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local Identifiers = require("core.text.engine.identifiers")
+local Json = require("core.text.engine.json")
+local NativePath = require("core.fs.engine.native_path")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
 local M = {}
 

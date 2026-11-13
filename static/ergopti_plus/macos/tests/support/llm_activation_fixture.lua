@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"adapters.http_client",
 	"ui.menu.menu_llm.ollama_enable_probe",
-	"llm.enable_admission",
+	"ai.engine.settings.enable_admission_core",
 	"infra.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
@@ -69,7 +69,7 @@ local OWNED_MODULES = {
 	"modules.llm.ollama_endpoint",
 }
 
--- The local OpenAI-compatible servers of _shared/modules/llm/local_servers.json
+-- The local OpenAI-compatible servers of _shared/ai/data/local_servers.json
 local LOCAL_SERVER_ORDER = { "omlx", "lmstudio", "llamacpp", "jan" }
 local LOCAL_SERVERS = {
 	omlx = { label = "oMLX", base_url = "http://localhost:8000/v1" },
@@ -194,8 +194,8 @@ local function build_fixture(backend, save_results, options)
 			return options.offer_pick(dialog)
 		end,
 	}
-	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
@@ -430,9 +430,9 @@ local function build_fixture(backend, save_results, options)
 		row_disabled = function() return false end,
 		title_health_dot = function() return nil end,
 	}
-	local presentation_renderer = assert(require("menu.renderer").new({
+	local presentation_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = require("adapters.json_codec").decode,
 		i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
 		logger = package.loaded["infra.logger"],

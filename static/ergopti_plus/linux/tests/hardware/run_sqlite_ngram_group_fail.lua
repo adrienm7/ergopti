@@ -7,8 +7,8 @@
 
 --- Actual public Writer multirow SQLite FAIL diagnostic; supplied software metrics.
 local uv = require('luv')
-require('compat.utf8').install()
-local Json = require('json')
+require('core.lifecycle.engine.compat.utf8').install()
+local Json = require('core.text.engine.json')
 local W = require('modules.keystats.sqlite_writer')
 local root = assert(os.getenv('OWN_NGRAM_FAIL_ROOT'))
 assert(uv.fs_mkdir(root, 448))

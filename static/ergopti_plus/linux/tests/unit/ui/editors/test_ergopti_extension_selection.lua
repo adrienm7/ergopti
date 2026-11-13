@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("test.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
+require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
 
 --- Finds an exact rendered row anywhere in the native menu tree.
 --- @param rows table Rendered native rows.
@@ -74,7 +74,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 					key_text = function(code) return code == 36 and "j" or nil end,
 					defer = function(callback) queued[#queued + 1] = callback; return true end,
 				})
-				Config.init(require("hotstring_engine").new(), nil)
+				Config.init(require("hotstrings.engine.matcher").new(), nil)
 				local _, committed = Config.load_all()
 				helpers.assert_true(committed, "the real bundled and shipped extension catalogue initializes")
 				local category = Config.get_category("magickey")
@@ -105,7 +105,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				helpers.assert_eq(Source.evdev_code(), 36)
 				helpers.assert_eq(typed, { "★" })
 				helpers.assert_eq(dispatched, { { "★", 36 } }, "actual injection is handed to the character path")
-				local saved = require("toml_codec").decode(Choices.read(path))
+				local saved = require("core.text.engine.toml_codec").decode(Choices.read(path))
 				helpers.assert_eq(saved.hotstrings.modules.magickey.replace, true)
 				local disable = find_row(extension().menu, I18n.get("menu.hotstrings.uncheck_all"))
 				helpers.assert_true(disable.fn())

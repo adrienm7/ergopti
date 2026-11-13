@@ -25,17 +25,17 @@ export const prerender = true;
 
 // Repo-rooted paths (process.cwd() is the repo root at build time).
 const SHARED_ROOT = resolve(process.cwd(), 'static/ergopti_plus/_shared');
-const LLM_ROOT = resolve(SHARED_ROOT, 'modules/llm');
-const HOTSTRINGS_ROOT = resolve(SHARED_ROOT, 'modules/hotstrings');
+const LLM_ROOT = resolve(SHARED_ROOT, 'ai/data');
+const HOTSTRINGS_ROOT = resolve(SHARED_ROOT, 'hotstrings/data/catalogue');
 // The Ergopti layout extension carries the hotstrings written for its key
 // positions (SFB reduction, rolls, repeat corrections), bound to their
 // historical categories by its manifest; every driver ships it installed.
 const ERGOPTI_EXTENSION_ROOT = resolve(process.cwd(), 'static/layouts/registry/ergopti');
 const UI_ROOT = resolve(SHARED_ROOT, 'ui');
-const LOCALES_ROOT = resolve(SHARED_ROOT, 'data/locales');
+const LOCALES_ROOT = resolve(SHARED_ROOT, 'core/i18n/data/locales');
 // Canonical language display order — single source shared with the drivers.
-const LOCALE_ORDER_PATH = resolve(SHARED_ROOT, 'data/locale_order.json');
-const LOCALE_NAMES_PATH = resolve(SHARED_ROOT, 'data/locale_names.json');
+const LOCALE_ORDER_PATH = resolve(SHARED_ROOT, 'core/i18n/data/locale_order.json');
+const LOCALE_NAMES_PATH = resolve(SHARED_ROOT, 'core/i18n/data/locale_names.json');
 
 /**
  * Read and parse a JSON file, failing the build loudly on malformed input.
@@ -299,7 +299,7 @@ function loadLocales() {
 		return { code, name, flag: entry?.flag ?? '' };
 	});
 
-	// Single source of truth for row order: _shared/data/locale_order.json,
+	// Single source of truth for row order: _shared/core/i18n/data/locale_order.json,
 	// read the same way by the Linux driver and pinned by the macOS/Windows
 	// tables. Codes absent from it (shouldn't happen — a parity test enforces
 	// coverage) fall to the end alphabetically, so a new locale still appears.
@@ -317,7 +317,7 @@ function loadLocales() {
 // ==================================================
 // ==================================================
 
-const ACTIONS_ROOT = resolve(SHARED_ROOT, 'modules/actions');
+const ACTIONS_ROOT = resolve(SHARED_ROOT, 'shortcuts/data/actions');
 
 /**
  * Load the shared action catalog (the single source of truth each driver's

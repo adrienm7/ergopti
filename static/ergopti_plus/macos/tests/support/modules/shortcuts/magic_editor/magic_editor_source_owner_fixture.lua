@@ -14,7 +14,7 @@ local OWNED_MODULES = {
 	"hs", "infra.logger", "infra.paths", "infra.manifest_reader",
 	"adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
 	"adapters.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
-	"adapters.keyboard_geometry", "shortcuts.magic_editor",
+	"adapters.keyboard_geometry", "shortcuts.engine.magic_editor_core",
 }
 
 local function with_fixture(callback)
@@ -63,8 +63,8 @@ local function with_fixture(callback)
 				return retained.operation
 			end,
 		}
-		local policy = require("shortcuts.magic_editor")
-		package.loaded["shortcuts.magic_editor"] = setmetatable({ resolve = function(options)
+		local policy = require("shortcuts.engine.magic_editor_core")
+		package.loaded["shortcuts.engine.magic_editor_core"] = setmetatable({ resolve = function(options)
 			state.projections[#state.projections + 1] = options
 			return policy.resolve(options)
 		end }, { __index = policy })

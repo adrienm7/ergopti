@@ -14,14 +14,14 @@ local scoped_helpers = helpers
 local OWNED = {
 	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
 	"adapters.text_sender", "adapters.timer_scheduler", "adapters.tooltip_renderer",
-	"compat.utf8", "hotstring_engine", "hotstrings.personal_files",
+	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "infra.capsword_output", "infra.deferred_work",
 	"infra.hotstring_engine", "infra.keystroke_integrity", "infra.logger",
-	"infra.text_utils", "infra.timings", "json",
-	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
-	"logger.shim", "modules.keystats", "modules.keymap.expander",
+	"infra.text_utils", "infra.timings", "core.text.engine.json",
+	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
+	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
-	"modules.keymap.utils", "adapters.clipboard", "tests.stubs.hs", "text_utils",
+	"modules.keymap.utils", "adapters.clipboard", "tests.stubs.hs", "core.text.engine.utils_core",
 }
 
 -- Keep native consumers isolated even when a historical assertion aborts early.

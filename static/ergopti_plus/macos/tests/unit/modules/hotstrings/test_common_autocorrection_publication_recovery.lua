@@ -2,11 +2,11 @@
 --- Actual controller with an independent capability/transport double. These
 --- cases do not qualify physical locks or the native adapter/Writer producer.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local function fixture(body)
 	helpers.with_fresh_modules({ "adapters.file_system", "modules.hotstrings.hotstrings_config",
-		"hotstrings.common_autocorrection_migration", "hotstrings.publication_recovery" }, function()
+		"hotstrings.engine.catalogue.common_autocorrection_migration", "hotstrings.engine.publication_recovery" }, function()
 		local f = { path = "overrides", configured_path = "overrides", route = "owned", writes = 0,
 			retries = 0, release = false, acknowledge = false, records = {} }
 		f.original = '# independently authored legacy source\n[autocorrection.caps]\ndelay = 0.3\n'
@@ -43,7 +43,7 @@ local function fixture(body)
 			return false, "independent native release refusal", native
 		end
 		package.loaded["adapters.file_system"] = files
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local original_publish = Writer.publish_if_unchanged
 		Writer.publish_if_unchanged = function(path, candidate, adapter, expected, on_error)
 			return adapter.write_if_unchanged(path, candidate, expected, on_error)

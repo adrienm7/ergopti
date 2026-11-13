@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Runs the llm_tone_more_formal / llm_tone_more_familiar actions and their
 --- _cycle variants: the selection is rewritten one register up or down the tone
---- ladder (_shared/lua/llm/tone.lua) and replaced at once, and the rewrite stays
+--- ladder (_shared/ai/engine/prediction/tone.lua) and replaced at once, and the rewrite stays
 --- selected so the next step applies to it.
 ---
 --- FEATURES & RATIONALE:
@@ -26,7 +26,7 @@
 
 local M = {}
 
-local Tone       = require("llm.tone")
+local Tone       = require("ai.engine.prediction.tone")
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local WindowInfo = require("adapters.window_info")

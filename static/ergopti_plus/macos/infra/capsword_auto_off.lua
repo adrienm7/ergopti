@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Owns the [shortcuts.caps_word] settings on macOS: their menu-state keys,
 --- their manifest defaults and the compiled shared policy
---- (_shared/lua/caps_word/auto_off.lua) that platform/remap/watchers.lua asks
+--- (_shared/keyboard/engine/caps_word_auto_off.lua) that platform/remap/watchers.lua asks
 --- for every keystroke and pointer event while CapsWord is on.
 ---
 --- FEATURES & RATIONALE:
@@ -24,9 +24,9 @@ local M = {}
 
 local Logger   = require("infra.logger")
 local Manifest = require("infra.manifest_reader")
-local Policy   = require("caps_word.auto_off")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local Policy   = require("keyboard.engine.caps_word_auto_off")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "capsword"
 local PLATFORM = "hs"

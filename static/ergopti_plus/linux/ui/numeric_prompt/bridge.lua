@@ -29,9 +29,9 @@
 local M = {}
 M.bridge_name = "numeric_prompt_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
-local NumberPolicy = require("number_policy")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
+local NumberPolicy = require("core.text.engine.number_policy")
 local LOG = "bridge.numeric_prompt"
 local APP_NAME = "numeric_prompt"
 

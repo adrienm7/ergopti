@@ -9,7 +9,7 @@
 --- ordinary. Status metadata never becomes an NDJSON response chunk.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local native_cpath = os.getenv("ERGOPTI_NATIVE_LUA_CPATH")
 if native_cpath and native_cpath ~= "" then package.cpath = native_cpath end
 local ok_luv, uv = pcall(require, "luv")
@@ -17,17 +17,17 @@ if not ok_luv then
 	io.stderr:write("ENVIRONMENT: native lua-luv for this Lua ABI is required\n")
 	os.exit(2)
 end
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 
 local Http = require("adapters.http_client")
 local Ollama = require("modules.llm.api_ollama")
-local Policy = require("llm.local_model_policy")
+local Policy = require("ai.engine.ollama.local_model_policy")
 local Offer = require("modules.llm.local_model_offer")
 local MODEL = "ergopti-stream-receipt:latest"
 local failures, checks, sockets = {}, 0, {}
 local requests = {}
 local response = { status = 404,
-	body = require("json").encode({ error = 'model "' .. MODEL .. '" not found' }) }
+	body = require("core.text.engine.json").encode({ error = 'model "' .. MODEL .. '" not found' }) }
 
 local function check(condition, message)
 	checks = checks + 1
@@ -90,7 +90,7 @@ server:listen(16, function(err)
 		local method, path = input:match("^(%u+) ([^ ]+) ")
 		requests[#requests + 1] = { method = method, path = path }
 		if path == "/api/tags" then
-			respond(socket, 200, require("json").encode({ models = { { name = MODEL } } }))
+			respond(socket, 200, require("core.text.engine.json").encode({ models = { { name = MODEL } } }))
 		elseif path == "/api/chat" then
 			respond(socket, response.status, response.body, response.incomplete)
 		elseif path == "/slow" then
@@ -127,7 +127,7 @@ Offer._reset_for_test({ notify = function(text) notices[#notices + 1] = text; re
 check(Offer.handle(missing, { automatic = true }) == true and #notices == 1,
 	"the actual automatic offer accepts the native missing-model receipt once")
 
-local missing_json = require("json").encode({ error = 'model "' .. MODEL .. '" not found' })
+local missing_json = require("core.text.engine.json").encode({ error = 'model "' .. MODEL .. '" not found' })
 response = { status = 404, body = missing_json, incomplete = true }
 local _, partial_failure = request_chat()
 check(not Policy.is_missing(partial_failure) and partial_failure == "HTTP 404",
@@ -136,7 +136,7 @@ check(Offer.handle(partial_failure, { automatic = true }) == false and #notices 
 	"a truncated small 404 cannot offer a model download")
 
 response = { status = 404, body = missing_json .. string.rep(" ", 65536) .. "trailing invalid JSON" }
-check(require("json").decode(response.body) == nil, "the entire oversized error body is independently invalid JSON")
+check(require("core.text.engine.json").decode(response.body) == nil, "the entire oversized error body is independently invalid JSON")
 local _, overflow_failure = request_chat()
 check(not Policy.is_missing(overflow_failure) and overflow_failure == "HTTP 404",
 	"a valid prefix with invalid discarded trailing bytes cannot become a model-missing receipt")
@@ -153,8 +153,8 @@ check(Offer.handle(boundary_failure, { automatic = true }) == true and #notices 
 
 for _, case in ipairs({
 	{ status = 404, body = '{"error":"route not found"}' },
-	{ status = 401, body = require("json").encode({ error = 'model "' .. MODEL .. '" not found' }) },
-	{ status = 503, body = require("json").encode({ error = 'model "' .. MODEL .. '" not found' }) },
+	{ status = 401, body = require("core.text.engine.json").encode({ error = 'model "' .. MODEL .. '" not found' }) },
+	{ status = 503, body = require("core.text.engine.json").encode({ error = 'model "' .. MODEL .. '" not found' }) },
 }) do
 	response = case
 	local _, failure = request_chat()

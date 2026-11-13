@@ -69,7 +69,7 @@ without launching the driver.
 Repository-wide delivery rules live in [`AGENTS.md`](../../../AGENTS.md),
 Windows semantics in the
 [`ahk-driver` skill](../../../.agents/skills/ahk-driver/SKILL.md), and logging
-in the shared [`logger contract`](../_shared/modules/logger/SPEC.md).
+in the shared [`logger contract`](../_shared/core/logger/data/SPEC.md).
 Hard-won gotchas live in
 [`../../../docs/memory/README.md`](../../../docs/memory/README.md). Work that is
 known but not done lives in the gate that measures it: each ratchet under

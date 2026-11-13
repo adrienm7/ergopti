@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local manifest_file = assert(io.open(helpers.driver_root() .. "/../../layouts/registry/ergopti/manifest.toml", "r"))
-local shipped = require("toml_codec.codec").decode(assert(manifest_file:read("*a"))).extension
+local shipped = require("core.text.engine.toml_codec.codec").decode(assert(manifest_file:read("*a"))).extension
 assert(manifest_file:close())
 
 --- A hotstrings config double whose loaded categories name their extension.
@@ -128,9 +128,9 @@ local function with_extension_frame(body, paused)
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, err = pcall(function()
 		local translator = require("infra.i18n")
-		local renderer = assert(require("menu.renderer").new({ platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.shim"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		local owner = helpers.load_module("ui.menu.builder")
@@ -214,7 +214,7 @@ end)
 -- The standard-category empty marker is inert presentation owned by its live list.
 local function read_standard_empty_json(path)
 	local file = assert(io.open(path, "rb"))
-	local value = assert(require("json").decode(file:read("*a")))
+	local value = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	return value
 end
@@ -260,7 +260,7 @@ local function with_standard_empty(callback, locale)
 		end,
 	}
 	local ok, detail = xpcall(function()
-		local catalogue = read_standard_empty_json(require("infra.paths").shared("data/locales/" .. (locale or "en") .. ".json"))
+		local catalogue = read_standard_empty_json(require("infra.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
 		i18n.get = function(key) return catalogue[key] or key end
 		i18n.get_locale = function() return locale or "en" end
 		binding.build = function(key, category, dynamic, builders, ctx, providers)
@@ -429,7 +429,7 @@ local function with_extension_empty(callback, locale)
 	local old_statuses = owner.status_rows
 	local state = { loaded = false, data = nil, delivered = nil, writes = {} }
 	local ok, detail = xpcall(function()
-		local catalogue = read_standard_empty_json(require("infra.paths").shared("data/locales/" .. (locale or "en") .. ".json"))
+		local catalogue = read_standard_empty_json(require("infra.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
 		i18n.get = function(key) return catalogue[key] or key end
 		i18n.get_locale = function() return locale or "en" end
 		binding.build = function(key, category, dynamic, builders, ctx, providers)

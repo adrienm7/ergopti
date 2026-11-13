@@ -17,7 +17,7 @@
 
 local helpers = require("tests.helpers")
 
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "f58d15798aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "f58d15798"

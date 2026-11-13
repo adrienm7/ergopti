@@ -47,18 +47,18 @@ local function tree(receipt)
 	write(root .. "/linux/install/ownership_schema.sh",
 		assert(io.open(helpers.driver_root() .. "/install/ownership_schema.sh", "rb")):read("*a"))
 	write(root .. "/linux/bc_probe_driver.lua", "return 'compiled'\n")
-	write(root .. "/_shared/lua/bc_probe_shared/init.lua", "return 'compiled'\n")
+	write(root .. "/_shared/bc_probe_shared/init.lua", "return 'compiled'\n")
 	-- The file infra.paths probes to name a shared tree beside the driver
-	write(root .. "/_shared/data/locales/en.json", "{}\n")
+	write(root .. "/_shared/core/i18n/data/locales/en.json", "{}\n")
 	if receipt then write(root .. "/.ergopti-owned-files", "") end
 	local digest = string.rep("a", 64)
 	local ok, failure = Owner.compile(root, {
 		{ relative = "linux/bc_probe_driver.lua", digest = digest },
-		{ relative = "_shared/lua/bc_probe_shared/init.lua", digest = digest },
+		{ relative = "_shared/bc_probe_shared/init.lua", digest = digest },
 	})
 	helpers.assert_true(ok, tostring(failure))
 	write(root .. "/linux/bc_probe_driver.lua", "return 'source'\n")
-	write(root .. "/_shared/lua/bc_probe_shared/init.lua", "return 'source'\n")
+	write(root .. "/_shared/bc_probe_shared/init.lua", "return 'source'\n")
 	return root, Owner
 end
 
@@ -68,7 +68,7 @@ end
 local function boot(root, Owner, runtime, script_dir)
 	local saved_path = package.path
 	local driver = script_dir or (root .. "/linux")
-	package.path = driver .. "/?.lua;" .. driver .. "/../_shared/lua/?/init.lua;" .. saved_path
+	package.path = driver .. "/?.lua;" .. driver .. "/../_shared/?/init.lua;" .. saved_path
 	-- The preload searcher stays first; the bytecode searcher follows it.
 	local searchers = { function() return "\n\tno preload" end }
 	local used = Owner.install(driver, { runtime = runtime, searchers = searchers })
@@ -108,7 +108,7 @@ helpers.describe("bytecode package: an installed tree loads what its installer c
 		helpers.assert_eq(answers.bc_probe_shared, "compiled")
 		helpers.assert_eq(names.bc_probe_driver, "@" .. root .. "/linux/bc_probe_driver.lua",
 			"tracebacks and source-identity checks see the source's name")
-		helpers.assert_eq(names.bc_probe_shared, "@" .. root .. "/linux/../_shared/lua/bc_probe_shared/init.lua")
+		helpers.assert_eq(names.bc_probe_shared, "@" .. root .. "/linux/../_shared/bc_probe_shared/init.lua")
 		local infos, warnings = report(Owner)
 		helpers.assert_eq(#infos, 1)
 		helpers.assert_eq(#warnings, 0)
@@ -174,7 +174,7 @@ helpers.describe("bytecode package: anything but a whole, matching package loads
 		{ "a missing manifest", function(directory) os.remove(directory .. "/manifest") end, "no bytecode manifest" },
 		-- The shared prefix comes from infra.paths, which names no tree here.
 		{ "a tree without its shared tree", function(directory)
-			os.remove(directory .. "/../_shared/data/locales/en.json")
+			os.remove(directory .. "/../_shared/core/i18n/data/locales/en.json")
 		end, "no shared tree" },
 	}
 	for _, case in ipairs(tamperings) do

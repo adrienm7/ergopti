@@ -1,0 +1,5 @@
+{
+	"_comment": "Identifiers of the physical shortcuts feature every driver names: the config slot prefix and the editor's page id. The Lua drivers keep their copies in _shared/shortcuts/engine/physical_slots.lua (PREFIX) and linux/ui/physical_shortcuts/bridge.lua (APP); Windows reads this file.",
+	"slot_prefix": "physical_",
+	"app_id": "physical_shortcuts"
+}

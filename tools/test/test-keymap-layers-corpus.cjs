@@ -34,7 +34,7 @@ const {
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const CORPUS_PATH = shared('tests', 'corpus', 'keymap_layers', 'vectors.json');
-const KEYMAP_DIR = shared('keymap');
+const KEYMAP_DIR = shared('layouts/data');
 
 // Floor: a corpus that stopped being read would otherwise pass with nothing replayed.
 const MIN_VECTORS = 25;

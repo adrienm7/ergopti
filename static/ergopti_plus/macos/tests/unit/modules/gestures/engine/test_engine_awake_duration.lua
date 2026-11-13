@@ -18,8 +18,8 @@ local OWNED_MODULES = {
 	"infra.timings",
 	"adapters.accessibility_permission",
 	"adapters.mouse_control",
-	"error_description",
-	"number_policy",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 }
 
 

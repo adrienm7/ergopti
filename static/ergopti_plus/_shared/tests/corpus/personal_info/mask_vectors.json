@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver corpus for personal-info preview masking. Every vector must produce the same `expected` in every driver's suite, unmodified. The policy below is a COPY of _shared/modules/personal_info/fields.toml [policy], carried here so a vector's expectation can be read without opening a second file; tools/test/test-personal-info-mask-corpus.cjs asserts the two agree, so a change to the TOML that is not reflected here fails rather than silently retargets every vector.",
+	"description": "Cross-driver corpus for personal-info preview masking. Every vector must produce the same `expected` in every driver's suite, unmodified. The policy below is a COPY of _shared/hotstrings/data/personal_info/fields.toml [policy], carried here so a vector's expectation can be read without opening a second file; tools/test/test-personal-info-mask-corpus.cjs asserts the two agree, so a change to the TOML that is not reflected here fails rather than silently retargets every vector.",
 	"policy": {
 		"mask_char": "•",
 		"reveal_head": 2,

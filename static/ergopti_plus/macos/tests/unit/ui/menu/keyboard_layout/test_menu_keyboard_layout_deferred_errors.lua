@@ -50,8 +50,8 @@ local function exercise_failure(site)
 		install.highest_installed = function() return nil end
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 
-		local Json, Paths = require("json"), require("infra.paths")
-		local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+		local Json, Paths = require("core.text.engine.json"), require("infra.paths")
+		local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 		local labels = assert(Json.decode(assert(file:read("*a"))))
 		assert(file:close())
 		require("infra.i18n").get = function(key) return labels[key] or key end

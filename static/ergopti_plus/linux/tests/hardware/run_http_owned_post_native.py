@@ -16,7 +16,7 @@ parser.add_argument("--lua", required=True)
 parser.add_argument("--child-command", nargs=argparse.REMAINDER)
 args = parser.parse_args()
 driver = args.driver_root.resolve()
-shared = args.shared_lua.resolve() if args.shared_lua else driver.parent / "_shared/lua"
+shared = args.shared_lua.resolve() if args.shared_lua else driver.parent / "_shared"
 hardware = driver / "tests/hardware"
 helper = hardware / "run_native_subreaper.py"
 if args.child_command:

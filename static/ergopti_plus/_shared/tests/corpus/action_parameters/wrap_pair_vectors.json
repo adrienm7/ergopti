@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the wrap_pair parameter of the wrap_selection action: which left/right symbols a stored value names. Replayed by the macOS, Linux and Windows suites against the built-in catalogue _shared/modules/wrap_symbols/wrap_symbols.json.",
+	"description": "Golden vectors for the wrap_pair parameter of the wrap_selection action: which left/right symbols a stored value names. Replayed by the macOS, Linux and Windows suites against the built-in catalogue _shared/keyboard/data/wrap_symbols/wrap_symbols.json.",
 	"rule": "The value is trimmed first. A value equal to the trimmed opening symbol of a catalogue pair names that pair; otherwise a value equal to the trimmed closing symbol of a catalogue pair names it (opening symbols win, in catalogue order, because a symbol such as “ opens one pair and closes another). Otherwise a value holding exactly one | with non-blank text on both sides is a custom pair: the text before and after the | are used verbatim. Anything else, including an empty value and a value holding a line break, is invalid.",
 	"vectors": [
 		{ "id": "catalogue_opening_parenthesis", "value": "(", "left": "(", "right": ")" },

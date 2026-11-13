@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Thinking Families
 --- DESCRIPTION:
---- Owns the model families of _shared/modules/llm/thinking_off.json for the
+--- Owns the model families of _shared/ai/data/thinking_off.json for the
 --- macOS driver: read once, at their first use, and shared by every request
 --- builder (api_remote's cloud bodies, every Ollama body).
 ---
@@ -19,7 +19,7 @@ local M = {}
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
 local JsonCodec   = require("adapters.json_codec")
-local ThinkingOff = require("llm.thinking_off")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
 
 local LOG = "llm.thinking_families"
 

@@ -106,13 +106,13 @@ global _AhkSubDir := "autohotkey\"
 global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 
 ; Load the cross-driver hotstring resolution defaults (global default delay /
-; color / "personal" baseline) from _shared/modules/hotstrings/defaults.toml — the single
+; color / "personal" baseline) from _shared/hotstrings/data/catalogue/defaults.toml — the single
 ; source shared with Hammerspoon. Must precede HotstringsConfigInit and the tray
 ; menu build (initMenu reads GLOBAL_DEFAULT_DELAY). Fail-fast on a missing key.
 HotstringsConfigLoadSharedDefaults()
 ; Load the shared timing registry, then reassign the logger retention, the
 ; keystats-walker and tap-hold timing constants from it
-; (_shared/modules/timings/constants.toml). AHK v2 runs
+; (_shared/core/timing/data/constants.toml). AHK v2 runs
 ; static/global initializers before this auto-execute body, so these constants
 ; start at a sentinel and are sourced here — well before LoggerInit purges, the
 ; keystats hook or any tap-hold hotkey arms. Fail-fast on a missing key.

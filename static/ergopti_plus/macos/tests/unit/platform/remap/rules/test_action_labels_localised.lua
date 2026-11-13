@@ -4,7 +4,7 @@
 --- MODULE: Remap Action Label Localisation Tests
 --- DESCRIPTION:
 --- Eighteen of `platform/remap/data/actions.json`'s entries are ALSO rows of the
---- one action registry (`_shared/modules/actions/actions.toml`), and those
+--- one action registry (`_shared/shortcuts/data/actions/actions.toml`), and those
 --- eighteen already carry an `sg_actions.<id>` label in all twenty-one locales.
 --- The French string in the JSON was a second declaration of the same label, so
 --- the remap picker showed French to every user while the gesture picker — which
@@ -24,7 +24,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json    = require("json")
+local json    = require("core.text.engine.json")
 
 
 
@@ -90,7 +90,7 @@ helpers.describe("remap action labels: the two groups", function()
 		-- stubs i18n and would make this assert its own stub. If a merge gives
 		-- every remap action a key, the second half fails and this file's third
 		-- case has to be retired deliberately.
-		local fh = io.open(helpers.shared("data/locales/fr.json"), "r")
+		local fh = io.open(helpers.shared("core/i18n/data/locales/fr.json"), "r")
 		assert(fh, "the French catalogue must be readable")
 		local locale = json.decode(fh:read("*a"))
 		fh:close()
@@ -178,7 +178,7 @@ helpers.describe("remap action labels: picker headings and key actions", functio
 		i18n.get = function(key) return key:find("^remap%.category%.") and "<" .. key .. ">" or key end
 		local actions = config.load_available_actions(ACTIONS_JSON)
 		helpers.assert_eq(type(actions), "table", "the catalogue must load")
-		local fh = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local fh = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local english = json.decode(fh:read("*a"))
 		fh:close()
 		local seen = 0

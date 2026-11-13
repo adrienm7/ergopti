@@ -2,7 +2,7 @@
 
 --- Explicit dormant capture wiring; installed runtime authority remains caller-owned.
 local M = {}
-local Coordinator = require("keystats.physical_history_coordinator")
+local Coordinator = require("metrics.engine.capture.physical_history_coordinator")
 local Context = require("adapters.physical_history_context")
 local Clock = require("adapters.physical_observation_clock")
 local Capture = require("modules.keystats.physical_capture")
@@ -293,7 +293,7 @@ end
 
 --- Creates a dormant once-init manager; all successor leases use fresh closures.
 local function new_manager(capacity, on_refused, native_ports)
-	local Policy = require("keystats.physical_lease_policy")
+	local Policy = require("metrics.engine.capture.physical_lease_policy")
 	local policy_new = port(Policy, "new")
 	local Scheduler = require("adapters.timer_scheduler")
 	local managed_bind = rawget(Capture, "bind_managed_source")

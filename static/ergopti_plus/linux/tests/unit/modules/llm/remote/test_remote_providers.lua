@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Formats = require("llm.remote_formats")
+local Json = require("core.text.engine.json")
+local Formats = require("ai.engine.api.remote_formats")
 
 local MESSAGES = {
 	{ role = "system", content = "Continue the text." },
@@ -42,7 +42,7 @@ end
 --- logger that keeps every line with its level.
 --- @param body function body(remote, calls, logs)
 local function with_remote(body)
-	local names = { "adapters.http_client", "logger.shim", "modules.llm.api_remote" }
+	local names = { "adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local calls, logs = {}, {}
@@ -64,7 +64,7 @@ local function with_remote(body)
 	for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 		logger[level] = recorder(level)
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["modules.llm.api_remote"] = nil
 	local remote = require("modules.llm.api_remote")
 	remote._reset_for_test()
@@ -104,9 +104,9 @@ end
 -- =========================================
 
 helpers.describe("New providers: listed in catalogue order, each where it can serve", function()
-	local catalogue = read_shared("modules/llm/api_providers.json")
+	local catalogue = read_shared("ai/data/api_providers.json")
 	-- Every local server of the shipped catalogue, in its order
-	local local_ids = read_shared("modules/llm/local_servers.json").server_order
+	local local_ids = read_shared("ai/data/local_servers.json").server_order
 	local expected_order = {}
 	for _, id in ipairs(catalogue.provider_order) do expected_order[#expected_order + 1] = id end
 	for _, id in ipairs(local_ids) do expected_order[#expected_order + 1] = id end
@@ -165,7 +165,7 @@ end)
 -- =========================================
 
 helpers.describe("New providers: the OpenAI-format ones send to their own base_url", function()
-	local catalogue = read_shared("modules/llm/api_providers.json")
+	local catalogue = read_shared("ai/data/api_providers.json")
 
 	for _, id in ipairs({ "openrouter", "groq", "together", "fireworks" }) do
 		helpers.it(id .. ": chat completions under its base_url, with a Bearer key", function()
@@ -193,7 +193,7 @@ end)
 -- =========================================
 
 helpers.describe("Backboard: an assistant per key, then one message per request", function()
-	local base = read_shared("modules/llm/api_providers.json").providers.backboard.base_url
+	local base = read_shared("ai/data/api_providers.json").providers.backboard.base_url
 
 	helpers.it("the first request creates the assistant, then sends the message; the next reuses it", function()
 		with_remote(function(remote, calls)
@@ -283,7 +283,7 @@ end)
 -- =========================================
 
 helpers.describe("Decisions: Jev answers typed questions and never chats", function()
-	local catalogue = read_shared("modules/llm/api_providers.json")
+	local catalogue = read_shared("ai/data/api_providers.json")
 
 	helpers.it("decide() posts the shared body to the full endpoint with a Bearer key", function()
 		with_remote(function(remote, calls)
@@ -339,7 +339,7 @@ end)
 -- ============================================
 
 helpers.describe("Jev through Backboard: the questions in system_one, the answers found and located", function()
-	local base = read_shared("modules/llm/api_providers.json").providers.backboard.base_url
+	local base = read_shared("ai/data/api_providers.json").providers.backboard.base_url
 	local JEV = { provider = "backboard", token = "bb", model = "typesafe/jev-1.13" }
 	local ANSWERS = { intent = { choice = "calendar", probabilities = { calendar = 0.9, none = 0.1 } } }
 	local LOCATIONS = {

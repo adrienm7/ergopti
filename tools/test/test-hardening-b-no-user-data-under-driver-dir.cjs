@@ -273,12 +273,12 @@ const allowedSeen = new Set();
 		'local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"',
 		'-- hs.configdir .. "/ignored_in_a_comment.json"',
 		'local logo = hs.configdir .. "/../../img/logo/"',
-		'local ok = Paths.shared("modules/hotstrings/_index.toml")'
+		'local ok = Paths.shared("hotstrings/data/catalogue/_index.toml")'
 	].join('\n');
 	const shipped = new Set([
 		'ergopti_plus/macos/data',
 		'img/logo',
-		'ergopti_plus/_shared/modules/hotstrings/_index.toml'
+		'ergopti_plus/_shared/hotstrings/data/catalogue/_index.toml'
 	]);
 	const bad = anchoredPaths(stripLuaComments(fixture), 'macos').filter(
 		(p) => p.target === null || !shipped.has(p.target)

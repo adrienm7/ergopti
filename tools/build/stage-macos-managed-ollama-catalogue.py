@@ -23,12 +23,12 @@ import subprocess
 import tarfile
 import tempfile
 
-CONTRACT = "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
-OFFICIAL_RELEASE = "static/ergopti_plus/_shared/modules/llm/ollama_release.json"
-DEFAULTS = "static/ergopti_plus/_shared/modules/updater/defaults.json"
+CONTRACT = "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json"
+OFFICIAL_RELEASE = "static/ergopti_plus/_shared/ai/data/ollama_release.json"
+DEFAULTS = "static/ergopti_plus/_shared/updater/data/defaults.json"
 # The release host is declared once here.
-IDENTIFIERS = "static/ergopti_plus/_shared/data/identifiers.json"
-CHANNELS = "static/ergopti_plus/_shared/modules/updater/channels.json"
+IDENTIFIERS = "static/ergopti_plus/_shared/core/text/data/identifiers.json"
+CHANNELS = "static/ergopti_plus/_shared/updater/data/channels.json"
 PRODUCER = "tools/build/build-macos-managed-ollama.py"
 SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 SOURCE_COMMIT = re.compile(r"[a-f0-9]{40}\Z")

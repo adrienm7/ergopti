@@ -69,7 +69,7 @@ helpers.describe("crypto adapter", function()
 			helpers.assert_eq(result, string.rep("a", 64))
 			helpers.assert_not_nil(transport, "the CLI must execute through the checked native command owner")
 			if kind == "binary" then
-				helpers.assert_eq(require("compat.base64").decode(transport.input), data)
+				helpers.assert_eq(require("core.lifecycle.engine.compat.base64").decode(transport.input), data)
 				helpers.assert_true(transport.options and transport.options.pipefail == true)
 			else
 				helpers.assert_contains(transport.command, shell.quote(data), "retain the existing inert POSIX input word")

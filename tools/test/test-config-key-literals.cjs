@@ -54,7 +54,7 @@ const COMMENT_LINE = /^\s*(--|;|\/\/|\*|\/\*)/;
 const EXEMPT_MARKER = 'config-key-literal-ok';
 const STRING_LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'/g;
 // A module path is not a config key even when it is spelt like one
-// (`require("llm.app_profile_overrides")`).
+// (`require("ai.engine.policy.app_profile_overrides")`).
 // A string that names a log channel, a window or a stop label is a homonym of a key, found by
 // the syntax around it: `LOG = "x"`, `get_app_geometry("x")`, `Logger.info("x", ...)`,
 // `label = "x"`, `name = "x"`.
@@ -216,8 +216,8 @@ function selfTest(words) {
 		'-- "metrics.private_filter_enabled" is only explained here',
 		'local s = "enabled" .. "schema_version"',
 		'local m = "metrics.private_filter_enabled is the key"',
-		'local Overrides = require("llm.app_profile_overrides")',
-		'local ok, mod = pcall(require, "llm.app_profile_overrides")',
+		'local Overrides = require("ai.engine.policy.app_profile_overrides")',
+		'local ok, mod = pcall(require, "ai.engine.policy.app_profile_overrides")',
 		'local LOG = "shortcuts.tap_keys"',
 		'local geo = ui_builder.get_app_geometry("layout_manager")',
 		'Logger.info("scope_restore", "x")',

@@ -18,7 +18,7 @@
 
 _TDC_Spec() {
 	global _SharedDir
-	return DriverControl_LoadSpec(_SharedDir . "\modules\control\driver_control.json")
+	return DriverControl_LoadSpec(_SharedDir . "\diagnostics\data\control\driver_control.json")
 }
 
 _TDC_Corpus() {

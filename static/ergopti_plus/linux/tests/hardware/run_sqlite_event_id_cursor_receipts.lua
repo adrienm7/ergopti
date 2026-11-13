@@ -13,7 +13,7 @@ local root = assert(uv.fs_mkdtemp("/tmp/ergopti-event-cursor-receipts-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
 end
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))

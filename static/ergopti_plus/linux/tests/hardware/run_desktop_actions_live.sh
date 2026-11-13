@@ -27,7 +27,7 @@ need xdotool
 # center_mouse reads the monitors through RandR (modules/gestures/pointer_warp.lua).
 need xrandr
 need luajit
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 # lua-lgi installs for the distro's Lua, not for LuaJIT.
 export LUA_PATH="${LUA_PATH};/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
 export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"

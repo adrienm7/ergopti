@@ -15,8 +15,8 @@ local M = {}
 --- @param translator table Current fixture translator, captured by its genuine native producer.
 --- @return table renderer Actual Hammerspoon binding over the canonical shared manifest.
 function M.install(translator)
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
+	local catalogue = assert(require("core.text.engine.json").decode(file:read("*a")))
 	assert(file:close())
 	local original_get = translator.get
 	translator.get = function(key)

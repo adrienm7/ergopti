@@ -26,7 +26,7 @@
 ---     it moved one workspace without wrapping.
 ---
 --- FEATURES & RATIONALE:
---- 1. One rule: where a step lands comes from _shared/lua/desktop_navigation,
+--- 1. One rule: where a step lands comes from _shared/keyboard/engine,
 ---    the rule the macOS and Windows drivers use, pinned by a shared corpus.
 --- 2. A query that fails is reported, never read as "workspace 0": the action
 ---    then presses the desktop's own shortcut, which is the plain step. A
@@ -43,11 +43,11 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
-local DesktopNavigation = require("desktop_navigation")
-local json = require("json")
+local DesktopNavigation = require("keyboard.engine.desktop_navigation")
+local json = require("core.text.engine.json")
 
 local LOG = "modules.gestures.workspace_switcher"
 

@@ -60,7 +60,7 @@ helpers.describe("i18n.format: {n} placeholders are substituted, not printed", f
 
 	helpers.it("keeps a calendar title containing another placeholder literal", function()
 		local i18n = load_i18n_with({ ["llm.agent.label.calendar"] = "📅 {1} — {2}" })
-		local Agent = require("llm.agent")
+		local Agent = require("ai.engine.agent.agent")
 		local key, args = Agent.label({ type = "calendar", title = "Sprint {2}",
 			start = "2026-11-06T14:00" })
 		helpers.assert_eq(i18n.format(key, table.unpack(args)), "📅 Sprint {2} — 2026-11-06 14:00")

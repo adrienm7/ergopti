@@ -115,7 +115,7 @@ class StartupReplayTests(unittest.TestCase):
             with sqlite3.connect(Path(temporary) / "cache.sqlite") as database:
                 for name in ("schema.sql", "media_schema.sql"):
                     database.executescript(
-                        (ROOT / "static/ergopti_plus/_shared/data/db" / name).read_text()
+                        (ROOT / "static/ergopti_plus/_shared/metrics/data/db" / name).read_text()
                     )
                 database.executescript(ledger + outbox)
                 for key, value in {

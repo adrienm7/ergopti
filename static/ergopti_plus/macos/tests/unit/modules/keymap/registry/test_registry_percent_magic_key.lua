@@ -23,7 +23,7 @@
 --- release tags — while the user-configurable magic key, the most obviously
 --- user-controlled value of the three, kept its raw interpolation.
 ---
---- The helper now lives once in _shared/lua/text_utils (escape_gsub_replacement)
+--- The helper now lives once in _shared/core/text/engine (escape_gsub_replacement)
 --- and the two former local copies delegate to it, so a fourth call site cannot
 --- reintroduce the bug by copying a stale private helper.
 --- ==============================================================================

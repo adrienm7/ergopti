@@ -24,8 +24,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Vision = require("llm.vision")
+local json = require("core.text.engine.json")
+local Vision = require("ai.engine.prediction.vision")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local TEXT_MODEL = "qwen-3.8-27b"
@@ -47,7 +47,7 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-local CONFIG = read_json("modules/llm/vision.json")
+local CONFIG = read_json("ai/data/vision.json")
 
 --- Compares two decoded JSON values structurally.
 --- @return boolean equal

@@ -176,10 +176,10 @@ TestHsCache_IndexChangeInvalidatesCache() {
 	Directory := _LCT_TempDir()
 	try {
 		_SharedDir := Directory
-		DirCreate(Directory . "\modules\hotstrings")
-		IndexPath := Directory . "\modules\hotstrings\_index.toml"
+		DirCreate(Directory . "\hotstrings\data\catalogue")
+		IndexPath := Directory . "\hotstrings\data\catalogue\_index.toml"
 		FileAppend('[menu]`ncategories_order = ["magickey"]`n[languages]`norder = []`n', IndexPath, "UTF-8")
-		SourcePath := Directory . "\modules\hotstrings\magickey.toml"
+		SourcePath := Directory . "\hotstrings\data\catalogue\magickey.toml"
 		AssertTrue(FSWriteCreateDurable(SourcePath,
 			'[[ct]]`n"indexprobe" = { output = "Index", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n'))
 		TsvPath := Directory . "\cache.tsv"
@@ -225,11 +225,11 @@ _HsCacheCommonReference() {
 ; The independently frozen pre-split input retains its original reader routes.
 _HsCacheLegacyRoot() {
 	Root := A_Temp . "\ergopti-legacy-common-" . A_TickCount . "-" . Random(100000, 999999)
-	DirCreate(Root . "\modules\hotstrings")
+	DirCreate(Root . "\hotstrings\data\catalogue")
 	FileCopy(_HsCacheTestSharedDir() . "\tests\corpus\hotstrings\common_autocorrection_legacy\autocorrection.toml",
-		Root . "\modules\hotstrings\autocorrection.toml")
+		Root . "\hotstrings\data\catalogue\autocorrection.toml")
 	FileAppend('[menu]`ncategories_order = ["autocorrection"]`n[languages]`norder = []`n',
-		Root . "\modules\hotstrings\_index.toml", "UTF-8")
+		Root . "\hotstrings\data\catalogue\_index.toml", "UTF-8")
 	return Root
 }
 
@@ -546,7 +546,7 @@ Test("common autocorrection: missing bound caps owner cannot use bundled cached 
 ; The reviewed editorial map, independently authored before the source split.
 _HsCacheCommonAssignment() {
 	Classification := JsonParse(FileRead(_HsCacheTestSharedDir()
-		. "\data\hotstrings\common_autocorrection_sections.json", "UTF-8"))
+		. "\hotstrings\data\autocorrection\common_autocorrection_sections.json", "UTF-8"))
 	Assignment := Map()
 	for Section in Classification["sections"]
 		for Trigger in Section["triggers"] {
@@ -727,9 +727,9 @@ _HSCI_CurrentOwner(Mode) {
 	Root := A_Temp . "\ergopti_cache_inventory_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	FSCreateDirectoryExclusiveStrict(Root)
 	try {
-		DirCreate(Root . "\modules\hotstrings")
-		Index := Root . "\modules\hotstrings\_index.toml"
-		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		DirCreate(Root . "\hotstrings\data\catalogue")
+		Index := Root . "\hotstrings\data\catalogue\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\hotstrings\data\catalogue\_index.toml", Index)
 		_SharedDir := Root
 		; Retain original memo contents independently; fixture reads still enter
 		; the genuine ReadTomlFile owner and generate their own native receipts.
@@ -910,9 +910,9 @@ _HSCI_EnsureWriteCallout(Mode) {
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
 		RegistryScope := _HotstringRegistryScope()
-		DirCreate(Root . "\modules\hotstrings")
-		Index := Root . "\modules\hotstrings\_index.toml"
-		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		DirCreate(Root . "\hotstrings\data\catalogue")
+		Index := Root . "\hotstrings\data\catalogue\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\hotstrings\data\catalogue\_index.toml", Index)
 		_SharedDir := Root
 		_TomlFileCache := _TomlFileCache.Clone()
 		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
@@ -1058,8 +1058,8 @@ _HCOW_PublicEnsure(Collision, TruncateStage := false) {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
-		DirCreate(Root . "\modules\hotstrings")
-		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Root . "\modules\hotstrings\_index.toml")
+		DirCreate(Root . "\hotstrings\data\catalogue")
+		FileCopy(_HsCacheTestSharedDir() . "\hotstrings\data\catalogue\_index.toml", Root . "\hotstrings\data\catalogue\_index.toml")
 		_SharedDir := Root
 		_TomlFileCache := _TomlFileCache.Clone()
 		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()

@@ -12,14 +12,14 @@
 --- ROOT CAUSE ENCODED: the join gate accepted a third contact once it had held
 --- pair_join_confirm_ms, with no spatial check, and the tap commit took any
 --- three contacts. Both join paths and the three-finger tap commit now ask the
---- shared rule (_shared/lua/gestures/contact_join.lua), which refuses a contact
+--- shared rule (_shared/gestures/engine/contact_join.lua), which refuses a contact
 --- farther than MAX_FINGER_GAP_MM from the others or larger than
 --- MAX_MAJOR_RATIO times the largest of them. Three fingers of one hand still
 --- join and tap.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ContactJoin = require("gestures.contact_join")
+local ContactJoin = require("gestures.engine.contact_join")
 
 -- About 125 Hz, the rate the touch device reports frames at.
 local FRAME_DT_SEC = 0.008

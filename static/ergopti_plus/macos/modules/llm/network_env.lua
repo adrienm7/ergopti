@@ -18,7 +18,7 @@
 ---    so every macOS download child reads the settings the same way.
 --- 3. Fail fast: without the shared policy file the prelude is nil and the
 ---    caller refuses to start a download that would fail for an unnamed cause.
---- 4. The user's proxy override (Issue #101 point 2, network/proxy_override.lua)
+--- 4. The user's proxy override (Issue #101 point 2, core/network/engine/proxy_override.lua)
 ---    leads every prelude as ERGOPTI_PROXY_OVERRIDE, always assigned so an
 ---    inherited value never applies: the shared policy then treats a relay as
 ---    the explicit route and "direct" as no relay, before any PAC lookup. A
@@ -31,11 +31,11 @@ local M = {}
 
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Admission = require("modules.llm.opaque_network_admission")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local Storage = require("adapters.storage")
-local ProxyOverride = require("network.proxy_override")
+local ProxyOverride = require("core.network.engine.proxy_override")
 
 -- The shared policy, relative to the driver root.
 local POLICY_RELATIVE = "modules/llm/network-retry.sh"
@@ -61,7 +61,7 @@ local function locate_policy()
 end
 
 -- The shared inventory of the origins each download client contacts.
-local ORIGINS_RELATIVE = "/../_shared/modules/network/route_origins.json"
+local ORIGINS_RELATIVE = "/../_shared/core/network/data/route_origins.json"
 
 -- Located once, when the module loads: the file ships beside it in the bundle.
 local _policy_path = locate_policy()
@@ -88,9 +88,9 @@ local function route_inventory()
 end
 
 -- The contract of the local sign-in relay (docs/design/proxy-auth-relay.md).
-local RELAY_RELATIVE = "/../_shared/modules/network/proxy_auth_relay.json"
+local RELAY_RELATIVE = "/../_shared/core/network/data/proxy_auth_relay.json"
 
---- The shared sign-in relay policy (network/proxy_auth_relay.lua).
+--- The shared sign-in relay policy (core/network/engine/proxy_auth_relay_core.lua).
 --- @return table|nil policy
 --- @return string|nil err Why the contract cannot be used.
 function M.proxy_auth_relay()
@@ -100,7 +100,7 @@ function M.proxy_auth_relay()
 	if not ok or status ~= "ok" or type(bytes) ~= "string" then return nil, "the relay contract is unreadable" end
 	local decoded, contract = pcall(Json.decode, bytes)
 	if not decoded then return nil, "the relay contract is unreadable" end
-	return require("network.proxy_auth_relay").new(contract)
+	return require("core.network.engine.proxy_auth_relay_core").new(contract)
 end
 
 --- Seconds one origin's route lookup may take (route_origins.json).
@@ -129,7 +129,7 @@ function M.route_origins(client)
 end
 
 -- The shared proxy override declaration, relative to the driver root.
-local OVERRIDE_RELATIVE = "/../_shared/modules/network/proxy_override.json"
+local OVERRIDE_RELATIVE = "/../_shared/core/network/data/proxy_override.json"
 
 --- Reads and validates the shared proxy override declaration.
 --- @return table|nil setting
@@ -180,7 +180,7 @@ local function override_assignment()
 end
 
 -- The shared proxy policy, relative to the driver root's shared tree.
-local PROXY_POLICY_RELATIVE = "/../_shared/modules/network/proxy_policy.json"
+local PROXY_POLICY_RELATIVE = "/../_shared/core/network/data/proxy_policy.json"
 
 --- The shell parameter expansion of the HTTPS proxy precedence, built from the
 --- shared proxy policy: one nested ${name:-...} level per variable, in order.

@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.crash_report_contract")(helpers, require("json"), helpers.shared(""))
+require("tests.lua.diagnostics.crash_report_contract")(helpers, require("core.text.engine.json"), helpers.shared(""))

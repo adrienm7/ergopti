@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local reload_gate = require("reload_gate")
+local reload_gate = require("core.lifecycle.engine.reload.gate")
 
 local native_ok, native_luv = pcall(require, "luv")
 
@@ -129,7 +129,7 @@ local function activation_fixture(receipt)
 	end
 	local replacements = {
 		{ "luv", backend }, { "posix", { stat = function() return { type = "directory" } end } },
-		{ "logger.shim", logger }, { "infra.file_watchers", nil },
+		{ "core.logger.engine.shim", logger }, { "infra.file_watchers", nil },
 	}
 	local saved = {}
 	for _, entry in ipairs(replacements) do

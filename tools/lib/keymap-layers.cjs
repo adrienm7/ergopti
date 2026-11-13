@@ -7,7 +7,7 @@
  * Reads a layer file (the shipped layers.recommended.toml or a user's
  * layers.toml), validates it against the physical-key registry and the layer
  * vocabulary, and resolves each binding for one OS. It implements the same
- * contract as the two driver loaders — _shared/lua/keymap/layers.lua and
+ * contract as the two driver loaders — _shared/layouts/engine/layers/layers.lua and
  * windows/platform/remap/layers_loader.ahk — so the JS gates can check the
  * shipped data, and so the shared corpus under
  * _shared/tests/corpus/keymap_layers/ can hold all three implementations to one
@@ -36,9 +36,9 @@ const fs = require('fs');
 const TOML = require('smol-toml');
 const { shared } = require('./paths.cjs');
 
-const REGISTRY_PATH = shared('data', 'keycodes', 'physical_keys.json');
-const VOCABULARY_PATH = shared('keymap', 'layer_actions.toml');
-const RECOMMENDED_PATH = shared('keymap', 'layers.recommended.toml');
+const REGISTRY_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
+const VOCABULARY_PATH = shared('layouts', 'data', 'layer_actions.toml');
+const RECOMMENDED_PATH = shared('layouts', 'data', 'layers.recommended.toml');
 
 const ACTION_ID = /^[a-z][a-z0-9_]*$/;
 const LAYER_ID = /^[a-z][a-z0-9_]*$/;

@@ -33,7 +33,7 @@ local M = {}
 local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
 local Fetch = require("platform.remap.runtime_artifact_fetch")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local text_utils = require("infra.text_utils")
 
 local LOG = "remap.runtime_vhid_update"

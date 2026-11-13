@@ -22,7 +22,7 @@ local StartupTransaction = require("infra.startup_transaction")
 local Logger             = require("infra.logger")
 local Manifest           = require("infra.manifest_reader")
 local ChordCatalogue     = require("infra.script_chord_catalogue")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local M = {}
 

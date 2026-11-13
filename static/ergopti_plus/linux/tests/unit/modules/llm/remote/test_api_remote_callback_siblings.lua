@@ -34,7 +34,7 @@ end
 --- Isolates only the scripted HTTP and logging seams, restoring them on failure.
 --- @param test function Receives the remote module, requests and diagnostics.
 local function isolated(test)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "logger.shim" }
+	local names = { "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }
 	local saved, calls, logs = {}, {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local function queue(method, url, headers, body, callback, options)
@@ -55,7 +55,7 @@ local function isolated(test)
 	logger.error = function(owner, message, detail)
 		logs[#logs + 1] = { owner = owner, message = message, detail = detail }
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	local ok, err = pcall(function()
 		local remote = helpers.load_module("modules.llm.api_remote")
 		remote._reset_for_test()

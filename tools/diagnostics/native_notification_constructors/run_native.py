@@ -22,12 +22,12 @@ from receipt import validate
 
 DEPENDENCIES = {
     "ownership": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98",
-    "inventory": "ec22906ec34b4b7efdf304dab81ab62cee0ad03148e6006bcbdf4276c8976afe",
+    "inventory": "7a89a04f144970cb8cddf9c2c42b3e32ec4b3880699d397396be065466570503",
 }
 PINS = (
     "static/ergopti_plus/macos/adapters/application_notifier.lua",
-    "static/ergopti_plus/_shared/lua/application_notifier.lua",
-    "static/ergopti_plus/_shared/lua/window_titles.lua",
+    "static/ergopti_plus/_shared/platform/focus/application_notifier_core.lua",
+    "static/ergopti_plus/_shared/core/ui/engine/window_titles.lua",
     "static/ergopti_plus/_shared/ui/apps.manifest.json",
     "tools/diagnostics/macos_owned_process.py",
     "tools/diagnostics/native_hs_program_providers/run_native.py",

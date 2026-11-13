@@ -163,7 +163,7 @@ helpers.with_fresh_modules({
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
+	"core.text.engine.toml_codec",
 }, function()
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.config_paths"] = {
@@ -178,7 +178,7 @@ helpers.with_fresh_modules({
 		F19_LAYER_NAV_EXITED    = 80,
 	}
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
 	package.loaded["infra.toml.codec"] = toml_stub
 	package.loaded["adapters.file_system"] = {
 		read = SourceFile.read,
@@ -414,7 +414,7 @@ helpers.with_fresh_modules({
 			local state = Config.build_recommended_state(keys, combos)
 			state.tap_holds_enabled = true
 			local sentinel = package.loaded["infra.keycodes"].to_name(90)
-			local tag = require("keymap.control_signals").modifiers_for("tap_hold_command")
+			local tag = require("layouts.engine.layers.control_signals").modifiers_for("tap_hold_command")
 			local function is_command(event)
 				for _, modifier in ipairs(type(event) == "table" and event.modifiers or {}) do
 					if modifier:find("command", 1, true) or modifier:find("control", 1, true)
@@ -455,7 +455,7 @@ helpers.with_fresh_modules({
 		-- Karabiner keeps down, so the marker must come first.
 		helpers.it("a Ctrl, Cmd or Option hold is led by the untagged modifier marker (macos-tap-hold-modifier-word-reset)",
 			function()
-				local marker = require("keycodes").CONTEXT_MENU_KARABINER_NAME
+				local marker = require("platform.input.keycodes.core").CONTEXT_MENU_KARABINER_NAME
 				local state = Config.build_default_state(keys, combos)
 				state.tap_holds_enabled = true
 				state.tap_hold_config.caps_lock = { tap = "return", hold = "ctrl" }

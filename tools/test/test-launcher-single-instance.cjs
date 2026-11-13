@@ -37,9 +37,9 @@ const constants = read(
 );
 const launcher = read('static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift');
 // The Swift constant reads the generated Identifiers enum (PAR-83); resolve it
-// through the one declaration, _shared/data/identifiers.json.
+// through the one declaration, _shared/core/text/data/identifiers.json.
 const { bundle_ids: bundleIds } = JSON.parse(
-	read('static/ergopti_plus/_shared/data/identifiers.json')
+	read('static/ergopti_plus/_shared/core/text/data/identifiers.json')
 );
 const swiftBundleId = (name) => {
 	const value = constants.match(
@@ -192,7 +192,7 @@ if (
 const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');
 // Both Lua sites read the ids from identifiers.json (generated into identifiers.lua);
 // the ids below are what that file declares, compared with the build script's.
-const identifiers = JSON.parse(read('static/ergopti_plus/_shared/data/identifiers.json'));
+const identifiers = JSON.parse(read('static/ergopti_plus/_shared/core/text/data/identifiers.json'));
 const luaLauncherId = /^M.LAUNCHER_BUNDLE_ID = Identifiers\.bundle_ids\.launcher$/m.test(admission)
 	? identifiers.bundle_ids.launcher
 	: undefined;

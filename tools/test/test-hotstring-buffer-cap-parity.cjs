@@ -10,7 +10,7 @@
  * would fire on some drivers and silently not on others.
  *
  * ROOT CAUSE ENCODED:
- * The cap had diverged — _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS =
+ * The cap had diverged — _shared/hotstrings/engine/matcher/init.lua BUFFER_MAX_CHARS =
  * 256 (used by macOS + Linux, which require the shared engine) vs Windows'
  * hardcoded 64 in two AHK files. Windows therefore failed to match triggers of
  * 65-256 chars that macOS/Linux matched. Windows was converged UP to the shared
@@ -46,7 +46,7 @@ let canon = null;
 try {
 	// Shared canonical (macOS + Linux require this engine, so they inherit it).
 	canon = extract(
-		'_shared/lua/hotstring_engine/init.lua',
+		'_shared/hotstrings/engine/matcher/init.lua',
 		/BUFFER_MAX_CHARS\s*=\s*(\d+)/,
 		'BUFFER_MAX_CHARS'
 	);

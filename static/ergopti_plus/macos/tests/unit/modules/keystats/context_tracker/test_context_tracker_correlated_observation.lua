@@ -6,8 +6,8 @@ local Privacy = require("modules.keystats.privacy_context")
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector",
-		"adapters.physical_observation_clock", "keystats.physical_context_observation",
-		"native_path", "error_description" }, function()
+		"adapters.physical_observation_clock", "metrics.engine.capture.physical_context_observation",
+		"core.fs.engine.native_path", "diagnostics.engine.reports.error_description" }, function()
 		local controls = { paused = false, no_window = false, no_focus = false, no_frontmost = false,
 			throw_property = nil, title = "Ordinary window", role = "AXTextField", subrole = nil,
 			queries = {}, clock = 100, records = {}, failures = {}, decision_calls = 0 }

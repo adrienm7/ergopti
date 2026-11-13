@@ -25,19 +25,19 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local hs                = hs
 local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
-local NumberPolicy      = require("number_policy")
+local NumberPolicy      = require("core.text.engine.number_policy")
 local TomlReader        = require("infra.toml.reader")
 local FileSystem        = require("adapters.file_system")
 local i18n              = require("infra.i18n")
 local Paths            = require("infra.paths")
-local PersonalFiles    = require("hotstrings.personal_files")
+local PersonalFiles    = require("hotstrings.engine.catalogue.personal_files")
 
 local LOG = "hotstrings_config_window"
 
@@ -115,7 +115,7 @@ end
 local ASSETS_DIR = (Paths.shared("ui/hotstrings_config_window") or "") .. "/"
 
 -- Display order for the built-in categories — matches the menu and the AHK driver.
-local CATEGORY_ORDER = require("menu.row_order").list("hotstring_config_categories")
+local CATEGORY_ORDER = require("menu.engine.row_order").list("hotstring_config_categories")
 
 -- Friendly labels for each built-in category. Falls back to the TOML's [_meta]
 -- description when this table has no entry for a given key.
@@ -143,7 +143,7 @@ local function common_categories()
 	-- The packs the driver loaded, handed over by M.setup(); a window set up
 	-- without them (the unit harness) shows the built-in categories only.
 	local packs = type(_config.language_packs) == "function" and _config.language_packs() or {}
-	local Languages = require("hotstrings.languages")
+	local Languages = require("hotstrings.engine.languages")
 	local names = {}
 	for _, row in ipairs(require("_generated.locale_table")) do names[row.code] = row.name end
 	for _, pack in ipairs(packs) do
@@ -157,8 +157,8 @@ local function common_categories()
 end
 
 -- Color palette offered in the "couleur" dropdown. The palette is generated from
--- _shared/data/native_theme.toml, the one list the Linux window reads too.
-local NativeTheme = require("native_theme_data")
+-- _shared/core/ui/data/native_theme.toml, the one list the Linux window reads too.
+local NativeTheme = require("core.ui.engine.native_theme_data")
 local COLOR_PRESETS = {}
 local PRESET_HEX = {}
 for _, preset in ipairs(NativeTheme.hotstring_palette) do
@@ -309,7 +309,7 @@ end
 
 --- Source-default collision priority (personal 50 / package 30 / common 10) for a
 --- UI group, read from the keymap engine so the window never hardcodes a fourth
---- copy of the tiers (the single source is _shared/modules/hotstrings/priority.json, held
+--- copy of the tiers (the single source is _shared/hotstrings/data/catalogue/priority.json, held
 --- equal across drivers by tools/test/test-priority-parity.cjs). The keymap module
 --- is required lazily — it is loaded long before this window opens, but a headless
 --- harness may lack it, in which case the source default is simply omitted.
@@ -485,7 +485,7 @@ local function build_state()
 				if entry.readonly then entry.title = entry.title .. " — " .. i18n.get("menu.hotstrings.personal_source_unavailable") end
 				if binding then
 					local legacy = hotstrings_config.get_user_override(source.owner, nil) or {}
-					local Metadata = require("hotstrings.personal_metadata")
+					local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 					local reason = i18n.get("menu.hotstrings.personal_metadata_unavailable")
 					entry.readonly_metadata = Metadata.readonly_fields(binding.record.content, nil, legacy)
 					entry.readonly_metadata_reason = reason
@@ -687,7 +687,7 @@ local function on_message(msg, owner)
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
 		return false
 	end
-	if action == "set_color" and not (canonical_personal and require("hotstrings.personal_metadata").valid("color", body.hex))
+	if action == "set_color" and not (canonical_personal and require("hotstrings.engine.catalogue.personal_metadata").valid("color", body.hex))
 		and not ConfigSchema.is_color(body.hex) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
 		return false

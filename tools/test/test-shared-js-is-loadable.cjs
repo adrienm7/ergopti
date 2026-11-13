@@ -41,17 +41,17 @@ const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 // Modules that no tool loads, on purpose. Each needs a reason, because the
 // alternative reading — "nothing can load it and nobody noticed" — is the bug.
 const SPEC_ONLY = {
-	'modules/tooltip/lifecycle.js':
+	'core/ui/data/tooltip/lifecycle.js':
 		'Describes the show/hide/replace lifecycle each driver implements natively.',
-	'modules/tooltip/tint.js':
+	'core/ui/data/tooltip/tint.js':
 		'Describes the tint derivation; both drivers reimplement it in their own language.',
-	'core/domain/Expander.spec.js':
+	'core/text/data/domain/Expander.spec.js':
 		'Domain specification cited by core/domain/SPEC.md and config_schema/SCHEMA.md. No tool ' +
 		'loads it; the expander is implemented per driver.',
-	'core/domain/GestureRecognizer.spec.js':
+	'core/text/data/domain/GestureRecognizer.spec.js':
 		'Domain specification cited by SPEC.md and SCHEMA.md; gesture recognition is implemented ' +
 		'per driver.',
-	'core/domain/ProfileSelector.js':
+	'core/text/data/domain/ProfileSelector.js':
 		'Profile-selection reference implementation cited by SPEC.md. Nothing executes it — the ' +
 		'drivers select profiles in their own language.'
 };

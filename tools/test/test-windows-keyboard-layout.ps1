@@ -29,7 +29,7 @@ if ($env:GITHUB_ACTIONS -cne "true" -or -not $env:RUNNER_TEMP) {
 }
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$SpecPath = Join-Path $RepoRoot "static\ergopti_plus\_shared\modules\layouts\windows_system_layout.json"
+$SpecPath = Join-Path $RepoRoot "static\ergopti_plus\_shared\layouts\data\windows_system_layout.json"
 $VendorDirectory = Join-Path $RepoRoot "static\ergopti_plus\windows\vendor\keyboard_layout"
 $Installer = Join-Path $VendorDirectory "install_keyboard_layout.ps1"
 $ResultPath = Join-Path $env:RUNNER_TEMP "ergopti-layout-install.json"
@@ -110,7 +110,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $env:SystemRoot "System32\$($spec.dl
 $hkl = [ErgoptiProbe.Keyboard]::LoadKeyboardLayout($klid, 0x80)
 if ($hkl -eq [IntPtr]::Zero) { throw "Windows refused to load $klid (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))." }
 try {
-	# Scan codes of static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json.
+	# Scan codes of static/ergopti_plus/_shared/layouts/data/mac_keycodes.json.
 	Assert-Typed "KeyA types a" (Get-Typed $hkl 0x1E) 1 "a"
 	Assert-Typed "Shift+KeyA types A" (Get-Typed $hkl 0x1E @("shift")) 1 "A"
 	Assert-Typed "AltGr+KeyA types <" (Get-Typed $hkl 0x1E @("altgr")) 1 "<"

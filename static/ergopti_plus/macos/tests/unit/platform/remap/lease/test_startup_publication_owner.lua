@@ -86,7 +86,7 @@ helpers.describe("startup configuration conditional publication ownership", func
 					return saved, detail, record
 				end
 				package.loaded["platform.remap.config"] = configured
-				-- The shared tap_hold.toml layout (_shared/tap_hold/SCHEMA.md).
+				-- The shared tap_hold.toml layout (_shared/tap_hold/data/SCHEMA.md).
 				local source = '# exact migration source\n[_meta]\nschema_version = 1\n[karabiner]\nintegration_enabled = false\n'
 					.. '[tap_hold.keys.tab]\ntap_action = "cmd_tab"\n'
 				body(remap, calls, fs, control, seed, path, source, receipts)

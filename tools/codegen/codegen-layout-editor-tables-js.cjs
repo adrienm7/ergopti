@@ -8,9 +8,9 @@
  * tables the layout source compiler (layout_composer/source_compiler.js) takes
  * as its `tables` argument, so the layout editor page compiles a source the
  * way the Node tooling does (tools/lib/layout-source.cjs keyTables()):
- *   - _shared/modules/layouts/mac_keycodes.json (macKeycodes);
- *   - _shared/data/keycodes/physical_keys.json (physicalKeys);
- *   - _shared/data/keycodes/hid_usages.json (hidUsages).
+ *   - _shared/layouts/data/mac_keycodes.json (macKeycodes);
+ *   - _shared/layouts/data/keycodes/physical_keys.json (physicalKeys);
+ *   - _shared/layouts/data/keycodes/hid_usages.json (hidUsages).
  *
  * FEATURES & RATIONALE:
  * 1. Classic script: the macOS and Linux hosts inline the page, which cannot
@@ -29,9 +29,9 @@ const { shared, sharedRel } = require('../lib/paths.cjs');
 
 const OUT_PATH = shared('ui', 'layout_editor', '_generated', 'key_tables.js');
 const TABLES = [
-	['macKeycodes', 'modules/layouts/mac_keycodes.json'],
-	['physicalKeys', 'data/keycodes/physical_keys.json'],
-	['hidUsages', 'data/keycodes/hid_usages.json']
+	['macKeycodes', 'layouts/data/mac_keycodes.json'],
+	['physicalKeys', 'layouts/data/keycodes/physical_keys.json'],
+	['hidUsages', 'layouts/data/keycodes/hid_usages.json']
 ];
 
 /**

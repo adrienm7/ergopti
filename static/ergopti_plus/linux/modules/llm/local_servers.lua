@@ -5,16 +5,16 @@
 local M = {}
 local Catalogue = require("modules.llm.local_server_catalogue")
 local Ports = require("modules.llm.local_server_ports")
-local Discovery = require("llm.local_server_discovery")
-local Auth = require("llm.local_server_auth")
-local Menu = require("llm.local_server_menu")
+local Discovery = require("ai.engine.local_servers.discovery")
+local Auth = require("ai.engine.local_servers.auth")
+local Menu = require("ai.engine.local_servers.menu")
 local Entries = require("modules.llm.api_entries")
 local Remote = require("modules.llm.api_remote")
 local Http = require("adapters.http_client")
 local Timings = require("infra.timings")
 local Clock = require("infra.monotonic")
 local EventLoop = require("adapters.event_loop")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "llm.local_servers"
 local catalogue_order, catalogue_servers, _, catalogue_discovery, _, _, catalogue_identities = Catalogue.load({})
 -- Server id -> the last port scan result (llm.local_server_ports); the callbacks

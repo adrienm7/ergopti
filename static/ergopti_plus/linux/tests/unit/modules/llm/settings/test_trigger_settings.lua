@@ -120,7 +120,7 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 	end)
 
 	helpers.it("stores the shared \"never\" debounce as -1 and reads it back (llm-debounce-never)", function()
-		local Debounce = require("llm.request_plan.debounce")
+		local Debounce = require("ai.engine.request_plan.debounce")
 		local settings, storage = load_settings()
 		helpers.assert_true(settings.set("debounce_ms", Debounce.NEVER_MS))
 		helpers.assert_eq(storage.get("llm.trigger.debounce_ms"), -1)
@@ -150,7 +150,7 @@ local function with_url_request(options, body)
 		observed.probes = observed.probes + 1
 		if options.probe_throw then error("controlled accessibility failure") end
 		if options.probe_unknown then return false, "" end
-		return true, "FOCUS:" .. require("json").encode({ role = 61,
+		return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = 61,
 			name = options.url and "Address and search bar" or "Document text",
 			attributes = {}, active_scope = true, native_bus_name = ":1.42",
 			native_object_path = "/org/a11y/atspi/accessible/7" })
@@ -500,7 +500,7 @@ local function trigger_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/automatic_trigger_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Exercises real menu projection and the manifest-backed durable setting owner.
@@ -545,11 +545,11 @@ local function with_trigger_menu(options, body)
 		return many(values, source)
 	end
 	if options.label or options.first then
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
-				local root = assert(require("json").decode(raw))
+				local root = assert(require("core.text.engine.json").decode(raw))
 				if options.label then root.llm_trigger_menu[2].i18n = options.label end
 				if options.first then
 					local row = table.remove(root.llm_trigger_menu, 2)
@@ -557,7 +557,7 @@ local function with_trigger_menu(options, body)
 				end
 				return root
 			end,
-			i18n = require("infra.i18n"), logger = require("logger.shim"),
+			i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
 	end
@@ -691,7 +691,7 @@ local function privacy_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 helpers.describe("Shared privacy trigger native owners", function()
@@ -777,7 +777,7 @@ end)
 
 helpers.describe("Shared privacy intent vectors", function()
 	helpers.it("replays strict bool types, owner revisions and exact backend identities (shared-privacy-triggers)", function()
-		local corpus, policy = privacy_corpus(), require("llm.trigger_policy")
+		local corpus, policy = privacy_corpus(), require("ai.engine.policy.trigger_policy")
 		for _, vector in ipairs(corpus.vectors) do
 			local expected, current = {}, {}
 			for key, value in pairs(corpus.snapshot) do expected[key], current[key] = value, value end

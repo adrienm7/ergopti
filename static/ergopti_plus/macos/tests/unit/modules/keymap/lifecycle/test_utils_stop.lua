@@ -36,10 +36,10 @@ local KU = helpers.load_with_stubs("modules.keymap.utils")
 -- =================================================
 -- =================================================
 
-helpers.describe("keymap.utils M.stop(): existence (watcher-leak-on-reload)", function()
+helpers.describe("layouts.engine.utils M.stop(): existence (watcher-leak-on-reload)", function()
 	helpers.it("M.stop is a function", function()
 		helpers.assert_eq(type(KU.stop), "function",
-			"keymap.utils must export M.stop() (watcher-leak-on-reload)")
+			"layouts.engine.utils must export M.stop() (watcher-leak-on-reload)")
 	end)
 
 	helpers.it("M.stop() does not raise when no watchers are running", function()
@@ -68,7 +68,7 @@ end)
 -- ==========================================================
 -- ==========================================================
 
-helpers.describe("keymap.utils M.stop(): cleans up injected watchers (watcher-leak-on-reload)", function()
+helpers.describe("layouts.engine.utils M.stop(): cleans up injected watchers (watcher-leak-on-reload)", function()
 	helpers.it("stop() releases the global, focused-app, and focused-window watchers", function()
 		-- Reload module so watchers are in a clean nil state
 		package.loaded["modules.keymap.utils"] = nil

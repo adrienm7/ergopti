@@ -3,12 +3,12 @@
 ; ==============================================================================
 ; MODULE: Corpus — the shared preview-masking vectors
 ; DESCRIPTION:
-; Replays _shared/modules/personal_info/preview_vectors.toml through this
+; Replays _shared/hotstrings/data/personal_info/preview_vectors.toml through this
 ; driver's masking path and asserts every expected preview character for
 ; character.
 ;
 ; WHY A CORPUS AND NOT EXPECTATIONS WRITTEN HERE:
-; fields.toml says WHICH fields are secret and _shared/lua/personal_info/mask.lua
+; fields.toml says WHICH fields are secret and _shared/hotstrings/engine/personal_info/mask.lua
 ; says HOW MUCH of one is hidden, but neither pins the ANSWER. Windows is
 ; AutoHotkey and cannot require the shared Lua, so infra/personal_info_mask.ahk
 ; is a PORT rather than a binding — and two implementations in two languages do
@@ -43,7 +43,7 @@
 _PIMV_ReadVectors() {
 	global _SharedDir
 	Vectors := []
-	Path := _SharedDir . "\modules\personal_info\preview_vectors.toml"
+	Path := _SharedDir . "\hotstrings\data\personal_info\preview_vectors.toml"
 	if !FileExist(Path) {
 		return Vectors
 	}
@@ -226,8 +226,8 @@ _PIMV_TypedDeclarationRejectsNumericFlag() {
 	global _SharedDir
 	SavedDir := _SharedDir
 	Root := A_Temp . "\ergopti_mask_types_" . A_TickCount . "_" . Random(1000, 9999)
-	DirCreate(Root . "\modules\personal_info")
-	Path := Root . "\modules\personal_info\fields.toml"
+	DirCreate(Root . "\hotstrings\data\personal_info")
+	Path := Root . "\hotstrings\data\personal_info\fields.toml"
 	try {
 		FileAppend('[policy]`nmask_char = "•"`nreveal_head = 0`nreveal_tail = 0`n'
 			. 'min_length_to_reveal = 12`npreserve_separators = true`n'

@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
-	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate",
-	"adapters.timer_scheduler", "error_description", "number_policy", "adapters.file_system",
+	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
+	"adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "adapters.file_system",
 }
 
 M.CONFIG_ROOT = "/fake/config/"

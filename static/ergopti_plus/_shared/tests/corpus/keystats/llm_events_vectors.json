@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of the events_llm rows a driver writes for the dashboard's AI tab (schema: _shared/data/db/schema.sql). event is the logical event a driver records; row is the column to value map the table must hold, with null for a column the event does not carry (the dashboard tells a missing token count from a zero). The Linux suite replays them through the real writer; the columns are pinned against the schema by the same test.",
+	"_comment": "Vectors of the events_llm rows a driver writes for the dashboard's AI tab (schema: _shared/metrics/data/db/schema.sql). event is the logical event a driver records; row is the column to value map the table must hold, with null for a column the event does not carry (the dashboard tells a missing token count from a zero). The Linux suite replays them through the real writer; the columns are pinned against the schema by the same test.",
 	"cases": [
 		{
 			"id": "generation-with-tokens",

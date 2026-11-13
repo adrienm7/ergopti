@@ -14,8 +14,8 @@
 local helpers = require("tests.helpers")
 
 local Packs     = require("infra.extension_packs")
-local TomlCodec = require("toml_codec.codec")
-local Json = require("json")
+local TomlCodec = require("core.text.engine.toml_codec.codec")
+local Json = require("core.text.engine.json")
 
 --- The repository's static folder, from this driver's shared tree.
 --- @return string
@@ -164,7 +164,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 	helpers.it("(ergopti-hotstrings-ext) keeps the repeat corrections row in the settings window", function()
 		Packs._reset()
 		Packs.discover(roots(true), real_io())
-		local magickey = static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/magickey.toml"
+		local magickey = static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml"
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local function sections_of(with_resolver)
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
@@ -251,7 +251,7 @@ helpers.describe("Ergopti extension distance reduction", function()
 				helpers.assert_eq(found[flag], row[flag], row.trigger .. "/" .. flag)
 			end
 		end
-		helpers.assert_nil(real_io().read_file(static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/distancesreduction.toml"))
+		helpers.assert_nil(real_io().read_file(static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/distancesreduction.toml"))
 		local user = os.tmpname()
 		local fh = assert(io.open(user, "w"))
 		fh:write('[[mine]]\n"qa" = { output = "user" }\n')
@@ -374,7 +374,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("french_distancesreduction", "suffixes_a"), false))
 			helpers.assert_true(Registry.reload_toml("french_distancesreduction", path))
 			for _, mapping in ipairs(state.mappings) do helpers.assert_true(mapping.group ~= "french_distancesreduction") end
-			local common = static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/magickey.toml"
+			local common = static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml"
 			local _, sources = Packs.route("magickey", common)
 			helpers.assert_eq(#sources, 2)
 			helpers.assert_eq(sources[1].sections, { "replace" })

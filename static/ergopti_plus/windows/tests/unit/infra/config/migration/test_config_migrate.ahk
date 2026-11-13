@@ -79,8 +79,8 @@ _CMG_Cases() {
 ; actual modifier matrix, not an expected fixture allowlist.
 _CMG_MigrationContext() {
 	global _SharedDir
-	Catalogue := JsonParse(_CMG_Read(_SharedDir . "\modules\actions\modifier_chords.json"))
-	Registry := _CMG_Parse(_SharedDir . "\modules\actions\actions.toml")
+	Catalogue := JsonParse(_CMG_Read(_SharedDir . "\shortcuts\data\actions\modifier_chords.json"))
+	Registry := _CMG_Parse(_SharedDir . "\shortcuts\data\actions\actions.toml")
 	Actions := Map()
 	Actions.CaseSense := "On"
 	for Family in ["sg", "ax"] {

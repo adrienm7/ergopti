@@ -9,7 +9,7 @@
 --- platform's AltGr), or while the key is unassigned, it types as usual.
 ---
 --- FEATURES & RATIONALE:
---- 1. Key identity is shared data (_shared/modules/actions/tap_keys.json). The
+--- 1. Key identity is shared data (_shared/shortcuts/data/actions/tap_keys.json). The
 ---    key left of 1 has two macOS keycodes: kVK_ANSI_Grave (50) on an ANSI
 ---    keyboard, kVK_ISO_Section (10) on an ISO one, also behind the ANSI virtual
 ---    keyboard Ergopti deploys, which passes the pair through. The layout's
@@ -30,22 +30,22 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local Manifest   = require("infra.manifest_reader")
-local ConfigOutdated = require("config_outdated")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 local Geometry   = require("adapters.keyboard_geometry")
-local Writer     = require("toml_codec.writer")
-local Codec      = require("toml_codec")
+local Writer     = require("core.text.engine.toml_codec.writer")
+local Codec      = require("core.text.engine.toml_codec")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
-local ShortcutCatalogue = require("shortcuts.catalogue")
-local ConfigKeys = require("config_keys")
+local ShortcutCatalogue = require("shortcuts.engine.catalogue")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "shortcuts.tap_keys"
 
@@ -54,7 +54,7 @@ local CONFIG_SECTION = ConfigKeys.KEY.SHORTCUTS_TAP_KEYS
 
 -- The shared key list (tap_keys.json) and its published identity, shared with Linux.
 local TapKeys = ShortcutCatalogue.new_tap_keys({
-	keys_rel_path = "modules/actions/tap_keys.json",
+	keys_rel_path = "shortcuts/data/actions/tap_keys.json",
 	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
 	resolve_path = function(rel) return Paths.shared(rel) end,
 	read = function(path)

@@ -51,7 +51,7 @@ local M = {}
 local original_source_owner_ports = {}
 local original_reconciliation_ports = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local InputEvent = require("infra.input_event")
 
 local LOG = "adapters.evdev_reader"

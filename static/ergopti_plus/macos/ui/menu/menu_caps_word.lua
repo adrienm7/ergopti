@@ -16,7 +16,7 @@ local M = {}
 local i18n            = require("infra.i18n")
 local ManifestMenu    = require("infra.manifest_menu")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
-local CapsWordPolicy  = require("caps_word.auto_off")
+local CapsWordPolicy  = require("keyboard.engine.caps_word_auto_off")
 local Manifest        = require("infra.manifest_reader")
 
 --- Builds the group's rows.
@@ -42,11 +42,11 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds) return commit(CapsWordAutoOff.IDLE_KEY, seconds) end,
+		[require("settings.engine.keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds) return commit(CapsWordAutoOff.IDLE_KEY, seconds) end,
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters[require("config_keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
+	render_ctx.state_getters[require("settings.engine.keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
 		return state[CapsWordAutoOff.IDLE_KEY]
 	end
 	local providers = {

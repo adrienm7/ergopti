@@ -146,13 +146,13 @@ local function with_fixture(options, body)
 			section = function(key) return key end,
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function()
-				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+				return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 			end,
 			json_decode = function(text)
-				local manifest = require("json").decode(text)
+				local manifest = require("core.text.engine.json").decode(text)
 				if options.create_label_key then
 					manifest.llm_profile_commands[1].i18n = options.create_label_key
 				end

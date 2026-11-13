@@ -17,7 +17,7 @@ local function with_editor(scenario)
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.layer_editor", "ui.ui_builder", "infra.logger", "infra.i18n",
 			"infra.paths", "infra.config_paths", "adapters.file_system", "infra.keycodes",
-			"platform.remap.nav_layer", "keymap.layer_editor", "keymap.layers" }, function()
+			"platform.remap.nav_layer", "layouts.engine.layers.editor", "layouts.engine.layers.layers" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...)
 				records.errors[#records.errors + 1] = string.format(message, ...)

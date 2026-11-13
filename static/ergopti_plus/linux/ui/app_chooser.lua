@@ -17,10 +17,10 @@
 --- ==============================================================================
 
 local M = {}
-local WindowTitles = require("window_titles")
+local WindowTitles = require("core.ui.engine.window_titles")
 local ConfigPaths = require("infra.config_paths")
-local AppParameter = require("app_parameter")
-local NativePath = require("native_path")
+local AppParameter = require("apps.engine.parameter")
+local NativePath = require("core.fs.engine.native_path")
 
 --- Where the system installs its desktop entries.
 M.APPLICATIONS_DIR = "/usr/share/applications/"
@@ -117,7 +117,7 @@ function M.pick(shell, title, opts)
 		end
 		local delivered, accepted = pcall(notify)
 		if not delivered or accepted ~= true then
-			require("logger.shim").error("ui.app_chooser", "Application selection verification was refused.")
+			require("core.logger.engine.shim").error("ui.app_chooser", "Application selection verification was refused.")
 		end
 		return nil, "the selected application is not the effective native desktop entry"
 	end

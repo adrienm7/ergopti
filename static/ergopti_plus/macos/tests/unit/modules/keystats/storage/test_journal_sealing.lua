@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local TextCrypto = require("keystats.text_crypto")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local SLOTS = { "modules.keystats.rotation", "modules.keystats.text_cipher", "infra.logger", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer" }
 

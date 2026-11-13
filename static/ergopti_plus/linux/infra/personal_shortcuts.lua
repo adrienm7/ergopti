@@ -27,10 +27,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local FileSystem = require("adapters.file_system")
 local Shell = require("adapters.shell_runner")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "infra.personal_shortcuts"
 local FILE_NAME = "personal_shortcuts.lua"
@@ -70,7 +70,7 @@ M.TEMPLATE = [[
 -- ===== Example: write a line in the log =====
 -- ============================================
 
--- require("logger.shim").info("personal_shortcuts", "Personal shortcuts loaded.")
+-- require("core.logger.engine.shim").info("personal_shortcuts", "Personal shortcuts loaded.")
 ]]
 
 

@@ -1,6 +1,6 @@
 # _shared/tests/corpus/tap_hold_shared_file/expected.toml
 # What each driver reads from each pair of files of this corpus: <name>.toml is
-# the shared tap_hold.toml (_shared/tap_hold/SCHEMA.md), <name>.config.toml the
+# the shared tap_hold.toml (_shared/tap_hold/data/SCHEMA.md), <name>.config.toml the
 # config.toml rows written beside it (the maintainer decision of 2026-11-11:
 # every manifest row lives in config.toml).
 #

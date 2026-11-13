@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Writes the sources of the Ergopti Windows keyboard layout DLL (C tables,
  * header, resources, module definition) from the registry layout that
- * _shared/modules/layouts/windows_system_layout.json names, so the Windows
+ * _shared/layouts/data/windows_system_layout.json names, so the Windows
  * system layout and the macOS and Linux ones come from one .keylayout. With
  * --klc <dir> it also writes the MSKLC source of the same layout there (UTF-16LE,
  * CRLF, as MSKLC reads it): a build output, never tracked.
@@ -31,9 +31,9 @@ const { parse: parseToml } = require('smol-toml');
 const { REPO_ROOT, shared, SHARED_DIR } = require('../lib/paths.cjs');
 const { generate, encodeKlc } = require('./lib/windows-keyboard-layout.cjs');
 
-const SPEC_PATH = shared('modules', 'layouts', 'windows_system_layout.json');
-const KEYCODES_PATH = shared('modules', 'layouts', 'mac_keycodes.json');
-const PHYSICAL_KEYS_PATH = shared('data', 'keycodes', 'physical_keys.json');
+const SPEC_PATH = shared('layouts', 'data', 'windows_system_layout.json');
+const KEYCODES_PATH = shared('layouts', 'data', 'mac_keycodes.json');
+const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
 const REGISTRY_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry');
 const OUT_DIR = path.join(
 	REPO_ROOT,

@@ -22,7 +22,7 @@
 --- Exit 0 = every check held.
 --- ==============================================================================
 
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 local uv = require("luv")
 
@@ -106,8 +106,8 @@ if DESKTOP == "unsupported" then
 	-- The reason row, in any locale the session may run in.
 	local reasons = {}
 	for _, locale in ipairs({ "en", "fr" }) do
-		local handle = assert(io.open("../_shared/data/locales/" .. locale .. ".json", "rb"))
-		local catalogue = require("json").decode(handle:read("*a"))
+		local handle = assert(io.open("../_shared/core/i18n/data/locales/" .. locale .. ".json", "rb"))
+		local catalogue = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()
 		reasons[catalogue["menu.layout.active_layouts_unsupported_desktop"]] = true
 	end

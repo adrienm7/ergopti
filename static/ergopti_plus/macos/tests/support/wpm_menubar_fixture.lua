@@ -7,12 +7,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local WPMModel = require("wpm_widget.model")
-local TomlCodec = require("toml_codec")
+local WPMModel = require("metrics.engine.wpm_widget_model")
+local TomlCodec = require("core.text.engine.toml_codec")
 local Paths = require("infra.paths")
 
 -- The real canon, read before any stub replaces the paths it lives at.
-local CANON = assert(WPMModel.load(Paths.shared("modules/wpm_widget/constants.toml"), TomlCodec.decode))
+local CANON = assert(WPMModel.load(Paths.shared("metrics/data/wpm_widget/constants.toml"), TomlCodec.decode))
 
 return function(callback)
 	local original_hs = _G.hs

@@ -5,7 +5,7 @@
  * MODULE: Repository URL Single Source
  * DESCRIPTION:
  * The GitHub owner and repository of Ergopti live in
- * static/ergopti_plus/_shared/modules/updater/defaults.json. Every link the
+ * static/ergopti_plus/_shared/updater/data/defaults.json. Every link the
  * app builds (releases, changelog, bug reports, feature requests) derives from
  * those two fields. Two kinds of drift reached users before this gate:
  * 1. a WRONG repository — the Linux service file and the demo extension
@@ -19,12 +19,12 @@
  *
  * HOSTS AND IDENTIFIERS (PAR-83):
  * The same rule covers the other typed identifiers declared once in
- * _shared/data/identifiers.json: the external hosts (GitHub, Ollama, Hugging
+ * _shared/core/text/data/identifiers.json: the external hosts (GitHub, Ollama, Hugging
  * Face), the bundle ids, the service labels and the ErgoptiPlus.ahk/.exe/.app
  * names. Their code-line copies per file are held to
  * tools/lint/identifier-literal-baseline.json, which may only go down
  * (`--shrink` writes a lower count back). The Lua sites of macOS and Linux read
- * _shared/lua/identifiers.lua, the shell scripts _shared/data/identifiers.sh
+ * _shared/core/text/engine/identifiers.lua, the shell scripts _shared/core/text/data/identifiers.sh
  * (tools/test/test-shell-identifiers-sourcing.cjs), the Node tools
  * tools/lib/identifiers.cjs and the Swift tests Identifiers.generated.swift.
  * What stays in the baseline has no generated copy to read (AHK, PowerShell,
@@ -43,7 +43,7 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = 'static/ergopti_plus';
-const DEFAULTS = `${SP}/_shared/modules/updater/defaults.json`;
+const DEFAULTS = `${SP}/_shared/updater/data/defaults.json`;
 const { owner, repo } = JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS), 'utf8')).github;
 
 // Source files whose URLs are executable logic rather than documentation
@@ -76,7 +76,7 @@ function isFixturePath(file) {
 // Self-test: canonical roots are fixtures; a production folder named tests is not.
 for (const [file, expected] of [
 	['static/ergopti_plus/linux/tests/unit/x.lua', true],
-	['static/ergopti_plus/_shared/lua/test/x_contract.lua', true],
+	['static/ergopti_plus/_shared/tests/x_contract.lua', true],
 	['static/ergopti_plus/macos/modules/tests/x.lua', false],
 	['static/ergopti_plus/_shared/ui/tests/x.js', false]
 ])
@@ -122,7 +122,7 @@ const TEST_ROOT_CASES = [
 	'static/ergopti_plus/macos/tests/',
 	'static/ergopti_plus/linux/tests/',
 	'static/ergopti_plus/_shared/tests/',
-	'static/ergopti_plus/_shared/lua/test/'
+	'static/ergopti_plus/_shared/tests/lua/'
 ];
 const repeatedForeignUrl = `https://github.com/foreign-${owner}/${repo}-fork`;
 const probeText = `${canonicalUrl}\n${canonicalUrl}\n${repeatedForeignUrl} ${repeatedForeignUrl}`;
@@ -133,8 +133,8 @@ for (const root of TEST_ROOT_CASES) {
 	}
 }
 for (const file of [
-	'static/ergopti_plus/_shared/lua/repository_url_contract.lua',
-	'static/ergopti_plus/_shared/lua/test_support/url_probe.lua',
+	'static/ergopti_plus/_shared/repository_url_contract.lua',
+	'static/ergopti_plus/_shared/test_support/url_probe.lua',
 	'static/ergopti_plus/windows/modules/tests/url_probe.lua',
 	'static/ergopti_plus/linux/platform/test/url_probe.lua',
 	'.github/scripts/tests/url_probe.js'
@@ -161,7 +161,7 @@ assert.equal(
 for (const [name, file, text, count] of [
 	[
 		'shared contract fixture',
-		`${SP}/_shared/lua/test/repository_url_contract.lua`,
+		`${SP}/_shared/tests/lua/repository_url_contract.lua`,
 		canonicalUrl + '\n' + foreignUrl,
 		0
 	],
@@ -173,18 +173,18 @@ for (const [name, file, text, count] of [
 	],
 	[
 		'adjacent shared owner literal',
-		`${SP}/_shared/lua/updater/repository_url.lua`,
+		`${SP}/_shared/updater/engine/repository_url.lua`,
 		canonicalUrl,
 		1
 	],
 	[
 		'adjacent shared owner foreign URL',
-		`${SP}/_shared/lua/updater/repository_url.lua`,
+		`${SP}/_shared/updater/engine/repository_url.lua`,
 		foreignUrl,
 		1
 	],
-	['test-like directory', `${SP}/_shared/lua/test_owner/repository_url.lua`, canonicalUrl, 1],
-	['test-like filename', `${SP}/_shared/lua/test.lua`, foreignUrl, 1],
+	['test-like directory', `${SP}/_shared/test_owner/repository_url.lua`, canonicalUrl, 1],
+	['test-like filename', `${SP}/_shared/test.lua`, foreignUrl, 1],
 	['other Lua test directory', `${SP}/macos/test/repository_url.lua`, canonicalUrl, 1],
 	['standalone example', `${SP}/extensions/example.lua`, canonicalUrl, 0],
 	['standalone example foreign URL', `${SP}/extensions/example.lua`, foreignUrl, 1]
@@ -198,13 +198,13 @@ const controlSource = `local canonical = "https://github.com/${owner}/${repo}"
 local foreign = "https://github.com/foreign-owner/${repo}"`;
 for (const fixture of [
 	'static/ergopti_plus/linux/tests/unit/repository_contract.lua',
-	'static/ergopti_plus/_shared/lua/test/repository_contract.lua'
+	'static/ergopti_plus/_shared/tests/repository_contract.lua'
 ]) {
 	assert.deepEqual(violations(fixture, controlSource), [], fixture);
 }
 for (const product of [
-	'static/ergopti_plus/_shared/lua/updater/repository_url.lua',
-	'static/ergopti_plus/_shared/lua/test_support/repository_url.lua'
+	'static/ergopti_plus/_shared/updater/engine/repository_url.lua',
+	'static/ergopti_plus/_shared/test_support/repository_url.lua'
 ]) {
 	const found = violations(product, controlSource);
 	assert.equal(found.length, 2, product);
@@ -264,14 +264,14 @@ const { failures, scanned } = scanTrackedFiles(files, readTrackedSource);
 // ======= 1/ Hosts, Bundle Ids and App Names =======
 // ==================================================
 
-const IDENTIFIERS_REL = 'static/ergopti_plus/_shared/data/identifiers.json';
+const IDENTIFIERS_REL = 'static/ergopti_plus/_shared/core/text/data/identifiers.json';
 const BASELINE_REL = 'tools/lint/identifier-literal-baseline.json';
 const identifiers = JSON.parse(fs.readFileSync(path.join(ROOT, IDENTIFIERS_REL), 'utf8'));
 const IDENTIFIER_SOURCE = /\.(lua|js|cjs|mjs|ahk|swift|sh|py|ps1|go|mm|hpp|cpp)$/;
 // Tests, vendored code, generated copies and the maintainer's diagnostics may
 // spell identifiers; so may the example extension users copy as one file.
 const IDENTIFIER_EXEMPT =
-	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/lua\/identifiers\.lua|_shared\/data\/identifiers\.(py|sh))|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
+	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/core\/text\/engine\/identifiers\.lua|_shared\/core\/text\/data\/identifiers\.(py|sh))|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
 const COMMENT_LINE = /^\s*(--|;|\/\/|#|\*|\/\*)/;
 
 const KIND_PATTERNS = {
@@ -375,7 +375,7 @@ for (const [file, kinds] of Object.entries(identifierScan.counts)) {
 		if (count > allowed)
 			failures.push(
 				`${file}: ${count} typed ${kind} literal(s), baseline ${allowed} — derive them from ` +
-					`${IDENTIFIERS_REL} (Lua: require("identifiers"))`
+					`${IDENTIFIERS_REL} (Lua: require("core.text.engine.identifiers"))`
 			);
 	}
 }

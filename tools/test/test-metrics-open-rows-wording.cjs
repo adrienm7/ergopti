@@ -29,7 +29,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const locales = path.resolve(__dirname, '../../static/ergopti_plus/_shared/data/locales');
+const locales = path.resolve(__dirname, '../../static/ergopti_plus/_shared/core/i18n/data/locales');
 const KEYS = ['menu.metrics.show_typing', 'menu.metrics.show_apps'];
 
 // How each locale said « open » while the rows carried the verb.
@@ -109,7 +109,7 @@ console.log(
 const TOML = require('smol-toml');
 const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
 const manifest = TOML.parse(
-	fs.readFileSync(path.join(shared, 'modules/features/manifest.toml'), 'utf8')
+	fs.readFileSync(path.join(shared, 'settings/data/features/manifest.toml'), 'utf8')
 );
 const retiredMetrics = [
 	'metrics_shortcut_typing',
@@ -125,7 +125,7 @@ for (const id of retiredMetrics) {
 	);
 }
 const actions = TOML.parse(
-	fs.readFileSync(path.join(shared, 'modules/actions/actions.toml'), 'utf8')
+	fs.readFileSync(path.join(shared, 'shortcuts/data/actions/actions.toml'), 'utf8')
 );
 for (const id of ['open_metrics_typing', 'open_metrics_apps']) {
 	assert.equal(
@@ -154,7 +154,10 @@ for (const file of files) {
 // Parse each real table header: these drafts contain unrelated duplicate scalar
 // examples, so this does not pretend to validate their whole-document grammar.
 for (const file of ['ahk_config.example.toml', 'hs_config.example.toml']) {
-	const source = fs.readFileSync(path.join(shared, 'core/config_schema/examples', file), 'utf8');
+	const source = fs.readFileSync(
+		path.join(shared, 'settings/data/config_schema/examples', file),
+		'utf8'
+	);
 	const headers = source
 		.split('\n')
 		.filter((line) => /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/.test(line));

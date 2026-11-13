@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Telemetry = require("infra.field_check_raw_telemetry")
 
 local function steps_of(report)
@@ -95,7 +95,7 @@ helpers.describe("field_raw_telemetry: the Metrics event tables", function()
 			return
 		end
 		sqlite:close()
-		local schema = read(helpers.driver_root() .. "../_shared/data/db/schema.sql")
+		local schema = read(helpers.driver_root() .. "../_shared/metrics/data/db/schema.sql")
 		local ddl = {}
 		for _, entry in ipairs(Telemetry.TABLES) do
 			local statement = schema:match("(CREATE TABLE IF NOT EXISTS " .. entry.table .. "%s*%b());")

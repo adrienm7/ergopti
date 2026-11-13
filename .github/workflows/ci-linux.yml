@@ -540,7 +540,7 @@ jobs:
           - platform-metrics
     env:
       # Python-owned native children also resolve the production shared modules.
-      LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+      LUA_PATH: './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
       # The shard this matrix row runs; the evidence record reads it.
       LINUX_E2E_SHARD: ${{ matrix.shard }}
     outputs:
@@ -725,7 +725,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
           else
               exit 1
           fi
@@ -742,7 +742,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_write_failures.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_file_write_failures.lua
           else
               exit 1
           fi
@@ -795,7 +795,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_openssl_exit_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_openssl_exit_receipts.lua
           else
               exit 1
           fi
@@ -812,7 +812,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_supervision_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_process_supervision_receipts.lua
           else
               exit 1
           fi
@@ -829,7 +829,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_diagnostics_save_receipts.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_diagnostics_save_receipts.py
           else
               exit 1
           fi
@@ -846,7 +846,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_schema_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_device_schema_receipts.lua
           else
               exit 1
           fi
@@ -863,7 +863,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_registration_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_device_registration_receipts.lua
           else
               exit 1
           fi
@@ -880,8 +880,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_cursor_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_cursor_receipts.lua
           else
               exit 1
           fi
@@ -898,8 +898,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_filesystem_paths.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_filesystem_paths.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_filesystem_paths.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_filesystem_paths.lua
           python3 tests/hardware/test_sqlite_file_admission.py
           else
               exit 1
@@ -917,7 +917,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_write_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_write_receipts.lua
           else
               exit 1
           fi
@@ -934,7 +934,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_read_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_read_receipts.lua
           else
               exit 1
           fi
@@ -951,7 +951,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_literal_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_literal_receipts.lua
           else
               exit 1
           fi
@@ -968,8 +968,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_text_migration_literal_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_text_migration_exact_ids.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_text_migration_literal_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_text_migration_exact_ids.lua
           else
               exit 1
           fi
@@ -1004,7 +1004,7 @@ jobs:
           sudo install -m 600 tests/hardware/fixtures/sqlite_profile.conf "$profile_home/.sqliterc"
           sudo chown -R "$profile_user:$profile_user" "$profile_home"
           sudo chmod -R u+rwX,go-rwx "$profile_home"
-          sudo runuser -u "$profile_user" -- sh -ec 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
+          sudo runuser -u "$profile_user" -- sh -ec 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
           else
               exit 1
           fi
@@ -1021,7 +1021,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_capture_error_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_shell_capture_error_receipts.lua
           else
               exit 1
           fi
@@ -1038,7 +1038,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_spawn_nul_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_spawn_nul_receipts.lua
           else
               exit 1
           fi
@@ -1055,7 +1055,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_exists_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_file_exists_receipts.lua
           else
               exit 1
           fi
@@ -1072,7 +1072,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_x11_selection_stamp.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_x11_selection_stamp.lua
           else
               exit 1
           fi
@@ -1089,7 +1089,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_delete_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_file_delete_receipts.lua
           else
               exit 1
           fi
@@ -1106,7 +1106,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_path_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_file_path_receipts.lua
           else
               exit 1
           fi
@@ -1123,7 +1123,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_timer_gc_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_timer_gc_receipts.lua
           else
               exit 1
           fi
@@ -1140,7 +1140,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_snapshot_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_process_snapshot_receipts.lua
           else
               exit 1
           fi
@@ -1157,7 +1157,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_logger_write_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_logger_write_receipts.lua
           else
               exit 1
           fi
@@ -1174,7 +1174,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_event_loop_stop_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_event_loop_stop_receipts.lua
           else
               exit 1
           fi
@@ -1191,8 +1191,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_reentry.lua"
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_reentry.lua"
           else
               exit 1
           fi
@@ -1209,8 +1209,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_timer_finite_admission.lua"
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_timer_finite_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit "$PWD/tests/fixtures/native_timer_finite_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_timer_finite_admission.lua"
           else
               exit 1
           fi
@@ -1227,8 +1227,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
           else
               exit 1
           fi
@@ -1247,8 +1247,8 @@ jobs:
           elif [ "$mode" = full ]; then
           for callback_source in after every idle periodic "registered idle" deferred; do
             for callback_failure in object string; do
-              env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
-              env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
+              env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
+              env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
             done
           done
           else
@@ -1267,8 +1267,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" node tests/hardware/run_sqlite_kc_hold_consumers.cjs
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_READER_TEST_LUA=lua5.4 node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" ERGOPTI_READER_TEST_LUA=lua5.4 node tests/hardware/run_sqlite_kc_hold_consumers.cjs
           else
               exit 1
           fi
@@ -1323,12 +1323,12 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_extra_sources.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_extra_sources.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_source_controls.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_source_controls.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py luajit
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py lua5.4
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_extra_sources.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_extra_sources.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_source_controls.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_source_controls.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py lua5.4
           else
               exit 1
           fi
@@ -1345,8 +1345,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_live_source_projection.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_live_source_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_live_source_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_live_source_projection.lua
           else
               exit 1
           fi
@@ -1363,7 +1363,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           for ERGOPTI_SOURCE_RUNTIME in luajit lua5.4; do
             ERGOPTI_SOURCE_PROOF=$(mktemp -d)
             "$ERGOPTI_SOURCE_RUNTIME" tests/hardware/run_sqlite_ngram_source_maps.lua "$ERGOPTI_SOURCE_PROOF"
@@ -1385,8 +1385,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py luajit
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
           else
               exit 1
           fi
@@ -1403,8 +1403,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py luajit
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py lua5.4
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py lua5.4
           else
               exit 1
           fi
@@ -1421,7 +1421,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+          export LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
           for ERGOPTI_SYSTEM_RUNTIME in luajit lua5.4; do
             ERGOPTI_SYSTEM_PROFILE=$(mktemp -d)
             export XDG_CONFIG_HOME="$ERGOPTI_SYSTEM_PROFILE/xdg/config"
@@ -1449,7 +1449,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -o pipefail
-          export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+          export LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
           for ERGOPTI_BACKSPACE_RUNTIME in luajit lua5.4; do
             ERGOPTI_BACKSPACE_LOG=$(mktemp)
             "$ERGOPTI_BACKSPACE_RUNTIME" tests/hardware/run_sqlite_backspace_unigrams.lua | tee "$ERGOPTI_BACKSPACE_LOG"
@@ -1473,8 +1473,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py luajit
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py lua5.4
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py lua5.4
           else
               exit 1
           fi
@@ -1491,8 +1491,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
           else
               exit 1
           fi
@@ -1509,8 +1509,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_manual_marker_chars.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manual_marker_chars.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_manual_marker_chars.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manual_marker_chars.lua
           else
               exit 1
           fi
@@ -1527,8 +1527,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_hourly_manual_errors.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_hourly_manual_errors.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_hourly_manual_errors.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_hourly_manual_errors.lua
           else
               exit 1
           fi
@@ -1545,10 +1545,10 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_projection.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_projection.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_sql_oracles.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_sql_oracles.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_projection.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_sql_oracles.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_sql_oracles.lua
           else
               exit 1
           fi
@@ -1565,8 +1565,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_layouts_seen.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_layouts_seen.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_layouts_seen.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_layouts_seen.lua
           else
               exit 1
           fi
@@ -1583,10 +1583,10 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_manifest_completion.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manifest_completion.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_completion_public_cache.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_completion_public_cache.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_manifest_completion.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manifest_completion.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_completion_public_cache.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_completion_public_cache.lua
           else
               exit 1
           fi
@@ -1603,16 +1603,16 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_raw_batch_transactions.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_raw_batch_transactions.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_owned_flush_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_owned_flush_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_cipher_flush_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_cipher_flush_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_owned_parent_death.py --lua luajit
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_owned_parent_death.py --lua lua5.4
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua luajit
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua lua5.4
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_raw_batch_transactions.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_raw_batch_transactions.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_owned_flush_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_owned_flush_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_cipher_flush_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_cipher_flush_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_owned_parent_death.py --lua luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_owned_parent_death.py --lua lua5.4
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua luajit
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua lua5.4
           else
               exit 1
           fi
@@ -1629,8 +1629,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_null_boundary.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_null_boundary.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_null_boundary.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_null_boundary.lua
           else
               exit 1
           fi
@@ -1647,8 +1647,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_text_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_text_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_text_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_text_receipts.lua
           else
               exit 1
           fi
@@ -1665,9 +1665,9 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_local_days_real_clock.lua
-          env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_local_days_real_clock.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_local_event_days.lua
+          env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_local_days_real_clock.lua
+          env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_local_days_real_clock.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_local_event_days.lua
           else
               exit 1
           fi
@@ -1684,8 +1684,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_wpm_fraction.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_wpm_fraction.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_wpm_fraction.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_wpm_fraction.lua
           else
               exit 1
           fi
@@ -1702,8 +1702,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_burst_histogram_keys.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_burst_histogram_keys.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_burst_histogram_keys.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_burst_histogram_keys.lua
           else
               exit 1
           fi
@@ -1720,8 +1720,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_category_edit_receipts.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_category_edit_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_category_edit_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_category_edit_receipts.lua
           else
               exit 1
           fi
@@ -1738,7 +1738,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_symbol_lists.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_symbol_lists.lua
           else
               exit 1
           fi
@@ -1755,7 +1755,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_key_definitions.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_key_definitions.lua
           else
               exit 1
           fi
@@ -1772,7 +1772,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_blocks.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_blocks.lua
           else
               exit 1
           fi
@@ -1843,8 +1843,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_meta_values.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_meta_values.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_meta_values.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_meta_values.lua
           else
               exit 1
           fi
@@ -1879,7 +1879,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_watch_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_file_watch_receipts.lua
           else
               exit 1
           fi
@@ -1896,7 +1896,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_digest_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_file_digest_receipts.lua
           else
               exit 1
           fi
@@ -1913,7 +1913,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_crypto_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_crypto_receipts.lua
           else
               exit 1
           fi
@@ -1930,7 +1930,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_crypto_cli_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" lua5.4 tests/hardware/run_crypto_cli_receipts.lua
           else
               exit 1
           fi
@@ -1947,7 +1947,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_calendar_split.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_sqlite_calendar_split.lua
           else
               exit 1
           fi
@@ -1964,8 +1964,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_http_empty_headers.py
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_http_empty_headers.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_http_empty_headers.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_http_empty_headers.py
           else
               exit 1
           fi
@@ -1982,8 +1982,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_asset_metadata.py
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_asset_metadata.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_asset_metadata.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_asset_metadata.py
           else
               exit 1
           fi
@@ -2000,8 +2000,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_notes.py
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_notes.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_notes.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_notes.py
           else
               exit 1
           fi
@@ -2018,8 +2018,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
-          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
           else
               exit 1
           fi
@@ -2036,8 +2036,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
-          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
           else
               exit 1
           fi
@@ -2054,8 +2054,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
-          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
           else
               exit 1
           fi
@@ -2072,8 +2072,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
-          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+          env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
           else
               exit 1
           fi
@@ -2090,8 +2090,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_conditional_receipts.py
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_conditional_receipts.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" python3 tests/hardware/run_updater_conditional_receipts.py
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_conditional_receipts.py
           else
               exit 1
           fi
@@ -2108,7 +2108,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_url_nul_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_url_nul_receipts.lua
           else
               exit 1
           fi
@@ -2125,7 +2125,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_redirect_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_redirect_receipts.lua
           else
               exit 1
           fi
@@ -2176,7 +2176,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_command_nul_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_shell_command_nul_receipts.lua
           else
               exit 1
           fi
@@ -2193,7 +2193,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_preflight_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_preflight_receipts.lua
           else
               exit 1
           fi
@@ -2210,7 +2210,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_header_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_header_receipts.lua
           else
               exit 1
           fi
@@ -2263,7 +2263,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_body_cleanup_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_body_cleanup_receipts.lua
           else
               exit 1
           fi
@@ -2280,7 +2280,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_literal_body_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_literal_body_receipts.lua
           else
               exit 1
           fi
@@ -2297,7 +2297,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_transport_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_transport_receipts.lua
           else
               exit 1
           fi
@@ -2594,7 +2594,7 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         env:
-          LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          LUA_PATH: './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2620,7 +2620,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_literal_url_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_http_literal_url_receipts.lua
           else
               exit 1
           fi
@@ -2637,7 +2637,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_cli_exit_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_cli_exit_receipts.lua
           else
               exit 1
           fi
@@ -2654,7 +2654,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_storage_read_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_storage_read_receipts.lua
           else
               exit 1
           fi
@@ -2707,7 +2707,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_uinput_roundtrip.lua
+          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_uinput_roundtrip.lua
           else
               exit 1
           fi
@@ -2730,7 +2730,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_grab_race.lua
+          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_grab_race.lua
           else
               exit 1
           fi
@@ -2771,7 +2771,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
           else
               exit 1
           fi
@@ -2788,7 +2788,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_localectl_variants.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_localectl_variants.lua
           else
               exit 1
           fi
@@ -2805,8 +2805,8 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8.lua
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8_missing_map.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8_missing_map.lua
           else
               exit 1
           fi
@@ -2843,7 +2843,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_source_qualification.lua | tee "$RUNNER_TEMP/linux-xkb-source.log"
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" luajit tests/hardware/run_xkb_source_qualification.lua | tee "$RUNNER_TEMP/linux-xkb-source.log"
           else
               exit 1
           fi
@@ -2969,7 +2969,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 
           echo "--- X11 (Xvfb) ---"
           xvfb-run -a luajit tests/hardware/run_display_server.lua
@@ -3090,7 +3090,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           # Absolute roots: the configuration writer proves its sibling modules by path.
-          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_rows_live.lua
+          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/?.lua;$PWD/../_shared/?/init.lua;;" luajit tests/hardware/run_layout_rows_live.lua
           else
               exit 1
           fi
@@ -3113,7 +3113,7 @@ jobs:
           elif [ "$mode" = full ]; then
           payload="$RUNNER_TEMP/layout-source-install-payload.json"
           node ../../../tools/layout-source.cjs install-payload ../../../static/layouts/sources/ergopti.toml linux "$payload"
-          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_source_live.lua "$payload"
+          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/?.lua;$PWD/../_shared/?/init.lua;;" luajit tests/hardware/run_layout_source_live.lua "$payload"
           else
               exit 1
           fi
@@ -3134,7 +3134,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;" luajit "$PWD/tests/hardware/run_reload_restart_live.lua"
+          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/?.lua;$PWD/../_shared/?/init.lua;;" luajit "$PWD/tests/hardware/run_reload_restart_live.lua"
           else
               exit 1
           fi
@@ -3155,7 +3155,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;" luajit "$PWD/tests/hardware/run_field_run_live.lua"
+          env LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/?.lua;$PWD/../_shared/?/init.lua;;" luajit "$PWD/tests/hardware/run_field_run_live.lua"
           else
               exit 1
           fi
@@ -3197,7 +3197,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
           else
               exit 1
           fi
@@ -3240,7 +3240,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           dbus-run-session -- python3 tests/hardware/test_startup_desktop.py
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           dbus-run-session -- bash -c '
             ready="$(mktemp -u)"
             export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
@@ -3348,7 +3348,7 @@ jobs:
           elif [ "$mode" = full ]; then
           scratch="$(mktemp -d /tmp/ergopti-managed-python-XXXXXX)"
           XDG_DATA_HOME="$scratch/data" XDG_CONFIG_HOME="$scratch/config" XDG_STATE_HOME="$scratch/state" \
-              LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+              LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' \
               luajit tests/hardware/run_managed_python_live.lua
           rm -rf -- "$scratch"
           else
@@ -3643,7 +3643,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          (cd static/ergopti_plus/linux && LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" xvfb-run -a luajit tests/hardware/run_clipboard_owner.lua x11)
+          (cd static/ergopti_plus/linux && LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" xvfb-run -a luajit tests/hardware/run_clipboard_owner.lua x11)
           else
               exit 1
           fi
@@ -4074,13 +4074,13 @@ jobs:
           curl -fsSL https://ollama.com/install.sh | sh
           # The Linux client asks only Ergopti's own port (defaults.json); a
           # daemon the installer may start on the stock port is left alone.
-          port="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["llm_ollama_owned_port"])' static/ergopti_plus/_shared/modules/llm/defaults.json)"
+          port="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["llm_ollama_owned_port"])' static/ergopti_plus/_shared/ai/data/defaults.json)"
           (OLLAMA_HOST="127.0.0.1:$port" ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
           for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$port/api/tags" >/dev/null && break; sleep 1; done
           OLLAMA_HOST="127.0.0.1:$port" ollama pull qwen2.5:0.5b
           cd static/ergopti_plus/linux
           HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
-            LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+            LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' \
             luajit tests/hardware/run_ollama_live.lua qwen2.5:0.5b
           else
               exit 1
@@ -4141,7 +4141,7 @@ jobs:
           elif [ "$mode" = full ]; then
           sudo modprobe uinput || true
           sudo chmod 0666 /dev/uinput
-          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
           else
               exit 1
           fi
@@ -4178,7 +4178,7 @@ jobs:
           # new uinput device belongs to root:input at 0660, and the runner's user
           # is in neither. Creating the device needs only /dev/uinput; READING it
           # back needs the node, which is the half this harness exists for.
-          sudo env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
+          sudo env LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
           else
               exit 1
           fi
@@ -4244,7 +4244,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           python3 tests/hardware/test_screen_capture_resize.py
           xvfb-run -a luajit tests/hardware/run_screen_path_receipts.lua
           else
@@ -4284,7 +4284,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;;'
           export LUA_CPATH='/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;'
           dbus-run-session -- xvfb-run -a luajit tests/hardware/run_model_pull_receipts.lua
           else
@@ -4320,7 +4320,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
           else
               exit 1
@@ -4374,7 +4374,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           # lua-lgi installs for the distro's Lua, not for LuaJIT, so the module
           # path has to be widened rather than assumed. Reported, not guessed at:
           # the harness exits 2 when lgi is unreachable and the step says so.
@@ -4420,7 +4420,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
@@ -4447,7 +4447,7 @@ jobs:
           # probe's own private session bus stands in for the desktop's settings store.
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends x11-xkb-utils \
             dconf-service dconf-gsettings-backend gsettings-desktop-schemas dbus-daemon dbus-bin libglib2.0-bin
-          export LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/lua/?.lua;$PWD/../_shared/lua/?/init.lua;;"
+          export LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;$PWD/../_shared/?.lua;$PWD/../_shared/?/init.lua;;"
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a -s "-noreset" luajit tests/hardware/run_layout_editor_webview.lua ../../../static/layouts/sources/ergopti.toml
@@ -4470,7 +4470,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_webkit_gc_signal.lua
@@ -4490,7 +4490,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           timeout 180s dbus-run-session -- xvfb-run -a luajit tests/hardware/run_typing_none_webkit.lua
@@ -4533,7 +4533,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_changelog_live.lua
@@ -4575,7 +4575,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           home="$(mktemp -d)"
@@ -4621,7 +4621,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           set +e
@@ -4924,7 +4924,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node -e "const v=require('./static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
+          node -e "const v=require('./static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
       - name: Install the pinned Go toolchain
         uses: actions/setup-go@v5
         with:
@@ -4976,7 +4976,7 @@ jobs:
 
       - name: Sign the update asset (detached signature)
         # PAR-30: the updaters verify <asset>.sig against the key in
-        # _shared/modules/updater/asset_signing.json. release-sign owns the
+        # _shared/updater/data/asset_signing.json. release-sign owns the
         # decision (tested in tools/test/test-update-asset-signature.cjs): once
         # the policy names a key or requires signatures, a missing or mismatched
         # UPDATE_SIGNING_KEY fails this step; before the maintainer provisions
@@ -5148,7 +5148,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build/linux-flatpak-builder
-          key: flatpak-builder-state-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/build/build-linux-flatpak.sh', 'static/ergopti_plus/_shared/data/linux_native_runtime.json', 'tools/codegen/codegen-linux-native-runtime.cjs') }}
+          key: flatpak-builder-state-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/build/build-linux-flatpak.sh', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json', 'tools/codegen/codegen-linux-native-runtime.cjs') }}
           restore-keys: flatpak-builder-state-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build the Flatpak
@@ -5174,8 +5174,8 @@ jobs:
                    build/linux/flatpak/payload/bin/ergopti \
                    build/linux/flatpak/payload/lib/ergopti/ergopti_hotstrings.lua \
                    build/linux/flatpak/payload/lib/ergopti/infra/paths.lua \
-                   build/linux/flatpak/payload/lib/ergopti/_shared/lua/logger/shim.lua \
-                   build/linux/flatpak/payload/lib/ergopti/_shared/data/locales/en.json; do
+                   build/linux/flatpak/payload/lib/ergopti/_shared/core/logger/engine/shim.lua \
+                   build/linux/flatpak/payload/lib/ergopti/_shared/core/i18n/data/locales/en.json; do
               if [ ! -f "$f" ]; then
                   echo "::error::the Flatpak payload is missing $f"
                   fail=1
@@ -5379,7 +5379,7 @@ jobs:
           # resolves _shared as ../_shared from the driver root and probes it, so a
           # layout that nests them differently boots to "shared tree not found".
           for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \
-                      "$HOME/.local/lib/ergopti/_shared/data/locales/en.json"; do
+                      "$HOME/.local/lib/ergopti/_shared/core/i18n/data/locales/en.json"; do
             if [ ! -f "$path" ]; then
               echo "::error::missing $path"
               FAIL=1
@@ -5387,7 +5387,7 @@ jobs:
           done
           # A hotstring pack, because an install with no hotstrings is an install
           # that runs and does nothing.
-          if ! ls "$HOME/.local/lib/ergopti/_shared/modules/hotstrings/"*.toml >/dev/null 2>&1; then
+          if ! ls "$HOME/.local/lib/ergopti/_shared/hotstrings/data/catalogue/"*.toml >/dev/null 2>&1; then
             echo "::error::no hotstring packs were installed"
             FAIL=1
           fi
@@ -5501,8 +5501,8 @@ jobs:
           for f in /usr/bin/ergopti \
                    /usr/lib/ergopti/ergopti_hotstrings.lua \
                    /usr/lib/ergopti/infra/paths.lua \
-                   /usr/lib/ergopti/_shared/lua/logger/shim.lua \
-                   /usr/lib/ergopti/_shared/data/locales/en.json \
+                   /usr/lib/ergopti/_shared/core/logger/engine/shim.lua \
+                   /usr/lib/ergopti/_shared/core/i18n/data/locales/en.json \
                    /usr/lib/systemd/user/ergopti-hotstrings.service; do
               if [ ! -e "$f" ]; then
                   echo "::error::the package did not install $f"
@@ -5830,7 +5830,7 @@ jobs:
           # The installed private runtime's environment, then the standalone
           # layout's LUA_PATH (_shared beside linux/, not inside it).
           source "$root/linux/network-runtime-env.sh" "$root/linux/runtime" "$root/linux"
-          export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/?.lua;$root/_shared/?/init.lua;;"
           "$ERGOPTI_RUNTIME_PREFIX/bin/luajit" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
@@ -6017,7 +6017,7 @@ jobs:
           check_dir="$(pwd)/static/ergopti_plus/linux/tests/hardware"
           flatpak run --user \
               --filesystem="$check_dir:ro" \
-              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
+              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/?.lua;/app/lib/ergopti/_shared/?/init.lua;;" \
               --command=luajit org.ergopti.Ergopti \
               "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
 

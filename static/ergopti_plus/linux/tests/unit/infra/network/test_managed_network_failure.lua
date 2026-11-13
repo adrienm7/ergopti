@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 
 --- Reads one corpus resource through the existing Linux path owner.
@@ -22,5 +22,5 @@ local function read(relative)
 end
 
 helpers.describe("shared managed network failure contract", function()
-	require("test.managed_network_contract").register(read, helpers)
+	require("tests.lua.core.managed_network_contract").register(read, helpers)
 end)

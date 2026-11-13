@@ -20,7 +20,7 @@ local receipts = setmetatable({}, { __mode = "k" })
 --- @param record table Private import identity.
 --- @return string|nil, string, string|nil Classified native source.
 local function read(record)
-	return require("toml_codec.writer").read_classified(record.path, require("adapters.file_system"))
+	return require("core.text.engine.toml_codec.writer").read_classified(record.path, require("adapters.file_system"))
 end
 
 --- Removes only the acknowledged import. A changed or unreadable source
@@ -28,9 +28,9 @@ end
 --- @param record table Private import identity.
 --- @return boolean, string|nil, boolean Whether an owned file was removed.
 local function remove(record)
-	local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
+	local settled, settle_err = require("layouts.engine.layers.preset").retry_undo_cleanup(record)
 	if settled ~= true then return false, settle_err, false end
-	if record.status ~= require("keymap.layer_preset").IMPORTED then return true, nil, false end
+	if record.status ~= require("layouts.engine.layers.preset").IMPORTED then return true, nil, false end
 	local content, status, detail = read(record)
 	if status == "absent" then return true, nil, false end
 	if status ~= "ok" then return false, "navigation-layer-source-unreadable: " .. tostring(detail or status) end
@@ -53,10 +53,10 @@ end
 --- @param record table Private import identity.
 --- @return boolean, string|nil Native publication receipt.
 local function replace(record)
-	local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
+	local settled, settle_err = require("layouts.engine.layers.preset").retry_undo_cleanup(record)
 	if settled ~= true then return false, settle_err end
 	if record.restoration_receipt ~= nil then
-		local ready, _, published = require("toml_codec.writer").retry_publication_cleanup(record.restoration_receipt)
+		local ready, _, published = require("core.text.engine.toml_codec.writer").retry_publication_cleanup(record.restoration_receipt)
 		if ready ~= true then return false, "navigation-layer-restoration-cleanup-pending" end
 		if published == true then
 			local current, status = read(record)
@@ -73,7 +73,7 @@ local function replace(record)
 	if status ~= "absent" then
 		return false, "navigation-layer-restore-conflict: " .. tostring(detail or status)
 	end
-	local written, write_err, retry_cleanup = require("toml_codec.writer").publish_if_unchanged(record.path, record.content,
+	local written, write_err, retry_cleanup = require("core.text.engine.toml_codec.writer").publish_if_unchanged(record.path, record.content,
 		require("adapters.file_system"), { status = "absent" })
 	if type(retry_cleanup) == "function" then record.restoration_receipt = { publication_cleanup = retry_cleanup } end
 	return written, write_err
@@ -103,7 +103,7 @@ function M.import()
 	function sibling.settled(ok)
 		if not record or ok ~= true then return end
 		record.committed = true
-		if record.status == require("keymap.layer_preset").IMPORTED then
+		if record.status == require("layouts.engine.layers.preset").IMPORTED then
 			require("platform.remap.nav_layer").reconcile_wheel("Remap scope")
 		end
 	end
@@ -127,7 +127,7 @@ function M.inverse(token)
 		return ready, detail
 	end
 	function sibling.restore()
-		local settled, settle_err = require("keymap.layer_preset").retry_undo_cleanup(record)
+		local settled, settle_err = require("layouts.engine.layers.preset").retry_undo_cleanup(record)
 		if settled ~= true then return false, settle_err end
 		if not removed then return true end
 		return replace(record)
@@ -135,7 +135,7 @@ function M.inverse(token)
 	function sibling.settled(ok)
 		if ok ~= true then return end
 		record.committed = false
-		if record.status == require("keymap.layer_preset").IMPORTED then
+		if record.status == require("layouts.engine.layers.preset").IMPORTED then
 			require("platform.remap.nav_layer").reconcile_wheel("Remap scope inverse")
 		end
 	end

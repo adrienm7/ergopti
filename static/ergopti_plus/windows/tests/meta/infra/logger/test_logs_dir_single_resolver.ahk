@@ -29,7 +29,7 @@ _LDSR_NoSecondLogsFormula() {
 		Assert(InStr(Src, Formula) == 0,
 			"'" . Formula . "' is a second copy of the logs-folder resolver; ask the logger")
 	; The pre-logger sink was written beside paths.toml in two places. Its name
-	; is now declared once in _shared/modules/paths/app_dirs.toml and reaches
+	; is now declared once in _shared/core/fs/data/paths/app_dirs.toml and reaches
 	; the driver as the generated AppDirsLogBootstrapName(), which the
 	; production scan above excludes with every other generated file.
 	Assert(InStr(Src, "bootstrap.log") == 0,

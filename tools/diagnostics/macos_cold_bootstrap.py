@@ -30,11 +30,11 @@ SOURCE_PATHS = (
     "macos/adapters/native_bootstrap_pty.lua",
     "macos/adapters/python_interpreter.lua",
     "macos/platform/network/native_http.py",
-    "_shared/python/network_proxy_policy.py",
-    "_shared/lua/core/llm/native_pty_receipt.lua",
-    "_shared/modules/network/proxy_policy.json",
-    "_shared/modules/llm/managed_python_release.json",
-    "_shared/data/identifiers.sh",
+    "_shared/core/network/adapters/python_network_proxy_policy.py",
+    "_shared/core/lifecycle/engine/core/native_pty_receipt.lua",
+    "_shared/core/network/data/proxy_policy.json",
+    "_shared/ai/data/managed_python_release.json",
+    "_shared/core/text/data/identifiers.sh",
     "macos/uv.lock",
     "macos/pyproject.toml",
 )
@@ -429,7 +429,7 @@ def receive_owned(app, output, expected_sha):
             ).stdout.strip()
             version = validate_uv_version(version_output)
             release = json.loads(
-                (resources / PREFIX / "_shared/modules/llm/managed_python_release.json").read_text()
+                (resources / PREFIX / "_shared/ai/data/managed_python_release.json").read_text()
             )
             expected_python = release["downloads"]["cpython-3.11.16-darwin-aarch64-none"]
             if probe.stdout.strip() != ".".join(

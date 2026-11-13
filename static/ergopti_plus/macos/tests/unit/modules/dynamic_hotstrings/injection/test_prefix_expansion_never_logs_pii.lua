@@ -49,7 +49,7 @@ local function install_keystats_recorder()
 			table.insert(rec.calls, { trigger = trigger, replacement = replacement })
 		end,
 		log_private_hotstring = function(trigger, replacement)
-			local roi = require("keystats.trigger_roi")
+			local roi = require("metrics.engine.privacy.trigger_roi")
 			rec.private_savings[#rec.private_savings + 1] =
 				math.max(0, roi.utf16_length(replacement) - roi.utf16_length(trigger))
 		end,

@@ -12,10 +12,10 @@ unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON
 case "$DRIVER_ROOT${ERGOPTI_RUNTIME_PREFIX:-}" in
 	*[\;\?]*)
 		export ERGOPTI_LITERAL_DRIVER_ROOT="$DRIVER_ROOT"
-		if [ -f "$DRIVER_ROOT/../_shared/data/locales/en.json" ]; then
-			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/../_shared/lua"
+		if [ -f "$DRIVER_ROOT/../_shared/core/i18n/data/locales/en.json" ]; then
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/../_shared"
 		else
-			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/_shared/lua"
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/_shared"
 		fi ;;
 	*) unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_NATIVE_MODULES ;;
 esac

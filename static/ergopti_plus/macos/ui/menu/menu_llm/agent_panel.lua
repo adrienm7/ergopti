@@ -37,10 +37,10 @@ local i18n         = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local AppPickerLib = require("infra.app_picker")
 local dialog       = require("infra.dialog_util")
-local Vision       = require("llm.vision")
-local Agent        = require("llm.agent")
+local Vision       = require("ai.engine.prediction.vision")
+local Agent        = require("ai.engine.agent.agent")
 local ProviderUses = require("modules.llm.provider_uses")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "menu_llm.agent_panel"
 
@@ -280,7 +280,7 @@ local function system_rows(ctx, system, selection)
 	local value = selection.value
 	local selection_is_current = selection.current
 	local parsed = value ~= "" and Vision.parse(value) or nil
-	local off = ManifestMenu.check_row("agent_system_controls", require("config_keys").COMMAND.AGENT_SYSTEM_OFF, {
+	local off = ManifestMenu.check_row("agent_system_controls", require("settings.engine.keys").COMMAND.AGENT_SYSTEM_OFF, {
 		agent_system_off = function() return apply(ctx, system.key, "", system.setter) end,
 	}, {
 		agent_system_is_off = function()
@@ -323,7 +323,7 @@ local function system_rows(ctx, system, selection)
 		installed = require("modules.llm.api_ollama").local_model_installed(model)
 	end
 	local model_commands = {
-		[require("config_keys").COMMAND.AGENT_SYSTEM_MODEL] = function() return prompt_model(ctx, system, parsed) end,
+		[require("settings.engine.keys").COMMAND.AGENT_SYSTEM_MODEL] = function() return prompt_model(ctx, system, parsed) end,
 	}
 	local model_rows
 	if installed == true then
@@ -348,7 +348,7 @@ local function system_rows(ctx, system, selection)
 	end
 	if installed == false then
 		local download = ManifestMenu.template_rows("agent_download_frame", {
-			[require("config_keys").COMMAND.AGENT_DOWNLOAD_MODEL] = function() return require("modules.llm.local_model_offer").install(model, { current = selection_is_current }) end,
+			[require("settings.engine.keys").COMMAND.AGENT_DOWNLOAD_MODEL] = function() return require("modules.llm.local_model_offer").install(model, { current = selection_is_current }) end,
 		})
 		if not download or #download ~= 1 or type(download[1].action) ~= "function" then return nil end
 		download[1].label = download[1].label:gsub("{1}", function() return model end)
@@ -461,13 +461,13 @@ function M.build(ctx)
 	local submenu = ManifestMenu.build("agent_menu", "AI agent", nil, nil, {
 		commands = { agent_mode = function(id) return set_mode(ctx, id) end },
 		state_getters = {
-			[require("config_keys").KEY.LLM_AGENT_MODE] = function() return ctx.state.llm_agent_mode end,
+			[require("settings.engine.keys").KEY.LLM_AGENT_MODE] = function() return ctx.state.llm_agent_mode end,
 			agent_mode_ready = function() return type(ctx.settings_mgr) == "table" and type(ctx.settings_mgr.apply_setting_transaction) == "function" end,
 		},
 	}, {
-		[require("config_keys").LEAF.AGENT_SYSTEM1] = listed(function() return system_rows(ctx, SYSTEMS.agent_system1, selections.agent_system1) end),
-		[require("config_keys").LEAF.AGENT_SYSTEM2] = listed(function() return system_rows(ctx, SYSTEMS.agent_system2, selections.agent_system2) end),
-		[require("config_keys").LEAF.AGENT_DISABLED_APPS] = listed(function() return disabled_apps_rows(ctx) end),
+		[require("settings.engine.keys").LEAF.AGENT_SYSTEM1] = listed(function() return system_rows(ctx, SYSTEMS.agent_system1, selections.agent_system1) end),
+		[require("settings.engine.keys").LEAF.AGENT_SYSTEM2] = listed(function() return system_rows(ctx, SYSTEMS.agent_system2, selections.agent_system2) end),
+		[require("settings.engine.keys").LEAF.AGENT_DISABLED_APPS] = listed(function() return disabled_apps_rows(ctx) end),
 	})
 	if not submenu or refused_frame then return nil end
 	local children = ManifestMenu.native_child_rows(submenu)

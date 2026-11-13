@@ -11,14 +11,14 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local ShellRunner = require("adapters.shell_runner")
 local Timings = require("infra.timings")
-local Interpreter = require("process.interpreter")
+local Interpreter = require("core.process.interpreter")
 local NativeIdentity = require("adapters.atspi_native_identity")
 local OwnedProcess = require("adapters.owned_process")
 local Paths = require("infra.paths")
-local ProcessLimits = require("llm.process_limits")
+local ProcessLimits = require("ai.engine.policy.process_limits")
 
 local LOG = "adapters.atspi_focus"
 local STATE_ACTIVE = 1
@@ -509,7 +509,7 @@ local function read_snapshot(include_context)
 	local query = include_context and "_get_native_context_snapshot" or "_get_native_snapshot"
 	local child_code = "local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); "
 		.. "if d and d~='' then assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX'),os.getenv('ERGOPTI_LITERAL_DIRECT')=='1' and 'child-direct' or (os.getenv('ERGOPTI_LITERAL_DAEMON')=='1' and 'daemon' or nil)) end; "
-		.. "local m=require('adapters.atspi_focus'); local j=require('json'); "
+		.. "local m=require('adapters.atspi_focus'); local j=require('core.text.engine.json'); "
 		.. "local s,ok=m." .. query .. "(); if ok then io.write('FOCUS:'..j.encode(s)) else os.exit(2) end"
 	local command = string.format("env LUA_PATH=%s timeout -s KILL %ds %s -e %s 2>/dev/null",
 		ShellRunner.quote(package.path), timeout_seconds,
@@ -519,7 +519,7 @@ local function read_snapshot(include_context)
 	if ok ~= true or type(output) ~= "string" then return nil, false end
 	local encoded = output:match("FOCUS:(.-)%s*$")
 	if not encoded then return nil, false end
-	local ok_json, Json = pcall(require, "json")
+	local ok_json, Json = pcall(require, "core.text.engine.json")
 	if not ok_json then return nil, false end
 	local ok_decode, snapshot = pcall(Json.decode, encoded)
 	if not ok_decode or type(snapshot) ~= "table" or type(snapshot.role) ~= "number"
@@ -590,7 +590,7 @@ function M.start_context_capture(field, options, callback)
 	local expected = { bus = field.bus, path = field.path, role = field.role }
 	local chunks, invalid_output = {}, false
 	local operation = OwnedProcess.start(executable, { Paths.driver_root() .. "/adapters/atspi_context_worker.lua",
-		expected.bus, expected.path, tostring(expected.role), Paths.shared("lua"), tostring(native.os_getpid()) }, {
+		expected.bus, expected.path, tostring(expected.role), Paths.shared_root(), tostring(native.os_getpid()) }, {
 		owner = options.owner, authorized = options.authorized,
 		timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms"),
 		max_output_bytes = ProcessLimits.defaults().max_output_bytes,
@@ -603,7 +603,7 @@ function M.start_context_capture(field, options, callback)
 		local body = table.concat(chunks)
 		chunks = {}
 		local encoded = not invalid_output and result.ok == true and body:match("^CONTEXT:(.*)$") or nil
-		local decoded, frame = pcall(function() return encoded and require("json").decode(encoded) end)
+		local decoded, frame = pcall(function() return encoded and require("core.text.engine.json").decode(encoded) end)
 		body = nil
 		local receipt = decoded and type(frame) == "table" and frame.field or nil
 		local context = decoded and type(frame) == "table" and frame.context or nil
@@ -645,7 +645,7 @@ function M.start_selection_capture(field, options, callback)
 	local expected = { bus = field.bus, path = field.path, role = field.role }
 	local chunks, invalid = {}, false
 	local argv = { Paths.driver_root() .. "/adapters/atspi_context_worker.lua",
-		expected.bus, expected.path, tostring(expected.role), Paths.shared("lua"), tostring(native.os_getpid()), span and "span" or "selection" }
+		expected.bus, expected.path, tostring(expected.role), Paths.shared_root(), tostring(native.os_getpid()), span and "span" or "selection" }
 	if span then argv[#argv + 1], argv[#argv + 2] = string.format("%.0f", span.first), string.format("%.0f", span.last) end
 	local operation = OwnedProcess.start(executable, argv, {
 		owner = options.owner, authorized = options.authorized,
@@ -660,7 +660,7 @@ function M.start_selection_capture(field, options, callback)
 		local body = table.concat(chunks)
 		chunks = {}
 		local encoded = not invalid and result.ok == true and body:match("^SELECTION:(.*)$") or nil
-		local decoded, frame = pcall(function() return encoded and require("json").decode(encoded) end)
+		local decoded, frame = pcall(function() return encoded and require("core.text.engine.json").decode(encoded) end)
 		local held = decoded and type(frame) == "table" and frame.field or nil
 		local selection = decoded and type(frame) == "table" and frame.selection or nil
 		if type(held) ~= "table" or held.bus ~= expected.bus or held.path ~= expected.path or held.role ~= expected.role

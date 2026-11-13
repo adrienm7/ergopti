@@ -37,9 +37,9 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
@@ -52,7 +52,7 @@ local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
-local Utf8 = require("compat.utf8")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 local LOG = "adapters.keyboard_layout"
 

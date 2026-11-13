@@ -40,8 +40,8 @@ const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const RESTORE_KEY = 'common.restore_recommended';
 const CLEAR_KEY = 'common.clear_to_system';

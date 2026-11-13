@@ -23,7 +23,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local LOG    = "paths"
 
 -- Backslash is a filename byte on macOS and separates components only when the
@@ -152,15 +152,15 @@ function M.shared(rel)
 	return root
 end
 
---- Resolves a file inside ``_shared/modules/llm/``. Thin wrapper over M.shared kept for
+--- Resolves a file inside ``_shared/ai/data/``. Thin wrapper over M.shared kept for
 --- call-site readability.
 --- @param filename string|nil File name (e.g. ``"models.json"``). Nil → directory path.
 --- @return string|nil Absolute path, or nil when the shared tree is unreachable.
 function M.shared_llm_path(filename)
 	if filename and filename ~= "" then
-		return M.shared("modules/llm/" .. filename)
+		return M.shared("ai/data/" .. filename)
 	end
-	return M.shared("modules/llm")
+	return M.shared("ai/data")
 end
 
 return M

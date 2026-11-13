@@ -242,7 +242,7 @@ helpers.describe("LLM API persistence transaction", function()
 			local foreign = { private_setting = "untouched", nested = { retained = true } }
 			with_persistence_fixture({ initial_store = { foreign_setting = foreign } }, function(llm, fixture)
 				local remote = fixture.api_remote
-				local file = assert(io.open(helpers.driver_root() .. "../_shared/modules/llm/api_providers.json", "rb"))
+				local file = assert(io.open(helpers.driver_root() .. "../_shared/ai/data/api_providers.json", "rb"))
 				local raw = file:read("*a"); assert(file:close())
 				local catalogue = assert(require("adapters.json_codec").decode(raw))
 				remote.PROVIDER_ORDER = { provider_id }
@@ -269,9 +269,9 @@ helpers.describe("LLM API persistence transaction", function()
 						notices[#notices + 1] = kind
 						return true
 					end }
-					local renderer = assert(require("menu.renderer").new({
+					local renderer = assert(require("menu.engine.renderer").new({
 						platform = "hs",
-						manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+						manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 						json_decode = require("adapters.json_codec").decode,
 						i18n = { get = package.loaded["infra.i18n"].get, section = function() return {} end },
 						logger = helpers.make_logger_stub(),

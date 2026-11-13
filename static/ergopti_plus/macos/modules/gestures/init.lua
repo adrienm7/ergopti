@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -45,9 +45,9 @@ local touchdevice = load_touchdevice_module()
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
-local Sensitivity = require("gestures.sensitivity")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local Sensitivity = require("gestures.engine.sensitivity")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 
 

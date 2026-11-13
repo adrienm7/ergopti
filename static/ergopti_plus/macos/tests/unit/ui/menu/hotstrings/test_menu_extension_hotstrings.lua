@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local ExtensionTranslator = require("infra.i18n")
-local shipped = require("toml_codec.codec").decode(require("tests.support.source_file").read(
+local shipped = require("core.text.engine.toml_codec.codec").decode(require("tests.support.source_file").read(
 	helpers.driver_root() .. "../../layouts/registry/ergopti/manifest.toml")).extension
 
 local ERGOPTI = {
@@ -144,8 +144,8 @@ local function with_extension_frame(body, paused)
 		"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }, function()
 		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.i18n"] = translator
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer

@@ -23,7 +23,7 @@ local JsonCodec = require("adapters.json_codec")
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
-local Renderer = require("menu.renderer")
+local Renderer = require("menu.engine.renderer")
 
 local LOG = "manifest_menu"
 
@@ -31,7 +31,7 @@ local instance, err = Renderer.new({
 	platform      = "hs",
 	-- Resolved on every read, not once here: Paths.shared is what the renderer's
 	-- unit files redirect to a throwaway fixture directory, per case.
-	manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+	manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 	-- Native decoding stays in the adapter, which returns independent tables
 	-- even when the manifest contains equal rows, options or menu arrays.
 	json_decode   = JsonCodec.decode,

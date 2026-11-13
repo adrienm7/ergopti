@@ -11,10 +11,10 @@
 --- ==============================================================================
 
 local uv = require('luv')
-require('compat.utf8').install()
+require('core.lifecycle.engine.compat.utf8').install()
 local Writer = require('modules.keystats.sqlite_writer')
 local Reader = require('modules.keystats.sqlite_reader')
-local Json = require('json')
+local Json = require('core.text.engine.json')
 local root = assert(os.getenv('OWNED_READER_PROOF'))
 local db = root .. '/metrics.sqlite'
 local checks, failures = 0, 0

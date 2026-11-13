@@ -7,7 +7,7 @@
  * The keycode -> finger/hand/home map used by the typing-heatmap dashboard used
  * to be a hand-copied literal `KEYCODE_DATA` array in state.js, with no
  * mechanism catching drift against the canonical
- * `_shared/data/keycodes/azerty.json`.
+ * `_shared/layouts/data/keycodes/azerty.json`.
  *
  * This test pins the fix:
  *   1. The generated `_generated/keycode_data.js` carries the exact
@@ -26,7 +26,10 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
-const AZERTY_JSON = path.join(ROOT, 'static/ergopti_plus/_shared/data/keycodes/azerty.json');
+const AZERTY_JSON = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/layouts/data/keycodes/azerty.json'
+);
 const GENERATED_JS = path.join(
 	ROOT,
 	'static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js'

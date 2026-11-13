@@ -17,7 +17,7 @@
  *
  * ROOT CAUSE ENCODED:
  * Earlier the AHK driver used infra/string_utils.ahk while macOS used
- * infra/text_utils.lua (backed by _shared/lua/text_utils/init.lua). The flat
+ * infra/text_utils.lua (backed by _shared/core/text/engine/utils_core.lua). The flat
  * ui/action_picker.ahk had no Windows-side folder structure unlike the macOS
  * ui/action_picker/init.lua. Both divergences made cross-driver navigation
  * harder. This guard fails the JS suite whenever a regression reintroduces

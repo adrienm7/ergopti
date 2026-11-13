@@ -76,7 +76,7 @@ try {
 async function main() {
 	if (process.platform !== 'win32') throw new Error('The Windows release is for Windows.');
 	const pinned = JSON.parse(
-		fs.readFileSync(path.join(runtime.SHARED, 'modules/llm/ollama_release.json'), 'utf8')
+		fs.readFileSync(path.join(runtime.SHARED, 'ai/data/ollama_release.json'), 'utf8')
 	);
 	const asset = pinned.assets[ASSET];
 	const home = releaseHome();

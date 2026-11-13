@@ -4,7 +4,7 @@
 ; MODULE: Ollama Installer Single Owner
 ; DESCRIPTION:
 ; Ergopti installs and runs only its own pinned Ollama (decision DELETE of
-; _shared/data/owned_runtimes.json): the user-level winget and browser fallback
+; _shared/core/network/data/owned_runtimes.json): the user-level winget and browser fallback
 ; is gone. Shutdown still joins the managed installer before it turns terminal,
 ; and the real checker stays enrolled.
 ; ==============================================================================

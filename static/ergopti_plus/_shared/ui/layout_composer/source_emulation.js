@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Ergopti Layout Source Emulation (web)
  * DESCRIPTION:
- * The web twin of _shared/lua/layouts/source_emulation.lua: performs the
+ * The web twin of _shared/layouts/engine/composer/source_emulation.lua: performs the
  * emulation table the source compiler writes (compileEmulation), the records no
  * .keylayout holds (custom modifiers and their layers, key-chord mappings,
  * shortcuts sending another key, tap-holds, remaps of system keys), on top of

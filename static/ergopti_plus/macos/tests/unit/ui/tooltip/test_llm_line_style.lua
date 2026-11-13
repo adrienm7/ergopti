@@ -7,7 +7,7 @@
 --- typed text is grey, the corrected part green and the continuation orange,
 --- and the indentation setting places the cursor mark. That rule used to live
 --- inside the canvas code, where no other driver could read it; it is now
---- _shared/lua/tooltip/llm_line.lua, shared with Linux and ported by Windows.
+--- _shared/core/ui/engine/tooltip/llm_line.lua, shared with Linux and ported by Windows.
 ---
 --- The first half replays the cross-driver corpus against the shared rule. The
 --- second drives the real tooltip and records every styled piece it builds, so
@@ -30,7 +30,7 @@ local function read_corpus()
 end
 
 local corpus = read_corpus()
-local LlmLine = require("tooltip.llm_line")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
 
 helpers.describe("AI prediction line: shared corpus (llm-line-style)", function()
 	for _, vector in ipairs(corpus.prefixes) do
@@ -165,7 +165,7 @@ helpers.describe("tooltip_llm: the shortcut column (llm-shortcut-column)", funct
 				local context = fixture.load_tooltip(support.CASES[1])
 				-- {id} stands for the key name table's glyph of that modifier.
 				local expected = vector.expected.hs:gsub("{(%a+)}", function(id)
-					return require("keycodes.key_names").macos_symbol(id)
+					return require("platform.input.keycodes.key_names").macos_symbol(id)
 				end)
 				helpers.assert_eq(LlmLine.shortcut_label(vector.index, vector.modifiers,
 					context.config.llm_ui.shortcut_spec), expected, vector.id)

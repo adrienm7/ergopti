@@ -15,7 +15,7 @@ parser and writes `kbdergop.c`, `.h`, `.rc` and `.def` to
 `static/ergopti_plus/windows/native/keyboard_layout/_generated/`. Never edit them:
 change the `.keylayout` or `tools/codegen/lib/windows-keyboard-layout.cjs`, then
 regenerate. The DLL name, language and Windows labels come from
-`_shared/modules/layouts/windows_system_layout.json`.
+`_shared/layouts/data/windows_system_layout.json`.
 `tools/test/test-windows-keyboard-layout-codegen.cjs` fails when the tracked sources
 drift and pins what the conversion may do:
 

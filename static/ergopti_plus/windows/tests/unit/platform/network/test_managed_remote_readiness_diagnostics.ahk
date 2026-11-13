@@ -42,7 +42,7 @@ _ManagedRemoteFixtureGenerationReceipt(Receipt, Policy) {
 
 _ManagedRemoteFixtureGenerationDiagnostic(Mode, Ordinal, ExpectedSuccess, Result, Receipt := 0) {
 	global _SharedDir
-	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))).Policy
 	Success := Result is Map ? _ManagedNetwork_Get(Result, "success") : 0
 	Failure := Result is Map ? _ManagedNetwork_Get(Result, "failure") : 0
 	Info := Failure is Array && Failure.Length == 1 && Failure[1] is Map ? Failure[1] : Map()
@@ -265,7 +265,7 @@ _ManagedRemoteCaptureReadinessHttp(Observation, Factory) {
 
 _ManagedRemoteReadinessDiagnostic(Mode, Expected, Results, Elapsed, Budget, Status, Receipt) {
 	global _SharedDir
-	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))).Policy
 	Admitted := _ManagedRemoteFixtureGenerationReceipt(Receipt, Policy)
 	Fields := Admitted["fields"]
 	Fact := "mode=" . _ManagedRemoteFixtureDiagnosticEnum(Mode, "fixed|pac")
@@ -436,7 +436,7 @@ _ManagedRemoteFixtureReadinessCallbackDiagnostic(Snapshot) {
 
 _ManagedRemoteFixtureReadinessDiagnostic(Mode, Ordinal, ExpectedSuccess, Result, Created, Status, Capture, Receipt := 0, CallbackSnapshot := 0, CallbackCapture := "unavailable") {
 	global _SharedDir
-	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\core\network\data\managed_network.json", "UTF-8"))).Policy
 	Actual := Result is Array && Result.Length == 1 ? _ManagedRemoteFixtureDiagnosticBoolean(Result[1]) : "unknown"
 	Fact := "readiness_mode=" . _ManagedRemoteFixtureDiagnosticEnum(Mode, "fixed|pac")
 		. " readiness_ordinal=" . _ManagedRemoteFixtureGenerationInteger(Ordinal, 1, 4)

@@ -9,9 +9,9 @@
 
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local OneShot = require("modules.keymap.one_shot_shift")
-local data = assert(Json.decode(SourceFile.read(helpers.shared("tap_hold/one_shot_shift.json"))))
+local data = assert(Json.decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
 
 local function armed()
 	local owner = OneShot.new(data)

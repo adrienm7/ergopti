@@ -29,7 +29,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 --- Runs `body` with controlled environment variables and bootstrap storage.
 --- @param env table Variables returned by os.getenv (others fall through).

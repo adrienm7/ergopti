@@ -38,7 +38,7 @@ end
 --- @param render_ctx table The context the IA menu handed to the renderer.
 --- @return table Rendered hs.menubar rows.
 local function render(render_ctx)
-	return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.renderer" }, function()
+	return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.engine.renderer" }, function()
 		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 		-- Every dynamic row answers with nothing: only the gate is under test here.
 		local handlers = setmetatable({}, { __index = function() return function() end end })
@@ -102,7 +102,7 @@ helpers.describe("IA submenu on/off row", function()
 	helpers.it("names a newer configuration on its greyed persistence rows and refuses their retained commands", function()
 		with_activation("ollama", { true }, nil, function(_action, _state, calls)
 			local read_only, scoped = false, 0
-			package.loaded["config_migrate"] = {
+			package.loaded["settings.engine.migration.migrate"] = {
 				read_only_reason = function() return read_only and "newer schema" or nil end,
 				read_only_status = function() return read_only and "newer" or nil end,
 			}
@@ -251,18 +251,18 @@ helpers.describe("actual transient download producer reaches completed root comp
 					-- Root construction needs the genuine native binding and complete locale owners.
 					local activation_logger = package.loaded["infra.logger"]
 					local owned = { "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
-						"menu.renderer", "infra.i18n", "infra.locale", "locale.core", "infra.logger" }
+						"menu.engine.renderer", "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.logger" }
 					local previous = {}
 					for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
 					helpers.with_fresh_modules(owned, function()
 						-- Retain the fixture's closed log functions; only genuine native read facts are missing.
 						local closed_logger = {}
 						for name, value in pairs(activation_logger) do closed_logger[name] = value end
-						closed_logger.LEVELS = require("logger").LEVELS
+						closed_logger.LEVELS = require("core.logger.engine").LEVELS
 						closed_logger.current_level = closed_logger.LEVELS.WARNING
 						package.loaded["infra.logger"] = closed_logger
-						helpers.assert_true(rawequal(closed_logger.LEVELS, require("logger").LEVELS))
-						helpers.assert_eq(closed_logger.current_level, require("logger").LEVELS.WARNING)
+						helpers.assert_true(rawequal(closed_logger.LEVELS, require("core.logger.engine").LEVELS))
+						helpers.assert_eq(closed_logger.current_level, require("core.logger.engine").LEVELS.WARNING)
 						for name, value in pairs(activation_logger) do
 							helpers.assert_true(rawequal(closed_logger[name], value), "closed root logger retains " .. name)
 						end
@@ -321,14 +321,14 @@ local function with_genuine_outer_parent(calls, callback)
 	local port = package.loaded["infra.manifest_menu"]
 	local before_build, before_group = port.build, port.group_row
 	local activation_logger = package.loaded["infra.logger"]
-	local owned = { "infra.manifest_menu", "menu.renderer", "infra.i18n", "infra.locale", "locale.core", "infra.logger" }
+	local owned = { "infra.manifest_menu", "menu.engine.renderer", "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.logger" }
 	local previous = {}
 	for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
 	local ok, detail = xpcall(function()
 		helpers.with_fresh_modules(owned, function()
 			local closed_logger = {}
 			for name, value in pairs(activation_logger) do closed_logger[name] = value end
-			closed_logger.LEVELS = require("logger").LEVELS
+			closed_logger.LEVELS = require("core.logger.engine").LEVELS
 			closed_logger.current_level = closed_logger.LEVELS.WARNING
 			package.loaded["infra.logger"] = closed_logger
 			local native_i18n, native_locale = require("infra.i18n"), require("infra.locale")
@@ -610,8 +610,8 @@ helpers.describe("IA protected configuration admission", function()
 	for _, protect_before_build in ipairs({ true, false }) do
 		helpers.it("IA toggle refuses protected configuration before effects (protected-ai-toggle "
 			.. (protect_before_build and "build" or "stale") .. ")", function()
-			local Migrate = require("config_migrate")
-			local registry = assert(Migrate.load_registry(helpers.driver_root() .. "../_shared/core/config_schema/migrations.toml"))
+			local Migrate = require("settings.engine.migration.migrate")
+			local registry = assert(Migrate.load_registry(helpers.driver_root() .. "../_shared/settings/data/config_schema/migrations.toml"))
 			local path = "/controlled/ergopti-protected-ai-" .. (protect_before_build and "build" or "stale") .. ".toml"
 			local source = "[_meta]\nschema_version = " .. (registry.current + 1) .. "\n[llm]\nenabled = true\n"
 			local function protect()

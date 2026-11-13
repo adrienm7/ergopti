@@ -9,7 +9,7 @@
 # (tools/dev/collect-macos-field-report.sh, collect-linux-field-report.sh); the
 # Windows collector (collect-windows-field-report.ps1) follows the same steps in
 # PowerShell. The names come from the field_report group of
-# static/ergopti_plus/_shared/data/identifiers.sh, which the caller sources
+# static/ergopti_plus/_shared/core/text/data/identifiers.sh, which the caller sources
 # first, with its own fail() and log().
 #
 # FEATURES & RATIONALE:

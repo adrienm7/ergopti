@@ -5,7 +5,7 @@
  * MODULE: Shared Test Format Single-Source Guard
  * DESCRIPTION:
  * `inspect()`, `deep_equal()`, and `caller_site()/fail_msg_for()` live exactly
- * once in `_shared/lua/test/format.lua`. Both the Linux and macOS test helpers
+ * once in `_shared/tests/lua/format.lua`. Both the Linux and macOS test helpers
  * require that module — they must NOT define their own copies of these helpers.
  *
  * ROOT CAUSE ENCODED:
@@ -44,15 +44,15 @@ function stripLua(src) {
 const errors = [];
 
 // ── 1. Shared module exists and exports the three helpers ──────────────────
-const formatSrc = read('lua/test/format.lua', SHARED);
+const formatSrc = read('tests/lua/format.lua', SHARED);
 if (!formatSrc.includes('M.inspect')) {
-	errors.push('_shared/lua/test/format.lua: must export M.inspect');
+	errors.push('_shared/tests/lua/format.lua: must export M.inspect');
 }
 if (!formatSrc.includes('M.deep_equal')) {
-	errors.push('_shared/lua/test/format.lua: must export M.deep_equal');
+	errors.push('_shared/tests/lua/format.lua: must export M.deep_equal');
 }
 if (!formatSrc.includes('fail_msg_for')) {
-	errors.push('_shared/lua/test/format.lua: must export fail_msg_for(skip_pattern)');
+	errors.push('_shared/tests/lua/format.lua: must export fail_msg_for(skip_pattern)');
 }
 
 // ── 2. Linux helpers must require, not define ──────────────────────────────
@@ -61,8 +61,8 @@ if (!formatSrc.includes('fail_msg_for')) {
 	const code = stripLua(raw);
 
 	// Must require the shared module
-	if (!raw.includes('require("test.format")')) {
-		errors.push('linux/tests/helpers.lua: must require("test.format")');
+	if (!raw.includes('require("tests.lua.format")')) {
+		errors.push('linux/tests/helpers.lua: must require("tests.lua.format")');
 	}
 
 	// Must re-export inspect and deep_equal (anchored, not substring match)
@@ -99,8 +99,8 @@ if (!formatSrc.includes('fail_msg_for')) {
 	const raw = read('tests/helpers/init.lua', MACOS);
 	const code = stripLua(raw);
 
-	if (!raw.includes('require("test.format")')) {
-		errors.push('macos/tests/helpers/init.lua: must require("test.format")');
+	if (!raw.includes('require("tests.lua.format")')) {
+		errors.push('macos/tests/helpers/init.lua: must require("tests.lua.format")');
 	}
 
 	if (!/M\.inspect\s*=\s*fmt\.inspect\b/.test(code)) {
@@ -145,12 +145,12 @@ for (const [driver, f] of [
 	}
 }
 
-// ---- 5. Banner alignment in _shared/lua/test/format.lua ----
+// ---- 5. Banner alignment in _shared/tests/lua/format.lua ----
 // ROOT CAUSE: the five major-section banners carried a right-hand "=" run that
 // did not equal the mandated 7 (e.g. "======= 1/ inspect() ==============" had
 // 14 on the right), and every border row above/below a title was a fixed 35
 // "=" wide instead of matching the title line's own length. Nothing caught it
-// because lint-conventions.js scans macos/ only, never _shared/lua/. This guard
+// because lint-conventions.js scans macos/ only, never _shared/. This guard
 // fails on any unbalanced (leftEq != rightEq) or wrong-length border banner.
 {
 	const bannerLines = formatSrc.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
@@ -164,7 +164,7 @@ for (const [driver, f] of [
 		const leftEq = m[2].length;
 		const title = m[3];
 		const rightEq = m[4].length;
-		const loc = `_shared/lua/test/format.lua:${i + 1}`;
+		const loc = `_shared/tests/lua/format.lua:${i + 1}`;
 		if (leftEq !== rightEq) {
 			errors.push(
 				`${loc}: banner "${title}" is unbalanced (${leftEq} left vs ${rightEq} right) — both sides must be 7`
@@ -187,12 +187,12 @@ for (const [driver, f] of [
 
 if (errors.length > 0) {
 	console.error(
-		'\x1b[31m[ERROR] test.format is not single-sourced in _shared/lua/test/format.lua:\x1b[0m'
+		'\x1b[31m[ERROR] test.format is not single-sourced in _shared/tests/lua/format.lua:\x1b[0m'
 	);
 	for (const e of errors) console.error('    ' + e);
 	process.exit(1);
 }
 
 console.log(
-	'\x1b[32m[OK] test.format single-sourced — _shared/lua/test/format.lua (inspect, deep_equal, fail_msg_for) consumed by Linux + macOS helpers; no local definitions.\x1b[0m'
+	'\x1b[32m[OK] test.format single-sourced — _shared/tests/lua/format.lua (inspect, deep_equal, fail_msg_for) consumed by Linux + macOS helpers; no local definitions.\x1b[0m'
 );

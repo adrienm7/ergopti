@@ -19,11 +19,11 @@ local function typed_at(offset_ms)
 end
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
-local TextCrypto = require("keystats.text_crypto")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 local uv = require("luv")
 local cipher = require("modules.keystats.text_cipher")
 local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-migration-consumer-XXXXXX"))
@@ -32,7 +32,7 @@ local machine = assert(io.open(machine_id, "wb"))
 assert(machine:write("0123456789abcdef0123456789abcdef\n"))
 assert(machine:close())
 cipher._set_machine_id_path(machine_id)
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local original_error, failures = Logger.error, 0
 local original_success, completions = Logger.success, 0
 Logger.success = function(tag, ...)
@@ -53,7 +53,7 @@ local ok, failure = xpcall(function()
 			assert(cipher.is_available(), "The owned machine identity must derive a real encryption key")
 			local device = assert(writer.query_rows("SELECT device_id FROM devices LIMIT 1;"))[1]
 			assert(writer.insert_typing_events(device, { { app = "owned-app", text = "historical-original" } }))
-			local key = require("keystats.text_migration_runner").CURSOR_META_KEY
+			local key = require("metrics.engine.privacy.text_migration_runner").CURSOR_META_KEY
 			assert(writer.exec_sql("CREATE TRIGGER owned_cursor_refusal BEFORE INSERT ON meta WHEN NEW.key='" .. key .. "' BEGIN SELECT RAISE(FAIL,'owned refusal'); END;"))
 			local posture = k.set_encrypt_enabled(true)
 			print("posture_return=" .. tostring(posture))
@@ -62,7 +62,7 @@ local ok, failure = xpcall(function()
 			print("durable_intent=" .. tostring(writer.get_meta(key)))
 			print("migration_errors=" .. failures)
 			assert(posture and k.is_encrypt_enabled())
-			assert(preferences.snapshot()[require("config_keys").KEY.METRICS_ENCRYPT] == true)
+			assert(preferences.snapshot()[require("settings.engine.keys").KEY.METRICS_ENCRYPT] == true)
 			assert(completions == 0, "refusing historical work must never announce its success")
 			assert(not k.get_migration_progress().running and writer.get_meta(key) == nil and failures == 1)
 			k.on_keydown("b", typed_at(1000), "owned-app")

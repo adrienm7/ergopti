@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local OpenAI-Compatible Servers
 --- DESCRIPTION:
---- The local servers of _shared/modules/llm/local_servers.json (oMLX,
+--- The local servers of _shared/ai/data/local_servers.json (oMLX,
 --- LM Studio, llama.cpp / LocalAI, Jan) that the user installed and runs,
 --- which of them answer right now, and the models each one serves.
 ---
@@ -36,11 +36,11 @@ local Logger         = require("infra.logger")
 local Paths          = require("infra.paths")
 local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
-local AuthPolicy     = require("llm.local_server_auth")
-local Json           = require("json")
-local Discovery      = require("llm.local_server_discovery")
-local PortPolicy     = require("llm.local_server_ports")
-local Fingerprint    = require("llm.local_server_fingerprint")
+local AuthPolicy     = require("ai.engine.local_servers.auth")
+local Json           = require("core.text.engine.json")
+local Discovery      = require("ai.engine.local_servers.discovery")
+local PortPolicy     = require("ai.engine.local_servers.ports_core")
+local Fingerprint    = require("ai.engine.local_servers.fingerprint")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.local_servers"
@@ -118,7 +118,7 @@ local function load_catalogue()
 		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
 	end
 	-- The family controls a local server carries, on top of request_fields
-	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	local dialect, dialect_reason = require("ai.engine.policy.thinking_off").parse_dialect(root.thinking_dialect)
 	if not dialect then
 		Logger.error(LOG, "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.", tostring(dialect_reason))
 		dialect = {}

@@ -26,7 +26,7 @@ assert.match(reader, /flags = \{ "-readonly", "-json" \}/);
 // dialect; the aggregate table is asserted on the catalogue the reader renders.
 assert.match(reader, /Queries\.render\(name, "cli_json"/);
 assert.match(
-	read('static/ergopti_plus/_shared/data/db/queries.sql'),
+	read('static/ergopti_plus/_shared/metrics/data/db/queries.sql'),
 	/FROM agg_app_day\{\{where\}\}/
 );
 // The reader reaches its nine n-gram tables through a code-to-table map now,

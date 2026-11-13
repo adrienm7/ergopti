@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Owns the assertions on the raw structural admission of the Debug,
  * Configuration, Metrics and About parents. The admission body lives once in
- * _shared/lua/menu/frames/parent_source.lua; each native driver keeps only its
+ * _shared/menu/engine/frames/parent_source.lua; each native driver keeps only its
  * root-level import and three delegating ports. The menu gates call this
  * module with their own physical-owner readers, so every mutation they used to
  * apply to a driver-local helper is now applied to the shared module text, and
@@ -33,10 +33,17 @@ const path = require('node:path');
 
 const SHARED_PATH = path.resolve(
 	__dirname,
-	'../..',
-	'static/ergopti_plus/_shared/lua/menu/frames/parent_source.lua'
+	'..',
+	'..',
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'menu',
+	'engine',
+	'frames',
+	'parent_source.lua'
 );
-const IMPORT = 'local ParentSource = require("menu.frames.parent_source")';
+const IMPORT = 'local ParentSource = require("menu.engine.frames.parent_source")';
 
 /** The physical SECTIONS line of each section. */
 const SECTION_LINES = {

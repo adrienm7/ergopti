@@ -19,7 +19,7 @@ local function with_owner(body, options)
 	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
 		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
-		"adapters.shell_runner", "infra.i18n", "window_titles", "modules.llm.runtime_factory" }
+		"adapters.shell_runner", "infra.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
@@ -114,7 +114,7 @@ local function with_owner(body, options)
 			end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["window_titles"] = { compose = function(value) return value end }
+		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
 		local Hook = helpers.load_module("adapters.keyboard_hook")
 		package.loaded["ui.llm_enable_refusal"] = nil
 		return Hook
@@ -164,7 +164,7 @@ end
 --- Runs the real repair, engine, profiles, probe and chat graph over owned OS ports.
 --- @param body function Receives actual producers and the retained service capability.
 local function with_managed_responses(body)
-	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "llm.runtime_repair",
+	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "ai.engine.local_servers.runtime_repair",
 		"modules.llm.model_inventory", "infra.managed_http_deadline" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local popen = io.popen
@@ -173,7 +173,7 @@ local function with_managed_responses(body)
 			require("tests.support.modules.llm.runtime.inventory_fixture").install(world)
 			local engine = world.load_engine()
 			local profiles = require("modules.llm.profiles")
-			local Repair = require("llm.runtime_repair")
+			local Repair = require("ai.engine.local_servers.runtime_repair")
 			world.responses, world.posts, world.observations = {}, {}, 0
 			world.runtime_valid, world.service_current = true, true
 			local engine_port, proof, app_source, app_epoch

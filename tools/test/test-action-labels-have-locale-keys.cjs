@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const ACTIONS = path.join(SP, 'macos', 'modules', 'gestures', 'actions.lua');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const src = fs.readFileSync(ACTIONS, 'utf8');
 const sg = [...src.matchAll(/\bsg\(\s*"([\w.]+)"/g)].map((m) => m[1]);

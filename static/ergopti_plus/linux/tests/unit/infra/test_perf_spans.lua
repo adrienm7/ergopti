@@ -19,9 +19,9 @@ local helpers = require("tests.support.logger_fixture").helpers({
 --- @param level number Logger minimum level.
 --- @return table perf, table lines
 local function fixture(level)
-	package.loaded["logger"] = nil
-	package.loaded["logger.shim"] = nil
-	local logger = require("logger")
+	package.loaded["core.logger.engine"] = nil
+	package.loaded["core.logger.engine.shim"] = nil
+	local logger = require("core.logger.engine")
 	local lines = {}
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(level)
@@ -126,9 +126,9 @@ helpers.describe("timing spans: the boot's load phase", function()
 	end)
 
 	helpers.it("names the load phase in the boot summary", function()
-		package.loaded["logger"] = nil
-		package.loaded["logger.shim"] = nil
-		local logger = require("logger")
+		package.loaded["core.logger.engine"] = nil
+		package.loaded["core.logger.engine.shim"] = nil
+		local logger = require("core.logger.engine")
 		local lines = {}
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
 		logger.set_level(20)

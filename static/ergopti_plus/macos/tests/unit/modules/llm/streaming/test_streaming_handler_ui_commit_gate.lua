@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Scope = require("tests.support.streaming_ui_scope")
-local SharedParser = require("llm.parser")
+local SharedParser = require("ai.engine.api.parser_core")
 
 local NIL_RESULT = {}
 

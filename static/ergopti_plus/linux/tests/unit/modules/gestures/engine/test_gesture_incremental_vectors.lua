@@ -4,7 +4,7 @@
 --- MODULE: Incremental Step Vectors (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/gestures/incremental_steps.json, which the
---- macOS and Windows suites replay too, through _shared/lua/gestures/incremental,
+--- macOS and Windows suites replay too, through _shared/gestures/incremental,
 --- the step rule modules/gestures/incremental_tracker.lua counts with.
 ---
 --- ROOT CAUSE ENCODED:
@@ -13,9 +13,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-require("test.incremental_steps_contract")(helpers, json, helpers.driver_root() .. "/../_shared")
+require("tests.lua.incremental_steps_contract")(helpers, json, helpers.driver_root() .. "/../_shared")
 
 helpers.describe("incremental swipes: the Linux reversal floor", function()
 	helpers.it("is the corpus floor (incremental-step-vectors)", function()

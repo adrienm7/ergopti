@@ -4,11 +4,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const ROOT = path.resolve(__dirname, '../..');
-const SOURCE = 'static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json';
+const SOURCE = 'static/ergopti_plus/_shared/core/network/data/native_http_failure_stages.json';
 const OUTPUTS = {
 	swift: 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift',
 	python: 'static/ergopti_plus/macos/platform/network/native_http.py',
-	go: 'static/ergopti_plus/_shared/go/native_http/transport.go'
+	go: 'static/ergopti_plus/_shared/core/network/native/go/native_http/transport.go'
 };
 const MARKER = 'GENERATED NATIVE HTTP FAILURE STAGES';
 

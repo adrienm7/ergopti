@@ -11,7 +11,7 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
--- Inject the _shared/lua root into package.path so that infra/ shims for
+-- Inject the _shared root into package.path so that infra/ shims for
 -- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
 local logger_shared_root
@@ -26,7 +26,7 @@ do
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
 	local _ergopti_plus = _hs_root:match("^(.*)/[^/]+$") or _hs_root
 	logger_shared_root = _ergopti_plus .. "/_shared"
-	local _shared       = logger_shared_root .. "/lua"
+	local _shared       = logger_shared_root .. ""
 	if not package.path:find(_shared, 1, true) then
 		package.path = _shared .. "/?.lua;" .. _shared .. "/?/init.lua;" .. package.path
 	end
@@ -207,7 +207,7 @@ Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
 -- Restore persisted log level from settings, or default to DEBUG
 do
-	local saved_level = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
+	local saved_level = Storage.get(require("settings.engine.keys").LEAF.LOG_LEVEL)
 	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(saved_level) == "string" and valid[saved_level] then
 		Logger.set_level(saved_level)
@@ -377,7 +377,7 @@ Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 local script_path = debug.getinfo(1, "S").source
 if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 
-local base_dir = require("native_path").directory_prefix(script_path) or "./"
+local base_dir = require("core.fs.engine.native_path").directory_prefix(script_path) or "./"
 
 -- Boot initialises the RESOLVER, not the path editor: every consumer below
 -- resolves through it, and none of them draws a UI. The editor's reload
@@ -405,7 +405,7 @@ local ManifestReader     = require("infra.manifest_reader")
 -- trap as project-lua-closure-before-local-nil-global.
 locale_mod.set_trigger_provider(function()
 	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+		or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
@@ -537,7 +537,7 @@ local TOML_CACHE_DIR = nil
 do
 	local home = os.getenv("HOME")
 	if type(home) == "string" and home ~= "" then
-		TOML_CACHE_DIR = home .. "/" .. require("app_dirs").macos.cache_relative .. "/toml_hotstrings"
+		TOML_CACHE_DIR = home .. "/" .. require("core.fs.engine.app_dirs").macos.cache_relative .. "/toml_hotstrings"
 	end
 end
 do
@@ -1351,12 +1351,12 @@ Boot.stage("Config schema migration")
 -- migrated file, and a file the wizard creates carries this build's version. A
 -- file this build cannot version (a newer schema, a failed migration) stays
 -- untouched and every write to it is refused for the session
--- (_shared/lua/config_migrate.lua, docs/adr/009-config-versioning.md).
+-- (_shared/settings/engine/migration/migrate.lua, docs/adr/009-config-versioning.md).
 do
-	local ConfigMigrate = require("config_migrate")
-	require("toml_codec.writer").set_sparse_defaults(
+	local ConfigMigrate = require("settings.engine.migration.migrate")
+	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
 		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
-	require("toml_codec.writer").set_case_twin_reporter(function(message)
+	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message)
 		local sent, notice_error = require("infra.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
 		if not sent then error(tostring(notice_error)) end
 	end)
@@ -1364,14 +1364,14 @@ do
 	local context, context_error
 	if catalogue_ok then
 		context, context_error = ConfigMigrate.load_context(
-			require("infra.paths").shared("modules/actions/modifier_chords.json"), action_catalogue, file_system)
+			require("infra.paths").shared("shortcuts/data/actions/modifier_chords.json"), action_catalogue, file_system)
 	else
 		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
 	end
 	-- The tap-hold rows of the manifest live in config.toml since its v22 step,
 	-- which moves them out of tap_hold.toml. An old config_karabiner.toml is
 	-- carried over into tap_hold.toml first, so a 1.0.9 configuration moves in
-	-- this one boot (_shared/tap_hold/migrations.toml [legacy_imports.hs]).
+	-- this one boot (_shared/tap_hold/data/migrations.toml [legacy_imports.hs]).
 	local tap_hold_path = config_paths.get("TapHoldConfigPath")
 	-- platform/remap/config.lua reads the rows from the config.toml beside it.
 	local TapHoldFile = require("platform.remap.tap_hold_file")
@@ -1391,7 +1391,7 @@ do
 		driver        = "hs",
 		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = file_system,
-		companions    = { [require("tap_hold.shared_file").FILE_NAME] = tap_hold_path },
+		companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] = tap_hold_path },
 	})
 	-- A file saved by a newer build stays untouched and read-only for the
 	-- session: say so, or every change the user makes silently fails to stick.
@@ -1637,7 +1637,7 @@ config_overrides.apply(config_paths.get("ConfigTomlPath"))
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
+local boot_llm_enabled = config_overrides.read_native_value(require("settings.engine.keys").KEY.LLM_ENABLED)
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1677,7 +1677,7 @@ end
 -- seconds instead of a 45-90 s cold reload. Killing it unconditionally (the old
 -- behaviour) is exactly what made every boot/reload pay a cold start.
 --
--- The MLX port is the single source of truth from api_mlx (_shared/modules/llm/mlx_server.json).
+-- The MLX port is the single source of truth from api_mlx (_shared/ai/data/mlx_server.json).
 -- Decision is spare-all-or-nuke-all: under SO_REUSEPORT the listening PID is
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
 -- never pick individual PIDs.
@@ -1724,7 +1724,7 @@ Boot.stage("LLM backend bootstrap")
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
+	local lvl = Storage.get(require("settings.engine.keys").LEAF.LOG_LEVEL)
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
@@ -1781,7 +1781,7 @@ Boot.mark("LLM backend bootstrap")
 Boot.stage("TOML discovery + ordering")
 
 local configured_hotstrings_dir = config_paths.get("HotstringsDirPath")
-local bundled_hotstrings_dir    = base_dir .. "../_shared/modules/hotstrings/"
+local bundled_hotstrings_dir    = base_dir .. "../_shared/hotstrings/data/catalogue/"
 local hotstrings_dir            = configured_hotstrings_dir
 
 local HOTSTRINGS_EXCLUDED_STEMS = {
@@ -1796,7 +1796,7 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 -- applies too. This scan kept its own copy that skipped only "_"-prefixed files,
 -- so defaults.toml (the resolver's fallback delays and colours) loaded as an
 -- empty group and the common hotstrings menu showed « defaults (0) ».
-local HotstringCatalogueFiles = require("hotstrings.catalogue_files")
+local HotstringCatalogueFiles = require("hotstrings.engine.catalogue.files")
 
 --- Stem of a hotstring category file, or nil for anything else in the directory.
 --- @param fname string File name.
@@ -1834,7 +1834,7 @@ end
 -- Language packs declared by the shared index ([languages]); each category file
 -- lives at <language>/<stem>.toml and loads as the group "<language>_<stem>".
 -- Declared here, above the resolver closure below that reads them.
-local HotstringLanguages = require("hotstrings.languages")
+local HotstringLanguages = require("hotstrings.engine.languages")
 local language_packs  = {}
 
 --- Absolute path of one language pack's category file. The configured directory
@@ -1877,11 +1877,11 @@ ExtensionPacks.discover()
 do
 	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 	local override_path = config_paths.get_config_dir()
-	override_path = require("native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
+	override_path = require("core.fs.engine.native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
 	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
 		current_override_path = function()
-			return require("native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
+			return require("core.fs.engine.native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
 		end,
 		delay_transaction = keymap.with_hotstring_delays,
 		-- The base expansion delay the overrides are offsets of is the keymap's,
@@ -1903,7 +1903,7 @@ do
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
 			end
-			local personal_components = require("hotstrings.personal_files").components(category)
+			local personal_components = require("hotstrings.engine.catalogue.personal_files").components(category)
 			if personal_components then
 				return (config_paths.get("PersonalHotstringsDir"):gsub("/+$", "")
 					.. "/" .. table.concat(personal_components, "/"))
@@ -1962,7 +1962,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+local magic_key = ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.
@@ -1987,7 +1987,7 @@ do
 	-- Use the shared toml_codec instead of a hand-rolled parser so _index.toml
 	-- gains full TOML support (multi-line strings, nested inline tables, etc.)
 	-- without maintaining a second parser that can drift from the codec.
-	local TomlCodec = require("toml_codec.codec")
+	local TomlCodec = require("core.text.engine.toml_codec.codec")
 
 	local fh = io.open(hotstrings_dir .. "_index.toml", "r")
 	if fh then
@@ -2215,7 +2215,7 @@ end
 -- pack or a dynamic group is never judged: its absence may be temporary.
 if bundled_complete then
 	local PersonalHotstrings = require("infra.personal_hotstrings")
-	local Extensions = require("hotstrings.extensions")
+	local Extensions = require("hotstrings.engine.extensions")
 	local published = require("infra.hotstring_choice_catalogue").publish(function(id)
 		if PersonalHotstrings.is_personal_group(id) or Extensions.parse_category_key(id) ~= nil
 			or id == "dynamichotstrings" then
@@ -2309,7 +2309,7 @@ end
 -- the one the next deploy writes. An unreadable file refuses the deploy instead
 -- of guessing a product.
 do
-	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
+	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
 	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
 		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
 		local flat, _, reason, key_path = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
@@ -2407,7 +2407,7 @@ ui_restore.restore()
 local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
-	personal_hotstrings_dir = require("native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),
+	personal_hotstrings_dir = require("core.fs.engine.native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),
 	personal_info_path       = personal_info_toml_path,
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
@@ -2427,10 +2427,10 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	-- A developer app also reloads on shared Lua edits; a packaged tree never changes.
-	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil,
+	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "") or nil,
 	git_roots               = {
 		base_dir,
-		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
+		require("core.fs.engine.native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
 	},
 })
 if file_watchers_committed ~= true then
@@ -2497,7 +2497,7 @@ require("infra.updater_boot_ready").report("boot complete")
 if _reload_started_epoch_ms then
 	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms
 	Logger.info(LOG, "Reload completed in %.0f ms (reload call to boot complete).", reload_ms)
-	require("perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
+	require("core.logger.engine.perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
 		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
 end
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
@@ -2522,7 +2522,7 @@ require("infra.driver_control").start({
 -- for a folder of this user holding the declaration); otherwise a packaged
 -- runtime never even loads the module.
 local field_run_root = require("infra.dev_source").is_active() and require("infra.dev_source").root()
-	or os.getenv(require("identifiers").field_report.environment)
+	or os.getenv(require("core.text.engine.identifiers").field_report.environment)
 if type(field_run_root) == "string" and field_run_root ~= "" then
 	require("infra.field_run").start({
 		root = field_run_root,

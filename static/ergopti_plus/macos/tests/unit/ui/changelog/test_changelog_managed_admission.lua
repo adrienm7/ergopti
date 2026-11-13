@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.changelog_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local TAG, BODY = "v0.0.0-dev.139", '[{"tag_name":"v0.0.0-dev.139"}]'
 
 local function listed(body)

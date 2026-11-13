@@ -52,8 +52,8 @@ end
 
 local corpus, corpus_err = read_corpus()
 
--- Load the shared TOML codec (lives in _shared/lua/toml_codec/).
-local codec_ok, codec = pcall(require, "toml_codec.codec")
+-- Load the shared TOML codec (lives in _shared/core/text/engine/toml_codec/).
+local codec_ok, codec = pcall(require, "core.text.engine.toml_codec.codec")
 
 
 
@@ -87,7 +87,7 @@ helpers.describe("toml_fuzz corpus — integrity", function()
 
 	helpers.it("toml_codec is available on the Lua path", function()
 		helpers.assert_true(codec_ok,
-			"toml_codec.codec not found — check package.path in tests/run.lua")
+			"core.text.engine.toml_codec.codec not found — check package.path in tests/run.lua")
 	end)
 end)
 

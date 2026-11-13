@@ -8,8 +8,8 @@
 
 local root, selected = assert(arg[1]), assert(arg[2])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Shell = require("adapters.shell_runner")
 local Display = require("infra.display_server")

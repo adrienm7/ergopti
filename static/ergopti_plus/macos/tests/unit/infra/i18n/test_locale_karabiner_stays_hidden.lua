@@ -81,7 +81,7 @@ end
 --- Loads locale codes from the same canonical order consumed by the product.
 --- @return table codes Ordered locale identifiers; empty means unreadable/invalid.
 local function read_locale_codes()
-	local raw = read(helpers.shared("data/locale_order.json"))
+	local raw = read(helpers.shared("core/i18n/data/locale_order.json"))
 	local order = raw and raw:match('"order"%s*:%s*%[(.-)%]')
 	if not order then return {} end
 	local codes = {}
@@ -101,7 +101,7 @@ local function tray_keys()
 	for key in src:gmatch('i18n%.get%(%s*"([^"]+)"') do seen[key] = true end
 	for key in src:gmatch('i18n%.section%(%s*"([^"]+)"') do seen[key] = true end
 	-- Keys the shared manifest declares for rows this platform renders.
-	local manifest = hs.json.decode(read(helpers.shared("modules/menu/menu_manifest.json")))
+	local manifest = hs.json.decode(read(helpers.shared("menu/data/menu_manifest.json")))
 	for _, rows in pairs(manifest) do
 		if type(rows) == "table" and rows[1] ~= nil then
 			for _, row in ipairs(rows) do
@@ -150,7 +150,7 @@ helpers.describe("no macOS tray text names Karabiner, in any locale", function()
 
 	for _, code in ipairs(LOCALE_CODES) do
 		helpers.it(code .. ".json shows no Karabiner in the macOS tray", function()
-			local locale = hs.json.decode(read(helpers.shared("data/locales/" .. code .. ".json")))
+			local locale = hs.json.decode(read(helpers.shared("core/i18n/data/locales/" .. code .. ".json")))
 			helpers.assert_true(type(locale) == "table", code .. ".json must decode")
 			for _, key in ipairs(tray_keys()) do
 				local value = locale[key]

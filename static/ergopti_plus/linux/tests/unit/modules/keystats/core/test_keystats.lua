@@ -259,7 +259,7 @@ helpers.describe("keystats", function()
       helpers.assert_eq(data.wpm, 0, "an expired typing burst must not remain a live speed")
       helpers.assert_eq(data.keystrokes, 2)
       helpers.assert_eq(data.duration_ms, 200, "pruning the rolling window preserves session duration")
-      local decoded = assert(require("json").decode(keystats.export_json()))
+      local decoded = assert(require("core.text.engine.json").decode(keystats.export_json()))
       helpers.assert_eq(decoded.wpm, 0)
       helpers.assert_eq(keystats.export_session().duration_ms, 200, "later exports keep the same session duration")
       keystats.on_keydown("c", now - 200, "test-app")
@@ -272,7 +272,7 @@ helpers.describe("keystats", function()
       keystats.record_physical_key("editor", 1, 100)
       keystats.record_physical_key("editor", 30, 200)
       local json = keystats.export_json()
-      local decoded = assert(require("json").decode(json))
+      local decoded = assert(require("core.text.engine.json").decode(json))
       helpers.assert_eq(decoded.apps.editor.physical_scancodes["1"], 1)
       helpers.assert_eq(decoded.apps.editor.physical_scancodes["30"], 1)
       helpers.assert_true(json:find('"physical_scancodes":{', 1, true) ~= nil)
@@ -285,7 +285,7 @@ helpers.describe("keystats", function()
       keystats.record_physical_key("dense", 1, 200)
       keystats.record_physical_key("dense", 2, 300)
       local json = keystats.export_json()
-      local decoded = assert(require("json").decode(json))
+      local decoded = assert(require("core.text.engine.json").decode(json))
       helpers.assert_true(json:find('"physical_scancodes":{}', 1, true) ~= nil)
       helpers.assert_eq(decoded.apps.dense.physical_scancodes["1"], 1)
       helpers.assert_eq(decoded.apps.dense.physical_scancodes["2"], 1)
@@ -767,7 +767,7 @@ helpers.describe("physical-backspace-corrections", function()
       kl.flush()
       local row = captured[1] and captured[1][1]
       helpers.assert_true(row ~= nil, "the typed events must reach the writer")
-      local events = require("json").decode(row.events_json)
+      local events = require("core.text.engine.json").decode(row.events_json)
       helpers.assert_eq(#events, 3)
       helpers.assert_eq(events[2][1], "[BS]")
       helpers.assert_eq(events[2][2], 100, "the correction keeps its own inter-key delay")
@@ -873,7 +873,7 @@ helpers.describe("linux-cross-flush-walk", function()
       helpers.assert_nil(words.hel)
       helpers.assert_nil(words.lo, "the refused snapshot's context was never adopted")
       helpers.assert_eq(bigrams.ll, 1, "the pair across the cut is counted once")
-      helpers.assert_eq(require("json").decode(typing[2].events_json)[1][2], 100,
+      helpers.assert_eq(require("core.text.engine.json").decode(typing[2].events_json)[1][2], 100,
         "the first key of a flush keeps its delay after the previous flush's last key")
       now = last + 300001
       helpers.assert_true(kl.flush(), "the settled session commits")
@@ -1081,7 +1081,7 @@ local function with_replayed_hotstring(options, callback)
       end
       return true
     end })
-    local engine = require("hotstring_engine").new()
+    local engine = require("hotstrings.engine.matcher").new()
     assert(engine:load_mappings({ { trigger = "adn", replacement = "ADN", is_word = true,
       auto_expand = options.auto == true, is_private = options.private == true } }))
     local destination = { current = function() return true end, cached = function() return true end }
@@ -1115,7 +1115,7 @@ local function with_replayed_hotstring(options, callback)
     assert(collector.flush(), "the real collector must commit its actual journal and derived walk")
     world.events = {}
     for _, row in ipairs(world.typing) do
-      for _, event in ipairs(require("json").decode(row.events_json)) do world.events[#world.events + 1] = event end
+      for _, event in ipairs(require("core.text.engine.json").decode(row.events_json)) do world.events[#world.events + 1] = event end
     end
     world.collector = collector
     callback(world)
@@ -1191,7 +1191,7 @@ helpers.describe("hotstring journal retains the replayed terminator", function()
       with_replayed_hotstring({ tail = " ", consumed = true }, function(world)
         world.collector.record_hotstring("tail-editor", "tag", "ADN", 20000, "dynamic", 3, false, tail or nil)
         helpers.assert_true(world.collector.flush())
-        local events = require("json").decode(world.typing[#world.typing].events_json)
+        local events = require("core.text.engine.json").decode(world.typing[#world.typing].events_json)
         helpers.assert_eq(#events, tail and 7 or 6)
         if tail then
           helpers.assert_eq(events[#events][1], tail)

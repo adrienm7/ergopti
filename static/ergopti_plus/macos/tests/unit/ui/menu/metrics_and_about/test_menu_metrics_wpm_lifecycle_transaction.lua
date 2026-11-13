@@ -50,10 +50,10 @@ local function load_menu(options)
 	package.loaded["infra.i18n"] = nil
 	local renderer_i18n = require("infra.i18n")
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function()
-			return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+			return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 		end,
 		json_decode = require("adapters.json_codec").decode,
 		i18n = renderer_i18n,

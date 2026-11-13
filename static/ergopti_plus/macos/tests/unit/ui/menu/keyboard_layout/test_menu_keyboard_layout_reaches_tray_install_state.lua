@@ -27,8 +27,8 @@ local with_switch_frame = Fixture.with_switch_frame
 
 helpers.describe("Layout owns install-state choices, bundle truth and every frozen original caption", function()
 	helpers.it("reports failed installs from the actual menu action (layout-install-visible-failure)", function()
-		local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
-		local labels = assert(require("json").decode(assert(file:read("*a")))); assert(file:close())
+		local file = assert(io.open(require("infra.paths").shared("core/i18n/data/locales/en.json"), "rb"))
+		local labels = assert(require("core.text.engine.json").decode(assert(file:read("*a")))); assert(file:close())
 		helpers.assert_true(labels["menu.layout.install_system_unavailable"]:find("verified safely", 1, true) ~= nil)
 		helpers.assert_true(labels["menu.layout.install_system_unavailable"]:find("old system copy", 1, true) ~= nil)
 		for _, case in ipairs({ { "launcher_unavailable", "menu.layout.install_launcher_required" },
@@ -56,8 +56,8 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 	end)
 	for _, state in ipairs({"fresh", "older", "current"}) do
 		helpers.it("retains system/user/status order for " .. state .. " actual native installation state", function()
-			local Json, Paths = require("json"), require("infra.paths")
-			local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+			local Json, Paths = require("core.text.engine.json"), require("infra.paths")
+			local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 			local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
 			with_switch_frame(function(build, fixture)
 				fixture.latest = "Ergopti_v2.2.2.bundle"
@@ -85,8 +85,8 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 	end
 	for _, state in ipairs({"all_active", "legacy_installed", "legacy_missing", "variants", "absent"}) do
 		helpers.it("publishes only the genuine " .. state .. " bundle status family", function()
-			local Json, Paths = require("json"), require("infra.paths")
-			local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+			local Json, Paths = require("core.text.engine.json"), require("infra.paths")
+			local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 			local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
 			with_switch_frame(function(build, fixture)
 				fixture.latest = "Ergopti_v2.2.2.bundle"
@@ -117,7 +117,7 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 	end
 	for _, language in ipairs({"da", "de", "en", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr", "cs", "ar", "he", "hi", "uk", "ru", "zh", "ja", "ko"}) do
 		helpers.it("retains the independently frozen complete original caption family in " .. language, function()
-			local Json, Paths = require("json"), require("infra.paths")
+			local Json, Paths = require("core.text.engine.json"), require("infra.paths")
 			local function load(relative)
 				local file = assert(io.open(Paths.shared(relative), "rb"))
 				local value = assert(Json.decode(assert(file:read("*a")))); assert(file:close()); return value
@@ -125,7 +125,7 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 			local expected = load("tests/corpus/menus/layout_complete_captions.json")[language]
 			with_switch_frame(function(build, fixture, binding)
 				fixture.latest = "Ergopti_v2.2.2.bundle"
-				local reason = load("data/locales/" .. language .. ".json")["menu.layout.install_system_reason"]
+				local reason = load("core/i18n/data/locales/" .. language .. ".json")["menu.layout.install_system_reason"]
 				local found = false
 				for _, row in ipairs(assert(build())) do
 					if type(row.title) == "string" and row.title:find(reason, 1, true) then found = true end
@@ -149,7 +149,7 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 					helpers.assert_eq(#rows, 1)
 					helpers.assert_eq(rows[1].label, expected[case[2]])
 				end
-			end, load("data/locales/" .. language .. ".json"))
+			end, load("core/i18n/data/locales/" .. language .. ".json"))
 		end)
 	end
 end)
@@ -167,8 +167,8 @@ helpers.describe("Layout native choices retain data identity and declared state"
 		end)
 	end)
 	helpers.it("retains added and available variants in actual installed-bundle order", function()
-		local Json, Paths = require("json"), require("infra.paths")
-		local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+		local Json, Paths = require("core.text.engine.json"), require("infra.paths")
+		local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 		local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
 		with_switch_frame(function(build, fixture)
 			fixture.latest = "Ergopti_v2.2.2.bundle"
@@ -191,8 +191,8 @@ end)
 
 helpers.describe("Layout installation state remains native per scope", function()
 	helpers.it("does not borrow the user installation when the system scope is absent", function()
-		local Json, Paths = require("json"), require("infra.paths")
-		local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+		local Json, Paths = require("core.text.engine.json"), require("infra.paths")
+		local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 		local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
 		with_switch_frame(function(build, fixture)
 			fixture.latest = "Ergopti_v2.2.2.bundle"

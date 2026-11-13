@@ -238,7 +238,7 @@ passed++;
 		/\*\*musl\*\*[\s\S]{0,200}cannot run programs built for\s+glibc/.test(readme),
 		'the README says musl hosts cannot run it'
 	);
-	const english = JSON.parse(read('static/ergopti_plus/_shared/data/locales/en.json'));
+	const english = JSON.parse(read('static/ergopti_plus/_shared/core/i18n/data/locales/en.json'));
 	assert.match(english['startup.linux_appimage_musl_body'], /musl/i);
 	assert.match(english['startup.linux_appimage_musl_body'], /cannot|can't|not/i);
 }

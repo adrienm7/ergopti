@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local ACCESSIBILITY_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 local BUNDLE_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
@@ -28,7 +28,7 @@ local MODULES = {
 --- @param code string Locale code.
 --- @return table strings
 local function locale_strings(code)
-	local handle = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "rb"))
+	local handle = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded

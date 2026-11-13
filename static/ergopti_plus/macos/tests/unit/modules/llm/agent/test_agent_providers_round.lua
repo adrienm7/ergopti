@@ -26,11 +26,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local World = require("tests.support.agent_world")
 
-local Agent = require("llm.agent")
-local Formats = require("llm.remote_formats")
+local Agent = require("ai.engine.agent.agent")
+local Formats = require("ai.engine.api.remote_formats")
 
 local CONFIG = World.CONFIG
 local SENTENCE = "Rappelle-moi d'appeler Paul demain à 9h"
@@ -38,7 +38,7 @@ local REMINDER = 'ACTIONS: [{"type":"reminder","title":"Appeler Paul","due":"202
 local STATE = "App: Notes\nText: " .. SENTENCE
 
 local CATALOGUE = (function()
-	local fh = assert(io.open(helpers.shared("modules/llm/api_providers.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/api_providers.json"), "r"))
 	local raw = fh:read("*a")
 	fh:close()
 	return assert(json.decode(raw))

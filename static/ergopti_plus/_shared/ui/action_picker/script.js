@@ -489,7 +489,7 @@ const EDITABLE_KINDS = new Set([
 ]);
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
-// Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
+// Host-supplied: the decoded _shared/shortcuts/data/actions/send_keys.json, the
 // host's capabilities (the executable path syntax of a program parameter,
 // "windows" or "posix", and whether Command is the primary modifier), and the
 // localized strings of the editor ({ save, back, captureKey, captureShortcut,

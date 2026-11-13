@@ -1,5 +1,5 @@
 {
-	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector gives the floor in milliseconds (floor_ms, the one value the user sets, which the floor port answers) and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. There is one behaviour for every driver, written in shared_behaviour; drivers records who replays this file. A port in another language replays it unchanged.",
+	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/ai/engine/request_plan/debounce.lua by the macOS and Linux runners. A vector gives the floor in milliseconds (floor_ms, the one value the user sets, which the floor port answers) and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. There is one behaviour for every driver, written in shared_behaviour; drivers records who replays this file. A port in another language replays it unchanged.",
 	"shared_behaviour": {
 		"never": "A negative debounce (the stored value -1) turns the automatic trigger off; an explicit trigger, an override request and live mode still arm.",
 		"explicit_requests": "An explicit request (shortcut, typed trigger, prompt action) is never held by the rate floor.",
@@ -9,8 +9,8 @@
 		"mashed_shortcuts": "Pressing an explicit shortcut again while its previous request is in flight supersedes that request (cancels it) and starts the new one at once; two requests of one shortcut are never concurrent."
 	},
 	"drivers": {
-		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"macos": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
 		"windows": "Replays every vector (windows/tests/unit/modules/llm/prediction/test_llm_request_plan.ahk)."
 	},
 	"vectors": [

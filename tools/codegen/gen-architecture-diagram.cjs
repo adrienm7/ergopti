@@ -38,7 +38,7 @@ const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 // hardcoded constants here (plus a ROOT that resolved to tools/ rather than the
 // repo root) pointed at nothing, so the diagram silently regenerated empty.
 const PORTS_DIR = shared('core', 'ports');
-const DOMAIN_DIR = shared('core', 'domain');
+const DOMAIN_DIR = shared('core', 'text', 'data', 'domain');
 const OUT_FILE = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'docs', 'architecture.md');
 const DRIVERS_ROOT = path.join(REPO_ROOT, 'static', 'ergopti_plus');
 

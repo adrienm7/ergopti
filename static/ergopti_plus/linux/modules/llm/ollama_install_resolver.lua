@@ -18,8 +18,8 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("llm.ollama_install_policy")
-local TableUtil = require("table_util")
+local Policy = require("ai.engine.ollama.install_policy")
+local TableUtil = require("core.text.engine.table_util")
 local available, native = pcall(require, "luv")
 if not available then native = nil end
 local DIRECTORY_MODE = 448
@@ -69,11 +69,11 @@ local copy = TableUtil.shallow_copy
 --- @return table|nil catalogue
 --- @return string|nil reason
 local function catalogue()
-	local path = require("infra.paths").shared("modules/llm/ollama_release.json")
+	local path = require("infra.paths").shared("ai/data/ollama_release.json")
 	if not path then return nil, "ollama_release_unreadable" end
-	local data, status = require("toml_codec.writer").read_classified(path)
+	local data, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	if status ~= "ok" or type(data) ~= "string" then return nil, "ollama_release_unreadable" end
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local decoded = Json.decode_lossless(data)
 	if type(decoded) ~= "table" or Json.is_array(decoded) then return nil, "ollama_release_unreadable" end
 	return decoded
@@ -118,7 +118,7 @@ function M.new(options)
 	end
 	local app_dirs = options.app_dirs
 	if app_dirs == nil then
-		local loaded, value = pcall(require, "app_dirs")
+		local loaded, value = pcall(require, "core.fs.engine.app_dirs")
 		if not loaded then return nil, "application_directory_unreadable" end
 		app_dirs = value
 	end

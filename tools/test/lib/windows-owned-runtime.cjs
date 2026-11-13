@@ -324,7 +324,7 @@ const quote = (value) => `"${value}"`;
 
 /** The arguments ollama_runtime_owner.ahk passes the launcher. */
 function launcherArguments(profile, { port, runtimeTicket, relayPath, relaySha256, timings }) {
-	const shared = path.join(SHARED, 'modules');
+	const shared = path.join(SHARED, '.');
 	const pinned = (name, file) => [`-${name}Path`, file, `-${name}Sha256`, sha256File(file)];
 	const row = [
 		...pinned('ManagedHelper', path.join(LLM, 'ollama_managed_files.ps1')),
@@ -349,15 +349,21 @@ function launcherArguments(profile, { port, runtimeTicket, relayPath, relaySha25
 		String(Math.floor(os.uptime() * 1000) - 2000),
 		'-DeadlineMs',
 		String(timings.deadlineMs),
-		...pinned('ServeEnvironment', path.join(shared, 'llm', 'managed_ollama_environment.json')),
+		...pinned(
+			'ServeEnvironment',
+			path.join(shared, 'ai', 'data', 'managed_ollama_environment.json')
+		),
 		'-VendorDirectory',
 		profile.vendorDirectory,
 		'-VendorSha256',
 		profile.vendorSha256,
-		...pinned('ProxyPolicy', path.join(shared, 'network', 'proxy_policy.json')),
-		...pinned('UpdaterDefaults', path.join(shared, 'updater', 'defaults.json')),
-		...pinned('RouteOrigins', path.join(shared, 'network', 'route_origins.json')),
-		...pinned('ProxyRelayContract', path.join(shared, 'network', 'proxy_auth_relay.json')),
+		...pinned('ProxyPolicy', path.join(shared, 'core', 'network', 'data', 'proxy_policy.json')),
+		...pinned('UpdaterDefaults', path.join(shared, 'updater', 'data', 'defaults.json')),
+		...pinned('RouteOrigins', path.join(shared, 'core', 'network', 'data', 'route_origins.json')),
+		...pinned(
+			'ProxyRelayContract',
+			path.join(shared, 'core', 'network', 'data', 'proxy_auth_relay.json')
+		),
 		'-ProxyRelayDialMs',
 		String(timings.dialMs),
 		'-ProxyRelayHandshakeMs',
@@ -430,14 +436,17 @@ async function waitForReceipt(run, timeoutMs) {
 
 /** Runs the real pull worker to its end against a ready launcher. */
 async function pull(profile, run, ready, model, { netOnly = null, environment = {} } = {}) {
-	const shared = path.join(SHARED, 'modules');
+	const shared = path.join(SHARED, '.');
 	const pinned = (name, file) => [`-${name}Path`, file, `-${name}Sha256`, sha256File(file)];
 	const hosted = startHosted(
 		profile,
 		powerShellCommandLine(path.join(LLM, 'ollama-model-pull.ps1'), [
 			...pinned('ManagedHelper', path.join(LLM, 'ollama_managed_files.ps1')),
 			...pinned('RuntimeLauncher', path.join(LLM, 'ollama-runtime-launch.ps1')),
-			...pinned('ServeEnvironment', path.join(shared, 'llm', 'managed_ollama_environment.json')),
+			...pinned(
+				'ServeEnvironment',
+				path.join(shared, 'ai', 'data', 'managed_ollama_environment.json')
+			),
 			'-ManagedRoot',
 			profile.managedRoot,
 			'-RootIdentity',

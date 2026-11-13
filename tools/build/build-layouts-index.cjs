@@ -12,7 +12,7 @@
  * 1. One layout = one <id>/<id>.keylayout. The .keylayout is the only source
  *    of a layout; nothing derived from it (xkb files, Windows tables) is
  *    stored here, so this index is the complete catalogue.
- * 2. The folder comes from _shared/modules/layouts/defaults.json, the file the
+ * 2. The folder comes from _shared/layouts/data/defaults.json, the file the
  *    drivers build their download URLs from, so the tool and the drivers
  *    cannot disagree about where the registry lives.
  * 3. Deterministic output: entries sorted by id, fixed key order, tab-indented
@@ -42,7 +42,7 @@ const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 // ================================
 
 const LAYOUT_DEFAULTS = JSON.parse(
-	fs.readFileSync(shared('modules', 'layouts', 'defaults.json'), 'utf8')
+	fs.readFileSync(shared('layouts', 'data', 'defaults.json'), 'utf8')
 );
 const REGISTRY_DIR = path.join(REPO_ROOT, ...LAYOUT_DEFAULTS.registry.folder.split('/'));
 const INDEX_PATH = path.join(REGISTRY_DIR, LAYOUT_DEFAULTS.registry.index_file);
@@ -89,7 +89,7 @@ const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb', 'extension_source
 const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
 
 // The rules the extension scanners apply to a manifest's historical hotstring
-// bindings and declared magic key (_shared/lua/hotstrings/extensions.lua and
+// bindings and declared magic key (_shared/hotstrings/engine/extensions.lua and
 // windows/infra/hotstrings/extension_packs.ahk). A published manifest that
 // breaks them would make every driver refuse its whole extension catalogue, so
 // the build refuses it first; all three replay the same shared vectors.
@@ -101,13 +101,13 @@ const FEATURE_SECTION_RE = /^hotstrings\.[a-z][a-z0-9_]*$/;
 const MAGIC_KEY_FIELDS = ['key'];
 const KEY_CODE_RE = /^[A-Z][A-Za-z0-9]*$/;
 const PHYSICAL_KEYS = JSON.parse(
-	fs.readFileSync(shared('data', 'keycodes', 'physical_keys.json'), 'utf8')
+	fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
 ).keys;
 // The keys a .keylayout defines, the table the Windows emulation and the Linux
 // converter resolve a layout's keys through: a declared magic key outside it
 // could never be turned into a scan code or an XKB key.
 const LAYOUT_KEY_CODES = new Set(
-	JSON.parse(fs.readFileSync(shared('modules', 'layouts', 'mac_keycodes.json'), 'utf8')).keys.map(
+	JSON.parse(fs.readFileSync(shared('layouts', 'data', 'mac_keycodes.json'), 'utf8')).keys.map(
 		(key) => key.code
 	)
 );

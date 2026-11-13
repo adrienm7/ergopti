@@ -100,7 +100,7 @@ global _PrefixVisibleFireDecisions := []
 
 ; Configuration constants.
 global _MIN_PREFIX_LEN := 2
-; Mirrors the shared cap _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS
+; Mirrors the shared cap _shared/hotstrings/engine/matcher/init.lua BUFFER_MAX_CHARS
 ; (256) so a long trigger matches identically on all three drivers — Windows was
 ; 64, which silently failed to match triggers of 65-256 chars that macOS/Linux
 ; matched. Pinned equal by tools/test/test-hotstring-buffer-cap-parity.cjs.

@@ -9,10 +9,10 @@
 --- only names its platform tag and its translation owners.
 --- ==============================================================================
 
-return require("native_presentation").receiver({
+return require("menu.engine.native_presentation_core").receiver({
 	platform = "linux",
 	name = "infra.native_presentation",
 	i18n = { name = "infra.i18n", module = require("infra.i18n") },
 	locale = { name = "infra.locale", module = require("infra.locale") },
-	core = { name = "locale.core", module = require("locale.core") },
+	core = { name = "core.i18n.engine.core", module = require("core.i18n.engine.core") },
 })

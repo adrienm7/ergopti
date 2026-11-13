@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads exact fixture bytes, including an absent quarantined source.
 --- @param path string
@@ -33,7 +33,7 @@ local function with_source(source, body)
 	Learning._reset_for_test({ path = path, scheduler = {
 		after = function() return { armed = true } end, cancel = function() return true end,
 	} })
-	local config = assert(Json.decode_lossless(assert(read(helpers.driver_root() .. "/../_shared/modules/llm/agent.json"))))
+	local config = assert(Json.decode_lossless(assert(read(helpers.driver_root() .. "/../_shared/ai/data/agent.json"))))
 	local ok, detail = xpcall(function() body(Learning, path, config) end, debug.traceback)
 	Learning._reset_for_test()
 	package.loaded["modules.llm.agent_learning"] = previous
@@ -179,7 +179,7 @@ helpers.describe("agent learning source admission", function()
 		with_source(source, function(Learning, path, config)
 			local okay, learned = pcall(Learning.record, config, "fresh", "calendar", true)
 			helpers.assert_true(okay, "all-infinite LRU entries cannot make the oldest key nil")
-			helpers.assert_eq(learned, require("llm.agent").learn(config, config.system1.threshold, true))
+			helpers.assert_eq(learned, require("ai.engine.agent.agent").learn(config, config.system1.threshold, true))
 			helpers.assert_eq(read(path .. ".corrupt"), source)
 			helpers.assert_true(Learning.flush())
 			local saved = assert(Json.decode_lossless(read(path)))
@@ -294,7 +294,7 @@ helpers.describe("agent learning quarantine ownership", function()
 				helpers.assert_nil(read(path .. ".corrupt"))
 				fault = false
 				local learned = Learning.record(config, "Mail", "calendar", true)
-				helpers.assert_eq(learned, require("llm.agent").learn(config, 0.2, true))
+				helpers.assert_eq(learned, require("ai.engine.agent.agent").learn(config, 0.2, true))
 				helpers.assert_true(Learning.flush())
 				local saved = assert(Json.decode_lossless(read(path)))
 				helpers.assert_eq(saved.apps.Mail.used, 8)

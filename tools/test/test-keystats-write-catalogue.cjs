@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Keystats Write-Catalogue Equivalence Test
  * DESCRIPTION:
- * Proves the typed-slot and keyed statements of `_shared/data/db/queries.sql`
+ * Proves the typed-slot and keyed statements of `_shared/metrics/data/db/queries.sql`
  * against the SQL the macOS and Linux drivers used to build by hand. Each
  * migrated family is executed twice on a fresh database made from the canonical
  * schema, once through the legacy statements (kept below as reference text) and
@@ -62,8 +62,8 @@ const vectors = JSON.parse(fs.readFileSync(VECTORS, 'utf8')).vectors;
 /** A fresh database made from the canonical schema. */
 function freshDb() {
 	const db = new DatabaseSync(':memory:');
-	db.exec(fs.readFileSync(path.join(SHARED, 'data', 'db', 'schema.sql'), 'utf8'));
-	db.exec(fs.readFileSync(path.join(SHARED, 'data', 'db', 'media_schema.sql'), 'utf8'));
+	db.exec(fs.readFileSync(path.join(SHARED, 'metrics', 'data', 'db', 'schema.sql'), 'utf8'));
+	db.exec(fs.readFileSync(path.join(SHARED, 'metrics', 'data', 'db', 'media_schema.sql'), 'utf8'));
 	return db;
 }
 

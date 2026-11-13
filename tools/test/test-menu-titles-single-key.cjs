@@ -32,7 +32,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 // Each top-level entry, the key every driver must read for it, and which drivers
 // actually have the entry. A driver that does not have the menu is not required
@@ -75,11 +75,11 @@ const sources = Object.fromEntries(['windows', 'macos', 'linux'].map((d) => [d, 
 // The manifest names keys on the drivers' behalf: a row declared there is
 // rendered from the declaration, so the driver never spells the key out.
 const manifest = fs.readFileSync(
-	path.join(SP, '_shared', 'modules', 'features', 'manifest.toml'),
+	path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml'),
 	'utf8'
 );
 const menuManifest = fs.readFileSync(
-	path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'),
+	path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json'),
 	'utf8'
 );
 

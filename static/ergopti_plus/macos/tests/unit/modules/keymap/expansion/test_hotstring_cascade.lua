@@ -51,7 +51,7 @@ local function fresh_engine(entries, depth)
 		end
 	end
 	package.loaded["infra.text_utils"] = nil
-	package.loaded["text_utils"]       = nil
+	package.loaded["core.text.engine.utils_core"]       = nil
 
 	local R = require("modules.keymap.registry")
 	local E = require("modules.keymap.expander")
@@ -439,7 +439,7 @@ local function corpus_vectors()
 	local file = assert(io.open(path, "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus = assert(require("json").decode(raw), "cascade_vectors.json must be valid JSON")
+	local corpus = assert(require("core.text.engine.json").decode(raw), "cascade_vectors.json must be valid JSON")
 	assert(#corpus.vectors > 0, "cascade_vectors.json must hold vectors")
 	return corpus.vectors
 end

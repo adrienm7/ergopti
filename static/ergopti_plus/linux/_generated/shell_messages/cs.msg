@@ -1,5 +1,5 @@
 # linux/_generated/shell_messages/cs.msg
-# AUTO-GENERATED from _shared/data/locales/cs.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/cs.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Síťový modul LuaJIT sestaven ze zdrojových kódů.
 build_luv.recipe_required=Nativní sestavení luv vyžaduje svůj zdrojový recept.

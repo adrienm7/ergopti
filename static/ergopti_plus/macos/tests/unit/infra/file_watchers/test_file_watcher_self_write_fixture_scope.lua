@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.file_watcher_self_write_fixture")
 local OWNERS = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
-	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate",
+	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
 }
 
 helpers.describe("File-watcher self-write fixture lifetime", function()

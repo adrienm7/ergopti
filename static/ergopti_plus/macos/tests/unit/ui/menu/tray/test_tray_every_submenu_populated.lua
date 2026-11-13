@@ -213,13 +213,13 @@ local function walk(rows, visit, path, depth)
 	end
 end
 
-local RowText = require("test.menu_row_text")
+local RowText = require("tests.lua.menu.row_text")
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 -- The whole tray holds many more; fewer means a builder gave up.
 local MIN_TRAY_ROWS = 100
 
 helpers.describe("the real macOS tray reads as text", LayoutFixture.scoped(function()
-	local decode = require("json").decode
+	local decode = require("core.text.engine.json").decode
 
 	helpers.it("the walk itself refuses each shape of raw text", function()
 		local rows = { { title = "Disposition", menu = {

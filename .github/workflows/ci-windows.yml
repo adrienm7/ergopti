@@ -146,7 +146,7 @@ jobs:
             static/ergopti_plus/windows/vendor/ergopti_network_pac.json
             static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
             static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
-          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/native/network/**', 'static/ergopti_plus/_shared/modules/network/pac_helpers.js', 'static/ergopti_plus/_shared/modules/network/proxy_policy.json', 'static/ergopti_plus/_shared/modules/updater/defaults.json', 'static/ergopti_plus/_shared/data/linux_native_runtime.json') }}
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/core/network/native/**', 'static/ergopti_plus/_shared/core/network/data/pac_helpers.js', 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json', 'static/ergopti_plus/_shared/updater/data/defaults.json', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json') }}
 
       - name: Build and test native full-URL PAC evaluator
         id: native-pac-build
@@ -185,7 +185,7 @@ jobs:
         id: ahk-contract
         shell: pwsh
         run: |
-          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\updater\data\windows_release_toolchain.json"
           $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
           "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
           "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
@@ -535,7 +535,7 @@ jobs:
             static/ergopti_plus/windows/vendor/ergopti_network_pac.json
             static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
             static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
-          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/native/network/**', 'static/ergopti_plus/_shared/modules/network/pac_helpers.js', 'static/ergopti_plus/_shared/modules/network/proxy_policy.json', 'static/ergopti_plus/_shared/modules/updater/defaults.json', 'static/ergopti_plus/_shared/data/linux_native_runtime.json') }}
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/core/network/native/**', 'static/ergopti_plus/_shared/core/network/data/pac_helpers.js', 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json', 'static/ergopti_plus/_shared/updater/data/defaults.json', 'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json') }}
 
       - name: Build and test native full-URL PAC evaluator
         if: steps.native-pac-cache.outputs.cache-hit != 'true'
@@ -546,7 +546,7 @@ jobs:
         id: ahk-contract
         shell: pwsh
         run: |
-          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\updater\data\windows_release_toolchain.json"
           $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
           "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
           "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
@@ -701,7 +701,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node -e "const v=require('./static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
+          node -e "const v=require('./static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
 
       - name: Install the pinned Go toolchain
         if: matrix.lot == 'Native cohorts and contracts'
@@ -843,7 +843,7 @@ jobs:
         id: ahk-contract
         shell: pwsh
         run: |
-          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\updater\data\windows_release_toolchain.json"
           $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
           "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
           "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
@@ -999,7 +999,7 @@ jobs:
         run: ./tools/build/build_windows_nav_owner.ps1
 
       # The stand-alone layout package every release publishes (release_asset
-      # of _shared/modules/layouts/windows_system_layout.json), uploaded with
+      # of _shared/layouts/data/windows_system_layout.json), uploaded with
       # assets-windows below. The DLLs land in vendor/keyboard_layout, which
       # the static bundle excludes: the exe never carries the elevated
       # installer, and its tray row opens this asset's download instead.
@@ -1026,7 +1026,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node -e "const v=require('./static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
+          node -e "const v=require('./static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json').go_version; if(!/^go\d+\.\d+\.\d+$/.test(v)) throw new Error('invalid Go pin'); console.log('version='+v.slice(2))" >> "$GITHUB_OUTPUT"
 
       - name: Install the pinned Go toolchain
         uses: actions/setup-go@v5
@@ -1082,7 +1082,7 @@ jobs:
       - name: Download the authenticated compiler toolchain
         shell: pwsh
         run: |
-          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\updater\data\windows_release_toolchain.json"
           $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
           $runtimeUrl = $contract.runtime.url
           $runtimeSha256 = $contract.runtime.sha256
@@ -1362,7 +1362,7 @@ jobs:
 
       - name: Sign the update asset (detached signature)
         # PAR-30: the updaters verify <asset>.sig against the key in
-        # _shared/modules/updater/asset_signing.json. release-sign owns the
+        # _shared/updater/data/asset_signing.json. release-sign owns the
         # decision (tested in tools/test/test-update-asset-signature.cjs): once
         # the policy names a key or requires signatures, a missing or mismatched
         # UPDATE_SIGNING_KEY fails this step; before the maintainer provisions
@@ -1662,7 +1662,7 @@ jobs:
               Write-Host "---- native startup log bytes; bounded tails never prove readiness ----"
               try {
                   # Resolve the same shared catalogue as the production logger.
-                  $catalogJson = & python -c 'import json,pathlib,sys,tomllib; c=tomllib.loads(pathlib.Path(sys.argv[1]).read_text()); w=c["logs"]["windows"]; f=c["logs"]["files"]; print(json.dumps({"base":w["base"],"segments":[v.replace("{app}",c["app"]["folder_name"]) for v in w["segments"]],"prefix":f["unified_prefix"],"extension":f["extension"]}))' "$env:GITHUB_WORKSPACE\static\ergopti_plus\_shared\modules\paths\app_dirs.toml"
+                  $catalogJson = & python -c 'import json,pathlib,sys,tomllib; c=tomllib.loads(pathlib.Path(sys.argv[1]).read_text()); w=c["logs"]["windows"]; f=c["logs"]["files"]; print(json.dumps({"base":w["base"],"segments":[v.replace("{app}",c["app"]["folder_name"]) for v in w["segments"]],"prefix":f["unified_prefix"],"extension":f["extension"]}))' "$env:GITHUB_WORKSPACE\static\ergopti_plus\_shared\core\fs\data\paths\app_dirs.toml"
                   if ($LASTEXITCODE -ne 0) { throw "The native log catalogue could not be read (python exit $LASTEXITCODE)." }
                   $catalog = $catalogJson | ConvertFrom-Json -ErrorAction Stop
                   $logsDir = if (-not [string]::IsNullOrEmpty($env:ERGOPTI_STARTUP_SMOKE_DIR)) {

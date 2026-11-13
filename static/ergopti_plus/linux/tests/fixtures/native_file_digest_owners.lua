@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_file_digest_owners%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv, ffi = require("luv"), require("ffi")
 ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
 local Digest = require("adapters.file_digest")

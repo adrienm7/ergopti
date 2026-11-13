@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 --- @return table context Captured native callbacks and side effects.
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
+		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 	}) do package.loaded[name] = nil end
 
@@ -77,7 +77,7 @@ local function load_healthcheck(scheduler, title_label)
 	end
 	package.loaded["infra.logger"] = logger
 	package.loaded["ui.healthcheck.helpers"] = {}
-	package.loaded["healthcheck.snapshot"] = {}
+	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	local compose_title = require("ui.ui_builder").window_title
 	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.i18n"] = { get = function(key)
@@ -110,17 +110,17 @@ end
 
 helpers.describe("healthcheck window focus ownership", function()
 	helpers.it("sends one localized product prefix to the native title owner in every locale", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local function read_json(relative)
 			local file = assert(io.open(helpers.shared(relative), "rb"))
 			local text = file:read("*a")
 			file:close()
 			return Json.decode(text)
 		end
-		local locales = read_json("data/locale_order.json").order
+		local locales = read_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			local label = read_json("data/locales/" .. locale .. ".json")["menu.debug.healthcheck"]
+			local label = read_json("core/i18n/data/locales/" .. locale .. ".json")["menu.debug.healthcheck"]
 			local healthcheck, context = load_healthcheck({ cancel = function() return true end }, label)
 			helpers.assert_true(healthcheck.show_window())
 			helpers.assert_eq(context.title, "ErgoptiPlus — " .. label, locale .. " native title")

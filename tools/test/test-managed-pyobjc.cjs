@@ -35,7 +35,7 @@ const MANIFEST = path.join(LLM, 'managed-pyobjc.json');
 const SCRIPT = path.join(LLM, 'ensure-managed-pyobjc.sh');
 const LOCATOR = path.join(
 	ROOT,
-	'static/ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua'
+	'static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua'
 );
 
 if (process.platform === 'win32') {

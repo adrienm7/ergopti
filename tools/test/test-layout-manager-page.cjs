@@ -27,7 +27,7 @@ const PAGE = path.join(SHARED, 'ui/layout_manager');
 const source = fs.readFileSync(path.join(PAGE, 'script.js'), 'utf8');
 const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
 const hostBridge = fs.readFileSync(path.join(SHARED, 'ui/host_bridge.js'), 'utf8');
-const LOCALE_DIR = path.join(SHARED, 'data/locales');
+const LOCALE_DIR = path.join(SHARED, 'core/i18n/data/locales');
 const LOCALES = [
 	'ar',
 	'cs',
@@ -727,7 +727,7 @@ check('the three hosts accept exactly the actions the page sends', () => {
 	// A top-level const is not a property of the context: evaluate it there.
 	const page = [...vm.runInContext('LAYOUT_MANAGER_ACTIONS', context)].sort();
 	assert.ok(page.length >= 8, `the page declares only ${page.length} actions`);
-	const lua = fs.readFileSync(path.join(SHARED, 'lua/layouts/manager_bridge.lua'), 'utf8');
+	const lua = fs.readFileSync(path.join(SHARED, 'layouts/engine/manager_bridge.lua'), 'utf8');
 	const luaBlock = /M\.ACTIONS = \{([\s\S]*?)\n\}/.exec(lua);
 	assert.ok(luaBlock, 'manager_bridge.lua declares no M.ACTIONS');
 	const luaActions = [...luaBlock[1].matchAll(/^\t([a-z_]+) = true,$/gm)].map((m) => m[1]).sort();
@@ -796,7 +796,7 @@ check('every host names the shortcut menu file the page counts', () => {
 		ahk.includes(`"shortcut_menu_path", "${SHORTCUT_MENU.windows}"`),
 		'the Windows host names another shortcut menu file'
 	);
-	const lua = fs.readFileSync(path.join(SHARED, 'lua/layouts/manager_bridge.lua'), 'utf8');
+	const lua = fs.readFileSync(path.join(SHARED, 'layouts/engine/manager_bridge.lua'), 'utf8');
 	assert.ok(
 		lua.includes(`M.SHORTCUT_MENU_PATH = "${SHORTCUT_MENU.linux}"`) &&
 			SHORTCUT_MENU.linux === SHORTCUT_MENU.macos &&

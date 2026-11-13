@@ -52,7 +52,7 @@ Test("i18n: pause/suspend must not break locale loading or t() fallback", TestI1
 ; locales.system_fallback of identifiers.json, as the Lua drivers read it.
 TestI18n_SystemFallbackIsShared() {
 	global _SharedDir
-	Shared := JsonParse(FileRead(_SharedDir . "\data\identifiers.json", "UTF-8"))["locales"]["system_fallback"]
+	Shared := JsonParse(FileRead(_SharedDir . "\core\text\data\identifiers.json", "UTF-8"))["locales"]["system_fallback"]
 	AssertEqual(Shared, Identifiers.Locales.SYSTEM_FALLBACK, "the generated fallback is the shared one")
 	AssertEqual(Shared, _I18nDetectSystemLocale({Ui: (*) => "xx-XX"}), "an unsupported language takes it")
 	AssertEqual(Shared, _I18nDetectSystemLocale({Ui: (*) => ""}), "an unavailable language takes it")
@@ -396,7 +396,7 @@ _I18nFallbackWarmupRetriesAfterTransientFailure() {
 	try {
 		if DirExist(Root)
 			DirDelete(Root, true)
-		DirCreate(Root . "\data\locales")
+		DirCreate(Root . "\core\i18n\data\locales")
 		_SharedDir := Root
 		_I18nLocale := "de"
 		_I18nTestReset()
@@ -408,9 +408,9 @@ _I18nFallbackWarmupRetriesAfterTransientFailure() {
 		AssertFalse(_I18nCacheFrLoaded)
 
 		FileAppend('{"retry.key": "English"}',
-			Root . "\data\locales\en.json", "UTF-8")
+			Root . "\core\i18n\data\locales\en.json", "UTF-8")
 		FileAppend('{"retry.key": "Francais"}',
-			Root . "\data\locales\fr.json", "UTF-8")
+			Root . "\core\i18n\data\locales\fr.json", "UTF-8")
 		_I18nEnsureFallbacksLoaded()
 		AssertTrue(_I18nFallbacksWarmed,
 			"a later successful load must complete fallback warmup")
@@ -547,8 +547,8 @@ _I18nInitRetainsVerifiedCache() {
 	SavedLocale := _I18nLocale
 	SavedMagic := ScriptInformation.Get("MagicKey", "★")
 	Directory := A_Temp . "\ergopti-locale-reuse-" . A_ScriptHwnd . "-" . A_TickCount
-	DirCreate(Directory . "\data\locales")
-	Path := Directory . "\data\locales\fr.json"
+	DirCreate(Directory . "\core\i18n\data\locales")
+	Path := Directory . "\core\i18n\data\locales\fr.json"
 	try {
 		_I18nTestReset()
 		_SharedDir := Directory
@@ -711,8 +711,8 @@ _I18nShape_Case(Mode) {
 		Created := FSCreateDirectoryExclusiveStrict(Root)
 		Owned := Created is Integer && Created == 1
 		AssertTrue(Owned, "Acquire the private root before creating or deleting any locale artifact")
-		DirCreate(Root . "\data\locales")
-		Path := Root . "\data\locales\de.json"
+		DirCreate(Root . "\core\i18n\data\locales")
+		Path := Root . "\core\i18n\data\locales\de.json"
 		AssertTrue(FSWriteCreateDurable(Path, Sources[Mode]))
 		if Mode == "legacy-numeric-cache" {
 			; Historical v1 caches stringify invalid numeric JSON, losing its

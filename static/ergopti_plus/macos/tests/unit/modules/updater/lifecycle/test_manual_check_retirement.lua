@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.updater.auto_check", "modules.updater", "infra.logger", "infra.paths", "infra.timings",
 	"adapters.file_system", "adapters.json_codec", "adapters.update_launcher",
-	"infra.notifications", "infra.i18n", "json", "updater.channels", "updater.schedule",
-	"updater.release_parser", "updater.check_result", "updater.rate_limit", "updater.version",
+	"infra.notifications", "infra.i18n", "core.text.engine.json", "updater.engine.channels", "updater.engine.schedule",
+	"updater.engine.release_parser", "updater.engine.check_result", "updater.engine.rate_limit", "updater.engine.version_core",
 }
 
 --- Runs exact owner logic while restoring injected modules and real pure consumers.
 local function with_owner(run)
 	helpers.with_stub_scope(OWNED, function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		-- The real registry reader, loaded before infra.paths is stubbed below:
 		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
 		local Timings = require("infra.timings")
@@ -30,8 +30,8 @@ local function with_owner(run)
 			assert(file:close())
 			return Json.decode(raw)
 		end
-		local defaults = shared("modules/updater/defaults.json")
-		local registry = assert(require("updater.channels").load(shared("modules/updater/channels.json")))
+		local defaults = shared("updater/data/defaults.json")
+		local registry = assert(require("updater.engine.channels").load(shared("updater/data/channels.json")))
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.paths"] = {}
 		package.loaded["infra.timings"] = Timings

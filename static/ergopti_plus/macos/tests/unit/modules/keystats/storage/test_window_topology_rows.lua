@@ -92,7 +92,7 @@ helpers.describe("macOS window topology: the watcher", function()
 		helpers.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger",
 			"modules.keystats.privacy_context", "modules.keystats.topology_watcher", "modules.keystats.network_watcher",
 			"adapters.window_info", "adapters.network_info", "adapters.timer_scheduler",
-			"keystats.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
+			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local rows, refused, now, window, ids, reach = {}, true, 0, nil, {}, nil
 			package.loaded["modules.keystats.log_manager"] = { append_log = function(entry) rows[#rows + 1] = entry end }

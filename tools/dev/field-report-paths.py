@@ -5,8 +5,8 @@
 The field report collector reads the logs and the personal hotstrings where
 the driver writes them; spelling those paths in the collector would drift the
 day a folder moves. Every name comes from its one declaration instead:
-_shared/modules/paths/app_dirs.toml for the folders and the log file names,
-_shared/modules/logger/sub_files.toml for the topical log files. The
+_shared/core/fs/data/paths/app_dirs.toml for the folders and the log file names,
+_shared/core/logger/data/sub_files.toml for the topical log files. The
 paths.toml the launcher keeps wins over both defaults, as it does in the
 driver (infra/config_paths.lua): its configuration and logs folder keys move
 the personal hotstrings and the logs. Only the topical logs the caller names
@@ -80,8 +80,8 @@ def main():
     parser.add_argument("shared", type=pathlib.Path, help="the _shared folder of the clone")
     parser.add_argument("topical", nargs="*", help="the topical log names to copy")
     arguments = parser.parse_args()
-    dirs = load(arguments.shared / "modules/paths/app_dirs.toml")
-    routes = load(arguments.shared / "modules/logger/sub_files.toml")
+    dirs = load(arguments.shared / "core/fs/data/paths/app_dirs.toml")
+    routes = load(arguments.shared / "core/logger/data/sub_files.toml")
     app = dirs["app"]["folder_name"]
     logs = dirs["logs"]
     files = logs["files"]

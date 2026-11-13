@@ -1,4 +1,4 @@
-/* Build-time consumer: static/ergopti_plus/_shared/modules/network/pac_helpers.js.
+/* Build-time consumer: static/ergopti_plus/_shared/core/network/data/pac_helpers.js.
  * prepare_network_pac_sources.py embeds those exact bytes in pac_generated.h. */
 /* Binary stdin/stdout keeps full URLs and PAC text outside the process argv. */
 #define WIN32_LEAN_AND_MEAN

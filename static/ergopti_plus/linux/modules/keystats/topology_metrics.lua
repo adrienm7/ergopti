@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One reducer for every driver: the classification and debounce live in
----    _shared/lua/keystats/window_topology.lua and capture_presence.lua.
+---    _shared/metrics/engine/system/window_topology.lua and capture_presence.lua.
 --- 2. No fork on the poll. Topology is read from the X server in this process
 ---    (adapters/x11_focus.lua, libxcb) at the shared [keystats] topo_tick_ms;
 ---    the program list is /proc/<pid>/comm, read every av_state_slow_tick_ms
@@ -25,10 +25,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
-local Topology = require("keystats.window_topology")
-local Capture = require("keystats.capture_presence")
+local Topology = require("metrics.engine.system.window_topology")
+local Capture = require("metrics.engine.capture_presence")
 
 local LOG = "modules.keystats.topology_metrics"
 

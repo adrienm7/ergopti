@@ -80,7 +80,7 @@ end
 
 helpers.describe("composer check row", function()
 	helpers.it("is declared once for every platform and wired in the menu (composer-check)", function()
-		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+		local file = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
 		local rows = {}

@@ -19,10 +19,10 @@
 
 local M = {}
 
-local Logger     = require("logger.shim")
+local Logger     = require("core.logger.engine.shim")
 local LoggerSink = require("infra.logger_sink")
 local RegularFileReader = require("infra.regular_file_reader")
-local ErrorDescription = require("error_description")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "log_openers"
 

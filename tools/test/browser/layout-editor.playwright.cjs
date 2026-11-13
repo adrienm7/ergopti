@@ -24,9 +24,11 @@ const { shared } = require('../../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
-const NAV = shared('keymap', 'layers.recommended.toml');
+const NAV = shared('layouts', 'data', 'layers.recommended.toml');
 const SOURCE_FIXTURE = shared('tests', 'corpus', 'layouts', 'source', 'source.toml');
-const LOCALES = JSON.parse(fs.readFileSync(shared('data', 'locale_order.json'), 'utf8')).order;
+const LOCALES = JSON.parse(
+	fs.readFileSync(shared('core', 'i18n', 'data', 'locale_order.json'), 'utf8')
+).order;
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -93,7 +95,9 @@ async function exerciseManager(browser, origin) {
 	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
-	const strings = JSON.parse(fs.readFileSync(shared('data', 'locales', 'en.json'), 'utf8'));
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
 	await page.addInitScript((strings) => {
 		window._i18n_strings = strings;
 		window.__posted = [];

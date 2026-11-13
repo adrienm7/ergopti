@@ -3,7 +3,7 @@
 ## Purpose
 
 The diagnostics window of the Debug menu. It collects a version 2 snapshot
-(`_shared/modules/diagnostics/schema.json`) and shows it in the shared page
+(`_shared/diagnostics/data/schema.json`) and shows it in the shared page
 (`_shared/ui/healthcheck/`) through WebView2. Without WebView2 it shows the
 snapshot as plain text in a read-only field.
 

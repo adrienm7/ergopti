@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local Json = require("json")
-local Share = require("healthcheck.share")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Json = require("core.text.engine.json")
+local Share = require("diagnostics.engine.healthcheck.share")
 
 local HOME = "/Users/jdoe"
 local LOGS = HOME .. "/" .. AppDirs.macos.relative
@@ -36,13 +36,13 @@ end
 --- The documents a host works from, read from their single sources.
 --- @return table
 local function documents()
-	local schema = shared_json("modules/diagnostics/schema.json")
-	schema.export_strings = shared_json("data/locales/en.json")
+	local schema = shared_json("diagnostics/data/schema.json")
+	schema.export_strings = shared_json("core/i18n/data/locales/en.json")
 	return {
 		schema     = schema,
-		templates  = shared_json("modules/diagnostics/issue_templates.json"),
-		redaction  = shared_json("modules/diagnostics/redaction.json"),
-		repository = shared_json("modules/updater/defaults.json").github,
+		templates  = shared_json("diagnostics/data/issue_templates.json"),
+		redaction  = shared_json("diagnostics/data/redaction.json"),
+		repository = shared_json("updater/data/defaults.json").github,
 	}
 end
 
@@ -851,7 +851,7 @@ helpers.describe("redaction context carries the configuration directory (config-
 		local context = Report.redaction_context(overrides)
 		helpers.assert_eq(context.config_dir, dir)
 		helpers.assert_eq(
-			require("diagnostics.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
+			require("diagnostics.engine.reports.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
 			"read '<config>/hotstrings/<name>/<name>'")
 	end)
 end)
@@ -862,7 +862,7 @@ local function completed_action_for(Report, action, config, context, overrides, 
 end
 
 helpers.describe("opt-in day log in the report actions (day-log-host)", function()
-	local DayLogHost = require("healthcheck.day_log")
+	local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 	local LOG_TEXT = "2026-09-24 09:00:00:001 [INFO] [A] opened /Users/jdoe/x\n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl\n"
 	local REDACTED = "2026-09-24 09:00:00:001 [INFO] [A] opened ~/x\n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>\n"
 
@@ -870,7 +870,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 	local function fixture()
 		local Report, calls, overrides = load_report()
 		local config = documents()
-		config.day_log = shared_json("modules/diagnostics/day_log.json")
+		config.day_log = shared_json("diagnostics/data/day_log.json")
 		local snapshot = host_snapshot(false)
 		local context = Report.redaction_context(overrides)
 		local function run(action)

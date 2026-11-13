@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
 local EV_KEY = 1
 local DOWN, UP, REPEAT = 1, 0, 2
 
@@ -226,7 +226,7 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 		end)
 	end)
 
-	-- The results come from _shared/tap_hold/one_shot_shift.json, which the
+	-- The results come from _shared/tap_hold/data/one_shot_shift.json, which the
 	-- Windows one-shot reads too (one-shot-results-shared).
 	helpers.it("types the shared one-shot results, and hands the injector what the layout lacks", function()
 		with_session(nil, function(s)
@@ -363,10 +363,10 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 			local function scope(mode, config)
 				local path = s.manager.user_path()
 				local fh = assert(io.open(path, "r"))
-				local document = require("toml_codec").decode(fh:read("*a"))
+				local document = require("core.text.engine.toml_codec").decode(fh:read("*a"))
 				fh:close()
 				helpers.assert_true(s.manager.apply_configuration(
-					require("toml_codec").decode(s.writer.render_scope(mode, document, {}, preset)), nil, config))
+					require("core.text.engine.toml_codec").decode(s.writer.render_scope(mode, document, {}, preset)), nil, config))
 			end
 			scope("clear", {})
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")

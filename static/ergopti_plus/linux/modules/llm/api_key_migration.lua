@@ -30,7 +30,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
 
 local LOG = "modules.llm.api_key_migration"

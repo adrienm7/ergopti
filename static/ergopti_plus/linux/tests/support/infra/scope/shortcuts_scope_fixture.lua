@@ -25,11 +25,11 @@ local function declared_parent(top, id)
 	return { selected }
 end
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local Manifest = require("infra.manifest_reader")
 
@@ -101,7 +101,7 @@ local function with_scope(body, source, options)
 			local combinations = require("modules.shortcuts.key_combinations")
 			if not options or options.initialize_pairs ~= false then
 				local Loader = require("platform.remap.tap_hold_loader")
-				local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+				local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
 				local loaded_pairs = Loader.load_document(defaults,
 					{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 				helpers.assert_true(combinations.install({ keys = loaded_pairs.catalog, hold_picker = loaded_pairs.hold_picker,
@@ -164,7 +164,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			if navigation_text ~= nil then
 				navigation_dir = os.tmpname()
 				assert(os.remove(navigation_dir))
-				local made = os.execute("mkdir " .. require("text_utils").shell_quote(navigation_dir))
+				local made = os.execute("mkdir " .. require("core.text.engine.utils_core").shell_quote(navigation_dir))
 				assert(made == true or made == 0)
 				navigation_made = true
 				tap_path = navigation_dir .. "/tap_hold.toml"
@@ -190,7 +190,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			Manager = require("platform.remap.tap_hold_manager")
 			helpers.assert_true(Manager.init({ keyboard_hook = hook, execute_action = function() error("no action during collision validation") end,
 				action_names = owners.gestures.get_executable_action_names, on_text_injected = function() error("no output during validation") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
+				defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			controls.source_reads, controls.intentional_hook_changes = 0, 0
 			-- This fixture acknowledges initial readiness solely to reach preflight.
 			-- The genuine getter answers true since 2026-11-11 (LIN-004); outside an
@@ -242,7 +242,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 		if navigation_made then
 			local removed, detail = os.remove(navigation_dir .. "/layers.toml")
 			if removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused: " .. tostring(detail) end
-			local removed = os.execute("rmdir " .. require("text_utils").shell_quote(navigation_dir))
+			local removed = os.execute("rmdir " .. require("core.text.engine.utils_core").shell_quote(navigation_dir))
 			if removed ~= true and removed ~= 0 then
 				ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused"
 			end

@@ -315,9 +315,9 @@ for _, name in ipairs({"tests.helpers", "tests.support.synthetic_input_stack"}) 
  assert(resolved:sub(1, #expected_root + 1) == expected_root .. "/", "the real driver module must come from this checkout")
 end
 local vectors = load_corpus()
-assert(type(package.loaded.json.decode) == "function" and #vectors > 0)
-local json_path = assert(package.searchpath("json", package.path))
-assert(json_path == shared_lua .. "/json.lua", "the real shared decoder must load")
+assert(type(package.loaded["core.text.engine.json"].decode) == "function" and #vectors > 0)
+local json_path = assert(package.searchpath("core.text.engine.json", package.path))
+assert(json_path == shared_lua .. "/core/text/engine/json.lua", "the real shared decoder must load")
 io.write("E2E_BOOTSTRAP_ONLY=", #vectors, "\n")
 ]=]
 assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(expected_root)
@@ -737,8 +737,8 @@ local function write(path, text)
  local handle = assert(io.open(path, "wb")); assert(handle:write(text)); assert(handle:close())
 end
 package.path = arg[4] .. "/?.lua;" .. arg[4] .. "/?/init.lua;" .. package.path
-local inventory = require("hotpath_segments")
-local registry = assert(require("toml_codec").decode(read(arg[3])))
+local inventory = require("metrics.engine.perf.hotpath_segments")
+local registry = assert(require("core.text.engine.toml_codec").decode(read(arg[3])))
 local contract = assert(loadfile(arg[1]))()
 local declarations = {}
 for name in pairs(inventory.for_driver("macos")) do
@@ -768,10 +768,10 @@ io.write("CENSUS_HIDDEN_ACCEPTED\n")
 				'-e',
 				withoutLfsSource,
 				'-',
-				path.join(ROOT, 'static/ergopti_plus/_shared/lua/test/hotpath_segments_contract.lua'),
+				path.join(ROOT, 'static/ergopti_plus/_shared/tests/lua/core/hotpath_segments_contract.lua'),
 				censusRoot,
-				path.join(ROOT, 'static/ergopti_plus/_shared/modules/timings/constants.toml'),
-				path.join(ROOT, 'static/ergopti_plus/_shared/lua')
+				path.join(ROOT, 'static/ergopti_plus/_shared/core/timing/data/constants.toml'),
+				path.join(ROOT, 'static/ergopti_plus/_shared')
 			],
 			{ input: censusSource, env: withoutMac, cwd: ROOT, encoding: 'utf8', timeout: 30000 }
 		);
@@ -823,7 +823,7 @@ io.write("NATIVE_TEMP_ALLOCATION_RETIRED\n")
 					withoutLfsSource,
 					'-',
 					path.join(ROOT, 'static/ergopti_plus/macos'),
-					path.join(ROOT, 'static/ergopti_plus/_shared/lua'),
+					path.join(ROOT, 'static/ergopti_plus/_shared'),
 					expected
 				],
 				{

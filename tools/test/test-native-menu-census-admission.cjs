@@ -90,11 +90,11 @@ function reset() {
 	write(BASELINE, JSON.stringify(legacy.baseline, null, '\t') + '\n');
 	// Current retirement needs real declaration and lexer inputs on every reset.
 	// The menu declarations live in the tray-menu source, read through its owner.
-	write('static/ergopti_plus/_shared/modules/menu/menu.toml', '[menu]\nowner = "retained"\n');
+	write('static/ergopti_plus/_shared/menu/data/menu.toml', '[menu]\nowner = "retained"\n');
 	for (const owner of ['tools/lib/menu-source.cjs', 'tools/lib/paths.cjs'])
 		write(owner, fs.readFileSync(path.join(ROOT, owner)));
 	write(
-		'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
+		'static/ergopti_plus/_shared/menu/data/menu_manifest.json',
 		JSON.stringify({
 			top_level: [{ id: 'llm' }],
 			llm_menu: [{ id: 'llm_toggle' }]
@@ -297,8 +297,8 @@ try {
 	// may be absent, with independently authored current declaration controls.
 	const retired = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 	// The menu declarations live in the tray-menu source.
-	const menuSource = 'static/ergopti_plus/_shared/modules/menu/menu.toml';
-	const generated = 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json';
+	const menuSource = 'static/ergopti_plus/_shared/menu/data/menu.toml';
+	const generated = 'static/ergopti_plus/_shared/menu/data/menu_manifest.json';
 	const lexer = 'tools/lib/script-source.cjs';
 	const retiredFixture = () => {
 		reset();

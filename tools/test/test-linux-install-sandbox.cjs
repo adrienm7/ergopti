@@ -294,7 +294,7 @@ function verifyOwnership(run, contents, prefix = path.join(run.home, '.local'), 
 	}
 	const requiredOwners = [
 		'linux/ergopti_hotstrings.lua',
-		'_shared/data/locales/en.json',
+		'_shared/core/i18n/data/locales/en.json',
 		'linux/bin/libergopti_archive_publication.so',
 		'bin/ergopti-hotstrings',
 		'@wrapper'
@@ -343,7 +343,7 @@ if (process.platform === 'linux') {
 			// the complete uninstaller's per-file cost is not a prefix invariant.
 			const ownerPaths = new Set([
 				'linux/ergopti_hotstrings.lua',
-				'_shared/data/locales/en.json',
+				'_shared/core/i18n/data/locales/en.json',
 				'bin/ergopti-hotstrings',
 				'@wrapper',
 				'@unit',
@@ -639,7 +639,7 @@ for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
 		configRootName: 'config with spaces',
 		seed(home, configRoot) {
 			for (const file of [
-				path.join(home, '.local/lib/ergopti/_shared/modules/hotstrings/legacy.toml'),
+				path.join(home, '.local/lib/ergopti/_shared/hotstrings/data/catalogue/legacy.toml'),
 				path.join(configRoot, 'ergopti/hotstrings/legacy.toml')
 			]) {
 				fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -800,7 +800,10 @@ for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
 		// The installer prints in the session's language (C.UTF-8 here: English), so the
 		// expected line is built from the catalogue rather than spelled in one locale.
 		const catalogue = JSON.parse(
-			fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/en.json'), 'utf8')
+			fs.readFileSync(
+				path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json'),
+				'utf8'
+			)
 		);
 		const degraded = catalogue['linux_shell.install.lua_module_degraded']
 			.replace('{1}', 'posix')

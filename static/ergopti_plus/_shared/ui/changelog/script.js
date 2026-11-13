@@ -97,7 +97,7 @@ var _ghRepo = window.__changelog_gh_repo || 'ergopti';
 var _bridgeSession =
 	typeof window.__changelog_session === 'string' ? window.__changelog_session : '';
 // Upper bound for one load, from request to data or error. Mirrors
-// release_sources.ui_watchdog_sec in _shared/modules/updater/defaults.json and
+// release_sources.ui_watchdog_sec in _shared/updater/data/defaults.json and
 // exceeds the hosts' proxy-resolution plus API plus feed budgets (pinned by
 // tools/test/test-changelog-network-resilience.cjs).
 var CHANGELOG_WATCHDOG_MS = 45000;

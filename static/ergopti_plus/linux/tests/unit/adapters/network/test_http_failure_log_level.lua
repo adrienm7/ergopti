@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 local Ports = require("tests.support.managed_http_native_ports")
-local Logger = require("logger.shim")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
 
 --- Retires every controlled native owner even when a regression assertion fails.
 --- @param config table Native refusal controls.

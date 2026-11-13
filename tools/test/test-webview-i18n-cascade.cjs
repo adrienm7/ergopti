@@ -40,7 +40,16 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const I18N_JS = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'i18n.js');
-const LOCALES = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const LOCALES = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
 
 const errors = [];
 
@@ -280,7 +289,7 @@ function check(label, cond, detail) {
 		check(
 			'chain-locale-exists',
 			fs.existsSync(path.join(LOCALES, `${code}.json`)),
-			`the fallback chain names "${code}" but ${code}.json is not in _shared/data/locales/`
+			`the fallback chain names "${code}" but ${code}.json is not in _shared/core/i18n/data/locales/`
 		);
 	}
 

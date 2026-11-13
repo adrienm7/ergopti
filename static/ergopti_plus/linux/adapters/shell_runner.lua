@@ -37,17 +37,17 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local Errors = require("diagnostics.engine.adapter_errors")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
-local Heredoc = require("shell.heredoc")
+local Logger = require("core.logger.engine.shim")
+local Heredoc = require("core.process.shell_heredoc")
 local Monotonic = require("infra.monotonic")
-local RuntimeLog = require("diagnostics.runtime_log")
+local RuntimeLog = require("diagnostics.engine.runtime_log")
 local Perf = require("infra.perf_counters")
 local PhaseStats = require("infra.phase_stats")
-local NumberPolicy = require("number_policy")
+local NumberPolicy = require("core.text.engine.number_policy")
 local OwnedProcess = nil
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
@@ -62,7 +62,7 @@ local EXIT_SUCCESS = 0
 local CHECKED_CAPTURE_TRAILER = "\nERGOPTI_CAPTURE_COMPLETE\n"
 
 -- Default opening token of a stdin heredoc for this driver. The framing itself
--- lives in _shared/lua/shell/heredoc.lua.
+-- lives in _shared/core/process/shell_heredoc.lua.
 local HEREDOC_BASE_TOKEN = "ERGOPTI_STDIN"
 
 -- Set by M._set_runner(). Declared above every closure that reads it so it can
@@ -485,7 +485,7 @@ M.HAS_ASYNC = luv ~= nil
 
 -- What an asynchronous child may print before it is stopped: the callers read
 -- a version line or a df row, never a stream
-local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
+local ASYNC_MAX_OUTPUT_BYTES = require("ai.engine.policy.process_limits").defaults().max_output_bytes
 
 --- Runs a program without a shell and without blocking the event loop.
 --- @param executable string Program name or absolute path.

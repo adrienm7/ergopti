@@ -16,7 +16,7 @@ local driver = helpers.driver_root():gsub("/$", "")
 -- genuine absolute ConfigMigrate/Writer before Preferences uses relative names.
 local child = [=[
 local driver, inherited, mode, scratch = assert(arg[1]), assert(arg[2]), assert(arg[3]), assert(arg[4])
-local shared = assert(driver:match("^(.*)/macos$")) .. "/_shared/lua"
+local shared = assert(driver:match("^(.*)/macos$")) .. "/_shared"
 local absolute = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;"
 package.path = absolute .. inherited
 _G.hs = require("tests.stubs.hs")
@@ -24,8 +24,8 @@ require("tests.helpers").load_with_stubs("infra.logger")
 local expected = mode == "absolute" or mode == "relative" or mode == "mixed"
 local called = 0
 if mode ~= "absolute" and mode ~= "relative" then
-	local owner = require("config_migrate")
-	require("toml_codec.writer")
+	local owner = require("settings.engine.migration.migrate")
+	require("core.text.engine.toml_codec.writer")
 	if mode == "copied-factory" then
 		local actual = assert(debug.getinfo(owner.writer_admission_factory, "S").source:match("^@(.*)$"))
 		local input = assert(io.open(actual, "rb"))
@@ -41,7 +41,7 @@ if mode ~= "absolute" and mode ~= "relative" then
 	end
 end
 if mode ~= "absolute" then
-	package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. inherited
+	package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. inherited
 end
 local ok, result = pcall(require, "infra.preferences")
 assert(ok == expected, "normal-loader admission " .. mode .. ": " .. tostring(result))

@@ -22,10 +22,10 @@ RUNTIME = "static/ergopti_plus/macos/modules/llm/managed_ollama_runtime.py"
 INPUTS = (
     RUNTIME,
     "static/ergopti_plus/macos/modules/llm/managed_bootstrap_http.py",
-    "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
-    "static/ergopti_plus/_shared/python/network_proxy_policy.py",
-    "static/ergopti_plus/_shared/python/managed_source_alias.py",
-    "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json",
+    "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
+    "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
+    "static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py",
+    "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json",
 )
 GENERIC = "Managed Ollama runtime admission refused.\n"
 MISSING = "OLLAMA_MANAGED_CATALOGUE_MISSING\n"

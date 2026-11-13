@@ -10,10 +10,10 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigKeys = require("settings.engine.keys")
 
 --- Builds one recoverable gesture transaction with a unique backup destination.
 --- @param options table Path, backup_path, files and gestures owner.

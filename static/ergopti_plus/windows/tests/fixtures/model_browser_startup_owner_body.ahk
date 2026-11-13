@@ -56,7 +56,7 @@ TimingsGet(Section, Key) {
 	global _MBSW
 	if Section != "ui" || (Key != "webview_page_safety_flush_ms" && !((InStr(_MBSW.Mode, "subscription-throw-") == 1 || InStr(_MBSW.Mode, "retry-") == 1) && Key == "model_browser_filter_debounce_ms"))
 		throw Error("The startup child binds only the page safety flush.")
-	if !RegExMatch(FileRead(A_Args[3] . "\modules\timings\constants.toml", "UTF-8"), "m)^\s*" . Key . "\s*=\s*(\d+)", &Value)
+	if !RegExMatch(FileRead(A_Args[3] . "\core\timing\data\constants.toml", "UTF-8"), "m)^\s*" . Key . "\s*=\s*(\d+)", &Value)
 		throw Error("The shared registry must declare the page safety flush.")
 	return Integer(Value[1])
 }

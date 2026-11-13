@@ -100,9 +100,9 @@ helpers.describe("shortcut retained native release debt", function()
 			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
 				revert = function(done) done(true) end, release = function() end,
 				pending = function() return false end, retry_restore = function(done) done(true) end }
-			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, level in ipairs({ "start", "success", "warn", "info", "error" }) do logger[level] = function() end end
-			local global = require("config_scope_composition").new({ manifest = Manifest, scope = "global", logger = logger,
+			local global = require("settings.engine.scope.composition").new({ manifest = Manifest, scope = "global", logger = logger,
 				participants = function() return { tap_holds = before, shortcuts = actual, llm = after } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
@@ -271,7 +271,7 @@ end)
 
 
 
-require("test.config_obsolete_parents_contract").register(helpers)
+require("tests.lua.settings.obsolete_parents_contract").register(helpers)
 
 
 
@@ -472,7 +472,7 @@ helpers.describe("Linux physical edit four-owner collision preflight", function(
 		end)
 	end
 	helpers.it("the shared policy preserves None and ordered claim identity without granting readiness", function()
-		local policy = require("shortcuts.physical_conflicts")
+		local policy = require("shortcuts.engine.physical_conflicts")
 		local request = { slot = "physical_none_CapsLock", code = 58, action = "none", mods = {}, aliases = {} }
 		local claims = { { kind = "prefix", binding = "combination__caps_lock_then_tab", codes = { 58, 15 } } }
 		helpers.assert_eq(policy.conflicts(request, claims), false)
@@ -525,7 +525,7 @@ helpers.describe("conditional Magic Editor yields during collision preflight", f
 					local decision = owners.keyboard.magic_editor_decision({ master = true, paused = false, inhibited = false })
 					helpers.assert_true(decision.active); helpers.assert_eq(decision.source.native_code, 36)
 					helpers.assert_eq(decision.action, case.stored or Manifest.default_for("shortcuts.keyboard.magic_editor"))
-					local policy = require("shortcuts.magic_editor")
+					local policy = require("shortcuts.engine.magic_editor_core")
 					local projected = policy.resolve({ default_action = Manifest.default_for(policy.PATH), stored_action = case.stored,
 						is_action = owners.gestures.is_assignable, trigger = "★", source = facts, known_codes = { KeyJ = true },
 						explicit_claims = { ["evdev:36"] = { action = "copy", binding_id = "keyboard__physical_super_KeyJ" } },

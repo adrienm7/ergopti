@@ -246,7 +246,10 @@ check(byId.empty.hidden === false, 'a search with no matching action still repor
 
 // Input methods and pasted text may use canonically equivalent Unicode forms.
 const french = JSON.parse(
-	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/fr.json'), 'utf8')
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/fr.json'),
+		'utf8'
+	)
 );
 context = loadPage();
 context.frenchActionLabel = french['sg_actions.eject_all_disks'];

@@ -81,7 +81,7 @@ const readerRoots = [
 	path.join(SP, 'windows', 'tests'),
 	path.join(SP, 'macos', 'tests'),
 	path.join(SP, 'linux', 'tests'),
-	path.join(SP, '_shared', 'lua', 'test'),
+	path.join(SP, '_shared', 'tests', 'lua'),
 	path.join(ROOT, 'tools')
 ];
 for (const base of readerRoots) {

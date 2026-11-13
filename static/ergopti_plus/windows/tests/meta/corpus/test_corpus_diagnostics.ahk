@@ -13,7 +13,7 @@
 ;    IssueLink_PercentEncode and IssueLink_BuildUrl (the prefilled GitHub issue
 ;    URL).
 ; 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
-;    Redact_Apply with the rules of _shared/modules/diagnostics/redaction.json
+;    Redact_Apply with the rules of _shared/diagnostics/data/redaction.json
 ;    (what leaves the machine).
 ; 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
 ;    IssueReport_Dump and IssueReport_Markdown (the bug report text).
@@ -141,7 +141,7 @@ Test("corpus:diagnostics: GitHub issue link vectors (issue-link-corpus)", _TCD_I
 
 _TCD_Redaction() {
 	Data := _TCD_Corpus("tests\corpus\diagnostics\redaction_vectors.json")
-	Rules := _TCD_Corpus("modules\diagnostics\redaction.json")
+	Rules := _TCD_Corpus("diagnostics\data\redaction.json")
 	Assert(Data["vectors"].Length >= 10, "the redaction corpus must hold its vectors")
 	for Vector in Data["vectors"]
 		AssertEqual(Vector["expected"], Redact_Apply(Vector["input"], Rules, Vector["context"]), Vector["id"])
@@ -263,7 +263,7 @@ _TCD_ErrorPolicy() {
 	Assert(Data["invalid_policies"].Length >= 5, "the error-policy corpus must hold its invalid policies")
 
 	; The shipped thresholds pass the same validation the drivers apply at load
-	ErrorPolicy_Validate(_TCD_Corpus("modules\diagnostics\error_policy.json"))
+	ErrorPolicy_Validate(_TCD_Corpus("diagnostics\data\error_policy.json"))
 
 	for Vector in Data["signature_vectors"]
 		AssertEqual(Vector["expected"],
@@ -333,7 +333,7 @@ Test("corpus:diagnostics: error window report vectors (error-report-corpus)", _T
 
 _TCD_DayLog() {
 	Data := _TCD_Corpus("tests\corpus\diagnostics\day_log_vectors.json")
-	Rules := _TCD_Corpus("modules\diagnostics\redaction.json")
+	Rules := _TCD_Corpus("diagnostics\data\redaction.json")
 	Assert(Data["vectors"].Length >= 8, "the day log corpus must hold its vectors")
 	for Vector in Data["vectors"] {
 		Got := DayLog_Collect(Vector.Has("raw") ? Vector["raw"] : "", Vector["file_size"], Rules, Data["context"],

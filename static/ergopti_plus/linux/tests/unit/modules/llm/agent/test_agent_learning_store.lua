@@ -4,7 +4,7 @@
 --- MODULE: Agent Learning Store Tests (Linux)
 --- DESCRIPTION:
 --- Pins the shared map behind the automatic mode's learned thresholds
---- (_shared/lua/llm/agent_learning_store.lua): an unseen pair keeps the
+--- (_shared/ai/engine/agent/learning_store.lua): an unseen pair keeps the
 --- configured threshold, accepting lowers and dismissing raises it within the
 --- bounds, each entry keeps its thresholds under the driver's field name, the
 --- recency counter orders the applications, and the least recently used one is
@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local LearningStore = require("llm.agent_learning_store")
+local LearningStore = require("ai.engine.agent.learning_store")
 
 local CONFIG = {
 	system1 = { threshold = 0.6 },

@@ -65,9 +65,9 @@ fi
 # shellcheck source=install/messages.sh
 source "${SRC_DRIVER}/install/messages.sh"
 
-# The external hosts are declared once, in _shared/data/identifiers.json. Both
+# The external hosts are declared once, in _shared/core/text/data/identifiers.json. Both
 # layouts carry the generated shell copy in the _shared tree beside the driver.
-. "${DRIVERS_ROOT}/_shared/data/identifiers.sh"
+. "${DRIVERS_ROOT}/_shared/core/text/data/identifiers.sh"
 
 # A release tarball carries the private runtime prefix every package runs
 # (linux/runtime: LuaJIT, luv, luafilesystem, luaposix, curl, sqlite3, openssl,
@@ -1201,8 +1201,8 @@ install -d "${CONFIG_DIR}"
 # shellcheck source=install/canonical_packs.sh
 source "${SRC_DRIVER}/install/canonical_packs.sh"
 migrate_canonical_packs \
-	"${SRC_SHARED}/modules/hotstrings" \
-	"${DEST_SHARED}/modules/hotstrings" \
+	"${SRC_SHARED}/hotstrings/data/catalogue" \
+	"${DEST_SHARED}/hotstrings/data/catalogue" \
 	"${CONFIG_DIR}"
 
 # Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball

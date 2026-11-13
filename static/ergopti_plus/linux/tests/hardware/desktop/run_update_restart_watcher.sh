@@ -82,7 +82,7 @@ make_tree() {
 		cat > "${dir}/bin/ergopti" <<-LAUNCHER
 			#!/bin/sh
 			cd '${DRIVER}' || exit 1
-			LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+			LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 			export LUA_PATH
 			exec luajit tests/hardware/desktop/update_watch_daemon.lua '${name}' '${ROOT}' '${RUNS}' '${LOG}' '${kind}'
 		LAUNCHER

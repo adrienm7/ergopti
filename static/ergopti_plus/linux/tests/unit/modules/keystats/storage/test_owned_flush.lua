@@ -413,7 +413,7 @@ helpers.describe("owned SQLite collector flush", function()
 	for _, phase in ipairs({ "pending", "rollback", "stopping", "healthy" }) do
 		it("rendered session reset preserves its real " .. phase .. " acknowledgement", function()
 			with_collector(function(k, ops)
-				local Logger, I18n = require("logger.shim"), require("infra.i18n")
+				local Logger, I18n = require("core.logger.engine.shim"), require("infra.i18n")
 				local startup, menu_name = "ui.menu.start_at_login", "ui.menu.builder"
 				local old_startup, old_menu = package.loaded[startup], package.loaded[menu_name]
 				package.loaded[startup] = { command_available = function() return false end,
@@ -1115,7 +1115,7 @@ helpers.describe("session reset construction frame retirement", function()
 	end)
 
 	it("reset-frame-throw: a throwing native observation retires the temporary dual branch", function()
-		local module_name = "keystats.session_events"
+		local module_name = "metrics.engine.system.session_events"
 		local original = require(module_name)
 		local tracker_inputs = {}
 		local wrapped = {}
@@ -1248,7 +1248,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 		local database = os.tmpname()
 		os.remove(database)
 		local native = require("tests.support.keystats_native_fixture")
-		local logger, i18n = require("logger.shim"), require("infra.i18n")
+		local logger, i18n = require("core.logger.engine.shim"), require("infra.i18n")
 		local previous_info, previous_error = logger.info, logger.error
 		local startup = "ui.menu.start_at_login"
 		local previous_startup = package.loaded[startup]
@@ -1408,13 +1408,13 @@ end)
 
 helpers.describe("native sampled reset acknowledgement", function()
 	it("reset-sampled-native-ack: consumes the exact committed reset source once", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
 		local runtime, provider = "luajit", ""
 		if rawget(_G, "jit") then
 			-- Distribution suites compile real luv outside the default C search path.
-			runtime = assert(require("process.interpreter").from_arguments(arg))
+			runtime = assert(require("core.process.interpreter").from_arguments(arg))
 			provider = " LUA_CPATH=" .. quote(package.cpath)
 		end
 		-- A stock-Lua parent cannot lend its native-module ABI to the JIT child.
@@ -1506,10 +1506,10 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 	end)
 
 	it("metrics-maintenance-vectors: the shared helper renders the shared tombstone and export name", function()
-		local Maintenance = require("keystats.metrics_maintenance")
+		local Maintenance = require("metrics.engine.maintenance")
 		local handle = assert(io.open(require("infra.paths").shared(
 			"tests/corpus/keystats/metrics_maintenance_vectors.json"), "rb"))
-		local vectors = require("json").decode(handle:read("*a"))
+		local vectors = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()
 		local tombstone = Maintenance.tombstone(vectors.tombstone.epoch)
 		helpers.assert_eq(tombstone.action, vectors.tombstone.action)

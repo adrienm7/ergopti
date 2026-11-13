@@ -13,7 +13,7 @@
 ;    layout is loaded or changed, never on the typing path; Keylayout_Step, the only
 ;    function called per keystroke, is Map lookups.
 ; 2. One reader, one form. Keylayout_ParseCanonical reads the file into the
-;    canonical form (schema 1) documented in _shared/lua/layouts/keylayout.lua,
+;    canonical form (schema 1) documented in _shared/layouts/engine/composer/keylayout.lua,
 ;    the form the Lua reader, the Python converter and the web composer produce,
 ;    with the same rules: comments stripped, XML character references decoded,
 ;    double or single quoted attribute values, modifierMap tokens folded onto
@@ -189,7 +189,7 @@ _Keylayout_RefuseUnreadableTag(Body, Open) {
  * Reads the text of a .keylayout into the canonical form (schema 1).
  * @param {string} Text - Full file content.
  * @returns {Map} schema, name, map_set, default_index, selects, key_map_sets,
- *   actions and terminators, as _shared/lua/layouts/keylayout.lua documents them.
+ *   actions and terminators, as _shared/layouts/engine/composer/keylayout.lua documents them.
  * @throws {ValueError} When the file cannot be read completely.
  */
 Keylayout_ParseCanonical(Text) {

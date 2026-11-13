@@ -68,9 +68,9 @@ local function run_action(mode, outcome, language)
 	-- Other old literal fixture captions remain unchanged.
 	local Paths = require("infra.paths")
 	local JsonCodec = require("adapters.json_codec")
-	local Locale = assert(loadfile(Paths.shared("lua/locale/core.lua")))()
+	local Locale = assert(loadfile(Paths.shared("core/i18n/engine/core.lua")))()
 	Locale.init({ json_decode = JsonCodec.decode,
-		resolve_locale_path = function(code) return Paths.shared("data/locales/" .. code .. ".json") end })
+		resolve_locale_path = function(code) return Paths.shared("core/i18n/data/locales/" .. code .. ".json") end })
 	Locale.set_locale(language or "en")
 	local magic_prefix = Locale.get("menu.hotstrings.magic_key_prefix")
 
@@ -149,7 +149,7 @@ local function run_action(mode, outcome, language)
 	package.loaded["ui.menu.menu_hotstrings_management"] = nil
 
 	local ok, fixture_or_err = xpcall(function()
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local keymap = {
 			DELAYS_DEFAULT = {
 				STAR_TRIGGER = 0.1,

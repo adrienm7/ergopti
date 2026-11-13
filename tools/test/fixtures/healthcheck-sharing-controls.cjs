@@ -10,10 +10,10 @@ const vm = require('node:vm');
 exports.run = function run(root) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared');
 	const schema = JSON.parse(
-		fs.readFileSync(path.join(shared, 'modules/diagnostics/schema.json'), 'utf8')
+		fs.readFileSync(path.join(shared, 'diagnostics/data/schema.json'), 'utf8')
 	);
 	schema.export_strings = JSON.parse(
-		fs.readFileSync(path.join(shared, 'data/locales/en.json'), 'utf8')
+		fs.readFileSync(path.join(shared, 'core/i18n/data/locales/en.json'), 'utf8')
 	);
 	const corpus = JSON.parse(
 		fs.readFileSync(path.join(shared, 'tests/corpus/healthcheck/share_vectors.json'), 'utf8')
@@ -129,7 +129,7 @@ exports.run = function run(root) {
 		for (const id of ids)
 			assert.ok(id === 'defaults' || spec.file_names[id], driver + ' lists an unknown file ' + id);
 	assert.match(
-		fs.readFileSync(path.join(shared, 'keymap/layer_actions.toml'), 'utf8'),
+		fs.readFileSync(path.join(shared, 'layouts/data/layer_actions.toml'), 'utf8'),
 		new RegExp('^user_file = "' + spec.file_names.layers.replace('.', '\\.') + '"', 'm'),
 		'the layers file name is the layer vocabulary user_file'
 	);

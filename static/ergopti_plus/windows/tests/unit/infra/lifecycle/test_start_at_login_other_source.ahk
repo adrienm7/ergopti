@@ -16,7 +16,7 @@ _TestStartupOtherSourceConflict(Scenario) {
 	try {
 		Driver := Directory . "\windows"
 		DirCreate(Driver . "\infra")
-		DirCreate(Directory . "\_shared\modules\updater")
+		DirCreate(Directory . "\_shared\updater\data")
 		Script := Driver . "\ErgoptiPlus.ahk"
 		Entry := "#Requires Autohotkey v2.0+" . Chr(10)
 			. "#Include infra/bundle.ahk" . Chr(10) . "#Include modules/updater.ahk" . Chr(10)
@@ -26,7 +26,7 @@ _TestStartupOtherSourceConflict(Scenario) {
 		FileAppend(Version . Chr(10), Driver . "\infra\bundle.ahk", "UTF-8")
 		Owner := Scenario == "wrong-repository" ? "foreign" : UPDATER_GH_OWNER
 		Json := '{"github":{"owner":"' . Owner . '","repo":"' . UPDATER_GH_REPO . '"}}'
-		FileAppend(Json, Directory . "\_shared\modules\updater\defaults.json", "UTF-8")
+		FileAppend(Json, Directory . "\_shared\updater\data\defaults.json", "UTF-8")
 		Compiled := Directory . "\current.exe"
 		FileAppend("inert executable", Compiled)
 		Command := StartupLaunchCommand(false, Compiled, Compiled)
@@ -69,13 +69,13 @@ _TestStartupInterpreterArgument(Scenario) {
 	try {
 		Driver := Directory . (InStr(Scenario, "spaced") ? "\source space" : "\windows")
 		DirCreate(Driver . "\infra")
-		DirCreate(Directory . "\_shared\modules\updater")
+		DirCreate(Directory . "\_shared\updater\data")
 		Script := Driver . "\ErgoptiPlus.ahk"
 		FileAppend("#Requires Autohotkey v2.0+`n#Include infra/bundle.ahk`n#Include modules/updater.ahk`n",
 			Script, "UTF-8")
 		FileAppend('global BUNDLE_VERSION := "__BUNDLE_VERSION__"' . "`n", Driver . "\infra\bundle.ahk", "UTF-8")
 		FileAppend('{"github":{"owner":"' . UPDATER_GH_OWNER . '","repo":"' . UPDATER_GH_REPO . '"}}',
-			Directory . "\_shared\modules\updater\defaults.json", "UTF-8")
+			Directory . "\_shared\updater\data\defaults.json", "UTF-8")
 		Interpreter := Directory . "\interpreter.exe"
 		Compiled := Directory . "\current.exe"
 		FileAppend("inert interpreter", Interpreter)

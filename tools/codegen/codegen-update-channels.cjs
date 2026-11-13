@@ -5,7 +5,7 @@
  * MODULE: Update Channel Registry Codegen
  * DESCRIPTION:
  * Emits the shared update-channel registry
- * (_shared/modules/updater/channels.json) for the consumers that cannot read the
+ * (_shared/updater/data/channels.json) for the consumers that cannot read the
  * JSON file themselves: the WebView pages (a script that defines the data), the
  * Windows driver (a data function the AHK matcher interprets) and the macOS
  * launcher (the appcast of every channel, the only ids its commands accept).
@@ -32,7 +32,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared', 'modules', 'updater', 'channels.json');
+const SOURCE = path.join(SP, '_shared', 'updater', 'data', 'channels.json');
 const MATCHER = path.join(SP, '_shared', 'ui', 'update_channels.js');
 const PAGE_OUTPUT = path.join(SP, '_shared', 'ui', '_generated', 'update_channel_registry.js');
 const AHK_OUTPUT = path.join(SP, 'windows', '_generated', 'update_channels.ahk');
@@ -83,7 +83,7 @@ function emitPage(registry) {
 		'\n' +
 		'// ==========================================\n' +
 		'// AUTO-GENERATED — do not edit manually\n' +
-		'// Source: static/ergopti_plus/_shared/modules/updater/channels.json\n' +
+		'// Source: static/ergopti_plus/_shared/updater/data/channels.json\n' +
 		`// Run: ${RUN_HINT}\n` +
 		'// ==========================================\n' +
 		'\n' +
@@ -127,7 +127,7 @@ function emitAhkChannel(channel) {
 function emitAhk(registry) {
 	return (
 		'﻿; _generated/update_channels.ahk\n' +
-		'; AUTO-GENERATED from _shared/modules/updater/channels.json.\n' +
+		'; AUTO-GENERATED from _shared/updater/data/channels.json.\n' +
 		`; DO NOT EDIT BY HAND — run \`${RUN_HINT}\` to refresh.\n` +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +
@@ -165,7 +165,7 @@ function emitSwift(registry) {
 	);
 	return (
 		'// Sources/ErgoptiPlus/UpdateChannels.generated.swift\n' +
-		'// AUTO-GENERATED from _shared/modules/updater/channels.json.\n' +
+		'// AUTO-GENERATED from _shared/updater/data/channels.json.\n' +
 		`// DO NOT EDIT BY HAND -- run \`${RUN_HINT}\` to refresh.\n` +
 		'\n' +
 		'// ==============================================================================\n' +

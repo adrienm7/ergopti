@@ -2,8 +2,8 @@
 --- Actual legacy adapter over closed native FS receipt ports; no SDK authority.
 local root = assert(arg[1])
 package.path = root .. "/static/ergopti_plus/macos/?.lua;" .. root .. "/static/ergopti_plus/macos/?/init.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-local Json = require("json")
+	.. root .. "/static/ergopti_plus/_shared/?.lua;" .. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+local Json = require("core.text.engine.json")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
 local assertions, cases = 0, 0
 local function check(actual, expected)

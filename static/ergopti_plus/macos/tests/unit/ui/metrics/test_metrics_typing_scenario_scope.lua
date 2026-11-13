@@ -11,13 +11,13 @@ local helpers = require("tests.helpers")
 -- Stateless shared helpers that the typing metrics modules load on first use.
 -- The leak check below compares package.loaded around each scenario, so the
 -- snapshot must already hold them: they are not scenario state.
-require("table_util")
-require("native_path")
-require("text_utils")
+require("core.text.engine.table_util")
+require("core.fs.engine.native_path")
+require("core.text.engine.utils_core")
 -- The fixtures install the real timing registry (helpers.provide_timings); it is no scenario state.
 helpers.provide_timings()
-require("toml_codec.source_memo")
-require("file_system.ports") -- the file-system owner checks itself against it when it loads
+require("core.text.engine.toml_codec.source_memo")
+require("core.fs.engine.ports") -- the file-system owner checks itself against it when it loads
 require("adapters.write_lock_path") -- the file-system owner names its cooperative locks with it
 require("lfs") -- a native library: a scenario that loads it first cannot unload it again
 

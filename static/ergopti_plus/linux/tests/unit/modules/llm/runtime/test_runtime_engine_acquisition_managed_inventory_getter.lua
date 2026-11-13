@@ -340,7 +340,7 @@ helpers.describe("profile initialization recovery", function()
 
 	test("(linux-inventory-init-recovery) real malformed preferences can be repaired before Engine retries", function()
 		with_initialization(function(_, engine, profiles)
-			local Sandbox = require("test.config_unused_keys_contract").sandbox
+			local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 			Sandbox.with_config("[llm\n", function(path)
 				local previous_paths, previous_preferences = package.loaded["infra.config_paths"], package.loaded["infra.llm_preferences"]
 				package.loaded["infra.config_paths"] = { config = function() return path end }

@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Policy = require("llm.local_server_auth")
+local Policy = require("ai.engine.local_servers.auth")
 
 
 helpers.describe("api_remote.local_request_fields", function()

@@ -7,8 +7,8 @@ helpers.load_with_stubs("infra.logger")
 -- Exercise the shared fallback transaction directly. The macOS wrapper now
 -- injects adapters.file_system; adapter-specific source revalidation is covered
 -- below with an explicit behavioral double.
-local writer = helpers.load_with_stubs("toml_codec.writer")
-local codec = helpers.load_with_stubs("toml_codec.codec")
+local writer = helpers.load_with_stubs("core.text.engine.toml_codec.writer")
+local codec = helpers.load_with_stubs("core.text.engine.toml_codec.codec")
 
 local function with_file_stubs(open_fn, rename_fn, body)
 	local original_open = io.open
@@ -157,7 +157,7 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 		helpers.assert_eq(wrote, true)
 		helpers.assert_eq(writes, 1)
 		helpers.assert_eq(inline_published, 'shortcuts = {}\n', "complete independent inline deletion image")
-		helpers.assert_nil(require("toml_codec.codec").decode(inline_published).shortcuts.enabled)
+		helpers.assert_nil(require("core.text.engine.toml_codec.codec").decode(inline_published).shortcuts.enabled)
 		-- A quoted spelling of the same key is addressable, and its deletion
 		-- commits only with the key gone (toml-batch-existing-key).
 		local published = nil
@@ -570,46 +570,46 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 	end)
 end)
 
-require("test.toml_quoted_headers_contract")(helpers)
-require("test.toml_batch_existing_key_contract")(helpers)
+require("tests.lua.settings.toml_quoted_headers_contract")(helpers)
+require("tests.lua.settings.toml_batch_existing_key_contract")(helpers)
 do
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/inline_scalar_vectors.json"), "rb"))
-	local corpus = assert(require("json").decode_lossless(file:read("*a")))
+	local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 	file:close()
-	require("test.toml_inline_scalar_vectors_contract")(helpers, corpus, 50)
+	require("tests.lua.settings.toml_inline_scalar_vectors_contract")(helpers, corpus, 50)
 end
 do
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/batch_write_vectors.json"), "rb"))
 	local corpus = assert(Json.decode_lossless(file:read("*a")))
 	file:close()
-	require("test.toml_batch_write_vectors_contract")(helpers, corpus, 144)
+	require("tests.lua.settings.toml_batch_write_vectors_contract")(helpers, corpus, 144)
 end
-require("test.toml_leaf_rows_contract")(helpers)
+require("tests.lua.settings.toml_leaf_rows_contract")(helpers)
 do
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/hotstring_reader_vectors.json"), "rb"))
-	local corpus = assert(require("json").decode_lossless(file:read("*a")))
+	local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 	file:close()
-	require("test.toml_hotstring_reader_vectors_contract")(helpers, corpus, 55)
+	require("tests.lua.settings.toml_hotstring_reader_vectors_contract")(helpers, corpus, 55)
 end
 do
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/leaf_rows_vectors.json"), "rb"))
-	local corpus = assert(require("json").decode_lossless(file:read("*a")))
+	local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 	file:close()
-	require("test.toml_leaf_rows_vectors_contract")(helpers, corpus, 12)
+	require("tests.lua.settings.toml_leaf_rows_vectors_contract")(helpers, corpus, 12)
 end
 
 local noop_vectors_file = assert(io.open(helpers.shared("tests/corpus/config_noop/vectors.json"), "rb"))
-local noop_vectors = assert(require("json").decode(noop_vectors_file:read("*a")))
+local noop_vectors = assert(require("core.text.engine.json").decode(noop_vectors_file:read("*a")))
 noop_vectors_file:close()
-require("test.toml_noop_contract")(helpers, noop_vectors)
+require("tests.lua.settings.toml_noop_contract")(helpers, noop_vectors)
 
-require("test.toml_dotted_keys_contract")(helpers)
+require("tests.lua.settings.toml_dotted_keys_contract")(helpers)
 
 local source_vectors_file = assert(io.open(helpers.shared("tests/corpus/config_source_preservation/vectors.json"), "rb"))
-local source_vectors = assert(require("json").decode(source_vectors_file:read("*a")))
+local source_vectors = assert(require("core.text.engine.json").decode(source_vectors_file:read("*a")))
 source_vectors_file:close()
-require("test.toml_source_preservation_contract")(helpers, source_vectors)
+require("tests.lua.settings.toml_source_preservation_contract")(helpers, source_vectors)
 
 helpers.describe("toml_writer: native conditional removal capability", function()
 	helpers.it("delegates the exact preimage without a separate unlocked source read", function()

@@ -9,9 +9,9 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local Policy = require("llm.local_model_policy")
-local Logger = require("logger.shim")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Policy = require("ai.engine.ollama.local_model_policy")
+local Logger = require("core.logger.engine.shim")
 local I18n = require("infra.i18n")
 local LOG = "modules.llm.local_model_offer"
 
@@ -43,7 +43,7 @@ end
 --- @return boolean|nil nil when no native question could be shown.
 local function confirm(title, text, opts)
 	local Shell = require("adapters.shell_runner")
-	title = require("window_titles").compose(title)
+	title = require("core.ui.engine.window_titles").compose(title)
 	local command = require("ui.native_dialog").command() .. " --question --no-markup --default-cancel --title="
 		.. Shell.quote(title) .. " --text=" .. Shell.quote(text)
 		.. " --ok-label=" .. Shell.quote(I18n.get("menu.llm.btn_download"))

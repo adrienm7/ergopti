@@ -165,7 +165,7 @@ if (criteria.some((criterion) => /^Row\["criterion"\]$/.test(criterion))) {
 
 const { parse } = require('smol-toml');
 const manifest = parse(
-	read(path.join(SP, '_shared', 'modules', 'features', 'manifest.toml')).replace(
+	read(path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml')).replace(
 		/^\[\[features\.([^\]]+)\]\]$/gm,
 		(_match, section) => `[[entries]]\nsection = "${section}"`
 	)
@@ -195,7 +195,7 @@ check(
 
 // The key each slot names, through the shared physical-key registry.
 const registry = JSON.parse(
-	read(path.join(SP, '_shared', 'data', 'keycodes', 'physical_keys.json'))
+	read(path.join(SP, '_shared', 'layouts', 'data', 'keycodes', 'physical_keys.json'))
 );
 const byName = new Map();
 for (const record of Object.values(registry.keys)) {
@@ -258,7 +258,7 @@ check(
 // The maintainer's first group (2026-09-30): the switch, the restore, the clear,
 // a separator, then the slots; the Shortcuts submenu ticks the group's title
 // from the same getter as the switch, so the tick can always be changed.
-const menu = JSON.parse(read(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json')));
+const menu = JSON.parse(read(path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json')));
 const group = (menu.script_control_group || []).map((row) => `${row.type}:${row.id || ''}`);
 check(
 	JSON.stringify(group) ===

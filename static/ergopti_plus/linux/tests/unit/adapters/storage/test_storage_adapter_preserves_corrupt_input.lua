@@ -15,15 +15,15 @@
 --- nested value was dropped and its inner keys leaked to the top level. The
 --- encoder also serialised Lua arrays as string-keyed objects. Any non-flat
 --- stored value was therefore corrupted on reload. The fix routes encode/decode
---- through the shared _shared/lua/json.lua codec; this test fails (nested/array
---- fields come back nil) against the bespoke codec and passes against json.lua.
+--- through the shared _shared/core/text/engine/json.lua codec; this test fails (nested/array
+--- fields come back nil) against the bespoke codec and passes against core/text/engine/json.lua.
 --- ==============================================================================
 
 package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
 local Fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local helpers, make_temp_config_root, storage_cohort_fixture =
 	Fixture.helpers, Fixture.make_temp_config_root, Fixture.storage_cohort_fixture
 
@@ -156,7 +156,7 @@ helpers.describe("native script storage cohorts", function()
 			local observed = { delete = files.delete, write_if_unchanged = function(name, bytes, expected)
 				calls[#calls + 1] = name
 				if name == path then
-					local snapshot = assert(require("json").decode_lossless(read(backup)))
+					local snapshot = assert(require("core.text.engine.json").decode_lossless(read(backup)))
 					helpers.assert_eq(snapshot.source.content, '{"a":false,"future":null,"empty":[],"foreign":2}')
 					helpers.assert_eq(storage.set("foreign", 88), false, "actual same-file publication reentry refuses")
 				end
@@ -166,9 +166,9 @@ helpers.describe("native script storage cohorts", function()
 			helpers.assert_eq(calls, { backup, path }); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
 			helpers.assert_true(storage.set("foreign", 3)); helpers.assert_true(storage.release_owned(owner))
 			helpers.assert_true(storage.acquire_owned(owner, { "new", "a" })); helpers.assert_true(storage.restore_owned(owner, receipt))
-			local actual = assert(require("json").decode_lossless(read(path)))
+			local actual = assert(require("core.text.engine.json").decode_lossless(read(path)))
 			helpers.assert_eq(actual.a, false); helpers.assert_nil(actual.new); helpers.assert_eq(actual.foreign, 3)
-			helpers.assert_true(require("json").is_null(actual.future)); helpers.assert_true(require("json").is_array(actual.empty))
+			helpers.assert_true(require("core.text.engine.json").is_null(actual.future)); helpers.assert_true(require("core.text.engine.json").is_array(actual.empty))
 			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_true(storage.release_owned(owner))
 		end)
 	end)
@@ -319,7 +319,7 @@ helpers.describe("script storage receipt finalization", function()
 				return result
 			end }
 			helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = 3 } }, backup, racing), false)
-			helpers.assert_eq(require("json").decode_lossless(read(path)), { a = 1, foreign = 99 })
+			helpers.assert_eq(require("core.text.engine.json").decode_lossless(read(path)), { a = 1, foreign = 99 })
 			helpers.assert_eq(storage.pending_owned(owner, receipt), false); helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_true(storage.release_owned(owner))
 		end)
 	end)
@@ -387,7 +387,7 @@ helpers.describe("script storage numeric source admission", function()
 				helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
 				local expected = source:gsub('"a":false', '"a":true', 1)
 				helpers.assert_eq(read(path), expected)
-				helpers.assert_eq(require("json").decode_lossless(read(backup)).source.content, source)
+				helpers.assert_eq(require("core.text.engine.json").decode_lossless(read(backup)).source.content, source)
 				helpers.assert_true(storage.set("foreign", true))
 				helpers.assert_eq(read(path), expected:sub(1, -2) .. ',"foreign":true}')
 				helpers.assert_true(storage.restore_owned(owner, receipt))
@@ -403,7 +403,7 @@ helpers.describe("script storage numeric source admission", function()
 	helpers.it("script-storage-cohort representable tokens and escaped numeric strings preserve native source", function()
 		local source = [[{"a":false,"fraction":0.125,"padded":16.50e+1,"exponent":1e3,"zero":0e9999,"future":null,"empty":[],"9007199254740993":"1e-400 0.1","escaped":"\\\"9007199254740993"}]]
 		storage_cohort_fixture(source, function(storage, files, path, backup, _, read)
-			local json = require("json"); local owner = {}
+			local json = require("core.text.engine.json"); local owner = {}
 			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
 			local receipt, cells = storage.capture_owned(owner); helpers.assert_true(type(receipt) == "table"); helpers.assert_eq(cells.a.value, false)
 			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
@@ -464,7 +464,7 @@ helpers.describe("script storage raw producer identity", function()
 					end } end
 					helpers.assert_eq(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, producer), false)
 					if stage == "readback" then
-						helpers.assert_eq(require("json").decode_lossless(read(path)).a, true, "actual effect requires retained compensation")
+						helpers.assert_eq(require("core.text.engine.json").decode_lossless(read(path)).a, true, "actual effect requires retained compensation")
 						helpers.assert_true(storage.pending_owned(owner, receipt)); helpers.assert_eq(storage.release_owned(owner), false)
 					else helpers.assert_eq(read(path), '{"a":false,"future":[]}'); helpers.assert_eq(storage.pending_owned(owner, receipt), false) end
 					if stage == "publish" then helpers.assert_nil(read(backup)) end
@@ -508,7 +508,7 @@ helpers.describe("native storage exact root-member source publication", function
 			storage_cohort_fixture(input, function(storage, _, path, backup, _, read)
 				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
 				local receipt = storage.capture_owned(owner)
-				local decoded = require("json").decode_lossless(token)
+				local decoded = require("core.text.engine.json").decode_lossless(token)
 				if token == "-0" and 1 / decoded == -math.huge then
 					helpers.assert_true(type(receipt) == "table", "runtime retains exact negative-zero inverse")
 				else helpers.assert_nil(receipt) end
@@ -521,14 +521,14 @@ helpers.describe("native storage exact root-member source publication", function
 	helpers.it("rejects actual codec instance or method replacement without equality callbacks", function()
 		for _, mode in ipairs({ "instance", "method" }) do
 			storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, files, path, backup, _, read)
-				local json = require("json"); local owner = {}
+				local json = require("core.text.engine.json"); local owner = {}
 				helpers.assert_true(storage.acquire_owned(owner, { "a" }))
 				local receipt = assert(storage.capture_owned(owner))
 				local original = json.splice_root_object_source
-				if mode == "instance" then package.loaded["json"] = setmetatable({}, { __eq = function() error("forged equality") end })
+				if mode == "instance" then package.loaded["core.text.engine.json"] = setmetatable({}, { __eq = function() error("forged equality") end })
 				else json.splice_root_object_source = function() return '{}', {}, {} end end
 				local result = storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files)
-				package.loaded["json"], json.splice_root_object_source = json, original
+				package.loaded["core.text.engine.json"], json.splice_root_object_source = json, original
 				helpers.assert_eq(result, false); helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
 				helpers.assert_nil(read(backup)); helpers.assert_eq(storage.pending_owned(owner, receipt), false)
 				helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
@@ -567,15 +567,15 @@ helpers.describe("storage source-read foreign publication fences", function()
 	helpers.it("refuses a codec successor inserted by actual classified source read", function()
 		storage_cohort_fixture('{"a":false,"future":0.1}', function(storage, _, path, _, _, read)
 			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
-			local json, reader = require("json"), require("infra.regular_file_reader")
+			local json, reader = require("core.text.engine.json"), require("infra.regular_file_reader")
 			local open = reader.open
 			reader.open = function(name, ...)
 				local handle, detail, errno = open(name, ...)
-				if name == path then package.loaded["json"] = {} end
+				if name == path then package.loaded["core.text.engine.json"] = {} end
 				return handle, detail, errno
 			end
 			local okay, committed = pcall(storage.set, "foreign", true)
-			reader.open, package.loaded["json"] = open, json
+			reader.open, package.loaded["core.text.engine.json"] = open, json
 			helpers.assert_true(okay); helpers.assert_eq(committed, false)
 			helpers.assert_eq(read(path), '{"a":false,"future":0.1}')
 			helpers.assert_true(storage.set("foreign", true))
@@ -592,7 +592,7 @@ helpers.describe("storage native backup transitive codec authority", function()
 	helpers.it("rejects source-read quote replacement before backup and permits the repaired same owner", function()
 		local source = '{"a":false,"future":0.1}'
 		storage_cohort_fixture(source, function(storage, files, path, backup, _, read)
-			local json, reader = require("json"), require("infra.regular_file_reader")
+			local json, reader = require("core.text.engine.json"), require("infra.regular_file_reader")
 			local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" }))
 			local receipt = assert(storage.capture_owned(owner))
 			local open, quote, replaced = reader.open, json.quote, false
@@ -612,7 +612,7 @@ helpers.describe("storage native backup transitive codec authority", function()
 			helpers.assert_eq(read(path), source); helpers.assert_nil(read(backup))
 			helpers.assert_eq(storage.pending_owned(owner, receipt), false)
 			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = true } }, backup, files))
-			helpers.assert_eq(require("json").decode_lossless(read(backup)).source.content, source)
+			helpers.assert_eq(require("core.text.engine.json").decode_lossless(read(backup)).source.content, source)
 			helpers.assert_true(storage.restore_owned(owner, receipt)); helpers.assert_eq(read(path), source)
 			helpers.assert_true(storage.release_owned(owner)); helpers.assert_true(storage.forget_owned(owner, receipt))
 		end)

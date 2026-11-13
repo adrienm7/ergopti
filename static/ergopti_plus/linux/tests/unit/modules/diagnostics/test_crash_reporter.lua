@@ -25,7 +25,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 
 
@@ -77,8 +77,8 @@ local EXPECTED_DIR = TMP_HOME .. "/.local/state/" .. FOLDER .. "/logs/crash_repo
 --- @return table The freshly required crash_reporter module.
 local function load_crash_reporter()
 	-- Neutralise the logger require so dump()'s error log stays silent in CI.
-	local prev_shim = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local prev_shim = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 
 	-- Redirect HOME only; every other variable falls through to the real env.
 	local saved_getenv = os.getenv
@@ -92,7 +92,7 @@ local function load_crash_reporter()
 
 	-- Always restore globals, even if the require itself raised.
 	os.getenv = saved_getenv
-	package.loaded["logger.shim"] = prev_shim
+	package.loaded["core.logger.engine.shim"] = prev_shim
 
 	if not ok then error(mod, 0) end
 	return mod
@@ -229,7 +229,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_not_nil(cap.path, "dump opened a file")
 		helpers.assert_eq(cap.mode, "wx", "report acquisition must refuse to replace an earlier incident")
 		helpers.assert_true(cap.path:sub(1, #EXPECTED_DIR) == EXPECTED_DIR, "file under the crash dir")
-		local report = require("json").decode(cap.content)
+		local report = require("core.text.engine.json").decode(cap.content)
 		helpers.assert_not_nil(report, "the file is a JSON document")
 		helpers.assert_eq(report.driver, "linux")
 		helpers.assert_eq(report.module, "prediction_engine", "module name in the report")
@@ -242,7 +242,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_not_nil(report.log_tail, "the log ring buffer field is present")
 		-- Same keys, same order as every other driver's report.
 		local last = 0
-		for _, field in ipairs(require("crash_report").FIELDS) do
+		for _, field in ipairs(require("diagnostics.engine.reports.crash_report").FIELDS) do
 			local at = cap.content:find('"' .. field[1] .. '":', 1, true)
 			helpers.assert_true(at ~= nil and at > last, "field " .. field[1] .. " is written in the shared order")
 			last = at
@@ -289,7 +289,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 	end)
 
 	helpers.it("keeps at most the shared cap of reports and never deletes another file", function()
-		local CrashReport = require("crash_report")
+		local CrashReport = require("diagnostics.engine.reports.crash_report")
 		local listing, deleted = { { name = "notes.txt", kind = "file" }, { name = "sub", kind = "directory" },
 			{ name = "2025-01-01T00-00-00Z42.json", kind = "file" } }, {}
 		for index = 1, CrashReport.MAX_REPORTS + 2 do

@@ -31,7 +31,7 @@ local Keycodes  = require("infra.keycodes")
 local Catalogue = require("infra.script_chord_catalogue")
 -- The shared keycode registry: each slot's sentinel constant and its number.
 -- infra.keycodes only adds the Karabiner name of a code (to_name).
-local SharedKeycodes = require("keycodes")
+local SharedKeycodes = require("platform.input.keycodes.core")
 
 -- The Karabiner key the Delete slot also reads with fn held.
 local FN_DELETE_KEY = "delete_or_backspace"

@@ -80,7 +80,7 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 			"only the coordinator may exit after proving the exact fence")
 		-- NUI-001: the refusal is told with the menubar Quit's one notice.
 		helpers.assert_eq(#notices, 1, "a refused shortcut or gesture Quit tells the user")
-		helpers.assert_eq(notices[1].level, require("feature_notice").LEVEL_REFUSAL)
+		helpers.assert_eq(notices[1].level, require("menu.engine.feature_notice").LEVEL_REFUSAL)
 	end)
 
 	helpers.it("falls back to the coordinator when timer scheduling throws or returns no handle", function()

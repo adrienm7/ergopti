@@ -222,7 +222,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 	end)
 	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
 		local Loader = require("platform.remap.tap_hold_loader")
-		local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+		local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
 		local loaded = Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
@@ -311,7 +311,7 @@ end)
 helpers.describe("configured pair publication lifecycle",function()
 	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
 		local Loader=require("platform.remap.tap_hold_loader")
-		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+		local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
 		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = true } })
 		local bytes=base_text
 		local hook={};hook.set_remapper=function(engine,callback)
@@ -332,7 +332,7 @@ helpers.describe("configured pair publication lifecycle",function()
 			local pairs=require("modules.shortcuts.key_combinations");local token={}
 			helpers.assert_true(pairs.acquire_configuration(token));helpers.assert_eq(hook.engine,nil)
 			local next_text=bytes:gsub('caps_lock_then_tab = "run_program"','caps_lock_then_tab = "copy"'):gsub('caps_lock_then_tab = "shift"','caps_lock_then_tab = "alt"')
-			local selected=pairs.configuration_candidate(require("toml_codec").decode(next_text),true)
+			local selected=pairs.configuration_candidate(require("core.text.engine.toml_codec").decode(next_text),true)
 			helpers.assert_true(pairs.apply_configuration(token,selected));helpers.assert_eq(hook.engine,nil,"unpublished candidate cannot receive physical input")
 			bytes=next_text
 			helpers.assert_true(pairs.release_configuration(token));helpers.assert_true(hook.engine~=nil)
@@ -343,7 +343,7 @@ helpers.describe("configured pair publication lifecycle",function()
 			local _,tap,slot,release=hook.engine:process(15,0,100,origin())
 			helpers.assert_eq(tap,"copy");helpers.assert_eq(slot,binding);helpers.assert_true(release.ack(true))
 			for _,unsupported in ipairs({"one_shot_shift"}) do
-				local accepted=pcall(pairs.configuration_candidate,require("toml_codec").decode(next_text:gsub('"copy"','"'..unsupported..'"')),true)
+				local accepted=pcall(pairs.configuration_candidate,require("core.text.engine.toml_codec").decode(next_text:gsub('"copy"','"'..unsupported..'"')),true)
 				assert_false(accepted,"native-only tap state must not be claimed as a dispatched pair action")
 			end
 		end)
@@ -393,7 +393,7 @@ end)
 helpers.describe("independent pair enablement across empty configuration",function()
 	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
 		local Loader=require("platform.remap.tap_hold_loader")
-		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
+		local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
 		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
 		local hook={};hook.set_remapper=function(engine,callback)
@@ -414,7 +414,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 			local pairs=require("modules.shortcuts.key_combinations")
 			local function publish(text)
 				local token={};helpers.assert_true(pairs.acquire_configuration(token))
-				helpers.assert_true(pairs.apply_configuration(token,pairs.configuration_candidate(require("toml_codec").decode(text),true)))
+				helpers.assert_true(pairs.apply_configuration(token,pairs.configuration_candidate(require("core.text.engine.toml_codec").decode(text),true)))
 				bytes=text;helpers.assert_true(pairs.release_configuration(token))
 			end
 			for cycle=1,2 do
@@ -749,7 +749,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 	end)
 	helpers.it("an original observer refuses closed capability copies busy sessions and export rebinding", function()
 		InputOwnerFixture.with_session(nil, function(s)
-			local Custody = require("input.modifier_custody")
+			local Custody = require("platform.input.modifier_custody")
 			local exact = Custody.new(s.writer, s.output); helpers.assert_true(exact.output_current())
 			local copied = {}; local view = s.writer.output_view(s.output)
 			helpers.assert_eq(Custody.new(s.writer, copied), nil)
@@ -761,7 +761,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 	end)
 	helpers.it("the original observer refuses a getter that reenters then returns its old view", function()
 		InputOwnerFixture.with_session(nil, function(s)
-			local Custody = require("input.modifier_custody"); local exact, reenter
+			local Custody = require("platform.input.modifier_custody"); local exact, reenter
 			local original = s.writer.output_view
 			local ports = { capture_output_observer = s.writer.capture_output_observer, output_view = function(cap)
 				local view = original(cap)
@@ -2026,12 +2026,12 @@ end)
 helpers.describe("original Manager pair action after genuine Logger callback (controlled transport)", function()
 	local Fixture = require("tests.support.input_owner_fixture")
 	local function logger_session(mode)
-		local previous_logger, previous_shim = package.loaded.logger, package.loaded["logger.shim"]
+		local previous_logger, previous_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
 		-- Fresh genuine core: no replacement debug method or invented effect ACK.
-		package.loaded.logger, package.loaded["logger.shim"] = nil, nil
-		local logger = require("logger")
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
+		local logger = require("core.logger.engine")
 		logger.set_level("debug")
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local called, reason = pcall(function()
 			Fixture.with_manager_session({ before_manager = function(s)
 				s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
@@ -2066,7 +2066,7 @@ helpers.describe("original Manager pair action after genuine Logger callback (co
 			end)
 		end)
 		logger.set_sink(nil)
-		package.loaded.logger, package.loaded["logger.shim"] = previous_logger, previous_shim
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = previous_logger, previous_shim
 		if not called then error(reason, 0) end
 	end
 	for _, mode in ipairs({ "source", "pause", "positive" }) do
@@ -2081,11 +2081,11 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 	helpers.it("(pair-manager-identity-rejoin) rejects real restored aliases without invoking __eq", function()
 		local Fixture = require("tests.support.input_owner_fixture")
 		for _, role in ipairs({ "combinations", "engine" }) do
-			local previous_logger, previous_shim = package.loaded.logger, package.loaded["logger.shim"]
-			package.loaded.logger, package.loaded["logger.shim"] = nil, nil
-			local logger = require("logger")
+			local previous_logger, previous_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
+			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
+			local logger = require("core.logger.engine")
 			logger.set_level("debug")
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			local original, original_metatable, altered_metatable, previous_eq
 			local called, reason = pcall(function()
 				Fixture.with_manager_session({ before_manager = function(s)
@@ -2125,7 +2125,7 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 				altered_metatable.__eq = previous_eq
 				setmetatable(original, original_metatable)
 			end
-			package.loaded.logger, package.loaded["logger.shim"] = previous_logger, previous_shim
+			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = previous_logger, previous_shim
 			if not called then error(reason, 0) end
 		end
 	end)

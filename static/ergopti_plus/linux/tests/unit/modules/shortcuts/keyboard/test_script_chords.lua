@@ -16,8 +16,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local TomlCodec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local TomlCodec = require("core.text.engine.toml_codec")
 
 -- evdev codes of the four keys.
 local KEY_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_ESC = 28, 14, 111, 1
@@ -116,7 +116,7 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 	helpers.it("script-chord: refuses a switch change racing the file write", function()
 		with_chords(nil, function(Chords, log)
 			helpers.assert_eq(Chords.chords_enabled(), true)
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local original = Writer.batch_write
 			local external = "[shortcuts.script_control]\nchords_enabled = false\n"
 			local ok, err = pcall(function()

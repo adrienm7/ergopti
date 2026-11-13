@@ -38,7 +38,7 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 	helpers.it("the modifier frame owns translated choices and retains every physical-key callback", function()
 		-- The choices name their modifiers from the shared key name table in the
 		-- user's language: French reads « Maj », never the English « Shift ».
-		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 		local french = require("adapters.json_codec").decode(file:read("*a"))
 		file:close()
 		local translate = function(key) return key:find("^key_name%.") and french[key] or nil end
@@ -94,8 +94,8 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 				end, debug.traceback)
 				root[section] = declaration
 				if not ok then error(detail, 0) end
-				helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(rebuild()),
-					require("test.menu_native_child_rows").hierarchy(before))
+				helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(rebuild()),
+					require("tests.lua.menu.native_child_rows").hierarchy(before))
 			end)
 		end)
 	end
@@ -108,7 +108,7 @@ local function with_fixed_controls_locale(locale, scenario)
 	local native, owner, receipt, acquired, scratch, fresh_bridge
 	local ok, err = pcall(function()
 		local driver = helpers.driver_root():gsub("/+$", "")
-		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared/lua"
+		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
 		helpers.load_with_stubs("infra.logger")
 		scratch = assert(os.tmpname())
@@ -226,7 +226,7 @@ helpers.describe("Complete LLM generation: independent native images", function(
 				end, debug.traceback)
 				root[section] = declaration
 				if not ok then error(detail, 0) end
-				helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(rebuild()), require("test.menu_native_child_rows").hierarchy(before))
+				helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(rebuild()), require("tests.lua.menu.native_child_rows").hierarchy(before))
 			end)
 		end)
 	end
@@ -243,7 +243,7 @@ helpers.describe("Complete LLM outer boundary context", function()
 					fixture.state.llm_enabled, fixture.state.llm_model = enabled, model
 					local i18n = require("infra.i18n")
 					local head = function(key) return (i18n.get(key):match("^[^%%{]*")) end
-					require("test.ai_menu_layout_contract").assert_block(helpers, fixture.top_level_callbacks().rebuild(), {
+					require("tests.lua.ai.menu_layout_contract").assert_block(helpers, fixture.top_level_callbacks().rebuild(), {
 						profile = head("menu.profiles.profile_label_prefix"),
 						test = head("menu.llm.test_prediction"),
 						trigger = head("menu.llm.trigger_menu_title"),

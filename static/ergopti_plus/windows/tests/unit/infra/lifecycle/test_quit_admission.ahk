@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Quit Admission Tests (Windows)
 ; DESCRIPTION:
-; The cases of _shared/lua/test/quit_admission_contract.lua on the Windows port,
+; The cases of _shared/tests/lua/core_lifecycle/quit_admission_contract.lua on the Windows port,
 ; the tray's request with an OnExit veto, the notice, and the feature notices'
-; contract of _shared/lua/test/feature_notice_contract.lua.
+; contract of _shared/tests/lua/menu/feature_notice_contract.lua.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -59,14 +59,14 @@ Test("quit admission: the shared decision on Windows (PAR-45)", _TQA_Decide)
 ; The causes and their log lines are the Lua owner's, word for word.
 _TQA_SameWording() {
 	global _SharedDir, _DriverDir
-	Lua := FileRead(_SharedDir . "\lua\quit_admission.lua", "UTF-8")
+	Lua := FileRead(_SharedDir . "\core\lifecycle\engine\shutdown\quit_admission.lua", "UTF-8")
 	for Cause, Text in QUIT_ADMISSION_MESSAGES {
 		Assert(InStr(Lua, '"' . Cause . '"', true) > 0, "the Lua owner names " . Cause)
 		Assert(InStr(Lua, '"' . Text . '"', true) > 0, "the Lua owner words " . Text)
 	}
 	for Name in QUIT_ADMISSION_FACTS
 		Assert(InStr(Lua, '"' . Name . '"', true) > 0, "the Lua owner names the fact " . Name)
-	Toml := FileRead(_SharedDir . "\modules\timings\constants.toml", "UTF-8")
+	Toml := FileRead(_SharedDir . "\core\timing\data\constants.toml", "UTF-8")
 	Assert(RegExMatch(Toml, "m)^user_quit_deadline_ms = (\d+)", &Deadline) > 0, "the shared deadline is declared")
 	Body := FileRead(_DriverDir . "\infra\lifecycle.ahk", "UTF-8")
 	Assert(InStr(Body, "global LIFECYCLE_USER_QUIT_DEADLINE_MS := " . Deadline[1]) > 0,

@@ -61,7 +61,7 @@ helpers.describe("AI submenu configuration guard (ai-submenus-newer-config-2026-
 		with_activation("ollama", { true }, nil, function(_action, state, calls)
 			state.llm_enabled = true
 			local protected = newer
-			package.loaded["config_migrate"] = {
+			package.loaded["settings.engine.migration.migrate"] = {
 				read_only_reason = function() return protected and "newer schema" or nil end,
 				read_only_status = function() return protected and "newer" or nil end,
 			}

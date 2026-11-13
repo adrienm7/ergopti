@@ -65,7 +65,7 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 
 /**
  * Per-call output-token budget for a backend request, the twin of
- * _shared/lua/llm/request_plan/token_budget.lua `for_call`: a call returning one
+ * _shared/ai/engine/request_plan/token_budget.lua `for_call`: a call returning one
  * prediction keeps the base budget; a batch call returning N gets N * (base + 5),
  * the five being a variant's numbering and separator.
  * @param {integer} maxTokens     Shared PromptBuilder per-prediction budget (>= 1).

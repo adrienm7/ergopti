@@ -7,7 +7,7 @@
 --- Two lines wrote a user's personal_info value into the driver's own log, in
 --- full, on every expansion:
 ---
----   1. _shared/lua/dynamic_hotstrings/init.lua — "Buffer match: suffix='%s' →
+---   1. _shared/hotstrings/engine/dynamic/core.lua — "Buffer match: suffix='%s' →
 ---      result='%s'", at DEBUG, in code BOTH Lua drivers run.
 ---   2. linux/modules/dynamic_hotstrings/manager.lua — "Dynamic expansion: '%s'
 ---      → '%s'", at INFO.
@@ -57,15 +57,15 @@ local function with_recording_logger(body)
 		set_level = function() end, set_sink = function() end,
 		ring_buffer_snapshot = function() return {} end,
 	}
-	local previous = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = recorder
+	local previous = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = recorder
 	-- Drop the modules under test so they re-require the recorder rather than
 	-- keeping the no-op stub they captured at first load.
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.manager"] = nil
 	local ok, err = pcall(body, lines)
-	package.loaded["logger.shim"] = previous
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["core.logger.engine.shim"] = previous
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.manager"] = nil
 	if not ok then error(err, 0) end
 end
@@ -88,7 +88,7 @@ helpers.describe("dynamic expansion log privacy", function()
 
 	helpers.it("the shared engine's buffer-match line carries no resolved value", function()
 		with_recording_logger(function(lines)
-			local Engine = require("dynamic_hotstrings")
+			local Engine = require("hotstrings.engine.dynamic.core")
 			Engine.add_rule("@i", "personal_info", function() return SECRET end)
 			local match = Engine.match_buffer("@i", "dynamic", nil)
 
@@ -103,7 +103,7 @@ helpers.describe("dynamic expansion log privacy", function()
 
 	helpers.it("but the length survives, because that is the diagnostic", function()
 		with_recording_logger(function(lines)
-			local Engine = require("dynamic_hotstrings")
+			local Engine = require("hotstrings.engine.dynamic.core")
 			Engine.add_rule("@i", "personal_info", function() return SECRET end)
 			Engine.match_buffer("@i", "dynamic", nil)
 
@@ -117,7 +117,7 @@ helpers.describe("dynamic expansion log privacy", function()
 
 	helpers.it("a resolver that returns nothing logs nothing about it", function()
 		with_recording_logger(function(lines)
-			local Engine = require("dynamic_hotstrings")
+			local Engine = require("hotstrings.engine.dynamic.core")
 			Engine.add_rule("@x", "personal_info", function() return "" end)
 			local match = Engine.match_buffer("@x", "dynamic", nil)
 			helpers.assert_true(match == nil,

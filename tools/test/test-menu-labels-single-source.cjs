@@ -5,13 +5,13 @@
  * MODULE: Menu Labels Single-Source Guard
  * DESCRIPTION:
  * Verifies that menu label formatters are single-sourced in
- * _shared/lua/menu/labels.lua: fmt_count, decorate_section. Log-token presentation now belongs
+ * _shared/menu/engine/labels.lua: fmt_count, decorate_section. Log-token presentation now belongs
  * to the validated shared menu choice, so the retired emoji helper cannot return.
  *
  * ROOT CAUSE ENCODED:
  * The log-level emoji map, count formatter, and section header decoration were
  * duplicated across macOS (Lua), Windows (AHK), and Linux (Lua). The Lua copies
- * were fused into _shared/lua/menu/labels.lua.
+ * were fused into _shared/menu/engine/labels.lua.
  *
  * IT CHECKED CONSUMPTION, WHICH IS NOT THE SAME AS ABSENCE:
  * The old gate named three macOS files and asserted each required the shared
@@ -22,7 +22,7 @@
  * only confirm the compliance it already knew about.
  *
  * It is now an EXCLUSION ratchet over all three drivers: no file outside
- * _shared/lua/menu/labels.lua may define any remaining formatter, unless it
+ * _shared/menu/engine/labels.lua may define any remaining formatter, unless it
  * is named in DUPLICATES with a reason. Two things are asserted about that list —
  * a duplicate not on it fails, and an entry whose duplicate is gone fails too, so
  * the list shrinks as the migration proceeds and can never rot.
@@ -36,7 +36,7 @@ const p = require('path');
 
 const ROOT = p.resolve(__dirname, '..', '..');
 const SP = p.join(ROOT, 'static/ergopti_plus');
-const CANONICAL = 'static/ergopti_plus/_shared/lua/menu/labels.lua';
+const CANONICAL = 'static/ergopti_plus/_shared/menu/engine/labels.lua';
 
 const FORMATTERS = ['fmt_count', 'decorate_section'];
 const RETIRED = ['log_level_emoji'];

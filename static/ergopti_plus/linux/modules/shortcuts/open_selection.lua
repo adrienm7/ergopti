@@ -7,7 +7,7 @@
 --- selected files' paths, as Explorer and Finder do on the other drivers;
 --- elsewhere it opens what the primary selection names (a URL, an IP address,
 --- localhost, a mail address, a file or a folder) through xdg-open, or searches
---- the web for plain text. The classification is _shared/lua/open_target,
+--- the web for plain text. The classification is _shared/shortcuts/engine,
 --- shared with macOS and ported to Windows.
 ---
 --- FEATURES & RATIONALE:
@@ -18,7 +18,7 @@
 ---    name, a registry key or a Windows path) is logged and notified, never
 ---    searched instead: the user asked to open that thing.
 --- 3. A file manager publishes its selection as text/uri-list after Ctrl+C.
----    The clipboard adapter reads that target, _shared/lua/file_selection
+---    The clipboard adapter reads that target, _shared/core/fs/engine
 ---    decodes its file: URIs, and the clipboard keeps the paths, one per line.
 ---    Ctrl+C is sent only to a known file manager: in a terminal it would
 ---    interrupt the running program. A compositor that names no focused
@@ -29,11 +29,11 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local OpenTarget = require("open_target")
-local FileSelection = require("file_selection")
-local Logger = require("logger.shim")
+local OpenTarget = require("shortcuts.engine.open_target")
+local FileSelection = require("core.fs.engine.file_selection")
+local Logger = require("core.logger.engine.shim")
 local FileManagerFolder = require("adapters.file_manager_folder")
 
 local LOG = "shortcuts.open_selection"

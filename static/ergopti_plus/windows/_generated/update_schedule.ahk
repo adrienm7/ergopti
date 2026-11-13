@@ -1,5 +1,5 @@
 ﻿; _generated/update_schedule.ahk
-; AUTO-GENERATED from _shared/modules/updater/defaults.json.
+; AUTO-GENERATED from _shared/updater/data/defaults.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:update-schedule` to refresh.
 #Requires AutoHotkey v2.0
 

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local MODULES = { "adapters.keyboard_geometry", "adapters.json_codec", "infra.logger" }
 local ENVIRONMENT = "ERGOPTI_KEYBOARD_GEOMETRY_V1"
 local PROPERTY = 42

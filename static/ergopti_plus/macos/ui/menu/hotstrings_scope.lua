@@ -30,18 +30,18 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local KeyPath = require("toml_codec.key_path")
-local Planner = require("hotstrings.scope_overrides")
-local TerminatorScope = require("hotstrings.terminator_scope")
-local Codec = require("toml_codec")
-local ScopeFile = require("config_scope_file")
-local Extensions = require("hotstrings.extensions")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Planner = require("hotstrings.engine.scope_overrides")
+local TerminatorScope = require("hotstrings.engine.matcher.terminator_scope")
+local Codec = require("core.text.engine.toml_codec")
+local ScopeFile = require("settings.engine.scope.file")
+local Extensions = require("hotstrings.engine.extensions")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu.hotstrings_scope"
 
@@ -49,22 +49,22 @@ local LOG = "menu.hotstrings_scope"
 --- is absent where the menu state is the only reader on this driver, and a
 --- getter is present where the native owner can read its value back.
 local OWNERS = {
-	{ key = require("config_keys").LEAF.REPEAT_KEY_ENABLED, setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
-	{ key = require("config_keys").LEAF.EXPANSION_DELAY, setter = "set_base_delay", getter = "get_base_delay" },
-	{ key = require("config_keys").LEAF.IDLE_RESET_SECONDS, setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
-	{ key = require("config_keys").LEAF.CASCADE_MAX_ARROWS, setter = "set_cascade_max_arrows", getter = "get_cascade_max_arrows" },
-	{ key = require("config_keys").LEAF.CLICK_RESETS_WORD, setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
-	{ key = require("config_keys").LEAF.ARROW_RESETS_WORD, setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
-	{ key = require("config_keys").LEAF.SHORTCUT_RESETS_WORD, setter = "set_shortcut_resets_word",
+	{ key = require("settings.engine.keys").LEAF.REPEAT_KEY_ENABLED, setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
+	{ key = require("settings.engine.keys").LEAF.EXPANSION_DELAY, setter = "set_base_delay", getter = "get_base_delay" },
+	{ key = require("settings.engine.keys").LEAF.IDLE_RESET_SECONDS, setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
+	{ key = require("settings.engine.keys").LEAF.CASCADE_MAX_ARROWS, setter = "set_cascade_max_arrows", getter = "get_cascade_max_arrows" },
+	{ key = require("settings.engine.keys").LEAF.CLICK_RESETS_WORD, setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
+	{ key = require("settings.engine.keys").LEAF.ARROW_RESETS_WORD, setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
+	{ key = require("settings.engine.keys").LEAF.SHORTCUT_RESETS_WORD, setter = "set_shortcut_resets_word",
 		getter = "is_shortcut_resets_word_enabled" },
-	{ key = require("config_keys").LEAF.TAP_HOLD_RESETS_WORD, setter = "set_tap_hold_resets_word",
+	{ key = require("settings.engine.keys").LEAF.TAP_HOLD_RESETS_WORD, setter = "set_tap_hold_resets_word",
 		getter = "is_tap_hold_resets_word_enabled" },
-	{ key = require("config_keys").LEAF.TRIGGER_CHAR, setter = "set_trigger_char", getter = "get_trigger_char" },
-	{ key = require("config_keys").LEAF.MAGIC_KEY_SOURCE, setter = "set_magic_key_source", getter = "get_magic_key_source" },
-	{ key = require("config_keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },
-	{ key = require("config_keys").LEAF.PREVIEW_AUTOCORRECT_ENABLED, setter = "set_preview_autocorrect_enabled" },
-	{ key = require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },
-	{ key = require("config_keys").LEAF.PREVIEW_AI_ENABLED, setter = "set_preview_ai_enabled" },
+	{ key = require("settings.engine.keys").LEAF.TRIGGER_CHAR, setter = "set_trigger_char", getter = "get_trigger_char" },
+	{ key = require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE, setter = "set_magic_key_source", getter = "get_magic_key_source" },
+	{ key = require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },
+	{ key = require("settings.engine.keys").LEAF.PREVIEW_AUTOCORRECT_ENABLED, setter = "set_preview_autocorrect_enabled" },
+	{ key = require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },
+	{ key = require("settings.engine.keys").LEAF.PREVIEW_AI_ENABLED, setter = "set_preview_ai_enabled" },
 	{ key = "dynamichotstrings_enabled" },
 	-- The date feature row's enabled leaf (hotstrings.dynamic.date.enabled since
 	-- the L20 fix); dynamic hotstrings read it from the menu state.
@@ -222,8 +222,8 @@ function M.new(options)
 		-- The base expansion delay is one of the scope's own scalars: after it the base
 		-- is the recommended value (restore) or the default (clear), and the delays below
 		-- are offsets of THAT base, whatever the user's is today.
-		base_after = mode == "recommended" and Manifest.recommended_for(require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
-			or Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
+		base_after = mode == "recommended" and Manifest.recommended_for(require("settings.engine.keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
+			or Manifest.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
 		local inherit = Config.delay_projection({}, base_after)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
 			inherited = function(name, section) return inherit(name, section, registered[name].metadata) end,
@@ -291,7 +291,7 @@ function M.new(options)
 			local value = values[owner.key]
 			if value ~= nil and owner.native ~= "dynamic" and owner.setter and current(owner.key) ~= value then
 				if keymap[owner.setter](value) ~= true then return false end
-				if owner.key == require("config_keys").LEAF.TRIGGER_CHAR and options.editor then options.editor.set_trigger_char(value) end
+				if owner.key == require("settings.engine.keys").LEAF.TRIGGER_CHAR and options.editor then options.editor.set_trigger_char(value) end
 			end
 		end
 		if programmable then

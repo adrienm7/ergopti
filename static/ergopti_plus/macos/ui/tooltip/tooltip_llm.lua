@@ -22,11 +22,11 @@ local LOG = "tooltip_llm"
 
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
-local LlmLine = require("tooltip.llm_line")
-local KeyNames = require("keycodes.key_names")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
+local KeyNames = require("platform.input.keycodes.key_names")
 local i18n = require("infra.i18n")
 local HotPath = require("infra.hotpath_profiler")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local MAC_KEYCODES_NUMBERS = {
 	[18] = 1, [19] = 2, [20] = 3, [21] = 4, [23] = 5,
@@ -1029,7 +1029,7 @@ local SELECTED_ROLE_COLOR = { typed = "unsel_gray", corrected = "corr_sel", next
 
 --- Builds a single line of text reflecting the diff states with precise coloring.
 --- What the line reads and the role of each piece is the shared rule
---- (tooltip/llm_line.lua); this only gives each piece its colour and weight.
+--- (core/ui/engine/tooltip/llm_line.lua); this only gives each piece its colour and weight.
 --- @param prediction table The prediction payload.
 --- @param is_selected boolean True if this prediction is currently highlighted.
 --- @param look table|nil { color?, paragraph? } A colour replacing every role's,
@@ -1064,7 +1064,7 @@ local function assemble_blocks(state, reserved_count)
 
 	local styled_gap = hs.styledtext.new("\n", { font = { name = Config.fonts.main, size = Config.sizes.gap }, color = Config.colors.invis })
 
-	-- The shortcut column (_shared/modules/tooltip/constants.toml [llm_ui]): every
+	-- The shortcut column (_shared/core/ui/data/tooltip/constants.toml [llm_ui]): every
 	-- prediction row shows the chord that inserts it, muted, in a text element of
 	-- its own laid over the predictions block and right-aligned in the block's
 	-- whole frame, so the column ends on the panel's inner edge. A tab stop placed
@@ -1252,7 +1252,7 @@ local function refresh_chain_timing()
 		_tooltip_first_show_at = now
 		_chain_ttft_ms         = (now - _chain_start_time) * 1000
 		Logger.debug(LOG, "TTFT captured: %.0f ms.", _chain_ttft_ms)
-		require("perf_budget").judge(Logger, LOG, "prediction.display", _chain_ttft_ms,
+		require("core.logger.engine.perf_budget").judge(Logger, LOG, "prediction.display", _chain_ttft_ms,
 			function() return require("infra.timings").ms("budgets", "prediction_display_ms") end)
 	end
 end

@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local lfs = require("lfs")
-local Files = require("hotstrings.personal_files")
+local Files = require("hotstrings.engine.catalogue.personal_files")
 local SectionBackups = require("tests.support.section_settings_backups")
 
 local function read(path)
@@ -41,7 +41,7 @@ local function fixture(body, options)
 		"modules.llm.prediction_engine", "modules.llm.warmup_controller", "modules.llm.streaming_handler",
 		"modules.keymap.terminators", "modules.keymap.terminator_replay", "ui.hotstring_editor",
 		"infra.preferences", "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom", "ui.menu.keymap_lifecycle",
-		"infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.hotstrings_config_window",
+		"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.hotstrings_config_window",
 	}, function()
 		local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
 		local primary, alpha, beta = root .. "/personal_hotstrings.toml", root .. "/alpha.toml", root .. "/beta.toml"
@@ -181,7 +181,7 @@ future = "keep every neighbor"
 				toml_resolver = function(id)
 					if id == "personal" then return primary end
 					local components = Files.components(id)
-					return components and root .. "/" .. table.concat(components, "/") or helpers.shared("modules/hotstrings/" .. id .. ".toml")
+					return components and root .. "/" .. table.concat(components, "/") or helpers.shared("hotstrings/data/catalogue/" .. id .. ".toml")
 				end }))
 			local Loader = require("infra.personal_hotstrings")
 			local Preferences = require("infra.preferences")
@@ -199,7 +199,7 @@ future = "keep every neighbor"
 					return native_load(name, ...)
 				end
 			end
-			local loaded = Loader.load({ bundled_hotstrings_dir = helpers.shared("modules/hotstrings/"), saved_preferences = saved })
+			local loaded = Loader.load({ bundled_hotstrings_dir = helpers.shared("hotstrings/data/catalogue/"), saved_preferences = saved })
 			helpers.assert_eq(#loaded, 3, "the real boot scanner adopts only primary and two personal source files")
 			helpers.assert_true(Keymap.apply_hotstring_preferences(saved), "the native boot projection applies actual durable choices")
 			local alpha_id, beta_id = Files.describe({ "alpha.toml" }).id, Files.describe({ "beta.toml" }).id
@@ -234,7 +234,7 @@ end
 --- The application configuration-window port is controlled; source and preference
 --- mutations still traverse the real controller, registry and conditional writer.
 local function personal_menu(f)
-	package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["locale.core"] = nil, nil, nil
+	package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
 	package.loaded["infra.manifest_menu"], package.loaded["ui.menu.menu_hotstrings_custom"] = nil, nil
 	local i18n = require("infra.i18n"); i18n.init()
 	local locale = require("infra.locale"); locale.set_locale("en")
@@ -406,7 +406,7 @@ helpers.describe("actual native personal file menu publication", function()
 			local current = menu.file("alpha"); local tooltip = (current.menu or current.submenu)[5]
 			helpers.assert_eq(f.Config.resolve(f.alpha_id, nil).show_tooltip, false)
 			helpers.assert_true(tooltip.fn(), "the actual rendered tooltip control publishes source metadata")
-			helpers.assert_eq(require("toml_codec").decode(assert(read(f.alpha)))._meta.show_tooltip, true)
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(assert(read(f.alpha)))._meta.show_tooltip, true)
 			helpers.assert_eq(f.Config.resolve(f.alpha_id, nil).show_tooltip, true)
 			helpers.assert_eq(f.Config.resolve(f.alpha_id, "probe").show_tooltip, false, "the unselected section override retains its independent choice")
 			local saved, status = f.Preferences.load(f.preferences); helpers.assert_eq(status, "ok")
@@ -529,11 +529,11 @@ helpers.describe("source-owned personal controls native publication", function()
 				for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 					local value = ({ delay = 0.35, color = "#c0ffee", show_tooltip = true, priority = 60 })[field]
 					helpers.assert_true(f.Controller.apply(f.binding(), selected, field, value), field .. " publication is acknowledged")
-					local source = require("toml_codec").decode(assert(read(f.alpha)))
+					local source = require("core.text.engine.toml_codec").decode(assert(read(f.alpha)))
 					local leaf = selected and source._meta.sections[selected] or source._meta
 					helpers.assert_eq(leaf[field], value)
 					helpers.assert_eq(f.Config.resolve(f.alpha_id, selected)[field], value, "the live resolver uses the published source field")
-					local override = require("toml_codec").decode(assert(read(f.overrides)))
+					local override = require("core.text.engine.toml_codec").decode(assert(read(f.overrides)))
 					helpers.assert_nil(override.personal_ext_alpha[field], "the file's masking legacy field is retired")
 					if selected then helpers.assert_nil(override.personal_ext_alpha.probe[field]) end
 					helpers.assert_eq(override.personal_ext_alpha.future, { keep = "unknown owner" })
@@ -688,7 +688,7 @@ helpers.describe("source-owned personal controls native publication", function()
 				helpers.assert_true(menu.category_scope_fn(ctx, { f.alpha_id }, true)())
 				helpers.assert_eq(f.Registry.is_group_enabled(f.alpha_id), true)
 				local encoded = assert(read(f.preferences))
-				local decoded = require("toml_codec").decode(encoded)
+				local decoded = require("core.text.engine.toml_codec").decode(encoded)
 				helpers.assert_eq(decoded.hotstrings.groups[f.alpha_id], true, "canonical true is durable even though the fresh-source default is true")
 				helpers.assert_eq(decoded.hotstrings.modules[f.alpha_id].probe, true)
 				for _, bytes in ipairs({ "# Durable legacy preference notes.\n", "personal_ext_beta = true\n", "future_group = false\n",
@@ -762,12 +762,12 @@ helpers.describe("source-owned personal controls native publication", function()
 			helpers.assert_eq(f.Config.resolve(f.alpha_id, "probe").priority, 63)
 			helpers.assert_eq(f.Config.resolve(f.alpha_id, "probe").delay, 0.8)
 			helpers.assert_eq(f.winner(), "Alpha", "the actual native collision uses the acknowledged metadata priority")
-			local source = require("toml_codec").decode(assert(read(f.alpha)))
+			local source = require("core.text.engine.toml_codec").decode(assert(read(f.alpha)))
 			helpers.assert_eq(source._meta.priority, 20, "the active legacy file priority transfers to preserve siblings")
 			helpers.assert_eq(source._meta.sections.probe.priority, 63)
 			local bytes = assert(read(f.overrides))
 			helpers.assert_true(bytes:find(unknown, 1, true) ~= nil, "the unsupported canonical block stays byte exact")
-			local parsed = require("toml_codec").decode(bytes)
+			local parsed = require("core.text.engine.toml_codec").decode(bytes)
 			helpers.assert_eq(parsed[id].priority, 51); helpers.assert_eq(parsed[id].probe.priority, 52)
 			helpers.assert_nil(parsed.personal_ext_alpha.priority)
 			helpers.assert_nil(parsed.personal_ext_alpha.probe.priority)
@@ -796,7 +796,7 @@ priority = 15
 			helpers.assert_eq(f.Config.resolve(f.alpha_id, "probe").color, "#abcdef")
 			local source = assert(read(f.alpha))
 			helpers.assert_true(source:find('[_meta.section_delays]\nprobe = 0.42 # Retain the historical typing delay.\n', 1, true) ~= nil)
-			local parsed = require("toml_codec").decode(source)
+			local parsed = require("core.text.engine.toml_codec").decode(source)
 			helpers.assert_nil(parsed._meta.sections.probe.delay, "a color edit must not rewrite another metadata field")
 			helpers.assert_eq(parsed._meta.sections.probe.color, "#abcdef")
 			helpers.assert_true(f.Config.reload())

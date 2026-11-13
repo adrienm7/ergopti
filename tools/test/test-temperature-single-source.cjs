@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Forbids any macOS LLM backend adapter from hardcoding the default generation
  * temperature (the ``tonumber(x) or 0.1`` idiom) at a call site. The default
- * has one source — ``llm_temperature`` in _shared/modules/llm/defaults.json,
+ * has one source — ``llm_temperature`` in _shared/ai/data/defaults.json,
  * surfaced once as ApiCommon.DEFAULT_TEMPERATURE — and every defensive fallback
  * must resolve to it, never to a per-site literal.
  *
@@ -35,8 +35,8 @@ const SSOT_FILE = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
-	'llm',
+	'ai',
+	'data',
 	'defaults.json'
 );
 

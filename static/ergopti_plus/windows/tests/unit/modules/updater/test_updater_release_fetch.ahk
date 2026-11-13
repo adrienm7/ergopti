@@ -41,7 +41,7 @@ _UpdaterTest_VersionVectorParity() {
 	; cross-driver vector table (also driven by the JS and macOS suites) so the
 	; three hand-ported semver impls cannot drift. The fail-closed non-semver
 	; fallback (expect 0) is the case that had drifted before D-1.
-	VectorsPath := A_ScriptDir . "\..\..\_shared\modules\updater\version_vectors.json"
+	VectorsPath := A_ScriptDir . "\..\..\_shared\updater\data\version_vectors.json"
 	AssertTrue(FileExist(VectorsPath) != "", "version vectors must exist at: " . VectorsPath)
 	Data := JsonParse(FileRead(VectorsPath, "UTF-8"))
 	Vectors := Data["vectors"]

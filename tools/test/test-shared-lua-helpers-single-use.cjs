@@ -6,8 +6,8 @@
  * DESCRIPTION:
  * The macOS driver, the Linux driver and the shared Lua they both load copy,
  * count, trim, shell-quote and percent-encode only through the shared owners:
- * _shared/lua/table_util.lua, _shared/lua/text_utils/init.lua and, for the parent
- * directory or the last component of a path, _shared/lua/native_path.lua.
+ * _shared/core/text/engine/table_util.lua, _shared/core/text/engine/utils_core.lua and, for the parent
+ * directory or the last component of a path, _shared/core/fs/engine/native_path.lua.
  *
  * ROOT CAUSE ENCODED:
  * The cross-OS parity audit (R16, K10) counted 26 deep-copy definitions, the
@@ -43,12 +43,12 @@ const BASELINE_FILE = path.join(__dirname, 'shared-lua-helpers-baseline.json');
 const TREES = [
 	{ dir: 'macos', excluded: 'macos/tests/', minFiles: 300 },
 	{ dir: 'linux', excluded: 'linux/tests/', minFiles: 200 },
-	{ dir: '_shared/lua', excluded: '_shared/lua/test/', minFiles: 200 }
+	{ dir: '_shared', excluded: '_shared/tests/', minFiles: 200 }
 ];
 
-const TABLE_OWNER = '_shared/lua/table_util.lua';
-const TEXT_OWNER = '_shared/lua/text_utils/init.lua';
-const PATH_OWNER = '_shared/lua/native_path.lua';
+const TABLE_OWNER = '_shared/core/text/engine/table_util.lua';
+const TEXT_OWNER = '_shared/core/text/engine/utils_core.lua';
+const PATH_OWNER = '_shared/core/fs/engine/native_path.lua';
 
 // Reusable regex fragments over comment-free Lua source.
 const NAME = String.raw`([\w.:]+)`;
@@ -68,7 +68,7 @@ function rx(...parts) {
 const DETECTORS = {
 	trim: {
 		owner: TEXT_OWNER,
-		use: 'require("text_utils").trim(text)',
+		use: 'require("core.text.engine.utils_core").trim(text)',
 		patterns: [
 			/(["'])\^%s\*\(\.-\)%s\*\$\1/g,
 			/gsub\(\s*(["'])\^%s[+*]\1\s*,\s*(?:""|'')\s*\)\s*:\s*gsub\(\s*(["'])%s[+*]\$\2\s*,\s*(?:""|'')\s*\)/g,
@@ -78,17 +78,17 @@ const DETECTORS = {
 	},
 	shell_quote: {
 		owner: TEXT_OWNER,
-		use: 'require("text_utils").shell_quote(value)',
+		use: 'require("core.text.engine.utils_core").shell_quote(value)',
 		patterns: [/"'\\\\''"/g]
 	},
 	percent_encode: {
 		owner: TEXT_OWNER,
-		use: 'require("text_utils").percent_encode(text)',
+		use: 'require("core.text.engine.utils_core").percent_encode(text)',
 		patterns: [/(["'])%%%02[Xx]\1/g]
 	},
 	shallow_copy: {
 		owner: TABLE_OWNER,
-		use: 'require("table_util").shallow_copy(source)',
+		use: 'require("core.text.engine.table_util").shallow_copy(source)',
 		patterns: [
 			rx(
 				String.raw`function\s+`,
@@ -105,7 +105,7 @@ const DETECTORS = {
 	},
 	deep_copy: {
 		owner: TABLE_OWNER,
-		use: 'require("table_util").deep_copy(value) or .deep_copy_with_keys(value)',
+		use: 'require("core.text.engine.table_util").deep_copy(value) or .deep_copy_with_keys(value)',
 		patterns: [
 			rx(
 				String.raw`function\s+`,
@@ -123,7 +123,7 @@ const DETECTORS = {
 	},
 	sorted_keys: {
 		owner: TABLE_OWNER,
-		use: 'require("table_util").sorted_keys(source)',
+		use: 'require("core.text.engine.table_util").sorted_keys(source)',
 		patterns: [
 			rx(
 				String.raw`for\s+(\w+)\s+in\s+pairs\s*`,
@@ -135,17 +135,17 @@ const DETECTORS = {
 	},
 	dirname: {
 		owner: PATH_OWNER,
-		use: 'require("native_path").dirname(path)',
+		use: 'require("core.fs.engine.native_path").dirname(path)',
 		patterns: [/(["'])\^\(\.\*\)\/\[\^\/\]\+\$\1/g]
 	},
 	basename: {
 		owner: PATH_OWNER,
-		use: 'require("native_path").basename(path)',
+		use: 'require("core.fs.engine.native_path").basename(path)',
 		patterns: [/\bmatch\(\s*(["'])\(?\[\^\/\]\+\)?\$\1/g]
 	},
 	count: {
 		owner: TABLE_OWNER,
-		use: 'require("table_util").count(source)',
+		use: 'require("core.text.engine.table_util").count(source)',
 		patterns: [
 			rx(
 				String.raw`for\s+\w+(?:\s*,\s*\w+)?\s+in\s+pairs\s*`,
@@ -373,8 +373,8 @@ function judge(rel, code, helper, allowed, debt) {
 // The verdict itself must fail on a planted inline copy and pass once the
 // baseline names it, so a rewrite of the judge cannot turn the ratchet off.
 for (const [helper, planted, call] of [
-	['basename', 'local name = path:match("([^/]+)$")', 'native_path").basename'],
-	['trim', 'local line = raw:match("^%s*(.-)%s*$")', 'text_utils").trim']
+	['basename', 'local name = path:match("([^/]+)$")', 'core.fs.engine.native_path").basename'],
+	['trim', 'local line = raw:match("^%s*(.-)%s*$")', 'core.text.engine.utils_core").trim']
 ]) {
 	const code = stripComments(planted, '.lua');
 	const refused = judge('planted.lua', code, helper, 0, 0);

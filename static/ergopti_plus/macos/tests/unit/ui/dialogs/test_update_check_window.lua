@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local STUBS = { "adapters.update_launcher", "ui.changelog", "ui.error_dialog", "ui.log_openers", "ui.ui_builder" }
 

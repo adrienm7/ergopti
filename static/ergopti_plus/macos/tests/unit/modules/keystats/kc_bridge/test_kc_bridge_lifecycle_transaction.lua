@@ -201,7 +201,7 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 	metrics_cache_dir = function() return "./metrics_cache" end }
 		for _, name in ipairs({
 			"adapters.input_source_broker", "modules.keystats.log_manager",
-			"modules.keystats.context_tracker", "keystats.metrics",
+			"modules.keystats.context_tracker", "metrics.engine.metrics",
 			"modules.keystats.watchers", "adapters.process_lifecycle",
 			"adapters.keyboard_hook", "adapters.event_provenance",
 			"adapters.synthetic_input",

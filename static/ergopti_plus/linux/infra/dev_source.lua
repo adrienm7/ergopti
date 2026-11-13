@@ -22,7 +22,7 @@
 ---    parameters, so every branch is tested without a daemon.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 
 local M = {}
 
@@ -31,7 +31,7 @@ M.ENVIRONMENT = Identifiers.dev_source.environment
 --- The driver folder inside a clone.
 M.DRIVER_SUBPATH = "/static/ergopti_plus/linux"
 --- The shared Lua tree inside a clone, reloaded like the driver's own sources.
-M.SHARED_LUA_SUBPATH = "/static/ergopti_plus/_shared/lua"
+M.SHARED_LUA_SUBPATH = "/static/ergopti_plus/_shared"
 --- The developer launcher inside a clone, relayed by a Reload.
 M.LAUNCHER_SUBPATH = "/tools/dev/run-linux-dev.sh"
 

@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json    = require("json")
+local json    = require("core.text.engine.json")
 
 
 
@@ -141,5 +141,5 @@ for _, adapter_name in ipairs(ADAPTERS_UNDER_TEST) do
 	end)
 end
 
-require("test.file_system_ports_contract").register(helpers, "macos", 8,
+require("tests.lua.core_fs.file_system_ports_contract").register(helpers, "macos", 8,
 	function() return helpers.load_with_stubs("adapters.file_system") end)

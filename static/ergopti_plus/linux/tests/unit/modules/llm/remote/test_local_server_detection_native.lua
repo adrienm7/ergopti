@@ -13,12 +13,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local uv = require("luv")
 
 local restore = helpers.keep_loaded({ "modules.llm.local_server_ports" })
 
-local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"), "rb")):read("*a"))
+local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 
 -- Answers GET <anything>/models like an OpenAI-compatible server. The port
 -- comes from the flag the real server takes, else from FAKE_PORT.
@@ -163,7 +163,7 @@ helpers.describe("Local server detection against real processes (local-server-de
 			end
 			local Ports = helpers.load_module("modules.llm.local_server_ports")
 			Ports._home = function() return home end
-			local Policy = require("llm.local_server_ports")
+			local Policy = require("ai.engine.local_servers.ports_core")
 			local entries = {}
 			for _, id in ipairs(CATALOGUE.server_order) do
 				entries[#entries + 1] = { id = id, base_url = CATALOGUE.servers[id].base_url,

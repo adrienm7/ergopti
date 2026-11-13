@@ -81,7 +81,7 @@ PHASE=install
 # The installed tree, as its launcher loads it; the restart relay is this
 # checkout's, as it is the running daemon's own code that restarts it.
 LIB="${HOME}/.local/lib/ergopti"
-export LUA_PATH="${LIB}/linux/?.lua;${LIB}/linux/?/init.lua;${LIB}/_shared/lua/?.lua;${LIB}/_shared/lua/?/init.lua;;"
+export LUA_PATH="${LIB}/linux/?.lua;${LIB}/linux/?/init.lua;${LIB}/_shared/?.lua;${LIB}/_shared/?/init.lua;;"
 PHASE=updater
 if [ -n "${EVIDENCE_DIR}" ]; then
 	mkdir -p "${EVIDENCE_DIR}" || echo "Updater evidence directory could not be created." >&2
@@ -107,8 +107,8 @@ NEW="$(sed -n 's/^version=//p' "${LIB}/_shared/build_stamp.txt")"
 # Where that daemon writes its logs: state, not data (infra/config_paths.lua),
 # in the folder its own installed registry names. It is the newest published
 # release, which may predate this checkout's folder name, so the name is read
-# from the installed _shared/lua/app_dirs.lua (LUA_PATH above), not spelled.
-LOGS="${XDG_STATE_HOME}/$(luajit -e 'io.write(require("app_dirs").linux.relative)')" \
+# from the installed _shared/core/fs/engine/app_dirs.lua (LUA_PATH above), not spelled.
+LOGS="${XDG_STATE_HOME}/$(luajit -e 'io.write(require("core.fs.engine.app_dirs").linux.relative)')" \
 	|| { CAUSE_STATUS=$?; echo "FAIL the installed logs folder could not be read"; exit 1; }
 for _ in $(seq 1 40); do
 	grep -qs "daemon starting (version ${NEW}," "${LOGS}/"*.log && break

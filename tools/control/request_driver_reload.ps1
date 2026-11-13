@@ -10,7 +10,7 @@ window message (the Diagnostics control endpoint). The driver hands the request
 to its own reload owner, which keeps the pause and the configuration hand-off.
 This script never starts a driver, never ends one and never retries: a reload
 that stays "requested" past the timeout has an unknown outcome. The declaration
-is static/ergopti_plus/_shared/modules/control/driver_control.json.
+is static/ergopti_plus/_shared/diagnostics/data/control/driver_control.json.
 
 Exit codes: 0 completed, 1 refused, 2 still requested at the timeout, 3 no
 reachable driver.
@@ -26,8 +26,8 @@ $ErrorActionPreference = 'Stop'
 if ([IntPtr]::Size -ne 8) { throw 'The driver control requires the Windows x64 host.' }
 
 $shared = Join-Path $PSScriptRoot '..\..\static\ergopti_plus\_shared'
-$spec = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shared 'modules\control\driver_control.json') | ConvertFrom-Json
-$appDirs = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shared 'modules\paths\app_dirs.toml')
+$spec = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shared 'diagnostics\data\control\driver_control.json') | ConvertFrom-Json
+$appDirs = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shared 'core\fs\data\paths\app_dirs.toml')
 # The [app] folder name: another table ([owned_runtime.macos]) also declares one.
 if ($appDirs -notmatch '(?m)^\[app\]\r?\n(?:(?!\[)[^\n]*\n)*?folder_name = "([^"]+)"') {
 	throw 'The application folder name is not declared.'

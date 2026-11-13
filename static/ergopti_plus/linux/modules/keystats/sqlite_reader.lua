@@ -9,15 +9,15 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
 
-local Logger = require("logger.shim")
-local Utils = require("keystats.utils")
-local MediaStore = require("keystats.media_store")
+local Logger = require("core.logger.engine.shim")
+local Utils = require("metrics.engine.utils")
+local MediaStore = require("metrics.engine.media.store")
 local SqliteCommand = require("modules.keystats.sqlite_command")
-local Queries = require("keystats.queries")
-local AppCategoryStore = require("keystats.app_category_store")
-local ok_json, Json = pcall(require, "json")
+local Queries = require("metrics.engine.queries")
+local AppCategoryStore = require("metrics.engine.apps.category_store")
+local ok_json, Json = pcall(require, "core.text.engine.json")
 local LOG = "modules.keystats.sqlite_reader"
 
 -- How long a read waits for the writer's COMMIT lock (single source: timings).
@@ -283,7 +283,7 @@ function M.read_manifest(sqlite_path, start_date, end_date, apps)
 		return rows
 	end
 	-- The per-app-day aggregates. The SQL is the shared catalogue's
-	-- (_shared/data/db/queries.sql) in the CLI dialect, so field names match the
+	-- (_shared/metrics/data/db/queries.sql) in the CLI dialect, so field names match the
 	-- macOS and Windows projections exactly: the dashboard is the same one.
 	local where = filters(start_date, end_date, apps)
 	local function manifest_query(name, media_owned)
@@ -550,7 +550,7 @@ local function merge_ngram(target, token, count, esrc_json, total_delay, error_c
 	target[token] = item
 end
 
---- Renders the shared catalogue's n-gram token read (_shared/data/db/queries.sql)
+--- Renders the shared catalogue's n-gram token read (_shared/metrics/data/db/queries.sql)
 --- for one family table. Source JSON is merged in Lua rather than selected with
 --- MIN()/MAX(): source counts are additive across dates and devices, just like
 --- the token count. TOTAL accumulates as a float, avoiding SUM's integer

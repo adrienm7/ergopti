@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Policy = require("tap_hold.key_combinations")
+local Policy = require("tap_hold.engine.key_combinations")
 
 local KEYS = { "escape", "tab", "caps_lock", "left_shift", "left_ctrl", "win", "left_alt", "space", "alt_gr",
 	"right_ctrl", "right_shift", "enter", "backspace", "delete" }

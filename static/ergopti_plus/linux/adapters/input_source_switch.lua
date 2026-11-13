@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Lists the desktop session's keyboard layouts and makes one of them active,
 --- for the automatic layout switch on a pause, a resume and a quit
---- (_shared/lua/layout/pause_switch_policy.lua decides which).
+--- (_shared/layouts/engine/layout/pause_switch_policy.lua decides which).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Three backends, one id per backend. GNOME (X11 or Wayland) keeps its
@@ -43,8 +43,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local TextUtils = require("text_utils")
+local Logger = require("core.logger.engine.shim")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "adapters.input_source_switch"
 

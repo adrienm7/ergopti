@@ -35,7 +35,7 @@ const fail = (message) => failures.push(message);
 
 // The published receipt domains must follow the native ABI owner.
 const collectionContract = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'collection.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'collection.json'), 'utf8')
 );
 const nativeHeader = fs.readFileSync(
 	path.join(
@@ -157,7 +157,9 @@ function loadPage() {
 	sandbox.atob = (text) => Buffer.from(text, 'base64').toString('binary');
 	sandbox.TextDecoder = TextDecoder;
 	// i18n.js fetches the locale; the test serves en.json, as the virtual host does
-	const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+	const en = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
 	sandbox.fetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(en) });
 	vm.createContext(sandbox);
 	const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
@@ -168,7 +170,9 @@ function loadPage() {
 	}
 	// The strings the hosts inject; en.json is the canonical catalogue
 	sandbox.window.i18n_apply(
-		JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'))
+		JSON.parse(
+			fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+		)
 	);
 	return { sandbox, document, posted, scheduled, elements: document.elements };
 }
@@ -180,13 +184,13 @@ function loadPage() {
 // ==================================
 
 const schema = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'schema.json'), 'utf8')
 );
 schema.export_strings = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'data/locales/en.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'core/i18n/data/locales/en.json'), 'utf8')
 );
 const redaction = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'redaction.json'), 'utf8')
 );
 const context = { home: '/home/jdoe', user: 'jdoe', case_insensitive: false };
 // The host capability of every page the tests open that does not exercise collection.
@@ -446,7 +450,9 @@ function init(page, detailed) {
 	{
 		// A report opened the prefilled form: the status says so, not where a
 		// file went
-		const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+		const en = JSON.parse(
+			fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+		);
 		page.sandbox.window.receiveDiagnostics({ type: 'action', action: 'report', ok: true });
 		if (page.elements.status.textContent !== en['notify.report_bug_body']) {
 			fail(`a sent report reads "${page.elements.status.textContent}"`);
@@ -458,7 +464,9 @@ function init(page, detailed) {
 	// Today's errors file does not exist before the day's first warning: no
 	// failure, and the page says why nothing opened (open-missing-file)
 	{
-		const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+		const en = JSON.parse(
+			fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+		);
 		page.sandbox.window.receiveDiagnostics({
 			type: 'action',
 			action: 'open_path',
@@ -981,7 +989,7 @@ for (const [driver, collects] of [
 		}
 	});
 	const strings = JSON.parse(
-		fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8')
+		fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
 	);
 	if (
 		page.elements['collection-progress'].textContent !== strings['healthcheck.collection.failed'] ||
@@ -1141,7 +1149,9 @@ for (const [driver, collects] of [
 		fail('a new snapshot must reset the day log box');
 
 	// The notice must say what the product can and cannot do about the upload
-	const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+	const en = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
 	if (!/Ergopti cannot remove it/.test(en['healthcheck.day_log.upload_notice']))
 		fail('the upload notice must say Ergopti cannot remove the attachment');
 }

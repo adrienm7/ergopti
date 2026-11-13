@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Contract = require("test.pause_switch_policy_contract")
+local Contract = require("tests.lua.settings.pause_switch_policy_contract")
 Contract.run(helpers, helpers.shared("tests/corpus/layouts/pause_switch_vectors.json"))
 Contract.run_manifest(helpers, require("infra.manifest_reader"))
 

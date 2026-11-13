@@ -39,7 +39,7 @@ const { buildTinyGguf } = require('./tiny-gguf.cjs');
 const runtime = require('./windows-owned-runtime.cjs');
 
 const RELEASE = JSON.parse(
-	fs.readFileSync(path.join(runtime.SHARED, 'modules/llm/ollama_release.json'), 'utf8')
+	fs.readFileSync(path.join(runtime.SHARED, 'ai/data/ollama_release.json'), 'utf8')
 );
 const STAMP_NAME = 'ergopti-e2e-release.json';
 const CERTIFICATE_REFUSAL = /x509|certificate/i;

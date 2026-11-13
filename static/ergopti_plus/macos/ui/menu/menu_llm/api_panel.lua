@@ -13,13 +13,13 @@
 ---    refreshes immediately, and the entry is only persisted to Keychain if the
 ---    availability probe succeeds — on failure the in-memory state is rolled back.
 --- 3. Automatic names: every entry reads <provider>/<model>, told apart by host
----    then order when two share it (_shared/lua/llm/api_entry_names.lua). Adding
+---    then order when two share it (_shared/ai/engine/api/entry_names.lua). Adding
 ---    an entry asks no name, and a `label` an earlier build stored is not read.
 --- ==============================================================================
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
+local SaveFailure = require("settings.engine.publication.save_failure")
 local llm_mod       = require("modules.llm")
 local i18n          = require("infra.i18n")
 local Logger        = require("infra.logger")
@@ -27,11 +27,11 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
-local EntryNames     = require("llm.api_entry_names")
-local EntryIdentity  = require("llm.api_entry_identity")
-local LocalAuth      = require("llm.local_server_auth")
-local UrlTemplate    = require("llm.api_url_template")
-local TextUtils = require("text_utils")
+local EntryNames     = require("ai.engine.api.entry_names")
+local EntryIdentity  = require("ai.engine.api.entry_identity")
+local LocalAuth      = require("ai.engine.local_servers.auth")
+local UrlTemplate    = require("ai.engine.api.url_template")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "api_panel"
 
@@ -787,7 +787,7 @@ function M.build(ctx)
 		if not boundary_rows then return "", {} end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 	end
-	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_TEST_ACTIVE, {
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("settings.engine.keys").COMMAND.API_TEST_ACTIVE, {
 		api_test_active = function()
 			local probed_id = active_entry.id
 			local probed_label = active_label
@@ -844,7 +844,7 @@ function M.build(ctx)
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
 	-- configured so the user does not chase a no-op click. Test sits above
 	-- it: the destructive action stays last.
-	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_REMOVE_ACTIVE, {
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("settings.engine.keys").COMMAND.API_REMOVE_ACTIVE, {
 		api_remove_active = function()
 			if _mutation_owner ~= nil then return false end
 			-- Confirm before destroying — the saved token is gone for good once

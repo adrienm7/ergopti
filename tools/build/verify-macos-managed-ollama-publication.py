@@ -14,13 +14,14 @@ import zipfile
 # The app bundle name and the release host are declared once, in this checkout.
 IDENTIFIERS = json.loads(
     (
-        Path(__file__).resolve().parents[2] / "static/ergopti_plus/_shared/data/identifiers.json"
+        Path(__file__).resolve().parents[2]
+        / "static/ergopti_plus/_shared/core/text/data/identifiers.json"
     ).read_text(encoding="utf-8")
 )
 APP_BUNDLE = IDENTIFIERS["app"]["bundle"]
 CATALOGUE = "managed_ollama_release.json"
 BUNDLE_CATALOGUE = (
-    APP_BUNDLE + "/Contents/Resources/static/ergopti_plus/_shared/modules/llm/" + CATALOGUE
+    APP_BUNDLE + "/Contents/Resources/static/ergopti_plus/_shared/ai/data/" + CATALOGUE
 )
 
 
@@ -99,7 +100,7 @@ def verify(options):
         raise ValueError("The actual native catalogue source or release plan differs")
     policy = module(
         "ergopti_managed_runtime_policy",
-        repository / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+        repository / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
     )
     contract_bytes = OWNER.source_file(repository, OWNER.CONTRACT).read_bytes()
     catalogue_bytes = catalogue_path.read_bytes()

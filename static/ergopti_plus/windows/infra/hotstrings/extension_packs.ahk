@@ -14,7 +14,7 @@
 ; files into their category through its TOML loader. A layout extension may
 ; also declare the physical key that types its
 ; magic key ([extension.magic_key]).
-; The Lua scanner (_shared/lua/hotstrings/extensions.lua) applies the same
+; The Lua scanner (_shared/hotstrings/engine/extensions.lua) applies the same
 ; rules; both replay the extension_binding_vectors.json and
 ; extension_magic_key_vectors.json corpora of _shared/tests/corpus/layouts.
 ; ==============================================================================
@@ -43,7 +43,7 @@ global HOTSTRING_BINDING_STEM_PATTERN := "^[a-z][a-z0-9_-]*$"
 global HOTSTRING_BINDING_ID_PATTERN := "^[a-z][a-z0-9_]*$"
 global HOTSTRING_BINDING_FEATURE_PATTERN := "^hotstrings\.[a-z][a-z0-9_]*$"
 ; [extension.magic_key] carries one field: the physical key, named by its
-; KeyboardEvent.code as in _shared/data/keycodes/physical_keys.json, that types
+; KeyboardEvent.code as in _shared/layouts/data/keycodes/physical_keys.json, that types
 ; the magic key on the extension's layout. Replayed with the Lua scanner from
 ; _shared/tests/corpus/layouts/extension_magic_key_vectors.json.
 global EXTENSION_MAGIC_KEY_FIELDS := Map("key", true)

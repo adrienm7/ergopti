@@ -24,8 +24,8 @@ end
 --- @param callback function Receives the actual menu, locale wrapper and codec.
 local function with_menu(callback)
 	helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"infra.i18n", "infra.locale", "locale.core", "infra.storage",
-		"infra.timer_scheduler", "tap_hold.combination_labels", "ui.action_picker" }, function()
+		"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.storage",
+		"infra.timer_scheduler", "tap_hold.engine.combination_labels", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local captured = package.loaded["infra.i18n"]
 		package.loaded["infra.i18n"] = nil
@@ -117,13 +117,13 @@ helpers.describe("canonical physical combination labels", function()
 			local original = read(matrix_path)
 			local definitions = codec.decode(original)
 			helpers.assert_eq(#definitions, 182, "the complete native matrix is covered")
-			local catalogue = require("tap_hold.key_catalog").load(helpers.shared("tap_hold/defaults.toml"), "hs")
+			local catalogue = require("tap_hold.engine.key_catalog").load(helpers.shared("tap_hold/data/defaults.toml"), "hs")
 			local observed = { calls = {}, regenerations = 0, accepted = true }
 			local facade = remap(definitions, observed)
 			local count = 0
 			for _, language in ipairs(locale.locales()) do
 				locale.set_locale_no_reload(language.code)
-				local strings = codec.decode(read(helpers.shared("data/locales/" .. language.code .. ".json")))
+				local strings = codec.decode(read(helpers.shared("core/i18n/data/locales/" .. language.code .. ".json")))
 				local expected = expected_rows(definitions, catalogue, strings)
 				local actual = physical_rows(menu.build_key_combinations({ karabiner = facade }))
 				helpers.assert_eq(#expected, 193, "179 visible pairs and 14 physical family headers; three script-control pairs stay hidden")
@@ -169,8 +169,8 @@ helpers.describe("canonical physical combination labels", function()
 			end
 			helpers.assert_eq(#chosen, 3, "the actual equivalent physical pairs exist")
 			local observed = { calls = {}, regenerations = 0, refreshes = 0, accepted = false }
-			local catalogue = require("tap_hold.key_catalog").load(helpers.shared("tap_hold/defaults.toml"), "hs")
-			local strings = codec.decode(read(helpers.shared("data/locales/en.json")))
+			local catalogue = require("tap_hold.engine.key_catalog").load(helpers.shared("tap_hold/data/defaults.toml"), "hs")
+			local strings = codec.decode(read(helpers.shared("core/i18n/data/locales/en.json")))
 			local expected = expected_rows(chosen, catalogue, strings)
 			local rows = physical_rows(menu.build_key_combinations({ karabiner = remap(chosen, observed),
 				updateMenu = function() observed.refreshes = observed.refreshes + 1 end }))

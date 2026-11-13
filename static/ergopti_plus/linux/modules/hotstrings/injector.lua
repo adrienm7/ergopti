@@ -34,8 +34,8 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Errors = require("adapter_errors")
-local Logger = require("logger.shim")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger = require("core.logger.engine.shim")
 local Perf = require("infra.perf_counters")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
@@ -45,7 +45,7 @@ local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
 local ModifierBroker = require("adapters.modifier_broker")
 local broker_for_channel = ModifierBroker.for_channel
-local NumberPolicy = require("number_policy")
+local NumberPolicy = require("core.text.engine.number_policy")
 
 local LOG = "modules.hotstrings.injector"
 

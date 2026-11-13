@@ -34,10 +34,10 @@ local assert_true, assert_eq = helpers.assert_true, helpers.assert_eq
 
 describe("locale catalogue: active over English over French", function()
 	it("fills what the active locale lacks from English, then French (catalogue-en-fallback)", function()
-		local saved_core = package.loaded["locale.core"]
-		package.loaded["locale.core"] = nil
-		local Core = require("locale.core")
-		package.loaded["locale.core"] = saved_core
+		local saved_core = package.loaded["core.i18n.engine.core"]
+		package.loaded["core.i18n.engine.core"] = nil
+		local Core = require("core.i18n.engine.core")
+		package.loaded["core.i18n.engine.core"] = saved_core
 
 		local files = {
 			fr = '{"a":"A-fr","b":"B-fr","c":"C-fr"}',
@@ -45,7 +45,7 @@ describe("locale catalogue: active over English over French", function()
 			de = '{"a":"A-de","b":""}',
 		}
 		Core.init({
-			json_decode = require("json").decode,
+			json_decode = require("core.text.engine.json").decode,
 			resolve_locale_path = function(code) return code end,
 			read_file = function(path) return files[path] end,
 		})

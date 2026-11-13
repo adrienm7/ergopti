@@ -40,15 +40,15 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCES = [
 	{
 		label: 'shared Lua',
-		file: path.join(SP, '_shared', 'lua', 'llm', 'prompt_builder.lua'),
+		file: path.join(SP, '_shared', 'ai', 'engine', 'prediction', 'prompt_builder_core.lua'),
 		pattern: /^M\.([A-Z_]+)\s*=\s*([-\d.]+)\s*$/gm,
-		fix: 'edit _shared/lua/llm/prompt_builder.lua'
+		fix: 'edit _shared/ai/engine/prediction/prompt_builder_core.lua'
 	},
 	{
 		label: 'shared JS',
-		file: path.join(SP, '_shared', 'core', 'domain', 'PromptBuilder.js'),
+		file: path.join(SP, '_shared', 'core', 'text', 'data', 'domain', 'PromptBuilder.js'),
 		pattern: /^const ([A-Z_]+)\s*=\s*([-\d.]+)\s*;/gm,
-		fix: 'edit _shared/core/domain/PromptBuilder.js'
+		fix: 'edit _shared/core/text/data/domain/PromptBuilder.js'
 	},
 	{
 		label: 'generated AHK',

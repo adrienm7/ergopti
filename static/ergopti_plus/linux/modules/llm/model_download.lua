@@ -12,9 +12,9 @@ local M = {}
 
 local HttpBridge = require("infra.llm_bridge")
 local HttpClient = require("adapters.http_client")
-local Json = require("json")
-local NumberPolicy = require("number_policy")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local NumberPolicy = require("core.text.engine.number_policy")
+local Logger = require("core.logger.engine.shim")
 local DownloadWindow = require("ui.download_window.bridge")
 local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id, DownloadWindow.retire, DownloadWindow.complete
 

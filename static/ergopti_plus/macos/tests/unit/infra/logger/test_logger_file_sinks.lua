@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Contract — the driver half of the logger, asserted as behaviour
 --- DESCRIPTION:
---- The shared core (_shared/lua/logger) owns the line format, the severity
+--- The shared core (_shared/core/logger/engine) owns the line format, the severity
 --- filter, the ring and the dedup window, and all of that is pinned by a
 --- cross-driver corpus. What the core does NOT own is everything this driver
 --- adds around it: the unified daily file, the errors-only mirror, the topical
@@ -602,8 +602,8 @@ helpers.describe("logger file sinks — canonical privacy", function()
 	end)
 
 	helpers.it("mac-logger-privacy: admission is explicit immutable and rejects duplicate initialization", function()
-		local policy = require("tests.support.source_file").read(helpers.shared("modules/diagnostics/redaction.json"))
-		helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+		local policy = require("tests.support.source_file").read(helpers.shared("diagnostics/data/redaction.json"))
+		helpers.with_stub_scope({ "infra.logger", "core.logger.engine", "adapters.log_transport" }, function()
 			local Fresh = require("infra.logger")
 			local ok, err = pcall(Fresh.redact_message, "PrivateUser")
 			helpers.assert_eq(ok, false)
@@ -620,9 +620,9 @@ helpers.describe("logger file sinks — canonical privacy", function()
 	end)
 
 	helpers.it("mac-logger-privacy: malformed policy and identity refuse before privacy is committed", function()
-		local policy = require("tests.support.source_file").read(helpers.shared("modules/diagnostics/redaction.json"))
+		local policy = require("tests.support.source_file").read(helpers.shared("diagnostics/data/redaction.json"))
 		for _, case in ipairs({ { "{" }, { "{}" }, { policy, {} }, { policy, { home = "", user = "PrivateUser" } } }) do
-			helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+			helpers.with_stub_scope({ "infra.logger", "core.logger.engine", "adapters.log_transport" }, function()
 				local Fresh = require("infra.logger")
 				local accepted, refusal = pcall(Fresh.initialize_privacy, case[1], case[2])
 				helpers.assert_eq(accepted, false)
@@ -648,11 +648,11 @@ end)
 
 helpers.describe("logger canonical metadata privacy", function()
 	helpers.it("mac-logger-privacy: exact core metadata survives captured account collisions", function()
-		local policy = require("tests.support.source_file").read(helpers.shared("modules/diagnostics/redaction.json"))
+		local policy = require("tests.support.source_file").read(helpers.shared("diagnostics/data/redaction.json"))
 		local original = Logger
 		local ok, err = xpcall(function()
 			for _, user in ipairs({ "2026", "ERROR", "logger" }) do
-				helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+				helpers.with_stub_scope({ "infra.logger", "core.logger.engine", "adapters.log_transport" }, function()
 					Logger = require("infra.logger")
 					Logger.initialize_privacy(policy, { home = "/Users/" .. user, user = user })
 					Logger.timestamp_fn = function() return "2026-10-10 12:00:00:000" end

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays tests/corpus/layouts/pause_switch_vectors.json through the AHK twin
 ; of the shared pause switch policy; the macOS and Linux suites replay the same
-; vectors through _shared/lua/layout/pause_switch_policy.lua.
+; vectors through _shared/layouts/engine/layout/pause_switch_policy.lua.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

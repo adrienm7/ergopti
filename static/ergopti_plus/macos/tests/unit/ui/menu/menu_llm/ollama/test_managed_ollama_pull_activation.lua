@@ -302,10 +302,10 @@ helpers.describe("Managed Ollama original pull activation", function()
 		end)
 	end)
 	helpers.it("downloads the catalogue registry tag while retaining the different presentation name", function()
-		local file = assert(io.open(helpers.shared("modules/llm/models.json"), "rb"))
+		local file = assert(io.open(helpers.shared("ai/data/models.json"), "rb"))
 		local bytes = file:read("*a")
 		helpers.assert_true(file:close())
-		local catalogue = require("json").decode(bytes)
+		local catalogue = require("core.text.engine.json").decode(bytes)
 		local known = nil
 		for _, provider in ipairs(catalogue) do
 			for _, family in ipairs(provider.families) do

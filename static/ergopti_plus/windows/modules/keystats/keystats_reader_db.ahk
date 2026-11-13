@@ -61,11 +61,11 @@ class KLReadConst {
 ; ================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
-; `static/ergopti_plus/_shared/data/db/schema.sql`; _StaticDir already
+; `static/ergopti_plus/_shared/metrics/data/db/schema.sql`; _StaticDir already
 ; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
 		global _SharedDir
-		base := _SharedDir . "\data\db\schema.sql"
+		base := _SharedDir . "\metrics\data\db\schema.sql"
 		loop files, base
 				return A_LoopFileFullPath
 		return base
@@ -96,7 +96,7 @@ _KLR_RefuseSchema(Reason) {
 ; Apply only the additive schema to a private cold or upgrade candidate.
 KLR_LoadMediaSchema(db) {
 		global _SharedDir
-		try media_schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
+		try media_schema := FSReadStrict(_SharedDir . "\metrics\data\db\media_schema.sql")
 		catch as err {
 				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
 				return _KLR_RefuseSchema("media_schema.sql is unreadable")
@@ -112,7 +112,7 @@ KLR_LoadMediaSchema(db) {
 ; triggers written before it, which CREATE TRIGGER IF NOT EXISTS would keep.
 KLR_LoadPurgeSchema(db) {
 		global _SharedDir
-		try purge_schema := FSReadStrict(_SharedDir . "\data\db\purge_schema.sql")
+		try purge_schema := FSReadStrict(_SharedDir . "\metrics\data\db\purge_schema.sql")
 		catch as err {
 				try LoggerError("KLReader", "Metrics purge schema read failed: {1}.", err.Message)
 				return _KLR_RefuseSchema("purge_schema.sql is unreadable")
@@ -127,7 +127,7 @@ KLR_LoadPurgeSchema(db) {
 ; The utc_offset_min migration's shape, read from the shared schema: every raw
 ; events_* table of schema.sql carries the column, last, with one definition
 ; (maintainer decision KMD-1; the same statements as
-; _shared/lua/keystats/utc_offset_column.lua).
+; _shared/metrics/engine/utc_offset_column.lua).
 ; @returns {Map} tables {Array} and definition {String}; throws on a schema
 ;   that does not spell them.
 KLR_UtcOffsetShape() {

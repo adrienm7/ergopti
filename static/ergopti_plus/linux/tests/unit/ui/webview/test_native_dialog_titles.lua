@@ -49,7 +49,7 @@ local function scenario(body)
 		exec_checked = function(command)
 			observed.commands[#observed.commands + 1] = command
 			local accepted = observed.status == 0 or observed.status == true
-			return accepted, observed.answer or "", accepted and nil or "command exited with status 1", accepted and nil or require("adapter_errors").COMMAND_EXITED_NONZERO, accepted and nil or 1
+			return accepted, observed.answer or "", accepted and nil or "command exited with status 1", accepted and nil or require("diagnostics.engine.adapter_errors").COMMAND_EXITED_NONZERO, accepted and nil or 1
 		end,
 	}
 	package.loaded["adapters.shell_runner"] = shell
@@ -180,7 +180,7 @@ h.describe("native menu dialog captions", function()
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute, original_checked = os.execute, Shell.exec_checked
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original_error, original_info = logger.error, logger.info
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
 		package.loaded["ui.menu.llm_backend_rows"] = {

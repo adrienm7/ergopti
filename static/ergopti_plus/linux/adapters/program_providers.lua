@@ -1,8 +1,8 @@
 --- adapters/program_providers.lua
 
 --- Native bounded script discovery; private paths never pass through a shell.
-local Shared = require("program_providers")
-local Json = require("json")
+local Shared = require("apps.engine.program_providers")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local ConfigPaths = require("infra.config_paths")
 local loaded, Native = pcall(require, "luv")
@@ -47,7 +47,7 @@ local function read_catalogue(native)
 	for _, name in ipairs({ "fs_open", "fs_fstat", "fs_read", "fs_close" }) do
 		if type(native[name]) ~= "function" then return nil end
 	end
-	local ok, path = pcall(Paths.shared, "modules/actions/program_providers.json")
+	local ok, path = pcall(Paths.shared, "shortcuts/data/actions/program_providers.json")
 	if not ok or not absolute(path) then return nil end
 	catalogue_busy = true
 	-- O_RDONLY | O_NONBLOCK never waits on a substituted FIFO.

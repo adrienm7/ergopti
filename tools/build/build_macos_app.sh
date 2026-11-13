@@ -64,7 +64,7 @@ ERGOPTI_BUILD="${ERGOPTI_BUILD:-1}"
 
 # Sparkle update channel — picks appcast-<channel>.xml on the release host.
 # The release workflow sets it to the channel the shared registry
-# (_shared/modules/updater/channels.json) gives the release tag; a local build
+# (_shared/updater/data/channels.json) gives the release tag; a local build
 # defaults to main.
 ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 
@@ -105,7 +105,7 @@ MACOS_SIGNING_CERTIFICATE_PASSWORD="${MACOS_SIGNING_CERTIFICATE_PASSWORD:-}"
 
 # Local builds must follow the same repository as the runtime updater. Explicit
 # environment overrides still support builds published from another repository.
-UPDATER_REPOSITORY="$(node - "$REPO_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json" <<'NODE'
+UPDATER_REPOSITORY="$(node - "$REPO_ROOT/static/ergopti_plus/_shared/updater/data/defaults.json" <<'NODE'
 const { github } = require(process.argv[2]);
 if (!github || ![github.owner, github.repo].every((value) =>
 	typeof value === 'string' && /^[A-Za-z0-9._-]+$/.test(value))) {
@@ -119,9 +119,9 @@ GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 
 # The outer app prohibits duplicate instances. Give the embedded GUI runtime a
 # dedicated Ergopti-owned identity while keeping it isolated from stock HS.
-# The names, bundle ids and hosts are declared once in _shared/data/identifiers.json.
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# The names, bundle ids and hosts are declared once in _shared/core/text/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # One owner of the file digest: shasum escapes the digest of a name holding a
 # backslash, which sha256_file_digest strips (the checkout path is the user's).
 . "$REPO_ROOT/static/ergopti_plus/macos/modules/llm/network-retry.sh"
@@ -500,7 +500,7 @@ bundle_keyboard_layout() {
 # The layout manager installs the Ergopti layouts offline from the keyboard-layout
 # registry shipped with the app (modules/keymap/layout_registry.lua), which it
 # resolves at the repository path mirrored under Resources: the folder of
-# _shared/modules/layouts/defaults.json below the static tree. A build without it
+# _shared/layouts/data/defaults.json below the static tree. A build without it
 # would need the network to install the very layouts it ships, so it fails.
 bundle_layout_registry() {
 	local static_root="$1"
@@ -592,7 +592,7 @@ assemble_app() {
 			--go "${ERGOPTI_MANAGED_OLLAMA_GO:?absolute pinned Go is required}" \
 			--release "${ERGOPTI_RELEASE:-false}" --release-tag "${ERGOPTI_RELEASE_TAG:-}" \
 			--release-version "${ERGOPTI_RELEASE_VERSION:-}" --release-channel "$ERGOPTI_CHANNEL" \
-			--output "$static_root/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
+			--output "$static_root/ergopti_plus/_shared/ai/data/managed_ollama_release.json"
 	fi
 	# The bundle has no .git: the stamp is how the driver's diagnostics name the
 	# commit this app was built from. Written before codesign seals the resources.

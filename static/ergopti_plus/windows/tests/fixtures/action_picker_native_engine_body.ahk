@@ -82,7 +82,7 @@ _APNR_Hash(Path) => CryptoSha256Bytes(FSReadBytesStrict(Path))
 _APNR_CopyAssets() {
 	global _APNR, _SharedDir, _APNR_SourceShared
 	for Relative in ["ui\action_picker\index.html", "ui\action_picker\script.js", "ui\action_picker\style.css",
-		"ui\host_bridge.js", "ui\i18n.js", "data\locales\en.json", "data\locales\fr.json"] {
+		"ui\host_bridge.js", "ui\i18n.js", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"] {
 		Source := _APNR_SourceShared . "\" . Relative, Target := _SharedDir . "\" . Relative
 		SplitPath(Target, , &Directory)
 		DirCreate(Directory)

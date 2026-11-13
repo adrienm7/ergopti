@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Timing Registry Constants Codegen
  * DESCRIPTION:
- * Projects _shared/modules/timings/constants.toml onto the readers that cannot
+ * Projects _shared/core/timing/data/constants.toml onto the readers that cannot
  * parse it at runtime: macos/_generated/registry_limits.lua, the [limits] byte
  * caps for the macOS modules loaded before infra.timings exists, and
  * LauncherTimings.generated.swift, the [launcher] durations of the Swift
@@ -36,7 +36,7 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE_REL = '_shared/modules/timings/constants.toml';
+const SOURCE_REL = '_shared/core/timing/data/constants.toml';
 const OUTPUT_LUA = path.join(SP, 'macos/_generated/registry_limits.lua');
 const OUTPUT_SWIFT = path.join(
 	SP,

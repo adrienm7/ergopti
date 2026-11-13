@@ -20,8 +20,8 @@ local helpers = require("tests.helpers")
 -- =========================================
 
 helpers.describe("AT-SPI focus query", function()
-	local previous_logger = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local previous_logger = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	local AtspiFocus = helpers.load_module("adapters.atspi_focus")
 	local ShellRunner = helpers.load_module("adapters.shell_runner")
 
@@ -329,7 +329,7 @@ helpers.describe("AT-SPI focus query", function()
 			AtspiFocus._set_backend_for_test(nil)
 			AtspiFocus._set_command_runner_for_test(function(command)
 				helpers.assert_true(command:find("_get_native_context_snapshot", 1, true) ~= nil)
-				return true, "FOCUS:" .. require("json").encode(snapshot)
+				return true, "FOCUS:" .. require("core.text.engine.json").encode(snapshot)
 			end)
 			local result, conclusive = AtspiFocus.get_context_snapshot()
 			helpers.assert_eq(conclusive, fault == "none" or fault == "cross process")
@@ -340,5 +340,5 @@ helpers.describe("AT-SPI focus query", function()
 
 	AtspiFocus._set_backend_for_test(nil)
 	AtspiFocus._set_command_runner_for_test(nil)
-	package.loaded["logger.shim"] = previous_logger
+	package.loaded["core.logger.engine.shim"] = previous_logger
 end)

@@ -94,7 +94,7 @@ DESKTOP
     "$pkgdir/etc/modules-load.d/ergopti-uinput.conf"
 
   # The desktop uses the same packaged logo as the tray, at its real size.
-  install -Dm644 "$bundle/_shared/assets/ergopti_tray.png" \
+  install -Dm644 "$bundle/_shared/tray/data/ergopti_tray.png" \
     "$pkgdir/usr/share/icons/hicolor/512x512/apps/ergopti.png"
 
   # The canonical unit prevents a refused setup from looping the prompt.

@@ -13,9 +13,9 @@ local Http = require("adapters.http_client")
 local Deferred = require("infra.managed_http_deadline")
 local Monotonic = require("infra.monotonic")
 local Bridge = require("infra.llm_bridge")
-local Policy = require("llm.local_model_policy")
-local Json = require("json")
-local Logger = require("logger.shim")
+local Policy = require("ai.engine.ollama.local_model_policy")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local LOG = "modules.llm.model_inventory"
 local OWNER = "ollama_model_inventory"
 

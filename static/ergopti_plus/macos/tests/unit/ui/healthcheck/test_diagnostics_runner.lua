@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Diagnostics Runner Tests (macOS)
 --- DESCRIPTION:
---- Pins the shared diagnostics action engine (_shared/lua/healthcheck/report.lua)
+--- Pins the shared diagnostics action engine (_shared/diagnostics/engine/healthcheck/report.lua)
 --- the macOS and Linux report modules build: a runner refuses missing ports, an
 --- unknown action completes as a failure instead of vanishing, a URL action
 --- opens through the effect kind its port names and a cancelled request never
@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Runner = require("healthcheck.report")
+local Runner = require("diagnostics.engine.healthcheck.report")
 
 local function silent_logger()
 	local logger = {}

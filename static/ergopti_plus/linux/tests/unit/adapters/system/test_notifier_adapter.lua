@@ -32,7 +32,7 @@ local function with_shell(opts, body)
 	opts = opts or {}
 	local shell_name = "adapters.shell_runner"
 	local notifier_name = "adapters.notifier"
-	local logger_name = "logger.shim"
+	local logger_name = "core.logger.engine.shim"
 	local previous_shell = package.loaded[shell_name]
 	local previous_notifier = package.loaded[notifier_name]
 	local previous_logger = package.loaded[logger_name]
@@ -125,7 +125,7 @@ helpers.describe("notifier: sending", function()
 			notifier.send("bonjour")
 			local ttl = require("infra.timings").ms("ui", "notification_ttl_ms")
 			helpers.assert_true(commands[1]:find("--expire-time=" .. string.format("%d", ttl), 1, true) ~= nil,
-				"one declaration in _shared/modules/timings/constants.toml, shared with macOS")
+				"one declaration in _shared/core/timing/data/constants.toml, shared with macOS")
 		end)
 		local source = assert(helpers.read_module_source("adapters.notifier"))
 		helpers.assert_true(source:find("TIMEOUT_MS = 5000", 1, true) == nil, "no typed copy of the duration")

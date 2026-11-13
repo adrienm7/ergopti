@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcuts_scope_fixture")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local SOURCE = '[shortcuts]\nenabled = true\n'
 	.. 'keyboard = { primary_a = "send_text", secondary_j = "send_text", secondary_space = "send_text" }\n'

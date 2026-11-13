@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Runs the shared diagnostics page model (_shared/ui/healthcheck/model.js) the
  * way the page loads it, against the v2 schema
- * (_shared/modules/diagnostics/schema.json) and one snapshot per driver:
+ * (_shared/diagnostics/data/schema.json) and one snapshot per driver:
  * 1. the schema is well formed: unique ids, known types and platforms, every
  *    probe a field names is declared, and every label it implies exists in
  *    all 21 locales;
@@ -31,7 +31,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
-const LOCALES_DIR = path.join(SHARED, 'data', 'locales');
+const LOCALES_DIR = path.join(SHARED, 'core', 'i18n', 'data', 'locales');
 const DRIVERS = ['windows', 'macos', 'linux'];
 const FIELD_TYPES = [
 	'text',
@@ -57,7 +57,7 @@ const fail = (message) => failures.push(message);
 // ==============================
 
 const schema = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'schema.json'), 'utf8')
 );
 const locales = new Map(
 	fs
@@ -706,7 +706,7 @@ for (const vector of vectors.file_name_vectors || []) {
 	// The host fills the report field with the whole report: a summary sent
 	// by the page would be refused by its validator
 	const templates = JSON.parse(
-		fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'issue_templates.json'), 'utf8')
+		fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'issue_templates.json'), 'utf8')
 	);
 	if (Object.prototype.hasOwnProperty.call(fields, templates.templates.bug.report_field)) {
 		fail(`the page must not fill the report field ${templates.templates.bug.report_field}`);

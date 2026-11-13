@@ -58,7 +58,9 @@ const qualification = require('../ci/dev-release-qualification.cjs');
 const signing = require('../ci/windows-stable-signing.cjs');
 const crypto = require('node:crypto');
 const MIN_VECTORS = 8;
-const EN = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+const EN = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+);
 const CI_ENV = {
 	VERSION: '1.2.3',
 	TAG: 'v1.2.3',
@@ -67,7 +69,7 @@ const CI_ENV = {
 	GITHUB_REPOSITORY_OWNER: 'adrienm7',
 	GITHUB_RUN_ID: '4242',
 	LINUX_BUNDLE_ASSET: JSON.parse(
-		fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8')
+		fs.readFileSync(path.join(SHARED, 'updater', 'data', 'defaults.json'), 'utf8')
 	).release_assets.linux_bundle,
 	RUNNER_TEMP: '/tmp/runner'
 };

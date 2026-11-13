@@ -45,14 +45,14 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local original_output_observer_factory, original_capture_output = nil, nil
 local kernel_backends = setmetatable({}, { __mode = "k" })
 local kernel_declared = setmetatable({}, { __mode = "k" })
 local original_kernel_capture, original_kernel_ports = nil, nil
 local kernel_sources = setmetatable({}, { __mode = "k" })
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "adapters.uinput_writer"
 
 

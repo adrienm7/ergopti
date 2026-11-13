@@ -20,10 +20,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local SourceFile = require("tests.support.source_file")
 
-local POLICY = SourceFile.read(helpers.shared("modules/diagnostics/redaction.json"))
+local POLICY = SourceFile.read(helpers.shared("diagnostics/data/redaction.json"))
 local RULES = Json.decode(POLICY)
 local CONFIG = RULES.config_placeholder
 local NAME = RULES.config_name_placeholder
@@ -35,7 +35,7 @@ local SuiteLogger = helpers.load_with_stubs("infra.logger")
 --- Runs a callback over a fresh logger whose privacy is admitted.
 --- @param callback function Receives the fresh logger.
 local function with_logger(callback)
-	helpers.with_stub_scope({ "infra.logger", "logger", "adapters.log_transport" }, function()
+	helpers.with_stub_scope({ "infra.logger", "core.logger.engine", "adapters.log_transport" }, function()
 		local Logger = require("infra.logger")
 		Logger.initialize_privacy(POLICY, { home = "/Users/PrivateUser", user = "PrivateUser" })
 		callback(Logger)

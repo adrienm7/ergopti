@@ -30,7 +30,7 @@
 ---    field refuses like the tone actions.
 --- 4. One transport per system, each behind one function taking the backend and
 ---    its payload, so a new request format plugs in there. A chat backend gets
----    a plain chat body built by llm/vision.lua (the local server, a chat
+---    a plain chat body built by ai/engine/prediction/vision.lua (the local server, a chat
 ---    provider) or a Backboard message. System 1 has a second kind: Jev, asked
 ---    its choice question through a decisions provider (TypeSafe's System One
 ---    protocol) or through Backboard with a "typesafe/" model. Neither the text
@@ -44,16 +44,16 @@
 ---    (modules/llm/agent_learning.lua).
 ---
 --- The pure logic (prompts, triage, validation, labels) is shared:
---- _shared/lua/llm/agent.lua, configured by _shared/modules/llm/agent.json.
+--- _shared/ai/engine/agent/agent.lua, configured by _shared/ai/data/agent.json.
 --- ==============================================================================
 
 local M = {}
 
-local Agent          = require("llm.agent")
-local AgentPlan      = require("llm.request_plan.agent")
-local Vision         = require("llm.vision")
-local Rewrite        = require("llm.rewrite")
-local Formats        = require("llm.remote_formats")
+local Agent          = require("ai.engine.agent.agent")
+local AgentPlan      = require("ai.engine.request_plan.agent")
+local Vision         = require("ai.engine.prediction.vision")
+local Rewrite        = require("ai.engine.prediction.rewrite")
+local Formats        = require("ai.engine.api.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local Logger         = require("infra.logger")
 local i18n           = require("infra.i18n")
@@ -64,8 +64,8 @@ local JsonCodec      = require("adapters.json_codec")
 local WindowInfo     = require("adapters.window_info")
 local SystemInfo     = require("adapters.system_info")
 local TimerScheduler = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
-local ConfigKeys = require("config_keys")
+local TextUtils = require("core.text.engine.utils_core")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "llm.agent_runner"
 
@@ -146,14 +146,14 @@ local _mode_persister = nil
 -- =====================================
 -- =====================================
 
---- Returns the decoded _shared/modules/llm/agent.json, read once. A missing or
+--- Returns the decoded _shared/ai/data/agent.json, read once. A missing or
 --- malformed file is a broken install and raises.
 --- @return table config
 function M.config()
 	if _config then return _config end
 	local path = Paths.shared_llm_path("agent.json")
 	local raw = path and FileSystem.read(path) or nil
-	if type(raw) ~= "string" then error("agent_runner: _shared/modules/llm/agent.json is unreadable") end
+	if type(raw) ~= "string" then error("agent_runner: _shared/ai/data/agent.json is unreadable") end
 	local config, decode_error = JsonCodec.decode(raw)
 	if type(config) ~= "table" then
 		error("agent_runner: agent.json is not valid JSON: " .. tostring(decode_error))

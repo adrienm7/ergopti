@@ -2,7 +2,7 @@
 
 local helpers = require("tests.helpers")
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local FileSystem = require("adapters.file_system")
 
 local function fixture(number_row_source, complete_source)

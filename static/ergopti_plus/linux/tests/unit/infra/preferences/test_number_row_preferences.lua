@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Codec = require("core.text.engine.toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
@@ -89,7 +89,7 @@ helpers.describe("number row preferences", function()
 	end)
 
 	helpers.it("reads the emulation's enum leaves in their manifest spelling (config-enum-case)", function()
-		local Settings = require("layouts.emulation_settings")
+		local Settings = require("layouts.engine.emulation.settings")
 		local reported = {}
 		local settings = Settings.resolve({ layout = { ergopti_variant = "Ergopti_Plus", direct_access_digits = "DIGITS" } },
 			require("infra.manifest_reader").default_for, function(segments) reported[#reported + 1] = table.concat(segments, ".") end)

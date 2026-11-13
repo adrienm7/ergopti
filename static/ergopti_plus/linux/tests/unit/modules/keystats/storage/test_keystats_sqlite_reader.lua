@@ -35,7 +35,7 @@ helpers.describe("keystats sqlite_reader", function()
     -- aggregate tables are asserted on the statements the reader renders.
     helpers.assert_true(src:find('Queries.render(name, "cli_json"', 1, true) ~= nil,
       "reader must render the manifest from the shared catalogue in the CLI dialect")
-    local Queries = require("keystats.queries")
+    local Queries = require("metrics.engine.queries")
     local app_day = Queries.render("manifest.app_day", "cli_json", { where = "" })
     helpers.assert_true(app_day:find("FROM agg_app_day", 1, true) ~= nil)
     helpers.assert_true(app_day:find("GROUP BY date, app", 1, true) ~= nil)

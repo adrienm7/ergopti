@@ -11,7 +11,7 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
-const SHARED_LUA_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua');
+const SHARED_LUA_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const PORT = 45678;
 
 function toBashPath(filePath) {
@@ -28,7 +28,16 @@ function shellQuote(value) {
 /** The [adapters] proxy relay deadlines of the real timings registry, as a Lua table literal. */
 function luaTimings() {
 	const toml = fs.readFileSync(
-		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'timings', 'constants.toml'),
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'core',
+			'timing',
+			'data',
+			'constants.toml'
+		),
 		'utf8'
 	);
 	const section = toml.split(/^\[adapters\]$/m)[1].split(/^\[/m)[0];
@@ -57,7 +66,7 @@ function buildCommand(fakeBinary, logFile) {
 		// has neither, so the stand-in serves that one file's real bytes.
 		'local FileSystem = require("adapters.file_system")',
 		'local read_with_status = FileSystem.read_with_status',
-		'FileSystem.read_with_status = function(p, ...) if p:match("/modules/network/route_origins%.json$") then local f = assert(io.open(p, "rb")); local bytes = f:read("*a"); f:close(); return bytes, "ok" end; return read_with_status(p, ...) end',
+		'FileSystem.read_with_status = function(p, ...) if p:match("/core/network/data/route_origins%.json$") then local f = assert(io.open(p, "rb")); local bytes = f:read("*a"); f:close(); return bytes, "ok" end; return read_with_status(p, ...) end',
 		// Native Windows Lua expands module dots with backslashes. Load this
 		// path-sensitive macOS module with its real POSIX filename on every host.
 		`package.loaded["modules.llm.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/modules/llm/network_env.lua`)}))()`,

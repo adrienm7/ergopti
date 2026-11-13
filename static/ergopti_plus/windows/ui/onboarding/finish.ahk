@@ -39,7 +39,7 @@
 _Onboarding_TapHoldTarget(Path, Keys) {
 	global _SharedDir
 	try {
-		Image := TapHoldImportImage(Path, _SharedDir . "\tap_hold\defaults.toml", Keys)
+		Image := TapHoldImportImage(Path, _SharedDir . "\tap_hold\data\defaults.toml", Keys)
 		Backup := TapHoldImportBackup(Path, Image)
 		ExpectedOld := ConfigTransitionExpectedOld(Image["source_present"], Image["source_content"])
 		if !(ExpectedOld is Map)
@@ -65,7 +65,7 @@ _Onboarding_TapHoldTarget(Path, Keys) {
 _Onboarding_NavLayerPath(ConfigDir, Keys) {
 	global _SharedDir
 	Preset := TapHoldRecommendedLayer(_SharedDir)
-	if !TapHoldPresetEntersLayer(_SharedDir . "\tap_hold\defaults.toml", Keys, Preset["layer_id"])
+	if !TapHoldPresetEntersLayer(_SharedDir . "\tap_hold\data\defaults.toml", Keys, Preset["layer_id"])
 		return ""
 	return KeymapLayers_UserFilePathFromVocabulary(_SharedDir, ConfigDir)
 }

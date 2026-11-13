@@ -308,7 +308,7 @@ class RetainedSourceControls(unittest.TestCase):
             create_session=create_session,
             POLICY=load(
                 "source_receiving_policy",
-                ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+                ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
             ),
         )
 
@@ -743,9 +743,9 @@ class PayloadDependencyControls(unittest.TestCase):
                 side_effect=lambda destination, _: destination.write_bytes(catalogue.read_bytes())
             )
             payload = subject.payload(root / "OwnedPayload.app")
-            relative = "static/ergopti_plus/_shared/data/http/redirect_policy.json"
+            relative = "static/ergopti_plus/_shared/core/network/data/http/redirect_policy.json"
             original = ROOT / relative
-            copied = payload / "_shared/data/http/redirect_policy.json"
+            copied = payload / "_shared/core/network/data/http/redirect_policy.json"
             self.assertEqual(copied.read_bytes(), original.read_bytes())
             self.assertEqual(
                 subject.source_hashes[relative], hashlib.sha256(original.read_bytes()).hexdigest()
@@ -868,7 +868,7 @@ class TerminalFailureObservationControls(unittest.TestCase):
     def test_prepare_phase_preserves_existing_runtime_and_cleanup_failure_facts(self):
         policy = RECEIVING.load(
             "milestone_actual_runtime_policy",
-            ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+            ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
         )
         namespace = SimpleNamespace
         for phase in [*sorted(RECEIVING.PREPARE_PHASES), None, 4, "private-marker"]:
@@ -908,7 +908,7 @@ class ReceivingCatalogueControls(unittest.TestCase):
 
     def catalogue(self):
         contract_bytes = (
-            ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
+            ROOT / "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json"
         ).read_bytes()
         contract = json.loads(contract_bytes)
         binding = contract["assets"]["macos-arm64"]
@@ -959,7 +959,7 @@ class ReceivingCatalogueControls(unittest.TestCase):
                 "catalogue": hashlib.sha256(input_path.read_bytes()).hexdigest()
             }
             payload = subject.payload(root / "OwnedPayload.app")
-            private_path = payload / "_shared/modules/llm/managed_ollama_release.json"
+            private_path = payload / "_shared/ai/data/managed_ollama_release.json"
             private_bytes = private_path.read_bytes()
             private = json.loads(private_bytes)
             self.assertEqual(input_path.read_bytes(), original_bytes)
@@ -985,9 +985,7 @@ class ReceivingCatalogueControls(unittest.TestCase):
             runtime = RECEIVING.load(
                 "planned_receiving_runtime", payload / "macos/modules/llm/managed_ollama_runtime.py"
             )
-            contract_bytes = (
-                payload / "_shared/modules/llm/managed_ollama_runtime.json"
-            ).read_bytes()
+            contract_bytes = (payload / "_shared/ai/data/managed_ollama_runtime.json").read_bytes()
 
             class OwnedBoundary(Exception):
                 pass
@@ -1089,7 +1087,7 @@ class ReceivingCatalogueControls(unittest.TestCase):
                 self.assertFalse(
                     (
                         root
-                        / "OwnedPayload.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
+                        / "OwnedPayload.app/Contents/Resources/static/ergopti_plus/_shared/ai/data/managed_ollama_release.json"
                     ).exists()
                 )
 
@@ -1261,7 +1259,8 @@ class NativeInferenceAccountingControls(unittest.TestCase):
         # refused the pull; the literal must be an upstream public vector.
         address = ipaddress.ip_address(RECEIVING.REGISTRY_ADDRESS)
         vectors = (
-            ROOT / "static/ergopti_plus/_shared/go/native_http/address_policy_test.go"
+            ROOT
+            / "static/ergopti_plus/_shared/core/network/native/go/native_http/address_policy_test.go"
         ).read_text(encoding="utf-8")
         self.assertIn(f'"{address}":', vectors)
         self.assertRegex(vectors, rf'"{re.escape(str(address))}":\s+true,')

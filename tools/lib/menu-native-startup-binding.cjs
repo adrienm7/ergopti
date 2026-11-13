@@ -237,7 +237,7 @@ function generatorHook(source) {
 		!one('const { shared, MENU_SOURCE_REL, FEATURES_MANIFEST_REL } = sharedPaths;') ||
 		!one('const MANIFEST_PATH = shared(FEATURES_MANIFEST_REL);') ||
 		!one('const MENU_SOURCE_PATH = shared(MENU_SOURCE_REL);') ||
-		!one("const OUT_PATH = shared('modules/menu/menu_manifest.json');")
+		!one("const OUT_PATH = shared('menu/data/menu_manifest.json');")
 	)
 		return false;
 	const owners = program.body.filter(
@@ -255,16 +255,16 @@ function generatorHook(source) {
     validateGreyedRows(parsed.menu);
     validateChildTemplates(parsed.menu);
     validateProviderStatus(parsed.menu);
-    const startupPolicy = parseToml(readFileSync(shared('modules/menu/startup_tray.toml'), 'utf8'));
-    const startupCodes = JSON.parse(readFileSync(shared('data/locale_order.json'), 'utf8')).order;
+    const startupPolicy = parseToml(readFileSync(shared('menu/data/startup_tray.toml'), 'utf8'));
+    const startupCodes = JSON.parse(readFileSync(shared('core/i18n/data/locale_order.json'), 'utf8')).order;
     const startupLocales = Object.fromEntries(startupCodes.map((code) => [
-      code, JSON.parse(readFileSync(shared(\`data/locales/\${code}.json\`), 'utf8'))
+      code, JSON.parse(readFileSync(shared(\`core/i18n/data/locales/\${code}.json\`), 'utf8'))
     ]));
     const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales);
     const out = { ...HEADER, ...parsed.menu };
     const json = JSON.stringify(out, null, '\\t') + '\\n';
     writeFileSync(OUT_PATH, json, 'utf8');
-    writeFileSync(shared('modules/menu/startup_tray_projection.ahk'), startupAhk, 'utf8');
+    writeFileSync(shared('menu/data/startup_tray_projection.ahk'), startupAhk, 'utf8');
   `);
 	const actual = shape(owners[0].body.body);
 	// One existing informational console.log remains after all owned writes.
@@ -422,7 +422,7 @@ function nativeStartupRows(inputs, platform) {
 		safe = sources[keys.safe];
 	if (
 		!entry ||
-		!sourceInclude(bootstrap, '../../_shared/modules/menu/startup_tray_projection.ahk') ||
+		!sourceInclude(bootstrap, '../../_shared/menu/data/startup_tray_projection.ahk') ||
 		!sourceInclude(sources[keys.entry], 'adapters/tray_menu.ahk') ||
 		!sourceInclude(sources[keys.entry], 'infra/menu_dispatcher.ahk') ||
 		!sourceInclude(dispatcher, 'menu_startup_commands.ahk') ||
@@ -494,7 +494,7 @@ function startupInputs(repositoryRoot, manifest) {
 	const { parse } = require('smol-toml');
 	const sp = path.join(repositoryRoot, 'static', 'ergopti_plus');
 	const readShared = (name) => fs.readFileSync(path.join(sp, '_shared', name), 'utf8');
-	const codes = JSON.parse(readShared('data/locale_order.json')).order;
+	const codes = JSON.parse(readShared('core/i18n/data/locale_order.json')).order;
 	if (!Array.isArray(codes) || codes.length !== 21 || new Set(codes).size !== 21)
 		throw new Error('Actual startup locale catalogue order is incomplete.');
 	return {
@@ -502,11 +502,11 @@ function startupInputs(repositoryRoot, manifest) {
 			Object.values(keys).map((key) => [key, fs.readFileSync(path.join(sp, key), 'utf8')])
 		),
 		manifest,
-		policy: parse(readShared('modules/menu/startup_tray.toml')),
+		policy: parse(readShared('menu/data/startup_tray.toml')),
 		locales: Object.fromEntries(
-			codes.map((code) => [code, JSON.parse(readShared(`data/locales/${code}.json`))])
+			codes.map((code) => [code, JSON.parse(readShared(`core/i18n/data/locales/${code}.json`))])
 		),
-		generated: readShared('modules/menu/startup_tray_projection.ahk'),
+		generated: readShared('menu/data/startup_tray_projection.ahk'),
 		generator: fs.readFileSync(
 			path.join(repositoryRoot, 'tools', 'build', 'build-menu-manifest.js'),
 			'utf8'

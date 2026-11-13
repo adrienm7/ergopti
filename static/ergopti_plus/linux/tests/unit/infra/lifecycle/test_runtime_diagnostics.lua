@@ -19,8 +19,8 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local Logger     = require("logger.shim")
-local RuntimeLog = require("diagnostics.runtime_log")
+local Logger     = require("core.logger.engine.shim")
+local RuntimeLog = require("diagnostics.engine.runtime_log")
 
 --- Runs body with the real shared logger at DEBUG and a capturing sink.
 --- @param body function
@@ -176,16 +176,16 @@ describe("Log privacy: a fired hotstring leaves no typed text in the log", funct
 	local REPLACEMENT = "zqx private replacement text"
 
 	it("the shared engine logs no trigger, replacement or typed character", function()
-		local saved_shim = package.loaded["logger.shim"]
-		local saved_engine = package.loaded["hotstring_engine"]
+		local saved_shim = package.loaded["core.logger.engine.shim"]
+		local saved_engine = package.loaded["hotstrings.engine.matcher"]
 		-- The engine captures its logger at require time, so it is reloaded
 		-- against the real logger rather than whatever stub a previous test left.
-		package.loaded["logger.shim"] = Logger
-		package.loaded["hotstring_engine"] = nil
+		package.loaded["core.logger.engine.shim"] = Logger
+		package.loaded["hotstrings.engine.matcher"] = nil
 		local fired = nil
 		local ok, err = pcall(function()
 			local lines = capture_lines(function()
-				local engine = require("hotstring_engine").new()
+				local engine = require("hotstrings.engine.matcher").new()
 				engine:load_mappings({ { trigger = TRIGGER, replacement = REPLACEMENT, auto_expand = true } })
 				for index = 1, #TRIGGER do
 					fired = engine:on_char(TRIGGER:sub(index, index)) or fired
@@ -198,8 +198,8 @@ describe("Log privacy: a fired hotstring leaves no typed text in the log", funct
 			assert_eq(nil, text:find("zqx private", 1, true), "the replacement leaked: " .. text)
 			assert_eq(nil, text:find("on_char('", 1, true), "a typed character leaked: " .. text)
 		end)
-		package.loaded["logger.shim"] = saved_shim
-		package.loaded["hotstring_engine"] = saved_engine
+		package.loaded["core.logger.engine.shim"] = saved_shim
+		package.loaded["hotstrings.engine.matcher"] = saved_engine
 		if not ok then error(err, 0) end
 	end)
 
@@ -214,7 +214,7 @@ describe("Log privacy: a fired hotstring leaves no typed text in the log", funct
 	end)
 
 	it("the diagnostic snapshot redacts the home directory", function()
-		local Snapshot = require("diagnostics.snapshot")
+		local Snapshot = require("diagnostics.engine.snapshot")
 		local line = Snapshot.format({ config_dir = Snapshot.redact_home("/home/alice/.config/ergopti", "/home/alice") })
 		assert_eq(nil, line:find("alice", 1, true), line)
 	end)

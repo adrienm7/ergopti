@@ -4,9 +4,9 @@
 --- MODULE: Diagnostic Snapshot Collector (Linux)
 --- DESCRIPTION:
 --- Gathers the environment facts of the cross-driver diagnostic snapshot
---- (_shared/modules/logger/diagnostic_snapshot.json) and logs them as one INFO
+--- (_shared/core/logger/data/diagnostic_snapshot.json) and logs them as one INFO
 --- line once the daemon is ready. Formatting is shared with macOS through
---- _shared/lua/diagnostics/snapshot.lua; only the probes live here.
+--- _shared/diagnostics/engine/snapshot.lua; only the probes live here.
 ---
 --- FEATURES & RATIONALE:
 --- 1. No subprocess on the boot path: every fact comes from /proc, /etc and the
@@ -18,17 +18,17 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger        = require("logger.shim")
-local Snapshot      = require("diagnostics.snapshot")
+local Logger        = require("core.logger.engine.shim")
+local Snapshot      = require("diagnostics.engine.snapshot")
 local Version       = require("infra.version")
 local ConfigPaths   = require("infra.config_paths")
 local LoggerSink    = require("infra.logger_sink")
 local Paths         = require("infra.paths")
 local DisplayServer = require("infra.display_server")
 local FileSystem    = require("adapters.file_system")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 M.DRIVER = "linux"
 

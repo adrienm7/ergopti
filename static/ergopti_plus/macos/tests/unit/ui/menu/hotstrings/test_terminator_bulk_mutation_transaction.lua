@@ -85,9 +85,9 @@ local function run_action(label, outcome, options)
 	local last_changes = nil
 	local consumed = { space = false, slash = true }
 
-	local native_renderer = assert(require("menu.renderer").new({
+	local native_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
 			local value = require("adapters.json_codec").decode(raw)
 			if options.reorder then

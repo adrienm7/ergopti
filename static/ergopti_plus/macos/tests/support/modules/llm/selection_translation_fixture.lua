@@ -10,14 +10,14 @@
 
 local helpers = require("tests.helpers")
 -- The shared logger is a process singleton; Scope preserves its exact identity.
-require("logger")
+require("core.logger.engine")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Translate = require("llm.translate")
+local Translate = require("ai.engine.prediction.translate")
 
 local ENTRY_ID = "translate-cerebras"
 local MODEL = "qwen-3.8-27b"
@@ -34,8 +34,8 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-local CONFIG = read_json("modules/llm/translate.json")
-local NAMES = read_json("data/locale_names.json")
+local CONFIG = read_json("ai/data/translate.json")
+local NAMES = read_json("core/i18n/data/locale_names.json")
 
 --- Returns one named closure upvalue, or nil when the closure does not own it.
 --- @param fn function Closure to inspect.

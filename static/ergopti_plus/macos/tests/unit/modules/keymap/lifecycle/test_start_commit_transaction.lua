@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
-local ONE_SHOT_DATA = assert(require("json").decode(SourceFile.read(helpers.shared("tap_hold/one_shot_shift.json"))))
+local ONE_SHOT_DATA = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
 
 local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
@@ -21,7 +21,7 @@ local RESET_MODULES = {
 	"adapters.synthetic_input", "adapters.event_provenance",
 	"adapters.timer_scheduler",
 	"infra.logger", "infra.perf", "infra.hotpath_profiler",
-	"infra.manifest_reader", "infra.keycodes", "keymap.terminators",
+	"infra.manifest_reader", "infra.keycodes", "layouts.engine.layers.terminators",
 }
 
 local function noop() end
@@ -248,7 +248,7 @@ local function load_fixture(prepare_input)
 		is_ignored_window = function() return false, 1 end,
 		is_secure_field = function() return false, 1 end,
 	})
-	package.loaded["keymap.terminators"] = api({ matches_magic_event = function() return false end })
+	package.loaded["layouts.engine.layers.terminators"] = api({ matches_magic_event = function() return false end })
 	package.loaded["infra.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
@@ -832,10 +832,10 @@ local INPUT_MODULES = {
 	"modules.keymap.magic_key_source", "adapters.event_clock",
 	"infra.key_event_health", "infra.keystroke_integrity", "infra.deferred_work",
 	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
-	"infra.hotstring_engine", "hotstring_engine", "infra.text_utils", "text_utils",
-	"compat.utf8", "keycodes", "keymap.control_signals", "tap_hold.one_shot_shift",
-	"unicode_case", "unicode_case.init", "unicode_case.data", "error_description", "number_policy",
-	"logger.shim", "hotstrings.personal_files", "native_path", "toml_codec.key_path", "toml_codec.basic_string",
+	"infra.hotstring_engine", "hotstrings.engine.matcher", "infra.text_utils", "core.text.engine.utils_core",
+	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
+	"core.text.engine.unicode_case", "core.text.engine.unicode_case.init", "core.text.engine.unicode_case.data", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"core.logger.engine.shim", "hotstrings.engine.catalogue.personal_files", "core.fs.engine.native_path", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
 	"platform.remap", "modules.shortcuts.keyboard_shortcuts",
 }
 for _, name in ipairs(RESET_MODULES) do INPUT_MODULES[#INPUT_MODULES + 1] = name end
@@ -993,7 +993,7 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 
 	helpers.it("keeps reserved stale controls consumed and publishes their existing signals", function()
 		with_input_fixture(function(fixture)
-			local codes = require("keycodes")
+			local codes = require("platform.input.keycodes.core")
 			for _, code in ipairs({ codes.F20_LAYER_NAV_ENTERED, codes.F19_LAYER_NAV_EXITED }) do
 				helpers.assert_true(fixture.down(fixture.event(code, "", 1200)))
 				helpers.assert_true(fixture.up(fixture.event(code, "", 1, 0, true)))

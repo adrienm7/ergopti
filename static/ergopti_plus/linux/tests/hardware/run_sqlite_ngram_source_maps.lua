@@ -9,7 +9,7 @@
 --- Uses native libuv and the real monotonic clock; no physical collection claim.
 --- ==============================================================================
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local proof = arg[1]
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-source-map-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
@@ -22,7 +22,7 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local Clock = require("infra.monotonic")
-local J = require("json")
+local J = require("core.text.engine.json")
 local path, today = root .. "/metrics.sqlite", os.date("%Y-%m-%d")
 K.init({ sqlite_path = path, log_dir = root .. "/logs" })
 assert(K.is_enabled() and W.is_available())

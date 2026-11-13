@@ -17,7 +17,7 @@ fires before i18n can be loaded.
 ## Where the strings live
 
 ```
-static/ergopti_plus/_shared/data/locales/
+static/ergopti_plus/_shared/core/i18n/data/locales/
 ├── en.json    ← canonical key set (tracked)
 ├── fr.json … zh.json   (20 more, tracked)
 └── *.tsv      ← gitignored self-healing fast-parse cache — never edit, never commit

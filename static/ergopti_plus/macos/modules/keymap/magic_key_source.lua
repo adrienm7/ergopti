@@ -10,7 +10,7 @@
 --- always did (the Ergopti+ keylayouts put ★ on KeyC).
 ---
 --- FEATURES & RATIONALE:
---- 1. The shared rules (_shared/lua/keymap/magic_key_source.lua) decide which
+--- 1. The shared rules (_shared/layouts/engine/layers/magic_key_source.lua) decide which
 ---    values are keys and which keycode a value names, from the manifest entry
 ---    and the physical-key registry.
 --- 2. The event's keyboard model determines which of the ISO-swapped virtual
@@ -27,12 +27,12 @@ local Logger     = require("infra.logger")
 local Manifest   = require("infra.manifest_reader")
 local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
-local Json       = require("json")
-local Shared     = require("keymap.magic_key_source")
+local Json       = require("core.text.engine.json")
+local Shared     = require("layouts.engine.layers.magic_key_source")
 local Geometry   = require("adapters.keyboard_geometry")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
-local LOG = "keymap.magic_key_source"
+local LOG = "layouts.engine.layers.magic_key_source"
 
 -- The canonical configuration path of the setting, and its automatic value.
 M.PATH = ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE
@@ -65,7 +65,7 @@ local _iso_keycode = nil
 --- @return table registry
 local function registry()
 	if _registry then return _registry end
-	local path = Paths.shared("data/keycodes/physical_keys.json")
+	local path = Paths.shared("layouts/data/keycodes/physical_keys.json")
 	local text = path and FileSystem.read(path)
 	if type(text) ~= "string" then
 		error("the physical-key registry is unreadable: " .. tostring(path))

@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-require("test.hotpath_segments_contract").register(helpers, {
+require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 	driver = "macos",
 	root = helpers.driver_root(),
 	call_patterns = { 'HotPath%.log_if_slow%(%s*"([^"]+)"', 'HotPath%.done%(%s*"([^"]+)"' },

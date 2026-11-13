@@ -31,7 +31,7 @@ function ConvertTo-AhkLiteral([string]$Value) {
 
 function New-OwnedRunner {
     $WindowsRoot = [IO.Path]::GetFullPath((Join-Path $Repository 'static/ergopti_plus/windows'))
-    $SharedModulesRoot = [IO.Path]::GetFullPath((Join-Path $WindowsRoot '../_shared/modules'))
+    $SharedModulesRoot = [IO.Path]::GetFullPath((Join-Path $WindowsRoot '../_shared'))
     $TestsRoot = Join-Path $WindowsRoot 'tests'
     $RunnerPath = Join-Path $TestsRoot 'run_all.ahk'
     $ProbeSource = Join-Path $PSScriptRoot 'notepad-callers.ahk'

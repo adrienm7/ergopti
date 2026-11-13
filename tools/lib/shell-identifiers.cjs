@@ -5,7 +5,7 @@
  * MODULE: Shell Identifier Expansion
  * DESCRIPTION:
  * The build scripts read the application names, bundle ids and hosts from
- * _shared/data/identifiers.sh (generated from identifiers.json) instead of
+ * _shared/core/text/data/identifiers.sh (generated from identifiers.json) instead of
  * spelling them. Tests that read a script's text to check a value expand those
  * references with this helper, so they compare the value the script resolves to
  * rather than the shell syntax that fetches it.
@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const IDENTIFIERS_SH = path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.sh');
+const IDENTIFIERS_SH = path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.sh');
 
 /** Reads the NAME="value" assignments of the generated shell file. */
 function readAssignments() {

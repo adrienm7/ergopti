@@ -19,17 +19,17 @@
 local helpers        = require("tests.helpers")
 local KarabinerModel = require("tests.support.karabiner_model")
 local SourceFile     = require("tests.support.source_file")
-local Catalog        = require("tap_hold.key_catalog")
-local ControlSignals = require("keymap.control_signals")
-local Contract       = require("test.tap_hold_decision_contract")
+local Catalog        = require("tap_hold.engine.key_catalog")
+local ControlSignals = require("layouts.engine.layers.control_signals")
+local Contract       = require("tests.lua.keyboard.tap_hold_decision_contract")
 
 local TOKEN    = "0123456789abcdef0123456789abcdef"
 local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 local TIMEOUT_PARAMETER = "basic.to_if_alone_timeout_milliseconds"
 
-local defaults = require("toml_codec").decode(SourceFile.read(helpers.shared("tap_hold/defaults.toml")))
-local corpus = assert(require("json").decode(SourceFile.read(helpers.shared("tests/corpus/tap_hold/decision_vectors.json"))))
-local one_shot_data = assert(require("json").decode(SourceFile.read(helpers.shared("tap_hold/one_shot_shift.json"))))
+local defaults = require("core.text.engine.toml_codec").decode(SourceFile.read(helpers.shared("tap_hold/data/defaults.toml")))
+local corpus = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tests/corpus/tap_hold/decision_vectors.json"))))
+local one_shot_data = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
 
 -- The corpus taps, by the actions.json id that types them; nil taps the key itself.
 local TAP_ACTION_OF = {
@@ -87,7 +87,7 @@ helpers.with_fresh_modules({
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
+	"core.text.engine.toml_codec",
 	"adapters.one_shot_shift",
 }, function()
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -105,7 +105,7 @@ helpers.with_fresh_modules({
 	-- The catalogues read here are JSON and the shared defaults use the
 	-- pure-Lua reader; the native TOML codec is absent from the headless runner.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
 	package.loaded["infra.toml.codec"] = toml_stub
 	local file_cache = {}
 	local function read_once(path)
@@ -148,7 +148,7 @@ helpers.with_fresh_modules({
 	local sentinel = "key_90"
 	-- The untagged marker that leads a Ctrl, Cmd or Option hold: the keymap
 	-- deletes it, so no application receives it, whatever the hand holds.
-	local hold_marker = require("keycodes").CONTEXT_MENU_KARABINER_NAME
+	local hold_marker = require("platform.input.keycodes.core").CONTEXT_MENU_KARABINER_NAME
 
 	--- Builds the rules of one vector: every key and combination off, then its bindings.
 	--- @param vector table

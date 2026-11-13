@@ -73,10 +73,10 @@ local _fallback_stages
 --- @return table stages Set of closed stage codes.
 function M.pac_fallback_stages()
 	if not _fallback_stages then
-		local path = require("infra.paths").shared("modules/network/proxy_policy.json")
+		local path = require("infra.paths").shared("core/network/data/proxy_policy.json")
 		assert(type(path) == "string", "the shared proxy policy path is unavailable")
 		local bytes = assert(require("adapters.file_system").read(path), "the shared proxy policy is unreadable")
-		local policy = require("json").decode(bytes)
+		local policy = require("core.text.engine.json").decode(bytes)
 		local listed = type(policy) == "table" and type(policy.pac_unavailable_fallback) == "table"
 			and policy.pac_unavailable_fallback.stages or nil
 		assert(type(listed) == "table" and #listed > 0, "the shared proxy policy names no PAC fallback stage")
@@ -119,10 +119,10 @@ end
 --- @return table report
 function M.report(receipt, capabilities)
 	if not _contract then
-		local path = require("infra.paths").shared("modules/network/managed_network.json")
+		local path = require("infra.paths").shared("core/network/data/managed_network.json")
 		assert(type(path) == "string", "the shared managed network policy path is unavailable")
 		local bytes = assert(require("adapters.file_system").read(path), "the shared managed network policy is unreadable")
-		_contract = require("network.failure").new(require("json").decode(bytes))
+		_contract = require("core.network.engine.failure").new(require("core.text.engine.json").decode(bytes))
 	end
 	return _contract.classify(receipt, capabilities)
 end

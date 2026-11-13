@@ -11,7 +11,7 @@
 --- 1. Millimetres, as on macOS: the decoder's travel is in device units, and
 ---    the touchpad's own resolution (units per millimetre) converts it, so one
 ---    sensitivity means the same distance on both systems.
---- 2. The shared step rule (_shared/lua/gestures/incremental.lua): the first
+--- 2. The shared step rule (_shared/gestures/engine/incremental.lua): the first
 ---    action after FIRST_STEP, each further one after one more step; a
 ---    shrinking distance keeps the actions fired.
 --- 3. Reversal from the last fire: coming back half a first step rebases the
@@ -24,8 +24,8 @@
 
 local M = {}
 
-local Direction = require("gestures.direction")
-local Incremental = require("gestures.incremental")
+local Direction = require("gestures.engine.direction")
+local Incremental = require("gestures.engine.incremental")
 
 -- Smallest reversal the tracker accepts, in millimetres (macOS LIVE_AXIS_MIN).
 M.REVERSE_FLOOR_MM = 1.0

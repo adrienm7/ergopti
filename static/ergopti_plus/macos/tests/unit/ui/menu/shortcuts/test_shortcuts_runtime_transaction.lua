@@ -366,7 +366,7 @@ local function with_chord_fixture(mode, body)
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "ui.menu.menu_utils", "ui.menu.shortcut_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "infra.manifest_reader",
-		"adapters.json_codec", "menu.renderer", "logger.shim" }, function()
+		"adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
@@ -463,8 +463,8 @@ local function with_chord_fixture(mode, body)
 				package.loaded["ui.menu.shortcut_utils"] = {}
 				package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
-				local renderer = assert(require("menu.renderer").new({ platform = "hs",
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+					manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
 					json_decode = require("adapters.json_codec").decode, i18n = package.loaded["infra.i18n"], logger = require("infra.logger") }))
 				package.loaded["infra.manifest_menu"] = renderer
 				local context = { state = state, shortcuts = {}, script_control = facade, paused = false,
@@ -643,7 +643,7 @@ end)
 helpers.describe("script chord fixture borrowed cache ownership", function()
 	for _, populated in ipairs({ false, true }) do
 		helpers.it("restores borrowed renderer cache " .. (populated and "present" or "absent"), function()
-			local names = { "adapters.json_codec", "menu.renderer", "logger.shim" }
+			local names = { "adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }
 			helpers.with_fresh_modules(names, function()
 				local previous, previous_hs = {}, rawget(_G, "hs")
 				for _, name in ipairs(names) do

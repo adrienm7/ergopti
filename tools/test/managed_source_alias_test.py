@@ -23,11 +23,11 @@ def load(name, path):
 
 ALIASES = load(
     "source_alias_controls",
-    ROOT / "static/ergopti_plus/_shared/python/managed_source_alias.py",
+    ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py",
 )
 POLICY = load(
     "alias_catalogue_controls",
-    ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+    ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
 )
 FINGERPRINT = "4f382b08854345f22682de3701228b9a132034a7b29b74a95cb52d7c1330e960"
 

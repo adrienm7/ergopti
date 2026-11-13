@@ -14,7 +14,7 @@
  *    that calls it, and their tests are registered in run_all.ahk and replay the
  *    shared corpora.
  * 2. The driver's built-in profile order is exactly the id list of
- *    _shared/modules/llm/profiles.json, since the llm_predict_<id> actions and
+ *    _shared/ai/data/profiles.json, since the llm_predict_<id> actions and
  *    the menu are built from it.
  * 3. The parser port carries the rewrite mode of the shared parser and refuses
  *    erasures without the exact deleted text and span; accepting erases in one SendInput
@@ -190,7 +190,7 @@ for (const [test, needle] of Object.entries(TESTS)) {
 
 // 2. The built-in order is the shared registry's id list.
 const profileIds = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared', 'modules', 'llm', 'profiles.json'), 'utf8')
+	fs.readFileSync(path.join(SP, '_shared', 'ai', 'data', 'profiles.json'), 'utf8')
 ).map((profile) => profile.id);
 const validation = read('modules/llm/option_validation.ahk');
 const orderBlock =

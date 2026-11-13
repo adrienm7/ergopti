@@ -5,7 +5,7 @@
  * MODULE: Menu Row Order Single-Source Gate
  * DESCRIPTION:
  * The display-order rules of the menus live once, in
- * _shared/modules/menu/row_order.json, and reach the Lua drivers through the
+ * _shared/menu/data/row_order.json, and reach the Lua drivers through the
  * generated menu.row_order_data. Windows reads the same rules through
  * windows/_generated/menu_row_order.ahk. This gate refuses a second copy of any
  * rule in a driver or in shared Lua, whether spelled as an ordered list of names
@@ -34,8 +34,8 @@ const SCANNED = [
 	path.join(ROOT, 'static', 'ergopti_plus', 'macos'),
 	path.join(ROOT, 'static', 'ergopti_plus', 'linux'),
 	path.join(ROOT, 'static', 'ergopti_plus', 'windows'),
-	path.join(SHARED, 'lua'),
-	path.join(SHARED, 'modules')
+	path.join(SHARED, '.'),
+	path.join(SHARED, '.')
 ];
 const WINDOWS_TABLE = path.join(
 	ROOT,
@@ -55,7 +55,7 @@ const WINDOWS_READER = path.join(
 );
 
 const data = JSON.parse(
-	fs.readFileSync(path.join(SHARED, 'modules', 'menu', 'row_order.json'), 'utf8')
+	fs.readFileSync(path.join(SHARED, 'menu', 'data', 'row_order.json'), 'utf8')
 );
 
 /** Escapes a name for a regular expression. */

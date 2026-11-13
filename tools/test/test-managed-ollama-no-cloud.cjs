@@ -28,7 +28,7 @@ const { createRequire } = require('node:module');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DECLARATION = 'static/ergopti_plus/_shared/modules/llm/managed_ollama_environment.json';
+const DECLARATION = 'static/ergopti_plus/_shared/ai/data/managed_ollama_environment.json';
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 let checks = 0;
 
@@ -47,7 +47,7 @@ check('the shared declaration disables Ollama cloud contact', () => {
 
 check('Windows passes the captured declaration to every managed serve launch', () => {
 	const bootstrap = read('static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk');
-	assert.match(bootstrap, /\\modules\\llm\\managed_ollama_environment\.json"/);
+	assert.match(bootstrap, /\\ai\\data\\managed_ollama_environment\.json"/);
 	assert.match(
 		bootstrap,
 		/"environment", ServeEnvironment, "environment_sha256", this\.Sources\[ServeEnvironment\]/
@@ -103,19 +103,19 @@ check('Linux loads the declaration and applies it to the owned serve child', () 
 	assert.match(factory, /require\("modules\.llm\.managed_ollama_environment"\)\.load\(\)/);
 	assert.match(factory, /serve_environment = serve_environment,/);
 	const loader = read('static/ergopti_plus/linux/modules/llm/managed_ollama_environment.lua');
-	assert.match(loader, /"modules\/llm\/managed_ollama_environment\.json"/);
+	assert.match(loader, /"ai\/data\/managed_ollama_environment\.json"/);
 	const composition = read('static/ergopti_plus/linux/modules/llm/runtime_composition.lua');
 	assert.match(composition, /for _,row in ipairs\(serve_environment\) do env\[#env\+1\]=row end/);
 });
 
 check('macOS builds the declaration into the managed server it starts', () => {
 	const contract = JSON.parse(
-		read('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json')
+		read('static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json')
 	);
 	assert.ok(contract.source_fingerprint_paths.includes(DECLARATION));
 	assert.ok(
 		contract.source_fingerprint_paths.includes(
-			'static/ergopti_plus/_shared/go/native_http/serve_environment.go'
+			'static/ergopti_plus/_shared/core/network/native/go/native_http/serve_environment.go'
 		)
 	);
 	assert.ok(
@@ -123,11 +123,16 @@ check('macOS builds the declaration into the managed server it starts', () => {
 			'TestServeEnvironmentDisablesOllamaCloud'
 		)
 	);
-	const go = read('static/ergopti_plus/_shared/go/native_http/serve_environment.go');
+	const go = read(
+		'static/ergopti_plus/_shared/core/network/native/go/native_http/serve_environment.go'
+	);
 	assert.match(go, /^\/\/go:embed managed_ollama_environment\.json$/m);
 	assert.deepEqual(
 		fs.readFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/go/native_http/managed_ollama_environment.json')
+			path.join(
+				ROOT,
+				'static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_environment.json'
+			)
 		),
 		fs.readFileSync(path.join(ROOT, DECLARATION))
 	);

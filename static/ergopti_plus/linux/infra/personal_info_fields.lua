@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Personal-Info Field Classification (Linux binding)
 --- DESCRIPTION:
---- Reads _shared/modules/personal_info/fields.toml — which personal_info fields
+--- Reads _shared/hotstrings/data/personal_info/fields.toml — which personal_info fields
 --- are secrets, and how much of one may appear on screen — and hands it to the
 --- shared masking function.
 ---
@@ -23,14 +23,14 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local Reader = require("toml_codec")
-local Mask   = require("personal_info.mask")
+local Logger = require("core.logger.engine.shim")
+local Reader = require("core.text.engine.toml_codec")
+local Mask   = require("hotstrings.engine.personal_info.mask")
 local Paths  = require("infra.paths")
 local FileReader = require("infra.regular_file_reader")
-local ErrorDescription = require("error_description")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "infra.personal_info_fields"
 
@@ -70,7 +70,7 @@ local _declaration = nil
 --- driver sits flat in /usr/lib/ergopti, three up is /usr, and nothing is found.
 --- @return string|nil
 local function resolve_path()
-	return Paths.shared("modules/personal_info/fields.toml")
+	return Paths.shared("hotstrings/data/personal_info/fields.toml")
 end
 
 --- Validates named field records before the shared mask reads their flags.

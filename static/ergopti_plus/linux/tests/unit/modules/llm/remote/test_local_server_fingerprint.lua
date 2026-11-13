@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 
 --- Reads one shared JSON file.
@@ -25,13 +25,13 @@ local function read(relative)
 end
 
 helpers.describe("Local server fingerprint (local-server-fingerprint)", function()
-	require("test.local_server_fingerprint_contract").run(read("tests/corpus/llm/local_server_fingerprint.json"),
-		read("modules/llm/local_servers.json"), helpers)
+	require("tests.lua.core.local_server_fingerprint_contract").run(read("tests/corpus/llm/local_server_fingerprint.json"),
+		read("ai/data/local_servers.json"), helpers)
 end)
 
 helpers.describe("Linux local server catalogue fingerprints (local-server-fingerprint)", function()
 	helpers.it("reports an unreadable cloud catalogue before refusing local discovery", function()
-		local Reader, Logger = require("infra.regular_file_reader"), require("logger.shim")
+		local Reader, Logger = require("infra.regular_file_reader"), require("core.logger.engine.shim")
 		local open, report, errors = Reader.open_source, Logger.error, {}
 		Reader.open_source = function(path, ...)
 			if path:match("api_providers%.json$") then return nil end
@@ -55,7 +55,7 @@ helpers.describe("Linux local server catalogue fingerprints (local-server-finger
 			local Catalogue = helpers.load_module("modules.llm.local_server_catalogue")
 			local order, _, published, _, _, _, identities = Catalogue.load({})
 			helpers.assert_true(published, "the production catalogue is admitted")
-			helpers.assert_eq(#order, #read("modules/llm/local_servers.json").server_order)
+			helpers.assert_eq(#order, #read("ai/data/local_servers.json").server_order)
 			helpers.assert_eq(identities.vllm.group, { "omlx", "vllm" })
 			helpers.assert_eq(identities.tabbyapi.group, { "textgen_webui", "tabbyapi" })
 			helpers.assert_eq(identities.vllm.rule, { model_field = "owned_by", equals = "vllm" })

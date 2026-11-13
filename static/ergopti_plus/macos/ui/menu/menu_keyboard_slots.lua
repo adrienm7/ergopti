@@ -26,11 +26,11 @@
 --- ==============================================================================
 
 local M = {}
-local ParameterLabel = require("action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
 local hs           = hs
 local i18n         = require("infra.i18n")
-local LabelValue = require("locale.label_value")
+local LabelValue = require("core.i18n.engine.label_value")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
@@ -185,7 +185,7 @@ local function choose_action_for(slot_id, ctx)
 		return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 			local committed = ShortcutUtils.prompt_action_parameter(gestures,
 				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
-					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
+					publishes_assignment = true, section = require("settings.engine.keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
 					read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
 					apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
 					restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,

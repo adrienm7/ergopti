@@ -6,7 +6,7 @@ helpers.describe("unused-key scanner source shape receipt", function()
 	helpers.it("forwards the receipt of its exact decode with scalar and array ownership", function()
 		local source = '[sample]\nlist=[]\ndictionary={}\nunowned=7\n'
 		local observed
-		local scan = require("config_unused_keys").find_in_source(source, function(document, mark, shapes)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, function(document, mark, shapes)
 			observed = { document = document, shapes = shapes }
 			mark("sample", "list")
 			mark("sample", "dictionary")
@@ -20,7 +20,7 @@ helpers.describe("unused-key scanner source shape receipt", function()
 	end)
 	helpers.it("retains historical two-argument reader behavior", function()
 		local calls = 0
-		local scan = require("config_unused_keys").find_in_source('[sample]\nowned=false\nunowned=true\n', function(document, mark)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source('[sample]\nowned=false\nunowned=true\n', function(document, mark)
 			calls = calls + 1
 			helpers.assert_eq(document.sample.owned, false)
 			mark("sample", "owned")
@@ -32,13 +32,13 @@ helpers.describe("unused-key scanner source shape receipt", function()
 	end)
 	helpers.it("does not call a reader or expose partial receipts for rejected source", function()
 		local calls = 0
-		local scan = require("config_unused_keys").find_in_source('[sample]\nlist=[\n', function() calls = calls + 1 end)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source('[sample]\nlist=[\n', function() calls = calls + 1 end)
 		helpers.assert_eq(scan.status, "malformed")
 		helpers.assert_eq(scan.keys, {})
 		helpers.assert_eq(calls, 0)
 	end)
 end)
 
-local model_records = require("test.user_model_records_contract")
+local model_records = require("tests.lua.hotstrings.user_model_records_contract")
 model_records.register_pure(helpers)
 model_records.register_native(helpers)

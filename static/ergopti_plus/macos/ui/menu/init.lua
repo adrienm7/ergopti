@@ -15,7 +15,7 @@ local M = {}
 
 local hs               = hs
 local notifications    = require("infra.notifications")
-local FeatureNotice    = require("feature_notice")
+local FeatureNotice    = require("menu.engine.feature_notice")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("infra.logger")
 local PhaseStats       = require("infra.phase_stats")
@@ -29,11 +29,11 @@ local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
 local RefreshScope  = require("ui.menu.refresh_scope")
 local BranchRows    = require("ui.menu.branch_rows")
-local QuitAdmission = require("quit_admission")
+local QuitAdmission = require("core.lifecycle.engine.shutdown.quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
-local WrapMutation  = require("menu.wrap_mutation")
+local WrapMutation  = require("menu.engine.wrap_mutation")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("adapters.storage")
@@ -76,9 +76,9 @@ local MENU_REFRESH_COALESCE_SEC = 0.05
 
 -- config.toml [ui] menubar_icon: its variants and its default are the
 -- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
-local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON)
+local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("settings.engine.keys").KEY.UI_MENUBAR_ICON)
 local MENUBAR_ICON_VARIANTS = {}
-for _, variant in ipairs(Manifest.find_entry_by_path(require("config_keys").KEY.UI_MENUBAR_ICON).enum_values) do
+for _, variant in ipairs(Manifest.find_entry_by_path(require("settings.engine.keys").KEY.UI_MENUBAR_ICON).enum_values) do
 	MENUBAR_ICON_VARIANTS[variant] = true
 end
 
@@ -1111,7 +1111,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		quit                      = function()
 			-- What Quit does is decided by the one admission both drivers share
-			-- (_shared/lua/quit_admission.lua): it wins over a reload in flight (the
+			-- (_shared/core/lifecycle/engine/shutdown/quit_admission.lua): it wins over a reload in flight (the
 			-- coordinator upgrades that reload to this exit), waits for a running
 			-- configuration write or publication up to the user-quit deadline, and is
 			-- refused only for a missing owner or an exit already under way.
@@ -1208,10 +1208,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		set_log_level             = function(level)
 			local L = require("infra.logger")
 			-- config.toml's [script] log_level wins at start: rewrite it first.
-			if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOG_LEVEL, level) then
+			if not require("infra.script_scope").rewrite_configured(require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL, level) then
 				return false
 			end
-			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
+			local ok, committed = pcall(Storage.set, require("settings.engine.keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
 				return false
@@ -1515,7 +1515,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	--- the log said that nothing had been restored.
 	--- @param report table Refused composition report.
 	local function show_reset_failure(report)
-		local title, message = require("config_reset_failure").message(report, i18n.get)
+		local title, message = require("settings.engine.publication.reset_failure").message(report, i18n.get)
 		local shown, err = pcall(require("infra.dialog_util").block_alert, title, message,
 			i18n.get("button.ok"), nil, "critical")
 		if not shown then
@@ -1763,7 +1763,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
 				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
-			require("perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
+			require("core.logger.engine.perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
 				function() return require("infra.timings").ms("budgets", "menu_rebuild_ms") end)
 			return true
 		else
@@ -1870,7 +1870,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function()
 			-- A failed prime only costs a slower first open, but it used to cost it
 			-- silently; the submenu then looked empty with nothing in the log.
-			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("config_keys").KEY.TAP_HOLDS }) do
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("settings.engine.keys").KEY.TAP_HOLDS }) do
 				local mod = menu_mods[name]
 				if mod and type(mod.prime) == "function" then
 					local primed, prime_err = pcall(mod.prime, ctx)

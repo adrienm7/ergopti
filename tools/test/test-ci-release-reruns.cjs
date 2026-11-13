@@ -70,7 +70,7 @@ const PUBLISH_FEED = 'Publish channel feed for Sparkle';
 const REPOSITORY = 'owner/ergopti';
 const LINUX_BUNDLE = JSON.parse(
 	fs.readFileSync(
-		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'updater', 'defaults.json'),
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'updater', 'data', 'defaults.json'),
 		'utf8'
 	)
 ).release_assets.linux_bundle;
@@ -82,8 +82,8 @@ const managedRuntime = JSON.parse(
 			'static',
 			'ergopti_plus',
 			'_shared',
-			'modules',
-			'llm',
+			'ai',
+			'data',
 			'managed_ollama_runtime.json'
 		),
 		'utf8'
@@ -102,41 +102,41 @@ const MANAGED_PUBLICATION_SOURCES = [
 	// shared identifiers and the repository through the updater defaults.
 	'tools/lib/identifiers.cjs',
 	'tools/lib/paths.cjs',
-	'static/ergopti_plus/_shared/data/identifiers.json',
-	'static/ergopti_plus/_shared/modules/updater/defaults.json',
+	'static/ergopti_plus/_shared/core/text/data/identifiers.json',
+	'static/ergopti_plus/_shared/updater/data/defaults.json',
 	'tools/build/verify-macos-managed-ollama-publication.py',
 	'tools/build/stage-macos-managed-ollama-catalogue.py',
 	'tools/build/build-macos-managed-ollama.py',
-	'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json',
-	'static/ergopti_plus/_shared/modules/llm/ollama_release.json',
-	'static/ergopti_plus/_shared/python/managed_ollama_runtime.py',
-	'static/ergopti_plus/_shared/go/native_http/transport.go',
-	'static/ergopti_plus/_shared/go/native_http/range_response.go',
-	'static/ergopti_plus/_shared/go/native_http/range_response_test.go',
-	'static/ergopti_plus/_shared/go/native_http/worker_darwin.go',
-	'static/ergopti_plus/_shared/go/native_http/worker_other.go',
-	'static/ergopti_plus/_shared/go/native_http/admission.go',
-	'static/ergopti_plus/_shared/go/native_http/address_policy.go',
-	'static/ergopti_plus/_shared/go/native_http/serve_environment.go',
-	'static/ergopti_plus/_shared/go/native_http/network_bootstrap.go',
-	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_posix.go',
-	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_unsupported.go',
-	'static/ergopti_plus/_shared/go/native_http/transport_test.go',
-	'static/ergopti_plus/_shared/go/native_http/admission_test.go',
-	'static/ergopti_plus/_shared/go/native_http/address_policy_test.go',
-	'static/ergopti_plus/_shared/go/native_http/serve_environment_test.go',
-	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_test.go',
-	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go',
-	'static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
-	'static/ergopti_plus/_shared/modules/llm/managed_ollama_environment.json',
-	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json',
+	'static/ergopti_plus/_shared/ai/data/ollama_release.json',
+	'static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/transport.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/range_response.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/range_response_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/worker_darwin.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/worker_other.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/admission.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/address_policy.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/serve_environment.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_posix.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_unsupported.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/transport_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/admission_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/address_policy_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/serve_environment_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/network_bootstrap_darwin_test.go',
+	'static/ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
+	'static/ergopti_plus/_shared/ai/data/managed_ollama_environment.json',
+	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json',
 	'tools/diagnostics/macos_owned_process.py',
-	'static/ergopti_plus/_shared/go/native_http/listener_event_posix.go',
-	'static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go',
-	'static/ergopti_plus/_shared/go/native_http/listener_event_linux.go',
-	'static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go',
-	'static/ergopti_plus/_shared/go/native_http/listener_event_test.go',
-	'static/ergopti_plus/_shared/go/native_http/failure_stage_test.go'
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_posix.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_darwin.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_linux.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_unsupported.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/listener_event_test.go',
+	'static/ergopti_plus/_shared/core/network/native/go/native_http/failure_stage_test.go'
 ];
 function copyManagedPublicationSources(work) {
 	for (const relative of MANAGED_PUBLICATION_SOURCES) {
@@ -271,8 +271,8 @@ function repository(name, branch) {
 		'tools/build/macos-release-archives.cjs',
 		'tools/lib/owned-descriptor-read.cjs',
 		'tools/lib/paths.cjs',
-		'static/ergopti_plus/_shared/modules/updater/defaults.json',
-		'static/ergopti_plus/_shared/modules/updater/channels.json',
+		'static/ergopti_plus/_shared/updater/data/defaults.json',
+		'static/ergopti_plus/_shared/updater/data/channels.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js'
 	]) {
 		const target = path.join(work, relative);
@@ -1285,10 +1285,10 @@ function preflight(
 		),
 		// The preflight asks the signing owner whether the assets must carry a .sig.
 		'tools/build/update-asset-signature.cjs',
-		'static/ergopti_plus/_shared/modules/updater/asset_signing.json',
+		'static/ergopti_plus/_shared/updater/data/asset_signing.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js',
-		'static/ergopti_plus/_shared/modules/updater/defaults.json',
-		'static/ergopti_plus/_shared/modules/updater/channels.json'
+		'static/ergopti_plus/_shared/updater/data/defaults.json',
+		'static/ergopti_plus/_shared/updater/data/channels.json'
 	]) {
 		const target = path.join(cwd, relative);
 		fs.mkdirSync(path.dirname(target), { recursive: true });

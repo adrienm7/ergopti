@@ -5,7 +5,7 @@
  * MODULE: Update Asset Signature Reference Test
  * DESCRIPTION:
  * Pins the detached-signature scheme of the Windows and Linux update assets
- * (_shared/modules/updater/asset_signing.json): the reference tool signs and
+ * (_shared/updater/data/asset_signing.json): the reference tool signs and
  * verifies, the shared vectors (the ones the Linux OpenSSL and Windows CNG
  * verifiers also replay) accept the valid record and refuse each tampered one,
  * a signature cannot be moved to another asset, and the policy cannot claim

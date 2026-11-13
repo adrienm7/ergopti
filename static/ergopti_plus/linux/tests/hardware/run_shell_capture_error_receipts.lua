@@ -15,7 +15,7 @@ ffi.cdef[[
 	int getrlimit(int resource, struct ergopti_capture_rlimit *limit);
 	int setrlimit(int resource, const struct ergopti_capture_rlimit *limit);
 ]]
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local CANARY = "ERGOPTI_SYNTHETIC_PRIVATE_CAPTURE_CANARY"
 local checks, failures = 0, 0
 Logger.set_level("debug")

@@ -19,7 +19,7 @@
 ---    failed or abandoned restart removes it at once, so a later ordinary start
 ---    never reports a reload.
 --- 3. The same log line as macOS ("Reload completed in N ms ...") and the
----    shared overrun warning (_shared/lua/perf_budget.lua), so
+---    shared overrun warning (_shared/core/logger/engine/perf_budget.lua), so
 ---    tools/dev/field-log-analyse.py reads both drivers with one pattern.
 --- 4. Diagnostics only: a stamp that cannot be written or read is logged as an
 ---    error and never blocks the reload or the boot.
@@ -28,8 +28,8 @@
 local M = {}
 
 local Files = require("adapters.file_system")
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
 local Shell = require("adapters.shell_runner")
 local Storage = require("adapters.storage")
 
@@ -93,7 +93,7 @@ function M.complete()
 		return nil
 	end
 	Logger.info(LOG, "Reload completed in %.0f ms (reload request to boot complete).", reload_ms)
-	require("perf_budget").judge(Logger, LOG, "reload", reload_ms,
+	require("core.logger.engine.perf_budget").judge(Logger, LOG, "reload", reload_ms,
 		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
 	return reload_ms
 end

@@ -25,12 +25,12 @@
 --- ==============================================================================
 
 local M = {}
-local _scope = require("scope_owner").new({ name = "infra.script_settings", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "infra.script_settings", module = M })
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
 local Storage = require("adapters.storage")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "infra.script_settings"
 local FEATURE_PATH = ConfigKeys.KEY.SCRIPT_LOG_LEVEL
@@ -176,14 +176,14 @@ end
 --- Whether the shared logger this module drives is still the loaded one.
 --- @return boolean current
 local function scope_backend_current()
-	return rawequal(package.loaded["logger.shim"], Logger) and rawequal(package.loaded["logger"], Logger)
+	return rawequal(package.loaded["core.logger.engine.shim"], Logger) and rawequal(package.loaded["core.logger.engine"], Logger)
 end
 
 _scope.install({
 	-- Reads only the logger state this module owns; no persistence occurs here.
 	state = function()
 		return { active = _active, level = Logger.get_level(), setter = Logger.set_level, getter = Logger.get_level,
-			backend_parent = package.loaded["logger.shim"], core_parent = package.loaded["logger"] }
+			backend_parent = package.loaded["core.logger.engine.shim"], core_parent = package.loaded["core.logger.engine"] }
 	end,
 	identity = { "backend_parent", "core_parent" },
 	stable = { "setter", "getter" },

@@ -168,7 +168,7 @@ local function with_shared_header(options, body)
 	end
 	local fixture = { resumes = 0, observers = 0 }
 	local ok, failure = xpcall(function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local path = helpers.driver_root() .. "/../_shared/tests/corpus/menus/linux_tray_header_original.json"
 		local file = assert(io.open(path, "rb")); local raw = assert(file:read("*a")); file:close()
 		local oracle = assert(Json.decode(raw))

@@ -43,7 +43,7 @@ const PLATFORM = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 /** Manifest entries as { section, id, platforms }, headers rewritten so the
  *  array-of-tables nesting of TOML cannot hide a sub-section. */
 function manifestEntries() {
-	const source = read(SHARED, 'modules', 'features', 'manifest.toml');
+	const source = read(SHARED, 'settings', 'data', 'features', 'manifest.toml');
 	const records = parseToml(
 		source.replace(
 			/^\[\[features\.([^\]]+)\]\]$/gm,
@@ -67,7 +67,7 @@ const inventoryIds = (driver, kinds, prefix) =>
 
 const actionIds = new Set(
 	[
-		...read(SHARED, 'modules', 'actions', 'actions.toml').matchAll(
+		...read(SHARED, 'shortcuts', 'data', 'actions', 'actions.toml').matchAll(
 			/^\[sg_actions\.([a-z0-9_]+)\]/gm
 		)
 	].map((m) => m[1])
@@ -186,7 +186,9 @@ const families = (driver) =>
 		.map((f) => f.prefix)
 		.sort();
 
-const roleFamilies = JSON.parse(read(SHARED, 'modules', 'actions', 'slot_roles.json')).families;
+const roleFamilies = JSON.parse(
+	read(SHARED, 'shortcuts', 'data', 'actions', 'slot_roles.json')
+).families;
 const prefixesOf = (driver) => roleFamilies[driver].map((roles) => roles.join('_') + '_').sort();
 const windowsGroups = [
 	...read(DRIVERS, 'windows', 'infra', 'config_io.ahk')

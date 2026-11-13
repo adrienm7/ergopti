@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Keystats Named-Query Catalogue Test
  * DESCRIPTION:
- * Proves the catalogue in `_shared/data/db/queries.sql` against a realistic
+ * Proves the catalogue in `_shared/metrics/data/db/queries.sql` against a realistic
  * SQLite fixture and pins its compiler.
  *
  * FEATURES & RATIONALE:
@@ -67,8 +67,8 @@ const reads = queries.filter(
 /** Opens a fresh fixture database with the canonical schema. */
 function fixture() {
 	const db = new DatabaseSync(':memory:');
-	db.exec(fs.readFileSync(path.join(SHARED, 'data', 'db', 'schema.sql'), 'utf8'));
-	db.exec(fs.readFileSync(path.join(SHARED, 'data', 'db', 'media_schema.sql'), 'utf8'));
+	db.exec(fs.readFileSync(path.join(SHARED, 'metrics', 'data', 'db', 'schema.sql'), 'utf8'));
+	db.exec(fs.readFileSync(path.join(SHARED, 'metrics', 'data', 'db', 'media_schema.sql'), 'utf8'));
 	db.exec(fs.readFileSync(FIXTURE, 'utf8'));
 	return db;
 }

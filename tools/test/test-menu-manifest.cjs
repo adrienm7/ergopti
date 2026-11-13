@@ -2,10 +2,10 @@
 // tools/test/test-menu-manifest.cjs
 //
 // Drift gate for the shared tray-menu manifest
-// (_shared/modules/menu/menu_manifest.json). The menu is a single shared file
+// (_shared/menu/data/menu_manifest.json). The menu is a single shared file
 // both drivers read at runtime; its `feature` items reference canonical v2
-// feature paths declared in _shared/modules/features/manifest.toml, and every
-// item label is an i18n key resolved against _shared/data/locales/*.json. Those
+// feature paths declared in _shared/settings/data/features/manifest.toml, and every
+// item label is an i18n key resolved against _shared/core/i18n/data/locales/*.json. Those
 // references can silently drift (a renamed feature path, a removed locale key)
 // because nothing validated them — a stale `path` just renders a dead toggle,
 // a missing i18n key shows the raw key string.
@@ -37,8 +37,8 @@ const parseToml = (source) => tomlOwnData(parseTomlSource(source));
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SHARED = resolve(REPO_ROOT, 'static/ergopti_plus/_shared');
-const MENU_PATH = resolve(SHARED, 'modules/menu/menu_manifest.json');
-const MANIFEST_PATH = resolve(SHARED, 'modules/features/manifest.toml');
+const MENU_PATH = resolve(SHARED, 'menu/data/menu_manifest.json');
+const MANIFEST_PATH = resolve(SHARED, 'settings/data/features/manifest.toml');
 // The hand-edited tray-menu source: the [menu] tables live here, not in MANIFEST_PATH.
 const { MENU_SOURCE_PATH } = require('../lib/menu-source.cjs');
 
@@ -50,9 +50,9 @@ const { MENU_SOURCE_PATH } = require('../lib/menu-source.cjs');
  */
 function combinedCompilerSource(sharedDir = SHARED) {
 	return (
-		readSourceFile(resolve(sharedDir, 'modules/features/manifest.toml')) +
+		readSourceFile(resolve(sharedDir, 'settings/data/features/manifest.toml')) +
 		'\n' +
-		readSourceFile(resolve(sharedDir, 'modules/menu/menu.toml'))
+		readSourceFile(resolve(sharedDir, 'menu/data/menu.toml'))
 	);
 }
 
@@ -67,12 +67,12 @@ function combinedCompilerSource(sharedDir = SHARED) {
 function writeCompilerSources(fixtureRoot, text) {
 	const fs = require('fs');
 	const sharedDir = resolve(fixtureRoot, 'static/ergopti_plus/_shared');
-	for (const rel of ['modules/features/manifest.toml', 'modules/menu/menu.toml']) {
+	for (const rel of ['settings/data/features/manifest.toml', 'menu/data/menu.toml']) {
 		fs.mkdirSync(dirname(resolve(sharedDir, rel)), { recursive: true });
 		fs.writeFileSync(resolve(sharedDir, rel), text);
 	}
 }
-const LOCALES_DIR = resolve(SHARED, 'data/locales');
+const LOCALES_DIR = resolve(SHARED, 'core/i18n/data/locales');
 
 // "linux" is expressible even though no row declares it yet: I2 fixes the
 // vocabulary at windows | macos | linux, and a value the schema rejects cannot
@@ -349,20 +349,20 @@ function checkChoiceProjection() {
 		for (const relativePath of [
 			'tools/build/build-menu-manifest.js',
 			'tools/lib/codegen-startup-tray.cjs',
-			'static/ergopti_plus/_shared/modules/menu/startup_tray.toml',
-			'static/ergopti_plus/_shared/data/locale_order.json',
-			...JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order.map(
-				(code) => `static/ergopti_plus/_shared/data/locales/${code}.json`
+			'static/ergopti_plus/_shared/menu/data/startup_tray.toml',
+			'static/ergopti_plus/_shared/core/i18n/data/locale_order.json',
+			...JSON.parse(readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))).order.map(
+				(code) => `static/ergopti_plus/_shared/core/i18n/data/locales/${code}.json`
 			),
 			'tools/lib/paths.cjs',
 			'tools/lib/_generated/config_keys.cjs',
 			'tools/lib/menu-row-availability.cjs',
-			'static/ergopti_plus/_shared/data/locales/en.json',
-			'static/ergopti_plus/_shared/modules/updater/channels.json',
+			'static/ergopti_plus/_shared/core/i18n/data/locales/en.json',
+			'static/ergopti_plus/_shared/updater/data/channels.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
-			'static/ergopti_plus/_shared/modules/updater/defaults.json',
-			'static/ergopti_plus/_shared/modules/updater/schedule.js',
-			'static/ergopti_plus/_shared/data/locales/en.json'
+			'static/ergopti_plus/_shared/updater/data/defaults.json',
+			'static/ergopti_plus/_shared/updater/data/schedule.js',
+			'static/ergopti_plus/_shared/core/i18n/data/locales/en.json'
 		]) {
 			const target = path.join(fixture, relativePath);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -377,12 +377,9 @@ function checkChoiceProjection() {
 		);
 		const manifest = path.join(
 			fixture,
-			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+			'static/ergopti_plus/_shared/settings/data/features/manifest.toml'
 		);
-		const output = path.join(
-			fixture,
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
-		);
+		const output = path.join(fixture, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json');
 		fs.mkdirSync(path.dirname(manifest), { recursive: true });
 		fs.mkdirSync(path.dirname(output), { recursive: true });
 		const original = combinedCompilerSource();
@@ -745,10 +742,7 @@ function checkChoiceProjection() {
 		result = execute(original);
 		assert.equal(result.status, 0, result.stderr);
 		menu = JSON.parse(fs.readFileSync(output));
-		const timingPath = path.join(
-			fixture,
-			'static/ergopti_plus/_shared/modules/updater/defaults.json'
-		);
+		const timingPath = path.join(fixture, 'static/ergopti_plus/_shared/updater/data/defaults.json');
 		const timingBytes = fs.readFileSync(timingPath);
 		const ownerTiming = JSON.parse(timingBytes);
 		[
@@ -806,7 +800,7 @@ function checkChoiceProjection() {
 
 		const registryPath = path.join(
 			fixture,
-			'static/ergopti_plus/_shared/modules/updater/channels.json'
+			'static/ergopti_plus/_shared/updater/data/channels.json'
 		);
 		const registryBytes = fs.readFileSync(registryPath);
 		const reorderedRegistry = JSON.parse(registryBytes);
@@ -1347,7 +1341,7 @@ function checkShowAllControl() {
 		);
 	}
 	const contract = JSON.parse(
-		readSourceFile(resolve(SHARED, 'modules/llm/menu_persistence_contract.json'))
+		readSourceFile(resolve(SHARED, 'ai/data/menu_persistence_contract.json'))
 	);
 	const wire = contract.entries.find((row) => row.id === 'streaming_multi').ahk;
 	assert.equal(wire.sample, false);
@@ -1550,7 +1544,7 @@ function checkNumericChoiceSchema() {
 	const assert = require('node:assert/strict');
 	const Ajv = require('ajv/dist/2020'); // Existing pinned package-lock dependency.
 	const schema = JSON.parse(
-		readSourceFile(resolve(SHARED, 'modules/features/manifest.schema.json'))
+		readSourceFile(resolve(SHARED, 'settings/data/features/manifest.schema.json'))
 	);
 	const validate = new Ajv({ strict: false }).compile(schema.$defs.feature_entry);
 	const corpus = JSON.parse(
@@ -2729,13 +2723,15 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			);
 	}
 	const locales = JSON.parse(
-		readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locale_order.json'))
+		readSourceFile(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locale_order.json')
+		)
 	).order;
 	assert.equal(locales.length, 21);
 	for (const code of locales) {
 		const strings = JSON.parse(
 			readSourceFile(
-				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json')
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/' + code + '.json')
 			)
 		);
 		for (const row of head.rows.filter((row) => row.caption_getter)) {
@@ -2811,13 +2807,15 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			/consume each shared/
 		);
 	const locales = JSON.parse(
-		readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locale_order.json'))
+		readSourceFile(
+			resolve(REPO_ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locale_order.json')
+		)
 	).order;
 	assert.equal(locales.length, 21);
 	for (const code of locales) {
 		const strings = JSON.parse(
 			readSourceFile(
-				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json')
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/' + code + '.json')
 			)
 		);
 		for (const status of corpus.statuses) {
@@ -2978,7 +2976,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			),
 		/actual provider edge/
 	);
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
 	for (const code of locales) {
 		const strings = JSON.parse(readSourceFile(resolve(LOCALES_DIR, code + '.json')));
@@ -2987,7 +2987,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			corpus.captions[code]
 		);
 	}
-	for (const relative of ['_shared/lua/menu/renderer.lua', 'windows/infra/manifest_menu.ahk']) {
+	for (const relative of ['_shared/menu/engine/renderer.lua', 'windows/infra/manifest_menu.ahk']) {
 		const renderer = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', relative));
 		assert.match(
 			renderer,
@@ -3016,7 +3016,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.equal(delayRow.type, 'command', 'the delay row opens its prompt, not a submenu');
 	assert.equal(delayRow.platforms, undefined, 'the delay row is drawn on the three drivers');
 	assert.equal(manifest.tap_hold_key_delay_rows, undefined, 'the one-row delay submenu is retired');
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(locales.length, 21);
 	for (const code of locales) {
 		const strings = JSON.parse(readSourceFile(resolve(LOCALES_DIR, code + '.json')));
@@ -3128,7 +3130,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		);
 	}
 	const catalogue = JSON.parse(
-		readSourceFile(resolve(SHARED, 'modules/wrap_symbols/wrap_symbols.json'))
+		readSourceFile(resolve(SHARED, 'keyboard/data/wrap_symbols/wrap_symbols.json'))
 	);
 	assert.deepEqual(
 		catalogue.groups.map((group) => ({
@@ -3137,7 +3139,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		})),
 		corpus.catalogue_groups
 	);
-	const localeOrder = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const localeOrder = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.deepEqual(
 		[...localeOrder].sort(),
 		[...corpus.locales].sort(),
@@ -3163,7 +3167,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua')
 		)
 	};
-	const helper = readSourceFile(resolve(SHARED, 'lua/menu/wrap_mutation.lua'));
+	const helper = readSourceFile(resolve(SHARED, 'menu/engine/wrap_mutation.lua'));
 	function tokens(source, extension = '.lua') {
 		return scriptTokens(source, extension).map((token) => token.kind + ':' + token.value);
 	}
@@ -3263,7 +3267,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				'native exact save receipt remains'
 			);
 			assert.ok(
-				hasCode(source, 'local WrapMutation = require("menu.wrap_mutation")'),
+				hasCode(source, 'local WrapMutation = require("menu.engine.wrap_mutation")'),
 				'actual shared mutation dependency'
 			);
 			assert.ok(
@@ -3409,7 +3413,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		corpus.sensitivity_values,
 		[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60]
 	);
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(locales.length, 21);
 	assert.deepEqual(Object.keys(corpus.caption_snapshots).sort(), [...locales].sort());
 	for (const code of locales) {
@@ -3580,7 +3586,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				!source.includes('"' + row.i18n + '"'),
 				'fixed native caption retired: ' + section + '/' + row.id
 			);
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(locales.length, 21);
 	for (const code of locales) {
 		const strings = JSON.parse(readSourceFile(resolve(LOCALES_DIR, code + '.json')));
@@ -3697,7 +3705,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		hs: ['gesture_system_refresh'],
 		linux: []
 	});
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(locales.length, 21);
 	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
 	for (const locale of locales) {
@@ -3873,7 +3883,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		],
 		linux: []
 	});
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(locales.length, 21);
 	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
 	for (const locale of locales) {
@@ -4235,7 +4247,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const generated = JSON.parse(readSourceFile(MENU_PATH));
 	assert.deepEqual(declared[expected.section], expected.declaration);
 	assert.deepEqual(generated[expected.section], expected.declaration);
-	const languages = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const languages = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(languages.length, 21);
 	assert.deepEqual(Object.keys(expected.caption_snapshots).sort(), [...languages].sort());
 	for (const code of languages) {
@@ -4362,7 +4376,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		mutate(wrong);
 		assert.throws(() => declaration(wrong));
 	}
-	const languages = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const languages = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(languages.length, 21);
 	assert.deepEqual(Object.keys(expected.captions).sort(), [...languages].sort());
 	for (const code of languages) {
@@ -4497,7 +4513,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const path = require('node:path');
 	const vm = require('node:vm');
 	const shared = path.resolve(__dirname, '../../static/ergopti_plus/_shared');
-	const declared = JSON.parse(readSourceFile(path.join(shared, 'modules/menu/menu_manifest.json')));
+	const declared = JSON.parse(readSourceFile(path.join(shared, 'menu/data/menu_manifest.json')));
 	const expected = JSON.parse(
 		readSourceFile(path.join(shared, 'tests/corpus/menus/profile_section_headings.json'))
 	);
@@ -4522,7 +4538,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.equal(Object.keys(expected.captions).length, 21);
 	for (const [language, captions] of Object.entries(expected.captions)) {
 		const values = JSON.parse(
-			readSourceFile(path.join(shared, 'data/locales', language + '.json'))
+			readSourceFile(path.join(shared, 'core/i18n/data/locales', language + '.json'))
 		);
 		assert.deepEqual(
 			expected.keys.map((key) => values[key]),
@@ -4999,7 +5015,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	]) {
 		const strings = JSON.parse(
 			readSourceFile(
-				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/data/locales/' + code + '.json')
+				resolve(REPO_ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales/' + code + '.json')
 			)
 		);
 		assert.equal(
@@ -5075,10 +5091,10 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			driver + ': actual extension boundary owner'
 		);
 	}
-	for (const file of readdirSync(resolve(SHARED, 'data/locales')).filter((name) =>
+	for (const file of readdirSync(resolve(SHARED, 'core/i18n/data/locales')).filter((name) =>
 		name.endsWith('.json')
 	)) {
-		const locale = JSON.parse(readSourceFile(resolve(SHARED, 'data/locales', file)));
+		const locale = JSON.parse(readSourceFile(resolve(SHARED, 'core/i18n/data/locales', file)));
 		assert.strictEqual(typeof locale[contract.caption_key], 'string');
 		assert.ok(locale[contract.caption_key].trim().length > 0);
 		assert.ok(locale[contract.caption_key] !== contract.caption_key);
@@ -5350,7 +5366,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			settings.reason_key,
 			'platform_reason.llm_generation_settings_are_inline_on_linux'
 		);
-		const localeDir = resolve(SHARED, 'data/locales');
+		const localeDir = resolve(SHARED, 'core/i18n/data/locales');
 		for (const file of readdirSync(localeDir).filter((name) => name.endsWith('.json'))) {
 			const strings = JSON.parse(readSourceFile(resolve(localeDir, file)));
 			assert.ok(strings[settings.reason_key]?.trim(), `${file}: the Linux placement is explained`);
@@ -6548,13 +6564,13 @@ console.log(
 				`${language}: existing physical-key caption ${key}`
 			);
 	}
-	const sharedRoot = resolve(SHARED, 'lua');
+	const sharedRoot = resolve(SHARED, '.');
 	const mac = 'macos/ui/menu/magic_key_source_menu.lua',
 		linux = 'linux/ui/menu/builder.lua';
 	for (const rel of [mac, linux]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', rel));
 		const reached = delegatedMenuSources([{ rel, src: source }], sharedRoot).find(
-			(entry) => entry.rel === 'keymap.magic_key_source.menu_rows'
+			(entry) => entry.rel === 'layouts.engine.layers.magic_key_source.menu_rows'
 		);
 		assert(reached, `${rel}: actual native call must reach the real shared renderer`);
 		for (const id of [
@@ -6571,7 +6587,7 @@ console.log(
 		])
 			assert(
 				!delegatedMenuSources([{ rel, src: inactive }], sharedRoot).some(
-					(entry) => entry.rel === 'keymap.magic_key_source.menu_rows'
+					(entry) => entry.rel === 'layouts.engine.layers.magic_key_source.menu_rows'
 				),
 				`${rel}: foreign receiver or missing renderer port cannot borrow the shared family`
 			);
@@ -6685,13 +6701,10 @@ console.log(
 		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
 		const manifest = path.join(
 			fixture,
-			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+			'static/ergopti_plus/_shared/settings/data/features/manifest.toml'
 		);
-		const output = path.join(
-			fixture,
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
-		);
-		const en = path.join(fixture, 'static/ergopti_plus/_shared/data/locales/en.json');
+		const output = path.join(fixture, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json');
+		const en = path.join(fixture, 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json');
 		const original = combinedCompilerSource(path.join(fixture, 'static/ergopti_plus/_shared'));
 		const addition = corpus.rows
 			.map(
@@ -7169,12 +7182,9 @@ console.log(
 		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
 		const manifest = path.join(
 			fixture,
-			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+			'static/ergopti_plus/_shared/settings/data/features/manifest.toml'
 		);
-		const output = path.join(
-			fixture,
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
-		);
+		const output = path.join(fixture, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json');
 		const original = combinedCompilerSource(path.join(fixture, 'static/ergopti_plus/_shared'));
 		const compile = (rows, extra = '') => {
 			const addition = rows
@@ -8525,9 +8535,7 @@ console.log(
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'debug'),
 		[{ type: 'group', id: 'debug', i18n: 'menu.debug.title', rows: [] }]
@@ -8537,7 +8545,7 @@ console.log(
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
 		// The row joins its label to its value through the locale's common.label_value.
@@ -8784,9 +8792,7 @@ console.log(
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'configuration'),
 		[{ type: 'group', id: 'configuration', i18n: 'menu.configuration.title', rows: [] }]
@@ -8796,7 +8802,7 @@ console.log(
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.configuration.title']);
 		assert.deepEqual(hand[code].children, [
@@ -9052,9 +9058,7 @@ console.log(
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	const hand = JSON.parse(
 		readSourceFile(path.join(base, '_shared/tests/corpus/menus/apps_parent.json'))
 	);
@@ -9066,7 +9070,7 @@ console.log(
 	assert.equal(Object.keys(hand.captions).length, 21);
 	for (const [code, caption] of Object.entries(hand.captions)) {
 		assert.equal(
-			JSON.parse(readSourceFile(path.join(base, '_shared/data/locales', code + '.json')))[
+			JSON.parse(readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json')))[
 				'menu.apps.title'
 			],
 			caption
@@ -9265,9 +9269,7 @@ console.log(
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'metrics'),
 		[
@@ -9286,7 +9288,7 @@ console.log(
 	);
 	for (const code of ['en', 'fr']) {
 		const locale = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code], locale['menu.metrics.title']);
 	}
@@ -9549,7 +9551,7 @@ console.log(
 	const availability = require(path.join(candidate, 'tools/lib/menu-row-availability.cjs'));
 	const corpus = JSON.parse(readSourceFile(corpusPath));
 	const locale = JSON.parse(
-		readSourceFile(path.join(base, 'static/ergopti_plus/_shared/data/locales/en.json'))
+		readSourceFile(path.join(base, 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json'))
 	);
 	const invalid = [false, 7, [], {}, null, '\n', '\t', '\0', '\x7f', '\ud800', '\udfff'];
 	for (const value of invalid) {
@@ -9581,18 +9583,18 @@ console.log(
 		for (const rel of [
 			'tools/build/build-menu-manifest.js',
 			'tools/lib/codegen-startup-tray.cjs',
-			'static/ergopti_plus/_shared/modules/menu/startup_tray.toml',
-			'static/ergopti_plus/_shared/data/locale_order.json',
-			...JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order.map(
-				(code) => `static/ergopti_plus/_shared/data/locales/${code}.json`
+			'static/ergopti_plus/_shared/menu/data/startup_tray.toml',
+			'static/ergopti_plus/_shared/core/i18n/data/locale_order.json',
+			...JSON.parse(readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))).order.map(
+				(code) => `static/ergopti_plus/_shared/core/i18n/data/locales/${code}.json`
 			),
-			'static/ergopti_plus/_shared/modules/updater/channels.json',
-			'static/ergopti_plus/_shared/modules/updater/defaults.json',
+			'static/ergopti_plus/_shared/updater/data/channels.json',
+			'static/ergopti_plus/_shared/updater/data/defaults.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'tools/lib/paths.cjs',
 			'tools/lib/_generated/config_keys.cjs',
-			'static/ergopti_plus/_shared/modules/updater/schedule.js',
-			'static/ergopti_plus/_shared/data/locales/en.json'
+			'static/ergopti_plus/_shared/updater/data/schedule.js',
+			'static/ergopti_plus/_shared/core/i18n/data/locales/en.json'
 		]) {
 			const destination = path.join(fixture, rel);
 			fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -9610,12 +9612,9 @@ console.log(
 		fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}\n');
 		const manifest = path.join(
 			fixture,
-			'static/ergopti_plus/_shared/modules/features/manifest.toml'
+			'static/ergopti_plus/_shared/settings/data/features/manifest.toml'
 		);
-		const output = path.join(
-			fixture,
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'
-		);
+		const output = path.join(fixture, 'static/ergopti_plus/_shared/menu/data/menu_manifest.json');
 		fs.mkdirSync(path.dirname(manifest), { recursive: true });
 		fs.mkdirSync(path.dirname(output), { recursive: true });
 		const toml = (rows) =>
@@ -10012,7 +10011,9 @@ console.log(
 		assert.deepEqual(declaration[key], rows, 'independent fixed native policy: ' + key);
 		assert.deepEqual(generated[key], rows, 'actual owner output: ' + key);
 	}
-	const locales = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const locales = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	assert.equal(locales.length, 21);
 	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
 	for (const locale of locales) {
@@ -10868,9 +10869,11 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const startup = require('../lib/codegen-startup-tray.cjs');
-	const policy = parseToml(readSourceFile(resolve(SHARED, 'modules/menu/startup_tray.toml')));
+	const policy = parseToml(readSourceFile(resolve(SHARED, 'menu/data/startup_tray.toml')));
 	const root = JSON.parse(readSourceFile(MENU_PATH));
-	const codes = JSON.parse(readSourceFile(resolve(SHARED, 'data/locale_order.json'))).order;
+	const codes = JSON.parse(
+		readSourceFile(resolve(SHARED, 'core/i18n/data/locale_order.json'))
+	).order;
 	const locales = Object.fromEntries(
 		codes.map((code) => [code, JSON.parse(readSourceFile(resolve(LOCALES_DIR, `${code}.json`)))])
 	);
@@ -10900,13 +10903,13 @@ console.log(
 		assert.equal(locales[code]['menu.global.startup_bootstrap'], frozen.expected[code].inert);
 	}
 	assert.equal(
-		readSourceFile(resolve(SHARED, 'modules/menu/startup_tray_projection.ahk')),
+		readSourceFile(resolve(SHARED, 'menu/data/startup_tray_projection.ahk')),
 		startup.render(root, policy, locales),
 		'genuine shared compiled projection drift'
 	);
 	const clone = (value) => JSON.parse(JSON.stringify(value));
 	const parsedPolicy = parseTomlSource(
-		readSourceFile(resolve(SHARED, 'modules/menu/startup_tray.toml'))
+		readSourceFile(resolve(SHARED, 'menu/data/startup_tray.toml'))
 	);
 	const parsedMenu = parseTomlSource(readSourceFile(MENU_SOURCE_PATH)).menu;
 	assert.equal(Object.getPrototypeOf(parsedPolicy), null, 'exercise genuine parser-owned records');
@@ -11087,7 +11090,7 @@ console.log(
 	assert.equal(Object.keys(corpus).length, 21);
 	for (const [language, subject] of Object.entries(corpus)) {
 		const locale = JSON.parse(
-			readSourceFile(resolve(SHARED, 'data/locales/' + language + '.json'))
+			readSourceFile(resolve(SHARED, 'core/i18n/data/locales/' + language + '.json'))
 		);
 		assert.equal(
 			locale[subject.source_key],
@@ -11108,9 +11111,7 @@ console.log(
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
-	const menu = JSON.parse(
-		readSourceFile(path.join(base, '_shared/modules/menu/menu_manifest.json'))
-	);
+	const menu = JSON.parse(readSourceFile(path.join(base, '_shared/menu/data/menu_manifest.json')));
 	const hand = JSON.parse(
 		readSourceFile(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'))
 	);
@@ -11131,7 +11132,7 @@ console.log(
 	);
 	for (const [code, prior] of Object.entries(hand.locales)) {
 		const labels = JSON.parse(
-			readSourceFile(path.join(base, '_shared/data/locales', code + '.json'))
+			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(labels['menu.about.title'], prior.about_parent);
 		assert.equal(labels['menu.about.changelog'], prior.changelog);
@@ -12790,10 +12791,10 @@ console.log(
 	assert.equal(corpus.backend, 'cerebras');
 	assert.equal(corpus.backend_label, 'Cerebras');
 	assert.deepEqual(corpus.counts, [0, 2, 1234]);
-	const providers = JSON.parse(readSourceFile(resolve(SHARED, 'modules/llm/api_providers.json')));
+	const providers = JSON.parse(readSourceFile(resolve(SHARED, 'ai/data/api_providers.json')));
 	assert.equal(providers.providers[corpus.backend].label, corpus.backend_label);
 	for (const [code, original] of Object.entries(corpus.locales)) {
-		const raw = readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'));
+		const raw = readFileSync(resolve(SHARED, 'core/i18n/data/locales/' + code + '.json'));
 		const values = JSON.parse(raw.toString('utf8'));
 		assert.match(original.locale_blob_sha256, /^[a-f0-9]{64}$/, 'original locale provenance');
 		assert.equal(values['menu.agent.off'], original.off);
@@ -13419,7 +13420,7 @@ console.log(
 	);
 }
 
-// The tray menu is defined in one findable file, _shared/modules/menu/menu.toml.
+// The tray menu is defined in one findable file, _shared/menu/data/menu.toml.
 // Its tables were interleaved with the feature tables of the feature manifest
 // until 2026-10-31, where a reader looking for a row had 9 500 lines to search;
 // a [menu] table back in that file would split the definition in two again.
@@ -13433,7 +13434,7 @@ console.log(
 	assert.deepEqual(
 		headers,
 		[],
-		'features/manifest.toml declares features only; [menu] tables belong in modules/menu/menu.toml'
+		'features/manifest.toml declares features only; [menu] tables belong in menu/data/menu.toml'
 	);
 	assert.equal(Object.hasOwn(parseToml(features), 'menu'), false);
 	const menu = parseToml(readSourceFile(MENU_SOURCE_PATH));

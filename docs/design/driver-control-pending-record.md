@@ -2,7 +2,7 @@
 
 # Driver control: the pending record (item 142, Linux successor)
 
-The local reload command (`_shared/modules/control/driver_control.json`) lets a
+The local reload command (`_shared/diagnostics/data/control/driver_control.json`) lets a
 tool ask the running driver to reload and read the answer in `reload.result`.
 Until now a `requested` result had to name the successor process, because the
 reloaded driver completes the request only when the pending record names its

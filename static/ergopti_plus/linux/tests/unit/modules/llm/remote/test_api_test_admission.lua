@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Formats = require("llm.remote_formats")
+local Json = require("core.text.engine.json")
+local Formats = require("ai.engine.api.remote_formats")
 local ENTRY = { provider = "cerebras", token = "synthetic-key" }
 local BACKBOARD = { provider = "backboard", token = "synthetic-key" }
 local MESSAGES = { { role = "user", content = "Synthetic probe." } }
@@ -17,7 +17,7 @@ local MESSAGES = { { role = "user", content = "Synthetic probe." } }
 --- Runs the actual remote module with an explicit HTTP acquisition boundary.
 --- @param body function Receives the remote module and transport controls.
 local function with_remote(body)
-	local names = { "adapters.http_client", "logger.shim", "modules.llm.api_remote" }
+	local names = { "adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
 	local previous, originals = {}, {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	for _, name in ipairs({ "backboard_assistant_id", "backboard_message_request" }) do
@@ -39,7 +39,7 @@ local function with_remote(body)
 	for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 		logger[level] = function(_, text) if state.on_log then state.on_log(text) end end
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["modules.llm.api_remote"] = nil
 	local remote = require("modules.llm.api_remote")
 	remote._reset_for_test()

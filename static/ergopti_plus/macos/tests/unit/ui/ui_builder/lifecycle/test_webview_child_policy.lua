@@ -9,14 +9,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 --- Composes pinned native child creation with the real factory lifecycle.
 --- @param scenario function Scenario over independent native observations.
 local function with_windows(scenario)
 	helpers.with_stub_scope({ "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.logger",
-		"adapters.json_codec", "adapters.timer_scheduler", "infra.locale", "json", "locale.core",
-		"webview.i18n_seed", "webview.presentation", "window_titles", "tests.support.webview_recursive_close_fixture",
+		"adapters.json_codec", "adapters.timer_scheduler", "infra.locale", "core.text.engine.json", "core.i18n.engine.core",
+		"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "tests.support.webview_recursive_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0, closed = 0 }
 		local native_new = require("tests.support.webview_recursive_close_fixture")(h)

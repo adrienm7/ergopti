@@ -13,7 +13,7 @@
  *   1. The list is well formed: unique ids, a windows, macos and linux list
  *      on every row, lowercase Linux fragments, no empty identity.
  *   2. Neither Lua driver declares a list of its own: the detectors and the
- *      Linux metrics read the shared file through _shared/lua/secure_apps.lua,
+ *      Linux metrics read the shared file through _shared/apps/engine/secure_apps.lua,
  *      over its generated projection secure_apps_data.lua, which matches it.
  *   3. Windows keeps no typed list: its secure-field detector reads the
  *      `windows` names of the shared file at run time.
@@ -71,7 +71,7 @@ for (const rel of LUA_SOURCES) {
 	if (!/secure_apps/.test(source)) errors.push(`${rel} does not read the shared secure-app list`);
 }
 
-const projected = read('_shared/lua/secure_apps_data.lua');
+const projected = read('_shared/apps/engine/secure_apps_data.lua');
 for (const app of document.apps || [])
 	for (const platform of ['windows', 'macos', 'linux'])
 		for (const identity of app[platform] || [])

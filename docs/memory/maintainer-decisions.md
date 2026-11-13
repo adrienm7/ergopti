@@ -39,7 +39,7 @@ repeat). Regression `hse-004-magic-key-case`.
 
 Decided by the maintainer on 2026-11-12 (BAP-004): a VSCodium or VS Code
 Insiders clone links its own settings and passes its own extensions folder,
-not VS Code's. `_shared/data/app_cloner/families.json` vscode `user_folders`
+not VS Code's. `_shared/apps/data/app_cloner/families.json` vscode `user_folders`
 names them per executable (`settings` under the platform's configuration
 folder, `extensions` under `{home}`) and marks the replaced argument
 `user_folder: "extensions"`; the change is additive, so the current AHK reader
@@ -51,7 +51,7 @@ Regressions `bap-004-vscode-variants`.
 
 Decided by the maintainer on 2026-11-12 (BAP-008): Linux writes two Encryptor
 desktop entries. The visible one opens the dedicated type of
-`_shared/data/encryptor/format.json` `mime_type`
+`_shared/apps/data/encryptor/format.json` `mime_type`
 (`application/x-ergopti-encrypted`, declared on `*.enc` by a shared-mime-info
 package) and is made its default opener with `xdg-mime`; a `NoDisplay=true`
 entry declares `application/octet-stream` and is never made a default, so «
@@ -113,10 +113,10 @@ symmetry and `[mod_combos.config.<first>_then_<second>]`), beside
 `tap_hold.toml` holds the keys and what only they read: `[tap_hold]`
 `inherit_defaults`, the global delay `time_activation_seconds`,
 `[tap_hold.keys.<id>]`, its `[_meta]` stamp, and the macOS-only `[karabiner]`
-section (`_shared/tap_hold/SCHEMA.md`).
+section (`_shared/tap_hold/data/SCHEMA.md`).
 
 - One migration step moves the old homes: `v21_to_v22` of
-  `_shared/core/config_schema/migrations.toml`, op `import_companion`, for
+  `_shared/settings/data/config_schema/migrations.toml`, op `import_companion`, for
   macOS and Linux (Windows already kept these rows in `config.toml`). The
   boot names the driver's `tap_hold.toml` (macOS first carries an old
   `config_karabiner.toml` over into it); the engine copies the values into
@@ -133,7 +133,7 @@ section (`_shared/tap_hold/SCHEMA.md`).
   shared file names the catalogue's positional PC id: the Mac `left_command`
   is `left_alt`, `right_command` is `alt_gr` and `right_option` is
   `right_ctrl`, after the order of `[tap_hold.catalog]`; the table is
-  `_shared/tap_hold/shared_file.toml` `[thumb_positions]`.
+  `_shared/tap_hold/data/shared_file.toml` `[thumb_positions]`.
   `shared_file.lua` maps the Mac thumb ids to those ids on read and write, so
   Linux and Windows honour a key a Mac bound; a file still holding a Mac thumb
   id is read as its positional key by the three drivers (Windows:
@@ -176,7 +176,7 @@ Windows already fell back there. Windows counterpart (maintainer): TODO
 ## Linux stages are named per process and reaped at start (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (CFD-1): the Linux TOML writer
-(`_shared/lua/toml_codec/writer.lua`, native writer only) and `storage.json`
+(`_shared/core/text/engine/toml_codec/writer.lua`, native writer only) and `storage.json`
 stage as `<file>.ergopti-<pid>-<start>.tmp`, `<start>` being the kernel start
 tick of `/proc/<pid>/stat` (field 22) so a reused pid is never the owner
 (`infra/stage_owner.lua`). A stage a kill or a power cut left therefore never
@@ -225,7 +225,7 @@ output, AI requests, clipboard borrowers and metrics stay inert there. The
 file holds one row per application with its `windows` process names (no case),
 `macos` display names (exact) and `linux` lowercase fragments of the WM class
 or Wayland app_id (substring, so `org.keepassxc.KeePassXC` matches); the rule
-is `_shared/lua/secure_apps.lua`. macOS `adapters/secure_field_detector.lua`
+is `_shared/apps/engine/secure_apps.lua`. macOS `adapters/secure_field_detector.lua`
 `isSecureApp` reads it; Linux reads it once in `infra/secure_apps.lua`, used by
 `secure_field_detector.isSecureApp` and the metrics' `_SECURE_APPS` (still
 behind the metrics secure filter for recording), and
@@ -280,7 +280,7 @@ holds every slot back under `only_script` and `consume` no longer exempts a
 script action from the pause epoch or the live admission. What does run
 through a pause (script chords, gestures, tap keys in dry-run,
 `ScriptActions.allows`) is the shared `paused_actions` list of
-`_shared/modules/actions/script_chords.json`, read by
+`_shared/shortcuts/data/actions/script_chords.json`, read by
 `ScriptActions.runs_while_paused`, not the `script_` prefix:
 `script_save_reload` waits, `open_personal_shortcuts` runs. Regressions
 `scd1-slot-paused`, `scd1-paused-actions`. Windows needs no change.
@@ -320,7 +320,7 @@ two- and five-finger, diagonal and axis entries keep
 ## The config migration registry starts at v20, the schema of 1.0.9 (2026-11-11)
 
 Decided by the maintainer on 2026-11-11: the old steps of
-`_shared/core/config_schema/migrations.toml` are squashed, which cuts most of
+`_shared/settings/data/config_schema/migrations.toml` are squashed, which cuts most of
 the registry every driver parses at boot and most of the config test time.
 `oldest_version` is v20, what 1.0.9 (the latest public release) and every
 1.0.10 pre-release wrote; only `v20_to_v21` remained at the squash. A file stamped below it,
@@ -410,7 +410,7 @@ stores `ts` in UTC and `utc_offset_min`, the local UTC offset in force when it
 was recorded (nullable column, last in each table, `schema.sql` and every
 `events.*` catalogue statement); `date` stays the local day. Hour-of-day,
 night wakes and a day read from `ts` use ts + offset, the local time the user
-lived (`_shared/lua/keystats/local_time.lua`). Rows recorded before the column
+lived (`_shared/metrics/engine/local_time.lua`). Rows recorded before the column
 have NULL: a Linux row then held UTC and is read with the reading device's
 current offset, which the rebuild logs; a macOS or Windows row held local time.
 Display follows the viewer's zone: no dashboard shows a raw instant today, so
@@ -421,7 +421,7 @@ a future one converts `ts` from UTC.
   with `local_time.from_local` (the system's choice in a fall-back hour). The
   purge tombstone's `metadata.utc` carries milliseconds and the Linux tombstone
   stamps `ts` in UTC.
-- Migration: `_shared/lua/keystats/utc_offset_column.lua` adds the column to an
+- Migration: `_shared/metrics/engine/utc_offset_column.lua` adds the column to an
   older store and drops the purge triggers written before it, run on open
   before `purge_schema.sql` (Linux `_ensure_utc_offset_column`, macOS
   `_initialize_db`). `purge_schema.sql` compares a row with an offset (or an
@@ -447,7 +447,7 @@ incremental one included, decides its direction from 3.0 mm of travel
 (diagonal 5.0 mm) on Linux as on macOS; three fingers or more keep 1.5 mm.
 The one value is the shared timings registry's `[gestures]`
 `swipe_minimum_mm`, `pair_swipe_minimum_mm` and `pair_diagonal_minimum_mm`
-(`_shared/modules/timings/constants.toml`), read with `Timings.count` by macOS
+(`_shared/core/timing/data/constants.toml`), read with `Timings.count` by macOS
 `geometry.lua` and the Linux `incremental_tracker.lua`; the finger-count rule
 is `gestures.direction.minimums_mm`. `test-gesture-defaults-single-source.cjs`
 fails on a gesture source (any driver, Windows included) that declares a swipe
@@ -504,7 +504,7 @@ Decided by the maintainer on 2026-11-11 (AID-3): a change of the backend, the
 API entry, its provider, model, endpoint or key while a prediction is in
 flight retires that request on macOS and Linux, as Windows does; the next
 request uses the new settings. The field list and the comparison are shared
-(`_shared/lua/llm/request_settings.lua`); each driver snapshots its own
+(`_shared/ai/engine/settings/request_settings.lua`); each driver snapshots its own
 sources at dispatch (Linux `prediction_engine.predict`, macOS
 `modules.llm.request_settings()`) and compares at every backend and
 streaming callback: the macOS engine routes every request id read through
@@ -517,7 +517,7 @@ never shown). The key is only compared, never logged.
 Decided by the maintainer on 2026-11-11 (AID-2): a token exchange (watsonx
 IAM, Vertex OAuth) that answers HTTP 400 is never retried on any OS; the
 request fails at once with the service's own message. The rule lives in the
-shared classifier (`_shared/lua/llm/failure_class.lua`, phrase « the token
+shared classifier (`_shared/ai/engine/policy/failure_class.lua`, phrase « the token
 exchange answered http 400 », corpus `auth_failure_vectors.json`) and the
 message in `api_token_exchange.read`'s refusal (error_description,
 errorMessage, error.message, message, then error; one line, at most
@@ -660,7 +660,7 @@ and Linux. The emulation is the first part: the user keeps any installed
 system layout and Ergopti types the selected layout over it, with the same
 options and menu rows as Windows (layers, rows, number-row ordering and edge
 keys, dead keys, AltGr, the shortcut chords' Command level, the magic key).
-macOS and Linux run one shared engine, `_shared/lua/layouts/keylayout_emulation.lua`,
+macOS and Linux run one shared engine, `_shared/layouts/engine/composer/keylayout_emulation.lua`,
 the twin of `windows/modules/keymap/keylayout/keylayout_emulation.ahk`; the
 three replay `_shared/tests/corpus/layouts/keylayout_vectors.json` (the
 cross-OS oracle) and the Lua drivers `emulation_vectors.json` for the options.
@@ -742,7 +742,7 @@ that needs real hardware goes under "To confirm on ...".
 
 When the Versions install has installed a release (Linux) or armed the app swap
 (macOS) and the restart is refused, the shared session
-(`_shared/lua/updater/release_install.lua`) holds it as `restart_pending`: the
+(`_shared/updater/engine/release_install.lua`) holds it as `restart_pending`: the
 page says it is installed and offers « Redémarrer maintenant »
 (`complete_install_restart`), the About check row becomes « Redémarrer pour
 terminer l'installation de {tag} », a window opened later is seeded with it,
@@ -809,7 +809,7 @@ file can still reach the destination there, but never as a success.
 
 ## N-gram keys are token encoding 2 (2026-11-01)
 
-A key is a run of markers from `_shared/data/keystats_tokens.json`, the escape `[[`
+A key is a run of markers from `_shared/metrics/data/keystats_tokens.json`, the escape `[[`
 for a typed `[`, and single characters, so `[BS]` no longer reads as both a Backspace
 and four typed characters. The long spellings won (`[PAGEUP]`, `[PAGEDOWN]`,
 `[DELETE]`); `[PGUP]`, `[PGDN]` and `[DEL]` stay aliases because raw events keep them.
@@ -879,7 +879,7 @@ The French sticky-modifier labels say « rémanent »: `📌 Maj rémanente`,
 the delay strings say « modificateur rémanent ». Other Latin-script locales keep
 their own wording. Since 2026-11-03 each `sg_actions.sticky_<mods>` value is a
 template (`📌 {1} rémanents`) whose `{1}` the modifiers fill from the key name
-table on the platform that shows it (`_shared/lua/actions/sticky_label.lua`,
+table on the platform that shows it (`_shared/shortcuts/engine/actions/sticky_label.lua`,
 Win and Alt on Windows); keep the gender and number agreement in the template.
 The French rows of
 `_shared/tests/corpus/menus/script_action_original_catalogue_projection.json`
@@ -899,14 +899,14 @@ When a finished sweep found no local AI server, the menu row says
 `menu.llm.local_servers.none_detected` (« Aucun serveur local détecté ») and
 lists no server; the names stay in the local servers panel and the "other
 address" submenu. The row of a running sweep (`searching`) keeps the list. The
-shared `_shared/lua/llm/local_server_menu.lua` owns the rule; the Windows twin
+shared `_shared/ai/engine/local_servers/menu.lua` owns the rule; the Windows twin
 follows through the PC handoff.
 
 ## config.toml `[script]` wins at start on macOS and Linux, without migration (2026-10-31)
 
 A `config.toml` `[script]` row (`locale`, `log_level`, `show_error_dialog`) wins
 over the native store (hs.settings, storage.json) at start, as on Windows:
-`_shared/lua/script_config_authority.lua` writes it into the native alias
+`_shared/settings/engine/scope/script_config_authority.lua` writes it into the native alias
 (`infra/script_scope.lua` `adopt_configured`) before the error window, the log
 level and i18n read it, and every menu or wizard change rewrites the row first
 when the file holds one (`rewrite_configured`). There is no migration or
@@ -935,7 +935,7 @@ shipped locale code is adopted.
 ## Every owned-runtime row is decided (2026-10-31)
 
 The maintainer accepted every row's proposal of the owned-runtimes inventory.
-The rows live in `_shared/data/owned_runtimes.json` (decision
+The rows live in `_shared/core/network/data/owned_runtimes.json` (decision
 PIN/SYS/OPT/DELETE/NA, status done/follow_up); where a proposal named two ways,
 the first is decided and the second kept as `alternative`. WebView2 stays the
 Evergreen system runtime (2026-10-27). Edit the JSON, then run
@@ -960,9 +960,9 @@ through `npm run build:manifest`.
 
 vLLM shares 8000 with oMLX and TabbyAPI 5000 with text-generation-webui. Each
 row of a shared default address declares `fingerprint { model_field, equals }`
-in `_shared/modules/llm/local_servers.json`, matched against the `owned_by` of
+in `_shared/ai/data/local_servers.json`, matched against the `owned_by` of
 `GET /v1/models` (`vllm`, `tabbyAPI`, `omlx`, `user`).
-`_shared/lua/llm/local_server_fingerprint.lua` and the shared discovery
+`_shared/ai/engine/local_servers/fingerprint.lua` and the shared discovery
 controller keep one row per answering address: the fingerprinted row, else the
 address's default row (first in `server_order`), which is also kept on 401/403.
 A generic entry at a shared address belongs to the default row only. A merged
@@ -979,12 +979,12 @@ count, untracked included); then it shows the clone's folder without HTTP. A
 git failure shows the clone's folder and logs an ERROR: the clone is the code
 being run, and the published registry would hide a local edit. The decision is
 shared (`Catalogue.registry_source` and `registry_changes_args` in
-`_shared/lua/layouts/catalogue.lua`); the Windows port is in the PC handoff.
+`_shared/layouts/engine/composer/catalogue.lua`); the Windows port is in the PC handoff.
 
 ## Decisions moved out of TODO by its 2026-10-31 shrink
 
 - **Every web-view page has a toggle action (2026-10-27).** Ten actions of the
-  shared catalogue (`_shared/modules/actions/actions.toml`, group "UI"):
+  shared catalogue (`_shared/shortcuts/data/actions/actions.toml`, group "UI"):
   `open_metrics_typing`, `open_metrics_apps`, `open_hotstrings_editor`,
   `open_paths_editor`, `open_hotstrings_settings`, `open_layout_manager`,
   `open_layer_editor`, `open_model_browser`, `open_changelog`,
@@ -1252,7 +1252,7 @@ its menu caption says ★ on Windows, macOS and Linux.
 The catalogue action toggles on every OS (macOS used to re-request ACTIVE).
 Escape, Delete, the arrows, Home/End, Page Up/Down and F1-F12 always end
 CapsWord, as macOS's fixed Karabiner exits do: one list,
-`FIXED_EXIT_KEYS` in `_shared/lua/caps_word/auto_off.lua`, pinned by
+`FIXED_EXIT_KEYS` in `_shared/keyboard/engine/caps_word_auto_off.lua`, pinned by
 `test-capsword-fixed-exits-single-source.cjs`. A modifier pressed alone is no
 keystroke for the idle delay (macOS and Linux; Windows follows).
 
@@ -1289,7 +1289,7 @@ read the live data correctly while a write may be in progress, and they offer
 explicit user actions. The same behaviour holds on Windows (AHK v2), macOS
 (Hammerspoon Lua) and Linux (LuaJIT).
 
-**Stores and journal.** Linux and macOS keep `db.sqlite` (`_shared/data/db/schema.sql`
+**Stores and journal.** Linux and macOS keep `db.sqlite` (`_shared/metrics/data/db/schema.sql`
 and the writers: `PRAGMA journal_mode = DELETE`, `synchronous = FULL`). It is a
 rollback-journal store; no driver uses a WAL, and none may switch to one without
 a new decision. The "hot journal" is `db.sqlite-journal`, left by a write
@@ -1382,7 +1382,7 @@ in `ErgoptiPlus.exe`: the exclude group `system-layout-installer` of
 `tools/build/windows_bundle_manifest.json` keeps them out, and no antivirus
 ceiling of `tools/ci/windows-exe-av-surface.json` is raised for them. They ship
 only as `Ergopti_windows_layout.zip` (`release_asset` of
-`_shared/modules/layouts/windows_system_layout.json`), an asset of every release
+`_shared/layouts/data/windows_system_layout.json`), an asset of every release
 (`ci-release.yml` preflight and notes, pinned by
 `test-release-notes-assets-are-uploaded.cjs`). Layout > « Download the Ergopti
 system layout installer » (`layout_system_install`) says whether the layout is
@@ -1400,7 +1400,7 @@ would compute, because semver must order every dev tag after the previous one:
 a predicted major or minor core could not come back down when `main` releases a
 lower version (`Release-As`), and the updaters would keep offering the older
 build. The `v0.0.0-dev.N` tags before 2026-11-08 are the same series; the dev
-channel of `_shared/modules/updater/channels.json` matches any core since
+channel of `_shared/updater/data/channels.json` matches any core since
 `v0.0.0-dev.169`, the bridge release that installed builds, which only know the
 old rule, still pick up; `ci.yml` keeps the `0.0.0` core for every counter up to 169, so a failed bridge run is
 published by the next request under the same legacy name. Action: never delete `v0.0.0-dev.169`; compute the dev

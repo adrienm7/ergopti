@@ -40,5 +40,5 @@ for _ in $(seq 80); do [ -S "${WORK}/run/wayland-1" ] && break; sleep 0.25; done
 [ -S "${WORK}/run/wayland-1" ] || { echo "ENVIRONMENT: sway did not open its socket" >&2; tail -5 "${WORK}/sway.log" >&2; exit 2; }
 export WAYLAND_DISPLAY=wayland-1
 unset DISPLAY
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 luajit tests/hardware/run_clipboard_owner.lua wayland

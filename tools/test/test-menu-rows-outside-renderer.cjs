@@ -85,7 +85,7 @@ const MEASURE = process.argv.includes('--measure');
 // row sites counted as INSIDE and Linux read 2/2 — a number that could not move
 // no matter how much of the menu was hand-built, because the hand-building WAS
 // the renderer by definition. Linux is the only driver whose renderer is entirely
-// shared (_shared/lua/menu/renderer.lua, bound by infra/manifest_menu.lua), and
+// shared (_shared/menu/engine/renderer.lua, bound by infra/manifest_menu.lua), and
 // ui/menu/builder.lua is a CALLER of it, exactly as menu_shortcuts.lua is on macOS —
 // which this file has always counted as outside.
 //
@@ -120,7 +120,7 @@ const MEASURE = process.argv.includes('--measure');
 // renderer materialises it: `type = "check"` carries the label key, the
 // checked_when predicate and the disabled_when predicate, and the driver
 // registers only a named command. Both renderers gained the type in the same
-// change — _shared/lua/menu/renderer.lua and windows/infra/manifest_menu.ahk —
+// change — _shared/menu/engine/renderer.lua and windows/infra/manifest_menu.ahk —
 // because a shared declaration that only one renderer understands is a row that
 // disappears on the other two.
 //
@@ -496,7 +496,7 @@ const DRIVER_SPEC = {
 		// sits with an action, a checkmark, or a nested menu.
 		patterns: [/\btitle\s*=(?!=)\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
-		// Like Linux, this driver now renders through _shared/lua/menu/renderer.lua
+		// Like Linux, this driver now renders through _shared/menu/engine/renderer.lua
 		// alone. builder.lua kept one tree in the driver dialect — the extension
 		// packs' read-only counts — and that tree is provider rows since the packs
 		// became real, switchable groups, so the files below draw no row of their
@@ -509,7 +509,7 @@ const DRIVER_SPEC = {
 		// Same row shape as macOS — `{ title = …, fn = … }`.
 		patterns: [/\btitle\s*=(?!=)\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
-		// This driver's renderer lives entirely in _shared/lua/menu/renderer.lua;
+		// This driver's renderer lives entirely in _shared/menu/engine/renderer.lua;
 		// infra/manifest_menu.lua is the binding that hands it this platform's
 		// token, its manifest path and its JSON decoder, and builds no row itself.
 		// So the set is empty ON PURPOSE, and `sharedRenderer` says so — without it
@@ -559,7 +559,7 @@ function countRows(driver, spec, base = path.join(DRIVERS, driver), counter = ro
 		);
 	}
 	if (spec.sharedRenderer) {
-		const sharedRenderer = path.join(DRIVERS, '_shared', 'lua', 'menu', 'renderer.lua');
+		const sharedRenderer = path.join(DRIVERS, '_shared', 'menu', 'engine', 'renderer.lua');
 		assert(
 			fs.existsSync(sharedRenderer) && fs.statSync(sharedRenderer).isFile(),
 			`${driver}: shared renderer unavailable`
@@ -712,7 +712,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 			`${driver}: menu rows built outside the renderer rose to ${outside} (baseline ` +
 				`${BASELINE[driver]}). A row created outside the renderer is a row no manifest describes — ` +
 				'it has no platforms field and no gate can compare it across drivers. Add the row to ' +
-				`_shared/modules/features/manifest.toml [menu.*] instead. Do NOT raise the baseline.\n` +
+				`_shared/settings/data/features/manifest.toml [menu.*] instead. Do NOT raise the baseline.\n` +
 				`      largest bypasses: ${worst.map(([f, n]) => `${f} (${n})`).join(', ')}`
 		);
 	}
@@ -740,7 +740,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 // going back into the driver.
 const LIST_PROVIDERS_FLOOR = { linux: 7 };
 
-const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'menu', 'data', 'menu_manifest.json');
 const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'builder.lua');
 if (fs.existsSync(LINUX_SRC) && fs.existsSync(MENU_MANIFEST)) {
 	const menuManifest = JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8'));

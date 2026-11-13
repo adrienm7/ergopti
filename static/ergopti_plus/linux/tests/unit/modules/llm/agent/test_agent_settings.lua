@@ -20,8 +20,8 @@ local ActualScenario = require("tests.support.agent_scenario")
 local i18n = require("infra.i18n")
 
 helpers.it("refuses fractional agent count limits", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	local settings = require("modules.llm.agent_settings")
 	for _, item in ipairs({
@@ -39,8 +39,8 @@ helpers.it("refuses fractional agent count limits", function()
 end)
 
 helpers.it("refuses a malformed Jev triage configuration", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, damage in ipairs({
 		function(config) config.system1.jev = nil end,
@@ -56,8 +56,8 @@ helpers.it("refuses a malformed Jev triage configuration", function()
 end)
 
 helpers.it("refuses malformed action schemas before accepting agent output", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, damage in ipairs({
 		function(config) config.actions.calendar = false end,
@@ -74,8 +74,8 @@ helpers.it("refuses malformed action schemas before accepting agent output", fun
 end)
 
 helpers.it("refuses missing and invalid agent source labels", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, case in ipairs({ { "selection" }, { "selection", false }, { "typing", "" }, { "command", 5 } }) do
 		local config = assert(Json.decode(source)); config.source_kinds[case[1]] = case[2]
@@ -89,7 +89,7 @@ helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
 	local Paths = require("infra.paths")
 	local original_shared, original_settings = Paths.shared, package.loaded["modules.llm.agent_settings"]
-	local source = assert(original_shared("modules/llm/agent.json"))
+	local source = assert(original_shared("ai/data/agent.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-agent-config-XXXXXX"))
 	local path = dir .. "/agent.json"
 	local made = os.execute("mkfifo '" .. path .. "'")
@@ -97,7 +97,7 @@ helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	package.loaded["modules.llm.agent_settings"] = nil
 	local Settings = require("modules.llm.agent_settings")
 	Paths.shared = function(relative)
-		if relative == "modules/llm/agent.json" then return path end
+		if relative == "ai/data/agent.json" then return path end
 		return original_shared(relative)
 	end
 	local exited, process = false, nil
@@ -186,7 +186,7 @@ local function with_agent_declaration(component, body)
 			file = assert(io.open(helpers.driver_root()
 				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "rb"))
 			local contents = assert(file:read("*a")); assert(file:close()); file = nil
-			local available = require("json").decode(contents)
+			local available = require("core.text.engine.json").decode(contents)
 			helpers.assert_type(available, "table", "the published declaration must decode")
 			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
 			helpers.assert_eq(available.greyed_when_paused, true, "the published pause policy is retained")
@@ -425,8 +425,8 @@ helpers.describe("AI agent settings: stored like every llm.* setting", function(
 
 	helpers.it("warns once about a retired mode or spec and offers it for cleanup (config-outdated-llm-agent)", function()
 		local marked = {}
-		require("config_outdated").reset_for_tests()
-		local reported = require("config_outdated").collect_reports(function()
+		require("settings.engine.migration.outdated").reset_for_tests()
+		local reported = require("settings.engine.migration.outdated").collect_reports(function()
 			Scenario.run({ stored = { ["llm.agent_system1"] = "Bad Value", ["llm.agent_mode"] = "suggest" } }, function()
 				local Settings = require("modules.llm.agent_settings")
 				helpers.assert_eq(Settings.get_mode(), "off")
@@ -466,7 +466,7 @@ local function mode_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus = assert(require("json").decode(raw))
+	local corpus = assert(require("core.text.engine.json").decode(raw))
 	helpers.assert_eq(#corpus.modes, 3)
 	helpers.assert_eq(#corpus.states, 3)
 	return corpus
@@ -621,7 +621,7 @@ local function system_off_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_off.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("AI agent shared system Off row (agent-system-off)", function()
@@ -686,7 +686,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 	end)
 
 	helpers.it("preserves foreign physical source and refuses an actual scoped writer before Off ACK (agent-system-off)", function()
-		local sandbox = require("test.config_unused_keys_contract").sandbox
+		local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		-- The agent reads on: an off category greys every row of its submenu.
 		sandbox.with_config('[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "initial"\n', function(path)
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
@@ -705,7 +705,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 				helpers.assert_eq(sandbox.read_bytes(path), initial)
 				helpers.assert_eq(changes, 0)
 				helpers.assert_eq(preferences.release(owner), true)
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local original_batch = writer.batch_write
 				local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "external"\n'
 				local observed = {}
@@ -725,7 +725,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 				helpers.assert_eq(changes, 0)
 				helpers.assert_eq(require("modules.llm.agent_settings").get_spec("system1"), "cerebras")
 				helpers.assert_eq(off.fn(), true)
-				local document = require("toml_codec").decode(sandbox.read_bytes(path))
+				local document = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path))
 				helpers.assert_nil(document.llm.agent_system1)
 				helpers.assert_eq(document.future.keep, "external")
 				helpers.assert_eq(changes, 1)
@@ -742,14 +742,14 @@ local function system_model_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_model.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Holds genuine locale/backend/renderer identities and restores them on every exit.
 --- @param code string Runtime-only fixture locale.
 --- @param scenario function Receives the authentic production i18n owner.
 local function with_system_model_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired
@@ -865,7 +865,7 @@ end)
 
 helpers.describe("Agent model physical-source ownership (agent-system-model)", function()
 	helpers.it("preserves physical bytes on scope/CAS refusal and retries the real model writer (agent-system-model)", function()
-		local sandbox = require("test.config_unused_keys_contract").sandbox
+		local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		-- The agent reads on: an off category greys every row of its submenu.
 		local initial = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "initial"\n'
 		local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "external"\n'
@@ -874,7 +874,7 @@ helpers.describe("Agent model physical-source ownership (agent-system-model)", f
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original_batch = writer.batch_write
 			local ok, err = pcall(function()
 				package.loaded["infra.config_paths"] = { config = function() return path end }
@@ -924,7 +924,7 @@ end)
 --- @param scenario function Receives the French owner and newer backend.
 local function with_system_model_french_seed(scenario)
 	with_system_model_locale("fr", function(native)
-		local backend, core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		local backend, core = package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"]
 		local ok, err = pcall(function()
 			require("infra.manifest_menu").get_root()
 			local newer = helpers.load_module("infra.locale")
@@ -934,7 +934,7 @@ local function with_system_model_french_seed(scenario)
 				"the old fixture changes a different genuine backend than the native producer")
 			scenario(native, newer)
 		end)
-		package.loaded["infra.locale"], package.loaded["locale.core"] = backend, core
+		package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = backend, core
 		if not ok then error(err, 0) end
 	end)
 end
@@ -942,7 +942,7 @@ end
 helpers.describe("Agent model locale cohort isolation (agent-system-model)", function()
 	helpers.it("uses actual English producers and restores the split French cohort exactly (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+			local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -966,7 +966,7 @@ helpers.describe("Agent model locale cohort isolation (agent-system-model)", fun
 
 	helpers.it("restores prior owners on a raised English scenario and permits a genuine retry (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+			local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -1026,7 +1026,7 @@ local function disabled_apps_frame_corpus()
 	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_disabled_apps.json")
 	local file = assert(io.open(path, "rb"))
 	local content = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(content))
+	return assert(require("core.text.engine.json").decode(content))
 end
 
 --- Runs through the actual producer, modal boundary and shared final parent renderer.
@@ -1251,7 +1251,7 @@ local function agent_system_frames_corpus()
 	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_system_frames.json")
 	local file = assert(io.open(path, "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Uses the registered native scenario, settings and menu producer unchanged.

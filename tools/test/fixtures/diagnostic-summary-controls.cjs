@@ -10,7 +10,7 @@ const vm = require('node:vm');
 exports.run = function run(root) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared');
 	const schema = JSON.parse(
-		fs.readFileSync(path.join(shared, 'modules/diagnostics/schema.json'), 'utf8')
+		fs.readFileSync(path.join(shared, 'diagnostics/data/schema.json'), 'utf8')
 	);
 	const sandbox = {};
 	sandbox.window = sandbox;

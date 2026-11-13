@@ -38,14 +38,14 @@ $ReadPredictionMs = 900
 # acceptable at once; alternatives keep arriving after it (final_visible).
 $PredictionTimeoutMs = 30000
 # Today's driver log in the default logs folder, both named by the one
-# declaration of the Ergopti folders (_shared/modules/paths/app_dirs.toml).
+# declaration of the Ergopti folders (_shared/core/fs/data/paths/app_dirs.toml).
 function Get-AppDirsValue([string]$Toml, [string]$Section, [string]$Key) {
 	$Pattern = '(?m)^\[' + [regex]::Escape($Section) + '\]\r?\n(?:(?!\[)[^\n]*\n)*?' + $Key + ' = ("[^"]*"|\[[^\]]*\])'
 	if ($Toml -notmatch $Pattern) { throw "app_dirs.toml names no $Section.$Key" }
 	# The comma keeps a one-element list a list: [0] then names the value, not its first character.
 	return ,@([regex]::Matches($Matches[1], '"([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
 }
-$AppDirs = Get-Content -Raw -Encoding utf8 (Join-Path $VideoRoot '../static/ergopti_plus/_shared/modules/paths/app_dirs.toml')
+$AppDirs = Get-Content -Raw -Encoding utf8 (Join-Path $VideoRoot '../static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml')
 $AppFolder = (Get-AppDirsValue $AppDirs 'app' 'folder_name')[0]
 $DriverLog = [Environment]::GetEnvironmentVariable((Get-AppDirsValue $AppDirs 'logs.windows' 'base')[0])
 foreach ($Segment in (Get-AppDirsValue $AppDirs 'logs.windows' 'segments')) {

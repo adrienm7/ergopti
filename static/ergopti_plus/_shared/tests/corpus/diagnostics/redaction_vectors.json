@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for diagnostics redaction with the rules of _shared/modules/diagnostics/redaction.json. `context` is the platform's home folder, account name and whether its paths compare case-insensitively (Windows). Replayed by the macOS and Linux Lua suites and the AHK suite.",
+	"description": "Golden vectors for diagnostics redaction with the rules of _shared/diagnostics/data/redaction.json. `context` is the platform's home folder, account name and whether its paths compare case-insensitively (Windows). Replayed by the macOS and Linux Lua suites and the AHK suite.",
 	"vectors": [
 		{
 			"id": "mac_home_everywhere_in_free_text",

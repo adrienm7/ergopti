@@ -121,7 +121,7 @@ const errors = [];
 // A generated catalogue is an output only at the complete owning invocation.
 // No copied reference to the same absent pathname can borrow this admission.
 const MANAGED_BUILDER = 'build_macos_app.sh';
-const MANAGED_OUTPUT = '_shared/modules/llm/managed_ollama_release.json';
+const MANAGED_OUTPUT = '_shared/ai/data/managed_ollama_release.json';
 const MANAGED_OWNER = 'tools/build/stage-macos-managed-ollama-inputs.py';
 const CATALOGUE_OWNER = 'tools/build/stage-macos-managed-ollama-catalogue.py';
 function managedCatalogueOutputLine(source) {
@@ -165,7 +165,7 @@ for (const [before, after] of [
 	],
 	['--go "${ERGOPTI_MANAGED_OLLAMA_GO:', '--go "${FOREIGN_GO:'],
 	['--release-tag "${ERGOPTI_RELEASE_TAG:-}"', '--release-tag "invented-tag"'],
-	[MANAGED_OUTPUT, '_shared/modules/llm/foreign_catalogue.json']
+	[MANAGED_OUTPUT, '_shared/ai/data/foreign_catalogue.json']
 ]) {
 	assert.ok(managedBuilderSource.includes(before), 'mutation hits the actual catalogue recipe');
 	assert.throws(() => managedCatalogueOutputLine(managedBuilderSource.replace(before, after)));

@@ -25,7 +25,7 @@
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")

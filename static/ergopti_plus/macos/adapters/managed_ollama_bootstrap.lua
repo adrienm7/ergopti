@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local M = {}
-local Choice = require("core.llm.ollama_runtime_choice")
+local Choice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local NativePty = require("adapters.native_bootstrap_pty")
 local Binary = require("modules.llm.ollama_binary")
 local Interpreter = require("adapters.python_interpreter")

@@ -11,9 +11,9 @@
 local root, temporary = assert(arg[3]), assert(arg[2])
 assert(os.getenv('HOME') == temporary, 'physical replay must own its HOME')
 local driver = root .. '/static/ergopti_plus/macos'
-package.path=driver..'/?.lua;'..driver..'/?/init.lua;'..root..'/static/ergopti_plus/_shared/lua/?.lua;'..root..'/static/ergopti_plus/_shared/lua/?/init.lua'
+package.path=driver..'/?.lua;'..driver..'/?/init.lua;'..root..'/static/ergopti_plus/_shared/?.lua;'..root..'/static/ergopti_plus/_shared/?/init.lua'
 package.cpath = ''
-local Json, Helpers = require('json'),require('tests.helpers')
+local Json, Helpers = require('core.text.engine.json'),require('tests.helpers')
 local function rpc(message)
  message.kind='request';assert(io.stdout:write(Json.encode(message)..'\n'));assert(io.stdout:flush())
  return assert(Json.decode_lossless(assert(io.stdin:read('*l'))))

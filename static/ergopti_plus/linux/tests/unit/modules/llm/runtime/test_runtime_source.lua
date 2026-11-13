@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"llm.bootstrap_budget", "llm.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "logger.shim", "infra.i18n", "llm.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "config_outdated", "toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "infra.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
@@ -34,12 +34,12 @@ local logger={}
 for _,name in ipairs({'info','warn','debug','error'})do
 	logger[name]=function(_,message)if w and w.on_log then w.on_log(message)end end
 end
-fixture_ports={['logger.shim']=logger,['infra.logger']=logger,
-	['infra.i18n']={get=function(k)return k end},['llm.profile_selector']={},['infra.llm_bridge']={}}
+fixture_ports={['core.logger.engine.shim']=logger,['infra.logger']=logger,
+	['infra.i18n']={get=function(k)return k end},['ai.engine.settings.profile_selector']={},['infra.llm_bridge']={}}
 for name,value in pairs(fixture_ports)do package.loaded[name]=value end
-Writer = helpers.load_module("toml_codec.writer")
+Writer = helpers.load_module("core.text.engine.toml_codec.writer")
 local function world()
-	Writer = helpers.load_module("toml_codec.writer")
+	Writer = helpers.load_module("core.text.engine.toml_codec.writer")
 	w={bytes='[llm]\nenabled = false\n[llm.models]\nselected = "ollama"\nollama = "llama3.2:3b"\n',state={
 		paused=false,blocked=false,enabled=false,backend='ollama',model='llama3.2:3b',
 		origin='http://127.0.0.1:11434',revision=5,app_epoch=2},writes=0}
@@ -92,8 +92,8 @@ local function world()
 		end}
 	package.loaded['infra.manifest_reader']=manifest
 	package.loaded['infra.config_paths']={config=function()return '/memory/config.toml'end}
-	package.loaded['config_outdated']={manifest_value_fits=function()return true end,canonical_enum_value=function(_,value)return value end,report=function()end}
-	package.loaded['toml_codec.writer']=routed
+	package.loaded['settings.engine.migration.outdated']={manifest_value_fits=function()return true end,canonical_enum_value=function(_,value)return value end,report=function()end}
+	package.loaded['core.text.engine.toml_codec.writer']=routed
 	local prefs = helpers.load_module("infra.llm_preferences")
 	package.loaded['infra.llm_preferences']=prefs
 	local profiles = helpers.load_module("modules.llm.profiles")
@@ -122,7 +122,7 @@ local function world()
 		owner.state.enabled=false;return true
 	end
 	owner.source=Source.new({preferences=prefs,profiles=profiles,writer=routed,manifest=manifest,engine=engine,backend_key='llm.models.selected',path='/memory/config.toml'})
-	package.loaded['toml_codec.writer']=Writer
+	package.loaded['core.text.engine.toml_codec.writer']=Writer
 	-- Actual Preferences captured its routed Writer at module import.
 	function owner:capture()self.handle=self.source.capture();assert(self.handle,'source capture must be admitted');return self.handle end
 	function owner:publish()

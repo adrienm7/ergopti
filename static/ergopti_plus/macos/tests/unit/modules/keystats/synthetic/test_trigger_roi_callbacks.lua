@@ -305,7 +305,7 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_eq(saved, {})
 		helpers.assert_eq(cipher.roi_text_enabled(), false)
 		local open = io.open
-		local rows = require("toml_codec.leaf_rows")
+		local rows = require("core.text.engine.toml_codec.leaf_rows")
 		local decode = rows.decode_source
 		io.open = function() error("input cannot read preferences") end
 		rows.decode_source = function() error("input cannot decode preferences") end
@@ -373,7 +373,7 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_true(f.keystats.set_options({ encrypt = false }))
 		local before = prefs.source_snapshot(path)
 		c.key("fragment")
-		local writer = require("toml_codec.writer")
+		local writer = require("core.text.engine.toml_codec.writer")
 		local previous = writer.batch_write
 		writer.batch_write = function()
 			local called, reason = pcall(prefs.load, path)

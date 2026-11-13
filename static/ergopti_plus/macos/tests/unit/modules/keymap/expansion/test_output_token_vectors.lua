@@ -14,8 +14,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local SendInput = require("send_input")
+local json = require("core.text.engine.json")
+local SendInput = require("platform.input.send_input")
 
 local function read_shared(relative)
 	local fh = assert(io.open(helpers.shared(relative), "r"), "cannot open " .. relative)
@@ -25,7 +25,7 @@ local function read_shared(relative)
 end
 
 local corpus = read_shared("tests/corpus/hotstrings/output_token_vectors.json")
-local vocabulary = read_shared("modules/actions/send_keys.json")
+local vocabulary = read_shared("shortcuts/data/actions/send_keys.json")
 
 --- @param tokens table Tokens of parse_output, or of the corpus.
 --- @return string One comparable line.
@@ -56,7 +56,7 @@ helpers.describe("hotstring outputs replay the shared token corpus", function()
 end)
 
 helpers.describe("the emitter plays the grammar with Hammerspoon key names", function()
-	local Shared = require("keymap.utils")
+	local Shared = require("layouts.engine.utils")
 	local function vocab() return vocabulary end
 
 	helpers.it("a counted key is that many key tokens", function()
@@ -109,7 +109,7 @@ local function load_expander(buffer)
 	package.loaded["adapters.tooltip_renderer"] = { hide = function() end }
 	package.loaded["adapters.file_system"] = {
 		read = function()
-			local fh = assert(io.open(helpers.shared("modules/actions/send_keys.json"), "r"))
+			local fh = assert(io.open(helpers.shared("shortcuts/data/actions/send_keys.json"), "r"))
 			local raw = fh:read("*a")
 			fh:close()
 			return raw

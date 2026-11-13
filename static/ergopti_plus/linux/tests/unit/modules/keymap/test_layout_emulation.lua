@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_all(path)
 	local handle = assert(io.open(path, "rb"))
@@ -20,8 +20,8 @@ local function read_all(path)
 	return text
 end
 
-local KEYCODES = Json.decode(read_all(Paths.shared("modules/layouts/mac_keycodes.json")))
-local REGISTRY = Json.decode_lossless(read_all(Paths.shared("data/keycodes/physical_keys.json")))
+local KEYCODES = Json.decode(read_all(Paths.shared("layouts/data/mac_keycodes.json")))
+local REGISTRY = Json.decode_lossless(read_all(Paths.shared("layouts/data/keycodes/physical_keys.json")))
 local INDEX = Json.decode(read_all(Paths.shared("../../layouts/registry/index.json")))
 
 -- evdev codes of the keys the cases press (input-event-codes.h).

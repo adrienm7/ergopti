@@ -1,8 +1,8 @@
 # _shared/tests/corpus/tap_hold_spellings/expected.toml
 # What macOS and Linux read from the files of this corpus, and what macOS
 # writes, for the action ids a driver spells its own way (the action
-# catalogue's tap_hold_spellings, from _shared/modules/actions/actions.toml)
-# and the Mac thumb keys (_shared/tap_hold/shared_file.toml [thumb_positions]).
+# catalogue's tap_hold_spellings, from _shared/shortcuts/data/actions/actions.toml)
+# and the Mac thumb keys (_shared/tap_hold/data/shared_file.toml [thumb_positions]).
 # Read by macos/tests/unit/platform/remap/config/test_tap_hold_shared_file.lua,
 # linux/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.lua and,
 # for mac_thumb, windows/tests/unit/platform/remap/tap_hold/test_tap_hold_shared_file.ahk.

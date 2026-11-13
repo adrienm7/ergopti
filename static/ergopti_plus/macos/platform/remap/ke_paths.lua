@@ -18,8 +18,8 @@
 ---    loudly, rather than silently substituted here.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
-local AppDirs = require("app_dirs")
+local Identifiers = require("core.text.engine.identifiers")
+local AppDirs = require("core.fs.engine.app_dirs")
 local M = {}
 
 -- Shared package root. Command-line helpers remain under bin/, while v15.7+

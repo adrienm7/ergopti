@@ -2,9 +2,9 @@
 
 --- Binds the shared cleanup session to the WebKit manager's exact page epoch.
 local M = { bridge_name = "config_cleanup_bridge" }
-local Logger = require("logger.shim")
-local Session = require("config_cleanup_session")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local Session = require("settings.engine.migration.cleanup_session")
+local Json = require("core.text.engine.json")
 local APP = "config_cleanup"
 local LOG = "config_cleanup"
 local active

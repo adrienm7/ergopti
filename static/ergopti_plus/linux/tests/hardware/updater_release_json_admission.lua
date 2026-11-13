@@ -32,7 +32,7 @@ end
 local failures = 0
 for index = 1, 34 do
 	local metadata_file = assert(io.open(root .. "/expected-" .. index .. ".json", "rb"))
-	local metadata = assert(require("json").decode(metadata_file:read("*a")))
+	local metadata = assert(require("core.text.engine.json").decode(metadata_file:read("*a")))
 	assert(metadata_file:close())
 	local answer, calls
 	assert(M.check_for_updates("main", function(available, release, err, result)

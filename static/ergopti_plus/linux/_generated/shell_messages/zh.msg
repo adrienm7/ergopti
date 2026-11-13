@@ -1,5 +1,5 @@
 # linux/_generated/shell_messages/zh.msg
-# AUTO-GENERATED from _shared/data/locales/zh.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/zh.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=已从源代码构建 LuaJIT 网络模块。
 build_luv.recipe_required=luv 原生构建需要其源代码配方。

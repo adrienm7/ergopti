@@ -27,7 +27,7 @@ local function scenario(mode, body)
 				chat = function(_, _, _, _, _, done) requests = requests + 1; callback = done; return true end,
 				cancel = function() return true end,
 			}
-			local Tone = require("llm.tone")
+			local Tone = require("ai.engine.prediction.tone")
 			local remember = Tone.remember
 			Tone.remember = function(...) remembered = remembered + 1; return remember(...) end
 			local engine, scheduler = require("modules.llm.prediction_engine"), Fakes.timer_scheduler()

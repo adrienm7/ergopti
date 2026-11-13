@@ -152,7 +152,7 @@ local PUBLICATION_LOCAL = [[{"server_order":["independent_local"],"servers":{"in
 --- @param close_refused boolean|nil Inject a refused cloud close receipt.
 local function with_publication_sources(cloud, local_source, callback, close_refused)
 	helpers.with_stub_scope({ "modules.llm.api_remote", "modules.llm.local_servers", "infra.paths",
-		"infra.logger", "llm.provider_config_policy" }, function()
+		"infra.logger", "ai.engine.policy.provider_config_policy" }, function()
 		-- Establish the native ports once. A second load_with_stubs would replace
 		-- the path owner and hide the source under examination.
 		helpers.load_with_stubs("modules.llm.api_remote")
@@ -281,7 +281,7 @@ helpers.describe("Actual provider catalogue publication", function()
 
 	helpers.it("(provider-publication-receipt) actual snapshots are detached from runtime map mutations", function()
 		with_publication_sources(PUBLICATION_CLOUD, PUBLICATION_LOCAL, function(owner)
-			local policy = require("llm.provider_config_policy")
+			local policy = require("ai.engine.policy.provider_config_policy")
 			local first = owner.provider_config_receipt()
 			helpers.assert_eq(first.published, true)
 			helpers.assert_eq(policy.classify("openai", first), "known")

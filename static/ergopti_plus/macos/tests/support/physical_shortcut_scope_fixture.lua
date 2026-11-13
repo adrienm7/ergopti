@@ -35,8 +35,8 @@ local function with_compiled_navigation(body, controls, files)
 				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
 				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
 					["platform.remap.nav_layer"] = true, ["infra.config_paths"] = true,
-					["adapters.file_system"] = true, ["json"] = true, ["toml_codec"] = true,
-					["toml_codec.writer"] = true, ["keymap.layers"] = true }
+					["adapters.file_system"] = true, ["core.text.engine.json"] = true, ["core.text.engine.toml_codec"] = true,
+					["core.text.engine.toml_codec.writer"] = true, ["layouts.engine.layers.layers"] = true }
 				-- The scope's own recorded native/port identities stay unchanged.
 				-- Retain only the exact dependencies the compiled producer rejoins.
 				for name in pairs(package.loaded) do if not retained[name] and saved[name] == nil then package.loaded[name] = nil end end
@@ -58,7 +58,7 @@ end
 
 local function run_fixture(body, source)
 	local root = helpers.driver_root()
-	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
+	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared"))
 	for _,name in ipairs({"modules.shortcuts.keyboard_shortcuts","adapters.physical_shortcut_hook"}) do package.loaded[name]=nil end
 	helpers.load_with_stubs("hs")
 	local controls = { writes = 0, native = {}, keyboard_handles = {} }
@@ -99,7 +99,7 @@ local function run_fixture(body, source)
 			local content = file:read("*a"); file:close(); return content
 		end,
 		read_with_status = function(path)
-			if path == controls.navigation_source_path then return require("toml_codec.writer").read_classified(path) end
+			if path == controls.navigation_source_path then return require("core.text.engine.toml_codec.writer").read_classified(path) end
 			return files[path], files[path] and "ok" or "absent"
 		end,
 		write = function() error("scope requires conditional publication") end,
@@ -121,7 +121,7 @@ local function run_fixture(body, source)
 	package.loaded["infra.keycodes"] = {
 		F18_WAKE_OS = 79, F19_LAYER_NAV_EXITED = 80,
 		F13_KARABINER_RETURN = 106, F14_KARABINER_BACKSPACE = 107, F15_KARABINER_ESCAPE = 108,
-		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
 		RETURN = 36, BACKSPACE = 51, ESCAPE = 53, FORWARD_DELETE = 117,
 		to_name = function(code) return "f" .. tostring(code) end,
 	}

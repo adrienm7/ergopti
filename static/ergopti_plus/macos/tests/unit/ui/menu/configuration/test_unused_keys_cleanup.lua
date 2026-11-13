@@ -12,11 +12,11 @@
 --- ==============================================================================
 
 local helpers    = require("tests.helpers")
-local Contract   = require("test.config_unused_keys_contract")
-local Engine     = require("config_unused_keys")
-local TomlCodec  = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local ProfileRegistry = require("llm.profile_registry_codec")
+local Contract   = require("tests.lua.settings.unused_keys_contract")
+local Engine     = require("settings.engine.migration.unused_keys")
+local TomlCodec  = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
 
 local Sandbox = Contract.sandbox
 
@@ -288,19 +288,19 @@ helpers.with_stub_scope(MODULES, function()
 			-- An unknown leaf or section was dropped at load without a word: only
 			-- the cleanup's list ever showed it, unlike the Windows loader.
 			local source = "[hotstrings]\nstale_toggle = false\n[shortcuts.keys]\nat_hash = true\n[stale.section]\nlabel = \"old\"\n"
-			local saved_logger = package.loaded["logger.shim"]
+			local saved_logger = package.loaded["core.logger.engine.shim"]
 			local warnings = {}
 			local recorder = helpers.make_logger_stub()
 			recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-			package.loaded["logger.shim"] = recorder
-			require("config_outdated").reset_for_tests()
+			package.loaded["core.logger.engine.shim"] = recorder
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local ok, err = pcall(function()
 				Sandbox.with_config(source, function(path)
 					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2)
 					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2, "the same entries are listed again…")
 				end)
 			end)
-			package.loaded["logger.shim"] = saved_logger
+			package.loaded["core.logger.engine.shim"] = saved_logger
 			if not ok then error(err, 0) end
 			local text = table.concat(warnings, "\n")
 			helpers.assert_eq(#warnings, 3, "…but each is named once, the owner's own report included: " .. text)
@@ -769,7 +769,7 @@ helpers.with_stub_scope(MODULES, function()
 	}
 	package.loaded["adapters.file_system"] = IoAdapter
 	local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
-	require("test.config_cleanup_roots_contract").register(helpers, {
+	require("tests.lua.settings.cleanup_roots_contract").register(helpers, {
 		driver = "macos", collect = cleanup.collect, file_adapter = IoAdapter,
 		find = function(path) return cleanup.find(path, IoAdapter) end,
 	})

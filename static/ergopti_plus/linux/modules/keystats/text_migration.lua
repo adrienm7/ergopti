@@ -10,7 +10,7 @@
 ---
 --- WHAT IS HERE AND WHAT IS SHARED:
 --- The state machine — cursor discipline, the fail-closed rule, idempotence —
---- lives in _shared/lua/keystats/text_migration_runner.lua and the public
+--- lives in _shared/metrics/engine/privacy/text_migration_runner.lua and the public
 --- surface in text_migration_driver.lua, because macOS runs the identical
 --- algorithm and a second copy would be a second place for the rule that
 --- protects the user's data to rot. What is here is the Linux half: reading and
@@ -37,12 +37,12 @@
 ---    here either — that would lock its owner out of its own data.
 --- ==============================================================================
 
-local Logger       = require("logger.shim")
+local Logger       = require("core.logger.engine.shim")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")
-local Plan         = require("keystats.text_migration")
-local Driver       = require("keystats.text_migration_driver")
-local Runner       = require("keystats.text_migration_runner")
+local Plan         = require("metrics.engine.privacy.text_migration_core")
+local Driver       = require("metrics.engine.privacy.text_migration_driver")
+local Runner       = require("metrics.engine.privacy.text_migration_runner")
 
 local LOG = "modules.keystats.text_migration"
 

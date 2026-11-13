@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The keys a tap-hold can be set on, their order in the tray, the hand each
  * belongs to and the label each carries are declared once, in
- * `[tap_hold.catalog]` of `_shared/tap_hold/defaults.toml`, and every driver
+ * `[tap_hold.catalog]` of `_shared/tap_hold/data/defaults.toml`, and every driver
  * reads them there.
  *
  * ROOT CAUSE ENCODED:
@@ -40,8 +40,8 @@ const KeyNames = require('../lib/key-names.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'defaults.toml');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'data', 'defaults.toml');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const MAC_KEYS = path.join(SP, 'macos', 'platform', 'remap', 'data', 'tap_hold_keys.json');
 const LINUX_ENGINE = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua');
 const WINDOWS_REMAP = path.join(SP, 'windows', 'platform', 'remap');
@@ -93,7 +93,7 @@ try {
 	const catalog = parsed.tap_hold && parsed.tap_hold.catalog;
 	entries = catalog && Array.isArray(catalog.keys) ? catalog.keys : [];
 } catch (e) {
-	errors.push(`_shared/tap_hold/defaults.toml does not parse: ${e.message}`);
+	errors.push(`_shared/tap_hold/data/defaults.toml does not parse: ${e.message}`);
 }
 
 if (entries.length < MIN_ENTRIES) {
@@ -126,7 +126,7 @@ for (const [index, entry] of entries.entries()) {
 	}
 	// The name is the shared key name table's, under each OS's usual name.
 	if (KeyNames.canonical(entry.id) !== entry.id) {
-		errors.push(`${where} "${entry.id}" is no key of _shared/data/keycodes/key_names.json`);
+		errors.push(`${where} "${entry.id}" is no key of _shared/layouts/data/keycodes/key_names.json`);
 	}
 	let platforms = 0;
 	for (const platform of PLATFORMS) {
@@ -246,7 +246,7 @@ sameKeys('ahk', [...windowsKeys], 'windows/platform/remap/*.ahk', false);
 const READERS = [
 	{
 		file: 'macos/ui/menu/menu_tap_holds.lua',
-		reads: /require\("tap_hold\.key_catalog"\)/,
+		reads: /require\("tap_hold\.engine\.key_catalog"\)/,
 		retired: [/tap_hold_keys_catalog/, /LEFT_HAND_IDS/, /_load_left_hand_from_catalog/]
 	},
 	{
@@ -261,7 +261,7 @@ const READERS = [
 	},
 	{
 		file: 'linux/platform/remap/tap_hold_loader.lua',
-		reads: /require\("tap_hold\.key_catalog"\)/,
+		reads: /require\("tap_hold\.engine\.key_catalog"\)/,
 		retired: []
 	},
 	{
@@ -296,7 +296,7 @@ for (const reader of READERS) {
 
 const macMenu = stripLineComments(read(path.join(SP, 'macos/ui/menu/menu_tap_holds.lua')), '.lua');
 if (
-	!/require\("tap_hold\.combination_labels"\)/.test(macMenu) ||
+	!/require\("tap_hold\.engine\.combination_labels"\)/.test(macMenu) ||
 	!macMenu.includes(
 		'CombinationLabels.resolve(key_catalog(), keys[1].key_code, keys[2].key_code, i18n.get)'
 	)
@@ -345,7 +345,7 @@ if (
 // composed through the same tap-hold catalogue. The separately checked
 // simultaneous branch must retain the original source/input/publication owners.
 const manifest = TOML.parse(
-	read(path.join(SP, '_shared/modules/features/manifest.toml')).replace(
+	read(path.join(SP, '_shared/settings/data/features/manifest.toml')).replace(
 		/^\[\[features\.([^\]]+)\]\]$/gm,
 		(_header, section) => `[[feature_records]]\nsection_path = \"${section}\"`
 	)
@@ -549,7 +549,7 @@ const linuxCombinationScope = stripLineComments(
 	'.lua'
 );
 const linuxCombinationPolicy = stripLineComments(
-	read(path.join(SP, '_shared/lua/tap_hold/key_combinations.lua')),
+	read(path.join(SP, '_shared/tap_hold/engine/key_combinations.lua')),
 	'.lua'
 );
 /** Checks the declared Linux mode only with its original pending-input consumer. */
@@ -625,7 +625,7 @@ function orderedLinuxAdmission(declaration, sources) {
 		manager.includes('require("platform.remap.key_combination_engine")') &&
 		manager.includes('CombinationEngine.new(') &&
 		manager.includes('.engine_options(') &&
-		wrapper.includes('require("tap_hold.key_combinations")') &&
+		wrapper.includes('require("tap_hold.engine.key_combinations")') &&
 		wrapper.includes('receipt.physical == true') &&
 		wrapper.includes('current.source == receipt.source') &&
 		wrapper.includes('function result.admit(') &&

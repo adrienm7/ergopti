@@ -60,7 +60,7 @@ luajit tests/hardware/desktop/take_note_action.lua > "${DESKTOP_HOME}/run1.log" 
 check $? "the action runs"
 wait_for_lines "${NOTICES}" 1
 check $? "the desktop's notification server receives one notice"
-EXPECTED="$(luajit -e 'require("compat.utf8").install(); local i = require("infra.i18n"); i.init()
+EXPECTED="$(luajit -e 'require("core.lifecycle.engine.compat.utf8").install(); local i = require("infra.i18n"); i.init()
 	io.write(i.get("notify.take_note_no_text_handler"))')"
 "${PYTHON}" -c 'import json,sys; n=json.loads(open(sys.argv[1]).readline()); sys.exit(0 if n["body"]==sys.argv[2] and "✖" in n["summary"] else 1)' \
 	"${NOTICES}" "${EXPECTED}"

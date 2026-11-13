@@ -18,18 +18,18 @@ const { expandConfigKeys } = require('./config-key-tokens.cjs');
 
 const MENU_METHOD = `function M.menu(template_rows, order, labels, commit, ready)
  if type(template_rows) ~= "function" then
-  Logger.error("hotstrings.section_order", "Section-order templates are unavailable.")
+  Logger.error("hotstrings.engine.section_order", "Section-order templates are unavailable.")
   return {}
  end
  local function admitted()
   local called, value = pcall(ready)
-  if not called then Logger.error("hotstrings.section_order", "Section-order admission could not be read.") end
+  if not called then Logger.error("hotstrings.engine.section_order", "Section-order admission could not be read.") end
   return called and value == true
  end
  local function render(...)
   local called, rows = pcall(template_rows, ...)
   if not called or type(rows) ~= "table" then
-   Logger.error("hotstrings.section_order", "Section-order template rendering was refused.")
+   Logger.error("hotstrings.engine.section_order", "Section-order template rendering was refused.")
    return nil
   end
   return rows
@@ -76,7 +76,7 @@ const starts = (source, fragment) => {
 /** Return only the physically reached shared menu method, or no evidence. */
 function hotstringOrderMenuSource(nativeSource, sharedSource) {
 	const native = tokens(nativeSource);
-	const binding = starts(native, 'local SectionOrder = require("hotstrings.section_order")');
+	const binding = starts(native, 'local SectionOrder = require("hotstrings.engine.section_order")');
 	if (binding.length !== 1) return '';
 	const direct = starts(native, 'local ManifestMenu = require("infra.manifest_menu")');
 	const protectedBinding = starts(
@@ -165,7 +165,7 @@ function hotstringOrderMenuSource(nativeSource, sharedSource) {
 	const expanded = expandConfigKeys(sharedSource);
 	const shared = tokens(expanded),
 		expected = tokens(MENU_METHOD);
-	const commandBinding = 'local COMMAND = require("config_keys").COMMAND';
+	const commandBinding = 'local COMMAND = require("settings.engine.keys").COMMAND';
 	const commandStarts = starts(shared, commandBinding);
 	if (commandStarts.length !== 1) return '';
 	const methods = starts(shared, 'function M.menu(');

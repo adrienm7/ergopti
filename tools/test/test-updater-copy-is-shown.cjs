@@ -36,7 +36,10 @@ const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..', '..');
 const driversRoot = path.join(root, 'static', 'ergopti_plus');
 const en = JSON.parse(
-	fs.readFileSync(path.join(driversRoot, '_shared', 'data', 'locales', 'en.json'), 'utf8')
+	fs.readFileSync(
+		path.join(driversRoot, '_shared', 'core', 'i18n', 'data', 'locales', 'en.json'),
+		'utf8'
+	)
 );
 const FAMILY = /^(?:updater|menu\.about|menu\.updates)\./;
 const SKIPPED_DIRS = new Set(['tests', 'Tests', 'locales', '.build', 'node_modules']);

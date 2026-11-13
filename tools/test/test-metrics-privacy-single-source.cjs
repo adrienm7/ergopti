@@ -5,7 +5,7 @@
  * MODULE: Metrics Privacy Defaults — Single Source
  * DESCRIPTION:
  * The three keystats privacy filters and the at-rest encryption opt-in are
- * declared once, in `_shared/modules/features/manifest.toml` under
+ * declared once, in `_shared/settings/data/features/manifest.toml` under
  * `[[features.metrics]]`, and every driver resolves its default from there.
  *
  * THE ROOT CAUSE THIS FREEZES:
@@ -44,7 +44,15 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const P = (...parts) => path.join(ROOT, ...parts);
 
-const MANIFEST = P('static', 'ergopti_plus', '_shared', 'modules', 'features', 'manifest.toml');
+const MANIFEST = P(
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'settings',
+	'data',
+	'features',
+	'manifest.toml'
+);
 const AHK_FILTERS = P(
 	'static',
 	'ergopti_plus',
@@ -211,12 +219,12 @@ for (const retired of RETIRED_IDS) {
 // keystroke is recorded at all. The driver names each key through the generated
 // constant table, so the constant must be the one that table maps to the key.
 const configKeys = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/_shared/lua/config_keys.lua'),
+	path.join(ROOT, 'static/ergopti_plus/_shared/settings/engine/keys.lua'),
 	'utf8'
 );
 const keyConstantsBound =
 	hsKeystats !== null &&
-	/^local ConfigKeys = require\("config_keys"\)$/m.test(hsKeystats) &&
+	/^local ConfigKeys = require\("settings.engine.keys"\)$/m.test(hsKeystats) &&
 	/^local KEY, LEAF = ConfigKeys\.KEY, ConfigKeys\.LEAF$/m.test(hsKeystats);
 for (const id of [
 	'private_filter_enabled',

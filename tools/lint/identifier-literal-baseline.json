@@ -1,5 +1,5 @@
 {
-	"_comment": "Typed copies of the hosts, bundle ids, service labels and ErgoptiPlus file names declared in _shared/data/identifiers.json, per driver source file and kind, on code lines. Counts may only go down; lower them with node tools/test/test-repo-url-single-source.cjs --shrink.",
+	"_comment": "Typed copies of the hosts, bundle ids, service labels and ErgoptiPlus file names declared in _shared/core/text/data/identifiers.json, per driver source file and kind, on code lines. Counts may only go down; lower them with node tools/test/test-repo-url-single-source.cjs --shrink.",
 	"files": {
 		"static/ergopti_plus/macos/launcher/Package.swift": {
 			"host": 1

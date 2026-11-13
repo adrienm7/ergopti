@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Queries = require("keystats.queries")
-local Json = require("json")
+local Queries = require("metrics.engine.queries")
+local Json = require("core.text.engine.json")
 
 helpers.describe("trigger ROI SQLite events", function()
 	helpers.it("routes each ROI event with the exact Windows metadata fields", function()
@@ -34,7 +34,7 @@ helpers.describe("trigger ROI SQLite events", function()
 					local encoded = Json.encode(meta)
 					helpers.assert_eq(Json.decode(encoded), meta)
 					-- Stored in UTC with the offset in force then (KMD-1).
-					local utc, offset = require("keystats.local_time").from_local(event.timestamp)
+					local utc, offset = require("metrics.engine.local_time").from_local(event.timestamp)
 					local expected = Queries.render("events.roi", "native", {
 						device_id = "nil", id = index, ts = utc, date = "2026-11-07",
 						kind = event.type, app = event.app, meta_json = encoded, utc_offset_min = offset,

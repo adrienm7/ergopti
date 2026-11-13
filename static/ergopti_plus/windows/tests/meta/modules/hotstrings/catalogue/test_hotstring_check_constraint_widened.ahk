@@ -7,7 +7,7 @@ _HotstringCheck_SchemaAllowsNearMissAndManualTyped() {
 	; 'fired'/'suggested'/'dismissed'; hotstring_near_miss and
 	; manual_typed_known_trigger rows silently vanished on every SQLite
 	; replay of data.sql (F20).
-	SchemaPath := A_ScriptDir . "\..\..\_shared\data\db\schema.sql"
+	SchemaPath := A_ScriptDir . "\..\..\_shared\metrics\data\db\schema.sql"
 	AssertTrue(FileExist(SchemaPath) != "", "schema.sql must exist at: " . SchemaPath)
 	Schema := FileRead(SchemaPath)
 	Idx := InStr(Schema, "CHECK (kind IN (")

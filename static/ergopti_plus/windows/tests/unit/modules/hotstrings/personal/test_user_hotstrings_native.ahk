@@ -504,7 +504,7 @@ _UCHScopedConfiguration(ScopeId, Mode, CancellationRefused := false) {
 		Assert(FSWriteCreateDurable(SourcePath, Source))
 		if ScopeId == "global" {
 			Fixture.options["tap_hold_path"] := Fixture.directory . "\tap_hold.toml"
-			Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+			Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 			Fixture.options["layers_config_dir"] := Fixture.directory
 			Assert(FSWriteDurable(Fixture.options["tap_hold_path"], '[tap_hold]`ninherit_defaults = true`n'))
 		}

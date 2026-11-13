@@ -33,7 +33,7 @@
 ; ============================
 
 ; The six *_MS / *_GAP_MS timing thresholds below are sourced from the shared
-; cross-driver registry (_shared/modules/timings/constants.toml [keystats]) by
+; cross-driver registry (_shared/core/timing/data/constants.toml [keystats]) by
 ; KeystatsWalkerLoadTimings(), called once at boot. They start at the sentinel
 ; 0 because AHK v2 runs static initializers BEFORE the auto-execute body, so the
 ; registry is not yet loaded here; reading one before the loader runs would be a
@@ -260,7 +260,7 @@ KLW_CharClass(c) {
 }
 
 ; The n-gram key form of one raw event, the rule of the shared Lua
-; keystats/token_encoding.lua: a marker stays itself, an older spelling becomes
+; metrics/engine/privacy/token_encoding.lua: a marker stays itself, an older spelling becomes
 ; its marker, and a typed "[" is escaped so no key has two readings. A "[" is
 ; rare, so an ordinary keystroke pays for one substring test only.
 ; @param char {String} The event's character or marker.

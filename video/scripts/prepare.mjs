@@ -29,7 +29,7 @@ import { parse as parseToml } from 'smol-toml';
 const VIDEO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(VIDEO_ROOT, '..');
 const STATIC_ROOT = join(REPO_ROOT, 'static');
-const HOTSTRINGS_ROOT = join(STATIC_ROOT, 'ergopti_plus/_shared/modules/hotstrings');
+const HOTSTRINGS_ROOT = join(STATIC_ROOT, 'ergopti_plus/_shared/hotstrings/data/catalogue');
 const ERGOPTI_EXTENSION_ROOT = join(STATIC_ROOT, 'layouts/registry/ergopti');
 const DEMO_SCRIPT_PATH = join(VIDEO_ROOT, 'src/data/demo-script.json');
 const OUTPUT_PATH = join(VIDEO_ROOT, 'src/_generated/driver-data.json');
@@ -221,7 +221,7 @@ const actionsOn = (tag) => allActions.filter((a) => isActionOnPlatform(a.platfor
 
 // English labels, through the same locale keys the driver menus use.
 const SHARED_ROOT = join(STATIC_ROOT, 'ergopti_plus/_shared');
-const en = JSON.parse(readFileSync(join(SHARED_ROOT, 'data/locales/en.json'), 'utf-8'));
+const en = JSON.parse(readFileSync(join(SHARED_ROOT, 'core/i18n/data/locales/en.json'), 'utf-8'));
 /**
  * @param {string} key
  * @returns {string}
@@ -234,10 +234,10 @@ const t = (key) => {
 /** Drops the picker's "[configurable]" note from a label. */
 const bareLabelOf = (label) => label.replace(/\s*\[[^\]]+\]$/, '');
 
-const tapHoldDefaults = readToml(join(SHARED_ROOT, 'tap_hold/defaults.toml')).tap_hold;
+const tapHoldDefaults = readToml(join(SHARED_ROOT, 'tap_hold/data/defaults.toml')).tap_hold;
 const tapHolds = Object.entries(tapHoldDefaults.keys).map(([id, key]) => ({
 	id,
-	// The Windows column of _shared/data/keycodes/key_names.json names these ids.
+	// The Windows column of _shared/layouts/data/keycodes/key_names.json names these ids.
 	key: t(`key_name.${id}`),
 	tap: t(`sg_actions.${key.tap_action}`),
 	hold: key.hold_layer
@@ -253,8 +253,7 @@ const windowsActions = allActions
 	.map((a) => ({ id: a.id, label: t(`sg_actions.${a.id}`) }));
 
 const gestureSlots = Object.values(
-	JSON.parse(readFileSync(join(SHARED_ROOT, 'modules/menu/menu_manifest.json'), 'utf-8'))
-		.gesture_slots
+	JSON.parse(readFileSync(join(SHARED_ROOT, 'menu/data/menu_manifest.json'), 'utf-8')).gesture_slots
 ).reduce((sum, slots) => sum + slots.length, 0);
 
 // ======= Tap-hold keys every system has, and option labels =======
@@ -302,9 +301,9 @@ const MENU_SUBMENUS = {
 	debug: 'debug_menu'
 };
 const menuManifest = JSON.parse(
-	readFileSync(join(SHARED_ROOT, 'modules/menu/menu_manifest.json'), 'utf-8')
+	readFileSync(join(SHARED_ROOT, 'menu/data/menu_manifest.json'), 'utf-8')
 );
-const featureTree = readToml(join(SHARED_ROOT, 'modules/features/manifest.toml')).features;
+const featureTree = readToml(join(SHARED_ROOT, 'settings/data/features/manifest.toml')).features;
 /**
  * The description key of a feature row, found by its manifest path.
  * @param {string} path - e.g. "shortcuts.wrap_text_if_selected".
@@ -327,7 +326,7 @@ function featureDescriptionKey(path) {
 const onWindows = (row) => !row.platforms || row.platforms.includes('ahk');
 // Menu labels follow the webviews' fallback cascade (English, then French) so
 // one missing key does not stop the film; every gap is reported.
-const fr = JSON.parse(readFileSync(join(SHARED_ROOT, 'data/locales/fr.json'), 'utf-8'));
+const fr = JSON.parse(readFileSync(join(SHARED_ROOT, 'core/i18n/data/locales/fr.json'), 'utf-8'));
 const missingMenuKeys = new Set();
 const driverBuiltLabels = new Set();
 const menuLabel = (key) => {
@@ -380,7 +379,7 @@ if (missingMenuKeys.size > 0) {
 
 // ======= Wrap-selection symbols (shared catalogue) =======
 const wrapCatalogue = JSON.parse(
-	readFileSync(join(SHARED_ROOT, 'modules/wrap_symbols/wrap_symbols.json'), 'utf-8')
+	readFileSync(join(SHARED_ROOT, 'keyboard/data/wrap_symbols/wrap_symbols.json'), 'utf-8')
 );
 const wrapSymbols = {
 	label: t('shortcuts.label_wrap_text'),
@@ -412,13 +411,13 @@ const actionLabel = (id) => {
 	throw new Error(`No English label for navigation action ${id}`);
 };
 const navLayer = Object.entries(
-	readToml(join(SHARED_ROOT, 'keymap/layers.recommended.toml')).layers.nav.all
+	readToml(join(SHARED_ROOT, 'layouts/data/layers.recommended.toml')).layers.nav.all
 ).map(([code, action]) => ({ code, action, label: actionLabel(action) }));
 
 // ======= Recommended Win+letter shortcuts and their macOS twins =======
 // [[features.shortcuts]] is an array of tables; its keyboard/keys arrays hang
 // off whichever element precedes them, so collect them across elements.
-const shortcutTables = readToml(join(SHARED_ROOT, 'modules/features/manifest.toml')).features
+const shortcutTables = readToml(join(SHARED_ROOT, 'settings/data/features/manifest.toml')).features
 	.shortcuts;
 const shortcutRows = (field) => shortcutTables.flatMap((table) => table[field] ?? []);
 const macKeys = new Set(shortcutRows('keys').map((k) => k.id));
@@ -465,7 +464,7 @@ const data = {
 	shortcuts,
 	// The native tooltip's spec (colours, radius, padding, LLM line colours),
 	// so the drawn tooltips match the driver's.
-	tooltip: readToml(join(STATIC_ROOT, 'ergopti_plus/_shared/modules/tooltip/constants.toml')),
+	tooltip: readToml(join(STATIC_ROOT, 'ergopti_plus/_shared/core/ui/data/tooltip/constants.toml')),
 	hotstrings
 };
 

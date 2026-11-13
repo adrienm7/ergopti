@@ -34,7 +34,7 @@
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 local BACKSLASH = string.char(92)
 local QUOTE = string.char(39)
@@ -60,7 +60,7 @@ end
 
 helpers.describe("shell_quote: emits the POSIX close-escape-reopen idiom", function()
 	helpers.it("an embedded quote produces a backslash (byte 92)", function()
-		local tu = require("text_utils")
+		local tu = require("core.text.engine.utils_core")
 		local got = tu.shell_quote("a" .. QUOTE .. "b")
 
 		helpers.assert_true(
@@ -81,7 +81,7 @@ helpers.describe("shell_quote: emits the POSIX close-escape-reopen idiom", funct
 	end)
 
 	helpers.it("a command substitution stays inside the quoted run", function()
-		local tu = require("text_utils")
+		local tu = require("core.text.engine.utils_core")
 		local payload = "a" .. QUOTE .. "$(id)" .. QUOTE .. "b"
 		local got = tu.shell_quote(payload)
 
@@ -112,7 +112,7 @@ helpers.describe("shell_quote: emits the POSIX close-escape-reopen idiom", funct
 	end)
 
 	helpers.it("a value with no quote is simply wrapped", function()
-		local tu = require("text_utils")
+		local tu = require("core.text.engine.utils_core")
 		local got = tu.shell_quote("plain/path")
 		helpers.assert_eq(
 			got,
@@ -122,7 +122,7 @@ helpers.describe("shell_quote: emits the POSIX close-escape-reopen idiom", funct
 	end)
 
 	helpers.it("a non-string value is coerced, not rejected", function()
-		local tu = require("text_utils")
+		local tu = require("core.text.engine.utils_core")
 		helpers.assert_eq(
 			tu.shell_quote(42),
 			QUOTE .. "42" .. QUOTE,
@@ -148,7 +148,7 @@ helpers.describe("shell_quote: the broken spelling exists nowhere in the tree", 
 	helpers.it("no quote-escaping gsub uses a single backslash", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local driver_root = src_path:match("^(.+)[/\\]tests[/\\]") or "."
-		local shared_root = helpers.shared("lua")
+		local shared_root = helpers.shared("")
 
 		-- Directories that ship shell-invoking code for this driver.
 		local roots = {

@@ -8,7 +8,7 @@ _NativeRelayHopBranches_Controls() {
 			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
 				_DriverDir . "\tests\fixtures\native_relay_hop_branches.ps1",
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
-				"-PolicyPath", _SharedDir . "\modules\network\proxy_policy.json"],
+				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "The private actual-hop branch fixture must start")
 		Started := A_TickCount

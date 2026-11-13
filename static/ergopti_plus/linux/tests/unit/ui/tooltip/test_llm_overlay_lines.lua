@@ -9,7 +9,7 @@
 --- the mark in front of the selected line, the typed text grey, the corrected
 --- part green and the continuation orange on it, grey on every other line.
 ---
---- The rule itself is _shared/lua/tooltip/llm_line.lua; the first half replays
+--- The rule itself is _shared/core/ui/engine/tooltip/llm_line.lua; the first half replays
 --- the cross-driver corpus against it, the second drives the overlay's rows
 --- (llm-line-style). The last part pins the shortcut column: the chord that
 --- inserts each line, right-aligned and muted, bare digits included, from the
@@ -27,11 +27,11 @@ local function read_corpus()
 	local fh = assert(io.open(corpus_path, "r"), "cannot open corpus at " .. corpus_path)
 	local raw = fh:read("*a")
 	fh:close()
-	return require("json").decode(raw)
+	return require("core.text.engine.json").decode(raw)
 end
 
 local corpus = read_corpus()
-local LlmLine = require("tooltip.llm_line")
+local LlmLine = require("core.ui.engine.tooltip.llm_line")
 
 helpers.describe("AI prediction line: shared corpus (llm-line-style)", function()
 	helpers.it("(llm-line-style) the corpus carries both families of vectors", function()
@@ -151,7 +151,7 @@ local function read_shortcut_corpus()
 	local fh = assert(io.open(shortcut_corpus_path, "r"), "cannot open corpus at " .. shortcut_corpus_path)
 	local raw = fh:read("*a")
 	fh:close()
-	return require("json").decode(raw)
+	return require("core.text.engine.json").decode(raw)
 end
 
 helpers.describe("AI overlay: the shortcut column (llm-shortcut-column)", function()
@@ -168,7 +168,7 @@ helpers.describe("AI overlay: the shortcut column (llm-shortcut-column)", functi
 			-- in the active language (cmd reads Super).
 			local translate = require("infra.i18n").get
 			local expected = vector.expected.linux:gsub("{(%a+)}", function(id)
-				return require("keycodes.key_names").label(id, "linux", translate)
+				return require("platform.input.keycodes.key_names").label(id, "linux", translate)
 			end)
 			helpers.assert_eq(LlmLine.shortcut_label(vector.index, vector.modifiers, chrome.shortcut_spec),
 				expected, vector.id)
@@ -191,7 +191,7 @@ end)
 
 helpers.describe("AI overlay: where the shortcut column goes (llm-shortcut-column)", function()
 	local fh = assert(io.open(shared_root .. "/tests/corpus/tooltip/llm_column_vectors.json", "r"))
-	local vectors = require("json").decode(fh:read("*a")).vectors
+	local vectors = require("core.text.engine.json").decode(fh:read("*a")).vectors
 	fh:close()
 
 	for _, vector in ipairs(vectors) do

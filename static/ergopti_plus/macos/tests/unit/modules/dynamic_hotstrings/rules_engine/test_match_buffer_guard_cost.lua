@@ -14,8 +14,8 @@ local helpers = require("tests.helpers")
 
 --- Loads a fresh shared engine with the date rules and two @-tags.
 local function engine()
-	package.loaded["dynamic_hotstrings"] = nil
-	local Engine = require("dynamic_hotstrings")
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
+	local Engine = require("hotstrings.engine.dynamic.core")
 	Engine.register_date_rules("\u{2605}")
 	assert(Engine.add_rule("@e", "personal", function() return "mail" end))
 	assert(Engine.add_rule("@p", "personal", function() return "name" end))

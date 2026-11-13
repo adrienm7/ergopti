@@ -33,7 +33,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(DRIVERS, '_shared', 'modules', 'menu', 'menu_manifest.json');
+const MANIFEST = path.join(DRIVERS, '_shared', 'menu', 'data', 'menu_manifest.json');
 
 const failures = [];
 let checks = 0;

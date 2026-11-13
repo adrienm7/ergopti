@@ -26,7 +26,7 @@ const VECTORS = path.join(
 	ROOT,
 	'static/ergopti_plus/_shared/tests/corpus/network/route_plan_vectors.json'
 );
-const ORIGINS = path.join(ROOT, 'static/ergopti_plus/_shared/modules/network/route_origins.json');
+const ORIGINS = path.join(ROOT, 'static/ergopti_plus/_shared/core/network/data/route_origins.json');
 const FAKE_NETWORK = path.join(__dirname, 'fake-network.cjs');
 
 const runtime =
@@ -252,7 +252,7 @@ $Answers | ConvertTo-Json -Compress
 // Lua policy answer.
 const RELAY_CONTRACT = path.join(
 	ROOT,
-	'static/ergopti_plus/_shared/modules/network/proxy_auth_relay.json'
+	'static/ergopti_plus/_shared/core/network/data/proxy_auth_relay.json'
 );
 const RELAY_VECTORS = path.join(
 	ROOT,

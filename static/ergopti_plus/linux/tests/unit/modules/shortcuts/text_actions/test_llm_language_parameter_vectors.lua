@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 local ACTION = "llm_translate_selection"
@@ -32,13 +32,13 @@ local function read_json(relative)
 end
 
 local Gestures = helpers.load_module("modules.gestures.manager")
-local Translate = require("llm.translate")
+local Translate = require("ai.engine.prediction.translate")
 local Translation = require("modules.llm.translation")
 
 helpers.describe("llm_language parameter replays the shared translate corpus", function()
 	local corpus = read_json("tests/corpus/llm/translate_vectors.json")
-	local config = read_json("modules/llm/translate.json")
-	local names = read_json("data/locale_names.json")
+	local config = read_json("ai/data/translate.json")
+	local names = read_json("core/i18n/data/locale_names.json")
 
 	helpers.it("the translation action declares the llm_language parameter", function()
 		helpers.assert_eq(Gestures.get_action_parameter_spec(ACTION), "llm_language")
@@ -80,12 +80,12 @@ helpers.describe("llm_language parameter replays the shared translate corpus", f
 	helpers.it("refuses duplicated or missing locales in the translation choices", function()
 		local config_text = json.encode(config)
 		local names_text = json.encode(names)
-		local order = read_json("data/locale_order.json")
+		local order = read_json("core/i18n/data/locale_order.json")
 		order.order[2] = order.order[1]
 		local duplicate, duplicate_reason = Translation.parse(config_text, names_text, json.encode(order))
 		helpers.assert_nil(duplicate, "a duplicated choice must not hide another language")
 		helpers.assert_true(type(duplicate_reason) == "string")
-		order = read_json("data/locale_order.json")
+		order = read_json("core/i18n/data/locale_order.json")
 		table.remove(order.order)
 		local missing, missing_reason = Translation.parse(config_text, names_text, json.encode(order))
 		helpers.assert_nil(missing, "a language absent from the display order must be refused")
@@ -102,9 +102,9 @@ helpers.describe("llm_language parameter replays the shared translate corpus", f
 end)
 
 helpers.describe("llm_language parameter: what the binding editors show", function()
-	local names = read_json("data/locale_names.json")
-	local order = read_json("data/locale_order.json")
-	local config = read_json("modules/llm/translate.json")
+	local names = read_json("core/i18n/data/locale_names.json")
+	local order = read_json("core/i18n/data/locale_order.json")
+	local config = read_json("ai/data/translate.json")
 	local i18n = require("infra.i18n")
 
 	--- The label of the interface-language choice for the current locale.

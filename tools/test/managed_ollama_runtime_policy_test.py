@@ -11,7 +11,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
-    "runtime_policy", ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py"
+    "runtime_policy",
+    ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_runtime.py",
 )
 POLICY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(POLICY)
@@ -24,7 +25,7 @@ class RuntimePolicyTests(unittest.TestCase):
         self.directory = Path(self.owned.name) / "runtime"
         self.directory.mkdir()
         self.contract_bytes = (
-            ROOT / "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
+            ROOT / "static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json"
         ).read_bytes()
         self.contract = json.loads(self.contract_bytes)
         self.binary = b"independent candidate bytes"

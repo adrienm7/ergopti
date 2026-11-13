@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Owned Runtimes Registry
  * DESCRIPTION:
- * Loads _shared/data/owned_runtimes.json, the decided policy row of every
+ * Loads _shared/core/network/data/owned_runtimes.json, the decided policy row of every
  * third-party program or runtime the three drivers depend on, and renders the
  * tables of docs/design/owned-runtimes.md from it.
  *
@@ -27,7 +27,10 @@ const path = require('path');
 const { escapeTableCell } = require('./text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DATA_PATH = path.join(ROOT, 'static/ergopti_plus/_shared/data/owned_runtimes.json');
+const DATA_PATH = path.join(
+	ROOT,
+	'static/ergopti_plus/_shared/core/network/data/owned_runtimes.json'
+);
 const DOC_PATH = path.join(ROOT, 'docs/design/owned-runtimes.md');
 const GENERATOR = 'tools/codegen/codegen-owned-runtimes.cjs';
 const OS_ORDER = Object.freeze(['macos', 'linux', 'windows']);

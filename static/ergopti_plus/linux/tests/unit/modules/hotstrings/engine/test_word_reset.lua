@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local Engine = require("hotstring_engine")
+local Engine = require("hotstrings.engine.matcher")
 
 
 
@@ -83,8 +83,8 @@ end)
 --- @param source string|nil Configuration bytes.
 --- @param body function body(subject, controls, path, reload, sandbox)
 local function with_settings(source, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Writer = require("toml_codec.writer")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local original = Writer.batch_write
@@ -139,7 +139,7 @@ helpers.describe("word reset: the settings", function()
 
 	helpers.it("word reset, persists, reloads and toggles every switch on its own", function()
 		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
-			local Codec = require("toml_codec")
+			local Codec = require("core.text.engine.toml_codec")
 			for _, key in ipairs(SWITCHES) do
 				helpers.assert_true(subject["set_" .. key](false), key .. " is persisted")
 				local stored = Codec.decode(sandbox.read_bytes(path)).hotstrings
@@ -166,7 +166,7 @@ helpers.describe("word reset: the settings", function()
 			local file = assert(io.open(path, "wb"))
 			assert(file:write('[hotstrings]\nidle_reset_seconds = 9\n')); assert(file:close())
 			helpers.assert_true(subject.set_click_resets_word(false))
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.idle_reset_seconds, 9)
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path)).hotstrings.idle_reset_seconds, 9)
 			helpers.assert_eq(subject.idle_seconds(), 9, "the active delay must reflect the source used for the write")
 			helpers.assert_eq(subject.click_resets_word(), false)
 		end)
@@ -176,7 +176,7 @@ helpers.describe("word reset: the settings", function()
 		helpers.it("word reset, retains a scope candidate adopted during " .. publication .. " publication (word-reset-reentrant-cache)", function()
 			local source = '[hotstrings]\nidle_reset_seconds = 5\n'
 			with_settings(source, function(subject, _, path, _, sandbox)
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local write = Writer.batch_write
 				local before = subject.snapshot()
 				local candidate = { hotstrings = { idle_reset_seconds = 12, click_resets_word = true,
@@ -193,7 +193,7 @@ helpers.describe("word reset: the settings", function()
 				helpers.assert_eq(subject.set_click_resets_word(false), publication == "commit")
 				helpers.assert_eq(subject.snapshot(), adopted, "the setter cannot replace a newer scope candidate")
 				if publication == "commit" then
-					local stored = require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings
+					local stored = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path)).hotstrings
 					helpers.assert_eq(stored.click_resets_word, false)
 					helpers.assert_eq(stored.idle_reset_seconds, 5)
 				else
@@ -221,7 +221,7 @@ helpers.describe("word reset: the settings", function()
 		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
 			helpers.assert_true(subject.set_idle_seconds(7.5))
 			helpers.assert_true(subject.set_click_resets_word(false))
-			local config = require("toml_codec").decode(sandbox.read_bytes(path))
+			local config = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path))
 			helpers.assert_eq(config.hotstrings.idle_reset_seconds, 7.5)
 			helpers.assert_eq(config.hotstrings.click_resets_word, false)
 			helpers.assert_eq(config.hotstrings.unknown, "keep")
@@ -229,7 +229,7 @@ helpers.describe("word reset: the settings", function()
 			helpers.assert_eq(fresh.idle_seconds(), 7.5)
 			helpers.assert_eq(fresh.click_resets_word(), false)
 			helpers.assert_true(fresh.toggle_click_resets_word())
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.click_resets_word, nil,
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path)).hotstrings.click_resets_word, nil,
 				"the default is written as an absent leaf")
 		end)
 	end)
@@ -250,8 +250,8 @@ helpers.describe("word reset: the settings", function()
 	helpers.it("word reset, reads an outdated value as the default with one warning", function()
 		with_settings('[hotstrings]\nidle_reset_seconds = -2\nclick_resets_word = "no"\narrow_resets_word = 1\n'
 			.. 'shortcut_resets_word = "off"\ntap_hold_resets_word = []\n', function(subject)
-			require("config_outdated").reset_for_tests()
-			local reported = require("config_outdated").collect_reports(function()
+			require("settings.engine.migration.outdated").reset_for_tests()
+			local reported = require("settings.engine.migration.outdated").collect_reports(function()
 				helpers.assert_eq(subject.idle_seconds(), 3)
 				for _, key in ipairs(SWITCHES) do helpers.assert_eq(subject[key](), true, key .. " falls back") end
 			end)
@@ -527,13 +527,13 @@ helpers.describe("word reset: the cascade arrow count", function()
 	helpers.it("cascade arrows, persists sparsely, reloads, and a default is an absent leaf", function()
 		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
 			helpers.assert_true(subject.set_cascade_max_arrows(2))
-			local config = require("toml_codec").decode(sandbox.read_bytes(path))
+			local config = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path))
 			helpers.assert_eq(config.hotstrings.cascade_max_arrows, 2)
 			helpers.assert_eq(config.hotstrings.unknown, "keep")
 			local fresh = reload()
 			helpers.assert_eq(fresh.cascade_max_arrows(), 2)
 			helpers.assert_true(fresh.set_cascade_max_arrows(3))
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.cascade_max_arrows, nil,
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path)).hotstrings.cascade_max_arrows, nil,
 				"the default is written as an absent leaf")
 		end)
 	end)
@@ -553,8 +553,8 @@ helpers.describe("word reset: the cascade arrow count", function()
 
 	helpers.it("cascade arrows, reads an outdated value as the default with one warning", function()
 		with_settings('[hotstrings]\ncascade_max_arrows = "deep"\n', function(subject)
-			require("config_outdated").reset_for_tests()
-			local reported = require("config_outdated").collect_reports(function()
+			require("settings.engine.migration.outdated").reset_for_tests()
+			local reported = require("settings.engine.migration.outdated").collect_reports(function()
 				helpers.assert_eq(subject.cascade_max_arrows(), 3)
 			end)
 			helpers.assert_eq(reported, { ["hotstrings.cascade_max_arrows"] = true })
@@ -590,11 +590,11 @@ helpers.describe("word reset: the cascade arrow count", function()
 		local text = helpers.read_menu_source()
 		helpers.assert_contains(text, "params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS]")
 		helpers.assert_contains(text, "WordReset.set_cascade_max_arrows(arrows)")
-		helpers.assert_contains(text, "params_ctx.state_getters[require(\"config_keys\").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]")
+		helpers.assert_contains(text, "params_ctx.state_getters[require(\"settings.engine.keys\").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]")
 		local daemon = source("ergopti_hotstrings.lua")
 		helpers.assert_contains(daemon, "cascade_max_arrows  = WordReset.cascade_max_arrows()")
 		helpers.assert_contains(daemon, "cascade_gate        = within_delay")
 	end)
 end)
 
-require("test.hotstring_idle_clock_contract").register(helpers)
+require("tests.lua.hotstrings.idle_clock_contract").register(helpers)

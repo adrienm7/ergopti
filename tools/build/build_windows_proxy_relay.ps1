@@ -22,10 +22,10 @@ function Get-RelaySha256([string]$Path) {
 
 if ($Publish -and $Verify) { throw 'Choose -Publish or -Verify.' }
 $RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$Module = Join-Path $RepoRoot 'static/ergopti_plus/_shared/go/native_http'
+$Module = Join-Path $RepoRoot 'static/ergopti_plus/_shared/core/network/native/go/native_http'
 $Vendor = Join-Path $RepoRoot 'static/ergopti_plus/windows/vendor'
 $BuildRoot = Join-Path $RepoRoot 'static/ergopti_plus/windows/build/native/proxy_relay'
-$Runtime = Get-Content -LiteralPath (Join-Path $RepoRoot 'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$Runtime = Get-Content -LiteralPath (Join-Path $RepoRoot 'static/ergopti_plus/_shared/ai/data/managed_ollama_runtime.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $Pin = $Runtime.go_version
 if ($Pin -cnotmatch '^go[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Canonical Go pin refused.' }
 

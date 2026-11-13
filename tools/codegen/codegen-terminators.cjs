@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates both the AHK v2 and Hammerspoon Lua implementations of the
  * Terminators port contract from the single source of truth defined in
- * static/ergopti_plus/_shared/core/domain/Terminators.spec.js. Running this script
+ * static/ergopti_plus/_shared/core/text/data/domain/Terminators.spec.js. Running this script
  * ensures both drivers start from identical catalogue data and expose the
  * same isTerminator / isConsumed / setEnabled / isEnabled / updateMagicKey /
  * addCustom / all() API surface.
@@ -32,15 +32,15 @@ const ROOT = path.resolve(__dirname, '../..');
 // Load the spec by reading and eval-ing it as CommonJS, since the file uses
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
-const specSource = fs.readFileSync(shared('core/domain/Terminators.spec.js'), 'utf8');
+const specSource = fs.readFileSync(shared('core/text/data/domain/Terminators.spec.js'), 'utf8');
 const specModule = { exports: {} };
 // eslint-disable-next-line no-new-func
 new Function('require', 'module', 'exports', '__dirname', '__filename', specSource)(
 	require,
 	specModule,
 	specModule.exports,
-	shared('core/domain'),
-	shared('core/domain/Terminators.spec.js')
+	shared('core/text/data/domain'),
+	shared('core/text/data/domain/Terminators.spec.js')
 );
 const { TERMINATOR_DEFS } = specModule.exports;
 
@@ -149,7 +149,7 @@ function generateAhk() {
 
 	return [
 		`; static/ergopti_plus/windows/_generated/terminators.ahk`,
-		`; AUTO-GENERATED from _shared/core/domain/Terminators.spec.js.`,
+		`; AUTO-GENERATED from _shared/core/text/data/domain/Terminators.spec.js.`,
 		`; DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		`#Requires AutoHotkey v2.0`,
 		``,
@@ -338,7 +338,7 @@ function generateAhk() {
  *
  * This is intentionally pure data (a single `return { … }` table) rather than a
  * full module: the macOS driver keeps its hand-written logic module
- * (_shared/lua/keymap/terminators.lua — O(1) caches, multi-codepoint safety,
+ * (_shared/layouts/engine/layers/terminators.lua — O(1) caches, multi-codepoint safety,
  * i18n, custom/magic-key lifecycle) and simply consumes this catalogue for its
  * TERMINATOR_DEFS. That keeps the macOS hot path untouched while still sourcing
  * the catalogue data from the single spec, so AHK and macOS can never drift.
@@ -364,8 +364,8 @@ function generateLua() {
 	}).join(',\n');
 
 	return [
-		`--- _shared/lua/keymap/terminators_catalogue.lua`,
-		`--- AUTO-GENERATED from _shared/core/domain/Terminators.spec.js.`,
+		`--- _shared/layouts/engine/layers/terminators_catalogue.lua`,
+		`--- AUTO-GENERATED from _shared/core/text/data/domain/Terminators.spec.js.`,
 		`--- DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
 		`--- ==============================================================================`,
@@ -391,7 +391,7 @@ function generateLua() {
 // ==================================================
 
 const AHK_OUT = path.join(ROOT, 'static/ergopti_plus/windows/_generated/terminators.ahk');
-const LUA_OUT = shared('lua/keymap/terminators_catalogue.lua');
+const LUA_OUT = shared('layouts/engine/layers/terminators_catalogue.lua');
 
 console.log('codegen:terminators — generating from terminators.spec.js…');
 writeFile(AHK_OUT, generateAhk());

@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- A WebKit JavaScriptCore value holding a posted object.
 --- @param json string What JSON.stringify gives for it.
@@ -32,7 +32,7 @@ end
 helpers.describe("webview pages: messages and replies cross the bridge", function()
 
 	helpers.it("(webview-private-error) never logs data contained in a bridge exception", function()
-		local logger, lines = require("logger.shim"), {}
+		local logger, lines = require("core.logger.engine.shim"), {}
 		-- A plain page: document apps refuse a payload without its envelope
 		-- before the handler runs, so they cannot reach the exception path.
 		local original_error, original_handler = logger.error, package.loaded["ui.hotstring_editor.bridge"]
@@ -67,7 +67,7 @@ helpers.describe("webview pages: messages and replies cross the bridge", functio
 		wm._send_response_to_js_for_test(webview, "metrics_typing_bridge", reply)
 		helpers.assert_true(script ~= nil, "a reply is sent")
 		local encoded = script:match("'metrics_typing_bridge',true,'([^']+)'")
-		helpers.assert_eq(encoded, require("compat.base64").encode(Json.encode(reply)),
+		helpers.assert_eq(encoded, require("core.lifecycle.engine.compat.base64").encode(Json.encode(reply)),
 			"the page receives the reply as base64 JSON")
 	end)
 

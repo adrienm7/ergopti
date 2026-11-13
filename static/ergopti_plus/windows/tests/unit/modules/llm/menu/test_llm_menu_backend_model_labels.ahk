@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The tray's one model button (maintainer, 2026-10-27) reads the backend's
 ; emoji, then the model: "🦙 qwen3:4b", "🌐 OpenAI/gpt-4o-mini". The emoji
-; comes from _shared/modules/llm/backends.json and the API form names the
+; comes from _shared/ai/data/backends.json and the API form names the
 ; provider by its display name. The shown model follows the active backend:
 ; with backend api it is the selected entry, never the stale Ollama tag. The
 ; model the page adds is validated against the shared identifier corpus.
@@ -53,7 +53,7 @@ Test("llm menu: model row follows the active backend (llm-menu-model-label)",
 ; shared file independently of the driver's loader.
 _LBMD_SelectorCaptionForms() {
 	global _LLM_Menu, LLM_API_PROVIDERS, _SharedDir
-	Shared := JsonParse(FileRead(_SharedDir . "\modules\llm\backends.json", "UTF-8"))["backends"]
+	Shared := JsonParse(FileRead(_SharedDir . "\ai\data\backends.json", "UTF-8"))["backends"]
 	AssertEqual(Shared["ollama"]["emoji"] . " qwen3:4b", LLM_ModelSelectorCaption("ollama", "qwen3:4b"))
 	AssertEqual(Shared["mlx"]["emoji"] . " Qwen3-4B", LLM_ModelSelectorCaption("mlx", "Qwen3-4B"))
 	SavedMenu := _LLM_Menu
@@ -104,7 +104,7 @@ Test("model-selector-page: added model identifiers follow the shared corpus",
 
 
 ; model-selector-api-listing: the API rows follow the shared listing corpus the
-; macOS and Linux suites replay through _shared/lua/llm/api_model_listing.lua.
+; macOS and Linux suites replay through _shared/ai/engine/api/model_listing.lua.
 _LBMD_ApiListingCorpus() {
 	global _SharedDir, LLM_API_LISTING_MAX_MODELS, LLM_API_LISTING_MAX_ID_LENGTH, LLM_API_LISTING_MAX_ENTRIES
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\api_model_listing_vectors.json", "UTF-8"))

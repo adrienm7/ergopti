@@ -4,8 +4,8 @@
 ; MODULE: Menu Row Order
 ; DESCRIPTION:
 ; The Windows reader of the display-order rules of the menus, the same answers as
-; _shared/lua/menu/row_order.lua from the generated projection of
-; _shared/modules/menu/row_order.json. No Windows file spells an order of its own
+; _shared/menu/engine/row_order.lua from the generated projection of
+; _shared/menu/data/row_order.json. No Windows file spells an order of its own
 ; (tools/test/test-menu-row-order-single-source.cjs).
 ;
 ; FEATURES & RATIONALE:

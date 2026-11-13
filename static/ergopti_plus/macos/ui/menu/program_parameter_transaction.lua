@@ -10,12 +10,12 @@
 
 local M = {}
 local Logger = require("infra.logger")
-local Codec = require("toml_codec")
-local Writer = require("toml_codec.writer")
-local Assignment = require("shortcuts.assignment")
+local Codec = require("core.text.engine.toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Assignment = require("shortcuts.engine.assignment")
 local Manifest = require("infra.manifest_reader")
-local PhysicalSlots = require("shortcuts.physical_slots")
-local TableUtil = require("table_util")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
+local TableUtil = require("core.text.engine.table_util")
 local LOG = "menu.program_parameter_transaction"
 
 local copy = TableUtil.shallow_copy
@@ -85,7 +85,7 @@ function M.new(options)
 	local function assignment_source(source, mutation, action)
 		if mutation.publishes_assignment ~= true then return source end
 		local row
-		if mutation.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD then
+		if mutation.section == require("settings.engine.keys").KEY.SHORTCUTS_KEYBOARD then
 			row = Assignment.operation(mutation.key, action, function(key) return key == mutation.key end, gestures.is_assignable)
 		else
 			row = Manifest.sparse_operation(mutation.section .. "." .. mutation.key, action)
@@ -306,7 +306,7 @@ function M.new(options)
 		-- Physical assignments belong to their joint scope publication owner.
 		-- Namespace refusal includes malformed keys, before any admission or mutation.
 		if PhysicalSlots.is_namespace(binding:match("^keyboard__(.*)$"))
-			or mutation.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD and PhysicalSlots.is_namespace(mutation.key) then return false end
+			or mutation.section == require("settings.engine.keys").KEY.SHORTCUTS_KEYBOARD and PhysicalSlots.is_namespace(mutation.key) then return false end
 		for _, name in ipairs({ "read", "apply", "restore" }) do if type(mutation[name]) ~= "function" then return false end end
 		return options.admission("Private program parameter edit", function()
 			if options.paused() ~= false or not current_path() then return false end

@@ -42,7 +42,7 @@
 ; the shipped ones.
 _TestRender_SeedShortcutSpec() {
 	global _SharedDir, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_JOINER
-	Constants := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
+	Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
 	UI_LLM_SHORTCUT_ORDER := IniCacheGet(Constants, "llm_ui", "shortcut_modifier_order")
 	UI_LLM_SHORTCUT_JOINER := IniCacheGet(Constants, "llm_ui", "shortcut_joiner_ahk")
 	AssertTrue(UI_LLM_SHORTCUT_ORDER != "_" && UI_LLM_SHORTCUT_JOINER != "_",

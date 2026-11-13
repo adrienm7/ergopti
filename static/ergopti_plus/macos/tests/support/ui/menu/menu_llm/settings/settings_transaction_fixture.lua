@@ -310,8 +310,8 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["infra.logger"] = Logger
 	package.loaded["infra.notifications"] = {notify = function() end}
-	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
@@ -335,11 +335,11 @@ local function with_fixture(options, callback)
 			return {}
 		end,
 	}
-	local display_renderer = assert(require("menu.renderer").new({
+	local display_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if options.parent_id then
 				for index, row in ipairs(root.llm_menu) do
 					if row.id == options.parent_id then
@@ -825,21 +825,21 @@ local function info_bar_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/info_bar_control.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 local function token_streaming_corpus()
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 local function privacy_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/privacy_trigger_controls.json", "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 return {

@@ -84,7 +84,7 @@ printf 'left=%s\n' "$(ls -A "$FX/tmp")"
 --- @return table The parsed fields plus the fixture root.
 -- The shared identifiers the release pins source, relative to the shared
 -- root: the fixture copies them to the same place under its own root.
-local IDENTIFIERS = "data/identifiers.sh"
+local IDENTIFIERS = "core/text/data/identifiers.sh"
 
 local function run(mode, extra)
 	-- A private root: a parallel suite run must not share the fixture.
@@ -106,7 +106,7 @@ local function run(mode, extra)
 	write(root .. "/driver.sh", DRIVER)
 	local output = command("env -u BASH_ENV -u ENV FX=" .. quote(root) .. " MODE=" .. mode
 		.. " HOME=" .. quote(root .. "/home") .. " TMPDIR=" .. quote(root .. "/tmp")
-		.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("modules/network/route_origins.json"))
+		.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("core/network/data/route_origins.json"))
 		.. " ERGOPTI_NATIVE_ARCH=arm64 " .. (extra or "") .. " /bin/bash " .. quote(root .. "/driver.sh"))
 	local result = { root = root, output = output }
 	for key, value in output:gmatch("(%w+)=([^\n]*)") do result[key] = value end

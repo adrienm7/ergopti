@@ -27,8 +27,8 @@ end
 -- fixture scripts the file streams.
 local TITLES = {}
 for _, code in ipairs({ "en", "fr", "de" }) do
-	local fh = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
-	TITLES[code] = require("json").decode(fh:read("*a"))["onboarding.window_title"]
+	local fh = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
+	TITLES[code] = require("core.text.engine.json").decode(fh:read("*a"))["onboarding.window_title"]
 	fh:close()
 end
 
@@ -114,7 +114,7 @@ helpers.describe("onboarding window title", function()
 
 	helpers.it("(onboarding-window-title) every locale's window title is brand-less", function()
 		local Json = require("tests.stubs.hs").json
-		local dir = "../_shared/data/locales/"
+		local dir = "../_shared/core/i18n/data/locales/"
 		local codes = { "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
 			"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
 		for _, code in ipairs(codes) do
@@ -132,13 +132,13 @@ end)
 helpers.describe("ui_builder window title", function()
 	helpers.it("(shared-window-titles) layout and navigation captions use every shipped translation", function()
 		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
-		local Json = require("json")
-		local file = assert(io.open(helpers.shared("data/locale_order.json"), "r"))
+		local Json = require("core.text.engine.json")
+		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "r"))
 		local locales = Json.decode(file:read("*a")).order
 		file:close()
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "r"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "r"))
 			local strings = Json.decode(file:read("*a"))
 			file:close()
 			for _, key in ipairs({ "layout_manager.window_title", "layer_editor.window_title" }) do

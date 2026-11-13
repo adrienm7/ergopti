@@ -11,7 +11,7 @@ local Publication = require("tests.support.ui.metrics.typing.publication")
 local Completion = require("tests.support.modules.keystats.ngram_completion_fixture")
 local Today = require("tests.support.modules.keystats.today_completion_fixture")
 local with_delivery = require("tests.support.typing_delivery_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local M = {}
 
 M.PAST, M.NEXT, M.TODAY = Completion.PAST, Completion.NEXT, Completion.TODAY

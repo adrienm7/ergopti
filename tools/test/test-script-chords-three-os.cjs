@@ -13,12 +13,12 @@
  *    Backspace → reload, Delete → personal shortcuts, Escape → quit), active
  *    by default, cleared to "none"; each generated manifest carries the same
  *    values, and no driver keeps a slot of its own.
- * 2. _shared/modules/actions/script_chords.json names the same slots, each
+ * 2. _shared/shortcuts/data/actions/script_chords.json names the same slots, each
  *    key as the shared physical-key registry does, and the actions a paused
  *    driver still runs. Windows declares the same slots, scan codes and paused
  *    actions (feature_state.ahk, config_io.ahk); macOS gives every slot a
  *    distinct Karabiner sentinel; Linux and macOS read the catalogue and apply
- *    the shared rule (_shared/lua/script_chords.lua).
+ *    the shared rule (_shared/keyboard/engine/layers/script_chords.lua).
  * 3. The submenu is script_control_group on the three drivers (switch, restore,
  *    clear, separator, slots), its title ticked from the switch getter, and each
  *    driver registers its group, its three commands and the getter.
@@ -83,7 +83,7 @@ const SECTION = 'shortcuts.script_control';
 // ==================================================
 // ==================================================
 
-const manifestSource = read('_shared', 'modules', 'features', 'manifest.toml');
+const manifestSource = read('_shared', 'settings', 'data', 'features', 'manifest.toml');
 const manifest = manifestSource
 	? parse(
 			manifestSource.replace(
@@ -175,7 +175,7 @@ for (const [id, preset] of PRESETS) {
 
 let catalogue = { slots: [], paused_actions: [] };
 try {
-	catalogue = JSON.parse(read('_shared', 'modules', 'actions', 'script_chords.json'));
+	catalogue = JSON.parse(read('_shared', 'shortcuts', 'data', 'actions', 'script_chords.json'));
 } catch (error) {
 	check(false, `script_chords.json must parse: ${error.message}`);
 }
@@ -185,7 +185,7 @@ check(
 );
 let registry = { keys: {} };
 try {
-	registry = JSON.parse(read('_shared', 'data', 'keycodes', 'physical_keys.json'));
+	registry = JSON.parse(read('_shared', 'layouts', 'data', 'keycodes', 'physical_keys.json'));
 } catch (error) {
 	check(false, `physical_keys.json must parse: ${error.message}`);
 }
@@ -233,7 +233,7 @@ check(
 );
 
 // macOS: one distinct sentinel per slot, and the shared rule on both Lua drivers.
-const keycodes = read('_shared', 'lua', 'keycodes', 'init.lua');
+const keycodes = read('_shared', 'platform', 'input', 'keycodes', 'core.lua');
 const sentinels = (keycodes.match(/M\.SCRIPT_CHORD_SENTINELS = \{([\s\S]*?)\n\}/) || ['', ''])[1];
 const sentinelNames = [...sentinels.matchAll(/(\w+)\s*=\s*"(\w+)"/g)];
 check(
@@ -283,7 +283,7 @@ check(
 
 let menu = {};
 try {
-	menu = JSON.parse(read('_shared', 'modules', 'menu', 'menu_manifest.json'));
+	menu = JSON.parse(read('_shared', 'menu', 'data', 'menu_manifest.json'));
 } catch (error) {
 	check(false, `menu_manifest.json must parse: ${error.message}`);
 }

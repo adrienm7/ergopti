@@ -27,10 +27,10 @@ over the file, destroying the settings it did not know.
 ## Decision
 
 `config.toml` carries its version in `[_meta] schema_version`. One data file,
-`_shared/core/config_schema/migrations.toml`, is the only registry of versions
+`_shared/settings/data/config_schema/migrations.toml`, is the only registry of versions
 and of the steps between them; every driver reads it at runtime (Windows with
 `windows/infra/config_migrate.ahk`, macOS and Linux with
-`_shared/lua/config_migrate.lua`). A step is `[steps.v<N>_to_v<N+1>]` with the
+`_shared/settings/engine/migration/migrate.lua`). A step is `[steps.v<N>_to_v<N+1>]` with the
 drivers whose files it changes and an ordered list of ops drawn from a closed,
 data-only set: `rename`, `rename_prefix`, `move_section`, `merge_into`,
 `map_value`, `delete`, `set_if_absent`. There is no code in a step, so the
@@ -145,8 +145,8 @@ placeholder stamped with the current version.
 
 ## Evidence in the codebase
 
-- Registry: `static/ergopti_plus/_shared/core/config_schema/migrations.toml`
-- Interpreters: `static/ergopti_plus/_shared/lua/config_migrate.lua`,
+- Registry: `static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml`
+- Interpreters: `static/ergopti_plus/_shared/settings/engine/migration/migrate.lua`,
   `static/ergopti_plus/windows/infra/config_migrate.ahk`
 - Corpus: `static/ergopti_plus/_shared/tests/corpus/config_migrations/`,
   `static/ergopti_plus/_shared/tests/corpus/config_migration_registries/`

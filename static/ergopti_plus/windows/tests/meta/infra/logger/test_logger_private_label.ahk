@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Private Label Twin (Windows)
 ; DESCRIPTION:
-; LoggerMaskUserName is the AutoHotkey twin of _shared/lua/diagnostics/private_label.lua
+; LoggerMaskUserName is the AutoHotkey twin of _shared/diagnostics/engine/private_label.lua
 ; (item 139): its placeholder is the redaction policy's, it refuses a value that is
 ; no name, and no TOML loader log line prints a category or a file in clear text.
 ; ==============================================================================
@@ -15,7 +15,7 @@
 
 _PL_RedactionPolicy() {
 	global _SharedDir
-	return JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
+	return JsonParse(FileRead(_SharedDir . "\diagnostics\data\redaction.json", "UTF-8"))
 }
 
 TestPL_PlaceholderIsThePolicys() {

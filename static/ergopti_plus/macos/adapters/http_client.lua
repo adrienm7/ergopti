@@ -55,8 +55,8 @@
 local hs             = hs
 local Logger         = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
-local ErrorDescription = require("error_description")
+local TextUtils = require("core.text.engine.utils_core")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "adapters.http_client"
 local CACHE_POLICIES = {
@@ -112,7 +112,7 @@ local TIMEOUT_ERROR                 = "timeout"
 local TIMEOUT_UNAVAILABLE_ERROR     = "timeout unavailable"
 local TIMEOUT_CLEANUP_PENDING_ERROR = "timeout cleanup pending"
 
--- The shared redirect law's buffered_get.max_hops (data/http/redirect_policy.json),
+-- The shared redirect law's buffered_get.max_hops (core/network/data/http/redirect_policy.json),
 -- pinned by tools/test/test-port-compliance.cjs. Kept literal so loading the
 -- adapter never depends on finding the shared tree.
 local MAX_REDIRECTS = 50
@@ -255,7 +255,7 @@ local function request_refusal(url, headers, body)
 			for name, value in pairs(headers) do
 				if type(name) ~= "string" or type(value) ~= "string" then error("header is not a string") end
 			end
-			local _, view = require("network.http_headers").capture(headers, policy.validate)
+			local _, view = require("core.network.engine.http_headers").capture(headers, policy.validate)
 			return view
 		end)
 		if not ok then return "headers cannot be represented by the native HTTP bridge" end

@@ -37,7 +37,7 @@ desktop_session_start() {
 	export XDG_DATA_HOME="${DESKTOP_HOME}/.local/share" XDG_STATE_HOME="${DESKTOP_HOME}/.local/state"
 	export XDG_CACHE_HOME="${DESKTOP_HOME}/.cache"
 	mkdir -p "${XDG_CONFIG_HOME}" "${XDG_DATA_HOME}" "${XDG_STATE_HOME}" "${XDG_CACHE_HOME}"
-	export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua'
+	export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua'
 	export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
 	Xvfb ":${number}" -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 &
 	DESKTOP_PIDS="$!"

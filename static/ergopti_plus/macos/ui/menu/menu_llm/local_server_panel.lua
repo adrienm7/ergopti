@@ -34,8 +34,8 @@ local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local llm_mod       = require("modules.llm")
 local ApiPanel      = require("ui.menu.menu_llm.api_panel")
-local ServerMenu    = require("llm.local_server_menu")
-local TextUtils = require("text_utils")
+local ServerMenu    = require("ai.engine.local_servers.menu")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "menu_llm.local_servers"
 

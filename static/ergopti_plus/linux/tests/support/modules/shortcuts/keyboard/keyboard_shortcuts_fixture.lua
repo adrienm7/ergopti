@@ -10,9 +10,9 @@
 
 local helpers = require("tests.helpers")
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -43,7 +43,7 @@ local function load_over_config(initial, writes_fail, chatgpt)
 	end
 	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
 	package.loaded["infra.config_paths"] = { config = function() return path end }
-	if writes_fail then require("toml_codec.writer").refuse_writes(path, "injected persistence refusal") end
+	if writes_fail then require("core.text.engine.toml_codec.writer").refuse_writes(path, "injected persistence refusal") end
 	package.loaded["modules.shortcuts.chatgpt"] = chatgpt or { open = function() return true end }
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	local shortcuts = require("modules.shortcuts.keyboard_shortcuts")

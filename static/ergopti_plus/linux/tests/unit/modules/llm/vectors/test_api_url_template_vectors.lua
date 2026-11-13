@@ -4,7 +4,7 @@
 --- MODULE: API URL Template Corpus (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/api_url_template_vectors.json through
---- _shared/lua/llm/api_url_template.lua, which fills the address of a
+--- _shared/ai/engine/api/url_template.lua, which fills the address of a
 --- per-account provider (Azure resource, AWS region, Cloudflare account id,
 --- Databricks workspace, Snowflake account) from the add-entry form.
 ---
@@ -15,11 +15,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 
-local Template = require("llm.api_url_template")
+local Template = require("ai.engine.api.url_template")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -97,12 +97,12 @@ helpers.describe("api_url_template replays the shared corpus", function()
 	end
 
 	helpers.it("the catalogue's blocks are usable and every locale names their suffix", function()
-		local catalogue = read_json("modules/llm/api_providers.json")
+		local catalogue = read_json("ai/data/api_providers.json")
 		local optional = catalogue.providers.dashscope.optional_address
 		helpers.assert_nil(Template.optional_problem(optional))
 		for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no",
 			"pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-			local locale = read_json("data/locales/" .. lang .. ".json")
+			local locale = read_json("core/i18n/data/locales/" .. lang .. ".json")
 			local text = locale["menu.llm.api_prompt_field_invalid." .. optional.field]
 			helpers.assert_true(type(text) == "string" and text:find(optional.host_suffix, 1, true) ~= nil, lang)
 			helpers.assert_true(type(locale["menu.llm.api_prompt_field." .. optional.field]) == "string", lang)

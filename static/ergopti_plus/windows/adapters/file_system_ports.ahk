@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: FileSystem Port Spec
 ; DESCRIPTION:
-; The Windows reader of _shared/lua/file_system/ports.lua: what a file-system owner
+; The Windows reader of _shared/core/fs/engine/ports.lua: what a file-system owner
 ; must offer besides the five plain operations. An owner is a Map from the spec's
 ; method names to callables; adapters/file_system.ahk checks its own when it loads,
 ; so a missing method fails at boot rather than inside a publication.

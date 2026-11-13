@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -77,8 +77,8 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 	end
 
 	helpers.it("lists the interface language first, then every shipped locale in menu order", function()
-		local names = read_json("data/locale_names.json")
-		local order = read_json("data/locale_order.json").order
+		local names = read_json("core/i18n/data/locale_names.json")
+		local order = read_json("core/i18n/data/locale_order.json").order
 		with_interface("fr", function()
 			local choices = Actions.llm_language_choices()
 			helpers.assert_eq(#choices, 22, "the interface language and the 21 shipped locales")
@@ -91,7 +91,7 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 			end
 
 			local prompt = Actions.parameter_prompt(ACTION)
-			helpers.assert_eq(prompt, "Languages:\n" .. tostring(read_json("modules/llm/translate.json").max_language_bytes),
+			helpers.assert_eq(prompt, "Languages:\n" .. tostring(read_json("ai/data/translate.json").max_language_bytes),
 				"the InputBox substitutes the declared byte limit instead of a locale catalogue")
 		end)
 	end)

@@ -22,9 +22,9 @@ DEPENDENCIES = (
     "static/ergopti_plus/macos/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
     "static/ergopti_plus/macos/infra/deferred_work.lua",
-    "static/ergopti_plus/_shared/lua/shortcuts/physical_editor_window.lua",
-    "static/ergopti_plus/_shared/lua/shortcuts/physical_editor.lua",
-    "static/ergopti_plus/_shared/lua/shortcuts/physical_entries.lua",
+    "static/ergopti_plus/_shared/shortcuts/engine/physical_editor_window.lua",
+    "static/ergopti_plus/_shared/shortcuts/engine/physical_editor.lua",
+    "static/ergopti_plus/_shared/shortcuts/engine/physical_entries.lua",
 )
 
 

@@ -15,10 +15,10 @@ local M = {}
 local hs          = hs
 local Logger      = require("infra.logger")
 local git_status  = require("infra.git_status")
-local reload_gate = require("reload_gate")
+local reload_gate = require("core.lifecycle.engine.reload.gate")
 local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
-local TableUtil   = require("table_util")
+local TableUtil   = require("core.text.engine.table_util")
 local LOG         = "menu_watchers"
 
 --- Whether a reload or quit is already under way, which makes a refused reload

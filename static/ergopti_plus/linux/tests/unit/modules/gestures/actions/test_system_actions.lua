@@ -296,7 +296,7 @@ helpers.describe("Linux system actions", function()
 				.. dir .. "/data/Trash/files'")
 			if trashed then local fh = assert(io.open(dir .. "/data/Trash/files/" .. trashed, "w")); fh:write("x"); fh:close() end
 			local status = os.execute("PATH='" .. dir .. "/bin':\"$PATH\" XDG_DATA_HOME='" .. dir .. "/data' sh -c "
-				.. require("text_utils").shell_quote(SystemActions.EMPTY_TRASH))
+				.. require("core.text.engine.utils_core").shell_quote(SystemActions.EMPTY_TRASH))
 			return status == true or status == 0
 		end
 		local ok, err = pcall(function()
@@ -955,7 +955,7 @@ helpers.describe("Linux system actions", function()
 			local cached_runner = package.loaded["modules.gestures.background_commands"]
 			package.loaded["modules.gestures.background_commands"] = nil
 			local ok, failure = pcall(function()
-				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "logger.shim", logger)
+				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "core.logger.engine.shim", logger)
 				local real = os.execute
 				local function dispatch(answer)
 					errors = {}

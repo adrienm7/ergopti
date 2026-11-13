@@ -7,7 +7,7 @@ import random
 import shutil
 
 env = os.environ.copy()
-env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 assert os.access("/usr/bin/convert", os.X_OK), "ImageMagick convert is required"
 assert_luajit = shutil.which("luajit")
 assert assert_luajit, "LuaJIT is required"

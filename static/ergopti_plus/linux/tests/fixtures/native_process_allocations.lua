@@ -5,7 +5,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_process_allocations%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local Process, Timers = require("adapters.process_runner"), require("adapters.timer_scheduler")
 local foreign = Timers.every(10, function() error("foreign timer unexpectedly fired") end)

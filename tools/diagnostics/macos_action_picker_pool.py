@@ -25,7 +25,7 @@ DEPENDENCIES = (
     "static/ergopti_plus/macos/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
     "static/ergopti_plus/macos/infra/deferred_work.lua",
-    "static/ergopti_plus/_shared/lua/program_provider_picker.lua",
+    "static/ergopti_plus/_shared/apps/engine/program_provider_picker.lua",
     "static/ergopti_plus/_shared/ui/action_picker/index.html",
     "static/ergopti_plus/_shared/ui/action_picker/script.js",
     "static/ergopti_plus/_shared/ui/action_picker/style.css",

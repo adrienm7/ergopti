@@ -8,7 +8,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Windows names tables by the lowercase_bare policy of the shared parser
-;    (hotstrings/overrides.lua): every vector of that policy is replayed. A
+;    (hotstrings/engine/overrides.lua): every vector of that policy is replayed. A
 ;    verbatim vector is replayed only for its verdict that the bytes are invalid,
 ;    which holds under every policy; the trees of that policy are Linux's.
 ; 2. The record of a table (Delay, PendingOffset, LegacyDelay...) is spelled as

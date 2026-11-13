@@ -37,7 +37,7 @@ from desktop_activation import LayoutSpec, libxkbcommon_version  # noqa: E402
 
 STATIC_DIR = INSTALLATION_DIR.parents[2]
 REGISTRY_DIR = STATIC_DIR / "layouts" / "registry"
-KEYCODES = STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
+KEYCODES = STATIC_DIR / "ergopti_plus" / "_shared" / "layouts" / "data" / "mac_keycodes.json"
 
 
 def convert(layout_id: str, out_dir: Path) -> None:

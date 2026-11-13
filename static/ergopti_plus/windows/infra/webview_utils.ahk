@@ -608,7 +608,7 @@ class WebViewHost {
 				; ── i18n seed ────────────────────────────────────────────────────────
 				if !(Opts.Has("SkipI18nSeed") && Opts["SkipI18nSeed"]) {
 						Loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
-						Seed := "window.__i18n_base='https://" . Vhost . "/data/locales/';"
+						Seed := "window.__i18n_base='https://" . Vhost . "/core/i18n/data/locales/';"
 								. "window._i18n_locale='" . Loc . "';"
 						try this.WebView.AddScriptToExecuteOnDocumentCreated(Seed)
 						if this.CloseRequested

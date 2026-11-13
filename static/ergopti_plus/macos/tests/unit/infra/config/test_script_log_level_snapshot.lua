@@ -7,4 +7,4 @@
 --- infra.logger.
 --- ==============================================================================
 
-require("test.config_scope_script_level_contract")(require("tests.helpers"), "macos")
+require("tests.lua.settings.scope_script_level_contract")(require("tests.helpers"), "macos")

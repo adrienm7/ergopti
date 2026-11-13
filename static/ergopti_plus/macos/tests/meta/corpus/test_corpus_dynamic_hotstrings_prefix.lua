@@ -6,7 +6,7 @@
 --- Loads the shared cross-driver corpus from
 --- _shared/tests/corpus/dynamic_hotstrings/prefix_vectors.json and validates
 --- it against the shared reference implementation itself
---- (_shared/lua/dynamic_hotstrings/init.lua) — the same module macOS's
+--- (_shared/hotstrings/engine/dynamic/core.lua) — the same module macOS's
 --- rules_engine.lua delegates to at runtime. Pinning the corpus against the
 --- reference (rather than a driver-local reimplementation) proves the corpus
 --- itself is correct; the AHK half in
@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DynamicHotstrings = require("dynamic_hotstrings")
+local DynamicHotstrings = require("hotstrings.engine.dynamic.core")
 
 
 

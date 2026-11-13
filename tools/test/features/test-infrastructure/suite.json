@@ -189,7 +189,7 @@
 		{
 			"id": "js-0117",
 			"ordinal": 129,
-			"name": "shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)",
+			"name": "shared-contract gate coverage (_shared + _shared/tests select all three driver suites)",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-contract-gate-coverage.cjs"],
 			"repro": "node tools/test/test-shared-contract-gate-coverage.cjs"

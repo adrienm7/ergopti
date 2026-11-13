@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
 -- AZERTY's plain presses on four keys: KEY_2 types é, KEY_7 è, KEY_0 à, KEY_Q a.
 local BASE = { [3] = { text = "é" }, [8] = { text = "è" }, [11] = { text = "à" }, [16] = { text = "a" },

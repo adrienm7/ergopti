@@ -300,8 +300,8 @@ helpers.describe("menu rebuild: clicks during a refresh", function()
 
 	helpers.it("(menu-click-dropped-logged) logs a click dropped by a stopped tray", function()
 		local warnings = {}
-		local previous = package.loaded["logger.shim"]
-		package.loaded["logger.shim"] = { info = function() end, error = function() end,
+		local previous = package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = { info = function() end, error = function() end,
 			warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end }
 		local ok, err = pcall(function()
 			local Owner = helpers.fresh_module("ui.menu.rebuild_owner")
@@ -316,7 +316,7 @@ helpers.describe("menu rebuild: clicks during a refresh", function()
 			old()
 			helpers.assert_eq(#warnings, 2, "a click on a stopped tray is reported")
 		end)
-		package.loaded["logger.shim"] = previous
+		package.loaded["core.logger.engine.shim"] = previous
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -417,7 +417,7 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			create = function() return true end, set_menu = function() return accepted end }
 		local environment = setmetatable({ require = function(name)
 			if name == "platform.tray.appindicator" then return indicator end
-			if name == "logger.shim" then return { debug = function() end, warn = function() end } end
+			if name == "core.logger.engine.shim" then return { debug = function() end, warn = function() end } end
 			if name == "tray.protocol" then return { resolve_tray_icon = function() return "input-keyboard" end } end
 			if name == "infra.paths" then return { shared_root = function() return "/synthetic" end } end
 			-- Counters only: the tray counts and times each menu replacement.

@@ -422,7 +422,7 @@ local function keyboard_source_answer(args, layout)
 		local dead = type(value) == "table" and value.dead == true or false
 		levels[#levels+1] = {code=code, text=text, dead=dead, direct=not dead and text ~= ""}
 	end
-	return {code=0, stdout=require("json").encode({version=1, source_id=layout.source_id,
+	return {code=0, stdout=require("core.text.engine.json").encode({version=1, source_id=layout.source_id,
 		keyboard_type=40, levels=levels}) .. "\n"}
 end
 M.keyboard_source_answer = keyboard_source_answer
@@ -739,7 +739,7 @@ end
 --- @return table env
 function M.launcher_environment(app_root, home)
 	local bundle = app_root .. "/ErgoptiPlus.app"
-	local AppDirs = require("app_dirs")
+	local AppDirs = require("core.fs.engine.app_dirs")
 	local logs = home .. "/" .. AppDirs.macos.relative
 	return {
 		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.keyboard_geometry").launcher_value(),

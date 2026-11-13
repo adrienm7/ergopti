@@ -554,7 +554,7 @@ _THSO_NativeInheritanceOwned(Inherit, TargetPath) {
 	Created := FSCreateDirectoryExclusiveStrict(Root)
 	Assert((Created is Integer) && Created == 1, "the native-mode fixture exclusively owns its private root")
 	try {
-		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 		Source := "[_meta]`nschema_version = " . TapHoldMigrationRegistry()["current"]
 			. "`n[tap_hold]`ninherit_defaults = " . (Inherit ? "true" : "false")
 			. '`n[tap_hold.keys.caps_lock]`ntap_action = "enter"`nhold_modifier = "ctrl"`n'
@@ -704,7 +704,7 @@ _THSO_ExtraOwned(Mode, Scenario, TargetPath) {
 		return StageWritten
 	}
 	try {
-		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 		Source := Scenario == "inherited"
 			? "[_meta]`nschema_version = " . TapHoldMigrationRegistry()["current"]
 				. "`n[tap_hold]`ninherit_defaults = true`n"
@@ -765,7 +765,7 @@ _THSO_FirstSaveNativeOwned(TargetPath) {
 	Created := FSCreateDirectoryExclusiveStrict(Root)
 	Assert((Created is Integer) && Created == 1, "The private first-save directory must be acquired exclusively")
 	try {
-		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 		DefaultBytes := FSReadUtf8Exact(Defaults)
 		AssertTrue(DefaultBytes is String && DefaultBytes != "", "The actual shared defaults must exist")
 		AssertFalse(FileExist(TargetPath), "The actual target must be absent before the first save")

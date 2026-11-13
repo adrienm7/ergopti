@@ -5,7 +5,7 @@ local original_composition = package.loaded["modules.llm.runtime_composition"]
 helpers.describe("Retained Ollama runtime composition", function()
  helpers.it("live repair forwards canonical resolver asset and native archive factory without updater metadata", function()
   local captured
-  local Compose = helpers.load_module_with_dependency("modules.llm.runtime_composition", "llm.runtime_repair", {
+  local Compose = helpers.load_module_with_dependency("modules.llm.runtime_composition", "ai.engine.local_servers.runtime_repair", {
    new = function(ports) captured = ports; return {} end,
   })
   local asset = { key = "linux-amd64", version = "0.24.0", name = "ollama-linux-amd64.tar.zst", bytes = 3,

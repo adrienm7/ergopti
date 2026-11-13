@@ -10,7 +10,7 @@
  * (tools/lib/layout-source-xkb.cjs, layout-source-klc.cjs) and the layout
  * editor page load this same script; only the Lua step differs in how it
  * runs (the `lua` process for the tool, fengari in the page) and both run the
- * shared Lua adapter _shared/lua/layouts/source_export.lua.
+ * shared Lua adapter _shared/layouts/engine/composer/source_export.lua.
  *
  * FEATURES & RATIONALE:
  * 1. Pure classic script: no file, process or DOM access; the caller passes

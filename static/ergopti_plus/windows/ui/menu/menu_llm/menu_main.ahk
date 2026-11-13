@@ -213,7 +213,7 @@ LLM_Menu_BuildSubmenu(Target := 0) {
 
 	; ── Settings rows ────────────────────────────────────────────────────────
 	; Row ORDER and the disabled-when-off POLICY come from the shared menu manifest
-	; (_shared/modules/menu/menu_manifest.json, key llm_menu), so the Windows and
+	; (_shared/menu/data/menu_manifest.json, key llm_menu), so the Windows and
 	; macOS IA menus can never drift again (a greying mismatch between them was the
 	; bug this prevents).
 	; The per-row native label + submenu builder are dispatched by id inside
@@ -438,13 +438,13 @@ LLM_Menu_Build() {
 
 /**
  * Returns the ordered settings-row list for this platform from the shared menu
- * manifest (_shared/modules/menu/menu_manifest.json, key ``llm_menu``) — the
+ * manifest (_shared/menu/data/menu_manifest.json, key ``llm_menu``) — the
  * SINGLE SOURCE OF TRUTH shared with the macOS renderer so the two IA menus can
  * never drift in row order or greying policy. Cached after the first read (the
  * manifest is static for the session).
  *
  * The rows used to live in a SECOND shared file of their own
- * (_shared/modules/llm/menu_layout.json); one menu therefore had two shared
+ * (_shared/ai/data/menu_layout.json); one menu therefore had two shared
  * descriptions, and the manifest's ``llm_menu`` key described a menu only Linux
  * drew. Reading the manifest here is what collapses the two back into one.
  *

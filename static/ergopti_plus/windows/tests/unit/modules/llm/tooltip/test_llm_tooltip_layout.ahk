@@ -127,7 +127,7 @@ _TLL_Footer(HintW, InfoW, InfoSizingW) {
 
 _TLL_ConstantsSection(Name) {
 	global _SharedDir
-	Parsed := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
+	Parsed := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
 	Assert(Parsed.Has(Name), "constants.toml must declare [" . Name . "]")
 	return Parsed[Name]
 }

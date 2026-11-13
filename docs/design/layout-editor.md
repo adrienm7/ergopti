@@ -17,7 +17,7 @@ All under `static/ergopti_plus/_shared/ui/layout_editor/`, classic scripts that 
 | `editor_model.js`  | Pure edits returning a new validated document, refusals with stable codes, layer selection by held modifiers, the typing simulation behind the live preview, undo/redo snapshots.                                                                                                                                                                                                                                                                                                                                                                                |
 | `editor_page.js`   | The DOM: toolbar, layer tabs, the physical board (`LAYER_EDITOR_DATA` geometry, numpad, media keys), the key inspector, modifiers and dead-key panels, Unicode palette, preview, export report, printable stickers. `LayoutEditorPage.mount(root, host)`.                                                                                                                                                                                                                                                                                                        |
 | `standalone.js`    | The website host: browser file picker, downloads, `?lang=` locale.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `lua_runner.js`    | Runs the shared Lua export adapter (`_shared/lua/layouts/source_export.lua`) in the vendored fengari VM (`vendor/fengari-web.js`, Lua 5.3), the module list the host fetches included, for the XKB conversion and the canonical `.keylayout` reading the KLC needs.                                                                                                                                                                                                                                                                                              |
+| `lua_runner.js`    | Runs the shared Lua export adapter (`_shared/layouts/engine/composer/source_export.lua`) in the vendored fengari VM (`vendor/fengari-web.js`, Lua 5.3), the module list the host fetches included, for the XKB conversion and the canonical `.keylayout` reading the KLC needs.                                                                                                                                                                                                                                                                                  |
 | `toml_prelude.js`  | The `exports` object the unmodified vendored CommonJS file assigns to.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `unicode_names.js` | Decodes the generated Unicode names table: name, aliases and block of a code point, and the name search.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
@@ -39,13 +39,13 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
 - **ErgoptiPlus, macOS and Linux.** The layout manager window (`layout_manager/index.html`) loads the same scripts and
   mounts the editor when `initData` carries `source_editor: true`. The page posts `source_open` and
   `{action: "source_save", filename, text}` on `layout_manager_bridge`; the shared bridge
-  (`_shared/lua/layouts/manager_bridge.lua`) routes them to the registry's `source_open` / `source_save`, which use
-  `_shared/lua/layouts/source_store.lua`. The host answers `window.sourceData({text, filename, folder})` and
+  (`_shared/layouts/engine/manager_bridge.lua`) routes them to the registry's `source_open` / `source_save`, which use
+  `_shared/layouts/engine/composer/source_store.lua`. The host answers `window.sourceData({text, filename, folder})` and
   `window.sourceResult({ok, code, detail, filename})`. Files go to `layout_sources/` of the configuration folder
-  (bounds in `_shared/modules/layouts/defaults.json` `[source]`); saving never installs or selects a layout.
+  (bounds in `_shared/layouts/data/defaults.json` `[source]`); saving never installs or selects a layout.
   « Install and use » sends `composer_save` with `source`, the compiled `.keylayout` for the host's OS, the
   source's `emulation` table for that OS (`LayoutSourceIO.emulationTable`; none for a preserved import) and
-  `use: true`: the composer host (`_shared/lua/layouts/composer.lua`) stores it, replaces any composition, installs
+  `use: true`: the composer host (`_shared/layouts/engine/composer/composer.lua`) stores it, replaces any composition, installs
   it as the `composed` layout and switches to it; its `composerResult` is routed back to the editor.
   « Emulate without installing » (shown when `initData` carries `emulate: true`) sends
   `{action: "composer_emulate", source, keylayout [, emulation]}`: the composer's `store` keeps the source, its
@@ -100,11 +100,11 @@ folder layout and `tools/kbd-dll.cjs`. Decided by the coordinator on 2026-11-11,
 | `nav_save`               | `{text}`                                                     | `navResult {saved, applied, errors}`                                             | the layer editor's codes                                                                                              |
 
 `initData` then carries `source_editor: true`, `emulate: true` and `nav_apply: true`. The checks are the shared
-composer's (`_shared/lua/layouts/composer.lua` `check_source` and `check_emulation`): the source is TOML of format
+composer's (`_shared/layouts/engine/composer/composer.lua` `check_source` and `check_emulation`): the source is TOML of format
 `ergopti-layout` version 1, the `.keylayout` is named after `exports.macos.internal_name` or the layout id, the
 emulation table compiles and names the source's layout and `windows` as its platform (the page compiles one per
 host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file names come from
-`_shared/modules/layouts/defaults.json` `[composer]` (`layout_source.toml`, `layout_source.keylayout`,
+`_shared/layouts/data/defaults.json` `[composer]` (`layout_source.toml`, `layout_source.keylayout`,
 `layout_source_emulation.json`) and `[source]`.
 
 **Files and functions.**
@@ -114,7 +114,7 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
    `LayoutManager_HandleMessage` pushes on `ready`; `LayoutManager_OpenEditor()` = `LayoutManager_Open()` then, once
    `ready` arrives (`_LayMgrWeb_OnNavigationCompleted` / the page's `ready`), the same answer as `source_open`. Then
    empty `windowsPending` in `tools/test/test-layout-manager-page.cjs`.
-2. `windows/ui/layout_manager/source_store.ahk` (new): the rules of `_shared/lua/layouts/source_store.lua` (file
+2. `windows/ui/layout_manager/source_store.ahk` (new): the rules of `_shared/layouts/engine/composer/source_store.lua` (file
    name `^[a-z][a-z0-9_]*\.(toml|keylayout)$`, at most `max_name_length`, UTF-8 text at most `max_file_bytes`, folder
    `layout_sources\`, `last_file`), replaying its Lua tests' cases.
 3. `windows/ui/layout_manager/composer.ahk`: `LayoutComposer_Handle` gains the source form of `composer_save` and
@@ -128,11 +128,11 @@ host platform; `LayoutSourceIO.emulationTable(doc, "windows")`). Bounds and file
    composer's and `read_local` fails, read `layout_composer\layout_source.keylayout` (what `read_composed` does on
    macOS and Linux) instead of logging « save it again »; and perform `layout_source_emulation.json` for what the
    `.keylayout` cannot hold (tap-holds, layer holds, multi-character outputs): an AHK port of
-   `_shared/lua/layouts/source_emulation.lua`, tested by replaying `_shared/tests/corpus/layouts/source/
+   `_shared/layouts/engine/composer/source_emulation.lua`, tested by replaying `_shared/tests/corpus/layouts/source/
 emulation_vectors.json` like `test-layout-source-emulation.cjs` does.
 5. `windows/ui/layout_manager/kbd_register.ahk` (new): the elevated helper below, `install <staging dir>` and
    `uninstall <dll>`.
-6. Menu: in `_shared/modules/menu/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
+6. Menu: in `_shared/menu/data/menu.toml` row `open_layout_editor`, drop `platforms`, `unavailable` and `reason_key`
    (and the locale key `platform_reason.layout_editor_is_on_the_website_on_windows`); in `windows/ui/menu/menu_init.ahk`
    bind `Commands[MenuCommand.OPEN_LAYOUT_EDITOR] := LayoutManager_OpenEditor` next to `LAYOUT_MANAGER` (line 700).
 

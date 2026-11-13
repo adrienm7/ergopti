@@ -38,7 +38,7 @@
 ; ==============================================================================
 ; ==============================================================================
 
-; Envelope format. MUST match _shared/lua/keystats/text_crypto.lua; the parity
+; Envelope format. MUST match _shared/metrics/engine/privacy/text_crypto.lua; the parity
 ; gate tools/test/test-text-crypto-envelope-parity.cjs fails if they drift.
 global KL_ENC_MARKER      := "ergopti-enc-v1"
 global KL_ENC_SEPARATOR   := ":"

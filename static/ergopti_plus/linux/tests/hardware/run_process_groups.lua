@@ -14,7 +14,7 @@
 --- only after the native terminal error, group absence and physical close ACK.
 --- ==============================================================================
 
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local uv = require("luv")
 local ShellRunner = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")

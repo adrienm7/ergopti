@@ -8,11 +8,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"llm.bootstrap_budget", "llm.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "logger.shim", "infra.i18n", "llm.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "config_outdated", "toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "infra.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
-local Budget = helpers.load_module("llm.bootstrap_budget")
+local Budget = helpers.load_module("ai.engine.bootstrap.budget")
 local function equal(actual, expected, message)
 	if actual ~= expected then error((message or 'Mismatch') .. ': expected ' .. tostring(expected) .. ', got ' .. tostring(actual), 2) end
 end

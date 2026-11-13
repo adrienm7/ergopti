@@ -18,7 +18,7 @@ const qualification = require('../ci/dev-release-qualification.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = path.join(ROOT, 'static/ergopti_plus/linux');
-const LUA_PATH = './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;';
+const LUA_PATH = './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;';
 const UNRESOLVED = new Map();
 const FIXTURES = [
 	{ args: ['tests/hardware/run_native_fixture_family_receipts.py'], timeout: 30 },

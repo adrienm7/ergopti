@@ -66,7 +66,7 @@ local function with_main(mappings, body, overrides)
 					observations.injected[#observations.injected + 1] = { backspaces = backspaces, text = text, private = private }
 					return { ok = true, cleanup_ok = true }
 				end },
-			engine = engine, Logger = require("logger.shim"),
+			engine = engine, Logger = require("core.logger.engine.shim"),
 		}, { __index = _G })
 		for name, value in pairs(overrides or {}) do environment[name] = value end
 		local character = main_character(environment)

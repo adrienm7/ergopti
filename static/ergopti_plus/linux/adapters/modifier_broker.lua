@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Custody = require("input.modifier_custody")
+local Custody = require("platform.input.modifier_custody")
 local brokers = setmetatable({}, { __mode = "k" })
 local binding_observers = setmetatable({}, { __mode = "k" })
 

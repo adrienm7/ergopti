@@ -30,7 +30,7 @@ const { shared } = require('../lib/paths.cjs');
 const availability = require('../lib/menu-row-availability.cjs');
 
 const ROOT = path.join(__dirname, '..', '..');
-const manifest = JSON.parse(fs.readFileSync(shared('modules/menu/menu_manifest.json'), 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(shared('menu/data/menu_manifest.json'), 'utf8'));
 const REASON_KEY = 'menu.category_off_reason';
 const REASON_HEAD_MAX = 32;
 
@@ -105,7 +105,7 @@ assert.throws(
 	/one of the row's choices/
 );
 
-const localesDir = shared('data/locales');
+const localesDir = shared('core/i18n/data/locales');
 for (const file of fs.readdirSync(localesDir).filter((name) => name.endsWith('.json'))) {
 	const text = JSON.parse(fs.readFileSync(path.join(localesDir, file), 'utf8'))[REASON_KEY];
 	assert.equal(typeof text, 'string', `${file} names the reason`);
@@ -113,7 +113,7 @@ for (const file of fs.readdirSync(localesDir).filter((name) => name.endsWith('.j
 	assert.ok(head !== text && head.length <= REASON_HEAD_MAX, `${file}: short head "${head}"`);
 }
 
-const lua = fs.readFileSync(shared('lua/menu/renderer.lua'), 'utf8');
+const lua = fs.readFileSync(shared('menu/engine/renderer.lua'), 'utf8');
 assert.match(lua, /apply_category_off\(finished, roles, off_reason_key\)/);
 const windows = 'static/ergopti_plus/windows/';
 const ahk = fs.readFileSync(path.join(ROOT, windows, 'infra/manifest_menu.ahk'), 'utf8');

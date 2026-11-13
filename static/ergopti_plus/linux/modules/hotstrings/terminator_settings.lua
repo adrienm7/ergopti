@@ -37,18 +37,18 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local Terminators = require("keymap.terminators")
-local TerminatorScope = require("hotstrings.terminator_scope")
+local TableUtil = require("core.text.engine.table_util")
+local Terminators = require("layouts.engine.layers.terminators")
+local TerminatorScope = require("hotstrings.engine.matcher.terminator_scope")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigPaths = require("infra.config_paths")
-local ConfigOutdated = require("config_outdated")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local Codec = require("toml_codec")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local Codec = require("core.text.engine.toml_codec")
 local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "hotstrings.terminator_settings"
 

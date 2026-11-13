@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local OWNERS = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
-	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate",
+	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
 }
 
 --- Collects real scenario callbacks without adding nested results to the runner.

@@ -34,7 +34,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
+const MANIFEST = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
 
 const errors = [];
 
@@ -103,7 +103,7 @@ const ALLOWED = new Set([
 	// The canonical character itself, as the shared engine's exported constant and
 	// as the onboarding page's option list — those ARE the declaration's twins and
 	// are locked to it by the value check below rather than by absence.
-	'static/ergopti_plus/_shared/lua/hotstring_engine/init.lua'
+	'static/ergopti_plus/_shared/hotstrings/engine/matcher/init.lua'
 ]);
 
 let scanned = 0;

@@ -88,7 +88,7 @@ for (const french of ['"Espace"', '"Entrée"']) {
 
 // 4. Platform reasons never name an engine the Linux driver no longer runs, and
 // the Linux personal-shortcuts reason describes the keyboard slots it has.
-const LOCALES = path.join(DRIVERS, '_shared', 'data', 'locales');
+const LOCALES = path.join(DRIVERS, '_shared', 'core', 'i18n', 'data', 'locales');
 for (const file of fs.readdirSync(LOCALES).filter((name) => name.endsWith('.json'))) {
 	const catalogue = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
 	for (const [key, value] of Object.entries(catalogue)) {

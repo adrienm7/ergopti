@@ -36,17 +36,18 @@ const { escapeRegExp } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-windows-field-report.ps1';
-const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.json';
-const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.json';
+const APP_DIRS = 'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml';
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const REPORT_REDACT = 'tools/dev/field-report-redact.py';
 const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The analyser and the declarations it reads its budgets from.
 const ANALYSER = 'tools/dev/field-log-analyse.py';
 // The field run protocol every driver shares, and the Windows steps.
-const FIELD_RUN_PROTOCOL = 'static/ergopti_plus/_shared/data/field_run_protocol.json';
+const FIELD_RUN_PROTOCOL = 'static/ergopti_plus/_shared/diagnostics/data/field_run_protocol.json';
 const FIELD_RUN_STEPS = 'static/ergopti_plus/windows/data/field_run_steps.json';
-const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml';
+const BUNDLED_SAMPLE =
+	'static/ergopti_plus/_shared/hotstrings/data/catalogue/french/autocorrection.toml';
 const GUARD =
 	"if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Fail 'This collector runs on Windows only.' }\n";
 

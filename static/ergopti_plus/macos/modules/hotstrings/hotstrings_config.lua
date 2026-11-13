@@ -31,24 +31,24 @@ local M = {}
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
-local TomlScanner = require("toml_codec.record_scanner")
-local TomlKeyPath = require("toml_codec.key_path")
-local Extensions = require("hotstrings.extensions")
+local TomlScanner = require("core.text.engine.toml_codec.record_scanner")
+local TomlKeyPath = require("core.text.engine.toml_codec.key_path")
+local Extensions = require("hotstrings.engine.extensions")
 local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
-local PersonalFiles = require("hotstrings.personal_files")
-local Overrides = require("hotstrings.overrides")
-local PublicationRecovery = require("hotstrings.publication_recovery")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local Overrides = require("hotstrings.engine.overrides")
+local PublicationRecovery = require("hotstrings.engine.publication_recovery")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
-local DelayResolver = require("hotstrings.delay_resolver")
-local Languages = require("hotstrings.languages")
-local HotstringPriority = require("hotstring_priority")
-local TextUtils = require("text_utils")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local DelayResolver = require("hotstrings.engine.delay_resolver")
+local Languages = require("hotstrings.engine.languages")
+local HotstringPriority = require("hotstrings.engine.priority")
+local TextUtils = require("core.text.engine.utils_core")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local LOG        = "hotstrings_config"
 
 
@@ -60,7 +60,7 @@ local LOG        = "hotstrings_config"
 
 -- Ultimate fallbacks when neither a user override nor a TOML default is set.
 -- LOADED AT REQUIRE-TIME from the shared cross-driver canon
--- (_shared/modules/hotstrings/defaults.toml) by load_shared_defaults() below — the
+-- (_shared/hotstrings/data/catalogue/defaults.toml) by load_shared_defaults() below — the
 -- SINGLE source shared verbatim with the AutoHotkey driver. They start nil so
 -- a missing file/key fails fast (rule 5.3) instead of masking driver drift
 -- behind a hardcoded literal (rules 5.2 / 5.4). ``GLOBAL_DEFAULT_COLOR`` remains
@@ -283,7 +283,7 @@ end
 --- @return boolean|nil common_admitted Exact common activation admission after migration.
 local function parse_overrides(path)
 	if not begin_publication_attempt() then return {}, "error", nil, {} end
-	local Migration = require("hotstrings.common_autocorrection_migration")
+	local Migration = require("hotstrings.engine.catalogue.common_autocorrection_migration")
 	local read_ok, migrated = pcall(Migration.run, path, Paths.shared(Migration.POLICY_PATH), FileSystem,
 		_state.on_publication_error, _state.recovery.publish)
 	local accepted = read_ok and type(migrated) == "table"
@@ -951,7 +951,7 @@ function M.resolve(category, section)
 	local meta = get_toml_meta(category)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
-	-- The cascade itself lives in _shared/lua/hotstrings/delay_resolver.lua.
+	-- The cascade itself lives in _shared/hotstrings/engine/delay_resolver.lua.
 	-- It was written once here and once in AutoHotkey, and the two had already
 	-- drifted on what an explicit `false` means — which matters, because a
 	-- category that ships `show_tooltip = false` is the common case and a rung
@@ -1377,7 +1377,7 @@ function M.prepare_personal_metadata(owner, record, section, field, value)
 	local legacy_name = personal_override_owner(record.owner, overrides)
 	local stored = overrides[legacy_name] or {}
 	local legacy = effective_view(stored)
-	local plan = require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)
+	local plan = require("hotstrings.engine.catalogue.personal_metadata").prepare(record.content, section, field, value, legacy)
 	if not plan then return nil end
 	if legacy_name and stored then
 		if plan.remove_file then clear_override_field(stored, field) end
@@ -1635,7 +1635,7 @@ end
 -- ==========================================================
 -- ==========================================================
 
---- Reads _shared/modules/hotstrings/defaults.toml at require-time and populates the
+--- Reads _shared/hotstrings/data/catalogue/defaults.toml at require-time and populates the
 --- three hard-fallback constants from the single cross-driver source. A missing
 --- file, section, or key raises an error (fail fast — no driver-side literal).
 --- The path is resolved relative to THIS file (cwd-independent), mirroring
@@ -1645,15 +1645,15 @@ local function load_shared_defaults()
 	-- Resolved through the single shared-tree resolver (Paths.shared) so the
 	-- shared root lives in exactly one place, cwd-independent in production and
 	-- in the headless unit harness.
-	local toml_path = Paths.shared("modules/hotstrings/defaults.toml")
+	local toml_path = Paths.shared("hotstrings/data/catalogue/defaults.toml")
 
 	local parsed, committed = TomlReader.parse(toml_path)
 	if committed ~= true then
-		error("[hotstrings_config] _shared/modules/hotstrings/defaults.toml read did not commit: " .. toml_path)
+		error("[hotstrings_config] _shared/hotstrings/data/catalogue/defaults.toml read did not commit: " .. toml_path)
 	end
 	local sections = (type(parsed) == "table") and parsed.sections or nil
 	if type(sections) ~= "table" then
-		error("[hotstrings_config] _shared/modules/hotstrings/defaults.toml not readable: " .. toml_path)
+		error("[hotstrings_config] _shared/hotstrings/data/catalogue/defaults.toml not readable: " .. toml_path)
 	end
 
 	local function require_key(section, key)

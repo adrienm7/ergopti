@@ -197,7 +197,7 @@ helpers.describe("api_ollama: owned missing-model preflight", function()
 			helpers.assert_eq(#errors, 1)
 			helpers.assert_eq(type(errors[1]), "string")
 			helpers.assert_eq(#transport.requests, 0)
-			helpers.assert_true(not require("llm.local_model_policy").is_missing(errors[1]))
+			helpers.assert_true(not require("ai.engine.ollama.local_model_policy").is_missing(errors[1]))
 			restore()
 		end)
 	end
@@ -257,8 +257,8 @@ end)
 
 helpers.describe("local model presence: independent shared corpus", function()
 	helpers.it("replays normalization, exact model errors and strict listing receipts", function()
-		local Policy = require("llm.local_model_policy")
-		local Json = require("json")
+		local Policy = require("ai.engine.ollama.local_model_policy")
+		local Json = require("core.text.engine.json")
 		local fh = assert(io.open(require("infra.paths").shared("tests/corpus/llm/local_model_presence.json"), "rb"))
 		local corpus = assert(Json.decode_lossless(fh:read("*a")))
 		fh:close()
@@ -303,7 +303,7 @@ helpers.describe("local model presence: native consent and download owner", func
 			notify = function() error("native notification unavailable") end,
 			install = function() installs = installs + 1; return true end,
 		}, function(Offer)
-			local ok, handled = pcall(Offer.handle, require("llm.local_model_policy").failure(
+			local ok, handled = pcall(Offer.handle, require("ai.engine.ollama.local_model_policy").failure(
 				"qwen:2b", "http://127.0.0.1:11434"))
 			helpers.assert_true(ok, "a notification failure must not escape the consent handler")
 			helpers.assert_true(handled)
@@ -324,7 +324,7 @@ helpers.describe("local model presence: native consent and download owner", func
 				install = function() installations = installations + 1; return true end,
 				notify = function() notifications = notifications + 1; return true end,
 			}, function(Offer)
-				helpers.assert_true(Offer.handle(require("llm.local_model_policy").failure("qwen2.5:7b", "http://localhost:11434")))
+				helpers.assert_true(Offer.handle(require("ai.engine.ollama.local_model_policy").failure("qwen2.5:7b", "http://localhost:11434")))
 			end)
 			helpers.assert_eq(confirmations, 1)
 			helpers.assert_eq(installations, 0)
@@ -342,7 +342,7 @@ helpers.describe("local model presence: native consent and download owner", func
 			end,
 			notify = function() notices = notices + 1; return true end,
 		}, function(Offer)
-			helpers.assert_true(Offer.handle(require("llm.local_model_policy").failure("qwen2.5vl:3b", "http://localhost:11435")))
+			helpers.assert_true(Offer.handle(require("ai.engine.ollama.local_model_policy").failure("qwen2.5vl:3b", "http://localhost:11435")))
 			helpers.assert_eq(confirmations, 1)
 			helpers.assert_eq(seen.base_url, "http://localhost:11435")
 			helpers.assert_eq(seen.model, "qwen2.5vl:3b")
@@ -358,7 +358,7 @@ helpers.describe("local model presence: native consent and download owner", func
 			install = function() installs = installs + 1; return true end,
 			notify = function() return true end,
 		}, function(Offer)
-			Offer.handle(require("llm.local_model_policy").failure("qwen2.5:7b", "http://localhost:11434"),
+			Offer.handle(require("ai.engine.ollama.local_model_policy").failure("qwen2.5:7b", "http://localhost:11434"),
 				{ current = function() return current end })
 		end)
 		helpers.assert_eq(installs, 0, "affirmative UI result cannot bypass a revoked requesting owner")
@@ -375,7 +375,7 @@ helpers.describe("local model presence: native consent and download owner", func
 				return accepted
 			end,
 		}, function(Offer)
-			local Policy = require("llm.local_model_policy")
+			local Policy = require("ai.engine.ollama.local_model_policy")
 			Offer.handle(Policy.failure("Qwen2.5", "http://localhost:11434"), { automatic = true })
 			accepted = true
 			Offer.handle(Policy.failure("qwen2.5:latest", "http://localhost:11434"), { automatic = true })
@@ -428,7 +428,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 	for _, mutation in ipairs({ "origin", "model", "installer", "installer-owner", "admission" }) do
 		helpers.it("linux-model-consent-affinity: refuses modal replacement of " .. mutation, function()
 			with_affinity(function(Offer, state, installer)
-				local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
+				local failure = require("ai.engine.ollama.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
 				local opts = { current = function() return true end }
 				state.during_confirm = function()
 					if mutation == "origin" then failure.base_url = "http://127.0.0.1:11435"
@@ -453,7 +453,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 				if modal_returned then installer.start = function() state.successors = state.successors + 1; return true end end
 				return true
 			end }
-			helpers.assert_true(Offer.handle(require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434"), opts))
+			helpers.assert_true(Offer.handle(require("ai.engine.ollama.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434"), opts))
 			helpers.assert_eq(#state.installs, 0)
 			helpers.assert_eq(state.successors, 0)
 		end)
@@ -461,7 +461,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 
 	helpers.it("linux-model-consent-affinity: accepted original installer retains origin and retry admission", function()
 		with_affinity(function(Offer, state, installer)
-			local failure = require("llm.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
+			local failure = require("ai.engine.ollama.local_model_policy").failure("qwen:2b", "http://127.0.0.1:11434")
 			local handled, downloading = Offer.handle(failure)
 			helpers.assert_true(handled)
 			helpers.assert_eq(downloading, true, "The default installer port proves actual acquisition, not only handled focus.")
@@ -476,7 +476,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 
 	helpers.it("linux-model-consent-affinity: notification suppression belongs to its exact origin", function()
 		with_affinity(function(Offer, state)
-			local Policy = require("llm.local_model_policy")
+			local Policy = require("ai.engine.ollama.local_model_policy")
 			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11434"), { automatic = true })
 			Offer.handle(Policy.failure("QWEN:2b", "http://127.0.0.1:11434"), { automatic = true })
 			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
@@ -486,7 +486,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 
 	helpers.it("linux-model-consent-affinity: completed original pull cannot clear a successor origin notice", function()
 		with_affinity(function(Offer, state)
-			local Policy = require("llm.local_model_policy")
+			local Policy = require("ai.engine.ollama.local_model_policy")
 			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11434"))
 			Offer.handle(Policy.failure("qwen:2b", "http://127.0.0.1:11435"), { automatic = true })
 			state.installs[1].done(true)
@@ -497,7 +497,7 @@ helpers.describe("local model offer: origin and installer consent affinity", fun
 
 	helpers.it("linux-model-consent-affinity: completed pull cannot clear a notice delivered after its consent", function()
 		with_affinity(function(Offer, state)
-			local Policy = require("llm.local_model_policy")
+			local Policy = require("ai.engine.ollama.local_model_policy")
 			local failure = Policy.failure("qwen:2b", "http://127.0.0.1:11434")
 			Offer.handle(failure)
 			Offer.handle(failure, { automatic = true })

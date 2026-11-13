@@ -28,7 +28,7 @@ if (!privatePath || !existsSync(privatePath)) {
 // The pipeline: sync the private file to the public location (with a refreshed
 // date line), then strip the personal "2/ PERSONAL SHORTCUTS" section.
 // Hotstrings are no longer generated from the AHK — the TOML catalogues under
-// _shared/modules/hotstrings/ are the single source of truth.
+// _shared/hotstrings/data/catalogue/ are the single source of truth.
 const scripts = [
 	path.join(PROJECT_DIR, 'tools', 'dev', 'sync-private-ahk.js'),
 	path.join(PROJECT_DIR, 'tools', 'dev', 'remove_ahk_personal_configuration.js')

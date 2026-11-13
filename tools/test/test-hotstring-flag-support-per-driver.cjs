@@ -40,7 +40,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const CORPUS_DIR = path.join(SP, '_shared', 'modules', 'hotstrings');
+const CORPUS_DIR = path.join(SP, '_shared', 'hotstrings', 'data', 'catalogue');
 const DRIVERS = ['windows', 'macos', 'linux'];
 
 const errors = [];

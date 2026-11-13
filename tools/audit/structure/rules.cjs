@@ -207,7 +207,7 @@ const SYNONYMS = new Set([
 ]);
 
 // Ordered [root, pattern] pairs matched against a file stem (or a folder name)
-// of today's infra/, modules/ and _shared/lua/ trees. The first match wins.
+// of today's infra/, modules/ and _shared/ trees. The first match wins.
 const LOGIC_FEATURES = [
 	[
 		'diagnostics',
@@ -818,7 +818,7 @@ function applySplits(rel) {
 /**
  * True when a path already has the target shape: a feature folder, a
  * core/<domain> or platform/<domain> folder, or (in _shared) the folders that
- * keep their place. Today's homonyms are told apart: _shared/tap_hold/ held
+ * keep their place. Today's homonyms are told apart: _shared/tap_hold/data/ held
  * flat data files, _shared/core/ held config_schema/ and domain/, and the
  * drivers' platform/ held remap/, network/, tray/ and flat files.
  */

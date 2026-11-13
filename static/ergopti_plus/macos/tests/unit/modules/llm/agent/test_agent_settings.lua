@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
+local codec = require("core.text.engine.toml_codec")
 
 local SOURCE = table.concat({
 	"[llm]",

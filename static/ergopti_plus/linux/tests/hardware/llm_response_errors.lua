@@ -11,7 +11,7 @@
 local uv = require("luv")
 -- Every failure a protected boundary swallows must reach the runner output:
 -- a raised recorder or callback otherwise only leaves "done" unset.
-require("logger").set_sink(function(line, variant)
+require("core.logger.engine").set_sink(function(line, variant)
 	if variant == "warn" or variant == "error" then io.stderr:write("LOG ", line, "\n") end
 end)
 local recorder_failures = 0
@@ -30,7 +30,7 @@ local Remote = require("modules.llm.api_remote")
 local Http = require("adapters.http_client")
 local origin = assert(os.getenv("LLM_RESPONSE_ORIGIN"))
 local root = assert(os.getenv("LLM_RESPONSE_ROOT"))
-local corpus = require("test.response_error_contract")
+local corpus = require("tests.lua.response_error_contract")
 assert(#corpus.vectors == 23, "every independent response vector executes")
 local native_post, receipt = Http.post
 Http.post = function(url, headers, body, callback, options)

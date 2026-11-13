@@ -21,7 +21,7 @@
 
 local M = {}
 
-local CopyCheck = require("tap_hold.copy_check")
+local CopyCheck = require("tap_hold.engine.copy_check")
 
 local Owner = {}
 Owner.__index = Owner

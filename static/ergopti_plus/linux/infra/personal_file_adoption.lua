@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Core = require("hotstrings.personal_adoption")
+local Core = require("hotstrings.engine.catalogue.personal_adoption")
 M.plan_gates, M.plan_selection = Core.plan_gates, Core.plan_selection
 local FileSystem = require("adapters.file_system")
 local available, FileAttributes = pcall(require, "lfs")

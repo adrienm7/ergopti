@@ -7,9 +7,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Catalog = require("tap_hold.key_catalog")
-local path = helpers.driver_root() .. "/../_shared/tap_hold/defaults.toml"
+local Catalog = require("tap_hold.engine.key_catalog")
+local path = helpers.driver_root() .. "/../_shared/tap_hold/data/defaults.toml"
 local handle = assert(io.open(path, "r"))
-local defaults = require("toml_codec").decode(handle:read("*a"))
+local defaults = require("core.text.engine.toml_codec").decode(handle:read("*a"))
 assert(handle:close())
-require("test.tap_hold_rollover_contract")(helpers, Catalog, defaults)
+require("tests.lua.keyboard.tap_hold_rollover_contract")(helpers, Catalog, defaults)

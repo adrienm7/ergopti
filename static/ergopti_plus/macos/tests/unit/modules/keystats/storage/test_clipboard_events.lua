@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-require("test.clipboard_events_contract").register(helpers)
+require("tests.lua.clipboard_events_contract").register(helpers)
 
 local HAS_SQLITE = (function()
 	local status = os.execute("command -v sqlite3 >/dev/null 2>&1")
@@ -56,7 +56,7 @@ helpers.describe("macOS clipboard rows reach events_clipboard", function()
 		}) do
 			inserts[#inserts + 1] = Writer.build_inserts(entry)[1]
 		end
-		local schema = assert(io.open(require("infra.paths").shared("data/db/schema.sql"), "rb"))
+		local schema = assert(io.open(require("infra.paths").shared("metrics/data/db/schema.sql"), "rb"))
 		local db, script = os.tmpname(), os.tmpname()
 		local handle = assert(io.open(script, "wb"))
 		handle:write(".output /dev/null\n", schema:read("*a"), "\n.output stdout\n", table.concat(inserts, "\n"),

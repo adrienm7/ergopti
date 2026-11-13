@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Phase Stats Tests
 ; DESCRIPTION:
-; The Windows port of _shared/lua/phase_stats_core.lua keeps the core's figures and
+; The Windows port of _shared/metrics/engine/perf/phase_stats_core.lua keeps the core's figures and
 ; evidence line, flushes on the latency summary's tick and records the phases macOS
 ; and Linux record. Before this a Windows log had no per-program child-process time
 ; and no parse or rebuild total to compare with the two other drivers.
@@ -106,7 +106,7 @@ Test("phase stats: flushes on the summary tick once an interval has elapsed (pha
 
 _TPS_SameIntervalAsTheCore() {
 	global _SharedDir
-	Core := FileRead(_SharedDir . "\lua\phase_stats_core.lua", "UTF-8")
+	Core := FileRead(_SharedDir . "\metrics\engine\perf\phase_stats_core.lua", "UTF-8")
 	Assert(RegExMatch(Core, "M\.DEFAULT_FLUSH_SECONDS\s*=\s*(\d+)", &Match), "the core names its interval")
 	AssertEqual(Integer(Match[1]), PhaseStatsStore.DEFAULT_INTERVAL_SEC, "one interval on the three drivers")
 }

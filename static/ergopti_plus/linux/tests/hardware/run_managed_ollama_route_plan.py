@@ -32,7 +32,7 @@ DRIVER = HERE.parent.parent
 SHARED = DRIVER.parent / "_shared"
 WRAPPER = DRIVER / "bin" / "ergopti-hotstrings"
 CONTROL = HERE / "run_managed_ollama_route_plan.lua"
-INVENTORY = json.loads((SHARED / "modules/network/route_origins.json").read_text())
+INVENTORY = json.loads((SHARED / "core/network/data/route_origins.json").read_text())
 REGISTRY_HOST = INVENTORY["clients"]["ollama"][0].removeprefix("https://")
 BLOB_HOST = INVENTORY["clients"]["ollama"][1].removeprefix("https://")
 RELAY_A = "127.0.0.1:3901"
@@ -99,7 +99,7 @@ def wrapper_lua_path(root):
         raise RuntimeError("The launcher wrapper's LUA_PATH block has no esac")
     block = "\n".join(lines[starts[0] : ends[0] + 1])
     script = (
-        f'DRIVER_ROOT="{root}/linux"; SHARED_LUA="{root}/_shared/lua"\n'
+        f'DRIVER_ROOT="{root}/linux"; SHARED_LUA="{root}/_shared"\n'
         + block
         + '\n[ -z "${ERGOPTI_LITERAL_DRIVER_ROOT+x}" ] || exit 3'
         + '\nprintf %s "$LUA_PATH"'

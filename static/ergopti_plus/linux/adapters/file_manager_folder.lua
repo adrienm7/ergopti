@@ -36,9 +36,9 @@
 
 local M = {}
 
-local FileSelection = require("file_selection")
-local Logger = require("logger.shim")
-local TextUtils = require("text_utils")
+local FileSelection = require("core.fs.engine.file_selection")
+local Logger = require("core.logger.engine.shim")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "adapters.file_manager_folder"
 

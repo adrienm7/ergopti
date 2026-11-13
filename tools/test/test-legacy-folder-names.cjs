@@ -7,7 +7,7 @@
  * Fails when anything but the one-time migration spells a data folder of the
  * builds before the single folder name (maintainer decision, 2026-11-03):
  * `Ergopti` on macOS and Windows, `ergopti` under XDG on Linux, every folder
- * named once in _shared/modules/paths/app_dirs.toml.
+ * named once in _shared/core/fs/data/paths/app_dirs.toml.
  *
  * FEATURES & RATIONALE:
  * 1. Old Spellings: the old names come from the app_dirs [migration] table, so
@@ -45,12 +45,12 @@ const SCANNED = [
 	'video/'
 ];
 const OWNERS = new Set([
-	'static/ergopti_plus/_shared/modules/paths/app_dirs.toml',
-	'static/ergopti_plus/_shared/lua/app_dirs.lua',
+	'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml',
+	'static/ergopti_plus/_shared/core/fs/engine/app_dirs.lua',
 	'static/ergopti_plus/windows/_generated/app_dirs.ahk',
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift',
-	'static/ergopti_plus/_shared/lua/legacy_folder_migration.lua',
-	'static/ergopti_plus/_shared/lua/test/legacy_folder_migration_contract.lua',
+	'static/ergopti_plus/_shared/settings/engine/migration/legacy_folder_migration_core.lua',
+	'static/ergopti_plus/_shared/tests/lua/settings/legacy_folder_migration_contract.lua',
 	'static/ergopti_plus/_shared/tests/corpus/paths/legacy_folder_migration_vectors.json',
 	'static/ergopti_plus/macos/adapters/legacy_folder_migration.lua',
 	'static/ergopti_plus/macos/tests/unit/adapters/test_legacy_folder_migration.lua',

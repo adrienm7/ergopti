@@ -26,7 +26,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "gestures.pointer_warp"

@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 local with_host = require("tests.support.physical_shortcuts_fade_fixture")
 

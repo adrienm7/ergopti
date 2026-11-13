@@ -255,7 +255,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("(hotstrings-reset-refusal) refuses a partial reset when personal files are present", function()
       local s2, notices, clears = build_mock_state(), {}, 0
-      local personal = require("hotstrings.personal_files").describe({ "independent.toml" }).id
+      local personal = require("hotstrings.engine.catalogue.personal_files").describe({ "independent.toml" }).id
       s2.config.get_categories = function() return { accents = {}, [personal] = { sections_order = { "work" } } } end
       s2.config.clear_override = function() clears = clears + 1; return true end
       s2.notify_error = function(key) notices[#notices + 1] = key end
@@ -267,11 +267,11 @@ helpers.describe("ui.bridge_handlers", function()
 
     helpers.it("(hotstrings-reset-refusal) does not notify a successor page", function()
       local s2, notices, clears, epoch = build_mock_state(), 0, 0, 1
-      local personal = require("hotstrings.personal_files").describe({ "independent.toml" }).id
+      local personal = require("hotstrings.engine.catalogue.personal_files").describe({ "independent.toml" }).id
       s2.config.get_categories = function() return { [personal] = {} } end
       s2.config.clear_override = function() clears = clears + 1; return true end
       s2.notify_error = function() notices = notices + 1 end
-      local previous, logger = package.loaded["ui.webview_manager"], require("logger.shim")
+      local previous, logger = package.loaded["ui.webview_manager"], require("core.logger.engine.shim")
       local old_error = logger.error
       package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end }
       logger.error = function() epoch = 2 end
@@ -827,7 +827,7 @@ helpers.it("download window refuses FIFO managed network policy without blocking
 	local uv, Paths = require("luv"), require("infra.paths")
 	local previous_bridge, previous_manager, original_shared = package.loaded["ui.download_window.bridge"],
 		package.loaded["ui.webview_manager"], Paths.shared
-	local source = assert(original_shared("modules/network/managed_network.json"))
+	local source = assert(original_shared("core/network/data/managed_network.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-download-fifo-XXXXXX"))
 	local path = dir .. "/policy.json"
 	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
@@ -836,7 +836,7 @@ helpers.it("download window refuses FIFO managed network policy without blocking
 	package.loaded["ui.download_window.bridge"] = nil
 	local Bridge = require("ui.download_window.bridge")
 	Paths.shared = function(relative)
-		if relative == "modules/network/managed_network.json" then return path end
+		if relative == "core/network/data/managed_network.json" then return path end
 		return original_shared(relative)
 	end
 	local exited, code, process = false, nil, nil

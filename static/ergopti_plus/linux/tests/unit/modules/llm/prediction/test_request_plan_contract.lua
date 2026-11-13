@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Contract = require("test.llm_request_plan_contract")
+local Contract = require("tests.lua.ai.request_plan_contract")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/"
 

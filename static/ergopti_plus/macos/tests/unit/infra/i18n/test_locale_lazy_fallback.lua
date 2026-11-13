@@ -15,8 +15,8 @@ local helpers = require("tests.helpers")
 --- Initializes a fresh shared locale core over in-memory locale tables.
 --- @return table core, table loads (code -> count)
 local function fresh_core()
-	package.loaded["locale.core"] = nil
-	local Core = require("locale.core")
+	package.loaded["core.i18n.engine.core"] = nil
+	local Core = require("core.i18n.engine.core")
 	local tables = {
 		fr = { ["menu.present"] = "présent" },
 		en = { ["menu.present"] = "present", ["menu.english_only"] = "english" },
@@ -40,7 +40,7 @@ helpers.describe("locale core: lazy fallback", function()
 		helpers.assert_eq(Core.get("menu.present"), "présent")
 		helpers.assert_eq(loads.fr, 1, "the active locale is decoded once")
 		helpers.assert_eq(loads.en, nil, "a complete active locale must not decode en.json")
-		package.loaded["locale.core"] = nil
+		package.loaded["core.i18n.engine.core"] = nil
 	end)
 
 	helpers.it("decodes English on the first miss and serves it", function()
@@ -49,7 +49,7 @@ helpers.describe("locale core: lazy fallback", function()
 		helpers.assert_eq(Core.get("menu.english_only"), "english")
 		helpers.assert_eq(Core.get("menu.english_only"), "english")
 		helpers.assert_eq(loads.en, 1, "the fallback is decoded once, on the miss")
-		package.loaded["locale.core"] = nil
+		package.loaded["core.i18n.engine.core"] = nil
 	end)
 
 	helpers.it("has() answers a miss from the active locale without decoding a fallback", function()
@@ -58,7 +58,7 @@ helpers.describe("locale core: lazy fallback", function()
 		helpers.assert_true(Core.has("menu.present"))
 		helpers.assert_eq(Core.has("menu.absent"), false)
 		helpers.assert_eq(loads.en, nil, "a probe for an optional key must not decode en.json")
-		package.loaded["locale.core"] = nil
+		package.loaded["core.i18n.engine.core"] = nil
 	end)
 
 	helpers.it("has() reads the fallbacks only when the active locale failed to load", function()
@@ -67,7 +67,7 @@ helpers.describe("locale core: lazy fallback", function()
 		helpers.assert_true(Core.has("menu.english_only"), "an unreadable active locale still answers from en")
 		helpers.assert_eq(Core.has("menu.absent"), false)
 		helpers.assert_eq(loads.en, 1)
-		package.loaded["locale.core"] = nil
+		package.loaded["core.i18n.engine.core"] = nil
 	end)
 
 	helpers.it("the merged catalogue still carries every fallback key", function()
@@ -76,6 +76,6 @@ helpers.describe("locale core: lazy fallback", function()
 		local catalogue = Core.catalogue()
 		helpers.assert_eq(catalogue["menu.english_only"], "english")
 		helpers.assert_eq(catalogue["menu.present"], "présent")
-		package.loaded["locale.core"] = nil
+		package.loaded["core.i18n.engine.core"] = nil
 	end)
 end)

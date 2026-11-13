@@ -7,10 +7,10 @@
 --- ==============================================================================
 
 local root, receipt = assert(arg[1]), assert(arg[2])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local Clock = require("infra.monotonic")

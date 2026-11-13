@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
-local Json = require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local Clock = require("infra.monotonic")
 local Calendar = require("modules.keystats.calendar")
 local K = require("modules.keystats.keystats")

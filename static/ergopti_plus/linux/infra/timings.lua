@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Linux)
 --- DESCRIPTION:
---- Binds the shared timings reader (_shared/lua/timings.lua) to this driver: its
+--- Binds the shared timings reader (_shared/core/timing/engine/timings_core.lua) to this driver: its
 --- logger, its shared-path resolver and the shared TOML parser. The registry,
---- `_shared/modules/timings/constants.toml`, is the single authoritative source
+--- `_shared/core/timing/data/constants.toml`, is the single authoritative source
 --- for every tunable timing in the project (debounces, timeouts, poll
 --- intervals, ...).
 ---
@@ -22,16 +22,16 @@
 ---   local SESSION_TIMEOUT_MS = Timings.ms("keystats", "session_timeout_ms")
 --- ==============================================================================
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Paths = require("infra.paths")
 
 -- A missing parser is a broken install: say so instead of a raw stack trace.
-local ok_reader, Reader = pcall(require, "toml_codec.reader")
+local ok_reader, Reader = pcall(require, "core.text.engine.toml_codec.reader")
 if not ok_reader then
-	error("[timings] toml_codec.reader not available — is _shared/lua/ in package.path?")
+	error("[timings] core.text.engine.toml_codec.reader not available — is _shared/ in package.path?")
 end
 
-return require("timings").new({
+return require("core.timing.engine.timings_core").new({
 	logger = Logger,
 	log = "timings",
 	loaded_level = "info",

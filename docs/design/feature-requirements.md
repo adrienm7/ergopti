@@ -3,7 +3,7 @@
 
 # Feature requirements per OS
 
-What each feature of `_shared/modules/features/manifest.toml` needs outside
+What each feature of `_shared/settings/data/features/manifest.toml` needs outside
 the driver itself, per OS. The declarations are the `requires` field of each
 feature; `tools/test/test-feature-requirements.cjs` derives the same table from
 the drivers (the macOS Karabiner generator state fields and remap facade

@@ -16,11 +16,11 @@ local CAPTIONS = {
 }
 
 local function english_captions()
-	return helpers.with_fresh_modules({ "infra.i18n", "infra.locale", "locale.core", "infra.paths" }, function()
+	return helpers.with_fresh_modules({ "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.paths" }, function()
 		local native = require("infra.i18n")
 		local locale = require("infra.locale")
 		local paths = require("infra.paths")
-		local fh = assert(io.open(paths.shared("data/locales/en.json"), "r"), "actual English caption file unavailable")
+		local fh = assert(io.open(paths.shared("core/i18n/data/locales/en.json"), "r"), "actual English caption file unavailable")
 		local raw = fh:read("*a")
 		fh:close()
 		local source = require("adapters.json_codec").decode(raw)

@@ -16,7 +16,7 @@
 
 local restore_loaded = require("tests.helpers").keep_loaded({ "adapters.keyboard_hook" })
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local OutputTokens = require("modules.hotstrings.output_tokens")
 local EvdevCodes = require("infra.evdev_codes")
 
@@ -128,7 +128,7 @@ helpers.describe("the injector plays output tokens", function()
 end)
 
 helpers.describe("the shared engine and output tokens", function()
-	local Engine = require("hotstring_engine")
+	local Engine = require("hotstrings.engine.matcher")
 
 	--- @param mappings table
 	--- @return table engine
@@ -163,7 +163,7 @@ helpers.describe("the shared engine and output tokens", function()
 	helpers.it("output token: the shipped {U+XXXX} symbols reach the engine as characters", function()
 		local loader = helpers.load_module("modules.hotstrings.loader")
 		local catalogue = loader.load_catalogue({
-			require("infra.paths").shared("modules/hotstrings/magickey.toml"),
+			require("infra.paths").shared("hotstrings/data/catalogue/magickey.toml"),
 		})
 		local found = 0
 		for _, mapping in ipairs(catalogue.mappings) do

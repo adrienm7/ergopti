@@ -177,7 +177,7 @@ local function run()
 	-- The hook logs why it refuses to start and only answers false: keep its
 	-- errors so a hosted failure names the reason (run 41141808375 showed
 	-- this assertion alone).
-	local Shim = require("logger.shim")
+	local Shim = require("core.logger.engine.shim")
 	local shim_error, refusals = Shim.error, {}
 	Shim.error = function(tag, fmt, ...)
 		local formatted, text = pcall(string.format, fmt, ...)

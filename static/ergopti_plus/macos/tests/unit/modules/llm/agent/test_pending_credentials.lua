@@ -11,13 +11,13 @@ local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
-require("logger")
+require("core.logger.engine")
 
 local OWNED = {
 	"modules.llm.agent_runner", "modules.llm.agent_learning", "modules.llm.agent_connectors",
-	"llm.agent", "llm.agent_learning", "adapters.system_info", "infra.locale",
-	"infra.dialog_util", "modules.llm.local_model_offer", "llm.translate",
-	"adapters.event_provenance", "compat.utf8", "locale.core", "modules.shortcuts.script_control",
+	"ai.engine.agent.agent", "llm.agent_learning", "adapters.system_info", "infra.locale",
+	"infra.dialog_util", "modules.llm.local_model_offer", "ai.engine.prediction.translate",
+	"adapters.event_provenance", "core.lifecycle.engine.compat.utf8", "core.i18n.engine.core", "modules.shortcuts.script_control",
 }
 
 local function with_agent(options, scenario)

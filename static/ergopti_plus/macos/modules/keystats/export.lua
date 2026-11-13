@@ -29,10 +29,10 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
-local Queries = require("keystats.queries")
+local Queries = require("metrics.engine.queries")
 -- One owner of SQL text values: db:exec ends a statement at a NUL, so doubling
 -- apostrophes alone let one cut a literal (sql-literal-nul-2026-10-21).
-local Literal = require("sqlite.literal")
+local Literal = require("core.fs.engine.sqlite.literal")
 local i18n   = require("infra.i18n")
 local FsDir  = require("infra.fs_dir")
 local RunningApplication = require("adapters.running_application")

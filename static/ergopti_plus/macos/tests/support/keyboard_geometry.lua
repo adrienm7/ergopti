@@ -13,7 +13,7 @@ local M = {}
 --- These model outcomes belong to this fixture and do not classify real hardware.
 --- @return string value Serialized v1 keyboard geometry declaration.
 function M.launcher_value()
-	return require("json").encode({ version = 1, maximum = 32767, ranges = {
+	return require("core.text.engine.json").encode({ version = 1, maximum = 32767, ranges = {
 		{ first = 0, last = 40, form = "ansi" },
 		{ first = 41, last = 41, form = "iso" },
 		{ first = 42, last = 42, form = "jis" },

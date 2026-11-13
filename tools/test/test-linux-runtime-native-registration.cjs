@@ -39,11 +39,11 @@ const CONTRACT = 'tools/test/test-linux-runtime-native-registration.cjs';
 const CONDITION_ROW =
 	/\[\s*LINUX_BOX,\s*'e2e-linux',\s*'Qualify native runtime prerequisites',\s*NOT_CANCELLED,?\s*\]/;
 const SOURCES = [
-	'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
-	'static/ergopti_plus/_shared/lua/llm/process_port.lua',
-	'static/ergopti_plus/_shared/lua/llm/finite_process_port.lua',
-	'static/ergopti_plus/_shared/lua/llm/process_limits.lua',
-	'static/ergopti_plus/_shared/lua/llm/ollama_archive_installer.lua',
+	'static/ergopti_plus/_shared/core/lifecycle/engine/native_worker_owner.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/process_port.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/finite_process_port.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/process_limits.lua',
+	'static/ergopti_plus/_shared/ai/engine/ollama/archive_installer.lua',
 	'static/ergopti_plus/linux/adapters/owned_process.lua',
 	'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',
@@ -74,7 +74,7 @@ const MANUAL_FIXTURES = [
 ];
 
 const LIVE_STEP = 'AI predictions against a real Ollama';
-const OLLAMA_DEFAULTS = 'static/ergopti_plus/_shared/modules/llm/defaults.json';
+const OLLAMA_DEFAULTS = 'static/ergopti_plus/_shared/ai/data/defaults.json';
 
 /**
  * The live step serves, polls and pulls on Ergopti's own Ollama port, read
@@ -421,7 +421,7 @@ function main() {
 		['luajit', 'lua5.4'].map((abi) => [
 			path.join(ROOT, 'static/ergopti_plus/linux'),
 			'--shared-lua',
-			path.join(ROOT, 'static/ergopti_plus/_shared/lua'),
+			path.join(ROOT, 'static/ergopti_plus/_shared'),
 			'--lua',
 			abi
 		])
@@ -463,7 +463,7 @@ function main() {
 	for (const call of physical) {
 		assert.equal(call.options.cwd, path.join(ROOT, 'static/ergopti_plus/linux'));
 		assert.equal(call.options.env.LUA_CPATH, 'existing-cpath');
-		assert(call.options.env.LUA_PATH.includes('../_shared/lua/?.lua'));
+		assert(call.options.env.LUA_PATH.includes('../_shared/?.lua'));
 		assert.equal(call.options.timeout, 120000);
 	}
 	for (const index of [0, 4, 6, 10, 12, 5, 11]) {

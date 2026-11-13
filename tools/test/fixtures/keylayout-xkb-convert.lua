@@ -14,10 +14,10 @@
 --- Exit status 2 and the reason on stderr when the layout is refused.
 --- ==============================================================================
 
-package.path = arg[1] .. "/lua/?.lua;" .. arg[1] .. "/lua/?/init.lua;" .. package.path
-local Json = require("json")
-local Keylayout = require("layouts.keylayout")
-local Converter = require("layouts.xkb_converter")
+package.path = arg[1] .. "/?.lua;" .. arg[1] .. "/?/init.lua;" .. package.path
+local Json = require("core.text.engine.json")
+local Keylayout = require("layouts.engine.composer.keylayout")
+local Converter = require("layouts.engine.composer.xkb_converter")
 
 local function read(path)
 	local handle = assert(io.open(path, "rb"))

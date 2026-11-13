@@ -133,7 +133,7 @@ do
 
  h.describe('actual Hook row-owner controlled behavioral regressions', function()
   local factory = function(...) return genuine_row_owner_builder()(...) end
-  local Custody = require('input.modifier_custody')
+  local Custody = require('platform.input.modifier_custody')
 local names, cases = {}, {}
 local function case(name, fn) names[#names + 1] = name; cases[name] = fn end
 local function fixture(options)
@@ -411,7 +411,7 @@ end
    h.it(literal_case, function()
     -- Read/load the whole original Hook before installing the modeled FFI.
     local builder = genuine_row_owner_builder()
-    local Custody = require('input.modifier_custody')
+    local Custody = require('platform.input.modifier_custody')
     with_original_reader_symbols(function(Reader, Input, push_bytes)
      opaque_owner_control(Reader, Input, push_bytes, builder, Custody, literal_case)
     end)

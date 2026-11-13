@@ -4,10 +4,10 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ProfileRegistry = require("llm.profile_registry_codec")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
 
 --- The user profiles a document stores at llm.user_profiles. An older build's
 --- list is outdated configuration its reader reports, so it owns no profile;

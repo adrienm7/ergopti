@@ -39,9 +39,7 @@ const PACKAGED_DIR = 'linux/xkb_generation';
 const INSTALLER_DIR = 'static/ergopti/linux/xkb_installation';
 const INSTALLER = `${INSTALLER_DIR}/user_layout_installer.py`;
 const PACKAGED_INSTALLER_DIR = 'linux/xkb_installation';
-const LAYOUT_DEFAULTS = JSON.parse(
-	read('static/ergopti_plus/_shared/modules/layouts/defaults.json')
-);
+const LAYOUT_DEFAULTS = JSON.parse(read('static/ergopti_plus/_shared/layouts/data/defaults.json'));
 
 let failures = 0;
 function check(name, fn) {
@@ -111,12 +109,12 @@ check('the Lua pieces and shared data of the conversion ship', () => {
 	const expected = [
 		'linux/modules/keymap/layout_registry.lua',
 		'linux/adapters/process_runner.lua',
-		'_shared/lua/layouts/registry.lua',
-		'_shared/lua/layouts/catalogue.lua',
-		'_shared/lua/layouts/keylayout.lua',
-		'_shared/lua/layouts/xkb_converter.lua',
-		'_shared/modules/layouts/defaults.json',
-		'_shared/modules/layouts/mac_keycodes.json'
+		'_shared/layouts/engine/registry/registry_core.lua',
+		'_shared/layouts/engine/composer/catalogue.lua',
+		'_shared/layouts/engine/composer/keylayout.lua',
+		'_shared/layouts/engine/composer/xkb_converter.lua',
+		'_shared/layouts/data/defaults.json',
+		'_shared/layouts/data/mac_keycodes.json'
 	];
 	const missing = expected.filter((file) => !required.includes(file));
 	assert.deepStrictEqual(missing, [], 'REQUIRED_FILES lacks these files');

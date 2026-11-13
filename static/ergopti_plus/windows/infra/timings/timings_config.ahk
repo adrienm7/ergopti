@@ -4,7 +4,7 @@
 ; MODULE: Timings Config
 ; DESCRIPTION:
 ; Fail-fast reader over the cross-driver timing registry at
-; _shared/modules/timings/constants.toml — the single authoritative source for every
+; _shared/core/timing/data/constants.toml — the single authoritative source for every
 ; tunable timing in the project (debounces, timeouts, poll intervals, …) that
 ; even names the AHK + HS constant each value used to duplicate. This module
 ; exposes those values to the AutoHotkey driver so per-module literals can be
@@ -40,17 +40,17 @@ global _TimingsCache := ""
 ; ============================================================
 ; ============================================================
 
-; Load the shared timing registry (_shared/modules/timings/constants.toml) into the
+; Load the shared timing registry (_shared/core/timing/data/constants.toml) into the
 ; module cache. Must run once at boot BEFORE any consumer reassigns its
 ; constants from it. A missing/empty file THROWS (fail fast — no fallback).
 ; @param SharedDir Optional _shared/ root; defaults to the global ``_SharedDir``.
 TimingsLoadShared(SharedDir := "") {
 		global _SharedDir, _TimingsCache
 		Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
-		Path := Dir . "\modules\timings\constants.toml"
+		Path := Dir . "\core\timing\data\constants.toml"
 		c    := ParseTomlFile(Path)
 		if !c.Count {
-				throw Error("_shared/modules/timings/constants.toml introuvable ou vide : " . Path)
+				throw Error("_shared/core/timing/data/constants.toml introuvable ou vide : " . Path)
 		}
 		_TimingsCache := c
 		try LoggerInfo("Timings", "Shared timings registry loaded ({1} section(s)).", c.Count)
@@ -69,7 +69,7 @@ TimingsGet(Section, Key) {
 		}
 		Val := IniCacheGet(_TimingsCache, Section, Key)
 		if (Val == "_") {
-				throw Error(Format("_shared/modules/timings/constants.toml — clé manquante : [{1}] {2}", Section, Key))
+				throw Error(Format("_shared/core/timing/data/constants.toml — clé manquante : [{1}] {2}", Section, Key))
 		}
 		return Integer(Val)
 }
@@ -87,7 +87,7 @@ TimingsGetNumber(Section, Key) {
 		}
 		Val := IniCacheGet(_TimingsCache, Section, Key)
 		if (Val == "_") || !IsNumber(Val) {
-				throw Error(Format("_shared/modules/timings/constants.toml — missing or non-numeric key [{1}] {2}", Section, Key))
+				throw Error(Format("_shared/core/timing/data/constants.toml — missing or non-numeric key [{1}] {2}", Section, Key))
 		}
 		return Val + 0
 }

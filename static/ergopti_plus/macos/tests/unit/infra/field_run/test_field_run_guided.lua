@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local MODULES = { "infra.logger", "infra.field_run_guided" }
 local PROMPT, ANSWER = "/run/prompt.json", "/run/answer.json"

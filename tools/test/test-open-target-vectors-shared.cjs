@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Checks the corpus of the copy_selected_path action,
  * _shared/tests/corpus/shortcuts/open_target_vectors.json, pins the two ports
- * of its rule together (_shared/lua/open_target for macOS and Linux,
+ * of its rule together (_shared/shortcuts/engine for macOS and Linux,
  * windows/infra/open_target.ahk for Windows) and checks that every driver
  * suite replays it.
  *
@@ -27,11 +27,11 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const CORPUS = path.join(SP, '_shared', 'tests', 'corpus', 'shortcuts', 'open_target_vectors.json');
-const LUA = path.join(SP, '_shared', 'lua', 'open_target', 'init.lua');
+const LUA = path.join(SP, '_shared', 'shortcuts', 'engine', 'open_target.lua');
 const AHK = path.join(SP, 'windows', 'infra', 'open_target.ahk');
-const MANIFEST = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
-const ACTIONS = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
-const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+const MANIFEST = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifest.toml');
+const ACTIONS = path.join(SP, '_shared', 'shortcuts', 'data', 'actions', 'actions.toml');
+const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 
 const KINDS = ['url', 'path', 'registry', 'search', 'file_name', 'unsupported', 'empty'];
 const REPORT_KEYS = [

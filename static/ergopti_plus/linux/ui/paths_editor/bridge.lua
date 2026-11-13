@@ -10,8 +10,8 @@
 local M = {}
 M.bridge_name = "hsPaths"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local ConfigDirPicker = require("ui.config_dir_picker")
 local Version = require("infra.version")
 local LOG = "bridge.hsPaths"

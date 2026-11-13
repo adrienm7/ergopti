@@ -1,0 +1,221 @@
+--- _shared/ai/engine/prediction/vision.lua
+
+--- ==============================================================================
+--- MODULE: Screen Reading — Shared Lua Implementation
+--- DESCRIPTION:
+--- The pure logic behind the llm_screen_region and llm_screen_full actions: a
+--- vision model transcribes a screenshot, then the AI menu's text backend
+--- drafts the answers offered in the prediction tooltip.
+---
+--- FEATURES & RATIONALE:
+--- 1. The binding names the vision backend: "local" (the local Ollama server)
+---    or a provider of _shared/ai/data/api_providers.json, optionally
+---    followed by |model. Without a model the default of vision.json applies;
+---    a backend without one needs the model in the binding, never a guess.
+--- 2. Each API dialect carries an image differently; build_request() writes
+---    the request body for all four (openai, anthropic, gemini, ollama), so the
+---    drivers only add the address and the credentials. The ollama body
+---    turns thinking off; the API dialects get it from the provider's
+---    thinking_off rules (ai/engine/policy/thinking_off.lua), applied by the drivers.
+--- 3. Prompts, tags, token budgets and defaults live in vision.json, read by
+---    every driver.
+---
+--- The AutoHotkey port is windows/modules/llm/vision.ahk. Both are pinned by
+--- _shared/tests/corpus/llm/vision_vectors.json.
+--- ==============================================================================
+
+local M = {}
+local TextUtils = require("core.text.engine.utils_core")
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 1/ Module Constants =================
+-- =============================================
+-- =============================================
+
+-- Backend id of the local server; every other id is an API provider
+M.LOCAL_BACKEND = "local"
+
+-- Longest model name a binding may carry
+M.MAX_MODEL_LENGTH = 200
+
+local Formats = require("ai.engine.api.remote_formats")
+
+-- Request formats build_request() writes
+M.FORMATS = { openai = true, anthropic = true, gemini = true, ollama = true, [Formats.AGENT_FORMAT] = true }
+
+-- The user turn that goes with the screenshot of the reading request
+M.READ_USER_TEXT = "Transcribe this screenshot."
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 2/ Binding parameter ========
+-- =====================================
+-- =====================================
+
+--- Parses a binding value: "<backend>" or "<backend>|<model>".
+--- @param value string The stored parameter.
+--- @return table|nil parsed { backend = string, model = string|nil }.
+--- @return string|nil err Reason the value is invalid.
+function M.parse(value)
+	if type(value) ~= "string" then return nil, "not a string" end
+	local backend, model = value:match("^([^|]*)|(.*)$")
+	if not backend then backend, model = value, nil end
+	if not backend:match("^[a-z][a-z0-9_]*$") then return nil, "invalid backend id" end
+	if model == nil then return { backend = backend }, nil end
+	if model == "" or #model > M.MAX_MODEL_LENGTH then return nil, "invalid model length" end
+	if model:find("[%c|]") or model:match("^%s") or model:match("%s$") then
+		return nil, "invalid model name"
+	end
+	return { backend = backend, model = model }, nil
+end
+
+--- Builds the binding value a native editor collected: a backend picked from a
+--- list, then a model typed (an empty one keeps the backend's default). A backend
+--- with no default and no model yields "<backend>|", which parse() refuses, so the
+--- editor's validation tells the user a model is required.
+--- @param backend string The picked backend id.
+--- @param typed string The typed model, trimmed here.
+--- @param default_model string|nil The backend's default model ("" or nil for none).
+--- @return string value
+function M.compose_parameter(backend, typed, default_model)
+	local model = TextUtils.trim(tostring(typed or ""))
+	if model ~= "" then return backend .. "|" .. model end
+	if type(default_model) == "string" and default_model ~= "" then return backend end
+	return backend .. "|"
+end
+
+--- Tells whether a binding value is syntactically valid.
+--- @param value string The stored parameter.
+--- @return boolean ok
+function M.is_valid(value)
+	return M.parse(value) ~= nil
+end
+
+--- Resolves the vision model a parsed binding runs.
+--- @param parsed table parse() output.
+--- @param config table The decoded vision.json.
+--- @return string|nil model The model, nil when the backend has no default.
+function M.resolve_model(parsed, config)
+	if parsed.model then return parsed.model end
+	local defaults = type(config) == "table" and config.default_models or nil
+	return type(defaults) == "table" and defaults[parsed.backend] or nil
+end
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 3/ Requests =================
+-- =====================================
+-- =====================================
+
+--- Builds the request body of one vision or text call.
+--- @param format string "openai", "anthropic", "gemini", "perplexity_agent" (text only) or "ollama".
+--- @param spec table { model, system, text, image (base64 or nil), mime, max_tokens, think }:
+---     think is required for ollama, false or a level (../policy/thinking_off.lua ollama_think).
+--- @return table body The JSON body, without address or credentials.
+function M.build_request(format, spec)
+	if not M.FORMATS[format] then error("vision.build_request: unknown format " .. tostring(format)) end
+	local think = spec.think
+	if format == "ollama" and think ~= false and (type(think) ~= "string" or think == "") then
+		error("vision.build_request: an ollama request needs its think value (false or a level)")
+	end
+	local image, mime = spec.image, spec.mime
+	if image ~= nil and (type(image) ~= "string" or image == "" or type(mime) ~= "string") then
+		error("vision.build_request: an image needs base64 data and a mime type")
+	end
+	if format == Formats.AGENT_FORMAT then
+		-- The Agent API takes an image by URL only: a screenshot has none
+		if image then error("vision.build_request: a perplexity_agent request carries no image") end
+		return Formats.agent_body(spec)
+	end
+	if format == "openai" then
+		local content = spec.text
+		if image then
+			content = {
+				{ type = "text", text = spec.text },
+				{ type = "image_url", image_url = { url = "data:" .. mime .. ";base64," .. image } },
+			}
+		end
+		return {
+			model = spec.model,
+			max_tokens = spec.max_tokens,
+			stream = false,
+			messages = { { role = "system", content = spec.system }, { role = "user", content = content } },
+		}
+	elseif format == "anthropic" then
+		local content = { { type = "text", text = spec.text } }
+		if image then
+			table.insert(content, 1,
+				{ type = "image", source = { type = "base64", media_type = mime, data = image } })
+		end
+		return {
+			model = spec.model,
+			max_tokens = spec.max_tokens,
+			system = spec.system,
+			messages = { { role = "user", content = content } },
+		}
+	elseif format == "gemini" then
+		local parts = { { text = spec.text } }
+		if image then table.insert(parts, 1, { inline_data = { mime_type = mime, data = image } }) end
+		return {
+			system_instruction = { parts = { { text = spec.system } } },
+			contents = { { role = "user", parts = parts } },
+			generationConfig = { maxOutputTokens = spec.max_tokens },
+		}
+	end
+	local user = { role = "user", content = spec.text }
+	if image then user.images = { image } end
+	-- A thinking model would spend the whole budget reasoning before it answers
+	return {
+		model = spec.model,
+		stream = false,
+		think = think,
+		messages = { { role = "system", content = spec.system }, user },
+		options = { num_predict = spec.max_tokens },
+	}
+end
+
+--- Returns an answer prompt with the interface language filled in.
+--- @param prompt string A prompt of vision.json.
+--- @param language string The interface language name.
+--- @return string prompt
+function M.fill_language(prompt, language)
+	return (prompt:gsub("{language}", function() return language end))
+end
+
+--- Returns the user turn of an answer request.
+--- @param screen string The transcription.
+--- @return string text
+function M.answer_user_text(screen)
+	return "SCREEN:\n" .. screen
+end
+
+--- Extracts the text a model wrote after a tag, over any number of lines.
+--- @param block string The raw model answer.
+--- @param tag string The tag, e.g. "SCREEN:" or "ANSWER:".
+--- @return string|nil text Trimmed text, nil when the tag is absent or nothing follows it.
+function M.extract(block, tag)
+	if type(block) ~= "string" or type(tag) ~= "string" or tag == "" then return nil end
+	local at = block:upper():find(tag:upper(), 1, true)
+	if not at then return nil end
+	local text = block:sub(at + #tag)
+	-- Remove a bold label's closing marker, never operators or formatting in
+	-- the screen transcription or the answer itself.
+	if at > 2 and block:sub(at - 2, at - 1) == "**" and text:sub(1, 2) == "**" then
+		text = text:sub(3)
+	end
+	text = TextUtils.trim(text)
+	if text == "" then return nil end
+	return text
+end
+
+return M

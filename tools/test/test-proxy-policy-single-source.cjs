@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Proxy Policy Single-Source Ratchet
  * DESCRIPTION:
- * _shared/modules/network/proxy_policy.json is the one declaration of the
+ * _shared/core/network/data/proxy_policy.json is the one declaration of the
  * proxy environment precedence. Lua, Python and PowerShell read it at
  * runtime; Go and Swift get generated copies (codegen-managed-bootstrap.cjs,
  * drift-checked). This gate finds every remaining hand-typed copy of the
@@ -24,7 +24,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const POLICY = 'static/ergopti_plus/_shared/modules/network/proxy_policy.json';
+const POLICY = 'static/ergopti_plus/_shared/core/network/data/proxy_policy.json';
 
 // Each remaining copy, how many times the file spells it, and why it is not
 // generated yet. Remove an entry when its copy is replaced by the JSON.

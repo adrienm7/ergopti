@@ -113,8 +113,8 @@ function M.start(opts)
 				local ok, err = pcall(callback, number)
 				if not ok then
 					pcall(function()
-						require("logger.shim").error("infra.signal_handlers", "Signal callback raised: %s",
-							require("error_description").describe(err))
+						require("core.logger.engine.shim").error("infra.signal_handlers", "Signal callback raised: %s",
+							require("diagnostics.engine.reports.error_description").describe(err))
 					end)
 				end
 			end

@@ -5,7 +5,7 @@
  * MODULE: Remote Provider Retirement Guard
  * DESCRIPTION:
  * Pins the announced provider retirements against the shared provider data
- * (_shared/modules/llm/api_providers.json), so a later edit cannot bring back
+ * (_shared/ai/data/api_providers.json), so a later edit cannot bring back
  * a retired endpoint or model as a default.
  *
  * FEATURES & RATIONALE:
@@ -35,8 +35,8 @@ const CATALOG = path.join(
 	'static',
 	'ergopti_plus',
 	'_shared',
-	'modules',
-	'llm',
+	'ai',
+	'data',
 	'api_providers.json'
 );
 

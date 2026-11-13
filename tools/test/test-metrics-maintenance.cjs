@@ -30,7 +30,7 @@ const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const STATIC = path.join(ROOT, 'static', 'ergopti_plus');
-const DB_DIR = path.join(STATIC, '_shared', 'data', 'db');
+const DB_DIR = path.join(STATIC, '_shared', 'metrics', 'data', 'db');
 const VECTORS = JSON.parse(
 	fs.readFileSync(
 		path.join(STATIC, '_shared', 'tests', 'corpus', 'keystats', 'metrics_maintenance_vectors.json'),

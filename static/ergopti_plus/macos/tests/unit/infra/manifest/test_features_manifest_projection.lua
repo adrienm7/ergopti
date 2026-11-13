@@ -12,4 +12,4 @@ local helpers = require("tests.helpers")
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
-require("test.features_manifest_contract").run(helpers, "hs", require("infra.manifest_reader"))
+require("tests.lua.features_manifest_contract").run(helpers, "hs", require("infra.manifest_reader"))

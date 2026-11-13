@@ -21,7 +21,7 @@
  * 3. Zero side channels: the specs are plain CommonJS modules, so we require()
  *    them directly rather than eval-parsing — no fragile text scraping.
  * 4. Closed log vocabulary: the `reason`, `phase`, `[TAG]` and evidence-field
- *    enums of _shared/modules/logger/vocabulary.json are projected beside the
+ *    enums of _shared/core/logger/data/vocabulary.json are projected beside the
  *    ports as `enums`, so every driver's compliance tooling reads the same
  *    closed sets the logger gate enforces. A malformed, duplicated or unsorted
  *    enum fails here, before any gate could compare a driver against it.
@@ -37,7 +37,7 @@ const { loadCjsModule } = require('../lib/load-cjs-module.cjs');
 
 const PORTS_DIR = shared('core/ports');
 const OUTPUT_PATH = path.join(PORTS_DIR, 'contracts.json');
-const VOCABULARY_REL = 'modules/logger/vocabulary.json';
+const VOCABULARY_REL = 'core/logger/data/vocabulary.json';
 
 // The shape each closed enum's members must have. Reasons, phases and fields
 // are lower-case codes (an empty reason or phase is the "none" sentinel); tags are

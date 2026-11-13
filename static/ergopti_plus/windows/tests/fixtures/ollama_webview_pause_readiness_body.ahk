@@ -226,8 +226,8 @@ _OPR_Main() {
 	Primary := 0, CleanupError := 0
 	try {
 		_SharedDir := A_Args[2] . "\shared", _I18nLocale := "fixture"
-		DirCreate(_SharedDir . "\data\locales")
-		FileAppend('{"fixture":"retained"}', _SharedDir . "\data\locales\fixture.json", "UTF-8-RAW")
+		DirCreate(_SharedDir . "\core\i18n\data\locales")
+		FileAppend('{"fixture":"retained"}', _SharedDir . "\core\i18n\data\locales\fixture.json", "UTF-8-RAW")
 		_OCSD_Note("before-gui")
 		World.Gui := Gui("+ToolWindow", "Private Ollama readiness component")
 		World.Gui.Show("NA w80 h40 x-32000 y-32000")

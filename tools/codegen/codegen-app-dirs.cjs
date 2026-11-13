@@ -5,7 +5,7 @@
  * MODULE: Application Folders Codegen
  * DESCRIPTION:
  * Emits the application folder name, the per-OS default logs folder and the
- * log file-name prefixes from the canonical _shared/modules/paths/app_dirs.toml
+ * log file-name prefixes from the canonical _shared/core/fs/data/paths/app_dirs.toml
  * for every consumer: the shared Lua tree (macOS and Linux drivers), the
  * AutoHotkey driver and the native macOS launcher.
  *
@@ -30,7 +30,7 @@ const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const SOURCE = path.join(SP, '_shared/modules/paths/app_dirs.toml');
+const SOURCE = path.join(SP, '_shared/core/fs/data/paths/app_dirs.toml');
 
 const APP_PLACEHOLDER = '{app}';
 
@@ -335,8 +335,8 @@ function swiftStr(s) {
 
 function emitLua() {
 	return (
-		'--- _shared/lua/app_dirs.lua\n' +
-		'--- AUTO-GENERATED from _shared/modules/paths/app_dirs.toml.\n' +
+		'--- _shared/core/fs/engine/app_dirs.lua\n' +
+		'--- AUTO-GENERATED from _shared/core/fs/data/paths/app_dirs.toml.\n' +
 		'--- DO NOT EDIT BY HAND — run `npm run codegen:app-dirs` to refresh.\n' +
 		'\n' +
 		'--- ==============================================================================\n' +
@@ -421,7 +421,7 @@ function emitAhk() {
 	const fn = (name, value, doc) => `; ${doc}\n${name}() {\n\treturn ${ahkStr(value)}\n}\n`;
 	return (
 		'﻿; _generated/app_dirs.ahk\n' +
-		'; AUTO-GENERATED from _shared/modules/paths/app_dirs.toml.\n' +
+		'; AUTO-GENERATED from _shared/core/fs/data/paths/app_dirs.toml.\n' +
 		'; DO NOT EDIT BY HAND — run `npm run codegen:app-dirs` to refresh.\n' +
 		'#Requires AutoHotkey v2.0\n' +
 		'\n' +
@@ -596,7 +596,7 @@ function emitSwift() {
 	const constant = (name, value, doc) => `/// ${doc}\nlet ${name} = ${swiftStr(value)}\n`;
 	return (
 		'// Sources/ErgoptiPlus/AppDirs.generated.swift\n' +
-		'// AUTO-GENERATED from _shared/modules/paths/app_dirs.toml.\n' +
+		'// AUTO-GENERATED from _shared/core/fs/data/paths/app_dirs.toml.\n' +
 		'// DO NOT EDIT BY HAND -- run `npm run codegen:app-dirs` to refresh.\n' +
 		'\n' +
 		'// ==============================================================================\n' +
@@ -681,7 +681,7 @@ function emitSwift() {
 // ── Write ───────────────────────────────────────────────────────────────────
 
 const targets = [
-	[path.join(SP, '_shared/lua/app_dirs.lua'), emitLua()],
+	[path.join(SP, '_shared/core/fs/engine/app_dirs.lua'), emitLua()],
 	[path.join(SP, 'windows/_generated/app_dirs.ahk'), emitAhk()],
 	[path.join(SP, 'macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift'), emitSwift()]
 ];

@@ -31,7 +31,7 @@ const p = require('path');
 const ROOT = p.resolve(__dirname, '..', '..');
 const UI = p.join(ROOT, 'static/ergopti_plus/_shared/ui');
 const REL = 'static/ergopti_plus/_shared/ui/metrics_freshness.js';
-const LOCALES = p.join(ROOT, 'static/ergopti_plus/_shared/data/locales');
+const LOCALES = p.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/locales');
 
 const errors = [];
 

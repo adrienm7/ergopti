@@ -9,7 +9,7 @@ const { readSourceFile } = require('./windows-updater-original-source.cjs');
 const root = path.resolve(__dirname, '../..');
 const contractPath = path.join(
 	root,
-	'static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json'
+	'static/ergopti_plus/_shared/updater/data/windows_release_toolchain.json'
 );
 const maximum = 134217728;
 const memberName = 'AutoHotkey64.exe';

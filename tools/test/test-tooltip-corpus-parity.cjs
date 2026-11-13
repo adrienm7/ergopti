@@ -39,7 +39,7 @@ const path = require('node:path');
 const { loadCjsModule } = require('../lib/load-cjs-module.cjs');
 
 const root = path.resolve(__dirname, '../../static/ergopti_plus');
-const tooltipDir = path.join(root, '_shared/modules/tooltip');
+const tooltipDir = path.join(root, '_shared/core/ui/data/tooltip');
 
 const layoutJs = loadCjsModule(path.join(tooltipDir, 'layout.js'));
 const dequeueJs = loadCjsModule(path.join(tooltipDir, 'dequeue.js'));

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json through
 ; the Windows tracker. macOS and Linux replay the same file through
-; _shared/lua/hotpath_segments.lua new_nesting, so the three drivers judge a
+; _shared/metrics/engine/perf/hotpath_segments.lua new_nesting, so the three drivers judge a
 ; segment on the same own time and name the same parent (PAR-53). Windows used
 ; to judge the wall clock, which billed a slow child to its parent too.
 ; ==============================================================================
@@ -77,7 +77,7 @@ _HPNV_DepthCapNeverRaisesOnTheKeystrokePath() {
 Test("hotpath nesting: the depth cap sweeps instead of raising (PAR-53)", _HPNV_DepthCapNeverRaisesOnTheKeystrokePath)
 
 _HPNV_GateMatchesTheLuaWindow() {
-	Lua := FileRead(_SharedDir . "\lua\hotpath_segments.lua", "UTF-8")
+	Lua := FileRead(_SharedDir . "\metrics\engine\perf\hotpath_segments.lua", "UTF-8")
 	Assert(RegExMatch(Lua, "M\.LOG_WINDOW_MS = (\d+)", &Match), "the Lua window must stay declared")
 	AssertEqual(Match[1] + 0, HotPathSlowGate.SLOW_LINE_WINDOW_MS, "one window on the three drivers")
 	Gate := HotPathSlowGate()

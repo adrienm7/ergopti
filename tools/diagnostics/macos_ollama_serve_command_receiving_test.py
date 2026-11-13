@@ -59,7 +59,8 @@ class EmittedServeCommand(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="ergopti-serve-source-copy-") as directory:
             copied = Path(directory) / "source"
             for relative in (
-                "static/ergopti_plus/_shared/python",
+                "static/ergopti_plus/_shared/ai/adapters/python",
+                "static/ergopti_plus/_shared/core/network/adapters",
                 "static/ergopti_plus/macos/modules/llm",
                 "static/ergopti_plus/macos/platform",
                 "static/ergopti_plus/macos/platform/network",

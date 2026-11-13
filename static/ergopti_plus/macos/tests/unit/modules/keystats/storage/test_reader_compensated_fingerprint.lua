@@ -13,8 +13,8 @@ local function child()
 	local driver = root .. "/static/ergopti_plus/macos"
 	local shared = root .. "/static/ergopti_plus/_shared"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
-	local json = require("json")
+		.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+	local json = require("core.text.engine.json")
 	local function request(message)
 		message.kind = "request"
 		assert(io.stdout:write(json.encode(message) .. "\n")); assert(io.stdout:flush())
@@ -42,7 +42,7 @@ local function child()
 	local path = temporary .. "/db.sqlite"
 	local db = sqlite.open(path)
 	for _, name in ipairs({ "schema.sql", "media_schema.sql" }) do
-		local file = assert(io.open(shared .. "/data/db/" .. name, "rb"))
+		local file = assert(io.open(shared .. "/metrics/data/db/" .. name, "rb"))
 		local schema = assert(file:read("*a")); assert(file:close())
 		assert(db:exec(schema) == sqlite.OK)
 	end
@@ -114,7 +114,7 @@ end
 if arg and arg[0] and arg[0]:match("test_reader_compensated_fingerprint%.lua$") then child(); return end
 
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local source = assert(debug.getinfo(1, "S").source):gsub("^@", "")
 
 local function verify(case)

@@ -10,7 +10,7 @@
 
 local M = {}
 
-local Policy = require("shortcuts.magic_editor")
+local Policy = require("shortcuts.engine.magic_editor_core")
 local Registrar = require("adapters.hotkey_registrar")
 local Broker = require("adapters.input_source_broker")
 local Probe = require("adapters.keyboard_source_probe")
@@ -24,8 +24,8 @@ local MagicKeySource = require("modules.keymap.magic_key_source")
 local Geometry = require("adapters.keyboard_geometry")
 local Logger = require("infra.logger")
 
-local LOG = "shortcuts.magic_editor"
-local SUBSCRIBER = "shortcuts.magic_editor"
+local LOG = "shortcuts.engine.magic_editor_core"
+local SUBSCRIBER = "shortcuts.engine.magic_editor_core"
 local _spec = nil
 local _started = false
 local _generation = 0
@@ -49,7 +49,7 @@ end
 
 local function registry()
 	if _registry then return _registry end
-	local text = FileSystem.read(Paths.shared("data/keycodes/physical_keys.json"))
+	local text = FileSystem.read(Paths.shared("layouts/data/keycodes/physical_keys.json"))
 	local parsed, detail = JsonCodec.decode(text or "")
 	assert(type(parsed) == "table" and type(parsed.keys) == "table",
 		"physical keyboard registry unavailable: " .. tostring(detail))

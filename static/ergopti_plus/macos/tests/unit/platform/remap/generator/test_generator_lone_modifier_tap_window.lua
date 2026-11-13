@@ -31,7 +31,7 @@ helpers.with_fresh_modules({
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
+	"core.text.engine.toml_codec",
 }, function()
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.config_paths"] = {
@@ -48,7 +48,7 @@ helpers.with_fresh_modules({
 	-- The catalogues read here are JSON and the shared defaults use the
 	-- pure-Lua reader; the native TOML codec is absent from the headless runner.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
 	package.loaded["infra.toml.codec"] = toml_stub
 	local file_cache = {}
 	local function read_once(path)

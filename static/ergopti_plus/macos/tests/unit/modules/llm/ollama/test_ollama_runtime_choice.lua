@@ -2,7 +2,7 @@
 --- Literal shared consent and actual selection-caller controls. Native ports
 --- remain controlled; these checks cannot qualify an installer or daemon.
 local helpers = require("tests.helpers")
-local Choice = require("core.llm.ollama_runtime_choice")
+local Choice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local target = "/fixture/ollama-native-http"
 
 helpers.describe("Shared Ollama migration decision", function()

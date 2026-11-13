@@ -4,7 +4,7 @@
 ; MODULE: Logger
 ; DESCRIPTION:
 ; Lightweight central logger for ErgoptiPlus, matching the 8-variant taxonomy
-; in _shared/modules/logger/SPEC.md (debug / trace / done / info / start / success /
+; in _shared/core/logger/data/SPEC.md (debug / trace / done / info / start / success /
 ; warn / error). Writes structured lines to the daily log in the logs folder
 ; (LoggerLogsDir: LogsDirPath, or %LOCALAPPDATA%\Ergopti\logs\) and keeps
 ; a small in-memory ring buffer that the tray menu can dump for live debugging
@@ -192,7 +192,7 @@ global _LOGGER_VOLUME_MARK := _LOGGER_VOLUME.Clone()
 ; previous days are deleted at init time. Paths are resolved relative to LogDir.
 ;
 ; Filled at LoggerInit from _generated/logger_sub_files.ahk, which is generated
-; from the canonical _shared/modules/logger/sub_files.toml.
+; from the canonical _shared/core/logger/data/sub_files.toml.
 ;
 ; This used to be populated by a 112-line hand-rolled [[array_of_tables]] parser
 ; living right here, backed by a hardcoded fallback list. Both were liabilities.
@@ -222,7 +222,7 @@ global _LOGGER_TEST_SINK := 0
 ; inlined because the macOS driver holds the same duration in SECONDS, and two
 ; bare literals in two units, each with a comment claiming to match the other,
 ; are indistinguishable from two literals that have drifted apart.
-; Single source: _shared/modules/timings/constants.toml [logger] dedup_window_ms.
+; Single source: _shared/core/timing/data/constants.toml [logger] dedup_window_ms.
 global LOGGER_DEDUP_WINDOW_MS := 5000
 
 ; Deduplication state (module-level so tests can reset it via _ResetLogger).
@@ -237,7 +237,7 @@ global _LastErrTime := 0
 ; How long a repeat streak stays open, and how many streaks are tracked at once
 ; (spec section 4.2). The shared Lua core holds the same values, the window in
 ; seconds; test-logger-scalars-single-source.cjs pins both to the registry.
-; Single source: _shared/modules/timings/constants.toml [logger]
+; Single source: _shared/core/timing/data/constants.toml [logger]
 ; repeat_window_ms and repeat_streak_capacity.
 global LOGGER_REPEAT_WINDOW_MS := 600000
 global LOGGER_REPEAT_CAPACITY := 64
@@ -392,7 +392,7 @@ LoggerUserNamePlaceholder() {
 
 /**
  * Masks a name the user chose for a log line, the twin of the Lua drivers'
- * diagnostics/private_label.lua. The redactor masks such a name only as a path
+ * diagnostics/engine/private_label.lua. The redactor masks such a name only as a path
  * component under the configuration directory: a bare name, or a file elsewhere,
  * needs the placeholder at the point of emission.
  * @param Name {String} The name or path; only its type is checked, never its content.
@@ -420,7 +420,7 @@ _LoggerPrivacyAdmitted() {
 			throw Error("Logger privacy source changed after admission.")
 		return State["config"]
 	}
-	Rules := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\redaction.json"))
+	Rules := JsonParse(FSReadStrict(_SharedDir . "\diagnostics\data\redaction.json"))
 	Context := Map("home", EnvGet("USERPROFILE"), "user", A_UserName, "case_insensitive", true)
 	if Context["home"] == "" || Context["user"] == ""
 		throw Error("Logger privacy identity is unavailable.")
@@ -538,7 +538,7 @@ LoggerInit() {
 		else
 				LoggerDebug("Logger", "Log retention is not loaded yet; the purge waits for the next rollover.")
 		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
-		; _shared/modules/logger/sub_files.toml — adding a topical log is a TOML edit
+		; _shared/core/logger/data/sub_files.toml — adding a topical log is a TOML edit
 		; plus a codegen run, never a parser change in two drivers.
 		global LOGGER_SUB_FILES
 		LOGGER_SUB_FILES := LoggerSubFilesData()

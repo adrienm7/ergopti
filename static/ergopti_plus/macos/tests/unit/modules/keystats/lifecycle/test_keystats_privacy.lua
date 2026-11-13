@@ -50,7 +50,7 @@ local helpers = require("tests.helpers")
 -- ============================================
 
 -- Timings stub shared by every scenario load: returns fixed values so the
--- harness never depends on the real _shared/modules/timings/constants.toml
+-- harness never depends on the real _shared/core/timing/data/constants.toml
 -- file being reachable from the unit-test cwd (mirrors test_log_manager.lua).
 local _TIMINGS_MS = {
 	keystats = {

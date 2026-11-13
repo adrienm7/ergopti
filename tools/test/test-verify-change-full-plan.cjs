@@ -71,7 +71,7 @@ assert.equal(command, 'luajit');
 assert.deepEqual(arguments_, ['tests/hardware/run_xkb_source_qualification.lua']);
 assert.equal(options.cwd, path.join(root, 'static/ergopti_plus/linux'));
 assert(
-	options.env.LUA_PATH.includes('../_shared/lua/?.lua'),
+	options.env.LUA_PATH.includes('../_shared/?.lua'),
 	'the native fixture loads the real shared driver modules'
 );
 assert.equal(
@@ -84,7 +84,7 @@ for (const file of [
 	'static/ergopti_plus/linux/adapters/xkb_source_probe.lua',
 	'static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
-	'static/ergopti_plus/_shared/lua/shortcuts/magic_editor.lua'
+	'static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua'
 ])
 	assert(
 		selectGates([file]).has('linux-xkb-source'),
@@ -120,7 +120,7 @@ for (const file of [
 	'static/ergopti_plus/linux/adapters/http_client.lua',
 	'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
-	'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua'
+	'static/ergopti_plus/_shared/ai/engine/ollama/local_model_policy.lua'
 ])
 	assert(
 		selectGates([file]).has('linux-http-stream'),
@@ -129,11 +129,11 @@ for (const file of [
 
 assert.equal(GATE_COMMANDS['linux-runtime-native'].npm, 'test:linux:runtime-native');
 for (const file of [
-	'static/ergopti_plus/_shared/lua/native_worker_owner.lua',
-	'static/ergopti_plus/_shared/lua/llm/process_port.lua',
-	'static/ergopti_plus/_shared/lua/llm/finite_process_port.lua',
-	'static/ergopti_plus/_shared/lua/llm/process_limits.lua',
-	'static/ergopti_plus/_shared/lua/llm/ollama_archive_installer.lua',
+	'static/ergopti_plus/_shared/core/lifecycle/engine/native_worker_owner.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/process_port.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/finite_process_port.lua',
+	'static/ergopti_plus/_shared/ai/engine/policy/process_limits.lua',
+	'static/ergopti_plus/_shared/ai/engine/ollama/archive_installer.lua',
 	'static/ergopti_plus/linux/adapters/owned_process.lua',
 	'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',
@@ -217,9 +217,9 @@ assert.deepEqual(
 	'tool changes must retain the full JS gate, which already covers report style'
 );
 for (const file of [
-	'static/ergopti_plus/_shared/modules/shortcuts/magic_editor.ahk',
-	'static/ergopti_plus/_shared/modules/hotstrings/scope_overrides.ahk',
-	'static/ergopti_plus/_shared/modules/llm/local_model_policy.ahk',
+	'static/ergopti_plus/_shared/shortcuts/data/magic_editor.ahk',
+	'static/ergopti_plus/_shared/hotstrings/data/catalogue/scope_overrides.ahk',
+	'static/ergopti_plus/_shared/ai/data/local_model_policy.ahk',
 	'static/ergopti_plus/_shared/modules/future/owner.ahk'
 ]) {
 	const gates = selectGates([file]);

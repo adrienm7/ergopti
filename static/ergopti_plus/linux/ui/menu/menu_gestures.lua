@@ -47,8 +47,8 @@ local function _build_gestures(ctx)
 	-- renderer builds each row and its label from the declaration, right after
 	-- the switch, and this driver registers only what the click does.
 	local gesture_commands = {
-		[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end,
-		[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end,
+		[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end,
+		[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end,
 	}
 
 	-- The master toggle's BEHAVIOUR. Its label, its position and the two i18n keys
@@ -90,12 +90,12 @@ local function _build_gestures(ctx)
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
 	-- The recommended-defaults rule and why Linux recommends no swipe, behind
 	-- the menu's « Infos… » row: several sentences do not fit a menu row.
-	gesture_commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = function()
+	gesture_commands[require("settings.engine.keys").COMMAND.GESTURE_RECOMMENDED_INFO] = function()
 		show_info(i18n_safe("menu.gestures.notify_title"), plain_markup(i18n_safe("menu.gestures.recommended_note")
 			.. "\n\n" .. i18n_safe("menu.gestures.recommended_reason_linux")))
 		return true
 	end
-	gesture_commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = function() return require("ui.gesture_conflicts").open_settings() end
+	gesture_commands[require("settings.engine.keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = function() return require("ui.gesture_conflicts").open_settings() end
 	--- The mode and step rows of a swipe slot, from the templates macOS renders
 	--- too: x1 or incremental, and the distance per action of an incremental
 	--- slot (modules/gestures/incremental_tracker.lua).
@@ -110,7 +110,7 @@ local function _build_gestures(ctx)
 			if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return committed
 		end
-		local COMMAND = require("config_keys").COMMAND
+		local COMMAND = require("settings.engine.keys").COMMAND
 		local mode_rows = ManifestMenu.template_rows("gesture_slot_mode_commands", {
 			[COMMAND.GESTURE_MODE_SINGLE] = function() return commit("set_mode", ge.MODE_SINGLE) end,
 			[COMMAND.GESTURE_MODE_INCREMENTAL] = function() return commit("set_mode", ge.MODE_INCREMENTAL) end,
@@ -120,7 +120,7 @@ local function _build_gestures(ctx)
 		})
 		local step_rows = ManifestMenu.template_rows("gesture_sensitivity_head")
 		if not mode_rows or not step_rows then return {} end
-		for _, value in ipairs(require("gestures.sensitivity").options()) do
+		for _, value in ipairs(require("gestures.engine.sensitivity").options()) do
 			local label = string.format("%.1f", value)
 			if value == ge.DEFAULT_SENSITIVITIES[slot] then label = label .. " " .. i18n_safe("menu.gestures.default_sensitivity") end
 			step_rows[#step_rows + 1] = {
@@ -142,7 +142,7 @@ local function _build_gestures(ctx)
 		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
 		-- parameterized actions unreachable for the omitted gesture bindings.
-		local slots = require("table_util").sorted_keys(ge.DEFAULT_GESTURES or {})
+		local slots = require("core.text.engine.table_util").sorted_keys(ge.DEFAULT_GESTURES or {})
 
 		-- What this machine's touchpad can physically express. The kernel only
 		-- advertises BTN_TOOL_QUADTAP at four slots and QUINTTAP at five, so a pad
@@ -249,7 +249,7 @@ local function _build_gestures(ctx)
 	for key, value in pairs(ctx) do gesture_ctx[key] = value end
 	gesture_ctx.commands = {}
 	for key, value in pairs(gesture_commands or {}) do gesture_ctx.commands[key] = value end
-	gesture_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = master_toggle_action
+	gesture_ctx.commands[require("settings.engine.keys").COMMAND.GESTURES_TOGGLE] = master_toggle_action
 	gesture_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do gesture_ctx.state_getters[key] = value end
 	gesture_ctx.state_getters["gestures_enabled"] = function() return gestures_on end

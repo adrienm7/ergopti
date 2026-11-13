@@ -15,14 +15,14 @@ Every value comes from a closed vocabulary (a native failure stage or reason,
 an HTTP status class); no URL, host, user name or PAC content is ever printed.
 
 With --hosts it instead sends one HEAD to the root (or the probe path) of every external host the
-drivers declare (_shared/data/identifiers.json), one after the other, and
+drivers declare (_shared/core/text/data/identifiers.json), one after the other, and
 prints one "step host_<name> <state> <value>" line each: the field run's
 reachability check. A host is named by its declared key, never by its name.
 
 With --ollama-blob <model> it reads that model's manifest from the Ollama
 registry, then asks for one of its blobs without following the redirect, and
 prints whether the host the registry sends the blob to is one the route
-inventory plans (_shared/modules/network/route_origins.json): the daemon's
+inventory plans (_shared/core/network/data/route_origins.json): the daemon's
 pull is routed by that inventory, so an unplanned blob host would be fetched
 on the wrong route. It then asks two bytes of that blob, following each
 redirect the way the daemon does, and judges whether the final answer honours
@@ -40,9 +40,9 @@ from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 SHARED_ROOT = DRIVER_ROOT.parent / "_shared"
-RELEASE = SHARED_ROOT / "modules/llm/managed_python_release.json"
-IDENTIFIERS = SHARED_ROOT / "data/identifiers.json"
-ROUTE_ORIGINS = SHARED_ROOT / "modules/network/route_origins.json"
+RELEASE = SHARED_ROOT / "ai/data/managed_python_release.json"
+IDENTIFIERS = SHARED_ROOT / "core/text/data/identifiers.json"
+ROUTE_ORIGINS = SHARED_ROOT / "core/network/data/route_origins.json"
 BOOTSTRAP = DRIVER_ROOT / "modules/llm/managed_bootstrap_http.py"
 
 # Seconds for the whole request, then for each read.

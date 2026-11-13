@@ -12,10 +12,10 @@
 local helpers = require("tests.helpers")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Json = require("json")
-local Classifier = require("llm.remote_response_classifier")
+local Json = require("core.text.engine.json")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
 
 -- Tolerance for comparing a computed dollar cost with the catalogue's price
 local COST_TOLERANCE = 1e-12
@@ -24,7 +24,7 @@ local COST_TOLERANCE = 1e-12
 --- @param model string
 --- @return table { in, out }
 local function catalogue_price(model)
-	local fh = assert(io.open(SHARED .. "modules/llm/api_providers.json", "r"))
+	local fh = assert(io.open(SHARED .. "ai/data/api_providers.json", "r"))
 	local raw = fh:read("*a")
 	fh:close()
 	local prices = Classifier.parse_prices(Json.decode(raw).model_prices)

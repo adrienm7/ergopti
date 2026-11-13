@@ -181,7 +181,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 		with_editor({ texts = { "  " }, choices = { 1, 1 } }, function(Utils)
 			local value = Utils.ask_parameter_value(GESTURES, "run_command", "command", "Title", "")
 			helpers.assert_eq(value, '{"version":1,"command":"  ","mode":"hidden","output":"none"}')
-			helpers.assert_eq(require("user_action_parameter").parse("command", value), nil)
+			helpers.assert_eq(require("shortcuts.engine.user_action_parameter").parse("command", value), nil)
 		end)
 	end)
 
@@ -195,7 +195,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 		with_editor({ rows = { { id = SHORTCUT_ID, name = "Resize Image" } }, choices = { 1, 2, 2 } },
 			function(Utils, seen)
 				local value = Utils.ask_parameter_value(GESTURES, "run_apple_shortcut", "apple_shortcut", "Title", "")
-				helpers.assert_eq(require("user_action_parameter").parse("apple_shortcut", value),
+				helpers.assert_eq(require("shortcuts.engine.user_action_parameter").parse("apple_shortcut", value),
 					{ id = SHORTCUT_ID, name = "Resize Image", input = "selection", output = "type" })
 				helpers.assert_eq(seen.choices[1].labels, { "Resize Image" })
 			end)

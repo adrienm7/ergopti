@@ -81,7 +81,7 @@ end
 
 helpers.describe("tray (linux): the category-off rule", function()
 	helpers.it("greys every gated manifest menu but its enable and reader rows", function()
-		require("test.category_off_contract").assert_every_gated_menu(helpers,
+		require("tests.lua.category_off_contract").assert_every_gated_menu(helpers,
 			require("infra.manifest_menu"), require("infra.i18n"), "linux")
 	end)
 	for _, on in ipairs({ false, true }) do
@@ -89,7 +89,7 @@ helpers.describe("tray (linux): the category-off rule", function()
 			helpers.it("the built " .. category.menu .. " with its category on " .. tostring(on), function()
 				local parent = row_for(build_tray(on), category.title)
 				helpers.assert_true(parent ~= nil, category.title .. " must be in the tray")
-				require("test.category_off_contract").assert_category(helpers, require("infra.i18n"),
+				require("tests.lua.category_off_contract").assert_category(helpers, require("infra.i18n"),
 					require("infra.manifest_menu").get_array(category.menu), parent, not on)
 			end)
 		end

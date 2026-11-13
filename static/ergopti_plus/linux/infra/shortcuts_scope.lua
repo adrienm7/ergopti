@@ -2,14 +2,14 @@
 
 --- Publishes one shortcut scope through existing preference and dispatch owners.
 local M = {}
-local PhysicalAvailability = require("shortcuts.physical_availability")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Parents = require("config_obsolete_parents")
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Parents = require("settings.engine.migration.obsolete_parents")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
 local _editor_owner, _editor_path, _editor_busy = nil, nil, false
@@ -214,7 +214,7 @@ function M.new(options)
 		if action and parameters.get_action_parameter_spec(action) then return domain(binding) end
 		return nil
 	end
-	local editor_inventory = require("shortcuts.physical_editor_inventory").new({
+	local editor_inventory = require("shortcuts.engine.physical_editor_inventory").new({
 		path = options.path, current_path = options.current_path or function() return require("infra.config_paths").config("config.toml") end,
 		read = function(path) return Writer.read_classified(path, files) end,
 		keyboard = keyboard, parameters = parameters, recognizes = domain,
@@ -597,7 +597,7 @@ end
 --- The shortcut participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})

@@ -34,7 +34,7 @@ end
 --- The real filesystem ports of a clone run.
 --- @return table ports
 function M.native_ports()
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local ConfigPaths = require("infra.config_paths")
 	-- The real account home: a clone's profile and the shared VS Code settings
 	-- live there, never in the temporary folder home() falls back to.
@@ -58,7 +58,7 @@ function M.native_ports()
 			local real = pipe and pipe:read("*l")
 			if pipe then pipe:close() end
 			if not real or real == "" then return false end
-			local folder = require("native_path").dirname(real) or "/"
+			local folder = require("core.fs.engine.native_path").dirname(real) or "/"
 			return succeeded("test -e " .. quote(folder .. "/" .. marker))
 		end,
 		write = function(plan) return require("apps.app_cloner_core").write(plan) end,
@@ -115,7 +115,7 @@ function M.run(ports)
 			{ initial = t("apps.cloner.default_clone_name", source_name), ok = t("apps.cloner.btn_validate"),
 				cancel = t("button.cancel") })
 		if name == nil then return "cancelled" end
-		name = require("text_utils").trim(name)
+		name = require("core.text.engine.utils_core").trim(name)
 		if name == "" then
 			dialogs.message("warning", t("apps.cloner.title_empty_input"), t("apps.cloner.err_open_empty"))
 		end
@@ -126,7 +126,7 @@ function M.run(ports)
 		open_item = dialogs.entry(t("apps.cloner.title_open_arg"), t("apps.cloner.msg_open_optional_portable"),
 			{ initial = "", ok = t("apps.cloner.btn_validate"), cancel = t("button.cancel") })
 		if open_item == nil then return "cancelled" end
-		open_item = require("text_utils").trim(open_item)
+		open_item = require("core.text.engine.utils_core").trim(open_item)
 		local key, value, resolved = invalid_open_item(open_item, ports.exists, ports.home)
 		if not key then
 			open_item = resolved
@@ -187,7 +187,7 @@ function M.main(argv)
 	return 0
 end
 
-if type(arg) == "table" and type(arg[0]) == "string" and require("native_path").basename(arg[0]) == "app_cloner.lua" then
+if type(arg) == "table" and type(arg[0]) == "string" and require("core.fs.engine.native_path").basename(arg[0]) == "app_cloner.lua" then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
 	os.exit(M.main(argv))

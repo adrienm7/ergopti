@@ -20,7 +20,7 @@ local SILENT_LEVEL = 1000
 --- @param callback function Receives (Logger, Healthcheck).
 local function with_healthcheck(callback)
 	helpers.with_stub_scope({
-		"infra.logger", "logger", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"infra.logger", "core.logger.engine", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}, function()
 		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.set_level("DEBUG")
@@ -183,7 +183,7 @@ end)
 helpers.describe("healthcheck simultaneous source refusals", function()
 	helpers.it("(errors-file-io-receipts) preserves both read and close refusal details", function()
 		with_tail_receipt("read_close_nil", function(path)
-			local completed, detail = pcall(require("healthcheck.snapshot").read_tail, path, 1)
+			local completed, detail = pcall(require("diagnostics.engine.healthcheck.snapshot").read_tail, path, 1)
 			helpers.assert_eq(completed, false, "post-open refusal cannot return an open-failure errno")
 			helpers.assert_true(tostring(detail):find("controlled read refusal", 1, true) ~= nil, "retain the original read refusal")
 			helpers.assert_true(tostring(detail):find("controlled close refusal", 1, true) ~= nil, "retain the independent close refusal")

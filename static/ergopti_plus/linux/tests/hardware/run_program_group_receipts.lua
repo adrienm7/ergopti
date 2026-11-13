@@ -11,7 +11,7 @@ assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "private program fixture requires child
 local Runner = require("adapters.program_runner")
 local Owner = require("modules.gestures.program_owner")
 local Shell = require("adapters.shell_runner")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local python = assert(Shell.exec_line("command -v python3"))
 assert(python:sub(1, 1) == "/", "the native fixture requires an absolute Python executable")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-private-groups-XXXXXX"))

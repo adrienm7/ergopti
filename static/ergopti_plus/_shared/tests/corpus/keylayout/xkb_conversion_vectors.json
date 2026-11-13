@@ -1,5 +1,5 @@
 {
-	"description": "What the shared Lua converter (layouts/xkb_converter.lua) must write for hand-written layouts (dead keys, chained dead keys including a dead key pressed inside a dead state, a multi-character output, XKB hints), with the ISO keycode table and the shipped keysym table and symbols template (static/ergopti/linux/xkb_generation/data). Expected files are the Python converter's; tools/test/test-keylayout-canonical-parity.cjs compares both converters on every shipped layout.",
+	"description": "What the shared Lua converter (layouts/engine/composer/xkb_converter.lua) must write for hand-written layouts (dead keys, chained dead keys including a dead key pressed inside a dead state, a multi-character output, XKB hints), with the ISO keycode table and the shipped keysym table and symbols template (static/ergopti/linux/xkb_generation/data). Expected files are the Python converter's; tools/test/test-keylayout-canonical-parity.cjs compares both converters on every shipped layout.",
 	"vectors": [
 		{
 			"name": "dead keys, chain, multi-character output, hints",

@@ -4,8 +4,8 @@
 ; MODULE: API URL Template Corpus (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/llm/api_url_template_vectors.json through
-; _shared/modules/llm/api_url_template.ahk, the port of
-; _shared/lua/llm/api_url_template.lua that macOS and Linux replay: the
+; _shared/ai/data/api_url_template.ahk, the port of
+; _shared/ai/engine/api/url_template.lua that macOS and Linux replay: the
 ; placeholders of a per-account provider's address, the values that may fill
 ; one, and the address the add-entry form stores.
 ; ==============================================================================
@@ -98,7 +98,7 @@ _LAUT_OptionalLocales() {
 	Optional := LLM_API_PROVIDERS["dashscope"]["OptionalAddress"]
 	AssertTrue(Optional is Map, "DashScope offers the workspace domain")
 	Count := 0
-	Loop Files _SharedDir . "\data\locales\*.json" {
+	Loop Files _SharedDir . "\core\i18n\data\locales\*.json" {
 		Count += 1
 		Locale := JsonParse(FileRead(A_LoopFileFullPath, "UTF-8"))
 		AssertContains(Locale["menu.llm.api_prompt_field_invalid." . Optional["field"]], Optional["host_suffix"],

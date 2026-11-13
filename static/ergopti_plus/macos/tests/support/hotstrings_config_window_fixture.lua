@@ -101,7 +101,7 @@ local function install_personal_binding(path, content)
 	local root, name = path:match("^(.*)[/\\]([^/\\]+)$")
 	assert(root and name and name:match("%.toml$"))
 	assert(type(content) == "string")
-	local Files = require("hotstrings.personal_files")
+	local Files = require("hotstrings.engine.catalogue.personal_files")
 	local source = Files.describe({ name })
 	local native_path = root .. "/" .. name
 	local record = { owner = source.id, source = source, path = native_path,
@@ -131,7 +131,7 @@ local function install_personal_binding(path, content)
 			local fs = package.loaded["adapters.file_system"]
 			local ok, bytes, status = pcall(fs.read_with_status, native_path)
 			if not ok or status ~= "ok" or type(bytes) ~= "string" or bytes ~= record.content then return false end
-			local plan = require("hotstrings.personal_metadata").prepare(bytes, section, field, value)
+			local plan = require("hotstrings.engine.catalogue.personal_metadata").prepare(bytes, section, field, value)
 			if not plan then return false end
 			local wrote, committed = pcall(fs.write_if_unchanged, native_path, plan.content,
 				{ status = "ok", content = bytes })
@@ -140,7 +140,7 @@ local function install_personal_binding(path, content)
 			return true
 		end,
 	}
-	local Reader = require("toml_codec.reader")
+	local Reader = require("core.text.engine.toml_codec.reader")
 	package.loaded["infra.toml.reader"] = {
 		parse = function(candidate)
 			if candidate == native_path then return Reader.parse_text(record.content) end

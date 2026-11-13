@@ -13,15 +13,15 @@ LUA_REPLAY = r"""
 local root = assert(arg[1])
 assert(_VERSION == "Lua 5.4", "The private-file control requires Lua 5.4")
 package.path = table.concat({ root .. "/?.lua", root .. "/?/init.lua",
-    root .. "/../_shared/lua/?.lua", root .. "/../_shared/lua/?/init.lua", package.path }, ";")
-require("test.runner_home").isolate()
+    root .. "/../_shared/?.lua", root .. "/../_shared/?/init.lua", package.path }, ";")
+require("tests.lua.core.runner_home").isolate()
 _G.hs = require("tests.stubs.hs")
 local fixture = require("tests.support.modules.llm.streaming_payload_fixture")
 local observations = {}
 for _, backend in ipairs({ "mlx", "ollama" }) do
     observations[backend] = fixture.assert_private_payload(backend)
 end
-print(assert(require("json").encode({ passed = 2, observations = observations })))
+print(assert(require("core.text.engine.json").encode({ passed = 2, observations = observations })))
 os.exit(0)
 """
 

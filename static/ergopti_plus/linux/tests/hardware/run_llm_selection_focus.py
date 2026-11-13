@@ -144,7 +144,7 @@ def session(root):
             time.sleep(1)
             worker_env = dict(os.environ)
             worker_env["LUA_PATH"] = (
-                "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"
+                "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;"
                 + os.environ.get("LUA_PATH", ";;")
             )
             with (root / "worker.log").open("w") as worker_log:

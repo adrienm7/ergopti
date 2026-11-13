@@ -20,7 +20,7 @@
 --- ("daemon" or "quit").
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Restarter = require("modules.updater.restarter")
 local BootReady = require("infra.updater_boot_ready")

@@ -40,7 +40,7 @@ local RESET_MODULES = {
 	"adapters.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "infra.config_paths", "infra.dialog_util", "infra.i18n",
 	"infra.logger", "infra.manifest_reader", "infra.timings",
-	"keystats.metrics", "modules.keystats", "modules.keystats.aggregator",
+	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
 	"modules.keystats.init", "modules.keystats.kc_bridge",
 	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
@@ -167,7 +167,7 @@ local function load_fixture(options)
 		get_sqlite_path = function() return nil end,
 		get_db_rev = function() return 0 end,
 	}
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function()
 			counters.wpm = counters.wpm + 1
 			if callback_active then counters.inside_wpm = counters.inside_wpm + 1 end

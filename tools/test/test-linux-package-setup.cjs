@@ -94,11 +94,11 @@ try {
 		const script = path.join(bundle, 'install.sh');
 		const installDirectory = path.join(bundle, 'linux/install');
 		provideShellMessages(installDirectory);
-		fs.mkdirSync(path.join(bundle, '_shared/data'), { recursive: true });
+		fs.mkdirSync(path.join(bundle, '_shared/core/text/data'), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, 'static/ergopti_plus/linux/install.sh'), script);
 		fs.copyFileSync(
-			path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.sh'),
-			path.join(bundle, '_shared/data/identifiers.sh')
+			path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.sh'),
+			path.join(bundle, '_shared/core/text/data/identifiers.sh')
 		);
 		for (const [args, cwd] of [
 			[[bashPath(script), '--help'], sandbox],
@@ -232,9 +232,9 @@ try {
 		const driver = path.join(fixture, 'driver');
 		const shared = path.join(fixture, 'shared');
 		fs.mkdirSync(driver, { recursive: true });
-		fs.mkdirSync(path.join(shared, 'data/locales'), { recursive: true });
+		fs.mkdirSync(path.join(shared, 'core/i18n/data/locales'), { recursive: true });
 		fs.writeFileSync(path.join(driver, 'ergopti_hotstrings.lua'), 'runtime');
-		fs.writeFileSync(path.join(shared, 'data/locales/en.json'), '{}');
+		fs.writeFileSync(path.join(shared, 'core/i18n/data/locales/en.json'), '{}');
 		const regular = path.join(fixture, 'regular');
 		fs.mkdirSync(regular);
 		fs.writeFileSync(path.join(regular, '.ergopti-owned-files'), 'old receipt\n');
@@ -334,7 +334,7 @@ try {
 			'linux/infra',
 			'linux/adapters/keyboard_hook.lua',
 			'_shared',
-			'_shared/lua',
+			'_shared',
 			'linux/static/layouts/registry',
 			'linux/bin',
 			'linux/bin/libergopti_archive_publication.so',
@@ -395,7 +395,7 @@ try {
 		// cp overwrites regular-file collisions in place: protect other hard
 		// links to each copied tree without changing the existing topology.
 		for (const [index, relative] of [
-			'_shared/data/locales/en.json',
+			'_shared/core/i18n/data/locales/en.json',
 			'linux/static/layouts/registry/index.json'
 		].entries()) {
 			const prefix = path.join(sandbox, `hardlinked-payload-${index}`);

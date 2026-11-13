@@ -7,13 +7,13 @@
 --- ==============================================================================
 
 local source, installed, module, target, mode, receipt = arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]
-package.path = installed .. '/?.lua;' .. source .. '/?.lua;' .. source .. '/?/init.lua;' .. source .. '/../_shared/lua/?.lua;' .. source .. '/../_shared/lua/?/init.lua;' .. package.path
-require('compat.utf8').install()
-local uv, Json = require('luv'), require('json')
+package.path = installed .. '/?.lua;' .. source .. '/?.lua;' .. source .. '/?/init.lua;' .. source .. '/../_shared/?.lua;' .. source .. '/../_shared/?/init.lua;' .. package.path
+require('core.lifecycle.engine.compat.utf8').install()
+local uv, Json = require('luv'), require('core.text.engine.json')
 local Paths = require('infra.paths')
 assert(Paths.shared_root() == installed .. '/_shared', 'actual resolver must admit the installed child layout')
-assert(Paths.shared('modules/llm/' .. target) == installed .. '/_shared/modules/llm/' .. target)
-local target_path = Paths.shared('modules/llm/' .. target)
+assert(Paths.shared('ai/data/' .. target) == installed .. '/_shared/ai/data/' .. target)
+local target_path = Paths.shared('ai/data/' .. target)
 local open, closes = io.open, 0
 if mode == 'close-refusal' then
  io.open = function(path, access)
@@ -27,7 +27,7 @@ local result = { target = target, mode = mode, admitted_child_layout = true }
 if module == 'local' then
  local order, servers, published = require('modules.llm.local_server_catalogue').load({})
  result.order, result.published = order, published
- result.optional_auth_allowed = require('llm.local_server_auth').entry_token_allowed('llamacpp', '', servers.llamacpp and servers.llamacpp.base_url or '', servers)
+ result.optional_auth_allowed = require('ai.engine.local_servers.auth').entry_token_allowed('llamacpp', '', servers.llamacpp and servers.llamacpp.base_url or '', servers)
 elseif module == 'environment' then
  local rows, reason = require('modules.llm.managed_ollama_environment').load()
  result.rows, result.reason = rows or false, reason

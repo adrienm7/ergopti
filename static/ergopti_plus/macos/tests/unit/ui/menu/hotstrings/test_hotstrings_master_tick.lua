@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local output_fixture = require("tests.support.toml_output_fixture")
 
-local Answers = require("onboarding_answers")
+local Answers = require("onboarding.engine.answers")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -227,7 +227,7 @@ local function with_wizard(answer, scenario)
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Manifest = require("infra.manifest_reader")
-		local TomlWriter = require("toml_codec.writer")
+		local TomlWriter = require("core.text.engine.toml_codec.writer")
 		local index = Answers.load(catalogue_text(), "macos")
 		local page = page_of(index, "hotstrings")
 		local groups, hotfiles = inventory(page)

@@ -26,7 +26,7 @@
 ---    failure and retains its diagnostic tail without an invented cause.
 --- ==============================================================================
 
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 local M = {}
 
 -- Resolved per call: the locale owner is a stateful singleton that tests and
@@ -53,7 +53,7 @@ M.KINDS = {
 	"permission", "disk_full", "import_failed", "python",
 }
 
--- The network classes, as _shared/modules/network/managed_network.json names
+-- The network classes, as _shared/core/network/data/managed_network.json names
 -- them for every driver; their sentence is the contract's message_key.
 M.NETWORK_KINDS = { certificate = true, proxy = true, host_blocked = true, offline = true, network_unknown = true }
 

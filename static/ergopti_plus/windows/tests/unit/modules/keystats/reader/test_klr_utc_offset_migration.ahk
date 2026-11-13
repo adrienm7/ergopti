@@ -8,7 +8,7 @@
 ; refused every new ledger row: SQLite answered "no such column" and the
 ; dashboard kept the last projection forever. The reader now adds the column to
 ; every raw table of such an image and renews its purge triggers before
-; purge_schema.sql (the statements of _shared/lua/keystats/utc_offset_column.lua).
+; purge_schema.sql (the statements of _shared/metrics/engine/utc_offset_column.lua).
 ;
 ; FEATURES & RATIONALE:
 ; 1. The image is a real reader.sqlite saved by a worker in a temporary metrics

@@ -27,9 +27,9 @@ const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAIRS = [
-	['static/ergopti_plus/_shared/assets/ergopti_tray.png', 'static/img/logo/logo_simple.png'],
+	['static/ergopti_plus/_shared/tray/data/ergopti_tray.png', 'static/img/logo/logo_simple.png'],
 	[
-		'static/ergopti_plus/_shared/assets/ergopti_tray_paused.png',
+		'static/ergopti_plus/_shared/tray/data/ergopti_tray_paused.png',
 		'static/img/logo/logo_simple_disabled.png'
 	]
 ];
@@ -57,8 +57,8 @@ for (const [copy, original] of PAIRS) {
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-icons-'));
 try {
 	const logo = fs.readFileSync(path.join(ROOT, PAIRS[0][0]));
-	fs.mkdirSync(path.join(sandbox, '_shared', 'assets'), { recursive: true });
-	fs.writeFileSync(path.join(sandbox, '_shared', 'assets', 'ergopti_tray.png'), logo);
+	fs.mkdirSync(path.join(sandbox, '_shared', 'tray', 'data'), { recursive: true });
+	fs.writeFileSync(path.join(sandbox, '_shared', 'tray', 'data', 'ergopti_tray.png'), logo);
 	for (const format of ['deb', 'rpm', 'appimage']) {
 		const source = fs.readFileSync(path.join(ROOT, `tools/build/build-linux-${format}.sh`), 'utf8');
 		const section = source.match(

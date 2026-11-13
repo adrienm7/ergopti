@@ -11,7 +11,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
-    "tested_sessions", ROOT / "static/ergopti_plus/_shared/python/managed_ollama_sessions.py"
+    "tested_sessions",
+    ROOT / "static/ergopti_plus/_shared/ai/adapters/python/managed_ollama_sessions.py",
 )
 SESSIONS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SESSIONS)

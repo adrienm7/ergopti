@@ -41,10 +41,10 @@ local function load_menu(start_result)
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	-- The switch is the command registered for the manifest's metrics_toggle
 	-- row, captured where the menu hands it to the renderer.
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function()
-			return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+			return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 		end,
 		json_decode = require("adapters.json_codec").decode,
 		i18n = renderer_i18n,

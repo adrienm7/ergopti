@@ -33,7 +33,7 @@ helpers.describe("log_manager — initialization transaction", function()
 			"modules.keystats.aggregator",
 			"modules.keystats.rotation",
 			"modules.keystats.export",
-			"keystats.metrics",
+			"metrics.engine.metrics",
 			"adapters.ledger_append", "modules.keystats.log_manager",
 		}
 		local saved = {}
@@ -108,7 +108,7 @@ helpers.describe("log_manager — initialization transaction", function()
 				init = function() end,
 				sync_foreign_data_sql = function() return {} end,
 			}
-			package.loaded["keystats.metrics"] = {
+			package.loaded["metrics.engine.metrics"] = {
 				compute_wpm_from_events = function() return 0 end,
 			}
 

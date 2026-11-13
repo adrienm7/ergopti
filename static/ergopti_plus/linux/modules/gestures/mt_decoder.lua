@@ -46,15 +46,15 @@
 ---    after a two-finger scroll is the user stopping it, not a swipe.
 --- 4. Three contacts become the gesture's count only when they can be one
 ---    hand's fingers: a far or oversized third contact is a resting thumb
----    (shared rule, _shared/lua/gestures/contact_join.lua, the macOS engine's
+---    (shared rule, _shared/gestures/engine/contact_join.lua, the macOS engine's
 ---    too), judged in millimetres from the pad's resolution.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Direction = require("gestures.direction")
-local ContactJoin = require("gestures.contact_join")
+local Logger = require("core.logger.engine.shim")
+local Direction = require("gestures.engine.direction")
+local ContactJoin = require("gestures.engine.contact_join")
 
 local LOG = "gestures.mt_decoder"
 
@@ -318,7 +318,7 @@ function M.new(opts)
 	end
 
 	--- Names the direction of a displacement through the classifier the macOS
-	--- geometry uses too (_shared/lua/gestures/direction.lua), measured in
+	--- geometry uses too (_shared/gestures/engine/direction.lua), measured in
 	--- millimetres through the pad's resolution (GSD-2). The swipe minimum is
 	--- the registry's decoder_swipe_minimum_mm, and a diagonal needs the shared
 	--- factor of it; this project's slot space has explicit diagonal
@@ -327,7 +327,7 @@ function M.new(opts)
 	--- Y grows DOWNWARD in evdev, so a negative dy is "up". Getting that backwards
 	--- inverts every vertical gesture and reads as the binding being wrong rather
 	--- than the decoder. The shared names put the horizontal part first
-	--- (`swipe_3_left_up`), as _shared/modules/actions/actions.toml declares
+	--- (`swipe_3_left_up`), as _shared/shortcuts/data/actions/actions.toml declares
 	--- every slot: "up_right" would bind every diagonal silently to nothing.
 	--- @param dx number
 	--- @param dy number

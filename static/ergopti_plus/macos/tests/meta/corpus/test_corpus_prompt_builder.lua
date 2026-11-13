@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Loads the shared cross-driver corpus from
 --- _shared/tests/corpus/prompt_builder/vectors.json and validates each vector
---- against the shared Lua implementation at _shared/lua/llm/prompt_builder.lua.
+--- against the shared Lua implementation at _shared/ai/engine/prediction/prompt_builder_core.lua.
 ---
 --- COVERAGE:
 --- 1. Corpus integrity — JSON file is readable and every vector has required
@@ -17,7 +17,7 @@
 --- 6. Language passthrough — language field is forwarded unchanged.
 --- 7. Direct string match — context field is exact when expected.context provided.
 ---
---- This file exercises the shared _shared/lua/llm/prompt_builder.lua module,
+--- This file exercises the shared _shared/ai/engine/prediction/prompt_builder_core.lua module,
 --- ensuring the Lua implementation stays in sync with the JS reference.
 --- ==============================================================================
 
@@ -33,8 +33,8 @@ local helpers = require("tests.helpers")
 -- ============================================
 -- ============================================
 
--- Inject the _shared/lua/ path so prompt_builder can be required directly.
-local _shared_lua  = helpers.shared("lua")
+-- Inject the _shared/ path so prompt_builder can be required directly.
+local _shared_lua  = helpers.shared("")
 local _entry       = _shared_lua .. "/?.lua"
 if not package.path:find(_entry, 1, true) then
 	package.path = _entry .. ";" .. package.path
@@ -61,9 +61,9 @@ end
 local corpus, corpus_err = read_corpus()
 
 -- Load the shared prompt_builder module
-local ok_pb, prompt_builder = pcall(require, "llm.prompt_builder")
+local ok_pb, prompt_builder = pcall(require, "ai.engine.prediction.prompt_builder_core")
 if not ok_pb then
-	-- Fallback: resolve relative to _shared/lua
+	-- Fallback: resolve relative to _shared
 	ok_pb, prompt_builder = pcall(require, "prompt_builder")
 end
 

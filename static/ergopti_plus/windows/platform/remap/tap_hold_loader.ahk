@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Loads tap-hold configuration into a hierarchical Map. Supports an optional
 ; defaults overlay: when ``DefaultsFilePath`` is supplied, the shared
-; ``_shared/tap_hold/defaults.toml`` is parsed first, then the user file is
+; ``_shared/tap_hold/data/defaults.toml`` is parsed first, then the user file is
 ; merged on top — user values win, absent user keys inherit the default. This
 ; means editing ``defaults.toml`` takes effect on every reload even when the
 ; user file exists, satisfying the cross-driver consistency goal.
@@ -52,12 +52,12 @@
 ; Linux read too, and the same 10 s.
 global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 ; The modifiers of the shared file that no Windows key holds (cmd, fn): the
-; names of _shared/tap_hold/shared_file.toml [modifiers] order that the hold
+; names of _shared/tap_hold/data/shared_file.toml [modifiers] order that the hold
 ; picker does not offer. A file carrying them keeps them; this driver warns once
 ; and holds nothing. Read at this include position, like the aliases below.
 global TAPHOLD_MACOS_MODIFIERS := _TapHoldReadMacOnlyModifiers()
 ; The PC key at the place of each Mac thumb key (maintainer decision TCL-004,
-; « follow the position »): _shared/tap_hold/shared_file.toml [thumb_positions],
+; « follow the position »): _shared/tap_hold/data/shared_file.toml [thumb_positions],
 ; read at this include position like the tables around it.
 global TAPHOLD_THUMB_POSITIONS := _TapHoldReadThumbPositions()
 ; The other spellings of a hold modifier (altgr, lctrl...), read here, at this
@@ -238,7 +238,7 @@ _TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := un
 	}
 	if (MigrateWith != "")
 		TapHoldMigrationReadAsCurrent(Document, MigrateWith)
-	; The user file is shared by every OS (_shared/tap_hold/SCHEMA.md): [karabiner]
+	; The user file is shared by every OS (_shared/tap_hold/data/SCHEMA.md): [karabiner]
 	; is macOS's own and is left alone; a manifest row an older macOS or Linux
 	; build kept here lives in config.toml now and is not read from this file.
 	if (MigrateWith != "") && Document.Has(ConfigLeaf.MOD_COMBOS)
@@ -620,7 +620,7 @@ _TapHoldOwnSideModifier(KeyId, Token) {
 
 ; The other spellings of a hold modifier (altgr, lctrl...), from the two alias
 ; tables of [tap_hold.hold_picker] in the shared defaults. The Linux loader
-; reads the same tables (_shared/lua/tap_hold/hold_options.lua): they were two
+; reads the same tables (_shared/tap_hold/engine/hold_options.lua): they were two
 ; hand-kept lists, here as case labels, that agreed only by care. Called once,
 ; for TAPHOLD_HOLD_MODIFIER_ALIASES; a table the file cannot give is logged
 ; there, once, and its spellings are refused.
@@ -628,7 +628,7 @@ _TapHoldOwnSideModifier(KeyId, Token) {
 ;          lower-case alias -> modifier id.
 _TapHoldReadHoldModifierAliases() {
 	global _SharedDir
-	Path := _SharedDir . "\tap_hold\defaults.toml"
+	Path := _SharedDir . "\tap_hold\data\defaults.toml"
 	Sections := ParseTomlFile(Path)
 	Picker := Sections.Has("tap_hold.hold_picker") ? Sections["tap_hold.hold_picker"] : Map()
 	Tables := Map()
@@ -763,7 +763,7 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel) {
 ; =========================================
 
 ; What the one-shot Shift makes of the next character, read once from
-; _shared/tap_hold/one_shot_shift.json, which the Linux driver reads too. The
+; _shared/tap_hold/data/one_shot_shift.json, which the Linux driver reads too. The
 ; results were an if/else chain in one_shot_shift.ahk, so Linux had none of
 ; them. A file that cannot be read is logged once and the failure kept: the
 ; one-shot only capitalises until the next start, rather than reading the file
@@ -774,7 +774,7 @@ _TapHoldOneShotTable() {
 	global _SharedDir, _TapHoldOneShotCache
 	if (_TapHoldOneShotCache is Map)
 		return _TapHoldOneShotCache
-	Path := (IsSet(_SharedDir) ? _SharedDir : "") . "\tap_hold\one_shot_shift.json"
+	Path := (IsSet(_SharedDir) ? _SharedDir : "") . "\tap_hold\data\one_shot_shift.json"
 	try {
 		Root := JsonParse(FileRead(Path, "UTF-8"))
 		Results := Map()
@@ -818,7 +818,7 @@ TapHoldOneShotEndKeys(MagicKey) {
 }
 
 ; The [tap_hold] fields an older macOS or Linux build kept in tap_hold.toml and
-; config.toml holds since schema v22 (_shared/core/config_schema/migrations.toml):
+; config.toml holds since schema v22 (_shared/settings/data/config_schema/migrations.toml):
 ; Windows always read them from config.toml [tap_holds].
 TapHoldConfigOwnedFields() {
 	static Fields := ["enabled", ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS, ConfigLeaf.STICKY_TIMEOUT_MS]
@@ -836,7 +836,7 @@ _TapHoldReportConfigOwned(FilePath, EntryPath) {
 ; @returns {Map} Mac catalogue id -> PC catalogue id.
 _TapHoldReadThumbPositions() {
 	global _SharedDir
-	Spec := ParseTomlFile(_SharedDir . "\tap_hold\shared_file.toml")
+	Spec := ParseTomlFile(_SharedDir . "\tap_hold\data\shared_file.toml")
 	Positions := Spec.Get("thumb_positions", "")
 	Out := Map()
 	if !(Positions is Map) {
@@ -865,7 +865,7 @@ _TapHoldPositionalKey(FileKeyId, Keys) {
 ; @returns {Map} Name -> true.
 _TapHoldReadMacOnlyModifiers() {
 	global _SharedDir
-	Spec := ParseTomlFile(_SharedDir . "\tap_hold\shared_file.toml")
+	Spec := ParseTomlFile(_SharedDir . "\tap_hold\data\shared_file.toml")
 	Order := Spec.Has("modifiers") ? Spec["modifiers"].Get("order", "") : ""
 	Names := Map()
 	if !(Order is Array) {
@@ -874,7 +874,7 @@ _TapHoldReadMacOnlyModifiers() {
 	}
 	; Read here, not through the writer's picker reader: this runs at the
 	; loader's include position, where tap_hold_writer.ahk may not be included.
-	Picker := ParseTomlFile(_SharedDir . "\tap_hold\defaults.toml").Get("tap_hold.hold_picker", Map())
+	Picker := ParseTomlFile(_SharedDir . "\tap_hold\data\defaults.toml").Get("tap_hold.hold_picker", Map())
 	Modifiers := (Picker is Map) ? Picker.Get("modifiers", "") : ""
 	if !(Modifiers is Array) {
 		try LoggerError("TapHoldLoader", "'defaults.toml' declares no [tap_hold.hold_picker] modifiers — a macOS hold is refused as unknown.")
@@ -913,9 +913,9 @@ TapHoldFieldKinds() {
 ; The per-key delays the shared defaults used to ship, in seconds, by key id
 ; (``[tap_hold.retired_delays]``). They are not defaults: they identify the delay
 ; values a rewrite of an older tap_hold.toml copied into the file, which the
-; migration (_shared/tap_hold/migrations.toml) must not mistake for a choice of
+; migration (_shared/tap_hold/data/migrations.toml) must not mistake for a choice of
 ; the user.
-; @param DefaultsFilePath {String} The shared tap_hold/defaults.toml.
+; @param DefaultsFilePath {String} The shared tap_hold/data/defaults.toml.
 ; @returns {Map} Key id -> seconds.
 ; Throws when the table is unusable: stamping a file without its cleanup would
 ; freeze the copied delays as the user's own.

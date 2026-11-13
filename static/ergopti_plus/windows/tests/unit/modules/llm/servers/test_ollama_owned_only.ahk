@@ -28,7 +28,7 @@ _OOO_WithSharedDefaults(Body) {
 
 _OOO_SharedDefaultsDifferAndOwnedLoads() {
 	global _SharedDir
-	Raw := JsonParse(FileRead(_SharedDir . "\modules\llm\defaults.json", "UTF-8"))
+	Raw := JsonParse(FileRead(_SharedDir . "\ai\data\defaults.json", "UTF-8"))
 	Assert(Raw["llm_ollama_owned_port"] != Raw["llm_ollama_port"], "the owned port differs from the stock port")
 	_OOO_WithSharedDefaults(Run)
 	Run() {

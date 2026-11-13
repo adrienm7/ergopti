@@ -13,7 +13,7 @@ local function with_apps(callback)
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.fs_dir",
 			"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
-			"adapters.json_codec", "menu.renderer", "logger.shim" }, function()
+			"adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
 				output = "", status = true, kind = "exit", code = 0 }
 			local logger = helpers.make_logger_stub()
@@ -207,7 +207,7 @@ end)
 
 -- Handwritten caption expectations are independent of the generated declaration.
 helpers.describe("the shared empty Applications caption", function()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local file = assert(io.open(helpers.shared("tests/corpus/menu/apps_empty_caption.json"), "rb"))
 	local corpus = assert(Json.decode(file:read("*a")))
 	file:close()
@@ -226,7 +226,7 @@ helpers.describe("the shared empty Applications caption", function()
 			with_apps(function(module, state, ctx)
 				state.render_native = true
 				module.prime(ctx)
-				local locale_file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+				local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 				local catalogue = assert(Json.decode(locale_file:read("*a")))
 				locale_file:close()
 				helpers.assert_eq(catalogue[corpus.row.i18n], expected)
@@ -275,8 +275,8 @@ local function with_native_apps_parent(language, body)
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local native, owner, receipt, acquired, scratch
 	local result, detail = xpcall(function()
-		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "locale.core",
-			"infra.manifest_menu", "infra.config_paths", "infra.paths", "adapters.json_codec", "menu.renderer",
+		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+			"infra.manifest_menu", "infra.config_paths", "infra.paths", "adapters.json_codec", "menu.engine.renderer",
 			"adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }) do
 			package.loaded[name] = nil
 		end
@@ -397,7 +397,7 @@ helpers.describe("Apps parent declaration admission", function()
 			helpers.assert_eq(actual_parent(renderer), expected.row)
 			local count = 0
 			for language, caption in pairs(expected.captions) do
-				local locale_file = assert(io.open(helpers.shared("data/locales/" .. language .. ".json"), "rb"))
+				local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. language .. ".json"), "rb"))
 				local locale = assert(require("adapters.json_codec").decode(locale_file:read("*a"))); assert(locale_file:close())
 				helpers.assert_eq(locale["menu.apps.title"], caption); count = count + 1
 			end

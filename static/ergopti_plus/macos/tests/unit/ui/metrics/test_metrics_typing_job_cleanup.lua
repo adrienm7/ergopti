@@ -91,7 +91,7 @@ helpers.describe("typing metrics projection custody", function()
 		local job = dashboard._job
 		local timer = job.timer
 		control.refused = timer
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		package.loaded["hs.json"].decode = Json.decode
 		local reset_id, acknowledgements = 1, {}
 		function control.native.webview:evaluateJavaScript(code, callback)

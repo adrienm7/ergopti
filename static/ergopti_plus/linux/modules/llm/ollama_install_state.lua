@@ -24,7 +24,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "modules.llm.ollama_install_state"
 local REASON = "model_browser.reason_ollama_missing"
@@ -104,7 +104,7 @@ end
 local DEFAULT_PORTS = {
 	failure = M.failure,
 	managed = managed_status,
-	loopback = function(origin) return require("llm.runtime_repair").loopback_origin(origin) ~= nil end,
+	loopback = function(origin) return require("ai.engine.local_servers.runtime_repair").loopback_origin(origin) ~= nil end,
 }
 
 --- Whether the local Ollama can run a model now.

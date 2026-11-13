@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 
 --- Reads one shared JSON file.
@@ -24,8 +24,8 @@ local function read(relative)
 end
 
 helpers.describe("Local server port discovery (local-server-ports)", function()
-	require("test.local_server_ports_contract").run(read("tests/corpus/llm/local_server_ports.json"),
-		read("modules/llm/local_servers.json"), Json.decode, helpers)
+	require("tests.lua.core.local_server_ports_contract").run(read("tests/corpus/llm/local_server_ports.json"),
+		read("ai/data/local_servers.json"), Json.decode, helpers)
 end)
 
 helpers.it("local server settings refuse a FIFO without waiting for its writer", function()
@@ -90,7 +90,7 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 	--- @return table results
 	--- @return table runs The programs run, in order.
 	local function scan_with(processes, answers, clock)
-		local Policy = require("llm.local_server_ports")
+		local Policy = require("ai.engine.local_servers.ports_core")
 		local previous = package.loaded["modules.llm.local_server_ports"]
 		package.loaded["modules.llm.local_server_ports"] = nil
 		local Scanner = require("modules.llm.local_server_ports")
@@ -107,7 +107,7 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 			callback((answers or {})[program] or { exit_code = 1, stdout = "" })
 			return true
 		end
-		local catalogue = read("modules/llm/local_servers.json")
+		local catalogue = read("ai/data/local_servers.json")
 		local entries = {}
 		for _, id in ipairs(catalogue.server_order) do
 			entries[#entries + 1] = { id = id, descriptor = assert(Policy.descriptor(id, catalogue.servers[id].discovery)),
@@ -204,7 +204,7 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 		end)
 
 	helpers.it("an unreadable /proc falls back to the catalogue port", function()
-		local Policy = require("llm.local_server_ports")
+		local Policy = require("ai.engine.local_servers.ports_core")
 		local previous = package.loaded["modules.llm.local_server_ports"]
 		package.loaded["modules.llm.local_server_ports"] = nil
 		local Scanner = require("modules.llm.local_server_ports")
@@ -213,7 +213,7 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 		Scanner._home = function() return "/home/u" end
 		Scanner._read_file = function() return nil end
 		Scanner._run = function(_, _, _, callback) callback({ exit_code = -1, stdout = "", error = "timed out" }); return true end
-		local catalogue = read("modules/llm/local_servers.json")
+		local catalogue = read("ai/data/local_servers.json")
 		local entries = {}
 		for _, id in ipairs(catalogue.server_order) do
 			entries[#entries + 1] = { id = id, descriptor = assert(Policy.descriptor(id, catalogue.servers[id].discovery)),
@@ -227,8 +227,8 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 end)
 
 helpers.describe("Shared process pattern matcher (local-server-ports)", function()
-	local Policy = require("llm.local_server_ports")
-	local catalogue = read("modules/llm/local_servers.json")
+	local Policy = require("ai.engine.local_servers.ports_core")
+	local catalogue = read("ai/data/local_servers.json")
 
 	helpers.it("agrees with matches() on every catalogue descriptor (linux-proc-scan)", function()
 		local entries = {}
@@ -321,7 +321,7 @@ helpers.it("(local-port-owned) waits for the exact cancelled ss process receipt"
 			is_settled = function() return close_ack end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = read("modules/llm/local_servers.json").servers.omlx.discovery
+		local descriptor = read("ai/data/local_servers.json").servers.omlx.discovery
 		descriptor.address_flags = {}
 		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() callback_count = callback_count + 1 end)
@@ -364,7 +364,7 @@ helpers.it("(local-port-owned) a real process acknowledges exit and closure befo
 		return require("adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
 	end
 	local ok, err = pcall(function()
-		local descriptor = read("modules/llm/local_servers.json").servers.omlx.discovery
+		local descriptor = read("ai/data/local_servers.json").servers.omlx.discovery
 		descriptor.address_flags = {}
 		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() deliveries = deliveries + 1 end)
@@ -412,7 +412,7 @@ helpers.it("(local-port-owned) a refused process waits for its native close befo
 			is_settled = function() return closed end, on_settled = function(_, fn) listener = fn; return true end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = read("modules/llm/local_servers.json").servers.omlx.discovery
+		local descriptor = read("ai/data/local_servers.json").servers.omlx.discovery
 		descriptor.address_flags = {}
 		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() deliveries = deliveries + 1 end)
@@ -445,8 +445,8 @@ helpers.it("(local-port-owned) a refused slice waits for its native close before
 			is_settled = function() return true end }
 	end
 	local ok, err = pcall(function()
-		local raw = read("modules/llm/local_servers.json").servers.omlx.discovery
-		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx", raw))
+		local raw = read("ai/data/local_servers.json").servers.omlx.discovery
+		local descriptor = assert(require("ai.engine.local_servers.ports_core").descriptor("omlx", raw))
 		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() deliveries = deliveries + 1 end)
 		helpers.assert_eq(starts, 0)
@@ -472,8 +472,8 @@ helpers.it("(local-port-owned) a physically settled child retains its active cal
 		return { started = true, cancel = function() return true end, is_settled = function() return closed end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
-			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local descriptor = assert(require("ai.engine.local_servers.ports_core").descriptor("omlx",
+			read("ai/data/local_servers.json").servers.omlx.discovery))
 		local scan
 		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() during = scan:cancel() end)
@@ -527,8 +527,8 @@ helpers.it("(local-port-owned) joins an overlapping slice close and ss process",
 			is_settled = function() return process_done end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
-			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local descriptor = assert(require("ai.engine.local_servers.ports_core").descriptor("omlx",
+			read("ai/data/local_servers.json").servers.omlx.discovery))
 		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() error("cancelled scan published") end)
 		helpers.assert_type(fire, "function")
@@ -556,8 +556,8 @@ helpers.it("review-scan-admit: an admission callback remains active after native
 		return { started = true, cancel = function() return true end, is_settled = function() return closed end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
-			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local descriptor = assert(require("ai.engine.local_servers.ports_core").descriptor("omlx",
+			read("ai/data/local_servers.json").servers.omlx.discovery))
 		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() end,
 			function() if armed then during = scan:cancel() end; return true end)
@@ -581,8 +581,8 @@ helpers.it("(local-port-owned) child cancellation cannot acknowledge its active 
 			is_settled = function() return closed end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
-			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local descriptor = assert(require("ai.engine.local_servers.ports_core").descriptor("omlx",
+			read("ai/data/local_servers.json").servers.omlx.discovery))
 		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() end)
 		helpers.assert_eq(scan:cancel(), true)
@@ -605,8 +605,8 @@ helpers.it("(local-port-owned) nested settlement observation cannot acknowledge 
 		end }
 	end
 	local ok, err = pcall(function()
-		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
-			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local descriptor = assert(require("ai.engine.local_servers.ports_core").descriptor("omlx",
+			read("ai/data/local_servers.json").servers.omlx.discovery))
 		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
 			base_url = "http://127.0.0.1:8000/v1" } }, function() end)
 		armed = true

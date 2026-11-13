@@ -9,31 +9,31 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 --- Runs one real controller and factory over isolated native reference ownership.
 --- @param module_name string Window controller to load.
 --- @param scenario function Receives controller and native observations.
 local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
-		"ui.config_cleanup", "config_cleanup_session", "config_cleanup", "ui.onboarding", "onboarding_answers",
-		"ui.update_check", "updater.check_session", "modules.updater", "adapters.update_launcher",
+		"ui.config_cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
+		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
 		"ui.metrics_apps", "infra.dialog_util", "infra.toml.writer", "infra.toml.codec", "infra.manifest_reader",
 		"tests.support.onboarding_shared_data", "adapters.file_system", "hs.spaces",
-		"toml_codec.writer", "config_unused_keys", "diagnostics.operation_reporter", "toml_codec.record_list",
-		"config_outdated", "module_source_identity", "toml_codec.leaf_rows", "lfs", "module_source_directory",
-		"config_migrate", "toml_codec.record_scanner", "toml_codec.key_path", "toml_codec.basic_string",
-		"toml_codec.bom", "toml_codec.cleanup_roots", "config_user_models",
-		"infra.notifications", "config_defaults", "text_utils", "hotstrings.personal_files", "compat.utf8",
-		"infra.fs_dir", "adapters.webview_result", "config_file_inverse", "onboarding_publication", "infra.config_paths",
-		"llm.model_catalogue", "adapters.shell_runner", "webview.document_csp", "diagnostics.runtime_log",
-		"adapters.task_environment", "modules.updater.config_backup", "updater.release_sources", "updater.channels",
-		"updater.version", "updater.release_install", "updater.release_assets", "network.failure", "updater.config_backup",
+		"core.text.engine.toml_codec.writer", "settings.engine.migration.unused_keys", "diagnostics.engine.operation_reporter", "core.text.engine.toml_codec.record_list",
+		"settings.engine.migration.outdated", "core.fs.engine.module_source_identity", "core.text.engine.toml_codec.leaf_rows", "lfs", "core.fs.engine.module_source_directory",
+		"settings.engine.migration.migrate", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
+		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.cleanup_roots", "settings.engine.publication.user_models",
+		"infra.notifications", "settings.engine.publication.defaults", "core.text.engine.utils_core", "hotstrings.engine.catalogue.personal_files", "core.lifecycle.engine.compat.utf8",
+		"infra.fs_dir", "adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "infra.config_paths",
+		"ai.engine.local_servers.model_catalogue", "adapters.shell_runner", "core.ui.engine.webview.document_csp", "diagnostics.engine.runtime_log",
+		"adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
+		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
 		"ui.model_browser", "ui.changelog",
 		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
-		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
-		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
+		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact",
+		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
+		"core.fs.engine.app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, controllers = {}, timers = {} }
@@ -86,7 +86,7 @@ local function run_window(module_name, scenario)
 			files.read = function(path, ...)
 				for _, name in ipairs({ "channels", "defaults" }) do
 					-- The read is recognized by the file's path under the shared root.
-					local real = helpers.shared("modules/updater/" .. name .. ".json")
+					local real = helpers.shared("updater/data/" .. name .. ".json")
 					local relative = real:sub(#helpers.shared() + 1)
 					if path:sub(-#relative) == relative then
 						local file = assert(io.open(real, "r"))

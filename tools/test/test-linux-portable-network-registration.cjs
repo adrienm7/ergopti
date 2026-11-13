@@ -81,7 +81,7 @@ for (const platform of ['darwin', 'win32']) {
 }
 const gate = 'linux-portable-network-native';
 for (const source of [
-	'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+	'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
 	'tools/build/build-linux-appimage.sh',
 	'tools/build/build-linux-flatpak.sh',
 	'tools/build/stage-linux-network-runtime.py',

@@ -40,7 +40,7 @@ helpers.describe("SHA-256 of a file whose name shasum escapes (sha256-escaped-na
 			.. "; printf 'stdin=%s\\n' \"$(shasum -a 256 < " .. quote(root .. "/f") .. ")\""
 			.. "; printf 'digest=%s\\n' \"$(sha256_file_digest " .. quote(root .. "/f") .. ")\""
 		local output, status = command("ROUTE_ORIGINS_FILE="
-			.. quote(helpers.shared("modules/network/route_origins.json")) .. " /bin/bash -c " .. quote(script))
+			.. quote(helpers.shared("core/network/data/route_origins.json")) .. " /bin/bash -c " .. quote(script))
 		command("rm -rf " .. quote(root))
 		helpers.assert_eq(status, 0, output)
 		helpers.assert_true(output:match("raw=\\%x+") ~= nil,

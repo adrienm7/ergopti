@@ -19,10 +19,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local leaks   = require("test.menu_off_platform")
+local leaks   = require("tests.lua.menu.off_platform")
 
 local PLATFORM      = "linux"
-local MANIFEST_PATH = "../_shared/modules/menu/menu_manifest.json"
+local MANIFEST_PATH = "../_shared/menu/data/menu_manifest.json"
 
 
 -- Every string the fixture menu can ask for. Keyed exactly as the manifest names
@@ -39,7 +39,7 @@ local TRANSLATIONS = {
 local function write_fixture_manifest()
 	local tmp_dir = os.tmpname()
 	os.remove(tmp_dir)
-	local manifest_dir = tmp_dir .. "/modules/menu"
+	local manifest_dir = tmp_dir .. "/menu/data"
 	os.execute('mkdir -p "' .. manifest_dir .. '"')
 
 	local fh = io.open(manifest_dir .. "/menu_manifest.json", "w")
@@ -67,12 +67,12 @@ end
 --- Builds a renderer bound to the fixture, rendering for Linux.
 --- @return table rows
 local function render_fixture()
-	local Renderer = helpers.load_module("menu.renderer")
+	local Renderer = helpers.load_module("menu.engine.renderer")
 	local dir = write_fixture_manifest()
 	local R = Renderer.new({
 		platform      = PLATFORM,
-		manifest_path = function() return dir .. "/modules/menu/menu_manifest.json" end,
-		json_decode   = require("json").decode,
+		manifest_path = function() return dir .. "/menu/data/menu_manifest.json" end,
+		json_decode   = require("core.text.engine.json").decode,
 		i18n          = {
 			get     = function(key) return TRANSLATIONS[key] or key end,
 			section = function(key) return TRANSLATIONS[key] or key end,
@@ -166,11 +166,11 @@ end)
 --- Renders a fixture menu of declared rows for Linux.
 --- @return table rows
 local function render_declared()
-	local Renderer = helpers.load_module("menu.renderer")
+	local Renderer = helpers.load_module("menu.engine.renderer")
 	local tmp_dir = os.tmpname()
 	os.remove(tmp_dir)
-	os.execute('mkdir -p "' .. tmp_dir .. '/modules/menu"')
-	local fh = assert(io.open(tmp_dir .. "/modules/menu/menu_manifest.json", "w"))
+	os.execute('mkdir -p "' .. tmp_dir .. '/menu/data"')
+	local fh = assert(io.open(tmp_dir .. "/menu/data/menu_manifest.json", "w"))
 	fh:write([[
 {
 	"declared_menu": [
@@ -190,8 +190,8 @@ local function render_declared()
 	}
 	local R = Renderer.new({
 		platform      = PLATFORM,
-		manifest_path = function() return tmp_dir .. "/modules/menu/menu_manifest.json" end,
-		json_decode   = require("json").decode,
+		manifest_path = function() return tmp_dir .. "/menu/data/menu_manifest.json" end,
+		json_decode   = require("core.text.engine.json").decode,
 		i18n          = {
 			get     = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end,
@@ -239,18 +239,18 @@ helpers.describe("menu: no off-platform explanation is rendered on linux", funct
 
 	helpers.it("the real manifest has rows the old renderer showed greyed here", function()
 		local fh = assert(io.open(MANIFEST_PATH, "r"))
-		local root = require("json").decode(fh:read("*a"))
+		local root = require("core.text.engine.json").decode(fh:read("*a"))
 		fh:close()
 		helpers.assert_true(leaks.explained_off_platform_count(root, PLATFORM) > 0,
 			"without such rows the check below cannot fail and proves nothing")
 	end)
 
 	helpers.it("renders every manifest menu without a platform_reason text", function()
-		package.loaded["menu.renderer"] = nil
-		local found, rendered = leaks.reason_leaks(require("menu.renderer"), {
+		package.loaded["menu.engine.renderer"] = nil
+		local found, rendered = leaks.reason_leaks(require("menu.engine.renderer"), {
 			platform      = PLATFORM,
 			manifest_path = MANIFEST_PATH,
-			json_decode   = require("json").decode,
+			json_decode   = require("core.text.engine.json").decode,
 			logger        = helpers.make_logger_stub(),
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
@@ -259,11 +259,11 @@ helpers.describe("menu: no off-platform explanation is rendered on linux", funct
 
 end)
 
-require("test.menu_platform_lookup").register(helpers, "linux")
+require("tests.lua.menu.platform_lookup").register(helpers, "linux")
 
 
-require("test.menu_native_composition").register(helpers, "linux")
+require("tests.lua.menu.native_composition").register(helpers, "linux")
 
-require("test.menu_fixed_feature_parent_contract").register(helpers, "linux")
+require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "linux")
 
-require("test.menu_top_level_separator_contract").register(helpers, "linux")
+require("tests.lua.menu.top_level_separator_contract").register(helpers, "linux")

@@ -8,20 +8,20 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Paths = require("infra.paths")
 local Shell = require("adapters.shell_runner")
-local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 local labels = assert(Json.decode_lossless(file:read("*a")))
 file:close()
 
 local function with_notice(tool, body)
 	local names = { "infra.i18n", "adapters.shell_runner", "adapters.keyboard_hook",
-		"adapters.notifier", "ui.llm_enable_refusal", "window_titles" }
+		"adapters.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { order = {}, commands = {}, notifications = {}, captions = {}, release_ok = true, restore_ok = true }
-	package.loaded["window_titles"] = { compose = function(caption)
+	package.loaded["core.ui.engine.window_titles"] = { compose = function(caption)
 		world.captions[#world.captions + 1] = caption
 		world.composed_title = "Caption policy % ' — " .. caption
 		return world.composed_title

@@ -318,7 +318,7 @@ helpers.describe("Main early pause restoration", function()
 				local before_watch = source:sub(first, last - 1)
 				local applications, pause_steps = 0, {}
 				local environment = setmetatable({ ScriptActions = require("modules.shortcuts.script_actions"),
-					Logger = require("logger.shim"), LOG = "Main early pause test", privacy_owners = {},
+					Logger = require("core.logger.engine.shim"), LOG = "Main early pause test", privacy_owners = {},
 					keystats = {
 						cancel_hold_intervals = function() end,
 						discard_roi = function() pause_steps[#pause_steps + 1] = "roi" end,

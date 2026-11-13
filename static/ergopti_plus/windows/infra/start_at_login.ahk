@@ -203,7 +203,7 @@ _StartupOtherSourceIdentity(Script, ReadFn := FSReadBounded) {
 	Limit := 1048576
 	Entry := ReadFn.Call(Script, Limit)
 	Bundle := ReadFn.Call(Directory . "\infra\bundle.ahk", Limit)
-	Defaults := ReadFn.Call(Directory . "\..\_shared\modules\updater\defaults.json", Limit)
+	Defaults := ReadFn.Call(Directory . "\..\_shared\updater\data\defaults.json", Limit)
 	if !(Entry is String) || !(Bundle is String) || !(Defaults is String)
 		return false
 	if !RegExMatch(Entry, "im)^#Requires\s+Autohotkey\s+v2\.0\+")

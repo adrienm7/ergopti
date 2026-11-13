@@ -10,12 +10,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local path = helpers.driver_root() .. "/../_shared/tap_hold/defaults.toml"
+local path = helpers.driver_root() .. "/../_shared/tap_hold/data/defaults.toml"
 
 --- The shipped defaults, decoded afresh.
 local function shipped()
 	local handle = assert(io.open(path, "r"))
-	local decoded = require("toml_codec").decode(handle:read("*a"))
+	local decoded = require("core.text.engine.toml_codec").decode(handle:read("*a"))
 	assert(handle:close())
 	return decoded
 end
@@ -37,7 +37,7 @@ helpers.describe("tap-hold delay model on macOS (par-15)", function()
 	end)
 
 	helpers.it("the retired per-key delays are resolved to the driver's key ids for the migrating drivers", function()
-		local Catalog = require("tap_hold.key_catalog")
+		local Catalog = require("tap_hold.engine.key_catalog")
 		local retired = Catalog.retired_delays_for_platform(shipped(), "hs")
 		helpers.assert_eq(retired.caps_lock, 0.35)
 		helpers.assert_eq(retired.left_control, 0.2, "left_ctrl is left_control in the macOS column")
@@ -45,7 +45,7 @@ helpers.describe("tap-hold delay model on macOS (par-15)", function()
 	end)
 
 	helpers.it("refuses a retired delay that is not a positive number, or for a key the catalogue does not list", function()
-		local Catalog = require("tap_hold.key_catalog")
+		local Catalog = require("tap_hold.engine.key_catalog")
 		for _, bad in ipairs({ 0, -0.2, "0.2" }) do
 			local defaults = shipped()
 			defaults.tap_hold.retired_delays.caps_lock = bad

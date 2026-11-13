@@ -5,7 +5,7 @@
  * MODULE: Tooltip [positioning] Constant Reach
  * DESCRIPTION:
  * Records which drivers actually read each `[positioning]` constant in
- * _shared/modules/tooltip/constants.toml, so a value declared shared and read by
+ * _shared/core/ui/data/tooltip/constants.toml, so a value declared shared and read by
  * one driver — or none — is a documented fact rather than an assumption.
  *
  * WHAT WAS MEASURED:
@@ -40,7 +40,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const TOML = path.join(SP, '_shared', 'modules', 'tooltip', 'constants.toml');
+const TOML = path.join(SP, '_shared', 'core', 'ui', 'data', 'tooltip', 'constants.toml');
 
 const errors = [];
 const src = fs.readFileSync(TOML, 'utf8');

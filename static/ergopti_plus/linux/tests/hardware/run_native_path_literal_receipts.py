@@ -24,9 +24,9 @@ local root = assert(os.getenv("ERGOPTI_NATIVE_DRIVER_ROOT"))
 local shared = assert(os.getenv("ERGOPTI_NATIVE_SHARED_ROOT"))
 assert(Paths.driver_root() == root, "native source/cwd filename bytes were rewritten")
 assert(Paths.shared_root() == shared, "real shared-tree lookup lost literal directory bytes")
-local locale_path = assert(Paths.shared("data/locales/en.json"))
+local locale_path = assert(Paths.shared("core/i18n/data/locales/en.json"))
 local file = assert(io.open(locale_path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
-assert(#bytes > 100 and require("json").decode(bytes), "actual shared locale file was not read")
+assert(#bytes > 100 and require("core.text.engine.json").decode(bytes), "actual shared locale file was not read")
 package.loaded["infra.paths"] = Paths
 local Installer = require("modules.updater.installer")
 local context = Installer.resolve(assert(os.getenv("ERGOPTI_NATIVE_MANAGER_SOURCE")))
@@ -64,7 +64,7 @@ def main():
             (root / "infra").mkdir(parents=True)
             (root / "modules" / "updater").mkdir(parents=True)
             (shared / "data" / "locales").mkdir(parents=True)
-            (shared / "lua").mkdir()
+            (shared).mkdir()
             (prefix / "bin").mkdir()
             source = root / "infra" / "paths.lua"
             manager = root / "modules" / "updater" / "manager.lua"
@@ -98,9 +98,9 @@ def main():
                     + ";"
                     + str(driver / "?" / "init.lua")
                     + ";"
-                    + str(shared_source / "lua" / "?.lua")
+                    + str(shared_source / "?.lua")
                     + ";"
-                    + str(shared_source / "lua" / "?" / "init.lua")
+                    + str(shared_source / "?" / "init.lua")
                     + ";;",
                 }
             )

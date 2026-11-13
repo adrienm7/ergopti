@@ -31,7 +31,7 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 
 	helpers.it("greys the profile parent with the newer cause and refuses its retained rows", function()
 		Preferences.with(function()
-			local Migrate = require("config_migrate")
+			local Migrate = require("settings.engine.migration.migrate")
 			local I18n = require("infra.i18n")
 			local old_reason, old_status = Migrate.read_only_reason, Migrate.read_only_status
 			local blocked = false
@@ -39,7 +39,7 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 			Migrate.read_only_status = function() return blocked and "newer" or nil end
 			local engine = require("modules.llm.prediction_engine")
 			local original_enabled = engine.is_enabled
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local old_warn = Logger.warn
 			local ok, err = xpcall(function()
 				local ctx = { llm = engine, paused = false, on_quit = function() end, on_menu_changed = function() end,

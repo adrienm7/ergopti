@@ -121,7 +121,7 @@ local function build_tray(on, extra)
 		ManifestMenu.build = function(...)
 			local args = table.pack(...)
 			previous_build(table.unpack(args, 1, args.n))
-			return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.renderer" }, function()
+			return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.engine.renderer" }, function()
 				return helpers.load_with_stubs("infra.manifest_menu").build(table.unpack(args, 1, args.n))
 			end)
 		end
@@ -279,13 +279,13 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 		["menu.tapholds.title"] = "tap_holds_menu", ["menu.gestures.title"] = "gestures_menu",
 	}
 	helpers.it("greys every gated manifest menu but its enable and reader rows", function()
-		require("test.category_off_contract").assert_every_gated_menu(helpers,
+		require("tests.lua.category_off_contract").assert_every_gated_menu(helpers,
 			require("infra.manifest_menu"), require("infra.i18n"), "hs")
 	end)
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("applies the category-off rule to the built tray, on " .. tostring(posture), function()
 			local tray = build_tray(posture)
-			local i18n, Contract = require("infra.i18n"), require("test.category_off_contract")
+			local i18n, Contract = require("infra.i18n"), require("tests.lua.category_off_contract")
 			local ManifestMenu = require("infra.manifest_menu")
 			for _, category in ipairs(CATEGORIES) do
 				Contract.assert_category(helpers, i18n, ManifestMenu.get_array(MENU_KEYS[category.title]),

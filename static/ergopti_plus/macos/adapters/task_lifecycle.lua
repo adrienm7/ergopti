@@ -21,7 +21,7 @@ local M = {}
 
 local hs = hs
 local Logger = require("infra.logger")
-local ErrorDescription = require("error_description")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local TaskEnvironment = require("adapters.task_environment")
 
 local LOG = "adapters.task_lifecycle"

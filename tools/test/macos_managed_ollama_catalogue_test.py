@@ -369,7 +369,7 @@ class PortableCatalogue(unittest.TestCase):
         upstream = self.root / "upstream"
         repository.mkdir()
         upstream.mkdir()
-        protected = repository / "_shared/modules/llm/managed_ollama_release.json"
+        protected = repository / "_shared/ai/data/managed_ollama_release.json"
         for path in (protected, upstream / "build/managed_ollama_release.json"):
             with self.subTest(path=path):
                 with self.assertRaises(ValueError):

@@ -79,7 +79,7 @@ guarded(function()
 	assert(hs.screen.mainScreen(), "no native GUI screen")
 	local root = config.source_root .. "/static/ergopti_plus"
 	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
-		.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path
+		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
 	-- Logging/locale and unrelated input-tag persistence are isolated. Constants,
 	-- APIs, shared line policy, anchor resolution and font metrics remain actual.
 	local logger = {}

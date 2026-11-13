@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local target, endpoint, kind = os.getenv("HC_TARGET"), os.getenv("HC_SOURCE_PATH"), os.getenv("HC_KIND")
 local regular = os.getenv("HC_REGULAR") == "1"
 local old_open = io.open
@@ -118,7 +118,7 @@ def main():
                     HC_REGULAR="1" if shape in ("regular", "file-link") else "0",
                     HC_CHAR="1" if shape == "char-link" else "0",
                     XDG_CONFIG_HOME=str(root / "config"),
-                    LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                    LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 )
                 try:
                     result = subprocess.run(

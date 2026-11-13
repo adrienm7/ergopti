@@ -18,7 +18,7 @@
  *    for that driver straight from the manifest, the path every driver template
  *    took before the shared file existed.
  * 3. Decoded values: smol-toml and the drivers' own Lua codec
- *    (_shared/lua/toml_codec) decode the shared file, project it with the
+ *    (_shared/core/text/engine/toml_codec) decode the shared file, project it with the
  *    dotted platform.<driver> keys, and find exactly the values of the driver
  *    template, table by table.
  * 4. Written once: a key every driver of a table shares with one value is a
@@ -106,8 +106,8 @@ for (const [platform, driverDir] of Object.entries(DRIVER_DIRS)) {
 
 // 3. The drivers' own Lua codec reads the shape and projects the same views.
 const LUA_VIEW = `
-package.path = "../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
-local Codec = require("toml_codec")
+package.path = "../_shared/?.lua;../_shared/?/init.lua;" .. package.path
+local Codec = require("core.text.engine.toml_codec")
 local function read(file)
 	local handle = assert(io.open(file, "rb"))
 	local text = handle:read("*a")

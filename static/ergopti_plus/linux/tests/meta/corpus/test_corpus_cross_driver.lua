@@ -58,8 +58,8 @@ local function load_json_corpus(path)
 	if not f then return nil, "cannot open: " .. path end
 	local raw = f:read("*a")
 	f:close()
-	-- Use _shared/lua/json.lua if available (bundled in the repo).
-	local ok, json_mod = pcall(require, "json")
+	-- Use _shared/core/text/engine/json.lua if available (bundled in the repo).
+	local ok, json_mod = pcall(require, "core.text.engine.json")
 	if ok and json_mod and json_mod.decode then
 		local decoded, err = json_mod.decode(raw)
 		if decoded then return decoded end
@@ -154,7 +154,7 @@ describe("Corpus: tap_hold/vectors.json", function()
 	-- Replayed through the daemon's own tap-hold loader. This used to be a skip:
 	-- tap-holds were kanata's, and no Lua engine existed to replay them through.
 	local Config = require("platform.remap.tap_hold_loader")
-	local defaults_path = require("infra.paths").shared("tap_hold/defaults.toml")
+	local defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml")
 
 	--- A TOML value for one corpus field.
 	local function toml_value(value)
@@ -327,10 +327,10 @@ describe("Corpus: toml/fuzz_corpus.json", function()
 
 	-- Attempt to load the shared TOML codec and exercise it against the fuzz
 	-- corpus. The codec should not crash on any of the fuzz inputs.
-	local toml_ok, toml_mod = pcall(require, "toml_codec.codec")
+	local toml_ok, toml_mod = pcall(require, "core.text.engine.toml_codec.codec")
 
-	it("shared TOML codec loads (_shared/lua/toml_codec/codec.lua)", function()
-		assert_true(toml_ok, "toml_codec.codec must be requireable: " .. tostring(toml_mod))
+	it("shared TOML codec loads (_shared/core/text/engine/toml_codec/codec.lua)", function()
+		assert_true(toml_ok, "core.text.engine.toml_codec.codec must be requireable: " .. tostring(toml_mod))
 	end)
 
 	if toml_ok and toml_mod and raw ~= "" then
@@ -433,21 +433,21 @@ describe("Corpus: tooltip/{layout,dequeue}_vectors.json", function()
 
 	-- The skip that used to sit here asserted that `require("modules.tooltip.layout")`
 	-- FAILS, on the grounds that Linux had no Lua port of the layout maths. It
-	-- does now — in _shared/lua/tooltip/layout.lua, shared with macOS — so the
+	-- does now — in _shared/core/ui/engine/tooltip/layout.lua, shared with macOS — so the
 	-- corpus is replayed against it instead. The vectors are the output of
-	-- _shared/modules/tooltip/layout.js, which is the reference every driver has
+	-- _shared/core/ui/data/tooltip/layout.js, which is the reference every driver has
 	-- to agree with.
 	--
 	-- Driven with the geometry from the shared constants rather than with
 	-- literals: the vectors were generated against those numbers, so a test
 	-- carrying its own copy would pass while the driver drew somewhere else.
-	local ok_layout, Layout = pcall(require, "tooltip.layout")
+	local ok_layout, Layout = pcall(require, "core.ui.engine.tooltip.layout")
 	local ok_style, Style = pcall(function()
 		return require("ui.tooltip.config").load()
 	end)
 
 	it("the shared layout module and the style canon both load", function()
-		assert_true(ok_layout, "tooltip.layout must be requirable: " .. tostring(Layout))
+		assert_true(ok_layout, "core.ui.engine.tooltip.layout must be requirable: " .. tostring(Layout))
 		assert_true(ok_style, "the tooltip style canon must load: " .. tostring(Style))
 	end)
 

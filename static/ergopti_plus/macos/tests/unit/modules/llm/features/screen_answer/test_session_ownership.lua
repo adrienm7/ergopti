@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Fixture = require("tests.support.modules.llm.screen_answer_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 

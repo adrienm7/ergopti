@@ -46,7 +46,7 @@ helpers.describe("healthcheck (linux): recent issues source", function()
 	end)
 
 	helpers.it("falls back to the ring only when the file is absent (errors-file-issues)", function()
-		local Logger = require("logger")
+		local Logger = require("core.logger.engine")
 		Logger.warn("probe", "ring fallback marker")
 		with_errors_path(TMP .. "/ergopti_hc_absent_" .. tostring(os.time()) .. ".log", function(Bridge)
 			local snapshot = Bridge.build_snapshot({}, false).sections.issues
@@ -60,7 +60,7 @@ helpers.describe("healthcheck (linux): recent issues source", function()
 	end)
 
 	helpers.it("reports an errors file that exists but cannot be read, never the ring (errors-file-issues)", function()
-		local Logger = require("logger")
+		local Logger = require("core.logger.engine")
 		Logger.warn("probe", "ring entry that must not stand in for the file")
 		local path = TMP .. "/ergopti_hc_unreadable_" .. tostring(os.time()) .. ".log"
 		-- The file is there but refuses to open: the ring would answer as if it
@@ -158,7 +158,7 @@ end)
 helpers.describe("healthcheck simultaneous source refusals", function()
 	helpers.it("(errors-file-io-receipts) preserves both read and close refusal details", function()
 		with_tail_receipt("read_close_nil", function(path)
-			local completed, detail = pcall(require("healthcheck.snapshot").read_tail, path, 1)
+			local completed, detail = pcall(require("diagnostics.engine.healthcheck.snapshot").read_tail, path, 1)
 			helpers.assert_eq(completed, false, "post-open refusal cannot return an open-failure errno")
 			helpers.assert_true(tostring(detail):find("controlled read refusal", 1, true) ~= nil, "retain the original read refusal")
 			helpers.assert_true(tostring(detail):find("controlled close refusal", 1, true) ~= nil, "retain the independent close refusal")

@@ -24,7 +24,7 @@
 local helpers = require("tests.helpers")
 
 -- The shared folder of the Ollama policy files, under the shared root.
-local POLICY = "/modules/llm"
+local POLICY = "/ai/data"
 
 for _, name in ipairs({ "defaults.json", "inference.json" }) do
 	helpers.it("Ollama payload refuses FIFO for " .. name, function()
@@ -123,7 +123,7 @@ helpers.describe("ollama payload: keep_alive", function()
 		local Paths = helpers.load_module("infra.paths")
 		local root = Paths.shared_root()
 		helpers.assert_not_nil(root, "the shared tree must be findable")
-		local handle = assert(io.open(root .. "/modules/llm/defaults.json", "r"))
+		local handle = assert(io.open(root .. "/ai/data/defaults.json", "r"))
 		local defaults = handle:read("*a")
 		handle:close()
 		local expected = defaults:match('"llm_ollama_keep_alive"%s*:%s*"([^"]+)"')

@@ -82,7 +82,7 @@ local STEP_ALLOCATION_BLOCKS = 6
 --- allocation, measured over the same paused window.
 local function run_replay(path, size, options)
 	local applied, steps, max_cpu_ms, max_step_bytes, max_step_kb = {}, 0, 0, 0, 0
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local state = LedgerReplay.new_state()
 	while true do
 		local before = state.offset

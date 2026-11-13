@@ -217,7 +217,7 @@ function qualifyStandalonePaths() {
 			for (const relative of [
 				'static/ergopti_plus/linux/infra',
 				'static/ergopti_plus/linux/_generated',
-				'static/ergopti_plus/_shared/lua'
+				'static/ergopti_plus/_shared'
 			])
 				copyLuaTree(path.join(ROOT, relative), path.join(root, relative), inventory, relative);
 			for (const relative of [
@@ -296,9 +296,9 @@ function run({
 			'/?.lua;' +
 			driver +
 			'/?/init.lua;' +
-			path.join(driver, '../_shared/lua/?.lua') +
+			path.join(driver, '../_shared/?.lua') +
 			';' +
-			path.join(driver, '../_shared/lua/?/init.lua')
+			path.join(driver, '../_shared/?/init.lua')
 	};
 	let result;
 	try {

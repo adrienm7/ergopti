@@ -21,23 +21,23 @@
 local helpers = require("tests.helpers")
 
 -- The shared logger keeps one process identity, as in the canonical runner.
-require("logger")
+require("core.logger.engine")
 
 local function with_remote(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
 		"modules.shortcuts.script_control", "adapters.http_client",
-		"llm.remote_response_classifier", "modules.llm.local_servers",
+		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
 		"infra.logger", "adapters.timer_scheduler", "adapters.file_system",
 		"adapters.json_codec", "adapters.storage", "infra.manifest_reader",
-		"llm.provider_config_policy", "llm.remote_formats", "llm.profile_selector",
-		"llm.parser", "llm.prompt_builder", "llm.local_server_auth", "llm.thinking_off", "llm.local_server_discovery",
-		"compat.utf8", "config_defaults", "diagnostics.operation_reporter",
-		"hotstrings.personal_files", "infra.fs_dir", "infra.toml.reader",
-		"json", "lfs", "logger.shim", "text_utils", "toml_codec.basic_string",
-		"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
+		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.policy.thinking_off", "ai.engine.local_servers.discovery",
+		"core.lifecycle.engine.compat.utf8", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
+		"hotstrings.engine.catalogue.personal_files", "infra.fs_dir", "infra.toml.reader",
+		"core.text.engine.json", "lfs", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local pending, posts = {}, {}
 		package.loaded["infra.logger"] = {
@@ -84,7 +84,7 @@ end
 local function posted_body(pending, posts)
 	if pending[1] then pending[1].done(true, "cleartext-key") end
 	helpers.assert_eq(#posts, 1, "exactly one request is posted")
-	return require("json").decode(posts[1].body)
+	return require("core.text.engine.json").decode(posts[1].body)
 end
 
 
@@ -158,7 +158,7 @@ helpers.describe("api_remote: the prediction payload turns thinking off", functi
 			helpers.assert_true(remote.test_request(entry, remote.get_test_request_spec(), function() end,
 				function() end))
 			helpers.assert_eq(#posts, 1, "the probe is posted")
-			local body = require("json").decode(posts[1].body)
+			local body = require("core.text.engine.json").decode(posts[1].body)
 			helpers.assert_eq(body.thinking.type, "between_tools")
 			helpers.assert_eq(body.max_tokens, remote.get_test_request_spec().max_tokens)
 		end)
@@ -177,7 +177,7 @@ end)
 
 --- An HTTP 400 answer whose message names a field.
 local function refusal(message)
-	return { ok = false, status = 400, body = require("json").encode({ error = { message = message } }) }
+	return { ok = false, status = 400, body = require("core.text.engine.json").encode({ error = { message = message } }) }
 end
 
 helpers.describe("api_remote: a refused thinking field is dropped once and remembered", function()
@@ -192,7 +192,7 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			helpers.assert_eq(first.thinking.type, "disabled", "the generic family turns thinking off")
 			posts[1].done(refusal("Unknown parameter: thinking"))
 			helpers.assert_eq(#posts, 2, "the request is sent once more")
-			helpers.assert_eq(require("json").decode(posts[2].body).thinking, nil, "without the refused field")
+			helpers.assert_eq(require("core.text.engine.json").decode(posts[2].body).thinking, nil, "without the refused field")
 			helpers.assert_eq(failures, 0, "a correction is not a failure")
 			posts[2].done(refusal("Unknown parameter: thinking"))
 			helpers.assert_eq(#posts, 2, "only once")
@@ -200,7 +200,7 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			remote.request_chat("deepseek", "deepseek-chat", { model = "deepseek-chat", messages = {} },
 				function() end, function() end)
 			pending[2].done(true, "cleartext-key")
-			helpers.assert_eq(require("json").decode(posts[3].body).thinking, nil, "the refusal is remembered")
+			helpers.assert_eq(require("core.text.engine.json").decode(posts[3].body).thinking, nil, "the refusal is remembered")
 		end)
 	end)
 
@@ -221,7 +221,7 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			fresh.request_chat("deepseek", "deepseek-flash", { model = "deepseek-flash", messages = {} },
 				function() end, function() end)
 			pending[#pending].done(true, "cleartext-key")
-			helpers.assert_eq(require("json").decode(posts[#posts].body).thinking, nil,
+			helpers.assert_eq(require("core.text.engine.json").decode(posts[#posts].body).thinking, nil,
 				"a fresh module reads the stored refusal")
 			require("adapters.storage").set(fresh.THINKING_REFUSED_KEY, nil)
 		end)
@@ -245,10 +245,10 @@ helpers.describe("api_remote: a refused thinking field is dropped once and remem
 			local entry = { id = "s", provider = "openai", token = "plain-key", model = "gpt-5.1" }
 			remote.set_entries({ entry })
 			remote.test_request(entry, remote.get_test_request_spec(), function() end, function() end)
-			helpers.assert_eq(require("json").decode(posts[1].body).reasoning_effort, "none")
+			helpers.assert_eq(require("core.text.engine.json").decode(posts[1].body).reasoning_effort, "none")
 			posts[1].done(refusal("Unrecognized request argument supplied: reasoning_effort"))
 			helpers.assert_eq(#posts, 2, "the probe is sent once more")
-			helpers.assert_eq(require("json").decode(posts[2].body).reasoning_effort, nil)
+			helpers.assert_eq(require("core.text.engine.json").decode(posts[2].body).reasoning_effort, nil)
 		end)
 	end)
 
@@ -281,8 +281,8 @@ helpers.describe("api_remote: models that accept only the default sampling get n
 			remote.set_entries({ opus, haiku })
 			remote.test_request(opus, remote.get_test_request_spec(), function() end, function() end)
 			remote.test_request(haiku, remote.get_test_request_spec(), function() end, function() end)
-			helpers.assert_eq(require("json").decode(posts[1].body).temperature, nil)
-			helpers.assert_true(require("json").decode(posts[2].body).temperature ~= nil, "Claude 4.5 keeps it")
+			helpers.assert_eq(require("core.text.engine.json").decode(posts[1].body).temperature, nil)
+			helpers.assert_true(require("core.text.engine.json").decode(posts[2].body).temperature ~= nil, "Claude 4.5 keeps it")
 		end)
 	end)
 
@@ -298,7 +298,7 @@ helpers.describe("api_remote: empty system prompt", function()
 				remote.request_raw(entry.model, "", "typed context", "", 0.2, 8,
 					function() end, function() end)
 				helpers.assert_eq(#posts, 1)
-				local body = require("json").decode(posts[1].body)
+				local body = require("core.text.engine.json").decode(posts[1].body)
 				if provider == "anthropic" then
 					helpers.assert_nil(body.system)
 					helpers.assert_eq(body.messages[1].content, "typed context")

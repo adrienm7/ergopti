@@ -42,7 +42,7 @@ local helpers = require("tests.helpers")
 --- @return table|nil Array of { name, patterns, platforms }, or nil if unreadable.
 local function read_canonical_entries()
 	-- tests run from the driver root: macos/ → ergopti_plus/ → _shared/
-	local fh = io.open("../_shared/modules/logger/sub_files.toml", "r")
+	local fh = io.open("../_shared/core/logger/data/sub_files.toml", "r")
 	if not fh then return nil end
 	local raw = fh:read("*a")
 	fh:close()

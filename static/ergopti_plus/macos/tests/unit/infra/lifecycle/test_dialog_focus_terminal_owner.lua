@@ -11,8 +11,8 @@
 local helpers = require("tests.helpers")
 local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "infra.logger",
 	"adapters.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
-	"infra.text_utils", "text_utils", "compat.utf8", "window_titles",
-	"error_description", "number_policy", "modules.gestures.action_confirm",
+	"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
+	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
 	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "infra.i18n" }
 
 

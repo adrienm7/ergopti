@@ -7,9 +7,9 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Private
@@ -113,7 +113,7 @@ local ok, failure = xpcall(function()
 			-- Observe real companion creation while the native CLI transaction is
 			-- still open; the canonical command boundary owns its original umask.
 			local Command = require("modules.keystats.sqlite_command")
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			local function sql_output(sql)
 				local command = assert(Command.build(database, sql, { capture_stderr = true, capture_exit = true }))
 				local pipe = assert(io.popen(command, "r"))

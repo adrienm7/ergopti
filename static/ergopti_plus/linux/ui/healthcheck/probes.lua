@@ -31,7 +31,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "healthcheck.probes"
 
@@ -101,7 +101,7 @@ end
 --- @return table|nil
 local function decode(body)
 	if type(body) ~= "string" or body == "" then return nil end
-	local ok, data = pcall(require("json").decode, body)
+	local ok, data = pcall(require("core.text.engine.json").decode, body)
 	return (ok and type(data) == "table") and data or nil
 end
 
@@ -174,7 +174,7 @@ local function proxy_pac(config, run)
 			done({ state = "unsupported" })
 			return
 		end
-		local PacCheck = require("network.pac_check")
+		local PacCheck = require("core.network.engine.pac_check")
 		local function none() done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } }) end
 		local function fetch(url)
 			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
@@ -368,7 +368,7 @@ local function configuration(schema, run, overrides)
 		end
 		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_defer_ms"), function()
 			local context = require("ui.healthcheck.bridge").configuration_context(schema, overrides)
-			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			local ok, result, sections = pcall(require("diagnostics.engine.healthcheck.configuration").probe, context)
 			if not ok then
 				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
 				return

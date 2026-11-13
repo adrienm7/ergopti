@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local BasicString = require("toml_codec.basic_string")
+local BasicString = require("core.text.engine.toml_codec.basic_string")
 
 helpers.describe("TOML basic-string decoder: one left-to-right pass", function()
 	helpers.it("keeps an escaped backslash followed by n as two literal bytes", function()
@@ -32,18 +32,18 @@ helpers.describe("TOML basic-string decoder: one left-to-right pass", function()
 
 	helpers.it("keeps the same scalar contract through the LuaJIT UTF-8 shim", function()
 		local original_utf8 = _G.utf8
-		local original_module = package.loaded["toml_codec.basic_string"]
+		local original_module = package.loaded["core.text.engine.toml_codec.basic_string"]
 		local ok, err = xpcall(function()
 			_G.utf8 = nil
-			package.loaded["toml_codec.basic_string"] = nil
-			local compat_codec = require("toml_codec.basic_string")
+			package.loaded["core.text.engine.toml_codec.basic_string"] = nil
+			local compat_codec = require("core.text.engine.toml_codec.basic_string")
 			helpers.assert_eq(compat_codec.unescape_body("\\u0001"), string.char(1))
 			helpers.assert_eq(compat_codec.unescape_body("\\U0001F600"),
 				string.char(0xF0, 0x9F, 0x98, 0x80))
 			helpers.assert_nil(compat_codec.unescape_body("\\uD800"))
 		end, debug.traceback)
 		_G.utf8 = original_utf8
-		package.loaded["toml_codec.basic_string"] = original_module
+		package.loaded["core.text.engine.toml_codec.basic_string"] = original_module
 		if not ok then error(err, 0) end
 	end)
 end)

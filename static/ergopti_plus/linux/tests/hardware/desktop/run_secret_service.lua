@@ -36,9 +36,9 @@ local function check(condition, what)
 end
 
 local phase, scratch, password = assert(arg[1]), assert(arg[2]), assert(arg[3])
-require("compat.utf8").install()
-local quote = require("text_utils").shell_quote
-local Json = require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local quote = require("core.text.engine.utils_core").shell_quote
+local Json = require("core.text.engine.json")
 
 --- @param path string
 --- @return string|nil

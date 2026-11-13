@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 
-require("test.script_config_authority_contract").run(helpers, {
+require("tests.lua.settings.script_config_authority_contract").run(helpers, {
 	platform = "hs", manifest = require("infra.manifest_reader"),
 	aliases = require("infra.script_scope").alias_names(), file_adapter = require("adapters.file_system"),
 })

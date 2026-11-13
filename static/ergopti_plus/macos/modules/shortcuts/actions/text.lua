@@ -29,8 +29,8 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local TextContinuation = require("modules.shortcuts.actions.text_continuation")
 local TextDispatch = require("modules.shortcuts.actions.text_dispatch")
 local TransformGrace = require("modules.shortcuts.actions.text_transform_grace")
-local TableUtil = require("table_util")
-local WrapPair = require("wrap_pair")
+local TableUtil = require("core.text.engine.table_util")
+local WrapPair = require("keyboard.engine.wrap_pair")
 
 local LOG = "shortcuts.actions.text"
 
@@ -609,7 +609,7 @@ end
 -- ====================================
 
 -- Clipboard settle delays come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [debounce]) so AHK and macOS stay in sync.
+-- (_shared/core/timing/data/constants.toml [debounce]) so AHK and macOS stay in sync.
 local COPY_SETTLE_SEC    = Timings.sec("debounce", "clipboard_copy_settle_ms")  -- Wait after Cmd+C for clipboard to fill
 local PASTE_SETTLE_SEC   = Timings.sec("debounce", "clipboard_paste_settle_ms") -- Wait before pasting the transformed text
 local RESELECT_DELAY_SEC = Timings.sec("debounce", "clipboard_reselect_ms")     -- Wait after paste before re-selecting
@@ -643,7 +643,7 @@ local FALLBACK_GROUPS = {
 --- symlinked ~/.hammerspoon setups alike.
 --- @return table|nil Array of groups (each {i18n=<label key>, pairs={{left,right},…}}).
 local function load_shared_groups()
-	local path = Paths.shared("modules/wrap_symbols/wrap_symbols.json")
+	local path = Paths.shared("keyboard/data/wrap_symbols/wrap_symbols.json")
 	if type(path) ~= "string" or path == "" then return nil end
 	local fh = io.open(path, "r")
 	if not fh then return nil end
@@ -734,7 +734,7 @@ local _text_case = nil
 
 --- @return table The shared unicode_case module.
 local function text_case()
-	if _text_case == nil then _text_case = require("unicode_case") end
+	if _text_case == nil then _text_case = require("core.text.engine.unicode_case") end
 	return _text_case
 end
 
@@ -1930,7 +1930,7 @@ M.WRAP_PAIRS = WRAP_PAIRS
 M.WRAP_GROUPS = WRAP_GROUPS
 
 --- The built-in pairs in catalogue order, the list the wrap_selection parameter
---- is resolved against (_shared/lua/wrap_pair).
+--- is resolved against (_shared/keyboard/engine).
 --- @return table Array of { left, right }.
 function M.wrap_pair_list()
 	local list = {}

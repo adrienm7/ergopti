@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local SECRET = "2840175123456"

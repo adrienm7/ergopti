@@ -52,12 +52,12 @@ helpers.describe("login startup", function()
 		helpers.assert_eq(Startup.command_available(function() return true, "disabled\n" end), true)
 	end)
 	helpers.it("logs a failed read once until a read succeeds, and every failed change (login-startup)", function()
-		local previous_logger = package.loaded["logger.shim"]
+		local previous_logger = package.loaded["core.logger.engine.shim"]
 		local previous_subject = package.loaded["ui.menu.start_at_login"]
 		local logs = {}
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local okay, detail = pcall(function()
 			local subject = helpers.load_module("ui.menu.start_at_login")
 			local function failing() return false, "", "command exited with status 78" end
@@ -82,7 +82,7 @@ helpers.describe("login startup", function()
 			helpers.assert_eq(subject.toggle(function() return true, "disabled\n" end), false)
 			helpers.assert_eq(count("Startup enable was not confirmed by the next read."), 1)
 		end)
-		package.loaded["logger.shim"], package.loaded["ui.menu.start_at_login"] = previous_logger, previous_subject
+		package.loaded["core.logger.engine.shim"], package.loaded["ui.menu.start_at_login"] = previous_logger, previous_subject
 		assert(okay, detail)
 	end)
 end)
@@ -214,7 +214,7 @@ local function with_source_startup(body)
 		Shell = helpers.load_module("adapters.shell_runner")
 		local menu = helpers.load_module("ui.menu.start_at_login")
 		assert(Shell.run("mkdir -p -- " .. Shell.quote(driver .. "/install") .. " " .. Shell.quote(driver .. "/bin")
-			.. " " .. Shell.quote(driver .. "/../_shared/data/locales") .. " " .. Shell.quote(root .. "/commands")))
+			.. " " .. Shell.quote(driver .. "/../_shared/core/i18n/data/locales") .. " " .. Shell.quote(root .. "/commands")))
 		for _, name in ipairs({ "start_at_login.sh", "desktop_entry.sh", "config_home.sh" }) do
 			local file = assert(io.open(source_root .. "/install/" .. name, "rb"))
 			local text = assert(file:read("*a")); assert(file:close())
@@ -222,7 +222,7 @@ local function with_source_startup(body)
 		end
 		require("tests.support.shell_messages_fixture").provide(driver .. "/install")
 		write(driver .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\n")
-		write(driver .. "/../_shared/data/locales/en.json", "{}\n")
+		write(driver .. "/../_shared/core/i18n/data/locales/en.json", "{}\n")
 		-- No user unit and no enabled service: the XDG entry alone is the startup.
 		write(root .. "/commands/systemctl", "#!/bin/bash\nif [ \"$2\" = is-enabled ]; then exit 1; fi\nexit 0\n")
 		assert(uv.fs_chmod(root .. "/commands/systemctl", 493))
@@ -269,11 +269,11 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 			write(desktop, '[Desktop Entry]\nType=Application\nName=Ergopti\n'
 				.. 'Exec=/bin/bash "/moved/clone/static/ergopti_plus/linux/bin/ergopti-hotstrings" --tray\n'
 				.. 'Terminal=false\nHidden=false\nX-Ergopti-Startup=true\n')
-			local previous_logger = package.loaded["logger.shim"]
+			local previous_logger = package.loaded["core.logger.engine.shim"]
 			local logs = {}
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			local ok, failure = pcall(function()
 				local subject = helpers.load_module("ui.menu.start_at_login")
 				helpers.assert_eq(subject.enabled(), false, "a gone launcher starts nothing")
@@ -287,7 +287,7 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 				helpers.assert_eq(subject.enabled(), true)
 				helpers.assert_true(read_file(desktop):find('Exec=/bin/bash "' .. launcher .. '" --tray\n', 1, true) ~= nil)
 			end)
-			package.loaded["logger.shim"] = previous_logger
+			package.loaded["core.logger.engine.shim"] = previous_logger
 			assert(ok, failure)
 		end)
 	end)

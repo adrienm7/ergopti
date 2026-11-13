@@ -17,7 +17,7 @@
 
 local M = {}
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads and decodes one locale file.
 --- @param path string Absolute path of a locale JSON file.

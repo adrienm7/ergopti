@@ -266,7 +266,7 @@ end)
 
 helpers.describe("shared model catalogue projection", function()
 	helpers.it("derives Ollama runtime tags and keeps active/install identities coherent", function()
-		local Catalogue = require("llm.model_catalogue")
+		local Catalogue = require("ai.engine.local_servers.model_catalogue")
 		local source = { {
 			label = "Provider",
 			families = { {
@@ -362,7 +362,7 @@ helpers.describe("model pull retains exact creator and native settlement debt", 
 
 	helpers.it("model JSON creator retains cancellation until preparation unwinds", function()
 		local Download, transport, window = load_fixture()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local encode = json.encode
 		json.encode = function(value)
 			transport.shutdown_during_encode = Download.shutdown()
@@ -480,7 +480,7 @@ end)
 helpers.describe("model preparation failure after source withdrawal", function()
 	helpers.it("withdrawn model consent with encode error retires known old UI without HTTP", function()
 		local Download, transport, window = load_fixture()
-		local json, allowed = require("json"), true
+		local json, allowed = require("core.text.engine.json"), true
 		local encode = json.encode
 		json.encode = function() allowed = false; error("controlled preparation error") end
 		local ok, err = xpcall(function()
@@ -692,9 +692,9 @@ helpers.describe("model download: exact requester retirement continuation", func
 	}) do
 		helpers.it("(pac-direct-fallback-pull) " .. case.name, function()
 			local State = require("modules.llm.ollama_install_state")
-			local saved_logger = package.loaded["logger.shim"]
+			local saved_logger = package.loaded["core.logger.engine.shim"]
 			local errors = {}
-			package.loaded["logger.shim"] = setmetatable({ error = function(_, message, ...)
+			package.loaded["core.logger.engine.shim"] = setmetatable({ error = function(_, message, ...)
 				errors[#errors + 1] = string.format(message, ...)
 			end }, { __index = function() return function() end end })
 			local ok, err = xpcall(function()
@@ -704,7 +704,7 @@ helpers.describe("model download: exact requester retirement continuation", func
 				local Download, transport, window = load_fixture()
 				helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen"))
 				if case.remote then
-					transport.starts[1].on_chunk(require("json").encode({ error = case.remote }) .. "\n")
+					transport.starts[1].on_chunk(require("core.text.engine.json").encode({ error = case.remote }) .. "\n")
 				end
 				transport.starts[1].on_done({ ok = case.remote ~= nil })
 				helpers.assert_eq(window.completions[1][2], false)
@@ -717,7 +717,7 @@ helpers.describe("model download: exact requester retirement continuation", func
 				end
 				helpers.assert_eq(named, case.logged, "the log names the lookup stage and the direct failure")
 			end, debug.traceback)
-			package.loaded["logger.shim"] = saved_logger
+			package.loaded["core.logger.engine.shim"] = saved_logger
 			require("modules.llm.ollama_install_state")._reset()
 			restore()
 			if not ok then error(err, 0) end

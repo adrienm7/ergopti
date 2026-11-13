@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local Fakes = helpers.load_module("tests.fakes")
 
 local ENGINE = "modules.llm.prediction_engine"

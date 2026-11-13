@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 --- Reads one shared JSON file.
 --- @param relative string Path under _shared/.
@@ -24,8 +24,8 @@ end
 --- @param sweeping boolean
 --- @return table rows, table catalogue
 local function rows_for(sweeping)
-	local catalogue = read_json("modules/llm/local_servers.json")
-	local Menu = require("llm.local_server_menu")
+	local catalogue = read_json("ai/data/local_servers.json")
+	local Menu = require("ai.engine.local_servers.menu")
 	local rows = Menu.rows({
 		order = catalogue.server_order, servers = catalogue.servers, detected = {},
 		result = function() return { status = "down" } end, sweeping = sweeping, paused = false,
@@ -56,7 +56,7 @@ helpers.describe("local server none row", function()
 			helpers.assert_true(submenu[catalogue.servers[id].label], id .. " stays in the other-address submenu")
 		end
 		for _, locale in ipairs({ "en", "fr", "de", "nl", "ja" }) do
-			local text = read_json("data/locales/" .. locale .. ".json")["menu.llm.local_servers.none_detected"]
+			local text = read_json("core/i18n/data/locales/" .. locale .. ".json")["menu.llm.local_servers.none_detected"]
 			helpers.assert_true(type(text) == "string" and text ~= "", locale .. " translates the sentence")
 			helpers.assert_true(not text:find("{1}", 1, true), locale .. " takes no server list")
 		end

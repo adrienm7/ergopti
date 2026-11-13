@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Contract = require("test.llm_request_plan_contract")
+local Contract = require("tests.lua.ai.request_plan_contract")
 
 Contract.run_debounce(helpers, helpers.shared("tests/corpus/llm/request_plan_debounce_vectors.json"), "macos")
 Contract.run_batching(helpers, helpers.shared("tests/corpus/llm/request_plan_batching_vectors.json"))

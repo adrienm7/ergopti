@@ -1,7 +1,7 @@
 --- tests/unit/modules/keystats/aggregation/test_aggregator_helpers.lua
 
 local helpers     = require("tests.helpers")
-local AggHelper   = helpers.load_module("keystats.aggregator_helpers")
+local AggHelper   = helpers.load_module("metrics.engine.aggregator.helpers")
 
 helpers.describe("aggregator_helpers", function()
 

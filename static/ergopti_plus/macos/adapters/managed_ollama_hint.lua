@@ -15,7 +15,7 @@ local Timer = require("adapters.timer_scheduler")
 local Settings = require("modules.llm.bootstrap_retry_generated")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Logger = require("infra.logger")
 local LOG = "managed_ollama_hint"
 
@@ -54,12 +54,12 @@ local function snapshot(directory, driver)
 	local paths = {
 		directory .. "/.ergopti-managed-runtime.json",
 		directory .. "/ollama",
-		driver .. "/../_shared/modules/llm/managed_ollama_runtime.json",
-		driver .. "/../_shared/modules/llm/managed_ollama_release.json",
-		driver .. "/../_shared/modules/llm/managed_ollama_bootstrap.json",
+		driver .. "/../_shared/ai/data/managed_ollama_runtime.json",
+		driver .. "/../_shared/ai/data/managed_ollama_release.json",
+		driver .. "/../_shared/ai/data/managed_ollama_bootstrap.json",
 		driver .. "/modules/llm/network-retry.sh",
 		driver .. "/modules/llm/managed_ollama_hint.py",
-		driver .. "/../_shared/modules/network/bootstrap_retry.json",
+		driver .. "/../_shared/core/network/data/bootstrap_retry.json",
 	}
 	local fields = { directory, driver }
 	for _, path in ipairs(paths) do

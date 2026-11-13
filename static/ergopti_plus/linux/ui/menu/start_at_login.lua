@@ -10,7 +10,7 @@
 local M = {}
 local ShellRunner = require("adapters.shell_runner")
 local Paths = require("infra.paths")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.start_at_login"
 

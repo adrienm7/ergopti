@@ -25,9 +25,9 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
-# The external hosts are declared once in _shared/data/identifiers.json.
-# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
-. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# The external hosts are declared once in _shared/core/text/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
 # A caller that runs several builds at once gives each its own output directory.
 BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
 case "$BUILD_DIR" in
@@ -138,7 +138,7 @@ echo "  Desktop entry: ergopti.desktop"
 # ----------------------------------------------------------------------
 # 6. Application icon
 # ----------------------------------------------------------------------
-install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$DEB_ROOT/usr/share/icons/hicolor/512x512/apps/ergopti.png"
+install -m 644 "$BUILD_DIR/_shared/tray/data/ergopti_tray.png" "$DEB_ROOT/usr/share/icons/hicolor/512x512/apps/ergopti.png"
 
 echo "  Application icon: ergopti.png"
 

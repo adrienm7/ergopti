@@ -773,7 +773,7 @@ helpers.describe("launcher guard — callback containment", function()
 			local quit_reasons, exits = {}, 0
 			helpers.assert_true(guard.init(function(reason) quit_reasons[#quit_reasons + 1] = reason end))
 			helpers.assert_eq(#heard, 1, "the quit request is watched while the launcher is")
-			helpers.assert_eq(heard[1].name, require("identifiers").macos_notifications.launcher_quit_request)
+			helpers.assert_eq(heard[1].name, require("core.text.engine.identifiers").macos_notifications.launcher_quit_request)
 			helpers.assert_true(guard.watch_quit_request(function() exits = exits + 1 end))
 
 			heard[1].callback(heard[1].name, "999999")

@@ -1,6 +1,6 @@
 ﻿; _generated/config_keys.ahk
-; AUTO-GENERATED from _shared/core/config_schema/config.schema.json and
-; _shared/modules/menu/menu_manifest.json.
+; AUTO-GENERATED from _shared/settings/data/config_schema/config.schema.json and
+; _shared/menu/data/menu_manifest.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:config-keys` to refresh.
 #Requires AutoHotkey v2.0
 

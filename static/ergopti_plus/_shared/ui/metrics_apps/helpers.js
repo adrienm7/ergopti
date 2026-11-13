@@ -96,7 +96,7 @@ function $id(id) {
 // ===================================
 
 // Map macOS LSApplicationCategoryType (English) → stable i18n id matching
-// _shared/data/locales/<code>.json app_category.* keys.
+// _shared/core/i18n/data/locales/<code>.json app_category.* keys.
 const CATEGORY_ID_MAP = {
 	Productivity: 'productivity',
 	'Social networking': 'social',

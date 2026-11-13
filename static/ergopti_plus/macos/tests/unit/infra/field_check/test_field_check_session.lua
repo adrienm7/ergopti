@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Session = require("infra.field_check_session")
 
 local function steps_of(report)
@@ -186,7 +186,7 @@ helpers.describe("field check session: costs and edge cases a program can answer
 			"10:02 [WARN] keystats: Slow ingest tick 340 ms (drain=1 foreign=0 outbox=2 read=40 build=3 apply=4 "
 				.. "commit=5 append=280 notify=0 ms; append: write=270 ms; metadata_commands=2 in 260 ms; "
 				.. "entries=4 statements=9).",
-			"10:07 [WARN] keymap.utils: Slow ignored-window probe 420 ms (frontmost=1 focused=400 title=19 ms).",
+			"10:07 [WARN] layouts.engine.utils: Slow ignored-window probe 420 ms (frontmost=1 focused=400 title=19 ms).",
 			"10:08 [INFO] healthcheck: The synchronous diagnostics took 230.6 ms, over the 5 ms budget; "
 				.. "slowest: system=180.2 ms, layout=30.1 ms.",
 			"10:09 [WARN] runtime: An hs.timer.doAfter callback (ui/menu/menu_builder.lua:12) held the main thread "

@@ -1035,7 +1035,7 @@ _KLT_BootCase() {
 ; Resolve expectations independently from the shared physical-key registry.
 _KLT_ResetKeyCase(Code) {
 	global CategoryEnabled, LayerEnabled, KLE_Registered
-	static Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
+	static Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	Record := Registry["keys"][Code]
 	Saved := [CategoryEnabled, LayerEnabled, KLE_Registered]
 	try {

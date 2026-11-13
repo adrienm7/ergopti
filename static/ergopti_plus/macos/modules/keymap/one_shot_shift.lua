@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("tap_hold.one_shot_shift")
+local Policy = require("tap_hold.engine.one_shot_shift_core")
 local Owner = {}
 Owner.__index = Owner
 

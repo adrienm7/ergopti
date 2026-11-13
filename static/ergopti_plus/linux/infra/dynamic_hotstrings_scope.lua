@@ -12,15 +12,15 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local BulkScope = require("hotstrings.bulk_scope")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local KeyPath = require("toml_codec.key_path")
+local BulkScope = require("hotstrings.engine.bulk_scope")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
 local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "infra.dynamic_hotstrings_scope"
 local PROGRAMMABLE_PATH = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE

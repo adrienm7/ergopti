@@ -48,7 +48,7 @@ _MMDW_Canonical() {
 _MMDW_ManifestPath() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	return EpDir . "\_shared\modules\menu\menu_manifest.json"
+	return EpDir . "\_shared\menu\data\menu_manifest.json"
 }
 
 _MMDW_LoadMetricsMenu() {
@@ -246,7 +246,7 @@ Test("menu-metrics-disabled-when: the manifest metrics switch reaches Windows (F
 _MMDW_ManifestTomlSourceReachesAhk() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	TomlPath := EpDir . "\_shared\modules\menu\menu.toml"
+	TomlPath := EpDir . "\_shared\menu\data\menu.toml"
 	Toml := ""
 	try Toml := FileRead(TomlPath, "UTF-8")
 	Assert(Toml != "", "menu.toml must be readable")

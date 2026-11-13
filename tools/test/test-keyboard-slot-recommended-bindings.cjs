@@ -174,7 +174,7 @@ function validate(input) {
 }
 
 const manifest = toml.parse(
-	read('_shared/modules/features/manifest.toml').replace(
+	read('_shared/settings/data/features/manifest.toml').replace(
 		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
 		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
 	)

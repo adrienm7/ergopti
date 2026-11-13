@@ -6,7 +6,7 @@
 --- KC_TO_FINGER (macOS virtual-keycode -> finger column, used for same-finger/
 --- same-hand streak tracking in events.lua) used to be a hand-copied literal
 --- table with no mechanism catching drift against the canonical
---- _shared/data/keycodes/azerty.json. It is now derived at module-load time by
+--- _shared/layouts/data/keycodes/azerty.json. It is now derived at module-load time by
 --- reading and parsing that shared JSON. These tests pin the fix:
 ---   1. KC_TO_FINGER is non-empty and has the expected content-key count.
 ---   2. Every entry's finger value matches azerty.json exactly (parity).
@@ -32,7 +32,7 @@ local EXPECTED_KCS = {
 }
 
 local function read_azerty_json()
-	local path = helpers.shared("data/keycodes/azerty.json")
+	local path = helpers.shared("layouts/data/keycodes/azerty.json")
 	local fh = io.open(path, "r")
 	if not fh then return nil, "cannot open " .. tostring(path) end
 	local raw = fh:read("*a")

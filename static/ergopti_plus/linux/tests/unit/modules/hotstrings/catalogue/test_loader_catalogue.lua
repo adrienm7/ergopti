@@ -7,7 +7,7 @@
 ---
 --- ROOT CAUSE ENCODED:
 --- The loader derived a mapping's category from its PARENT DIRECTORY. The five
---- shared packs live flat beside each other in _shared/modules/hotstrings/, and
+--- shared packs live flat beside each other in _shared/hotstrings/data/catalogue/, and
 --- install.sh copies them flat into ~/.config/ergopti/hotstrings/ — so every
 --- entry in magickey.toml, autocorrection.toml, rolls.toml, sfbsreduction.toml
 --- and distancesreduction.toml reported the same group, literally named after
@@ -40,7 +40,7 @@ local function pack(name)
 	if ERGOPTI_PACKS[name] then
 		return Paths.shared_root() .. "/../../layouts/registry/ergopti/hotstrings/" .. name
 	end
-	return Paths.shared("modules/hotstrings/" .. name)
+	return Paths.shared("hotstrings/data/catalogue/" .. name)
 end
 
 --- Loads the catalogue for a set of shared packs.
@@ -204,10 +204,10 @@ end)
 
 helpers.describe("personal-file descriptors: independent cross-driver corpus", function()
 	helpers.it("preserves exact relative components without borrowing mutable arrays", function()
-		local PersonalFiles = require("hotstrings.personal_files")
+		local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/personal_file_descriptors.json", "r"))
 		local content = assert(handle:read("*a")); assert(handle:close())
-		local corpus = assert(require("json").decode(content))
+		local corpus = assert(require("core.text.engine.json").decode(content))
 		helpers.assert_eq(#corpus.vectors, 13, "the independent corpus must not become vacuous")
 		local identities = {}
 		for _, vector in ipairs(corpus.vectors) do
@@ -252,7 +252,7 @@ helpers.describe("personal-file transport through the real loader and compiled e
 		assert(handle:write('[_meta]\ndelay = 1.25\n[probe]\n"pqx" = { output = "Owned", auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true, priority = 73 }\n'))
 		assert(handle:close())
 		local ok, err = pcall(function()
-			local PersonalFiles = require("hotstrings.personal_files")
+			local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 			local source = PersonalFiles.describe({ "Équipe", "mémoire.toml" })
 			local Loader = helpers.load_module("modules.hotstrings.loader")
 			local catalogue = Loader.load_catalogue({ { path = path, category = "legacy", personal_source = source } })
@@ -265,7 +265,7 @@ helpers.describe("personal-file transport through the real loader and compiled e
 			source.components[1] = "mutated"
 			helpers.assert_eq(mapping.personal_source.components[1], "Équipe")
 			helpers.assert_true(mapping.personal_source ~= catalogue.categories.legacy.personal_source)
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			helpers.assert_true(engine:load_mappings(catalogue.mappings))
 			mapping.personal_source.components[1] = "borrowed"
 			engine:on_char("p"); engine:on_char("q"); local result = engine:on_char("x")
@@ -315,7 +315,7 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 			end
 			helpers.assert_eq(team_discovered, 2, "actual discovery must retain both same-stem physical files")
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			Config._set_override_config_dir_for_test(root)
 			local Choices = require("tests.support.hotstring_choices")
 			Choices.with_file(Config,
@@ -332,8 +332,8 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 				local sources, descriptors, records = {}, {}, {}
 				for _, item in ipairs(discovery) do
 					local relative = item.path:sub(#root + 2)
-					sources[relative], descriptors[relative] = item.descriptor.id, require("hotstrings.personal_files").copy(item.descriptor)
-					records[#records + 1] = { source = require("hotstrings.personal_files").copy(item.descriptor), path = item.path,
+					sources[relative], descriptors[relative] = item.descriptor.id, require("hotstrings.engine.catalogue.personal_files").copy(item.descriptor)
+					records[#records + 1] = { source = require("hotstrings.engine.catalogue.personal_files").copy(item.descriptor), path = item.path,
 						legacy_name = relative:match("([^/]+)%.toml$") }
 				end
 				helpers.assert_eq(sources, {
@@ -343,7 +343,7 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 					["Équipe/mémoire.toml"] = "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c", ["rolls.toml"] = "personal-file:726f6c6c732e746f6d6c",
 				})
 				discovery[1].descriptor.components[1] = "borrowed"
-				helpers.assert_true(require("hotstrings.personal_files").is_descriptor(Config.personal_file_sources()[1].descriptor))
+				helpers.assert_true(require("hotstrings.engine.catalogue.personal_files").is_descriptor(Config.personal_file_sources()[1].descriptor))
 				local function match(text)
 					engine:reset(); local result
 					for char in text:gmatch(".") do result = engine:on_char(char) end
@@ -363,12 +363,12 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 					helpers.assert_eq(preview.personal_source_id, sources[relative], "the actual preview agrees")
 					helpers.assert_eq(preview.fires, true)
 				end
-				local Codec = require("toml_codec")
+				local Codec = require("core.text.engine.toml_codec")
 				local inventory = assert(require("infra.personal_file_adoption").stage(records,
 					Codec.decode(before).hotstrings, root .. "/personal_hotstrings.toml"))
 				local evidence = {}
 				for _, item in ipairs(inventory) do evidence[item.source.id] = item end
-				local Policy = require("hotstrings.personal_scope")
+				local Policy = require("hotstrings.engine.catalogue.personal_scope")
 				for _, relative in ipairs({ "home/team.toml", "work/team.toml" }) do
 					local id, record = sources[relative], evidence[sources[relative]]
 					helpers.assert_eq(record.owner, id)
@@ -396,12 +396,12 @@ helpers.describe("personal-file discovery: exact owners preserve source and choi
 					{ path = { "hotstrings", "groups", home }, value = false },
 					{ path = { "hotstrings", "groups", work }, value = false },
 				}
-				local rows = require("toml_codec.leaf_rows").prepare(before, operations)
-				helpers.assert_eq(require("toml_codec.writer").batch_write(choice_path, rows, nil,
+				local rows = require("core.text.engine.toml_codec.leaf_rows").prepare(before, operations)
+				helpers.assert_eq(require("core.text.engine.toml_codec.writer").batch_write(choice_path, rows, nil,
 					{ status = "ok", content = before .. "\n# stale source receipt\n" }), false, "stale publication cannot retire another owner's legacy choices")
 				helpers.assert_eq(Choices.read(choice_path), before)
 				helpers.assert_eq(engine:mapping_state().mappings, 5)
-				helpers.assert_eq(require("toml_codec.writer").batch_write(choice_path, rows, nil,
+				helpers.assert_eq(require("core.text.engine.toml_codec.writer").batch_write(choice_path, rows, nil,
 					{ status = "ok", content = before }), true, "explicit repair needs actual conditional publication")
 				local repaired = Choices.read(choice_path)
 				local choices = Codec.decode(repaired).hotstrings
@@ -467,7 +467,7 @@ helpers.describe("common autocorrection interleaved source order", function()
 	local function actual_catalogue(category, selected)
 		local Paths = require("infra.paths")
 		local handle = assert(io.open(Paths.shared("tests/corpus/hotstrings/source_order_entries.json"), "r"))
-		local expected = require("json").decode(handle:read("*a")); assert(handle:close())
+		local expected = require("core.text.engine.json").decode(handle:read("*a")); assert(handle:close())
 		local path = os.tmpname()
 		handle = assert(io.open(path, "w")); assert(handle:write(expected.source)); assert(handle:close())
 		local ok, failure = pcall(function()
@@ -587,13 +587,13 @@ helpers.describe("literal POSIX backslash filenames", function()
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 			Config._set_override_config_dir_for_test(root)
 			require("tests.support.hotstring_choices").with_file(Config, {}, function()
-				local engine = require("hotstring_engine").new()
+				local engine = require("hotstrings.engine.matcher").new()
 				helpers.assert_true(Config.init(engine, root))
 				local _, published = Config.load_all()
 				helpers.assert_eq(published, true)
 				helpers.assert_true(Config.get_category("autocorrection").path ~= path,
 					"a literal backslash filename cannot replace the common source")
-				local source = require("hotstrings.personal_files").describe({ "team\\autocorrection.toml" })
+				local source = require("hotstrings.engine.catalogue.personal_files").describe({ "team\\autocorrection.toml" })
 				helpers.assert_eq(Config.get_category(source.id).path, path)
 				for _, char in ipairs({ "n", "a", "t", "i", "v", "e" }) do
 					helpers.assert_eq(engine:on_char(char), nil, "a partial trigger must not expand")
