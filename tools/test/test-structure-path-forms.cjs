@@ -902,10 +902,10 @@ function run() {
 	const gainMap = new Map([
 		['windows/adapters/crypto.ahk', 'windows/core/crypto/crypto.ahk'],
 		['windows/infra/a.ahk', 'windows/infra/a.ahk'],
-		['windows/modules/b.ahk', 'windows/modules/b.ahk']
+		['windows/platform/b.ahk', 'windows/platform/b.ahk']
 	]);
 	const gainText =
-		"const T = ['adapters', 'infra', 'modules'];\n" +
+		"const T = ['adapters', 'infra', 'platform'];\n" +
 		'const G = /^unit\\/(adapters|infra)\\//;\n' +
 		"const D = ['adapters', 'docs'];\n";
 	assert.equal(
@@ -915,7 +915,7 @@ function run() {
 			new Map(),
 			'tools/test/z.cjs'
 		),
-		"const T = ['adapters', 'infra', 'modules', 'core'];\n" +
+		"const T = ['adapters', 'infra', 'platform', 'core'];\n" +
 			'const G = /^unit\\/(adapters|infra|core)\\//;\n' +
 			"const D = ['adapters', 'docs'];\n",
 		'a sibling folder list gains the folder the step creates'
