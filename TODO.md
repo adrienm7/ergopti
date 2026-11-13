@@ -570,8 +570,12 @@ between workers) green alone. All live checks pass, typed by the harness.
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
 
-- [ ] **Modifier-chord action labels from the key name table.** The action pickers still show raw or French chords
+- [x] **Modifier-chord action labels from the key name table.** The action pickers still show raw or French chords
       (« Cmd + Option + Shift + Enter ») on every driver; the tests that pin this label family change with it.
+      Verified done by worker A on 2026-11-13: every driver names a chord through the key name table (shared
+      `key_names.lua` `chord_label` on macOS and Linux, its AHK port `KeyNameChordLabel` on Windows), and the web
+      picker shows the host's labels; pinned by `test_key_names.lua` (Linux), `test_action_catalogue_parity.lua`
+      and the script-action projection corpus (macOS) and `test_gestures.ahk` (Windows).
 
 ### Linux (container proofs of 2026-11-10)
 
