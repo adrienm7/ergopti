@@ -508,6 +508,7 @@ return {
 	"tests.unit.ui.menu.structure.test_custom_layout_selection",
 	"tests.unit.ui.menu.structure.test_pause_layout_rows",
 	"tests.unit.ui.menu.structure.test_active_layout_rows",
+	"tests.unit.ui.menu.structure.test_compose_input_method_row",
 	"tests.unit.ui.menu.structure.test_menu_matches_manifest",
 	"tests.unit.ui.menu.structure.test_menu_prompt_cancel",
 	"tests.unit.ui.menu.structure.test_menu_no_double_separator",

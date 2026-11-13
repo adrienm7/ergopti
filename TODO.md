@@ -107,9 +107,20 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       Shell 46 (`run_input_sources_live.sh gnome`: 16 checks, the sources list untouched; `gnome-no-extension`: 9
       checks, the refusal named, the layout kept). Linux only: Windows and macOS switch through their own system
       APIs. Decided by the agent on 2026-11-13, to review by the maintainer: the exported method admits any client of
-      the user's session bus, which can already write the same `gsettings`.
-- [ ] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
-      keep the inlined single-character rules as the safety net, and state the remaining limit in the menu.
+      the user's session bus, which can already write the same `gsettings`. Real-desktop check in TODO-tests-linux.md
+      (`wayland_focus`).
+- [x] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
+      keep the inlined single-character rules as the safety net, and state the remaining limit in the menu. Done
+      2026-11-13 (worker D): the user installer (`publish_compose_input_method` in `layout_package.py`) writes
+      `GTK_IM_MODULE=ibus` to `~/.config/environment.d/90-ergopti-ibus.conf` and an autostart for `ibus-daemon` (system
+      layout kept) only while a Compose block exists, IBus is installed and no input method runs; a running fcitx5 (or
+      any other) withdraws Ergopti's files, a user file of the same name is never touched, GNOME already composes
+      through IBus. The inlined single-character rules stay. Layout > « Custom layouts » shows a row from the state the
+      installer records (`compose_input_method`, 5 keys in 21 locales): all sequences through IBus, IBus from the next
+      login, your input method, or single-character sequences only. Linux only: macOS and Windows have no Compose file.
+      Decided by the agent on 2026-11-13, to review by the maintainer: GTK_IM_MODULE only (Qt and libX11 read the
+      includes), and only from the user installer (the site's system installer runs as root and cannot see the
+      session's input method). Real-desktop check in TODO-tests-linux.md (`input_policies`).
 - [ ] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
       update prompt run while paused, as on macOS and Linux; background checks keep their pause drop.
 - Validated as they are: structured import keeps action/state names and modifier tokens; the editor page compiles

@@ -72,6 +72,11 @@ class UserInstallerTests(unittest.TestCase):
         self.root = self.scratch / "config" / "xkb"
         self.home = self.scratch / "home"
         self.home.mkdir()
+        # A session with no input method and no IBus, unless a test says otherwise.
+        self.session = ({}, set(), None)
+        probe = mock.patch.object(installer, "probe_input_method", lambda: self.session)
+        probe.start()
+        self.addCleanup(probe.stop)
         self.sources = {}
         for layout_id in ("ergol", "ergopti"):
             out = self.scratch / "converted" / layout_id
@@ -151,6 +156,40 @@ class UserInstallerTests(unittest.TestCase):
         installer.uninstall("ergol", self.root, self.home, deactivate=False)
         self.assertEqual(
             (self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <a> <a> : "å"\n'
+        )
+
+    def test_gtk3_compose_enables_ibus_only_when_no_input_method_runs(self) -> None:
+        """gtk3-compose-ibus: GTK 3 composes multi-character outputs only through
+        IBus; an active fcitx5 is never replaced."""
+        config = self.root.parent
+        environment = config / "environment.d" / "90-ergopti-ibus.conf"
+        autostart = config / "autostart" / "ergopti-ibus.desktop"
+        state = self.root / installer.COMPOSE_STATE_NAME
+        self.install("ergol", "French (Ergo-L)")
+        self.assertEqual(
+            state.read_text(encoding="utf-8"), "no_ibus\n", "no IBus: the inline rules only"
+        )
+        self.assertFalse(environment.exists())
+        self.session = ({"XDG_CURRENT_DESKTOP": "KDE"}, set(), "/usr/bin/ibus-daemon")
+        self.install("ergol", "French (Ergo-L)")
+        self.assertEqual(state.read_text(encoding="utf-8"), "ibus_enabled\n")
+        self.assertIn("GTK_IM_MODULE=ibus\n", environment.read_text(encoding="utf-8"))
+        self.assertIn("exec ibus-daemon --daemonize", autostart.read_text(encoding="utf-8"))
+        self.assertNotIn(
+            "--replace", autostart.read_text(encoding="utf-8"), "a running IBus is kept"
+        )
+        self.session = ({"GTK_IM_MODULE": "ibus"}, {"fcitx5"}, "/usr/bin/ibus-daemon")
+        self.install("ergol", "French (Ergo-L)")
+        self.assertEqual(state.read_text(encoding="utf-8"), "other_active\n")
+        self.assertFalse(
+            environment.exists() or autostart.exists(), "fcitx5 runs: the setting is withdrawn"
+        )
+        self.session = ({}, set(), "/usr/bin/ibus-daemon")
+        self.install("ergol", "French (Ergo-L)")
+        installer.uninstall("ergol", self.root, self.home, deactivate=False)
+        self.assertFalse(
+            environment.exists() or autostart.exists() or state.exists(),
+            "no Compose block, no IBus",
         )
 
     def test_the_xcompose_block_repeats_single_character_rules_for_gtk3(self) -> None:
@@ -418,6 +457,11 @@ class X11LiveReplaceTests(unittest.TestCase):
         self.root = self.scratch / "config" / "xkb"
         self.home = self.scratch / "home"
         self.home.mkdir()
+        # A session with no input method and no IBus, unless a test says otherwise.
+        self.session = ({}, set(), None)
+        probe = mock.patch.object(installer, "probe_input_method", lambda: self.session)
+        probe.start()
+        self.addCleanup(probe.stop)
         self.sources = {}
         for layout_id in ("ergol", "ergopti"):
             out = self.scratch / "converted" / layout_id
