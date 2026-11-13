@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 
-helpers.describe("adapters.crypto: native binary SHA-256", function()
+helpers.describe("core.crypto.crypto: native binary SHA-256", function()
 	helpers.it("hashes the exact binary payload including NUL bytes", function()
 		local expected = string.rep("a", 64)
 		local payload = "zip\0payload\255"
@@ -31,7 +31,7 @@ helpers.describe("adapters.crypto: native binary SHA-256", function()
 			return expected
 		end
 
-		local Crypto = helpers.load_with_stubs("adapters.crypto", {
+		local Crypto = helpers.load_with_stubs("core.crypto.crypto", {
 			execute = function()
 				observed.execute_calls = observed.execute_calls + 1
 				return ""

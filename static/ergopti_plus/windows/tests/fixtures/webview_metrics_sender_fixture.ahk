@@ -22,7 +22,7 @@
 #Include ../../infra/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../adapters/file_system.ahk
-#Include ../../adapters/crypto.ahk
+#Include ../../core/crypto/crypto.ahk
 #Include ../../adapters/webview_profiles.ahk
 #Include ../../infra/webview_utils.ahk
 #Include ../../infra/config_transition.ahk

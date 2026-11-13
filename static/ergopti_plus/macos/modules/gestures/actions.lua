@@ -2816,7 +2816,7 @@ function M.run_program(binding)
 				and ConfigPaths.get("ConfigTomlPath") == path and revision == _program_revision
 				and Preferences.source_matches(source, Preferences.source_snapshot(path)) == true
 		end
-		local digest = require("adapters.crypto").sha256_bytes(source.content, function()
+		local digest = require("core.crypto.crypto").sha256_bytes(source.content, function()
 			Logger.error(LOG, "Private user program source hashing refused.")
 		end)
 		if type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$") then return false end

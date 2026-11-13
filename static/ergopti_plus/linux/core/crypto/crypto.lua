@@ -1,4 +1,4 @@
---- adapters/crypto.lua
+--- core/crypto/crypto.lua
 
 --- ==============================================================================
 --- MODULE: Crypto Adapter (Linux)
@@ -20,7 +20,7 @@ local Shell = require("adapters.shell_runner")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local NativeDigest = require("infra.openssl_digest")
 
-local LOG = "adapters.crypto"
+local LOG = "core.crypto.crypto"
 local fallback_reported = false
 
 

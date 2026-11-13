@@ -6,13 +6,13 @@ local helpers = require("tests.helpers")
 local function with_crypto(callback)
 	local saved_hs = _G.hs
 	local ok, failure = xpcall(function()
-		helpers.with_fresh_modules({ "adapters.crypto", "infra.logger" }, function()
+		helpers.with_fresh_modules({ "core.crypto.crypto", "infra.logger" }, function()
 			local logs = {}
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
 			package.loaded["infra.logger"] = logger
 			_G.hs = { hash = { new = function() error("PRIVATE executable argv source bytes") end } }
-			callback(require("adapters.crypto"), logs)
+			callback(require("core.crypto.crypto"), logs)
 		end)
 	end, debug.traceback)
 	_G.hs = saved_hs

@@ -108,7 +108,7 @@
 				"windows/adapters/clipboard.ahk",
 				"windows/adapters/console_window.ahk",
 				"windows/adapters/crash_report_worker.ahk",
-				"windows/adapters/crypto.ahk",
+				"windows/core/crypto/crypto.ahk",
 				"windows/adapters/editor_replace.ahk",
 				"windows/adapters/file_system.ahk",
 				"windows/adapters/graphics_renderer.ahk",

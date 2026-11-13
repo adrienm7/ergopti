@@ -268,7 +268,7 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 			end,
 		}
 	end
-	local adapter = helpers.load_with_stubs("adapters.crypto", {
+	local adapter = helpers.load_with_stubs("core.crypto.crypto", {
 		hash = native_hash(CANONICAL),
 	})
 
@@ -301,7 +301,7 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 	end)
 
 	helpers.it("sha256 returns '' when the digest cannot be parsed (error_behavior)", function()
-		local bad = helpers.load_with_stubs("adapters.crypto", {
+		local bad = helpers.load_with_stubs("core.crypto.crypto", {
 			hash = native_hash("garbage with no digest line"),
 		})
 		helpers.assert_eq("", bad.sha256("hello"),

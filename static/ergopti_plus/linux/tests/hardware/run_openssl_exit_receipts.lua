@@ -174,7 +174,7 @@ check("production envelopes use the unchanged cached CLI KDF and shared IV/Base6
 	local value = "Synthetic envelope\0payload\n\n"
 	local envelope = assert(cipher.encrypt("synthetic-device", 7, value))
 	local iv, payload = Codec.unwrap(envelope)
-	assert(iv == Codec.iv_for("synthetic-device", 7, require("adapters.crypto").sha256))
+	assert(iv == Codec.iv_for("synthetic-device", 7, require("core.crypto.crypto").sha256))
 	assert(payload == Base64.encode(oracle(key, iv, value, false)))
 	assert(cipher.decrypt(Codec.wrap(iv, Base64.encode(oracle(key, iv, value, false)))) == value)
 end)

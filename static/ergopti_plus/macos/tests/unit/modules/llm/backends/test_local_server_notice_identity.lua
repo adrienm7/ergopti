@@ -16,7 +16,7 @@ local FIXTURE = "tests.support.modules.llm.backends.local_openai_backends_fixtur
 -- load_with_stubs separately tracks every cache write made by the loader.
 local OWNED_MODULES = {
 	"_generated.logger_sub_files",
-	"adapters.crypto",
+	"core.crypto.crypto",
 	"adapters.event_clock",
 	"adapters.event_provenance",
 	"adapters.file_system",

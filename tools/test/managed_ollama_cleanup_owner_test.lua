@@ -14,7 +14,7 @@ local function check(actual, expected)
 end
 local function with_owned(options, run)
 	options = options or {}
-	local names = { "adapters.managed_ollama_pull", "adapters.file_system", "adapters.crypto" }
+	local names = { "adapters.managed_ollama_pull", "adapters.file_system", "core.crypto.crypto" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	package.loaded["adapters.managed_ollama_pull"] = nil
@@ -63,7 +63,7 @@ local function with_owned(options, run)
 			return true
 		end,
 	}
-	package.loaded["adapters.crypto"] = { sha256_bytes = function(raw)
+	package.loaded["core.crypto.crypto"] = { sha256_bytes = function(raw)
 		if raw == "authority-vector\n" then return string.rep("b", 64) end
 		if raw == "window-vector\n" then return string.rep("c", 64) end
 		return string.rep("e", 64)

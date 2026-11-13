@@ -14,7 +14,7 @@ local function with_program(callback, program_admission)
 	os.remove(path)
 	local tasks, actions, auxiliary = {}, nil, nil
 	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
-		"adapters.owned_program_runner", "platform.remap.lease_helper", "adapters.crypto",
+		"adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
 		"adapters.task_environment", "adapters.file_system", "adapters.timer_scheduler", "infra.preferences",
 		"infra.config_paths", "infra.paths", "infra.i18n", "infra.logger", "infra.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }

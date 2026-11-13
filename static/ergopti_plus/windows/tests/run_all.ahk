@@ -377,7 +377,7 @@ InstallHotstringHooks()
 #Include ../adapters/key_state.ahk
 #Include ../adapters/keyboard_layout_switch.ahk
 #Include ../adapters/app_launcher.ahk
-#Include ../adapters/crypto.ahk
+#Include ../core/crypto/crypto.ahk
 ; The bundled App Cloner and Encryptor: definitions only (their entry runs nothing at load).
 #Include ../adapters/bundled_apps_native.ahk
 #Include ../apps/app_strings.ahk
@@ -2034,7 +2034,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_gesture_screenshot_no_tempfile.ahk
 #Include meta/adapters/test_wmexists_is_not_a_handle.ahk
 #Include meta/platform/remap/tap_hold/test_taphold_scancodes_are_the_real_keys.ahk
-#Include unit/adapters/test_crypto_sha256_is_real.ahk
+#Include unit/core/crypto/test_sha256_is_real.ahk
 #Include meta/platform/remap/keys/test_capslock_led_does_not_latch.ahk
 #Include meta/modules/hotstrings/engine/test_hotstrings_deadkey_uppercase_cleanup.ahk
 #Include meta/infra/toml/test_parser_splitblocks_cap.ahk
@@ -2296,7 +2296,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/metrics/test_metrics_shortcut_transaction.ahk
 #Include meta/modules/keystats/metrics/test_metrics_app_time_accuracy.ahk
 #Include meta/infra/config/persistence/test_toggle_category_all_features_atomic.ahk
-#Include meta/adapters/test_crypto_djb2_fallback_logged.ahk
+#Include meta/core/crypto/test_djb2_fallback_logged.ahk
 #Include meta/adapters/test_adapter_callback_swallow_logged.ahk
 #Include meta/modules/llm/prediction/test_llm_callbacks_never_swallowed.ahk
 #Include meta/modules/llm/prediction/test_llm_inflight_hygiene.ahk

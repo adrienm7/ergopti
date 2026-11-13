@@ -64,7 +64,7 @@ package.loaded["adapters.file_system"] = {
 	end,
 	read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
 }
-package.loaded["adapters.crypto"] = { sha256_bytes = function(raw)
+package.loaded["core.crypto.crypto"] = { sha256_bytes = function(raw)
 	if raw == raw_contract then return cd end; if raw == raw_catalogue then return rd end; return ""
 end }
 package.loaded["modules.llm.network_env"] = { prelude = function() network_calls = network_calls + 1; return "STATIC-PRELUDE; " end }

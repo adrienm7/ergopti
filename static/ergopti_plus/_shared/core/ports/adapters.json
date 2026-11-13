@@ -11,9 +11,9 @@
 			"linux": "static/ergopti_plus/linux/adapters/clipboard.lua"
 		},
 		"Crypto": {
-			"windows": "static/ergopti_plus/windows/adapters/crypto.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/crypto.lua",
-			"linux": "static/ergopti_plus/linux/adapters/crypto.lua"
+			"windows": "static/ergopti_plus/windows/core/crypto/crypto.ahk",
+			"macos": "static/ergopti_plus/macos/core/crypto/crypto.lua",
+			"linux": "static/ergopti_plus/linux/core/crypto/crypto.lua"
 		},
 		"FileSystem": {
 			"windows": "static/ergopti_plus/windows/adapters/file_system.ahk",

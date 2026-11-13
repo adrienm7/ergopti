@@ -37,7 +37,10 @@ const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.join(__dirname, '../..');
 const CONTRACTS_PATH = shared('core/ports/contracts.json');
-const AHK_ADAPTERS_DIR = path.join(ROOT, 'static/ergopti_plus/windows/adapters');
+const AHK_ADAPTERS_DIRS = [
+	path.join(ROOT, 'static/ergopti_plus/windows/adapters'),
+	path.join(ROOT, 'static/ergopti_plus/windows/core/crypto')
+];
 
 const PASS = '✓';
 const FAIL = '✗';
@@ -142,10 +145,12 @@ function parseAdapterMaps(src) {
 	return maps;
 }
 
-const ahkFiles = fs
-	.readdirSync(AHK_ADAPTERS_DIR)
-	.filter((f) => f.endsWith('.ahk'))
-	.map((f) => path.join(AHK_ADAPTERS_DIR, f));
+const ahkFiles = AHK_ADAPTERS_DIRS.flatMap((dir) =>
+	fs
+		.readdirSync(dir)
+		.filter((f) => f.endsWith('.ahk'))
+		.map((f) => path.join(dir, f))
+);
 
 let adapterMapCount = 0;
 const coveredPorts = new Set();
@@ -204,10 +209,11 @@ const failBeforeCompleteness = totalFail;
 const portsImplementedElsewhere = [];
 for (const portName of Object.keys(contracts)) {
 	if (coveredPorts.has(portName)) continue;
-	const adapterFile = path.join(
-		AHK_ADAPTERS_DIR,
-		pascalToUpperSnake(portName).toLowerCase() + '.ahk'
-	);
+	const adapterName = pascalToUpperSnake(portName).toLowerCase();
+	const adapterFile =
+		AHK_ADAPTERS_DIRS.map((dir) => path.join(dir, `${adapterName}.ahk`)).find((f) =>
+			fs.existsSync(f)
+		) || path.join(AHK_ADAPTERS_DIRS[0], `${adapterName}.ahk`);
 	if (fs.existsSync(adapterFile)) {
 		fail(`${portName}: adapter file declares an ADAPTER_ map`, [
 			`${path.basename(adapterFile)} exists but has no global ADAPTER_${pascalToUpperSnake(portName)} := Map(…) — a missing dispatch map silently weakens the contract gate`
