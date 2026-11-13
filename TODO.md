@@ -737,6 +737,10 @@ between workers) green alone. All live checks pass, typed by the harness.
       `key_names.chord_label` (macOS `gestures/actions.lua` and `remap/config.lua`, Linux `gestures/manager.lua`,
       Windows `KeyNameChordLabel` in `gestures/actions.ahk`), pinned per locale by `test_action_catalogue_parity.lua`
       and Linux `test_key_names.lua`. No code step left.
+      Verified done by worker A on 2026-11-13: every driver names a chord through the key name table (shared
+      `key_names.lua` `chord_label` on macOS and Linux, its AHK port `KeyNameChordLabel` on Windows), and the web
+      picker shows the host's labels; pinned by `test_key_names.lua` (Linux), `test_action_catalogue_parity.lua`
+      and the script-action projection corpus (macOS) and `test_gestures.ahk` (Windows).
 
 ### Linux (container proofs of 2026-11-10)
 
