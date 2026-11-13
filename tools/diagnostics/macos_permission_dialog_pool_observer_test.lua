@@ -22,7 +22,7 @@ local function fixture()
 		return function(clear)
 			if clear then _session=nil end
 			return _session,ControllerPool
-		end]], "@" .. root .. "/macos/ui/permission_dialog/init.lua"))(session, pool)
+		end]], "@" .. root .. "/macos/onboarding/ui/permission_dialog/init.lua"))(session, pool)
 	return { show = open }, lease, entry, leases, view, controller, pool
 end
 
@@ -84,7 +84,7 @@ local function dispatch_control(kind)
 	local open = assert(load([[
 		local _session,ControllerPool=...
 		return function() return _session,ControllerPool end]],
-		"@" .. production .. "/macos/ui/permission_dialog/init.lua"))(session, pool)
+		"@" .. production .. "/macos/onboarding/ui/permission_dialog/init.lua"))(session, pool)
 	local host, depth = { show = open }, 0
 	assert(pool.bind(token, function(message)
 		if kind == "nested" and depth == 0 then depth = 1; callback(message); return end

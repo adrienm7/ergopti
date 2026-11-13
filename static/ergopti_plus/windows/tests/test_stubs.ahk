@@ -375,7 +375,7 @@ _TestRestoreAltGrFamily(Saved) {
 	_ALTGR_LAYOUT_PROBE := Saved.Probe
 }
 
-; ui/onboarding/core.ahk is not loaded by the harness; the AltGr criteria read
+; onboarding/ui/core.ahk is not loaded by the harness; the AltGr criteria read
 ; the wizard's pass-through switch through the same public check.
 global _OB_ALTGR_PASSTHROUGH := false
 IsOnboardingActive() {

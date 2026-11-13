@@ -26,7 +26,7 @@ local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 local function with_declared_about_provider(offer, body)
 	helpers.with_stub_scope({"menu.engine.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths", "core.logger.engine.logger",
 		"ui.menu.menu_about", "modules.updater", "adapters.update_launcher", "ui.update_check",
-		"ui.menu.start_at_login", "ui.changelog"}, function()
+		"onboarding.ui.menu_start_at_login", "ui.changelog"}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local manifest = helpers.load_with_stubs("menu.engine.manifest_menu")
 		local session = { offer = offer, opens = {}, requests = {} }
@@ -40,7 +40,7 @@ local function with_declared_about_provider(offer, body)
 			request_check = function(channel) session.requests[#session.requests + 1] = channel; return true end,
 		}
 		package.loaded["ui.update_check"] = {open = function(opts) session.opens[#session.opens + 1] = opts; return true end}
-		package.loaded["ui.menu.start_at_login"] = {enabled = function() return false end}
+		package.loaded["onboarding.ui.menu_start_at_login"] = {enabled = function() return false end}
 		package.loaded["ui.changelog"] = {open = function() error("A provider build must not open its changelog") end,
 			pending_install = function() return nil end}
 		session.channel = "dev"

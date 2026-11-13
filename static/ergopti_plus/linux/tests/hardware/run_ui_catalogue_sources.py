@@ -18,10 +18,10 @@ local target = kind == "catalogue" and require("onboarding.engine.answers").CATA
 paths.shared = function(name) if name == target then return endpoint end return original(name) end
 local regular = os.getenv("UI_SOURCE_REGULAR") == "1"
 if kind == "catalogue" then
-    local ok = pcall(require("ui.onboarding.bridge").config_values, {})
+    local ok = pcall(require("onboarding.ui.bridge").config_values, {})
     assert(ok == regular, "onboarding catalogue admission")
 elseif kind == "locale" then
-    local bridge = require("ui.onboarding.bridge")
+    local bridge = require("onboarding.ui.bridge")
     local state = { i18n = { list_locales = function() return { "en" } end },
         webview_manager = { eval_js = function() return true end, set_title = function() return true end } }
     local result = bridge.on_message({ action = "previewLocale", locale = "en" }, state)

@@ -32,9 +32,9 @@ _OWOC_Source(Root) {
 		Source .= "#Include " . Owner . "`n"
 	}
 	return Source . _WebViewChildTimingBinding("webview_host_safety_flush_ms")
-		. "#Include " . _DriverDir . "\ui\onboarding\core.ahk`n"
-		. "#Include " . _DriverDir . "\ui\onboarding\translate.ahk`n"
-		. "#Include " . _DriverDir . "\ui\onboarding\webview.ahk`n"
+		. "#Include " . _DriverDir . "\onboarding\ui\core.ahk`n"
+		. "#Include " . _DriverDir . "\onboarding\ui\translate.ahk`n"
+		. "#Include " . _DriverDir . "\onboarding\ui\webview.ahk`n"
 		. "#Include " . _DriverDir . "\tests\fixtures\onboarding_open_generation_body.ahk`n"
 }
 

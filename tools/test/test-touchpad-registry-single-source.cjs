@@ -176,7 +176,7 @@ function functionBody(source, name) {
 	);
 	// WG-003: HKCU in an elevated worker is the hive of the account that
 	// answered UAC, so the wizard writes in process and elevates only the restart.
-	const wizard = read(path.join(WIN, 'ui', 'onboarding', 'gesture_registration.ahk'));
+	const wizard = read(path.join(WIN, 'onboarding', 'ui', 'gesture_registration.ahk'));
 	const launch = functionBody(wizard, '_Onboarding_StartGestureAuto');
 	const applyAt = launch.indexOf('TouchpadRegistryApply()');
 	check(

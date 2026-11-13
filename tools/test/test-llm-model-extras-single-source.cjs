@@ -258,6 +258,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/ai/engine',
 	'static/ergopti_plus/macos/settings/engine',
 	'static/ergopti_plus/macos/ui',
+	'static/ergopti_plus/macos/onboarding/ui',
 	'static/ergopti_plus/macos/metrics/ui/menu',
 	'static/ergopti_plus/macos/metrics/ui/metrics_apps',
 	'static/ergopti_plus/macos/metrics/ui/metrics_typing',

@@ -16,7 +16,7 @@ require("core.logger.engine")
 --- @param scenario function Complete dialog and deferred native cleanup scenario.
 local function with_windows(scenario)
 	helpers.with_stub_scope({
-		"ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.events.timer_scheduler", "core.timing.engine.deferred_work",
+		"onboarding.ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.events.timer_scheduler", "core.timing.engine.deferred_work",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
@@ -24,7 +24,7 @@ local function with_windows(scenario)
 	}, function()
 		local h = { windows = {}, retained = {}, script_refs = {}, deferred = {}, closed = 0 }
 		local new_window = require("tests.support.native_webview_close_fixture")(h)
-		h.dialog = helpers.load_with_stubs("ui.permission_dialog", {
+		h.dialog = helpers.load_with_stubs("onboarding.ui.permission_dialog", {
 			webview = { new = new_window, windowMasks = { titled = 1, closable = 2, utility = 16 },
 				usercontent = { new = function()
 					local controller = {}

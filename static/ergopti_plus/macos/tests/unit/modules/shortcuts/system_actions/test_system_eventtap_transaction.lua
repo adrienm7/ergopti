@@ -193,14 +193,14 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 		-- withdrew Accessibility, and the error named only "enabled=false".
 		local fixture = load_fixture({{ enable_on_start = false }})
 		local errors = {}
-		local saved_permission = package.loaded["adapters.accessibility_permission"]
+		local saved_permission = package.loaded["onboarding.adapters.accessibility_permission"]
 		local saved_error = package.loaded["core.logger.engine.logger"].error
-		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return false end }
+		package.loaded["onboarding.adapters.accessibility_permission"] = { is_trusted = function() return false end }
 		package.loaded["core.logger.engine.logger"].error = function(_, text, ...)
 			errors[#errors + 1] = string.format(text, ...)
 		end
 		local ok, owner = pcall(fixture.system.bind_cmd_star)
-		package.loaded["adapters.accessibility_permission"] = saved_permission
+		package.loaded["onboarding.adapters.accessibility_permission"] = saved_permission
 		package.loaded["core.logger.engine.logger"].error = saved_error
 		helpers.assert_true(ok)
 		helpers.assert_nil(owner)

@@ -39,7 +39,7 @@ local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
 -- the forbidden strings does not trip the guard.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings", "keyboard", "layouts", "metrics", "onboarding" }
 
 -- The two forbidden markers, with the reason each one is banned.
 local FORBIDDEN = {

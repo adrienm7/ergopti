@@ -3257,7 +3257,7 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	-- Completion belongs to the wizard's committed config, not to window creation.
 	-- Run only after every bridge dependency is ready and never in hardware probes.
-	require("ui.onboarding.startup").run({
+	require("onboarding.ui.startup").run({
 		graphical = opts.tray == true and not opts.dry_run,
 		path = require("settings.engine.paths").config("config.toml"),
 		show = function(app) return webview_manager and webview_manager.show(app) == true end,

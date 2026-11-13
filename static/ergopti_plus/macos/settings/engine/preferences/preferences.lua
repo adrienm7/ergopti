@@ -90,7 +90,7 @@ local MetricsState = require("metrics.engine.state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard", "layouts" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui", "core", "settings", "menu", "ai", "apps", "diagnostics", "keyboard", "layouts", "onboarding" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:

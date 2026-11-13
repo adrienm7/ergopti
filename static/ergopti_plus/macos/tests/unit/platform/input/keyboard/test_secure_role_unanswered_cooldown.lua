@@ -18,9 +18,9 @@ local LOGINWINDOW_PID = 449
 --- @return boolean secure Classification result.
 --- @return boolean askable Whether later readers may still ask the application.
 local function classify(refusal)
-	return helpers.with_stub_scope({ "platform.focus.secure_field_detector", "adapters.accessibility_permission",
+	return helpers.with_stub_scope({ "platform.focus.secure_field_detector", "onboarding.adapters.accessibility_permission",
 		"core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
-		package.loaded["adapters.accessibility_permission"] = nil
+		package.loaded["onboarding.adapters.accessibility_permission"] = nil
 		local field = {
 			attributeValue = function(_, attribute)
 				if refusal then return nil, refusal end
@@ -31,7 +31,7 @@ local function classify(refusal)
 		local detector = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			processInfo = { processID = 1 },
 		})
-		local permission = require("adapters.accessibility_permission")
+		local permission = require("onboarding.adapters.accessibility_permission")
 		permission.reset_unanswered_for_tests()
 		local secure = detector.isElementSecure(field)
 		return secure, permission.is_askable(LOGINWINDOW_PID)

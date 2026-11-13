@@ -20,7 +20,7 @@ end
 --- @return table observation Native objects and weak receiver/domain references.
 local function current(host, root)
 	assert(type(host) == "table" and type(host.show) == "function")
-	assert(debug.getinfo(host.show, "S").source == "@" .. root .. "/macos/ui/permission_dialog/init.lua",
+	assert(debug.getinfo(host.show, "S").source == "@" .. root .. "/macos/onboarding/ui/permission_dialog/init.lua",
 		"foreign PermissionDialog owner")
 	local session = upvalue(host.show, "_session")
 	local pool = upvalue(host.show, "ControllerPool")

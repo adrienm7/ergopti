@@ -67,7 +67,7 @@
 			"patterns": [
 				"ergopti_plus/macos/tests/**",
 				"ergopti_plus/_shared/tests/**",
-				"ergopti_plus/macos/data/test_*.py"
+				"ergopti_plus/macos/onboarding/test_*.py"
 			]
 		},
 		{

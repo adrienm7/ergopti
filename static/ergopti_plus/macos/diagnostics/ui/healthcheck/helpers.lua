@@ -415,7 +415,7 @@ end
 -- them, one per step, after phase A.
 local PERMISSION_READERS = {
 	accessibility    = function()
-		return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
+		return permission_state("accessibility", require("onboarding.adapters.accessibility_permission").is_trusted())
 	end,
 	screen_recording = function()
 		return permission_state("screen_recording", require("platform.system.screen_capture").permission_state())

@@ -79,7 +79,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 			end)
 		end)
 		helpers.it("(webview-focus-owner) onboarding retirement revokes focus, delete refused=" .. tostring(refused), function()
-			with_window("ui.onboarding", function(onboarding, state)
+			with_window("onboarding.ui", function(onboarding, state)
 				require("tests.support.onboarding_shared_data").install()
 				helpers.assert_true(onboarding.run("/virtual/config.toml"))
 				require("tests.support.webview_focus_fixture").check(state.view,
@@ -97,7 +97,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 		end)
 	end
 	helpers.it("(webview-focus-owner) onboarding constructor close revokes factory focus", function()
-		with_window("ui.onboarding", function(onboarding, state)
+		with_window("onboarding.ui", function(onboarding, state)
 			require("tests.support.onboarding_shared_data").install()
 			state.close_during_create = true
 			helpers.assert_eq(onboarding.run("/virtual/config.toml"), false)
@@ -109,7 +109,7 @@ end)
 -- Public reuse must distinguish a live wizard from exact cleanup-only ownership.
 -- These use the genuine controller and existing native fixture ports, not AppKit.
 local function with_onboarding_reuse(callback)
-	with_window("ui.onboarding", function(onboarding, state)
+	with_window("onboarding.ui", function(onboarding, state)
 		require("tests.support.onboarding_shared_data").install()
 		local builder = package.loaded["core.ui.ui.builder"]
 		local show = builder.show_webview

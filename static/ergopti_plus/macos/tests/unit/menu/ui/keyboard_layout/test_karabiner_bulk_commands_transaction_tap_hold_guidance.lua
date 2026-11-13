@@ -107,7 +107,7 @@ helpers.describe("shared Tap-Hold guidance retains actual native admission and o
 	end)
 
 	for _, case in ipairs({
-		{ name = "steps", module = "ui.permission_dialog.login_items_guide", method = "reopen",
+		{ name = "steps", module = "onboarding.ui.permission_dialog.login_items_guide", method = "reopen",
 			label = "menu.tapholds.show_login_items_steps" },
 		{ name = "legacy", module = "keyboard.ui.legacy_rules_cleanup", method = "open",
 			label = "menu.tapholds.legacy_rules_pending" },

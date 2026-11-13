@@ -25,7 +25,7 @@ local i18n   = require("core.i18n.engine.i18n")
 local SecureFieldDetector = require("platform.focus.secure_field_detector")
 local TimerScheduler = require("core.events.timer_scheduler")
 local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
-local AXResponsiveness = require("adapters.accessibility_permission")
+local AXResponsiveness = require("onboarding.adapters.accessibility_permission")
 local LOG    = "keystats.context_tracker"
 local M      = {}
 

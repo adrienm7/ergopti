@@ -33,7 +33,7 @@ local MODULE_NAMES = {
 	"keyboard.engine.runtime.defaults",
 	"keyboard.engine.layers.nav_layer",
 	"settings.ui.menu.paths",
-	"ui.onboarding",
+	"onboarding.ui",
 	"onboarding.engine.publication",
 	"settings.engine.migration.file_inverse",
 }
@@ -293,7 +293,7 @@ function M.with_finish(opts, scenario)
 			package.loaded["core.text.engine.toml.writer"] = nil
 			require("core.text.engine.toml.writer")
 		end
-		local onboarding = require("ui.onboarding")
+		local onboarding = require("onboarding.ui")
 		if not opts.canonical_files then require("tests.support.onboarding_shared_data").install() end
 		local handle_message = named_upvalue(onboarding.run, "handle_message")
 		helpers.assert_type(handle_message, "function",

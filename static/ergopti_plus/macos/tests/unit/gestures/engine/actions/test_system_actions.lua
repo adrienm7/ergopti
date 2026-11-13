@@ -28,7 +28,7 @@ local OWNED = {
 	"clipboard.adapters.clipboard",
 	"adapters.mouse_control",
 	"core.fs.adapters.file_system",
-	"adapters.tcc_grant",
+	"onboarding.adapters.tcc_grant",
 	"platform.focus.window_info",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
@@ -85,7 +85,7 @@ local function with_system(body, options)
 				return status == "created", status, nil
 			end,
 		}
-		package.loaded["adapters.tcc_grant"] = { bundle_id = function() return OWN_BUNDLE end }
+		package.loaded["onboarding.adapters.tcc_grant"] = { bundle_id = function() return OWN_BUNDLE end }
 		local running = options.running or {}
 		package.loaded["platform.focus.window_info"] = {
 			application_bundle_id = function(pid) return running[pid] end,

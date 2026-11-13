@@ -60,7 +60,7 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\settings\engine\migration\transition.ahk
 #Include ..\..\settings\engine\migration\transition_runtime.ahk
 #Include ..\..\settings\engine\migration\migrate.ahk
-#Include ..\..\infra\first_boot.ahk
+#Include ..\..\onboarding\engine\first_boot.ahk
 #Include ..\..\gestures\engine\config.ahk
 ; LoggerInit admits the real shared privacy policy through this native codec.
 #Include ..\..\core\text\engine\json.ahk

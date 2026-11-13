@@ -22,12 +22,12 @@ local function with_native(native, body)
 		calls[#calls + 1] = prompt
 		return native(prompt)
 	end or nil
-	package.loaded["adapters.accessibility_permission"] = nil
+	package.loaded["onboarding.adapters.accessibility_permission"] = nil
 	local ok, err = pcall(function()
-		body(require("adapters.accessibility_permission"), calls)
+		body(require("onboarding.adapters.accessibility_permission"), calls)
 	end)
 	_G.hs.accessibilityState = saved
-	package.loaded["adapters.accessibility_permission"] = nil
+	package.loaded["onboarding.adapters.accessibility_permission"] = nil
 	if not ok then error(err, 0) end
 end
 

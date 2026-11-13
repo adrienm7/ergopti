@@ -49,8 +49,8 @@ end
 local function build(quits, source_run, startup, paused)
 	local runs = {}
 	startup = startup or { enabled = false, toggles = 0, changes = 0 }
-	local previous_startup = package.loaded["ui.menu.start_at_login"]
-	package.loaded["ui.menu.start_at_login"] = {
+	local previous_startup = package.loaded["onboarding.ui.menu_start_at_login"]
+	package.loaded["onboarding.ui.menu_start_at_login"] = {
 		command_available = function() return true end,
 		enabled = function() return startup.enabled end,
 		toggle = function()
@@ -67,7 +67,7 @@ local function build(quits, source_run, startup, paused)
 	Installation.is_source_run = function() return source_run == true end
 	local function restore()
 		package.loaded["menu.ui.transactions.uninstall"] = previous
-		package.loaded["ui.menu.start_at_login"] = previous_startup
+		package.loaded["onboarding.ui.menu_start_at_login"] = previous_startup
 		Installation.is_source_run = real_is_source_run
 	end
 	local mb = helpers.load_module("menu.ui.builder.builder")
@@ -218,7 +218,7 @@ end
 local function with_about_parent(code, options, body)
 	options = options or {}
 	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.i18n.engine.i18n", "infra.version",
-		"core.lifecycle.engine.installation", "ui.menu.start_at_login", "menu.ui.transactions.uninstall" }
+		"core.lifecycle.engine.installation", "onboarding.ui.menu_start_at_login", "menu.ui.transactions.uninstall" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, detail = xpcall(function()
@@ -260,7 +260,7 @@ local function with_about_parent(code, options, body)
 			return { kind = "release", version = "9.9.9", commit = "frozen123" }
 		end }
 		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return options.source_run == true end }
-		package.loaded["ui.menu.start_at_login"] = {
+		package.loaded["onboarding.ui.menu_start_at_login"] = {
 			command_available = function() return options.startup_available ~= false end,
 			enabled = function() state.startup_reads = state.startup_reads + 1; return state.enabled end,
 			toggle = function() state.toggles = state.toggles + 1; state.enabled = not state.enabled; return true end,

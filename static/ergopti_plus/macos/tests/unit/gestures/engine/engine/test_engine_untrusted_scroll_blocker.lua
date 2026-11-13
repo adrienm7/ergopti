@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 --- @return table engine, table logged { level = { messages } }
 local function load_engine(trusted)
 	package.loaded["gestures.engine.engine"] = nil
-	package.loaded["adapters.accessibility_permission"] = nil
+	package.loaded["onboarding.adapters.accessibility_permission"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
 	local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 	local logged = { error = {}, warn = {} }

@@ -326,7 +326,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../core/ui/adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk
 #Include ../core/lifecycle/engine/shutdown/uninstall.ahk
-#Include ../infra/start_at_login.ahk
+#Include ../onboarding/engine/start_at_login.ahk
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../settings/engine/registry.ahk
 #Include ../core/text/engine/json.ahk
@@ -1008,19 +1008,19 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/lifecycle/engine/test_buffered_data_snapshot_owner.ahk
 ; Load the definitions-only onboarding worker owner so its elevated-launch
 ; reservation can be exercised without constructing the wizard UI.
-#Include ../ui/onboarding/gesture_registration.ahk
+#Include ../onboarding/ui/gesture_registration.ahk
 ; The answers contract, the commit and the WebView host are definitions-only
 ; until _Onboarding_TryWeb is called. Include them so the finish payload is
 ; followed to the candidate config.toml without the persistence/reload boundary.
-#Include ../ui/onboarding/translate.ahk
-#Include ../ui/onboarding/answers.ahk
-#Include ../ui/onboarding/finish.ahk
-#Include ../ui/onboarding/webview.ahk
+#Include ../onboarding/ui/translate.ahk
+#Include ../onboarding/ui/answers.ahk
+#Include ../onboarding/ui/finish.ahk
+#Include ../onboarding/ui/webview.ahk
 #Include unit/diagnostics/adapters/crash_report/test_screenshot_worker_ownership.ahk
 #Include unit/diagnostics/adapters/crash_report/test_screenshot_layered_native.ahk
-#Include unit/ui/onboarding/test_onboarding_finish_payload.ahk
-#Include unit/ui/onboarding/test_onboarding_answers.ahk
-#Include unit/ui/onboarding/test_onboarding_metrics_path.ahk
+#Include unit/onboarding/test_finish_payload.ahk
+#Include unit/onboarding/test_answers.ahk
+#Include unit/onboarding/test_metrics_path.ahk
 #Include unit/gestures/engine/test_gestures.ahk
 #Include unit/gestures/engine/test_binding_identity.ahk
 #Include unit/gestures/engine/test_menu_status.ahk
@@ -1846,9 +1846,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/menu/test_prune_quadratic_tray_walk.ahk
 #Include meta/metrics/engine/context/test_ni_isvpnactive_missing_return.ahk
 #Include meta/metrics/engine/test_no_onexit_keystats_flush.ahk
-#Include meta/ui/onboarding/test_onboarding_no_appstate.ahk
-#Include meta/ui/onboarding/test_onboarding_toml_bool_reads.ahk
-#Include meta/ui/onboarding/test_onboarding_effective_config_dir.ahk
+#Include meta/onboarding/test_no_appstate.ahk
+#Include meta/onboarding/test_toml_bool_reads.ahk
+#Include meta/onboarding/test_effective_config_dir.ahk
 #Include meta/core/ui/windows/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/keyboard/keys/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/keyboard/keys/test_oneshotshift_suspend_guard.ahk
@@ -2024,7 +2024,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/shortcuts/test_sendinstant_clip_contention_guard.ahk
 #Include meta/modules/shortcuts/test_sendinstant_clipboard_sequence_ownership.ahk
 #Include meta/gestures/test_plain_paste_clipboard_sequence_ownership.ahk
-#Include meta/ui/onboarding/test_onboarding_gesture_registration_async.ahk
+#Include meta/onboarding/test_gesture_registration_async.ahk
 #Include unit/platform/input/test_text_sender_completion_status.ahk
 #Include unit/core/ui/windows/test_native_editor_completion.ahk
 #Include unit/platform/input/test_text_sender_sendinput_failure.ahk
@@ -2285,7 +2285,7 @@ _LogBootProgress("keystats modules + tests included")
 ; WMGetList/WIGetAll bare-try-no-catch fix (F33) — sibling of the
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/platform/focus/test_window_adapters_catch.ahk
-#Include meta/ui/onboarding/test_onbweb_singleton_guard.ahk
+#Include meta/onboarding/test_onbweb_singleton_guard.ahk
 #Include meta/settings/persistence/test_reset_config_writes_meta_placeholder.ahk
 #Include meta/core/ui/webview/test_shared_env_reentrancy_guard.ahk
 #Include meta/core/ui/webview/test_host_callback_epoch.ahk
@@ -2339,7 +2339,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/hotstrings/engine/catalogue/test_live_rebuild_no_critical_io.ahk
 #Include meta/metrics/engine/metrics/test_focus_refresh_suspend_guard.ahk
 #Include meta/ai/tooltip/test_loading_tooltip_no_safety_deadline.ahk
-#Include meta/ui/onboarding/test_onboarding_gesture_result_token.ahk
+#Include meta/onboarding/test_gesture_result_token.ahk
 #Include meta/core/lifecycle/engine/reload/test_suspend_prefix_drain_covers_all_combos.ahk
 #Include meta/hotstrings/engine/catalogue/test_case_sensitivity_mapping.ahk
 #Include meta/ai/profiles/test_prompt_editor_singleton_context.ahk
@@ -2364,7 +2364,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/menu/test_prune_keeps_detached_registrations.ahk
 #Include meta/metrics/engine/metrics/test_filter_secure_field_fails_closed.ahk
 #Include meta/metrics/engine/context/test_network_info_single_wlan_roundtrip.ahk
-#Include meta/ui/onboarding/test_onboarding_unbraced_if_scope.ahk
+#Include meta/onboarding/test_unbraced_if_scope.ahk
 #Include meta/hotstrings/engine/personal/test_info_save_surfaces_failure.ahk
 #Include meta/ai/servers/test_remote_curl_forwards_usage_meta.ahk
 #Include meta/ai/servers/test_remote_token_not_on_argv.ahk

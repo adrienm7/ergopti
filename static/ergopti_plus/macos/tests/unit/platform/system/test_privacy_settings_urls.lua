@@ -16,8 +16,8 @@ local EXTENSION = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.
 
 local function load()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.privacy_settings"] = nil
-	return require("adapters.privacy_settings")
+	package.loaded["onboarding.adapters.privacy_settings"] = nil
+	return require("onboarding.adapters.privacy_settings")
 end
 
 helpers.describe("privacy settings URLs: one version-aware table", function()
@@ -51,6 +51,6 @@ helpers.describe("privacy settings URLs: one version-aware table", function()
 		-- moved or new caller is covered and no read is pinned to a location.
 		helpers.assert_true(helpers.read_driver_source() ~= nil, "the production source scan must not be empty")
 		local spelled = helpers.read_driver_source("?Privacy_")
-		helpers.assert_true(spelled == nil, "a production file spells a privacy pane URL outside data/privacy_panes.json")
+		helpers.assert_true(spelled == nil, "a production file spells a privacy pane URL outside onboarding/privacy_panes.json")
 	end)
 end)

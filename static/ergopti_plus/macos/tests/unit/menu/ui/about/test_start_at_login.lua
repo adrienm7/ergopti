@@ -9,8 +9,8 @@
 local helpers = require("tests.helpers")
 
 local function fixture()
-	package.loaded["ui.menu.start_at_login"] = nil
-	local module = require("ui.menu.start_at_login")
+	package.loaded["onboarding.ui.menu_start_at_login"] = nil
+	local module = require("onboarding.ui.menu_start_at_login")
 	local calls = { commands = {}, callbacks = {}, errors = 0, changes = 0, dialogs = {}, logs = {} }
 	local function log(level)
 		return function(_, message) calls.logs[#calls.logs + 1] = level .. ": " .. message end

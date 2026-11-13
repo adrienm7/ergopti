@@ -335,7 +335,7 @@
 				"tar",
 				"shasum"
 			],
-			"used_for": "OS plumbing: opening files, process checks, launch jobs, preferences, system information, extension state, permissions (`macos/gestures/engine/system_actions.lua:56-60`, `macos/keyboard/engine/runtime/onboarding.lua:222,247`, `macos/adapters/tcc_grant.lua:25`, `macos/diagnostics/engine/field_check/checks.lua:334`, `macos/adapters/release_stage.sh:105`)",
+			"used_for": "OS plumbing: opening files, process checks, launch jobs, preferences, system information, extension state, permissions (`macos/gestures/engine/system_actions.lua:56-60`, `macos/keyboard/engine/runtime/onboarding.lua:222,247`, `macos/onboarding/adapters/tcc_grant.lua:25`, `macos/diagnostics/engine/field_check/checks.lua:334`, `macos/adapters/release_stage.sh:105`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "n/a",

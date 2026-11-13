@@ -21,7 +21,7 @@ _MetaOllamaWebviewMsgSubRetained() {
 	Assert(Body != "", "OllamaWV_Create must exist in ai/engine/ollama/webview.ahk")
 
 	Assert(InStr(Body, "_OllamaWV_MsgSub := _OllamaWV_WebView.WebMessageReceived(OllamaWV_OnWebMessage)") > 0,
-		"OllamaWV_Create must store the WebMessageReceived() subscription handle in the persistent _OllamaWV_MsgSub global, mirroring ui/onboarding/webview.ahk's _OnbWeb_MsgSub fix")
+		"OllamaWV_Create must store the WebMessageReceived() subscription handle in the persistent _OllamaWV_MsgSub global, mirroring onboarding/ui/webview.ahk's _OnbWeb_MsgSub fix")
 
 	CloseBody := _DriverFuncBody("OllamaWV_Close")
 	Assert(CloseBody != "", "OllamaWV_Close must exist")

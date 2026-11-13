@@ -1536,7 +1536,7 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	; _LLM_MBW_Reset releases the WebMessageReceived subscription that is
 	; CURRENTLY DISPATCHING, then closes the controller and destroys the host
 	; Gui — all synchronously on the callback stack. That is the
-	; access-violation class ui/onboarding/webview.ahk documents and solves
+	; access-violation class onboarding/ui/webview.ahk documents and solves
 	; with SetTimer(-1); an SEH fault of this kind is uncatchable.
 	Deferred := _LLM_MBW_RunAction.Bind(Payload, ExpectedEpoch)
 	if (Action == "select_model" && !Payload.Has("backend")) {

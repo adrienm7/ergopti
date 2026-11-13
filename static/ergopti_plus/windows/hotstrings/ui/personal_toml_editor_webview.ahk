@@ -279,7 +279,7 @@ _HsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	; (paths_editor, personal_info_editor, prompt_editor). `save` does file I/O
 	; plus an N-section live re-registration on the STA callback thread, and
 	; `close` tears the controller down from inside its own dispatch — the
-	; access-violation class documented in ui/onboarding/webview.ahk. This was the
+	; access-violation class documented in onboarding/ui/webview.ahk. This was the
 	; one host that still called them synchronously.
 	if (Action == "save") {
 		SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_Save, Data), -1)

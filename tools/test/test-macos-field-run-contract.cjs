@@ -39,7 +39,7 @@ const SPEC_PATH = 'static/ergopti_plus/macos/diagnostics/data/field_run.json';
 const CHECKS_PATH = 'static/ergopti_plus/macos/diagnostics/engine/field_check/checks.lua';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
-const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
+const PRIVACY_PANES = 'static/ergopti_plus/macos/onboarding/privacy_panes.json';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
 // The logs are scrubbed of typed text before they reach the pushed branch.
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
@@ -64,7 +64,7 @@ const FIELD_PATHS = 'tools/dev/field-report-paths.py';
 const APP_DIRS = 'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml';
 const SUB_FILES = 'static/ergopti_plus/_shared/core/logger/data/sub_files.toml';
 // The readiness budget covers the boot's Accessibility wait, read from its owner.
-const ACCESSIBILITY_WAIT = 'static/ergopti_plus/macos/infra/accessibility_wait.lua';
+const ACCESSIBILITY_WAIT = 'static/ergopti_plus/macos/onboarding/engine/accessibility_wait.lua';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS field report collector is a macOS shell tool; not run on Windows.');
@@ -672,7 +672,7 @@ function reportFolder(paths) {
 			const checks = fs.readFileSync(path.join(ROOT, SHELL_CHECKS), 'utf8');
 			assert.match(
 				checks,
-				/PRIVACY_PANES_SPEC="static\/ergopti_plus\/macos\/data\/privacy_panes\.json"/
+				/PRIVACY_PANES_SPEC="static\/ergopti_plus\/macos\/onboarding\/privacy_panes\.json"/
 			);
 			// System Settings is quit only when the run opened it
 			assert.match(

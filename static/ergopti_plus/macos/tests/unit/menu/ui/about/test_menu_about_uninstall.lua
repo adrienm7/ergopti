@@ -47,8 +47,8 @@ local function submenu(paused, fired, title_key, source_run, startup_enabled)
 	Updater.is_local_source = function() return source_run == true end
 	package.loaded["ui.menu.menu_about"] = nil
 	local About = require("ui.menu.menu_about")
-	local previous_startup = package.loaded["ui.menu.start_at_login"]
-	package.loaded["ui.menu.start_at_login"] = { enabled = function() return startup_enabled == true end }
+	local previous_startup = package.loaded["onboarding.ui.menu_start_at_login"]
+	package.loaded["onboarding.ui.menu_start_at_login"] = { enabled = function() return startup_enabled == true end }
 	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
@@ -56,7 +56,7 @@ local function submenu(paused, fired, title_key, source_run, startup_enabled)
 	local ok, menu = pcall(builder.generate, { config = { log_level = 2 }, paused = paused, channel_owner = owner },
 		{ about = About }, recording_actions(fired))
 	Updater.is_local_source = real_is_local_source
-	package.loaded["ui.menu.start_at_login"] = previous_startup
+	package.loaded["onboarding.ui.menu_start_at_login"] = previous_startup
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(menu))
 	for _, item in ipairs(menu) do
 		if item.title == title_key then return item.menu end

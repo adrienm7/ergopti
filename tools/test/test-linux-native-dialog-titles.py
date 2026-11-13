@@ -326,7 +326,7 @@ try:
                             if mode == "directory"
                             else "local dialogs\n"
                             "package.loaded['ai.ui.menu.backend_rows']={bind_page=function(_,options) dialogs=options.dialogs end,caption=function() return 'model button' end}\n"
-                            "package.loaded['ui.menu.start_at_login']={enabled=function() return false end,command_available=function() return false end}\n"
+                            "package.loaded['onboarding.ui.menu_start_at_login']={enabled=function() return false end,command_available=function() return false end}\n"
                             "package.loaded['core.fs.adapters.storage']={get=function(key,default) if key=='locale' then return 'en' end;return default end,set=function() return false end}\n"
                             "require('core.i18n.engine.locale').set_locale('en')\n"
                             "require('menu.ui.builder.builder').build({llm={is_enabled=function() return false end},_version='native-profile',on_quit=function() end})\n"

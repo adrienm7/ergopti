@@ -1001,7 +1001,7 @@ local function login_items_steps_command(karabiner)
 	return function()
 		Logger.info(LOG, "Showing the Login Items steps again from the Tap-Holds menu.")
 		local ok, shown = xpcall(function()
-			return require("ui.permission_dialog.login_items_guide").reopen(karabiner)
+			return require("onboarding.ui.permission_dialog.login_items_guide").reopen(karabiner)
 		end, debug.traceback)
 		if not ok then
 			Logger.error(LOG, "The Login Items steps could not be shown: %s.", tostring(shown))

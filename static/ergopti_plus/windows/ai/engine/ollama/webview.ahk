@@ -47,7 +47,7 @@ global _OllamaWV_WebView    := unset
 ; garbage-collected its __Delete unsubscribes via remove_WebMessageReceived —
 ; silently killing the handler the instant it is discarded. It MUST be kept
 ; alive in a persistent global for the JS->AHK channel to keep delivering
-; messages (see ui/onboarding/webview.ahk's _OnbWeb_MsgSub for the sibling
+; messages (see onboarding/ui/webview.ahk's _OnbWeb_MsgSub for the sibling
 ; fix this mirrors).
 global _OllamaWV_MsgSub     := unset
 global _OllamaWV_Ready      := false   ; true once JS signals "ready"
@@ -342,7 +342,7 @@ OllamaWV_Create(kind, subtitle) {
 	; The returned subscription handle MUST be stored in a persistent global:
 	; discarding it lets AHK garbage-collect it immediately, whose __Delete
 	; unsubscribes via remove_WebMessageReceived — silently killing the
-	; JS->AHK channel the instant it is created (see ui/onboarding/webview.ahk's
+	; JS->AHK channel the instant it is created (see onboarding/ui/webview.ahk's
 	; _OnbWeb_MsgSub for the sibling fix this mirrors).
 	_OllamaWV_MsgSub := _OllamaWV_WebView.WebMessageReceived(OllamaWV_OnWebMessage)
 

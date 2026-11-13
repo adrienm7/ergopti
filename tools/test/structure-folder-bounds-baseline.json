@@ -3,7 +3,7 @@
 	"windows.code_oversized": 0,
 	"windows.code_singleton": 0,
 	"windows.tests_oversized": 9,
-	"windows.tests_singleton": 9,
+	"windows.tests_singleton": 10,
 	"macos.code_oversized": 0,
 	"macos.code_singleton": 1,
 	"macos.tests_oversized": 2,
@@ -13,8 +13,8 @@
 	"linux.tests_oversized": 3,
 	"linux.tests_singleton": 22,
 	"_shared.code_oversized": 2,
-	"_shared.code_singleton": 9,
+	"_shared.code_singleton": 8,
 	"_shared.tests_oversized": 1,
 	"_shared.tests_singleton": 1,
-	"drivers.mismatched_top_level": 3
+	"drivers.mismatched_top_level": 2
 }

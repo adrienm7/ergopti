@@ -21,7 +21,7 @@ BUSINESS_SCOPE = "open_settings callback recorded; no System Settings opened or 
 IDENTITY_SCOPE = "private read-only dispatch stack; raw native name and exact webView observed"
 WEAK_SCOPE = "per-window lease receiver, settings callback and sentinel; pooled dispatcher retained"
 DEPENDENCIES = (
-    "static/ergopti_plus/macos/ui/permission_dialog/init.lua",
+    "static/ergopti_plus/macos/onboarding/ui/permission_dialog/init.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_controller_pool.lua",
     "static/ergopti_plus/macos/core/ui/ui/builder.lua",
     "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",

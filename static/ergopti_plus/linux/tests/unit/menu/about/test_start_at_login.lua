@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Startup = require("ui.menu.start_at_login")
+local Startup = require("onboarding.ui.menu_start_at_login")
 
 helpers.describe("login startup", function()
 	helpers.it("queries without changing startup and verifies both toggle directions (login-startup)", function()
@@ -53,13 +53,13 @@ helpers.describe("login startup", function()
 	end)
 	helpers.it("logs a failed read once until a read succeeds, and every failed change (login-startup)", function()
 		local previous_logger = package.loaded["core.logger.engine.shim"]
-		local previous_subject = package.loaded["ui.menu.start_at_login"]
+		local previous_subject = package.loaded["onboarding.ui.menu_start_at_login"]
 		local logs = {}
 		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 		package.loaded["core.logger.engine.shim"] = logger
 		local okay, detail = pcall(function()
-			local subject = helpers.load_module("ui.menu.start_at_login")
+			local subject = helpers.load_module("onboarding.ui.menu_start_at_login")
 			local function failing() return false, "", "command exited with status 78" end
 			helpers.assert_eq(subject.enabled(failing), nil)
 			helpers.assert_eq(subject.command_available(failing), nil)
@@ -82,7 +82,7 @@ helpers.describe("login startup", function()
 			helpers.assert_eq(subject.toggle(function() return true, "disabled\n" end), false)
 			helpers.assert_eq(count("Startup enable was not confirmed by the next read."), 1)
 		end)
-		package.loaded["core.logger.engine.shim"], package.loaded["ui.menu.start_at_login"] = previous_logger, previous_subject
+		package.loaded["core.logger.engine.shim"], package.loaded["onboarding.ui.menu_start_at_login"] = previous_logger, previous_subject
 		assert(okay, detail)
 	end)
 end)
@@ -93,7 +93,7 @@ end)
 --- @param body function Receives the menu, desktop path and actual command ledger.
 local function with_installed_startup(mode, body)
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local loaded = { "core.process.adapters.shell_runner", "ui.menu.start_at_login" }
+	local loaded = { "core.process.adapters.shell_runner", "onboarding.ui.menu_start_at_login" }
 	local previous = {}
 	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
 	local Shell, menu
@@ -107,7 +107,7 @@ local function with_installed_startup(mode, body)
 	for key in pairs(environment) do saved[key] = os.getenv(key) end
 	local okay, detail = xpcall(function()
 		Shell = helpers.load_module("core.process.adapters.shell_runner")
-		menu = helpers.load_module("ui.menu.start_at_login")
+		menu = helpers.load_module("onboarding.ui.menu_start_at_login")
 		for _, relative in ipairs({ "/a space d'été Ω", "/a space d'été Ω/lib", "/a space d'été Ω/lib/ergopti",
 			"/a space d'été Ω/lib/ergopti/linux", "/a space d'été Ω/lib/ergopti/linux/install", "/commands", "/runtime" }) do
 			assert(uv.fs_mkdir(root .. relative, 448))
@@ -197,7 +197,7 @@ end)
 --- @param body function Receives the menu, the checkout's launcher, the entry path and a writer.
 local function with_source_startup(body)
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local loaded = { "core.process.adapters.shell_runner", "ui.menu.start_at_login" }
+	local loaded = { "core.process.adapters.shell_runner", "onboarding.ui.menu_start_at_login" }
 	local previous = {}
 	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
 	local Shell
@@ -212,7 +212,7 @@ local function with_source_startup(body)
 	end
 	local okay, detail = xpcall(function()
 		Shell = helpers.load_module("core.process.adapters.shell_runner")
-		local menu = helpers.load_module("ui.menu.start_at_login")
+		local menu = helpers.load_module("onboarding.ui.menu_start_at_login")
 		assert(Shell.run("mkdir -p -- " .. Shell.quote(driver .. "/install") .. " " .. Shell.quote(driver .. "/bin")
 			.. " " .. Shell.quote(driver .. "/../_shared/core/i18n/data/locales") .. " " .. Shell.quote(root .. "/commands")))
 		for _, name in ipairs({ "start_at_login.sh", "desktop_entry.sh", "config_home.sh" }) do
@@ -275,7 +275,7 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
 			local ok, failure = pcall(function()
-				local subject = helpers.load_module("ui.menu.start_at_login")
+				local subject = helpers.load_module("onboarding.ui.menu_start_at_login")
 				helpers.assert_eq(subject.enabled(), false, "a gone launcher starts nothing")
 				helpers.assert_eq(subject.command_available(), true, "the entry is ours to rewrite")
 				local warned = 0

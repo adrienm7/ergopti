@@ -27,7 +27,7 @@ _A0720WV_TeardownIsDeferredOutOfTheCallback() {
 		Assert(Body != "", Fn . " must exist")
 		for _, Call in Forbidden {
 			Assert(InStr(Body, Call) = 0,
-				Fn . " must not call " . Call . " directly — it runs on the WebMessageReceived stack, where releasing the subscription currently dispatching and then closing the controller / destroying the Gui is an uncatchable access-violation class. Hand off with SetTimer(-1), as ui/onboarding/webview.ahk documents")
+				Fn . " must not call " . Call . " directly — it runs on the WebMessageReceived stack, where releasing the subscription currently dispatching and then closing the controller / destroying the Gui is an uncatchable access-violation class. Hand off with SetTimer(-1), as onboarding/ui/webview.ahk documents")
 		}
 		Assert(InStr(Body, "SetTimer(") > 0,
 			Fn . " must defer its side-effecting work out of the COM callback with SetTimer(-1)")

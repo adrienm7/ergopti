@@ -27,7 +27,7 @@ end
 --- @return table result { rendered, removed, counts, second_askable }
 local function focus_through(remove_error, add_error)
 	package.loaded["metrics.engine.context_tracker"] = nil
-	package.loaded["adapters.accessibility_permission"] = nil
+	package.loaded["onboarding.adapters.accessibility_permission"] = nil
 	local first, second, third = element("first"), element("second"), element("third")
 	second.pid = function() return 449 end
 	local removed = {}
@@ -63,7 +63,7 @@ local function focus_through(remove_error, add_error)
 	}, function() return false end))
 	helpers.assert_eq(tracker.update_ax_observer(4242), true)
 	assert(handler, "the observer callback must be installed")
-	local permission = require("adapters.accessibility_permission")
+	local permission = require("onboarding.adapters.accessibility_permission")
 	local lines = {}
 	local Logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Logger)

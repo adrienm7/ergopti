@@ -24,7 +24,7 @@ local function with_permissions(states, body)
 	local prompts = {}
 	local ok, err = xpcall(function()
 		helpers.load_with_stubs("core.logger.engine.logger")
-		package.loaded["adapters.accessibility_permission"] = {
+		package.loaded["onboarding.adapters.accessibility_permission"] = {
 			is_trusted = function() return table.unpack(states.accessibility, 1, 2) end,
 			request_prompt = function() prompts[#prompts + 1] = "accessibility" return true end,
 		}

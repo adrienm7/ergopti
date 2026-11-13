@@ -62,7 +62,7 @@ function M.collect(decoded, mark)
 		return require("ai.engine.prediction.engine").is_backend(value)
 	end)
 	require("modules.updater.manager").mark_config_reads(decoded, mark)
-	require("ui.onboarding.bridge").config_values(decoded, mark)
+	require("onboarding.ui.bridge").config_values(decoded, mark)
 end
 
 --- Lists the unused keys of a config file under the Linux rule.

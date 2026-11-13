@@ -16,9 +16,9 @@ local helpers = require("tests.helpers")
 
 helpers.describe("context tracker with an unanswering application (context-unanswered-window)", function()
 	helpers.it("skips the window details after a read that waited out the timeout", function()
-		helpers.with_stub_scope({ "metrics.engine.context_tracker", "adapters.accessibility_permission",
+		helpers.with_stub_scope({ "metrics.engine.context_tracker", "onboarding.adapters.accessibility_permission",
 			"core.i18n.engine.i18n" }, function()
-			package.loaded["adapters.accessibility_permission"] = nil
+			package.loaded["onboarding.adapters.accessibility_permission"] = nil
 			local clock_ns = 0
 			local reads = { window = 0, title = 0, fullscreen = 0 }
 			local tracker = helpers.load_with_stubs("metrics.engine.context_tracker", {

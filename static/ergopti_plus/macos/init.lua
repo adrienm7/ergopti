@@ -180,8 +180,8 @@ if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
 end
 local SyntheticInput     = require("platform.input.synthetic_input")
-local AccessibilityPermission = require("adapters.accessibility_permission")
-local AccessibilityWait       = require("infra.accessibility_wait")
+local AccessibilityPermission = require("onboarding.adapters.accessibility_permission")
+local AccessibilityWait       = require("onboarding.engine.accessibility_wait")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -1435,9 +1435,9 @@ end
 -- shortcuts are never armed during the wizard (they default enabled=true which
 -- would fire touch callbacks and synthetic keys before the user consented).
 do
-	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
+	local ok_ob, onboarding_mod = pcall(require, "onboarding.ui")
 	if not ok_ob or type(onboarding_mod) ~= "table" then
-		Logger.error(LOG, "ui.onboarding failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
+		Logger.error(LOG, "onboarding.ui failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
 		emergency_exit_after_runtime_failure("onboarding", "module_load_failed")
 		return
 	end
@@ -1547,7 +1547,7 @@ if accessibility_trusted ~= true then
 		watch_reopen = watch_launcher_reopen,
 		-- Another copy signed differently can hold the one switch: its paths are named.
 		name_other_copies = function(paths)
-			return require("ui.permission_dialog").name_other_copies(AccessibilityPermission, paths)
+			return require("onboarding.ui.permission_dialog").name_other_copies(AccessibilityPermission, paths)
 		end,
 		install_identity = install_identity,
 		reset_memory = {
@@ -2332,7 +2332,7 @@ end
 do
 	local presenter_ok, registered = xpcall(function()
 		return karabiner.set_approval_presenter(function()
-			return require("ui.permission_dialog.login_items_guide").offer(karabiner)
+			return require("onboarding.ui.permission_dialog.login_items_guide").offer(karabiner)
 		end)
 	end, debug.traceback)
 	if presenter_ok ~= true or registered ~= true then

@@ -1199,7 +1199,7 @@ end
 --- scripts grant TCC, so a deep-link is the closest we can get to one click.
 function M.open_input_monitoring_pane()
 	Logger.info(LOG, "Opening Input Monitoring pane…")
-	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("adapters.privacy_settings").url("input_monitoring")))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("onboarding.adapters.privacy_settings").url("input_monitoring")))
 end
 
 --- Opens the System Settings pane where the user grants Accessibility
@@ -1207,7 +1207,7 @@ end
 --- Input Monitoring redundant); v15 and older required Input Monitoring.
 function M.open_accessibility_pane()
 	Logger.info(LOG, "Opening Accessibility pane…")
-	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("adapters.privacy_settings").url("accessibility")))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("onboarding.adapters.privacy_settings").url("accessibility")))
 end
 
 --- Opens the System Extensions pane where the user must approve the

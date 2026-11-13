@@ -17,7 +17,7 @@ local fixture = require("tests.support.guardian_recovery_fixture")
 local count_logs = fixture.count_logs
 local with_remap = fixture.with_remap
 
-local GUIDE_MODULES = { "ui.permission_dialog", "ui.permission_dialog.login_items_guide" }
+local GUIDE_MODULES = { "onboarding.ui.permission_dialog", "onboarding.ui.permission_dialog.login_items_guide" }
 
 --- Registers the real guide over a recording dialog, as the boot does, and
 --- gives the fixture's scheduler the recurring timer the guide polls with.
@@ -26,7 +26,7 @@ local GUIDE_MODULES = { "ui.permission_dialog", "ui.permission_dialog.login_item
 --- @return table polls Guide poll handles.
 local function register_guide(remap)
 	local dialog = { shows = {}, open = nil }
-	package.loaded["ui.permission_dialog"] = {
+	package.loaded["onboarding.ui.permission_dialog"] = {
 		show = function(spec)
 			dialog.shows[#dialog.shows + 1] = spec
 			dialog.open = spec
@@ -55,7 +55,7 @@ local function register_guide(remap)
 		polls[#polls + 1] = handle
 		return handle, true
 	end
-	local guide = require("ui.permission_dialog.login_items_guide")
+	local guide = require("onboarding.ui.permission_dialog.login_items_guide")
 	helpers.assert_true(remap.set_approval_presenter(function() return guide.offer(remap) end) == true)
 	return dialog, polls
 end
@@ -110,7 +110,7 @@ helpers.describe("the guardian's approval opens the Login Items steps (guardian-
 				local dialog, polls = register_guide(remap)
 				remap.regenerate(function() end)
 				helpers.assert_eq(calls.guardian_probe_count, 0, "no guardian is observed with the switch off")
-				local guide = require("ui.permission_dialog.login_items_guide")
+				local guide = require("onboarding.ui.permission_dialog.login_items_guide")
 				helpers.assert_true(guide.offer(remap) == false, "a switch that is off needs no approval")
 				helpers.assert_eq(#dialog.shows, 0)
 				helpers.assert_eq(#polls, 0)

@@ -9,7 +9,7 @@ local M = {}
 local helpers = require("tests.helpers")
 local Coordinator = require("core.lifecycle.engine.shutdown.coordinator")
 local Gate = require("platform.input.capture_gate")
-local Onboarding = require("ui.onboarding.startup")
+local Onboarding = require("onboarding.ui.startup")
 
 --- Runs actual Main startup statements through its first real idle callback.
 --- @param options table|nil Controlled refusal and synchronous native callback.
@@ -251,7 +251,7 @@ function M.run(options)
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
 		elseif name == "settings.engine.paths" then
 			return { config = function() return "/controlled/config.toml" end }
-		elseif name == "ui.onboarding.startup" then
+		elseif name == "onboarding.ui.startup" then
 			return { run = function(opts)
 				opts.open = function() return nil, "controlled missing config", 2 end
 				return Onboarding.run(opts)

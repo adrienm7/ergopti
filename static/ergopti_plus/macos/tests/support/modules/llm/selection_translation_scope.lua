@@ -93,7 +93,7 @@ local OWNED = {
 	"apps.engine.secure_apps",
 	"apps.engine.secure_apps_data",
 
-	"adapters.accessibility_permission",
+	"onboarding.adapters.accessibility_permission",
 	"clipboard.adapters.clipboard",
 	"diagnostics.adapters.event_provenance",
 	"core.fs.adapters.file_system",

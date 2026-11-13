@@ -25,8 +25,8 @@ helpers.describe("menu start: login item state before the prime build", function
 	end)
 
 	helpers.it("a status answer equal to the baked state requests no rebuild", function()
-		package.loaded["ui.menu.start_at_login"] = nil
-		local StartAtLogin = require("ui.menu.start_at_login")
+		package.loaded["onboarding.ui.menu_start_at_login"] = nil
+		local StartAtLogin = require("onboarding.ui.menu_start_at_login")
 		local callback
 		local deps = {
 			resolver = { resolve = function() return "/bin/launcher", nil, {} end },
@@ -40,6 +40,6 @@ helpers.describe("menu start: login item state before the prime build", function
 		helpers.assert_true(StartAtLogin.request("status", function() changes = changes + 1 end, deps))
 		callback(0, "enabled\n")
 		helpers.assert_eq(changes, 1, "the prime build's own question then changes nothing")
-		package.loaded["ui.menu.start_at_login"] = nil
+		package.loaded["onboarding.ui.menu_start_at_login"] = nil
 	end)
 end)

@@ -497,9 +497,9 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 	-- The steps open by themselves once per launch; the row is where they
 	-- stay afterwards (guardian-approval-steps).
 	helpers.it("reopens the Login Items steps while approval is missing (guardian-approval-steps)", function()
-		local saved_guide = package.loaded["ui.permission_dialog.login_items_guide"]
+		local saved_guide = package.loaded["onboarding.ui.permission_dialog.login_items_guide"]
 		local reopened = {}
-		package.loaded["ui.permission_dialog.login_items_guide"] = {
+		package.loaded["onboarding.ui.permission_dialog.login_items_guide"] = {
 			reopen = function(remap)
 				reopened[#reopened + 1] = remap
 				return true
@@ -520,7 +520,7 @@ helpers.describe("the Tap-Hold submenu says when the remap guardian holds its ru
 			helpers.assert_nil(find_descendant(unavailable, "menu.tapholds.show_login_items_steps"),
 				"the approval steps cannot register a missing helper")
 		end)
-		package.loaded["ui.permission_dialog.login_items_guide"] = saved_guide
+		package.loaded["onboarding.ui.permission_dialog.login_items_guide"] = saved_guide
 		if not ok then error(err, 0) end
 	end)
 

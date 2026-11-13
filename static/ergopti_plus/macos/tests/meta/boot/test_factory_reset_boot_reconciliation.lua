@@ -40,7 +40,7 @@ end
 local function reconciliation_precedes_consumers(source)
 	local code = strip_lua_comments(source)
 	local reconcile_at = code:find("owner:reconcile()", 1, true)
-	local onboarding_at = code:find('pcall(require, "ui.onboarding")', 1, true)
+	local onboarding_at = code:find('pcall(require, "onboarding.ui")', 1, true)
 	local overrides_at = code:find("config_overrides.apply(", 1, true)
 	local preferences_at = code:find("Preferences.load(", 1, true)
 	return type(reconcile_at) == "number"

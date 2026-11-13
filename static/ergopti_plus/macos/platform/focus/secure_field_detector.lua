@@ -28,7 +28,7 @@ local M = {}
 
 local hs               = hs
 local Logger           = require("core.logger.engine.logger")
-local AXResponsiveness = require("adapters.accessibility_permission")
+local AXResponsiveness = require("onboarding.adapters.accessibility_permission")
 local SecureApps       = require("apps.engine.secure_apps")
 
 local LOG = "platform.focus.secure_field_detector"

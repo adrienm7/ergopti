@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.ui.owned_window_close_fixture")
 
 helpers.describe("owned windows release native references on user close", function()
-	for _, module_name in ipairs({ "settings.ui.cleanup", "ui.onboarding", "metrics.ui.metrics_apps",
+	for _, module_name in ipairs({ "settings.ui.cleanup", "onboarding.ui", "metrics.ui.metrics_apps",
 		"ai.ui.model_browser", "ui.changelog" }) do
 		helpers.it(module_name .. " releases a user-closed window and preserves its successor", function()
 			with_window(module_name, function(_, h)

@@ -16,7 +16,7 @@ require("core.logger.engine")
 --- @param scenario function Receives controller and native observations.
 local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
-		"settings.ui.cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
+		"settings.ui.cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "onboarding.ui", "onboarding.engine.answers",
 		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
 		"metrics.ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "menu.engine.manifest_reader",
 		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
@@ -79,7 +79,7 @@ local function run_window(module_name, scenario)
 		-- The cleanup window is named by the shared manifest through the real
 		-- translator; the loader's passthrough would leave it a bare key, refused.
 		if module_name == "settings.ui.cleanup" then package.loaded["core.i18n.engine.i18n"] = nil end
-		if module_name == "ui.onboarding" then require("tests.support.onboarding_shared_data").install() end
+		if module_name == "onboarding.ui" then require("tests.support.onboarding_shared_data").install() end
 		if module_name == "ui.changelog" then
 			local files = require("core.fs.adapters.file_system")
 			local original = files.read
@@ -102,7 +102,7 @@ local function run_window(module_name, scenario)
 			if module_name == "ai.ui.model_browser" then return window.open({ presets = {}, active_backend = "mlx" }) end
 			if module_name == "ui.changelog" then return window.open() end
 			if module_name == "settings.ui.cleanup" then return window.open({ path = "/virtual/config.toml" }) end
-			if module_name == "ui.onboarding" then return window.run("/virtual/config.toml") end
+			if module_name == "onboarding.ui" then return window.run("/virtual/config.toml") end
 			if module_name == "ui.update_check" then return window.open({
 				channel_owner = { get = function() return "dev" end, set = function() return true end },
 				checks = { check_now = function() return true end },
@@ -114,7 +114,7 @@ local function run_window(module_name, scenario)
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "close", session = "" } })
 			elseif module_name == "ui.update_check" then
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "close" } })
-			elseif module_name == "ui.onboarding" then
+			elseif module_name == "onboarding.ui" then
 				-- Invalid answers exercise the real fail_commit close without authorizing a write.
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "finish", answers = {} } })
 			else return window.close() end

@@ -20,7 +20,7 @@ local OWNERS = {
 	["ai.ui.prompt_editor"]        = '{"titled", "closable", "resizable", "utility"}',
 	["hotstrings.ui.personal_info_editor"] = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
 	["settings.ui.menu.paths"]      = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
-	["ui.onboarding"]           = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
+	["onboarding.ui"]           = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
 }
 
 helpers.describe("macOS editor windows are resizable", function()

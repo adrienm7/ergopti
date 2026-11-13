@@ -828,7 +828,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 				restart = function() captured.restarts = captured.restarts + 1; return true end,
 				notify_error = function(key) captured.errors[#captured.errors + 1] = key end,
 			}
-			local result = require("ui.onboarding.bridge").on_message({ action = "finish", answers = {
+			local result = require("onboarding.ui.bridge").on_message({ action = "finish", answers = {
 				locale = options.code or "fr", config_dir = "",
 				operations = { { path = "gestures.enabled", value = true } },
 			} }, state)

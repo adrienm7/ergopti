@@ -427,7 +427,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.accessibility_permission",
+		id       = "onboarding.adapters.accessibility_permission",
 		contract = { "is_trusted", "request_prompt" },
 		wired    = true,
 	},
@@ -444,12 +444,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.privacy_settings",
+		id       = "onboarding.adapters.privacy_settings",
 		contract = { "url", "url_for", "os_major" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.tcc_grant",
+		id       = "onboarding.adapters.tcc_grant",
 		contract = { "bundle_id", "reset" },
 		wired    = true,
 	},

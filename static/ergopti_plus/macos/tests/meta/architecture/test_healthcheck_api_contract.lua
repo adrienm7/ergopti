@@ -46,7 +46,7 @@ local CONTRACT = {
 		"get_active_profile" } },
 	{ mod = "ai.engine.api.ollama",           fns = { "get_base_url" } },
 	{ mod = "ai.engine.api.mlx",              fns = { "get_base_url" } },
-	{ mod = "adapters.accessibility_permission", fns = { "is_trusted" } },
+	{ mod = "onboarding.adapters.accessibility_permission", fns = { "is_trusted" } },
 	{ mod = "platform.system.screen_capture",          fns = { "permission_state" } },
 	{ mod = "core.network.adapters.http_client",             fns = { "new" } },
 	{ mod = "core.process.adapters.shell_runner",            fns = { "spawn" } },
@@ -63,7 +63,7 @@ local CONTRACT = {
 -- The adapters that capture the hs global when they load: reloaded inside
 -- the fixture so they read its answers
 local HS_READERS = {
-	"platform.input.key_state", "adapters.accessibility_permission", "platform.system.screen_capture", "platform.system.info",
+	"platform.input.key_state", "onboarding.adapters.accessibility_permission", "platform.system.screen_capture", "platform.system.info",
 }
 
 --- Answers the Hammerspoon queries the collectors make, as a Mac would.

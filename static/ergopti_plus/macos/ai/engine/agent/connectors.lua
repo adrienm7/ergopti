@@ -39,10 +39,10 @@ local SHORTCUTS_BIN = "/usr/bin/shortcuts"
 M.APPS = { calendar = "Calendar", reminder = "Reminders", mail = "Mail" }
 
 --- The System Settings pane where the user grants the Automation permission,
---- for the running macOS (adapters/privacy_settings.lua).
+--- for the running macOS (onboarding/adapters/privacy_settings.lua).
 --- @return string url
 function M.automation_settings_url()
-	return require("adapters.privacy_settings").url("automation")
+	return require("onboarding.adapters.privacy_settings").url("automation")
 end
 
 -- The Apple event error macOS returns when the Automation permission is refused

@@ -41,8 +41,8 @@ local function harness(overrides)
 		end,
 	}
 	for name, fn in pairs(overrides or {}) do h.permission[name] = fn end
-	package.loaded["infra.accessibility_wait"] = nil
-	h.wait = require("infra.accessibility_wait")
+	package.loaded["onboarding.engine.accessibility_wait"] = nil
+	h.wait = require("onboarding.engine.accessibility_wait")
 	h.opts = {
 		permission = h.permission,
 		every = function(_, fn) h.ticks = fn; return "timer", true end,

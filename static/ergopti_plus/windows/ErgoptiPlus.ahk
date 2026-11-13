@@ -505,7 +505,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
 ; script being included twice.
-#Include infra/first_boot.ahk
+#Include onboarding/engine/first_boot.ahk
 #Include ../_shared/settings/data/outdated.ahk
 #Include platform/remap/tap_hold_loader.ahk
 #Include platform/remap/tap_hold_writer.ahk
@@ -526,7 +526,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include ai/engine/defaults.ahk
 #Include modules/updater.ahk
 #Include core/lifecycle/engine/shutdown/uninstall.ahk
-#Include infra/start_at_login.ahk
+#Include onboarding/engine/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include diagnostics/ui/healthcheck/init.ahk
 #Include diagnostics/engine/field_run/input_probe.ahk
@@ -547,7 +547,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include _generated/action_catalogue.ahk
 #Include _generated/locale_table.ahk
 #Include core/i18n/engine/i18n.ahk
-#Include ui/onboarding/init.ahk
+#Include onboarding/ui/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include hotstrings/engine/catalogue/config.ahk
 #Include hotstrings/ui/hotstrings_config_window/init.ahk

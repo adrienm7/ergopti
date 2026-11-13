@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"ui.permission_dialog.login_items_guide", "ui.permission_dialog", "core.events.timer_scheduler",
+	"onboarding.ui.permission_dialog.login_items_guide", "onboarding.ui.permission_dialog", "core.events.timer_scheduler",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications",
 }
 
@@ -40,7 +40,7 @@ local function install_doubles(h)
 	-- One dialog owner, as in production: at most one kind is open.
 	h.shows, h.closes, h.open = {}, 0, nil
 	h.accessibility_open = false
-	package.loaded["ui.permission_dialog"] = {
+	package.loaded["onboarding.ui.permission_dialog"] = {
 		show = function(spec)
 			h.shows[#h.shows + 1] = spec
 			if h.show_fails then return false end
@@ -94,7 +94,7 @@ local function with_guide(body)
 	helpers.with_fresh_modules(MODULES, function()
 		local h = {}
 		install_doubles(h)
-		h.guide = require("ui.permission_dialog.login_items_guide")
+		h.guide = require("onboarding.ui.permission_dialog.login_items_guide")
 		--- Fires the live poll once, as its timer would.
 		function h.tick()
 			local timer = h.timers[#h.timers]
@@ -290,11 +290,11 @@ local function with_monotonic_guide(body)
 		local h = {}
 		install_doubles(h)
 		package.loaded["core.events.timer_scheduler"] = nil
-		package.loaded["ui.permission_dialog.login_items_guide"] = nil
+		package.loaded["onboarding.ui.permission_dialog.login_items_guide"] = nil
 		local scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 		h.clock = 0
 		hs.timer.absoluteTime = function() return math.floor(h.clock * 1e9) end
-		h.guide = require("ui.permission_dialog.login_items_guide")
+		h.guide = require("onboarding.ui.permission_dialog.login_items_guide")
 		function h.fire_at(seconds)
 			h.clock = seconds
 			local native = hs.timer.__timers[#hs.timer.__timers]
@@ -355,7 +355,7 @@ helpers.describe("the Login Items poll ends with a reload (guardian-approval-ste
 			install_doubles(h)
 			package.loaded["core.events.timer_scheduler"] = nil
 			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
-			local guide = require("ui.permission_dialog.login_items_guide")
+			local guide = require("onboarding.ui.permission_dialog.login_items_guide")
 			helpers.assert_true(guide.offer(h.remap) == true)
 			local natives = hs.timer.__timers
 			local native = natives[#natives]
@@ -390,9 +390,9 @@ helpers.describe("Login Items guide follows Tap-Holds eligibility (guardian-appr
 		with_guide(function(h)
 			h.accessibility_open = true
 			helpers.assert_true(h.guide.offer(h.remap))
-			local close = package.loaded["ui.permission_dialog"].close
+			local close = package.loaded["onboarding.ui.permission_dialog"].close
 			local kinds = {}
-			package.loaded["ui.permission_dialog"].close = function(kind)
+			package.loaded["onboarding.ui.permission_dialog"].close = function(kind)
 				kinds[#kinds + 1] = kind
 				return close(kind)
 			end
@@ -414,7 +414,7 @@ helpers.describe("Login Items guide follows Tap-Holds eligibility (guardian-appr
 			install_doubles(h)
 			package.loaded["core.events.timer_scheduler"] = nil
 			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
-			local guide = require("ui.permission_dialog.login_items_guide")
+			local guide = require("onboarding.ui.permission_dialog.login_items_guide")
 			helpers.assert_true(guide.offer(h.remap))
 			local natives = hs.timer.__timers
 			local native = natives[#natives]
@@ -448,8 +448,8 @@ helpers.describe("Login Items cleanup keeps its original owners (guardian-approv
 			install_doubles(h)
 			package.loaded["core.events.timer_scheduler"] = nil
 			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
-			local guide = require("ui.permission_dialog.login_items_guide")
-			local dialog = package.loaded["ui.permission_dialog"]
+			local guide = require("onboarding.ui.permission_dialog.login_items_guide")
+			local dialog = package.loaded["onboarding.ui.permission_dialog"]
 			local close, attempts = dialog.close, 0
 			dialog.close = function(kind)
 				attempts = attempts + 1
@@ -477,7 +477,7 @@ helpers.describe("Login Items cleanup keeps its original owners (guardian-approv
 	helpers.it("does not present new steps while a throwing close remains pending", function()
 		with_guide(function(h)
 			helpers.assert_true(h.guide.offer(h.remap))
-			local dialog = package.loaded["ui.permission_dialog"]
+			local dialog = package.loaded["onboarding.ui.permission_dialog"]
 			local close = dialog.close
 			dialog.close = function() error("independent original window deletion refusal") end
 			h.remap.tap_holds = false
@@ -501,7 +501,7 @@ helpers.describe("Login Items cleanup keeps its original owners (guardian-approv
 			install_doubles(h)
 			package.loaded["core.events.timer_scheduler"] = nil
 			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
-			local guide = require("ui.permission_dialog.login_items_guide")
+			local guide = require("onboarding.ui.permission_dialog.login_items_guide")
 			helpers.assert_true(guide.offer(h.remap))
 			local native = hs.timer.__timers[#hs.timer.__timers]
 			local stop = native.stop

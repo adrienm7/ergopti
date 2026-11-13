@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local function attach_with_add_error(message)
 	package.loaded["metrics.engine.context_tracker"] = nil
 	-- Each case starts with no application in its unanswered cooldown
-	package.loaded["adapters.accessibility_permission"] = nil
+	package.loaded["onboarding.adapters.accessibility_permission"] = nil
 	local stops = 0
 	local observer = {
 		addWatcher = function() error(message, 0) end,

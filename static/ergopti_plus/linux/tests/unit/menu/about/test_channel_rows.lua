@@ -757,7 +757,7 @@ local function with_source_command(alternative, callback)
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "hotstrings.engine.magic_key",
 		"hotstrings.engine.preview_settings", "hotstrings.engine.repeat_key", "core.ui.ui.modal", "core.ui.ui.text_prompt",
-		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "ui.menu.start_at_login" }
+		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "onboarding.ui.menu_start_at_login" }
 	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
 	local ok, err = xpcall(function()
@@ -783,7 +783,7 @@ local function with_source_command(alternative, callback)
 			return {kind = "local", version = "", commit = "known"}
 		end }
 		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
-		package.loaded["ui.menu.start_at_login"] = {
+		package.loaded["onboarding.ui.menu_start_at_login"] = {
 			command_available = function() return true end,
 			enabled = function() return false end,
 		}

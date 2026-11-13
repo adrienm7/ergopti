@@ -471,7 +471,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["diagnostics.ui.console_window"] = nil
 	-- The Accessibility adapter remembers which application left a read
 	-- unanswered and captures hs: each test starts with no cooldown.
-	loaded["adapters.accessibility_permission"] = nil
+	loaded["onboarding.adapters.accessibility_permission"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`

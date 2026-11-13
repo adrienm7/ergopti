@@ -27,7 +27,7 @@ end
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("onboarding_bridge", function()
-    local handler = helpers.load_module("ui.onboarding.bridge")
+    local handler = helpers.load_module("onboarding.ui.bridge")
 
 		helpers.it("(onboarding-config-fifo) refuses a chosen FIFO without blocking", function()
 			if package.config:sub(1, 1) == "\\" then return end
@@ -37,7 +37,7 @@ helpers.describe("ui.bridge_handlers", function()
 			assert(made == true or made == 0)
 			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
 				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;")
-				.. "..package.path; local b=require('ui.onboarding.bridge'); local r=b.on_message("
+				.. "..package.path; local b=require('onboarding.ui.bridge'); local r=b.on_message("
 				.. "{action='loadExistingConfig',request=1,config_dir=" .. string.format("%q", dir) .. "},"
 				.. "{config_paths={default_config_dir=function()return '/' end}}); assert(r.loaded==false)"
 			local status = os.execute("timeout 3 " .. quote(assert(require("luv").exepath())) .. " -e " .. quote(source))

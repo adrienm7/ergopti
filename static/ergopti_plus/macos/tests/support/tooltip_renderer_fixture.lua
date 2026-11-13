@@ -26,7 +26,7 @@ local OWNERS = {
 	"core.fs.engine.native_path",
 	-- The renderer asks it which applications answer Accessibility; it
 	-- captures hs at require time, so each scenario loads it afresh.
-	"adapters.accessibility_permission",
+	"onboarding.adapters.accessibility_permission",
 	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
@@ -51,7 +51,7 @@ function M.load()
 	package.loaded["core.ui.ui.tooltip.config"] = nil
 	package.loaded["core.text.engine.toml_codec.reader"] = nil
 	package.loaded["core.text.engine.toml.reader"] = nil
-	package.loaded["adapters.accessibility_permission"] = nil
+	package.loaded["onboarding.adapters.accessibility_permission"] = nil
 	return helpers.load_with_stubs("core.ui.ui.tooltip.renderer"), errors
 end
 

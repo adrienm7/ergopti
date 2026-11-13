@@ -284,7 +284,7 @@ const allowedSeen = new Set();
 		(p) => p.target === null || !shipped.has(p.target)
 	);
 	const got = bad.map((p) => p.target).join(', ');
-	const want = 'ergopti_plus/macos/data/app_categories.json';
+	const want = 'ergopti_plus/macos/onboarding/app_categories.json';
 	if (got !== want) {
 		errors.push(`self-check: the scanner flagged [${got}], expected [${want}]`);
 	}

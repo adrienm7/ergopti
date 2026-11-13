@@ -164,7 +164,7 @@ end)
 local function with_source_row(alternative, callback)
 	helpers.with_stub_scope({ "ui.menu.menu_about", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.logger.engine.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
-		"ui.changelog", "adapters.update_launcher", "ui.menu.start_at_login", "hs", "tests.stubs.hs" }, function()
+		"ui.changelog", "adapters.update_launcher", "onboarding.ui.menu_start_at_login", "hs", "tests.stubs.hs" }, function()
 		local native = require("tests.stubs.hs")
 		native.__reset()
 		_G.hs = native
@@ -192,7 +192,7 @@ local function with_source_row(alternative, callback)
 		end }
 		package.loaded["ui.changelog"] = { open = effect }
 		package.loaded["adapters.update_launcher"] = { request_check = effect, select_channel = effect }
-		package.loaded["ui.menu.start_at_login"] = { enabled = function() return false end }
+		package.loaded["onboarding.ui.menu_start_at_login"] = { enabled = function() return false end }
 		local renderer = require("menu.engine.manifest_menu")
 		local declaration = renderer.get_array("about_source_menu")
 		helpers.assert_eq(#declaration, 1)

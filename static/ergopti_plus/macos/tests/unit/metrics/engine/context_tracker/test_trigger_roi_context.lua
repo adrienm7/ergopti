@@ -13,9 +13,9 @@ local Native = require("tests.support.modules.keystats.context_tracker.ax_native
 
 --- Runs the window writer against already available native window observations.
 local function with_window(callback)
-	return helpers.with_stub_scope({ "metrics.engine.context_tracker", "adapters.accessibility_permission" }, function()
+	return helpers.with_stub_scope({ "metrics.engine.context_tracker", "onboarding.adapters.accessibility_permission" }, function()
 		local native = { title = "Document", id = 42, paused = false, available = true, app_available = true }
-		package.loaded["adapters.accessibility_permission"] = {
+		package.loaded["onboarding.adapters.accessibility_permission"] = {
 			frontmost_pid = function() return 7 end,
 			is_askable = function() return true end,
 			note_read = function() return false end,

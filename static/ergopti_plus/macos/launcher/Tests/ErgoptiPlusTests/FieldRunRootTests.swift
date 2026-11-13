@@ -8,7 +8,7 @@ final class FieldRunRootTests: XCTestCase {
 	func testOnlyAnOwnCloneWithTheDeclarationReachesTheChild() throws {
 		let clone = FileManager.default.temporaryDirectory.appendingPathComponent("field-run-" + UUID().uuidString)
 		defer { try? FileManager.default.removeItem(at: clone) }
-		let data = clone.appendingPathComponent("static/ergopti_plus/macos/data")
+		let data = clone.appendingPathComponent("static/ergopti_plus/macos/onboarding")
 		try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
 		try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: clone.path)
 		let key = Identifiers.FieldReport.environment

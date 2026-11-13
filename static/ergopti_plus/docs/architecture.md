@@ -40,7 +40,6 @@ graph TD
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
-        MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
         MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
@@ -51,8 +50,6 @@ graph TD
         MACOS_physical_lifecycle_event["PhysicalLifecycleEvent.lua"]
         MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
         MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
-        MACOS_privacy_settings["PrivacySettings.lua"]
-        MACOS_tcc_grant["TccGrant.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
     end
 

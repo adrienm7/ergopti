@@ -20,8 +20,8 @@ local BUNDLE_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspo
 local COPIES = { "/Users/me/ergopti/build/macos/ErgoptiPlus.app" }
 
 local MODULES = {
-	"ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.i18n.engine.i18n", "infra.accessibility_wait",
-	"adapters.accessibility_permission", "core.process.adapters.shell_runner",
+	"onboarding.ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.i18n.engine.i18n", "onboarding.engine.accessibility_wait",
+	"onboarding.adapters.accessibility_permission", "core.process.adapters.shell_runner",
 }
 
 --- Reads one shipped locale.
@@ -77,7 +77,7 @@ local function with_dialog(body)
 		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(url) h.urls[#h.urls + 1] = url; return true end,
 		}
-		h.dialog = helpers.load_with_stubs("ui.permission_dialog", {
+		h.dialog = helpers.load_with_stubs("onboarding.ui.permission_dialog", {
 			webview = { usercontent = { new = function(name)
 				h.bridge_name = name
 				return { setCallback = function(self, fn) h.post = fn; return self end }
@@ -108,9 +108,9 @@ local function with_dialog(body)
 		function h.use_locale(code)
 			active.code, active.strings = code, locale_strings(code)
 		end
-		package.loaded["ui.permission_dialog"] = nil
-		h.dialog = require("ui.permission_dialog")
-		h.permission = require("adapters.accessibility_permission")
+		package.loaded["onboarding.ui.permission_dialog"] = nil
+		h.dialog = require("onboarding.ui.permission_dialog")
+		h.permission = require("onboarding.adapters.accessibility_permission")
 		--- Posts one button action as the page does.
 		function h.click(action)
 			h.post({ name = h.bridge_name, webView = h.windows[#h.windows], body = { action = action } })
@@ -133,7 +133,7 @@ end
 --- finds nothing, and every deferred focus retry is captured to be drained.
 --- @param body function Receives the harness.
 local function with_untrusted_factory(body)
-	local owned = { "ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.timing.engine.deferred_work", "core.i18n.engine.i18n" }
+	local owned = { "onboarding.ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.timing.engine.deferred_work", "core.i18n.engine.i18n" }
 	helpers.with_stub_scope(owned, function()
 		local h = { deferred = {}, activations = 0, levels = {}, fronts = {}, shows = 0 }
 		package.loaded["core.timing.engine.deferred_work"] = {
@@ -165,7 +165,7 @@ local function with_untrusted_factory(body)
 		function view.delete(self) setmetatable(self, nil); return self end
 		local LEVELS = { floating = 3, screenSaver = 1000 }
 		h.floating = LEVELS.floating
-		helpers.load_with_stubs("ui.permission_dialog", {
+		helpers.load_with_stubs("onboarding.ui.permission_dialog", {
 			webview = {
 				windowMasks = { titled = 1, closable = 2, utility = 16 },
 				new = function() return view end,
@@ -180,8 +180,8 @@ local function with_untrusted_factory(body)
 			end },
 			processInfo = { bundlePath = BUNDLE_PATH, bundleID = "com.ergoptiplus.app.hammerspoon" },
 		})
-		h.dialog = require("ui.permission_dialog")
-		h.permission = require("adapters.accessibility_permission")
+		h.dialog = require("onboarding.ui.permission_dialog")
+		h.permission = require("onboarding.adapters.accessibility_permission")
 		--- Runs every deferred focus retry, including those each retry schedules.
 		function h.drain()
 			local ran = 0

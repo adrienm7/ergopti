@@ -22,7 +22,7 @@ local function with_cleanup(callback)
 	helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "settings.engine.preferences.preferences", "settings.engine.migration.cleanup_session",
 		"settings.engine.migration.unused_keys", "core.logger.engine.logger", "settings.ui.menu.unused_keys_cleanup",
-		"settings.engine.overrides", "ui.onboarding", "modules.shortcuts.tap_keys",
+		"settings.engine.overrides", "onboarding.ui", "modules.shortcuts.tap_keys",
 		"modules.shortcuts.keyboard_shortcuts",
 		"platform.input.hotkey_registrar", "core.fs.adapters.json_codec", "platform.input.keyboard_geometry",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "settings.engine.migration.migrate", "settings.engine.paths",

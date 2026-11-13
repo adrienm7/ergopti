@@ -1072,7 +1072,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local actions = {
 		start_at_login            = function()
-			return require("ui.menu.start_at_login").request("toggle", function()
+			return require("onboarding.ui.menu_start_at_login").request("toggle", function()
 				if type(updateMenu) == "function" then updateMenu() end
 			end)
 		end,
@@ -1200,7 +1200,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_today_log            = function() return LogOpeners.open_today_log(open_async) end,
 		open_error_log            = function() return LogOpeners.open_today_errors(open_async) end,
 		show_setup_wizard         = function()
-			local ok, ob = pcall(require, "ui.onboarding")
+			local ok, ob = pcall(require, "onboarding.ui")
 			if ok and type(ob.run_from_menu) == "function" then
 				pcall(ob.run_from_menu, MenuPaths.get("ConfigTomlPath"))
 			end
@@ -1739,7 +1739,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function rebuild_menu_cache()
-		require("ui.menu.start_at_login").request("status", function()
+		require("onboarding.ui.menu_start_at_login").request("status", function()
 			if type(updateMenu) == "function" then updateMenu() end
 		end)
 		local t0 = hs.timer.secondsSinceEpoch()
@@ -1857,7 +1857,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- by that build, an enabled login item flipped the baked state and forced a
 	-- second full rebuild at every boot (two 0.5 to 0.6 s holds on the Mac, 23:34).
 	-- Before priming its answer only marks the menu dirty.
-	require("ui.menu.start_at_login").request("status", function()
+	require("onboarding.ui.menu_start_at_login").request("status", function()
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
 

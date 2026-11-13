@@ -41,7 +41,7 @@ local function with_delivery(callback, native_timers)
 			end,
 		}
 		package.loaded["core.text.engine.toml.codec"] = { decode = function() return {} end }
-		with_window("ui.onboarding", function(onboarding, state)
+		with_window("onboarding.ui", function(onboarding, state)
 			require("tests.support.onboarding_shared_data").install()
 			local pending, errors, evaluations = {}, {}, {}
 			local i18n = package.loaded["core.i18n.engine.i18n"]
@@ -104,8 +104,8 @@ local function with_delivery(callback, native_timers)
 				scheduler = require("core.events.timer_scheduler")
 				package.loaded["core.timing.engine.deferred_work"] = nil
 				require("core.timing.engine.deferred_work")
-				package.loaded["ui.onboarding"] = nil
-				onboarding = require("ui.onboarding")
+				package.loaded["onboarding.ui"] = nil
+				onboarding = require("onboarding.ui")
 				state.focus_attempts = 0
 				package.loaded["core.ui.ui.builder"].force_focus = function(view, _, options)
 					state.focus_attempts = state.focus_attempts + 1

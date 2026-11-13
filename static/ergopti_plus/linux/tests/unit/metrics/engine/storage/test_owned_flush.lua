@@ -414,7 +414,7 @@ helpers.describe("owned SQLite collector flush", function()
 		it("rendered session reset preserves its real " .. phase .. " acknowledgement", function()
 			with_collector(function(k, ops)
 				local Logger, I18n = require("core.logger.engine.shim"), require("core.i18n.engine.i18n")
-				local startup, menu_name = "ui.menu.start_at_login", "menu.ui.builder.builder"
+				local startup, menu_name = "onboarding.ui.menu_start_at_login", "menu.ui.builder.builder"
 				local old_startup, old_menu = package.loaded[startup], package.loaded[menu_name]
 				package.loaded[startup] = { command_available = function() return false end,
 					enabled = function() return false end }
@@ -1250,7 +1250,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 		local native = require("tests.support.keystats_native_fixture")
 		local logger, i18n = require("core.logger.engine.shim"), require("core.i18n.engine.i18n")
 		local previous_info, previous_error = logger.info, logger.error
-		local startup = "ui.menu.start_at_login"
+		local startup = "onboarding.ui.menu_start_at_login"
 		local previous_startup = package.loaded[startup]
 		local successes, refusals = 0, 0
 		logger.info = function(tag, message, ...)

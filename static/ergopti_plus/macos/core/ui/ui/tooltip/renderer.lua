@@ -15,7 +15,7 @@ local hs = hs
 local Logger = require("core.logger.engine.logger")
 local LOG = "tooltip_renderer"
 local Config = require("core.ui.ui.tooltip.config")
-local AXResponsiveness = require("adapters.accessibility_permission")
+local AXResponsiveness = require("onboarding.adapters.accessibility_permission")
 -- The two pieces of tooltip maths that must not differ between drivers, and
 -- are pinned to the same JSON vectors on both.
 local SharedTint   = require("core.ui.engine.tooltip.tint")

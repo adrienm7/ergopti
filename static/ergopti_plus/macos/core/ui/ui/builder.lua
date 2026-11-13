@@ -646,7 +646,7 @@ function M.set_window_title(view, title)
 end
 
 --- The one window kept above other apps: the Accessibility steps of the macOS
---- permission dialog (ui/permission_dialog; its other kinds are focused like
+--- permission dialog (onboarding/ui/permission_dialog; its other kinds are focused like
 --- any window). It is shown only while ErgoptiPlus is not trusted for
 --- Accessibility, where force_focus cannot find it (OwnWindow is an
 --- Accessibility lookup), and its steps are followed in System Settings, the

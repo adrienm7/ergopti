@@ -192,7 +192,7 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 					helpers.assert_contains(result[2], "no such bundle")
 					local _, refusal = pcall(adapter.reset_permission, "", function() end)
 					helpers.assert_contains(tostring(refusal), "bundle_id must be a non-empty string")
-					local _, unsupported = pcall(require("adapters.tcc_grant").reset, "All", "com.ergoptiplus.app.hammerspoon",
+					local _, unsupported = pcall(require("onboarding.adapters.tcc_grant").reset, "All", "com.ergoptiplus.app.hammerspoon",
 						function() end)
 					helpers.assert_contains(tostring(unsupported), "unsupported service")
 					spawned = nil

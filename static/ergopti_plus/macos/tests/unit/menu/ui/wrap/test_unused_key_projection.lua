@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local function scan(source)
 	return helpers.with_stub_scope({ "core.fs.adapters.storage", "core.fs.adapters.file_system", "settings.engine.overrides",
-		"settings.engine.preferences.preferences", "ui.onboarding", "settings.ui.menu.unused_keys_cleanup", "menu.ui.builder.builder",
+		"settings.engine.preferences.preferences", "onboarding.ui", "settings.ui.menu.unused_keys_cleanup", "menu.ui.builder.builder",
 		"menu.engine.wrap_preferences", "core.lifecycle.engine.compat.utf8" }, function()
 		local stored = {}
 		package.loaded["core.fs.adapters.storage"] = { set = function(key, value) stored[key] = value; return true end,
@@ -12,7 +12,7 @@ local function scan(source)
 			keys = function() return {} end }
 		helpers.load_with_stubs("settings.engine.preferences.preferences")
 		helpers.load_with_stubs("settings.engine.overrides")
-		helpers.load_with_stubs("ui.onboarding")
+		helpers.load_with_stubs("onboarding.ui")
 		local cleanup = helpers.load_with_stubs("settings.ui.menu.unused_keys_cleanup")
 		local result = require("settings.engine.migration.unused_keys").find_in_source(source, cleanup.collect)
 		helpers.assert_eq(result.status, "ok")

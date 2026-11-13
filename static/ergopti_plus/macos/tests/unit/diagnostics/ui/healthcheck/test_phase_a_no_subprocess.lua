@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 local FIXTURE_MODULES = {
 	"tests.stubs.hs", "core.logger.engine.logger", "diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers",
 	"platform.system.info", "platform.input.key_state", "core.network.adapters.info",
-	"adapters.accessibility_permission", "platform.system.screen_capture",
+	"onboarding.adapters.accessibility_permission", "platform.system.screen_capture",
 }
 
 -- The machine the stubbed runtime describes

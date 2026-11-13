@@ -26,10 +26,10 @@
 
 local M = {}
 
---- The Screen Recording pane URL for the running macOS (adapters/privacy_settings.lua).
+--- The Screen Recording pane URL for the running macOS (onboarding/adapters/privacy_settings.lua).
 --- @return string url
 function M.settings_url()
-	return require("adapters.privacy_settings").url("screen_recording")
+	return require("onboarding.adapters.privacy_settings").url("screen_recording")
 end
 
 
@@ -97,7 +97,7 @@ end
 --- @return string|nil bundle_id Nil when the running process has none.
 --- @return string|nil detail Exact reason when bundle_id is nil.
 function M.bundle_id()
-	return require("adapters.tcc_grant").bundle_id()
+	return require("onboarding.adapters.tcc_grant").bundle_id()
 end
 
 --- Removes this app's Screen Recording entry so a stale grant from a previous
@@ -106,7 +106,7 @@ end
 --- @param on_done function fn(ok, detail) once tccutil has exited.
 --- @return boolean started True when tccutil was started.
 function M.reset_permission(bundle_id, on_done)
-	return require("adapters.tcc_grant").reset("ScreenCapture", bundle_id, on_done)
+	return require("onboarding.adapters.tcc_grant").reset("ScreenCapture", bundle_id, on_done)
 end
 
 --- Opens System Settings on the Screen Recording privacy pane.

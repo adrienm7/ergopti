@@ -42,19 +42,19 @@ end
 local function permission_facts()
 	local eventtap = type(hs.eventtap) == "table" and hs.eventtap or {}
 	return {
-		accessibility = (require("adapters.accessibility_permission").is_trusted()),
+		accessibility = (require("onboarding.adapters.accessibility_permission").is_trusted()),
 		screen_recording = (require("platform.system.screen_capture").permission_state()),
 		-- Only some Hammerspoon builds can ask without prompting; nil otherwise
 		input_monitoring = optional_query(eventtap.checkKeyboardEventAccess, false),
 		secure_input = optional_query(eventtap.isSecureInputEnabled),
-		bundle_id = (require("adapters.accessibility_permission").bundle_id()),
+		bundle_id = (require("onboarding.adapters.accessibility_permission").bundle_id()),
 	}
 end
 
 --- The running application bundle, the one macOS files the grants under.
 --- @return string|nil path
 local function running_bundle_path()
-	return (require("adapters.accessibility_permission").bundle_path())
+	return (require("onboarding.adapters.accessibility_permission").bundle_path())
 end
 
 

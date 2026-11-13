@@ -109,7 +109,7 @@ local IoAdapter = {
 
 local MODULES = {
 	"core.fs.adapters.storage", "core.fs.adapters.file_system", "settings.engine.overrides",
-	"settings.engine.preferences.preferences", "ui.onboarding", "settings.ui.menu.unused_keys_cleanup", "menu.ui.builder.builder",
+	"settings.engine.preferences.preferences", "onboarding.ui", "settings.ui.menu.unused_keys_cleanup", "menu.ui.builder.builder",
 }
 
 helpers.with_stub_scope(MODULES, function()
@@ -123,7 +123,7 @@ helpers.with_stub_scope(MODULES, function()
 	package.loaded["core.fs.adapters.file_system"] = IoAdapter
 	local Overrides   = helpers.load_with_stubs("settings.engine.overrides")
 	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
-	local Onboarding  = helpers.load_with_stubs("ui.onboarding")
+	local Onboarding  = helpers.load_with_stubs("onboarding.ui")
 	local Cleanup     = helpers.load_with_stubs("settings.ui.menu.unused_keys_cleanup")
 
 	Contract.register(helpers, {

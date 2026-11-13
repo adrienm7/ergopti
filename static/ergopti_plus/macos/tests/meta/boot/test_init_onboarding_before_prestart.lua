@@ -66,7 +66,7 @@ end
 --- @return string|nil reason
 local function onboarding_failure_is_terminal(source)
 	local code = strip_lua_comments(source)
-	local req_pos = code:find('pcall(require, "ui.onboarding")', 1, true)
+	local req_pos = code:find('pcall(require, "onboarding.ui")', 1, true)
 	local should_pos = code:find("should_run", req_pos or 1, true)
 	local input_pos = code:find("shortcuts.start()", should_pos or 1, true)
 	if not req_pos or not should_pos or not input_pos then
@@ -150,14 +150,14 @@ end)
 -- =================================================================================
 -- =================================================================================
 
-helpers.describe("ui.onboarding require failure is fail-fast, not silently skipped", function()
+helpers.describe("onboarding.ui require failure is fail-fast, not silently skipped", function()
 
 	-- Root cause: the first-launch guard loads ui.onboarding via pcall(require).
 	-- If that require failed, the block used to fall through and pre-start gestures
 	-- and shortcuts anyway — arming synthetic input BEFORE the user consented. The
 	-- not-ok case must log the exact load error, request the bounded runtime exit,
 	-- and return only as a root-chunk backstop between the require and first use.
-	helpers.it("requests a bounded exit when ui.onboarding fails to load", function()
+	helpers.it("requests a bounded exit when onboarding.ui fails to load", function()
 		-- Selected by a declaration unique to init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
@@ -166,7 +166,7 @@ helpers.describe("ui.onboarding require failure is fail-fast, not silently skipp
 
 		local valid, reason = onboarding_failure_is_terminal(src)
 		helpers.assert_true(valid,
-			"a failed ui.onboarding load must request a bounded exit: " .. tostring(reason))
+			"a failed onboarding.ui load must request a bounded exit: " .. tostring(reason))
 	end)
 
 	helpers.it("rejects commented-out bounded exits", function()

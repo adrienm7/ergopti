@@ -914,7 +914,7 @@ return {
 	"tests.unit.menu.test_privacy_toggle_publication",
 	"tests.unit.menu.hotstrings.test_personal_hotstring_frames",
 	"tests.unit.menu.about.test_menu_uninstall",
-	"tests.unit.ui.onboarding.test_onboarding_startup",
+	"tests.unit.onboarding.test_startup",
 	"tests.unit.menu.about.test_restore_recommended_no_confirm",
 	"tests.unit.menu.about.test_configuration_reset_failure",
 	"tests.unit.menu.about.test_start_at_login",

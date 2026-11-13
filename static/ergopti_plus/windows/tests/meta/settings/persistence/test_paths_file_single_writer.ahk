@@ -116,7 +116,7 @@ Test("meta paths: the shared writer fails loudly rather than skipping",
 Test("meta paths: every caller skips the reload when the write failed",
 	_PFSW_CallersSkipReloadOnFailure)
 
-; via SetTimer(-1), as ui/onboarding/webview.ahk already documents.
+; via SetTimer(-1), as onboarding/ui/webview.ahk already documents.
 ; F-29  _PathsEdWeb_Save left FileOpen unprotected with no else on `if f`, so a
 ; failed write was silent, the log claimed success, and Reload() dropped
 ; The guarantee is unchanged — a failed config-directory write must be surfaced,

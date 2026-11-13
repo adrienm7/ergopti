@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
 	"core.timing.engine.timings",
-	"adapters.accessibility_permission",
+	"onboarding.adapters.accessibility_permission",
 	"adapters.mouse_control",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
@@ -80,7 +80,7 @@ local function with_engine_scope(callback)
 				return seconds[key]
 			end,
 		}
-		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return true end }
+		package.loaded["onboarding.adapters.accessibility_permission"] = { is_trusted = function() return true end }
 		package.loaded["adapters.mouse_control"] = { any_button_down = function() return false end }
 		local Engine = require("gestures.engine.engine")
 		local Timer = require("core.events.timer_scheduler")

@@ -310,7 +310,7 @@ local function _build_about(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
 		[require("settings.engine.keys").COMMAND.START_AT_LOGIN] = function()
-			if not require("ui.menu.start_at_login").toggle() then
+			if not require("onboarding.ui.menu_start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
 			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -346,10 +346,10 @@ local function _build_about(ctx)
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
 	getters["startup_command_available"] = function()
-		return require("ui.menu.start_at_login").command_available() ~= false
+		return require("onboarding.ui.menu_start_at_login").command_available() ~= false
 	end
 	getters["start_at_login_enabled"] = function()
-		return require("ui.menu.start_at_login").enabled() == true
+		return require("onboarding.ui.menu_start_at_login").enabled() == true
 	end
 	render_ctx.state_getters = getters
 

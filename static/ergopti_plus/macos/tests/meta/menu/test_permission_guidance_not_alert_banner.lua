@@ -64,7 +64,7 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_true(body:find("show_guidance", 1, true) == nil, "the wait takes no guidance dialog")
 		helpers.assert_true(body:find("name_other_copies(AccessibilityPermission, paths)", 1, true) ~= nil,
 			"the copies that can hold the switch are named")
-		local dialog = helpers.read_module_source("ui.permission_dialog")
+		local dialog = helpers.read_module_source("onboarding.ui.permission_dialog")
 		helpers.assert_true(dialog ~= nil and dialog:find("function M.guide_accessibility", 1, true) == nil,
 			"the retired Accessibility steps dialog must stay retired")
 	end)
@@ -99,7 +99,7 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 				"the presenter must exist before the first guardian answer the boot deploy asks for")
 			local registration = body:sub(register_at, body:find("\nend\n", register_at, true))
 			helpers.assert_true(registration:find(
-				'require("ui.permission_dialog.login_items_guide").offer(karabiner)', 1, true) ~= nil,
+				'require("onboarding.ui.permission_dialog.login_items_guide").offer(karabiner)', 1, true) ~= nil,
 				"the presenter must offer the steps through the guide, once per launch")
 			local guarded = body:sub(1, register_at):match(".*()xpcall%(function%(%)")
 			helpers.assert_true(guarded ~= nil and guarded > init_at,

@@ -171,7 +171,7 @@ local function driver_state(path)
 		chatgpt_url = chatgpt_url,
 		magic_key = magic_key,
 		update_channel = update_channel,
-		wizard = require("ui.onboarding.bridge").config_values(decoded),
+		wizard = require("onboarding.ui.bridge").config_values(decoded),
 	}
 end
 

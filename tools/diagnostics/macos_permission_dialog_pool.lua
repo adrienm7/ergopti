@@ -15,7 +15,7 @@ function M.run(config, done)
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
-	assert(package.loaded["ui.permission_dialog"] == nil, "PermissionDialog already loaded")
+	assert(package.loaded["onboarding.ui.permission_dialog"] == nil, "PermissionDialog already loaded")
 	assert(package.loaded["core.ui.ui.webview_controller_pool"] == nil, "ControllerPool already loaded")
 	assert(rawequal(require("hs.webview"), hs.webview), "native WebView identity differs")
 	assert(hs.screen.mainScreen(), "native GUI unavailable")
@@ -28,11 +28,11 @@ function M.run(config, done)
 	local methods = { "windowCallback", "delete", "evaluateJavaScript", "hswindow", "deleteOnClose", "allowNewWindows" }
 	for _, name in ipairs(methods) do native[name] = assert(view_methods[name]) end
 	native.setCallback = assert(controller_methods.setCallback)
-	local Host = require("ui.permission_dialog")
+	local Host = require("onboarding.ui.permission_dialog")
 	local UI, Pool = require("core.ui.ui.builder"), require("core.ui.ui.webview_controller_pool")
 	local Scheduler, Result = require("core.events.timer_scheduler"), require("core.ui.adapters.webview_result")
 	require("core.i18n.engine.i18n").init()
-	for fn, suffix in pairs({ [Host.show] = "/macos/ui/permission_dialog/init.lua",
+	for fn, suffix in pairs({ [Host.show] = "/macos/onboarding/ui/permission_dialog/init.lua",
 		[Pool.new] = "/macos/core/ui/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/core/ui/ui/builder.lua",
 		[Scheduler.activeCount] = "/macos/core/events/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")

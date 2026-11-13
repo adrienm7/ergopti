@@ -7,7 +7,7 @@
 # ONE SOURCE. tools/codegen/codegen-touchpad-registry.cjs turns this file into
 # windows/_generated/touchpad_registry.ahk. The tray action
 # (gestures/engine/config.ahk) and the first-run wizard
-# (ui/onboarding/gesture_registration.ahk) both write it in the resident
+# (onboarding/ui/gesture_registration.ahk) both write it in the resident
 # process, so the values land in the signed-in user's hive; only the touchpad
 # restart is elevated. gestures/adapters/touchpad_registry.ahk owns every write: it backs up the
 # prior values before the first one, and restores them (or, without a backup,

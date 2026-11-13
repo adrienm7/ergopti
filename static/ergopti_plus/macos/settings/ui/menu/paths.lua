@@ -202,7 +202,7 @@ local function pick_dir(current, prompt)
 	-- eaten by AppleScript, the `as alias` coercion then failed, and the on-error
 	-- branch returned "" — the folder picker did nothing at all, with no
 	-- diagnostic. The prompt is i18n text from a 21-locale corpus, and the other
-	-- copy of this very script (ui/onboarding/init.lua) escaped it while this one
+	-- copy of this very script (onboarding/ui/init.lua) escaped it while this one
 	-- did not. applescript_format removes the choice.
 	local script = text_utils.applescript_format([[
 		try

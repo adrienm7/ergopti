@@ -324,7 +324,7 @@ function M.build(ctx, actions)
 	-- owned status truthful; legacy cross-install conflict detection is unqualified.
 	getters["startup_command_available"] = function() return true end
 	getters["start_at_login_enabled"] = function()
-		return require("ui.menu.start_at_login").enabled()
+		return require("onboarding.ui.menu_start_at_login").enabled()
 	end
 	render_ctx.state_getters = getters
 

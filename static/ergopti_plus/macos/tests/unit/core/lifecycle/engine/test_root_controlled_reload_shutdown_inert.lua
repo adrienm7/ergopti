@@ -60,7 +60,7 @@ local MODULE_NAMES = {
 	"core.ui.engine.notifications",
 	"diagnostics.ui.error_dialog",
 	"menu.engine.ui_restore",
-	"ui.onboarding",
+	"onboarding.ui",
 }
 
 local function run_isolated(options, assertions)
@@ -396,7 +396,7 @@ local function run_isolated(options, assertions)
 				end,
 			},
 			["menu.engine.ui_restore"] = {},
-			["ui.onboarding"] = {
+			["onboarding.ui"] = {
 				should_run = function() return true end,
 				run = function()
 					state.onboarding_runs = state.onboarding_runs + 1

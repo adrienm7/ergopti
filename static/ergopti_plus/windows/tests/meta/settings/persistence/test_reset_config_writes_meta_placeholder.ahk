@@ -6,9 +6,9 @@
 ; Static source guards for the "reset to defaults" -> onboarding interaction. The
 ; tray item common.restore_recommended calls ReloadWithDefaultConfig (infra/
 ; config_io.ahk), which deletes config.toml and Reloads. On the next boot
-; Onboarding_Run() (ui/onboarding/core.ahk) gates the first-run wizard purely on
+; Onboarding_Run() (onboarding/ui/core.ahk) gates the first-run wizard purely on
 ; FileExist(ConfigurationFile), preferring the shared WebView2 host
-; (_Onboarding_TryWeb, ui/onboarding/webview.ahk) with the native pages as a
+; (_Onboarding_TryWeb, onboarding/ui/webview.ahk) with the native pages as a
 ; fallback. A bare delete of config.toml would therefore re-launch the wizard
 ; unconditionally, which is NOT what "reset to defaults" means -- a separate
 ; "Setup wizard" tray item re-runs the first-run flow on demand. The fix writes a
@@ -25,7 +25,7 @@
 ;
 ; SCOPE: source introspection only -- exercising a real reset needs a live driver
 ; boot and a WebView2 runtime unavailable in the headless harness (same rationale
-; as tests/meta/ui/onboarding/test_onbweb_singleton_guard.ahk).
+; as tests/meta/onboarding/test_onbweb_singleton_guard.ahk).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -95,7 +95,7 @@ Test("reset_config: the [_meta] placeholder is written after the delete and befo
 
 _RCMP_OnboardingGatesOnConfigFile() {
 	Body := _DriverFuncBody("Onboarding_Run")
-	Assert(Body != "", "Onboarding_Run must be defined in ui/onboarding/core.ahk")
+	Assert(Body != "", "Onboarding_Run must be defined in onboarding/ui/core.ahk")
 
 	Assert(InStr(Body, "FileExist(ConfigurationFile)") > 0,
 		"Onboarding_Run must gate the first-run wizard on FileExist(ConfigurationFile) -- this is the invariant ReloadWithDefaultConfig's '[_meta]' placeholder relies on to keep the WebView2 wizard closed after a reset")

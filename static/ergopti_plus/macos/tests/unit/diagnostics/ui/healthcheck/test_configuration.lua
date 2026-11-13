@@ -191,7 +191,7 @@ end)
 -- Reloaded under the stubbed runtime and restored after the case
 local PROBE_MODULES = {
 	"tests.stubs.hs", "core.logger.engine.logger", "diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers", "diagnostics.ui.healthcheck.probes",
-	"platform.system.info", "platform.input.key_state", "core.network.adapters.info", "adapters.accessibility_permission",
+	"platform.system.info", "platform.input.key_state", "core.network.adapters.info", "onboarding.adapters.accessibility_permission",
 	"platform.system.screen_capture", "core.events.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
 }
 

@@ -13,7 +13,7 @@ local with_picker = require("tests.support.ui.usercontent_reference_fixture")
 --- Reuses the native reference contract without replacing the dialog receiver.
 --- @param scenario function Receives the real dialog and native observations.
 local function with_dialog(scenario)
-	helpers.with_stub_scope({ "ui.permission_dialog" }, function()
+	helpers.with_stub_scope({ "onboarding.ui.permission_dialog" }, function()
 		with_picker(function(_, h)
 			local i18n = require("core.i18n.engine.i18n")
 			i18n.format = function(key) return key end
@@ -26,7 +26,7 @@ local function with_dialog(scenario)
 				if view and h.on_factory then h.on_factory(view) end
 				return view
 			end
-			local dialog = require("ui.permission_dialog")
+			local dialog = require("onboarding.ui.permission_dialog")
 			h.settings, h.closed = 0, 0
 			function h.show(on_closed)
 				return dialog.show({ kind = "login_items", open_settings = function()

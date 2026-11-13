@@ -116,7 +116,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
 		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
-			local names = { "settings.engine.paths", "ai.engine.preferences", "ai.engine.settings.navigation_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.display_settings", "ai.engine.settings.profile_settings", "menu.engine.manifest_menu", "menu.ui.builder.builder", "core.fs.adapters.storage", "diagnostics.ui.error_dialog", "ui.menu.start_at_login", "core.i18n.engine.i18n" }
+			local names = { "settings.engine.paths", "ai.engine.preferences", "ai.engine.settings.navigation_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.display_settings", "ai.engine.settings.profile_settings", "menu.engine.manifest_menu", "menu.ui.builder.builder", "core.fs.adapters.storage", "diagnostics.ui.error_dialog", "onboarding.ui.menu_start_at_login", "core.i18n.engine.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
 			local notices, changed, refused_publications = 0, 0, 0
@@ -125,7 +125,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
 					-- The storage adapter keeps storage.json in the default configuration folder.
 					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end }
-				package.loaded["ui.menu.start_at_login"] = {
+				package.loaded["onboarding.ui.menu_start_at_login"] = {
 					enabled = function() return false end,
 					command_available = function() return true end,
 				}

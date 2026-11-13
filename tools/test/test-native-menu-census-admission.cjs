@@ -220,7 +220,8 @@ try {
 						'hotstrings',
 						'keyboard',
 						'layouts',
-						'metrics'
+						'metrics',
+						'onboarding'
 					])
 		);
 		reset();

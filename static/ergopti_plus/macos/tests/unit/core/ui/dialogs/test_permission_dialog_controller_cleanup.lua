@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- Runs a real dialog over native-shaped controller and window boundaries.
 --- @param body function Receives the harness.
 local function with_dialog(body)
-	helpers.with_stub_scope({ "ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_controller_pool" }, function()
+	helpers.with_stub_scope({ "onboarding.ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_controller_pool" }, function()
 		local h = { controllers = {}, windows = {}, references = {}, releases = 0, settings = 0 }
 		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 560, height = 400 } end,
@@ -32,7 +32,7 @@ local function with_dialog(body)
 				return window
 			end,
 		}
-		h.dialog = helpers.load_with_stubs("ui.permission_dialog", {
+		h.dialog = helpers.load_with_stubs("onboarding.ui.permission_dialog", {
 			webview = { usercontent = { new = function()
 				local controller = {}
 				function controller:setCallback(callback)

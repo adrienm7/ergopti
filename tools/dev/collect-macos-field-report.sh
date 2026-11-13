@@ -109,7 +109,7 @@ FIELD_RUN_RELOAD_RETRIES=2
 # M.DEADLINE_SECONDS of infra/accessibility_wait.lua (600 s): the readiness
 # budget covers that wait and two minutes of boot.
 FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS="$(sed -n 's/^M\.DEADLINE_SECONDS = \([0-9][0-9]*\)$/\1/p' \
-	"${REPO_ROOT}/static/ergopti_plus/macos/infra/accessibility_wait.lua")"
+	"${REPO_ROOT}/static/ergopti_plus/macos/onboarding/engine/accessibility_wait.lua")"
 [ -n "${FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS}" ] \
 	|| { printf '[field-report] ERROR: infra/accessibility_wait.lua declares no DEADLINE_SECONDS.\n' >&2; exit 1; }
 FIELD_RUN_READY_SECONDS="${FIELD_RUN_READY_SECONDS_OVERRIDE:-$((FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS + 120))}"

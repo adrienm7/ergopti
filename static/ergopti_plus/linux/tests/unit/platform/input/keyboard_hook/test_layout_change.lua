@@ -349,7 +349,7 @@ local function with_daemon_layout_state(body)
 	local initial = assert(initial_section:match("webview_manager%.set_daemon_state%((%b{})%)"),
 		"the actual initial state table must be present")
 	local saved_manager = package.loaded["core.ui.ui.webview_manager"]
-	local saved_wizard = package.loaded["ui.onboarding.bridge"]
+	local saved_wizard = package.loaded["onboarding.ui.bridge"]
 	local called, failure = xpcall(function()
 		local manager = helpers.load_module("core.ui.ui.webview_manager")
 		local notices, refreshed = {}, 0
@@ -382,7 +382,7 @@ local function with_daemon_layout_state(body)
 			change = compile("return ({" .. handler .. "}).on_layout_change")(),
 			refreshes = function() return refreshed end })
 	end, debug.traceback)
-	package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.onboarding.bridge"] = saved_manager, saved_wizard
+	package.loaded["core.ui.ui.webview_manager"], package.loaded["onboarding.ui.bridge"] = saved_manager, saved_wizard
 	if not called then error(failure, 0) end
 end
 
@@ -412,7 +412,7 @@ helpers.describe("daemon layout changes preserve UI state ownership", function()
 
 	helpers.it("(layout-ui-state-ports) keeps the actual wizard's refusal visible after a layout change", function()
 		with_daemon_layout_state(function(f)
-			local wizard = helpers.load_module("ui.onboarding.bridge")
+			local wizard = helpers.load_module("onboarding.ui.bridge")
 			local first = wizard.on_message({ action = "finish" }, f.manager.get_daemon_state())
 			helpers.assert_eq(first.done, false)
 			helpers.assert_eq(#f.notices, 1)

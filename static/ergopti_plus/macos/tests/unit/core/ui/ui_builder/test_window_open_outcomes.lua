@@ -51,7 +51,7 @@ end
 
 local function with_onboarding(controls, callback)
 	helpers.with_fresh_modules({
-		"ui.onboarding", "core.ui.ui.builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
+		"onboarding.ui", "core.ui.ui.builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.text.engine.toml.writer", "core.text.engine.toml.codec", "core.ui.engine.notifications", "core.fs.engine.paths",
 		"core.timing.engine.deferred_work", "core.text.engine.utils", "menu.engine.manifest_reader",
 		"core.ui.engine.dialog_util", "settings.ui.menu.paths", "core.fs.adapters.file_system",
@@ -122,7 +122,7 @@ local function with_onboarding(controls, callback)
 			end
 			return bridge
 		end
-		local onboarding = require("ui.onboarding")
+		local onboarding = require("onboarding.ui")
 		require("tests.support.onboarding_shared_data").install()
 		callback(onboarding, state)
 	end)

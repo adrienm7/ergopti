@@ -11,7 +11,7 @@
 #
 # FEATURES & RATIONALE:
 # 1. Privacy pane URL forms (ledger L29): every pane of
-#    static/ergopti_plus/macos/data/privacy_panes.json is opened in every form
+#    static/ergopti_plus/macos/onboarding/privacy_panes.json is opened in every form
 #    with /usr/bin/open, whose exit code proves which form this macOS accepts.
 #    System Settings is quit afterwards only when it was not running before,
 #    so the session is left as found.
@@ -22,7 +22,7 @@
 # Sourced only; defines functions and runs nothing.
 # ==============================================================================
 
-PRIVACY_PANES_SPEC="static/ergopti_plus/macos/data/privacy_panes.json"
+PRIVACY_PANES_SPEC="static/ergopti_plus/macos/onboarding/privacy_panes.json"
 # How long System Settings may take to take a URL before the next one.
 PRIVACY_PANE_SETTLE_SECONDS=2
 

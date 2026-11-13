@@ -18,8 +18,8 @@ require("tests.lua.onboarding.publication_contract").register(helpers)
 
 helpers.describe("Linux wizard retained native publication phases", function()
 	helpers.it("defers and retains exact scalar rollback after native cleanup, without replaying accepted phases", function()
-		local saved = package.loaded["ui.onboarding.bridge"]
-		package.loaded["ui.onboarding.bridge"] = nil
+		local saved = package.loaded["onboarding.ui.bridge"]
+		package.loaded["onboarding.ui.bridge"] = nil
 		local settled, cleanup_calls, forward_calls = false, 0, 0
 		local locale, directory, path_rollbacks, locale_rollbacks = "en", "/before", 0, 0
 		local refuse_locale_inverse = true
@@ -56,7 +56,7 @@ helpers.describe("Linux wizard retained native publication phases", function()
 			notify_error = function() end,
 		}
 		local ok, detail = xpcall(function()
-			local bridge = require("ui.onboarding.bridge")
+			local bridge = require("onboarding.ui.bridge")
 			local answers = { locale = "fr", config_dir = "/after",
 				operations = { { path = "gestures.enabled", value = true } } }
 			helpers.assert_eq(bridge.on_message({ action = "finish", answers = answers }, state), { done = false })
@@ -79,7 +79,7 @@ helpers.describe("Linux wizard retained native publication phases", function()
 				"replacing the held native writer cannot acquire the previous inverse")
 			helpers.assert_eq(forward_calls, 1)
 		end, debug.traceback)
-		package.loaded["ui.onboarding.bridge"] = saved
+		package.loaded["onboarding.ui.bridge"] = saved
 		if not ok then error(detail, 0) end
 	end)
 end)
@@ -87,8 +87,8 @@ end)
 
 --- Drives the actual native Finish entry with a controlled no-effect publisher.
 local function with_receiving_boundary(scenario)
-	local saved = package.loaded["ui.onboarding.bridge"]
-	package.loaded["ui.onboarding.bridge"] = nil
+	local saved = package.loaded["onboarding.ui.bridge"]
+	package.loaded["onboarding.ui.bridge"] = nil
 	local f = { locale = "en", directory = "/before", writes = 0, cleanups = 0,
 		path_rollbacks = 0, locale_rollbacks = 0, settled = false }
 	local answers = { locale = "fr", config_dir = "/after",
@@ -135,11 +135,11 @@ local function with_receiving_boundary(scenario)
 		notify_error = function() end,
 	}
 	local called, detail = xpcall(function()
-		f.bridge, f.state, f.answers = require("ui.onboarding.bridge"), state, answers
+		f.bridge, f.state, f.answers = require("onboarding.ui.bridge"), state, answers
 		f.finish = function() return f.bridge.on_message({ action = "finish", answers = answers }, state) end
 		return scenario(f)
 	end, debug.traceback)
-	package.loaded["ui.onboarding.bridge"] = saved
+	package.loaded["onboarding.ui.bridge"] = saved
 	if not called then error(detail, 0) end
 end
 
