@@ -183,15 +183,12 @@ helpers.describe("Linux gesture scope transaction", function()
 					if command:find("dialog_host.lua", 1, true) then questions = questions + 1 end
 					return 0
 				end
-				-- A pause refuses the owner's publication; the file stays whole.
+				-- A pause stops typing, not configuration (EDD-1): the clear
+				-- commits while paused (edd1-paused-writes).
 				controls.paused = true
 				clear.fn()
-				helpers.assert_eq(table.concat(calls, ","), "clear")
-				helpers.assert_eq(refreshes, 0)
-				helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 				controls.paused = false
-				clear.fn()
-				helpers.assert_eq(table.concat(calls, ","), "clear,clear")
+				helpers.assert_eq(table.concat(calls, ","), "clear")
 				helpers.assert_true(refreshes > 0)
 				helpers.assert_eq(gestures.is_enabled(), true, "the menu clear keeps the switch (gestures-clear-keeps-switch)")
 				local saved = Codec.decode(Sandbox.read_bytes(path))
@@ -200,7 +197,7 @@ helpers.describe("Linux gesture scope transaction", function()
 				helpers.assert_eq(Sandbox.read_bytes(controls.backups[#controls.backups]), SOURCE,
 					"the clear backs the file up before it rewrites it")
 				restore.fn()
-				helpers.assert_eq(table.concat(calls, ","), "clear,clear,recommended")
+				helpers.assert_eq(table.concat(calls, ","), "clear,recommended")
 				local recommended = require("infra.manifest_reader").recommended_for("gestures.enabled")
 				helpers.assert_eq(gestures.is_enabled(), recommended)
 				helpers.assert_eq(questions, 0, "neither scope row asks a question")
@@ -309,6 +306,21 @@ helpers.describe("Linux gesture scope revert", function()
 			helpers.assert_eq(owner.pending(), false)
 			owner.release()
 			helpers.assert_eq(owner.revert(), false, "one commit reverts once")
+		end)
+	end)
+
+	-- A pause stops typing, not configuration (EDD-1): the switch commits while
+	-- paused and the dispatch keeps every bound gesture inert until resume.
+	helpers.it("switches gestures while paused and keeps them inert (edd1-paused-writes)", function()
+		with_scope(function(_, gestures, controls, path)
+			controls.paused = true
+			helpers.assert_eq(gestures.set_enabled(false), true, "OFF commits while paused")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gestures.enabled, false)
+			helpers.assert_eq(gestures.set_enabled(true), true, "ON commits while paused")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gestures.enabled, true)
+			helpers.assert_true(gestures.is_enabled())
+			helpers.assert_eq(gestures.dispatch_gesture({ fingers = 3, tap = true }), false,
+				"a bound tap stays inert while paused")
 		end)
 	end)
 end)
