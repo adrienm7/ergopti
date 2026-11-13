@@ -4,25 +4,34 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-13, 05:00)
+## Where things stand (2026-11-13, 06:00)
 
 - Branch: `claude/ergopti-todo-structure-phase2`, fast-forward only. Base:
   dev `520bb24c`, merged in `ee1aa96f`.
 - Steps landed on dev: none. The migration is not authorized to land yet.
-- **S01 is NOT green on CI yet.** The last proof, run 43311674550 on
-  `claude/ergopti-todo-structure-phase2-proof-2` (`244ef275`), had 28 failing
-  jobs. The fixes below are on the branch. Proof 3,
-  `claude/ergopti-todo-structure-phase2-proof-3` at `c4cec48e` (built from
-  `2627e45d`), was dispatched to `ci.yml` (`os_lanes=all`) at 02:44. About 120 checks are red locally on dev itself (root user, no
-  `pwsh`, no Windows), so **measure S01 by CI, not locally.**
-- S02 (`core/crypto`) applies locally on top of the S01 proof
-  (`/home/user/wt-seq` holds S01 proof + the tool commits since `2627e45d` +
-  S02). S02 needed: derived pins found where S01 left them (`a4d8fcd6`,
-  `4c145c12`), the committed step numbers kept (`4e04dd96`), the folder gain
-  rule (`ffe92aff`, `1e98ba49`), the adapter matrix by path (`31583188`), the
-  I1 records moved by the runner (`57869cd5`) and the banner fixture read from
-  the lint (`691e47a4`). Its six JS reds are fixed; macOS meta (3) and macOS
-  modules (1) are being compared.
+- **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
+  Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
+  input-display, platform-metrics; Windows Integration Driver startup (and
+  the verdicts). Windows unit core/meta/config-scope-global, Linux
+  integration native and macOS Launcher XCTest are green there, so any red of
+  theirs on a proof is the step's.
+- S01 proof 3 (`c4cec48e`, run 43347126427): 19 failing jobs, down from 28.
+  Fixed since on the branch: dev runner clone (`1d58f217`), tap-hold and
+  onboarding staging (`ba67b25d`), the control CLI's PowerShell Join-Path
+  (`2cf27190`), the boot-order include regex (`964062d1`), the repin test on
+  a stepped tree (`a4d8fcd6`, `4c145c12`). Not yet explained: Linux
+  integration native, macOS Launcher XCTest and Archive update controls,
+  Common Ai and network.
+- Proof 4 (S01 + S02 together, from `964062d1`) is being built in
+  `/home/user/wt-proof`; next: push it to
+  `claude/ergopti-todo-structure-phase2-proof-4` and dispatch `ci.yml`
+  (`os_lanes=all`).
+- S02 (`core/crypto`) needed: derived pins found where S01 left them
+  (`a4d8fcd6`, `4c145c12`), the committed step numbers kept (`4e04dd96`), the
+  folder gain rule (`ffe92aff`, `1e98ba49`), one adapter path table
+  (`6b4e07ca`), the I1 records moved by the runner (`57869cd5`) and the banner
+  fixture read from the lint (`691e47a4`). Locally its JS and macOS Lua reds
+  are gone.
 
 ### S01 CI failures (run 43311674550) and their state
 
