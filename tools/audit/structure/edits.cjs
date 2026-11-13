@@ -219,6 +219,38 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "(MAC + 'tests/support/core/native_http_fixture_main.swift',)"
 	},
 	{
+		// The manifest reader climbs one named folder per level to its driver;
+		// S19 moves it from infra/ into menu/engine/, one level deeper.
+		file: 'static/ergopti_plus/macos/infra/manifest_reader.lua',
+		moves: 'macos/infra/manifest_reader.lua',
+		from: 'local infra_dir = NativePath.dirname(source) or source\nlocal driver_dir = NativePath.dirname(infra_dir) or infra_dir',
+		to: 'local engine_dir = NativePath.dirname(source) or source\nlocal feature_dir = NativePath.dirname(engine_dir) or engine_dir\nlocal driver_dir = NativePath.dirname(feature_dir) or feature_dir'
+	},
+	{
+		// The manifest reader climbs one named folder per level to its driver;
+		// S19 moves it from infra/ into menu/engine/, one level deeper.
+		file: 'static/ergopti_plus/linux/infra/manifest_reader.lua',
+		moves: 'linux/infra/manifest_reader.lua',
+		from: 'local infra_dir = NativePath.dirname(source) or source\nlocal driver_dir = NativePath.dirname(infra_dir) or infra_dir',
+		to: 'local engine_dir = NativePath.dirname(source) or source\nlocal feature_dir = NativePath.dirname(engine_dir) or engine_dir\nlocal driver_dir = NativePath.dirname(feature_dir) or feature_dir'
+	},
+	{
+		// The lease helper finds its driver by the names of the folders it sits
+		// in; S28 moves it from platform/remap to keyboard/adapters/karabiner.
+		file: 'static/ergopti_plus/macos/platform/remap/lease_helper.lua',
+		moves: 'macos/platform/remap/lease_helper.lua',
+		from: '\tlocal remap = NativePath.dirname(source)\n\tlocal platform = remap and NativePath.basename(remap) == "remap" and NativePath.dirname(remap) or nil\n\tif not platform or NativePath.basename(platform) ~= "platform" then return nil end\n\treturn NativePath.dirname(platform)',
+		to: '\tlocal karabiner = NativePath.dirname(source)\n\tlocal adapters = karabiner and NativePath.basename(karabiner) == "karabiner" and NativePath.dirname(karabiner) or nil\n\tlocal keyboard = adapters and NativePath.basename(adapters) == "adapters" and NativePath.dirname(adapters) or nil\n\tif not keyboard or NativePath.basename(keyboard) ~= "keyboard" then return nil end\n\treturn NativePath.dirname(keyboard)'
+	},
+	{
+		// The webview manager finds its driver by the folder it sits in; S12
+		// moves it from ui/ to core/ui/ui/, two levels deeper.
+		file: 'static/ergopti_plus/linux/ui/webview_manager.lua',
+		moves: 'linux/ui/webview_manager.lua',
+		from: '\tif NativePath.basename(src) ~= "ui" then return "." end\n\treturn NativePath.dirname(src) or "."',
+		to: '\tif NativePath.basename(src) ~= "ui" then return "." end\n\tlocal feature = NativePath.dirname(src) or ""\n\tif NativePath.basename(feature) ~= "ui" then return "." end\n\tlocal core = NativePath.dirname(feature) or ""\n\tif NativePath.basename(core) ~= "core" then return "." end\n\treturn NativePath.dirname(core) or "."'
+	},
+	{
 		// The XI2 receiver derives the shared Lua root from the logger shim's
 		// path; S01 moves the shim to core/logger/engine under _shared itself.
 		file: 'static/ergopti_plus/linux/tests/hardware/xi2_luajit_receiver.lua',
