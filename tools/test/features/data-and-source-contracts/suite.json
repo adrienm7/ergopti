@@ -793,6 +793,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-scriptdir.cjs"],
 			"repro": "npm run test:structure-ahk-scriptdir"
+		},
+		{
+			"id": "js-0526",
+			"ordinal": 648,
+			"name": "structure plan follows the AutoHotkey paths of a tool naming the Windows driver",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-windows-tool-paths.cjs"],
+			"repro": "npm run test:structure-windows-tool-paths"
 		}
 	]
 }
