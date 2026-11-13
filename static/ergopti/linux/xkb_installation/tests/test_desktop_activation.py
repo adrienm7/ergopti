@@ -256,13 +256,28 @@ class PrivilegeDropTests(unittest.TestCase):
 class GnomeApplyTests(unittest.TestCase):
     def run_apply(self, initial, accept=True, specs=(ERGOPTI,)):
         writes: list[list[str]] = []
+        self.activated: list[str] = []
+
+        def activate(source_id):
+            self.activated.append(source_id)
+            return activation.GNOME_SWITCH_SWITCHED
+
         with mock.patch("builtins.print"), mock.patch.object(
             activation.time, "sleep"
         ), mock.patch.object(
             activation.subprocess, "run", side_effect=gsettings_session(initial, writes, accept)
-        ):
+        ), mock.patch.object(activation, "gnome_activate_when_listed", activate):
             applied = activation.apply_gnome(list(specs), {"gnome"})
         return applied, writes
+
+    def test_the_running_shell_is_switched_through_the_extension(self):
+        """gnome-runtime-switch: the lists hold the layout first for the next
+        login; the running Shell switches only through the Ergopti extension."""
+        applied, _ = self.run_apply({"sources": "[('xkb', 'us')]"})
+        self.assertTrue(applied)
+        self.assertEqual(self.activated, ["xkb:ergopti"])
+        _, _ = self.run_apply({"sources": "[('xkb', 'us')]"}, accept=False)
+        self.assertEqual(self.activated, [], "a refused write switches nothing")
 
     def test_layout_is_written_first_and_read_back(self):
         applied, writes = self.run_apply({"sources": "[('xkb', 'us')]"})
@@ -408,6 +423,10 @@ class OwningDesktopTests(unittest.TestCase):
             fake_subprocess(gsettings_session({"sources": "[('xkb', 'us')]"}, writes, accept)),
         ), mock.patch.object(activation.shutil, "which", return_value=None), mock.patch.object(
             activation, "running_as_root", return_value=False
+        ), mock.patch.object(
+            activation,
+            "gnome_activate_when_listed",
+            return_value=activation.GNOME_SWITCH_SWITCHED,
         ):
             applied = activation.activate_layout([spec], environ)
         return applied, "\n".join(printed), writes
