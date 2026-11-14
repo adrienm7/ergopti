@@ -229,8 +229,11 @@ local BEHAVIOURS = {
 	exit_ok_no_file = 'exit 0',
 	fail = 'exit 1',
 	maim_cancel = 'echo "Selection was cancelled by keystroke or right-click." >&2; exit 1',
-	magick_ok = 'for a; do last=$a; done; printf "scaled" > "$last"',
+	-- A whole PNG ends with its IEND chunk and that chunk's CRC (octal escapes).
+	magick_ok = 'for a; do last=$a; done; printf "scaled\\111\\105\\116\\104\\256\\102\\140\\202" > "$last"',
 	magick_partial = 'for a; do last=$a; done; printf "truncated" > "$last"; exit 1',
+	-- ImageMagick 7 on a full disk: part of the PNG written, and exit 0.
+	magick_truncated_ok = 'for a; do last=$a; done; printf "truncated" > "$last"',
 }
 
 --- Runs the capture script with the given fake tools.
@@ -245,7 +248,9 @@ local function run(mode, tools, wayland)
 	local bin, log, out = root .. "/bin", root .. "/calls.log", root .. "/screen.png"
 	os.execute("mkdir " .. ShellRunner.quote(bin))
 	os.execute("ln -s /bin/rm " .. ShellRunner.quote(bin .. "/rm"))
-	os.execute("ln -s /bin/mv " .. ShellRunner.quote(bin .. "/mv"))
+	for _, name in ipairs({ "mv", "tail", "od", "tr" }) do
+		os.execute("ln -s /bin/" .. name .. " " .. ShellRunner.quote(bin .. "/" .. name))
+	end
 	for tool, behaviour in pairs(tools) do
 		local path = bin .. "/" .. tool
 		local handle = assert(io.open(path, "w"))
@@ -359,6 +364,13 @@ helpers.describe("screen capture: the whole screen falls through the tools", fun
 		helpers.assert_eq(outcome.status, "ok")
 		helpers.assert_eq(outcome.scaled, false)
 		helpers.assert_eq(outcome.image, "png", "a failed resize must not replace the original bytes")
+	end)
+
+	helpers.it("keeps the original screenshot when resizing exits 0 after a truncated write", function()
+		local outcome = run("full", { grim = "write_last", magick = "magick_truncated_ok" }, false)
+		helpers.assert_eq(outcome.status, "ok")
+		helpers.assert_eq(outcome.scaled, false)
+		helpers.assert_eq(outcome.image, "png", "a truncated resize must not replace the original bytes")
 	end)
 
 	helpers.it("a tool that writes nothing is a failure, not a cancellation", function()
