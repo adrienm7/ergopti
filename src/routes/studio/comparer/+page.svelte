@@ -14,6 +14,7 @@ runs in the visitor's browser.
 <script>
 	import { asset } from '$app/paths';
 	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import SiteFrame from '#lib/components/SiteFrame.svelte';
 
 	/** Height before the framed page reports its own (its usual empty height). */
 	const INITIAL_HEIGHT_PX = 800;
@@ -66,17 +67,17 @@ runs in the visitor's browser.
 		</bloc-introduction>
 	</svelte:fragment>
 
-	<iframe
+	<SiteFrame
 		class="layout-analysis-frame"
 		title="Comparer des dispositions — Ergopti Studio"
 		src={comparerSrc}
-		bind:this={frame}
-		style="height:{height}px"
-	></iframe>
+		bind:frame
+		{height}
+	/>
 </PageWrapper>
 
 <style>
-	.layout-analysis-frame {
+	:global(.layout-analysis-frame) {
 		border: 0;
 		border-radius: 8px;
 		display: block;

@@ -143,11 +143,17 @@ async function exerciseHome(page, origin, basePath) {
 }
 
 /**
- * Each embedded driver window loads once: hydration once replaced the
+ * Each framed page (driver window, Studio tab) loads once: hydration once replaced the
  * prerendered (relative) frame address with the client's absolute one, which
  * reloaded every window and cut off its first load.
  */
-async function expectSingleFrameLoads(page, origin, basePath, route) {
+async function expectSingleFrameLoads(
+	page,
+	origin,
+	basePath,
+	route,
+	frames = '.frame-wrap iframe'
+) {
 	const loads = [];
 	const record = (request) => {
 		if (request.isNavigationRequest() && request.frame() !== page.mainFrame())
@@ -156,18 +162,21 @@ async function expectSingleFrameLoads(page, origin, basePath, route) {
 	page.on('request', record);
 	try {
 		await visit(page, origin, basePath, route);
-		await page.locator('.frame-wrap iframe[src]').first().waitFor({ state: 'attached' });
+		await page
+			.locator(frames + '[src]')
+			.first()
+			.waitFor({ state: 'attached' });
 		await smoke.settleFrames(page);
 		// Hydration ran before networkidle; give a late replacement time to show.
 		await page.waitForTimeout(500);
 	} finally {
 		page.off('request', record);
 	}
-	assert.ok(loads.length > 0, 'The page embeds driver windows: ' + route);
+	assert.ok(loads.length > 0, 'The page embeds framed pages: ' + route);
 	assert.equal(
 		new Set(loads).size,
 		loads.length,
-		'Each driver window loads once: ' + loads.join(', ')
+		'Each framed page loads once: ' + loads.join(', ')
 	);
 }
 
@@ -223,6 +232,8 @@ async function exerciseSections(page, origin, basePath) {
 			'Studio tabs on ' + route
 		);
 	}
+	for (const route of ['/studio', '/studio/comparer'])
+		await expectSingleFrameLoads(page, origin, basePath, route, 'main iframe');
 	// The comparison page reports its height; the frame follows it.
 	const frame = page.locator('iframe.layout-analysis-frame');
 	await page.waitForFunction(() => {

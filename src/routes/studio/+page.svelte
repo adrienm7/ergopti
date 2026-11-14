@@ -15,6 +15,7 @@ save as downloads; nothing leaves the visitor's computer.
 <script>
 	import { asset, resolve } from '$app/paths';
 	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import SiteFrame from '#lib/components/SiteFrame.svelte';
 
 	/** Height of the framed editor; it scrolls inside the frame beyond that. */
 	const EDITOR_HEIGHT_PX = 1400;
@@ -57,27 +58,27 @@ save as downloads; nothing leaves the visitor's computer.
 				</li>
 				<li>
 					<strong>Installer ou émuler</strong> : dans
-					<a href={resolve('/ergopti-plus')}>ErgoptiPlus</a>, le menu « Disposition clavier » ouvre
-					le même éditeur, qui sait installer la disposition sur le système ou l’émuler sans rien
+					<a href={resolve('/ergopti-plus')}>Ergopti+</a>, le menu « Disposition clavier » ouvre le
+					même éditeur, qui sait installer la disposition sur le système ou l’émuler sans rien
 					installer (sans droit administrateur).
 					<a href={resolve('/ergopti-plus/installation') + '#ep-telecharger'}
-						>Télécharger ErgoptiPlus</a
+						>Télécharger Ergopti+</a
 					>.
 				</li>
 			</ol>
 		</bloc-introduction>
 	</svelte:fragment>
 
-	<iframe
+	<SiteFrame
 		class="layout-editor-frame"
 		title="Ergopti Studio"
 		src={editorSrc}
-		style="height:{EDITOR_HEIGHT_PX}px"
-	></iframe>
+		height={EDITOR_HEIGHT_PX}
+	/>
 </PageWrapper>
 
 <style>
-	.layout-editor-frame {
+	:global(.layout-editor-frame) {
 		border: 0;
 		border-radius: 8px;
 		display: block;
