@@ -53,7 +53,13 @@ const LOCALES_DIR = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const GENERATOR = path.join(ROOT, 'tools', 'codegen', 'codegen-value-schema.cjs');
 const LOCALE_COUNT = 21;
 
-const FILES = ['config.toml', 'tap_hold.toml', 'hotstrings_config.toml', 'personal_info.toml'];
+const FILES = [
+	'config.toml',
+	'tap_hold.toml',
+	'hotstrings_config.toml',
+	'personal_info.toml',
+	'app_categories.json'
+];
 const UNITS = ['ms', 's', 'mm', 'characters', 'words'];
 const FIELDS = {
 	common: ['file', 'type', 'default_from', 'platforms'],

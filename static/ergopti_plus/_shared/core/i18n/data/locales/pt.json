@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "Novo nome para a categoria \"%s\":",
 	"metrics_apps.rename_subtext": "Todos os apps desta categoria serão renomeados",
 	"metrics_apps.rename_title": "Renomear",
-	"metrics_apps.score_error": "A pontuação deve estar entre -2 e 2.",
 	"metrics_apps.score_prompt": "Pontuação de produtividade para %s\n(-2 muito distrator a 2 muito produtivo):",
 	"metrics_apps.score_title": "Pontuação",
 	"metrics_apps.title": "Métricas de digitação",

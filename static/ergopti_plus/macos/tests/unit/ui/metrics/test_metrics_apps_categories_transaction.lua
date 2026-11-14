@@ -414,12 +414,15 @@ end)
 
 helpers.describe("metrics warning native signature", function()
 	helpers.it("presents an invalid score warning without saving the category", function()
-		for _, input in ipairs({ "abc", "3" }) do
+		-- The shared value check's refusal names the declared range (value-validation):
+		-- a word, past the maximum, a fraction past it written with a comma, a
+		-- hexadecimal string and an empty answer.
+		for _, input in ipairs({ "abc", "3", "2,5", "0x1", "" }) do
 			with_category_store({ score_input = input }, function(metrics, state, callbacks)
 				local before = state.target
 				attempt_edit(metrics, callbacks)
 				helpers.assert_eq(state.warnings.shown, {
-					{ "common.warning", "metrics_apps.score_error", "button.ok" },
+					{ "dialog.value_check.title", "dialog.value_check.range_decimal", "button.ok" },
 				}, "Invalid scores must show their warning through the native message/button contract")
 				helpers.assert_eq(state.warnings.refused, 0)
 				helpers.assert_eq(state.target, before)

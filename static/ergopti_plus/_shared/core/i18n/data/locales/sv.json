@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "Nytt namn för kategorin \"%s\":",
 	"metrics_apps.rename_subtext": "Alla appar i denna kategori kommer att få nytt namn",
 	"metrics_apps.rename_title": "Byt namn",
-	"metrics_apps.score_error": "Poäng måste vara mellan -2 och 2.",
 	"metrics_apps.score_prompt": "Produktivitetspoäng för %s\n(-2 mycket distraherade till 2 mycket produktiv):",
 	"metrics_apps.score_title": "Poäng",
 	"metrics_apps.title": "Skrivmetriker",

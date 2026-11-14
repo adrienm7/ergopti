@@ -302,6 +302,12 @@
 					"label_key": "value_check.special.never"
 				}
 			]
+		},
+		"metrics_apps.*.score": {
+			"file": "app_categories.json",
+			"type": "decimal",
+			"min": -2,
+			"max": 2
 		}
 	}
 }

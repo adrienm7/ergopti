@@ -117,6 +117,41 @@ H.describe("metrics flush bridge", function()
 			if mode == "invalid" then H.assert_eq(result.saved, false) else H.assert_nil(result) end
 		end
 	end)
+	-- The shared value schema's declaration (value-validation): a refused typed
+	-- score is notified with the localized text naming the range, nothing is written.
+	for _, typed in ipairs({ "3", "2,5", "abc", "0x1", "", "-2.01" }) do
+		H.it("category edit refuses the typed score " .. typed .. " with the value check's text (value-validation)", function()
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local notified, calls = nil, 0
+			F.state.notify_error = function(key, text) notified = { key, text } end
+			F.B._category_prompt = function()
+				calls = calls + 1
+				return calls == 1 and "Work" or typed
+			end
+			local saved = false
+			F.K.set_app_category = function() saved = true; return true end
+			local result = F.B.on_message({ action = "edit", app = "Editor", cat = "Work", score = 0 }, F.state, F.context)
+			H.assert_eq(result.saved, false)
+			H.assert_eq(saved, false, "nothing reaches the store")
+			H.assert_eq(notified[1], "dialog.value_check.title")
+			H.assert_type(notified[2], "string", "the refusal carries its rendered text")
+		end)
+	end
+	H.it("category edit accepts the declared bounds and a decimal comma (value-validation)", function()
+		for _, pair in ipairs({ { "-2", -2 }, { "2", 2 }, { "1,5", 1.5 } }) do
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local calls, saved = 0, nil
+			F.B._category_prompt = function()
+				calls = calls + 1
+				return calls == 1 and "Work" or pair[1]
+			end
+			F.K.set_app_category = function(_, _, score) saved = score; return true end
+			F.B.on_message({ action = "edit", app = "Editor", cat = "Work", score = 0 }, F.state, F.context)
+			H.assert_eq(saved, pair[2], pair[1])
+		end
+	end)
 	H.it("(metrics-callback-error) a failing error formatter cannot escape the dashboard bridge", function()
 		local F = fixture("metrics_apps")
 		F.read_safe()

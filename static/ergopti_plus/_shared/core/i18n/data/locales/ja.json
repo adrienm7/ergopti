@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "カテゴリ「%s」の新しい名前:",
 	"metrics_apps.rename_subtext": "このカテゴリのすべてのアプリが名前変更されます",
 	"metrics_apps.rename_title": "名前を変更",
-	"metrics_apps.score_error": "スコアは -2 から 2 の間でなければなりません。",
 	"metrics_apps.score_prompt": "%s の生産性スコア\n(-2 非常に気が散る〜2 非常に生産的):",
 	"metrics_apps.score_title": "スコア",
 	"metrics_apps.title": "タイピング指標",

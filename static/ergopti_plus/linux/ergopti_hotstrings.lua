@@ -3245,9 +3245,13 @@ local function main()
 					})
 				end
 			end,
-			notify_error = function(key)
+			-- A refusal may carry its own localized text (a value check naming the
+			-- range); the key alone names the message otherwise.
+			notify_error = function(key, text)
 				if notifier and ok_i18n and i18n_mod then
-					notifier.send(i18n_mod.get(key), {
+					local message = i18n_mod.get(key)
+					if type(text) == "string" then message = text end
+					notifier.send(message, {
 						title = i18n_mod.get("common.error_title"), level = "error",
 					})
 				end

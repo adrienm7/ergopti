@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "שם חדש לקטגוריה \"%s\":",
 	"metrics_apps.rename_subtext": "כל היישומים בקטגוריה זו ישונו",
 	"metrics_apps.rename_title": "שנה שם",
-	"metrics_apps.score_error": "הציון חייב להיות בין -2 ל-2.",
 	"metrics_apps.score_prompt": "ציון פרודוקטיביות עבור %s\n(-2 מאוד מסיח עד 2 מאוד פרודוקטיבי):",
 	"metrics_apps.score_title": "ציון",
 	"metrics_apps.title": "מטריקות הקלדה",

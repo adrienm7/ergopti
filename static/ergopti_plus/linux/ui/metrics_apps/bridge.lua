@@ -144,8 +144,8 @@ local function handle(payload, state, request)
 		if state.keystats and type(state.keystats.set_app_category) == "function" then
 			local stats = state.keystats
 			local capture, setter = stats.capture_app_category_edit, stats.set_app_category
-			local function refused(key)
-				if request.valid() and type(state.notify_error) == "function" then pcall(state.notify_error, key) end
+			local function refused(key, text)
+				if request.valid() and type(state.notify_error) == "function" then pcall(state.notify_error, key, text) end
 				return with_payload({ saved = false })
 			end
 			if type(capture) ~= "function" or app_name == "" then return refused("healthcheck.status.failed") end
@@ -159,9 +159,11 @@ local function handle(payload, state, request)
 			local score_text = M._category_prompt(i18n.get("metrics_apps.score_title"),
 				string.format(i18n.get("metrics_apps.score_prompt"), app_name), tostring(payload.score or 0))
 			if score_text == nil or not request.valid() then return nil end
-			local score = tonumber(score_text)
-			if not require("metrics.engine.apps.category_store").score_valid(score) then
-				return refused("metrics_apps.score_error")
+			-- The shared value schema owns the range and its localized refusal.
+			local score, refusal = require("metrics.engine.apps.category_store").parse_score_entry(score_text, i18n.get)
+			if score == nil then
+				Logger.warn(LOG, "Typed score for '%s' refused.", app_name)
+				return refused("dialog.value_check.title", refusal)
 			end
 			if not chosen:find("%S") then return refused("healthcheck.status.failed") end
 			if stats.capture_app_category_edit ~= capture or stats.set_app_category ~= setter or state.keystats ~= stats then return nil end

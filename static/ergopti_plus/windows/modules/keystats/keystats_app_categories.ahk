@@ -41,6 +41,8 @@
 
 #Requires Autohotkey v2.0+
 
+; The score bounds are the shared value schema declaration (metrics_apps.*.score).
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 #Include keystats_app_category_store.ahk
 #Include keystats_app_category_edits.ahk
 
@@ -58,8 +60,6 @@ class KLAppCatConst {
 		static FILE_NAME := "app_categories.json"
 		static STORE_SCHEMA := "ergopti.app_categories"
 		static STORE_VERSION := 1
-		static MIN_SCORE := -2
-		static MAX_SCORE := 2
 		; What a record holds before the user edits it.
 		static UNEDITED_SCORE := 0
 		static DISCOVERED_LABEL := "unknown"

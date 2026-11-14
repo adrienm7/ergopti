@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "Nyt navn for kategori \"%s\":",
 	"metrics_apps.rename_subtext": "Alle apps i denne kategori vil blive omdøbt",
 	"metrics_apps.rename_title": "Omdøb",
-	"metrics_apps.score_error": "Score skal være mellem -2 og 2.",
 	"metrics_apps.score_prompt": "Produktivitetskarakter for %s\n(-2 meget distraherende til 2 meget produktivt):",
 	"metrics_apps.score_title": "Score",
 	"metrics_apps.title": "Skrivemetriker",

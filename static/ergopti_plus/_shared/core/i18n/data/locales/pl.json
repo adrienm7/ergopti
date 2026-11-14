@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "Nowa nazwa kategorii „%s\":",
 	"metrics_apps.rename_subtext": "Wszystkie aplikacje w tej kategorii zostaną przemianowane",
 	"metrics_apps.rename_title": "Zmień nazwę",
-	"metrics_apps.score_error": "Wynik musi być między -2 a 2.",
 	"metrics_apps.score_prompt": "Wynik produktywności dla %s\n(-2 bardzo rozpraszający do 2 bardzo produktywny):",
 	"metrics_apps.score_title": "Wynik",
 	"metrics_apps.title": "Statystyki pisania",

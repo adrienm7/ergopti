@@ -599,6 +599,12 @@ function requireValue(schema, key, value) {
 						"label_key": "value_check.special.never"
 					}
 				]
+			},
+			"metrics_apps.*.score": {
+				"file": "app_categories.json",
+				"type": "decimal",
+				"min": -2,
+				"max": 2
 			}
 		}
 	};
@@ -629,7 +635,8 @@ function requireValue(schema, key, value) {
 		"SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY": "shortcuts.search.search_engine_url_query",
 		"PERSONAL_INFO_INFO_ANY": "personal_info.info.*",
 		"PERSONAL_INFO_LETTERS_ANY": "personal_info.letters.*",
-		"UPDATER_CHECK_INTERVAL_SECONDS": "updater.check_interval_seconds"
+		"UPDATER_CHECK_INTERVAL_SECONDS": "updater.check_interval_seconds",
+		"METRICS_APPS_ANY_SCORE": "metrics_apps.*.score"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

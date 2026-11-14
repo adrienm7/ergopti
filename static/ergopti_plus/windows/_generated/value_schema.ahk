@@ -159,6 +159,11 @@ ValueSchemaData() {
 			"max", 10000,
 			"default_from", Map(
 				"manifest", "llm.trigger.min_request_interval_ms")),
+		"metrics_apps.*.score", Map(
+			"file", "app_categories.json",
+			"type", "decimal",
+			"min", -2,
+			"max", 2),
 		"mod_combos.simultaneous_threshold_ms", Map(
 			"file", "config.toml",
 			"type", "integer",
