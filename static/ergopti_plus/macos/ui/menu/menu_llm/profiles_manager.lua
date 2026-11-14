@@ -1027,12 +1027,18 @@ end
 local function build_profile_menu(
 	deps, models_mgr, delete_profile, activate_candidate, replace_profile)
 	local state  = deps.state
-	local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
-	local function create_ready()
+	-- A pause stops typing, not configuration (EDD-1): profiles are chosen,
+	-- created, cloned, edited and deleted while paused. Only a profile shortcut
+	-- waits for resume, because it binds a hotkey. An unreadable pause refuses.
+	local function pause_state()
 		if type(deps.script_control) ~= "table"
-			or type(deps.script_control.is_paused) ~= "function" then return false end
+			or type(deps.script_control.is_paused) ~= "function" then return nil end
 		local ok, current = pcall(deps.script_control.is_paused)
-		return ok and current == false
+		if not ok or type(current) ~= "boolean" then return nil end
+		return current
+	end
+	local function create_ready()
+		return pause_state() ~= nil
 	end
 
 
@@ -1079,8 +1085,7 @@ local function build_profile_menu(
 			table.insert(rows, {
 				label    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
 				checked  = (state.llm_active_profile == pid) or nil,
-				disabled = paused or nil,
-				action       = not paused and function() return select_manual_profile(deps, state, pid) end or nil,
+				action       = function() return select_manual_profile(deps, state, pid) end,
 			})
 		end
 		return rows
@@ -1100,13 +1105,14 @@ local function build_profile_menu(
 			local item = {
 				label    = display_label,
 				checked  = (state.llm_active_profile == pid) or nil,
-				disabled = paused or nil,
 			}
 			
 			-- User profiles get a sub-menu for Editing/Deleting
 			local child_commands = {
 				[ConfigKeys.COMMAND.LLM_PROFILE_USE] = function() return select_manual_profile(deps, state, pid) end,
 				[ConfigKeys.COMMAND.LLM_PROFILE_SHORTCUT] = function()
+						-- A shortcut binds a hotkey: it waits for resume.
+						if pause_state() ~= false then return false end
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
 							native_presentation_id = "profile_shortcut_dialog",
@@ -1167,10 +1173,7 @@ local function build_profile_menu(
 					end,
 			}
 			local function child_ready()
-				if paused or type(deps.script_control) ~= "table"
-					or type(deps.script_control.is_paused) ~= "function" then return false end
-				local ok, current = pcall(deps.script_control.is_paused)
-				if not ok or current ~= false then return false end
+				if pause_state() == nil then return false end
 				local count = 0
 				for _, current_profile in ipairs(state.llm_user_profiles or {}) do
 					if rawequal(current_profile, profile) then count = count + 1 end
@@ -1180,10 +1183,13 @@ local function build_profile_menu(
 			item.items = ManifestMenu.template_rows("llm_custom_profile_controls", child_commands, {
 				["llm_custom_profile_active"] = function() return state.llm_active_profile == pid end,
 				["llm_custom_profile_ready"] = child_ready,
+				["llm_custom_profile_shortcut_ready"] = function()
+					return pause_state() == false and child_ready()
+				end,
 			}, {}) or {}
-			-- Preserve the native paused-construction contract: disabled leaves have no action.
-			if paused then
-				for _, row in ipairs(item.items) do row.action = nil end
+			-- Preserve the native disabled-construction contract: disabled leaves have no action.
+			for _, row in ipairs(item.items) do
+				if row.disabled then row.action = nil end
 			end
 			table.insert(rows, item)
 		end
@@ -1199,7 +1205,7 @@ local function build_profile_menu(
 				break
 			end
 		end
-		return active_builtin ~= nil and not paused
+		return active_builtin ~= nil
 	end
 
 	local function create_profile()
@@ -1263,10 +1269,9 @@ local function build_profile_menu(
 			clear_rows[#clear_rows + 1] = {
 				label = entry.app .. "  →  " .. (profile
 					and ProfileLabel.format(profile.label or entry.profile, state.llm_num_predictions) or entry.profile),
-				disabled = paused or nil,
-				action = not paused and function()
+				action = function()
 					return commit(AppProfileOverrides.without(overrides, entry.app))
-				end or nil,
+				end,
 			}
 		end
 		return ManifestMenu.template_rows("llm_profile_app_override_frame", {

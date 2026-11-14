@@ -381,14 +381,17 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 			helpers.assert_eq(fixture.direct_saves(), 0)
 		end)
 	end)
-	helpers.it("custom-profile-child: native pause and removed profile refuse held delivery", function()
+	helpers.it("custom-profile-child: a pause keeps Use, Edit and Delete and refuses only the shortcut; a removed profile refuses", function()
 		with_child({}, function(fixture, child)
 			local held = child()
 			fixture.native_dependencies.script_control.is_paused = function() return true end
-			for _, index in ipairs({1, 2, 4, 5}) do helpers.assert_eq(held[index].fn(), false) end
+			-- A pause stops typing, not configuration (EDD-1); a shortcut binds a hotkey.
+			helpers.assert_eq(held[2].fn(), false, "the held shortcut waits for resume")
 			local paused = child()
-			for _, index in ipairs({1, 2, 4, 5}) do
-				helpers.assert_true(paused[index].disabled); helpers.assert_nil(paused[index].fn)
+			helpers.assert_true(paused[2].disabled); helpers.assert_nil(paused[2].fn)
+			for _, index in ipairs({1, 4, 5}) do
+				helpers.assert_true(paused[index].disabled ~= true, "a paused profile row stays live")
+				helpers.assert_type(paused[index].fn, "function")
 			end
 			fixture.native_dependencies.script_control.is_paused = function() return false end
 			fixture.state.llm_user_profiles = {}
@@ -568,12 +571,13 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 			helpers.assert_eq(f.fixture.state.llm_active_profile,"advanced")
 		end)
 	end)
-	helpers.it("profile-headings: native pause still disables actual builtin choices", function()
+	helpers.it("profile-headings: a builtin choice commits while paused (EDD-1)", function()
 		with_headings(true, function(f)
 			f.fixture.native_dependencies.script_control.is_paused=function() return true end
 			local _, builtin = position(f.rows(), "Advanced")
-			helpers.assert_true(builtin.disabled); helpers.assert_nil(builtin.fn)
-			f.untouched()
+			helpers.assert_true(builtin.disabled ~= true); helpers.assert_type(builtin.fn, "function")
+			helpers.assert_eq(builtin.fn(), true)
+			helpers.assert_eq(f.fixture.state.llm_active_profile, "advanced")
 		end)
 	end)
 end)

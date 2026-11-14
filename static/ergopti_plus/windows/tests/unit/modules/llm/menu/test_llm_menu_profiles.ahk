@@ -39,20 +39,21 @@ _LMT_SharedCreateProfileCommand() {
 	AssertEqual(t(Corpus["i18n"]), Row["label"])
 	AssertEqual(1, Row["action"].Call())
 	AssertEqual(1, Seen["opens"])
+	; A pause stops typing, not configuration (EDD-1): the row runs while suspended.
 	Seen["paused"] := 1
-	AssertEqual(false, Row["action"].Call(), "a held callback rechecks the exact pause owner")
-	AssertEqual(1, Seen["opens"])
+	AssertEqual(1, Row["action"].Call(), "a held callback runs while paused")
+	AssertEqual(2, Seen["opens"])
 	Seen["paused"] := 0
 	Seen["result"] := 0
 	AssertEqual(0, Row["action"].Call(), "native editor refusal must remain refusal")
-	AssertEqual(2, Seen["opens"])
+	AssertEqual(3, Seen["opens"])
 	for Unknown in ["0", "false", Map(), 2] {
 		Seen["paused"] := Unknown
 		AssertEqual(false, Row["action"].Call(), "unknown pause receipts cannot open an editor")
-		AssertEqual(2, Seen["opens"])
+		AssertEqual(3, Seen["opens"])
 	}
 }
-Test("LLM profiles: shared Create command keeps native pause and editor refusal", _LMT_SharedCreateProfileCommand)
+Test("LLM profiles: shared Create command runs while paused and keeps editor refusal", _LMT_SharedCreateProfileCommand)
 
 _LMT_SharedCreateProfileLabelOwner() {
 	global _MM_MANIFEST_ROOT_CACHE
@@ -91,20 +92,21 @@ _LMT_SharedCloneProfileCommand() {
 	AssertEqual(t(Corpus["i18n"]), Row["label"])
 	AssertEqual(1, Row["action"].Call())
 	AssertEqual(1, Seen["opens"])
+	; A pause stops typing, not configuration (EDD-1): the row runs while suspended.
 	Seen["paused"] := 1
-	AssertEqual(false, Row["action"].Call(), "held Clone callbacks re-read the exact pause owner")
-	AssertEqual(1, Seen["opens"])
+	AssertEqual(1, Row["action"].Call(), "a held callback runs while paused")
+	AssertEqual(2, Seen["opens"])
 	Seen["paused"] := 0
 	Seen["result"] := 0
 	AssertEqual(0, Row["action"].Call(), "transactional clone refusal stays refusal")
-	AssertEqual(2, Seen["opens"])
+	AssertEqual(3, Seen["opens"])
 	for Unknown in ["0", "false", Map(), 2] {
 		Seen["paused"] := Unknown
 		AssertEqual(false, Row["action"].Call(), "unknown pause receipts cannot reach the clone owner")
-		AssertEqual(2, Seen["opens"])
+		AssertEqual(3, Seen["opens"])
 	}
 }
-Test("LLM profiles: shared Clone command retains native pause and refusal", _LMT_SharedCloneProfileCommand)
+Test("LLM profiles: shared Clone command runs while paused and retains refusal", _LMT_SharedCloneProfileCommand)
 
 _LMT_SharedCloneProfileLabelOwner() {
 	Corpus := _LMT_ProfileCloneCorpus()

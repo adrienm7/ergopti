@@ -3454,11 +3454,12 @@ platforms = ["hs", "linux"]
 unavailable = "hide"
 
 # Only the macOS native profile child exposes its existing shortcut prompt here.
+# It binds a hotkey, so it waits for resume; the other rows run while paused (EDD-1).
 [[menu.llm_custom_profile_controls]]
 type = "command"
 id = "llm_profile_shortcut"
 i18n = "menu.profiles.shortcut_prefix"
-disabled_when = ["llm_custom_profile_ready"]
+disabled_when = ["llm_custom_profile_shortcut_ready"]
 platforms = ["hs"]
 unavailable = "hide"
 

@@ -310,12 +310,11 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		helpers.assert_eq(opened.existing, nil)
 		helpers.assert_true(opened.opts.profile_id:match("^user_") ~= nil)
 		helpers.assert_eq(editor_calls, 1)
+		-- A pause stops typing, not configuration (EDD-1, maintainer decision
+		-- 2026-11-12): a retained Create callback opens the editor while paused.
 		paused = true
-		helpers.assert_eq(create.fn(), false,
-			"a retained Create callback must re-read the native pause owner")
-		helpers.assert_eq(editor_calls, 1, "the paused callback cannot reach the editor")
-		-- An open editor's save does publish while paused (EDD-1, maintainer
-		-- decision 2026-11-12): only the menu row reads the pause here.
+		helpers.assert_eq(create.fn(), true, "a retained Create callback runs while paused")
+		helpers.assert_eq(editor_calls, 2, "the paused callback reaches the editor")
 		helpers.assert_eq(#settings.list_user(), 0)
 		helpers.assert_eq(rebuilds, 0)
 		paused = false
@@ -462,7 +461,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 end)
 
 helpers.describe("shared Clone Profile command", function()
-	helpers.it("shared Clone Profile preserves editor refusal, live pause and exact save acknowledgement", function()
+	helpers.it("shared Clone Profile preserves editor refusal, opens while paused and keeps the exact save acknowledgement", function()
 		local ok, err = xpcall(function()
 			local storage_options = {}
 			local storage = PreferencesFixture.new(storage_options)
@@ -509,11 +508,11 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_not_nil(opened.existing)
 			helpers.assert_eq(opened.opts.as_new, true)
 			helpers.assert_eq(#settings.list_user(), 0, "opening the existing native clone draft does not publish it")
+			-- A pause stops typing, not configuration (EDD-1): the row opens while paused.
 			paused = true
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(calls, 2)
 			local profile = { id = opened.opts.profile_id, label = "Cloned", system_single = "Clone {context}", batch = false }
-			-- The open editor's save publishes while paused (EDD-1); only the row refuses.
 			helpers.assert_eq(#settings.list_user(), 0)
 			helpers.assert_eq(refreshes, 0)
 			paused = false
@@ -528,13 +527,13 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_eq(refreshes, 1)
 			accepted = false
 			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(calls, 1, "the already committed menu draft cannot open another editor")
+			helpers.assert_eq(calls, 2, "the already committed menu draft cannot open another editor")
 			helpers.assert_eq(refreshes, 1)
 			helpers.assert_eq(settings.set("active", "basic"), true,
 				"the conditional Clone row requires a real active built-in before rebuilding")
 			local fresh_clone = assert(find(builder.build(context), i18n.get("menu.profiles.clone_builtin")))
 			helpers.assert_eq(fresh_clone.fn(), false, "a fresh row still preserves native editor refusal")
-			helpers.assert_eq(calls, 2)
+			helpers.assert_eq(calls, 3)
 			local Paths = require("infra.paths")
 			local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
 			local manifest = require("core.text.engine.json").decode(file:read("*a"))
@@ -550,7 +549,7 @@ helpers.describe("shared Clone Profile command", function()
 			local changed = find(builder.build(context), i18n.get("button.cancel"))
 			helpers.assert_not_nil(changed, "the real Clone provider must follow only the shared declaration")
 			helpers.assert_eq(changed.fn(), false)
-			helpers.assert_eq(calls, 3)
+			helpers.assert_eq(calls, 4)
 			helpers.assert_eq(refreshes, 1)
 		end, debug.traceback)
 		restore()

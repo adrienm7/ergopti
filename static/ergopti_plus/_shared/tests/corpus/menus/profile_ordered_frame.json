@@ -164,6 +164,8 @@
 			"custom_heading",
 			"custom:user_canonical",
 			"---",
+			"clone",
+			"---",
 			"create",
 			"---",
 			"app_overrides"

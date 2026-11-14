@@ -1,21 +1,13 @@
 --- tests/unit/ui/menu/menu_llm/profiles/test_profiles_manager_edit_delete_pause_gate.lua
 
 --- ==============================================================================
---- MODULE: Regression — custom profile Edit/Delete rows stay clickable while paused (F-MED-12)
+--- MODULE: Regression — custom profile rows while paused (EDD-1)
 --- DESCRIPTION:
---- The custom (user-created) profile submenu has four rows: "Use this profile",
---- "Set shortcut", "Edit…" and "Delete…". The first two correctly gate on the
---- pause flag (disabled = paused or nil, fn = not paused and ... or nil) — but
---- Edit and Delete, added later, carried neither the `disabled` field nor the
---- `not paused` guard on `fn`, so both stayed clickable while the script was
---- paused, unlike every sibling row in the same submenu.
----
---- Fix: gate Edit and Delete the same way the sibling rows already do.
----
---- This test builds the menu with paused=true via ProfilesManager.new(deps,
---- models_mgr).get_menu_item() and asserts the custom profile's Edit and Delete
---- rows are disabled=true — it fails before the fix (disabled is nil) and
---- passes after.
+--- A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12):
+--- a custom profile's Use, Edit and Delete rows stay live while paused, and
+--- only "Set shortcut" waits for resume because it binds a hotkey. F-MED-12
+--- had greyed Edit and Delete under the pause to match their siblings; the
+--- siblings now follow EDD-1 instead.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -68,35 +60,24 @@ local function ensure_real_llm_module()
 	end
 end
 
-helpers.describe("profiles_manager: custom profile Edit/Delete rows are pause-gated (F-MED-12)", function()
-	helpers.it("Edit and Delete rows are disabled=true when paused", function()
+helpers.describe("profiles_manager: custom profile rows while paused (EDD-1)", function()
+	helpers.it("Edit and Delete stay live while paused, the shortcut row waits", function()
 		ensure_real_llm_module()
 		local ProfilesManager = helpers.load_with_stubs("ui.menu.menu_llm.profiles_manager")
 		local i18n = require("infra.i18n")
-		-- The real i18n stub from load_with_stubs returns the key verbatim, so
-		-- we can match on the canonical key strings below.
-
 		local deps = make_deps(true)
 		local mgr = ProfilesManager.new(deps, nil)
 		local root_item = mgr.get_menu_item()
-		helpers.assert_true(type(root_item) == "table" and type(root_item.menu) == "table",
-			"get_menu_item() must return a table with a .menu submenu")
-
 		local custom_row = find_by_title(root_item.menu, "My Custom Profile")
-		helpers.assert_true(custom_row ~= nil, "the custom profile row must be present")
-		helpers.assert_true(type(custom_row.menu) == "table", "the custom profile row must have its own submenu")
-
+		helpers.assert_true(custom_row ~= nil and type(custom_row.menu) == "table",
+			"the custom profile row and its submenu must be present")
 		local edit_row   = find_by_title(custom_row.menu, i18n.get("menu.profiles.edit_profile"))
 		local delete_row = find_by_title(custom_row.menu, i18n.get("menu.profiles.delete_profile"))
-		helpers.assert_true(edit_row ~= nil, "the Edit row must be present in the custom profile submenu")
-		helpers.assert_true(delete_row ~= nil, "the Delete row must be present in the custom profile submenu")
-
-		helpers.assert_eq(edit_row.disabled, true,
-			"the Edit row must be disabled=true when paused, matching its sibling rows (F-MED-12)")
-		helpers.assert_eq(delete_row.disabled, true,
-			"the Delete row must be disabled=true when paused, matching its sibling rows (F-MED-12)")
-		helpers.assert_nil(edit_row.fn, "the Edit row's fn must be nil (not just disabled) while paused")
-		helpers.assert_nil(delete_row.fn, "the Delete row's fn must be nil (not just disabled) while paused")
+		local shortcut_row = find_by_title(custom_row.menu, i18n.get("menu.profiles.shortcut_prefix"))
+		helpers.assert_true(edit_row.disabled ~= true and type(edit_row.fn) == "function", "Edit stays live while paused")
+		helpers.assert_true(delete_row.disabled ~= true and type(delete_row.fn) == "function", "Delete stays live while paused")
+		helpers.assert_eq(shortcut_row.disabled, true, "a shortcut binds a hotkey: it waits for resume")
+		helpers.assert_nil(shortcut_row.fn)
 	end)
 
 	helpers.it("Edit and Delete rows are enabled when not paused (positive control)", function()

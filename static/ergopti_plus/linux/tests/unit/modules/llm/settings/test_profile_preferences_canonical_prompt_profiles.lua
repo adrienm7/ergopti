@@ -677,12 +677,13 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 			helpers.assert_eq(f.redraws(),1)
 		end)
 	end)
-	helpers.it("profile-headings: current native pause still refuses held automatic-profile publication", function()
+	-- A pause stops typing, not configuration (EDD-1).
+	helpers.it("profile-headings: a held automatic-profile check publishes while paused (edd1-paused-writes)", function()
 		with_headings(true,function(f)
 			local _,held=position(f.rows(),"menu.profiles.auto_detect")
 			f.ctx.is_paused=function() return true end
-			helpers.assert_eq(held.fn(),false)
-			f.untouched()
+			helpers.assert_eq(held.fn(),true)
+			helpers.assert_eq(f.settings.get("auto_profile_for_model"),true)
 		end)
 	end)
 end)
