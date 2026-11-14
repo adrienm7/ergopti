@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} означает: {2}.",
 	"dialog.value_check.too_long": "Введите не более {1} символов.",
 	"dialog.value_check.not_allowed": "Выберите одно из предложенных значений.",
+	"dialog.value_check.not_url": "Введите веб-адрес, начинающийся с https:// или http://, без пробелов.",
 	"dialog.value_check.empty": "Введите значение.",
 	"value_check.unit.ms": "миллисекунды",
 	"value_check.unit.s": "секунды",

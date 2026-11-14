@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} פירושו: {2}.",
 	"dialog.value_check.too_long": "הזן לכל היותר {1} תווים.",
 	"dialog.value_check.not_allowed": "בחר אחד מהערכים המוצעים.",
+	"dialog.value_check.not_url": "הזן כתובת אינטרנט שמתחילה ב-https:// או ב-http://, ללא רווחים.",
 	"dialog.value_check.empty": "הזן ערך.",
 	"value_check.unit.ms": "אלפיות שנייה",
 	"value_check.unit.s": "שניות",

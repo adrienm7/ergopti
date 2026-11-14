@@ -42,10 +42,16 @@ const REASONS = [
 	'below_minimum',
 	'above_maximum',
 	'not_allowed',
-	'too_long'
+	'too_long',
+	'not_url'
 ];
 
-const TYPES = ['integer', 'decimal', 'boolean', 'enum', 'string', 'path'];
+const TYPES = ['integer', 'decimal', 'boolean', 'enum', 'string', 'path', 'url'];
+
+// A web address: a lowercase http or https scheme, then at least one
+// character and no ASCII space or control character anywhere, so a stored
+// link never reaches a browser or a shell carrying a line break or a space.
+const URL_TEXT = /^https?:\/\/[^\x00-\x20\x7f]+$/;
 
 // Plain decimal text: an optional sign, digits, an optional fraction.
 const DECIMAL_TEXT = /^[+-]?[0-9]+(?:[.,][0-9]+)?$/;
@@ -132,6 +138,7 @@ function checkValue(entry, value) {
 			if (entry.max_length !== undefined && Array.from(value).length > entry.max_length) {
 				return refusal('too_long', entry);
 			}
+			if (entry.type === 'url' && !URL_TEXT.test(value)) return refusal('not_url', entry);
 			return { ok: true, value };
 		}
 	}
@@ -221,6 +228,8 @@ function messageParts(entry, result) {
 		parts.push({ key: 'dialog.value_check.too_long', args: [entry.max_length] });
 	} else if (result.reason === 'not_allowed') {
 		parts.push({ key: 'dialog.value_check.not_allowed', args: [] });
+	} else if (result.reason === 'not_url') {
+		parts.push({ key: 'dialog.value_check.not_url', args: [] });
 	} else {
 		parts.push({ key: 'dialog.value_check.empty', args: [] });
 	}

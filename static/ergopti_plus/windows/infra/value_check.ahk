@@ -150,13 +150,17 @@ ValueCheckValue(Entry, Value) {
 					return _ValueCheckAdmitted(Value)
 			}
 			return _ValueCheckRefusal("not_allowed", Entry)
-		case "string", "path":
+		case "string", "path", "url":
 			if !(Value is String)
 				return _ValueCheckRefusal("wrong_type", Entry)
 			if (Value == "" && !(Entry.Has("allow_empty") && Entry["allow_empty"]))
 				return _ValueCheckRefusal("empty", Entry)
 			if (Entry.Has("max_length") && _ValueCheckCharCount(Value) > Entry["max_length"])
 				return _ValueCheckRefusal("too_long", Entry)
+			; A lowercase http or https scheme, then no ASCII space or control
+			; character, as the JS and Lua ports read a web address.
+			if (Kind == "url" && !RegExMatch(Value, "^https?://[^\x{00}-\x{20}\x{7F}]+$"))
+				return _ValueCheckRefusal("not_url", Entry)
 			return _ValueCheckAdmitted(Value)
 	}
 	throw ValueError("value_check: unknown declared type " . Kind, -1)
@@ -276,6 +280,8 @@ ValueCheckMessageParts(Entry, Result) {
 		Parts.Push(Map("key", "dialog.value_check.too_long", "args", [Entry["max_length"]]))
 	} else if (Result["reason"] == "not_allowed") {
 		Parts.Push(Map("key", "dialog.value_check.not_allowed", "args", []))
+	} else if (Result["reason"] == "not_url") {
+		Parts.Push(Map("key", "dialog.value_check.not_url", "args", []))
 	} else {
 		Parts.Push(Map("key", "dialog.value_check.empty", "args", []))
 	}

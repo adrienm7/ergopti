@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} betyr {2}.",
 	"dialog.value_check.too_long": "Skriv inn høyst {1} tegn.",
 	"dialog.value_check.not_allowed": "Velg en av de tilbudte verdiene.",
+	"dialog.value_check.not_url": "Skriv inn en nettadresse som starter med https:// eller http://, uten mellomrom.",
 	"dialog.value_check.empty": "Skriv inn en verdi.",
 	"value_check.unit.ms": "millisekunder",
 	"value_check.unit.s": "sekunder",

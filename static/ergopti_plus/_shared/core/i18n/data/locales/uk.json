@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} означає: {2}.",
 	"dialog.value_check.too_long": "Введіть не більше {1} символів.",
 	"dialog.value_check.not_allowed": "Виберіть одне із запропонованих значень.",
+	"dialog.value_check.not_url": "Введіть вебадресу, що починається з https:// або http://, без пробілів.",
 	"dialog.value_check.empty": "Введіть значення.",
 	"value_check.unit.ms": "мілісекунди",
 	"value_check.unit.s": "секунди",

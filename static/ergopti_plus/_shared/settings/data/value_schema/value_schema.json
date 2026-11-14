@@ -256,6 +256,30 @@
 			"unit": "mm",
 			"min": 1,
 			"max": 60
+		},
+		"shortcuts.chatgpt_url": {
+			"file": "config.toml",
+			"type": "url",
+			"max_length": 2048,
+			"default_from": {
+				"manifest": "shortcuts.chatgpt_url"
+			}
+		},
+		"shortcuts.search.search_engine": {
+			"file": "config.toml",
+			"type": "url",
+			"max_length": 2048,
+			"default_from": {
+				"manifest": "shortcuts.search.search_engine"
+			}
+		},
+		"shortcuts.search.search_engine_url_query": {
+			"file": "config.toml",
+			"type": "url",
+			"max_length": 2048,
+			"default_from": {
+				"manifest": "shortcuts.search.search_engine_url_query"
+			}
 		}
 	}
 }

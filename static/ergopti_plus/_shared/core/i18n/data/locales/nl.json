@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} betekent {2}.",
 	"dialog.value_check.too_long": "Voer hoogstens {1} tekens in.",
 	"dialog.value_check.not_allowed": "Kies een van de aangeboden waarden.",
+	"dialog.value_check.not_url": "Voer een webadres in dat begint met https:// of http://, zonder spaties.",
 	"dialog.value_check.empty": "Voer een waarde in.",
 	"value_check.unit.ms": "milliseconden",
 	"value_check.unit.s": "seconden",

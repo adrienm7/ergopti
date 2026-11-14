@@ -581,8 +581,18 @@ function M.build(ctx)
 				i18n.get("dialog.shortcuts.chatgpt_prompt"),
 				state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
 			if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
+				-- The shared value check names what a web address needs.
+				local ValueCheck = require("settings.engine.value_check")
+				local key = ValueCheck.KEY.SHORTCUTS_CHATGPT_URL
+				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), url)
+				if not typed.ok then
+					Logger.warn(LOG, "Typed ChatGPT URL refused (%s).", typed.reason)
+					pcall(dialog.block_alert, i18n.get("dialog.value_check.title"),
+						ValueCheck.refusal_text(key, typed, i18n.get), i18n.get("button.ok"))
+					return false
+				end
 				if type(ctx.commit_chatgpt_url) ~= "function"
-					or ctx.commit_chatgpt_url(url) ~= true then return false end
+					or ctx.commit_chatgpt_url(typed.value) ~= true then return false end
 				ctx.updateMenu()
 			end
 		end or nil

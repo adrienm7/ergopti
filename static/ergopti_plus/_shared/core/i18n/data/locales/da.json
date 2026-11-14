@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} betyder {2}.",
 	"dialog.value_check.too_long": "Indtast højst {1} tegn.",
 	"dialog.value_check.not_allowed": "Vælg en af de tilbudte værdier.",
+	"dialog.value_check.not_url": "Indtast en webadresse, der starter med https:// eller http://, uden mellemrum.",
 	"dialog.value_check.empty": "Indtast en værdi.",
 	"value_check.unit.ms": "millisekunder",
 	"value_check.unit.s": "sekunder",

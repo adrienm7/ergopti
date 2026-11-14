@@ -618,6 +618,7 @@
 			"not_json",
 			"not_running",
 			"not_swept",
+			"not_url",
 			"observer_failed",
 			"off",
 			"ok",

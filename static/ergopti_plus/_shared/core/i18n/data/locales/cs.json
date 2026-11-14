@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} znamená: {2}.",
 	"dialog.value_check.too_long": "Zadejte nejvýše {1} znaků.",
 	"dialog.value_check.not_allowed": "Vyberte jednu z nabízených hodnot.",
+	"dialog.value_check.not_url": "Zadejte webovou adresu, která začíná https:// nebo http://, bez mezer.",
 	"dialog.value_check.empty": "Zadejte hodnotu.",
 	"value_check.unit.ms": "milisekundy",
 	"value_check.unit.s": "sekundy",

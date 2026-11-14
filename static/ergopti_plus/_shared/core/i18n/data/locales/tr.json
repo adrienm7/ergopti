@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1}: {2}.",
 	"dialog.value_check.too_long": "En fazla {1} karakter girin.",
 	"dialog.value_check.not_allowed": "Sunulan değerlerden birini seçin.",
+	"dialog.value_check.not_url": "https:// veya http:// ile başlayan, boşluk içermeyen bir web adresi girin.",
 	"dialog.value_check.empty": "Bir değer girin.",
 	"value_check.unit.ms": "milisaniye",
 	"value_check.unit.s": "saniye",

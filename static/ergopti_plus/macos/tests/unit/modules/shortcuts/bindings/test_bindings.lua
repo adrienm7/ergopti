@@ -411,6 +411,17 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 		B.set_chatgpt_url("")
 		helpers.assert_eq(B.get_chatgpt_url(), B.DEFAULT_CHATGPT_URL)
 	end)
+
+	helpers.it("refuses a URL its value schema declaration refuses and keeps the current one", function()
+		local B = fresh_bindings()
+		local configured_url = "https://chatgpt.example.test/configured"
+		helpers.assert_eq(B.set_chatgpt_url(configured_url), true)
+		for _, refused in ipairs({ "file:///etc/passwd", "javascript:alert(1)", "https://bad url",
+			"https://line\nbreak", 42, "https://example.test/" .. string.rep("a", 2048) }) do
+			helpers.assert_eq(B.set_chatgpt_url(refused), false, tostring(refused))
+			helpers.assert_eq(B.get_chatgpt_url(), configured_url)
+		end
+	end)
 end)
 
 

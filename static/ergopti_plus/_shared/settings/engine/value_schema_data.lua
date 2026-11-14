@@ -26,6 +26,9 @@ return {
 		["LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS"] = "llm.trigger.min_request_interval_ms",
 		["MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS"] = "mod_combos.simultaneous_threshold_ms",
 		["SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS"] = "shortcuts.caps_word.idle_timeout_seconds",
+		["SHORTCUTS_CHATGPT_URL"] = "shortcuts.chatgpt_url",
+		["SHORTCUTS_SEARCH_SEARCH_ENGINE"] = "shortcuts.search.search_engine",
+		["SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY"] = "shortcuts.search.search_engine_url_query",
 		["TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS"] = "tap_holds.lone_modifier_tap_max_ms",
 		["TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS"] = "tap_hold.keys.*.time_activation_seconds",
 		["TAP_HOLD_TIME_ACTIVATION_SECONDS"] = "tap_hold.time_activation_seconds",
@@ -227,6 +230,30 @@ return {
 			} },
 			["type"] = "decimal",
 			["unit"] = "s",
+		},
+		["shortcuts.chatgpt_url"] = {
+			["default_from"] = {
+				["manifest"] = "shortcuts.chatgpt_url",
+			},
+			["file"] = "config.toml",
+			["max_length"] = 2048,
+			["type"] = "url",
+		},
+		["shortcuts.search.search_engine"] = {
+			["default_from"] = {
+				["manifest"] = "shortcuts.search.search_engine",
+			},
+			["file"] = "config.toml",
+			["max_length"] = 2048,
+			["type"] = "url",
+		},
+		["shortcuts.search.search_engine_url_query"] = {
+			["default_from"] = {
+				["manifest"] = "shortcuts.search.search_engine_url_query",
+			},
+			["file"] = "config.toml",
+			["max_length"] = 2048,
+			["type"] = "url",
 		},
 		["tap_hold.keys.*.time_activation_seconds"] = {
 			["entry_scale"] = 1000,

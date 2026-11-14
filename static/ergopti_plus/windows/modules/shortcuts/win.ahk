@@ -10,6 +10,8 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 
 
@@ -312,7 +314,10 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, Pat
 		Kind := Target["kind"]
 		Value := Target["target"]
 		if (Kind == "empty") {
-				try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine"])
+				; A search address its shared value schema declaration refuses
+				; throws before the launch and is logged below.
+				try LaunchFn.Call(ValueCheckRequire(ConfigKey.SHORTCUTS_SEARCH_SEARCH_ENGINE,
+						Features["shortcuts"][ConfigLeaf.SEARCH][ConfigLeaf.SEARCH_ENGINE]))
 				catch as SearchError {
 						LoggerWarn("Search", "Could not open search engine: {1}.", SearchError.Message)
 				}
@@ -321,7 +326,8 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, Pat
 		if (Kind == "search") {
 				; Preserve the existing CRLF-to-space selection policy, then encode one component.
 				Query := UriEncode(StrReplace(Value, "`r`n", " "))
-				try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine_url_query"] . Query)
+				try LaunchFn.Call(ValueCheckRequire(ConfigKey.SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY,
+						Features["shortcuts"][ConfigLeaf.SEARCH][ConfigLeaf.SEARCH_ENGINE_URL_QUERY]) . Query)
 				catch as SearchError {
 						LoggerWarn("Search", "Could not open search URL: {1}.", SearchError.Message)
 				}

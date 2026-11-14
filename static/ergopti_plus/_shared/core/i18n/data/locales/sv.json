@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} betyder {2}.",
 	"dialog.value_check.too_long": "Ange högst {1} tecken.",
 	"dialog.value_check.not_allowed": "Välj ett av de erbjudna värdena.",
+	"dialog.value_check.not_url": "Ange en webbadress som börjar med https:// eller http://, utan mellanslag.",
 	"dialog.value_check.empty": "Ange ett värde.",
 	"value_check.unit.ms": "millisekunder",
 	"value_check.unit.s": "sekunder",

@@ -21,6 +21,8 @@
 		"trigger": { "type": "string", "max_length": 1 },
 		"optional_url": { "type": "string", "allow_empty": true, "max_length": 2048 },
 		"folder": { "type": "path" },
+		"web_url": { "type": "url", "max_length": 2048 },
+		"short_url": { "type": "url", "max_length": 12 },
 		"delay_seconds": {
 			"type": "decimal",
 			"unit": "s",
@@ -180,7 +182,91 @@
 			"reason": "wrong_type"
 		},
 		{ "id": "path-plain", "declaration": "folder", "value": "/home/a/Ergopti", "ok": true },
-		{ "id": "path-empty", "declaration": "folder", "value": "", "ok": false, "reason": "empty" }
+		{ "id": "path-empty", "declaration": "folder", "value": "", "ok": false, "reason": "empty" },
+		{ "id": "url-https", "declaration": "web_url", "value": "https://chatgpt.com/", "ok": true },
+		{
+			"id": "url-http-port-query",
+			"declaration": "web_url",
+			"value": "http://localhost:8080/search?q=",
+			"ok": true
+		},
+		{
+			"id": "url-non-ascii-path",
+			"declaration": "web_url",
+			"value": "https://exemple.fr/été",
+			"ok": true
+		},
+		{
+			"id": "url-scheme-only",
+			"declaration": "web_url",
+			"value": "https://",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-uppercase-scheme",
+			"declaration": "web_url",
+			"value": "HTTPS://exemple.fr",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-inner-space",
+			"declaration": "web_url",
+			"value": "https://exemple.fr/a b",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-line-break",
+			"declaration": "web_url",
+			"value": "https://exemple.fr/\nrm",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-tab",
+			"declaration": "web_url",
+			"value": "https://exemple.fr/\t",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-delete-char",
+			"declaration": "web_url",
+			"value": "https://exemple.fr/",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-file-scheme",
+			"declaration": "web_url",
+			"value": "file:///etc/passwd",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "url-script-scheme",
+			"declaration": "web_url",
+			"value": "javascript:alert(1)",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{ "id": "url-empty", "declaration": "web_url", "value": "", "ok": false, "reason": "empty" },
+		{
+			"id": "url-number",
+			"declaration": "web_url",
+			"value": 5,
+			"ok": false,
+			"reason": "wrong_type"
+		},
+		{
+			"id": "url-too-long",
+			"declaration": "short_url",
+			"value": "https://a.bc/d",
+			"ok": false,
+			"reason": "too_long"
+		}
 	],
 	"entry": [
 		{
@@ -420,6 +506,27 @@
 			"reason": "not_integer",
 			"min": 1,
 			"max": 10000
+		},
+		{
+			"id": "entry-url-trimmed",
+			"declaration": "web_url",
+			"text": "  https://exemple.fr/ ",
+			"ok": true,
+			"value": "https://exemple.fr/"
+		},
+		{
+			"id": "entry-url-without-scheme",
+			"declaration": "web_url",
+			"text": "exemple.fr",
+			"ok": false,
+			"reason": "not_url"
+		},
+		{
+			"id": "entry-url-blank",
+			"declaration": "web_url",
+			"text": "   ",
+			"ok": false,
+			"reason": "empty"
 		}
 	],
 	"messages": [
@@ -469,6 +576,12 @@
 			"declaration": "folder",
 			"text": "",
 			"parts": [{ "key": "dialog.value_check.empty", "args": [] }]
+		},
+		{
+			"id": "message-not-url",
+			"declaration": "web_url",
+			"text": "exemple.fr",
+			"parts": [{ "key": "dialog.value_check.not_url", "args": [] }]
 		}
 	]
 }
