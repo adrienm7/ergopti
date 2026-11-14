@@ -19,10 +19,10 @@
 			"download_api": "URLDownloadToFile|DownloadFile|Invoke-WebRequest|Invoke-RestMethod"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 16 },
-			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 15 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 2 },
 			"elevated_run": { "pattern": "\\*RunAs", "max": 3 },
-			"powershell_mentions": { "pattern": "powershell", "max": 52 },
+			"powershell_mentions": { "pattern": "powershell", "max": 46 },
 			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
 			"key_state_polling": {
 				"pattern": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
