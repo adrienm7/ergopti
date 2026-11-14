@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "对紧凑键盘的适应性",
 	"layout_analysis.metric.char_coverage": "字符覆盖率",
 	"layout_analysis.metric.direct_digits": "直接输入的数字",
-	"layout_analysis.metric.shortcut_left": "左手快捷键"
+	"layout_analysis.metric.shortcut_left": "左手快捷键",
+	"layout_analysis.details.heatmap": "按键热力图",
+	"layout_analysis.heat.presses": "击键",
+	"layout_analysis.heat.scissors": "剪刀（完全与半）",
+	"layout_analysis.heat.sfb": "同指连击（SFB）",
+	"layout_analysis.heat.sfs": "同指隔字（SFS）",
+	"layout_analysis.heat.lsb": "横向伸展（LSB）",
+	"layout_analysis.heat.redirect": "方向变换"
 }

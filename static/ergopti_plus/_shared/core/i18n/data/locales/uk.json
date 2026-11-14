@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Придатність для компактних клавіатур",
 	"layout_analysis.metric.char_coverage": "Охоплення символів",
 	"layout_analysis.metric.direct_digits": "Цифри з прямим доступом",
-	"layout_analysis.metric.shortcut_left": "Сполучення під лівою рукою"
+	"layout_analysis.metric.shortcut_left": "Сполучення під лівою рукою",
+	"layout_analysis.details.heatmap": "Теплова карта клавіш",
+	"layout_analysis.heat.presses": "Натискання",
+	"layout_analysis.heat.scissors": "Ножиці (повні та пів-)",
+	"layout_analysis.heat.sfb": "Біграми одним пальцем (SFB)",
+	"layout_analysis.heat.sfs": "Скіпграми одним пальцем (SFS)",
+	"layout_analysis.heat.lsb": "Бічні розтяжки (LSB)",
+	"layout_analysis.heat.redirect": "Зміни напрямку"
 }

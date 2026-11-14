@@ -278,12 +278,31 @@ body {
 	border: 1px solid var(--la-border);
 	border-radius: 8px;
 	margin-top: 16px;
+	overflow-x: auto;
 	padding: 12px;
 }
 
 .la-details .la-table th {
 	font-weight: normal;
 	text-align: left;
+}
+
+.la-heatmap {
+	margin: 8px 0;
+	max-width: 100%;
+	position: relative;
+}
+
+.la-key {
+	align-items: center;
+	border-radius: 6px;
+	color: var(--theme-bg);
+	cursor: default;
+	display: flex;
+	font-weight: 600;
+	height: 40px;
+	justify-content: center;
+	position: absolute;
 }
 
 .la-weight-list {

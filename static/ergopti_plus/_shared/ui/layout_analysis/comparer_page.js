@@ -52,6 +52,8 @@
 	// Layouts ticked on a first visit: the registry and the two references.
 	const DEFAULT_ORIGINS = ['registry', 'reference'];
 	const CHART_MAX_BARS = 40;
+	// Size of one key unit of the heatmap, in pixels.
+	const HEAT_UNIT_PX = 44;
 	const TEXT_DEBOUNCE_MS = 400;
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
@@ -142,6 +144,7 @@
 		tables: null,
 		results: [],
 		sort: { key: 'rank', descending: false },
+		heat: 'presses',
 		details: null
 	};
 	if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined)
@@ -369,6 +372,46 @@
 		}
 	}
 
+	/**
+	 * The board of the chosen keyboard, each key showing the layout's base
+	 * character and coloured from green to red by its share of the chosen
+	 * per-key value (presses or a bad event); the tooltip gives the value and,
+	 * for SFBs, the worst partners.
+	 */
+	function renderHeatmap(result) {
+		const box = $('la-heatmap');
+		box.replaceChildren();
+		const board = E.keyboard(result.keyboard);
+		const layout = byId.get(result.layout.id);
+		const modifiers = new Set(Object.values(DATA.model.modifier_keys));
+		const values = board.codes.map((code) => result.keys[code][state.heat]);
+		const max = Math.max(...values, 1e-9);
+		const minX = Math.min(...board.x) - 0.5;
+		const maxX = Math.max(...board.x) + 0.5;
+		const maxY = Math.max(...board.y);
+		box.style.width = `${(maxX - minX) * HEAT_UNIT_PX}px`;
+		box.style.height = `${maxY * HEAT_UNIT_PX}px`;
+		board.codes.forEach((code, k) => {
+			if (modifiers.has(code)) return;
+			const row = layout.rows[code];
+			const base = row && typeof row[0] === 'string' ? row[0] : row && row[0] ? '◌' : '';
+			const key = el('span', 'la-key', code === 'Space' ? '␣' : base);
+			const share = values[k] / max;
+			key.style.left = `${(board.x[k] - 0.5 - minX) * HEAT_UNIT_PX}px`;
+			key.style.top = `${(board.y[k] - 1) * HEAT_UNIT_PX}px`;
+			key.style.width = `${(code === 'Space' ? 6 : 1) * HEAT_UNIT_PX - 4}px`;
+			if (code === 'Space') key.style.left = `${(board.x[k] - 3 - minX) * HEAT_UNIT_PX}px`;
+			key.style.background = `color-mix(in srgb, var(--la-bad) ${Math.round(share * 100)}%, var(--la-good))`;
+			const partners = (result.keys[code].sfbWith || [])
+				.map(([other, pct]) => `${(layout.rows[other] || [''])[0] || other} ${format(pct, 2)} %`)
+				.join(', ');
+			key.title = `${t(`heat.${state.heat}`)}: ${format(values[k], 2)} %${
+				state.heat === 'sfb' && partners ? ` (${partners})` : ''
+			}`;
+			box.append(key);
+		});
+	}
+
 	/** One layout's contributions, finger load and every metric. */
 	function renderDetails() {
 		const section = $('la-details');
@@ -379,6 +422,7 @@
 			layout: result.layout.name,
 			rank: result.rank
 		});
+		renderHeatmap(result);
 		const contributions = Object.entries(result.score.contributions)
 			.filter(([, v]) => v !== 0)
 			.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -532,6 +576,10 @@
 			}
 		});
 		$('la-filter').addEventListener('input', fillLayouts);
+		$('la-heat-metric').addEventListener('change', (event) => {
+			state.heat = event.target.value;
+			renderDetails();
+		});
 		$('la-all').addEventListener('click', () => {
 			for (const id of visibleLayoutIds()) state.selected.add(id);
 			save();

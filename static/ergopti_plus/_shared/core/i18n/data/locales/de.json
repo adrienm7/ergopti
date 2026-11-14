@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Eignung für kompakte Tastaturen",
 	"layout_analysis.metric.char_coverage": "Zeichenabdeckung",
 	"layout_analysis.metric.direct_digits": "Ziffern direkt erreichbar",
-	"layout_analysis.metric.shortcut_left": "Tastenkürzel links"
+	"layout_analysis.metric.shortcut_left": "Tastenkürzel links",
+	"layout_analysis.details.heatmap": "Tasten-Heatmap",
+	"layout_analysis.heat.presses": "Tastenanschläge",
+	"layout_analysis.heat.scissors": "Scheren (volle und halbe)",
+	"layout_analysis.heat.sfb": "Gleichfinger-Bigramme (SFB)",
+	"layout_analysis.heat.sfs": "Gleichfinger-Skipgramme (SFS)",
+	"layout_analysis.heat.lsb": "Seitliche Streckungen (LSB)",
+	"layout_analysis.heat.redirect": "Richtungswechsel"
 }

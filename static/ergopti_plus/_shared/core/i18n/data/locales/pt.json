@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Adequação a teclados compactos",
 	"layout_analysis.metric.char_coverage": "Cobertura de caracteres",
 	"layout_analysis.metric.direct_digits": "Algarismos de acesso direto",
-	"layout_analysis.metric.shortcut_left": "Atalhos na mão esquerda"
+	"layout_analysis.metric.shortcut_left": "Atalhos na mão esquerda",
+	"layout_analysis.details.heatmap": "Mapa de calor das teclas",
+	"layout_analysis.heat.presses": "Toques",
+	"layout_analysis.heat.scissors": "Tesouras (completas e meias)",
+	"layout_analysis.heat.sfb": "Bigramas do mesmo dedo (SFB)",
+	"layout_analysis.heat.sfs": "Skipgramas do mesmo dedo (SFS)",
+	"layout_analysis.heat.lsb": "Esticões laterais (LSB)",
+	"layout_analysis.heat.redirect": "Redirecionamentos"
 }

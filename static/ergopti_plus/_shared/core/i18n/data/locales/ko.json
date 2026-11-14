@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "소형 키보드 적합성",
 	"layout_analysis.metric.char_coverage": "문자 범위",
 	"layout_analysis.metric.direct_digits": "바로 입력하는 숫자",
-	"layout_analysis.metric.shortcut_left": "왼손 단축키"
+	"layout_analysis.metric.shortcut_left": "왼손 단축키",
+	"layout_analysis.details.heatmap": "키 히트맵",
+	"layout_analysis.heat.presses": "키 입력",
+	"layout_analysis.heat.scissors": "가위(완전 및 반)",
+	"layout_analysis.heat.sfb": "같은 손가락 연타(SFB)",
+	"layout_analysis.heat.sfs": "같은 손가락 건너뛰기(SFS)",
+	"layout_analysis.heat.lsb": "옆으로 뻗기(LSB)",
+	"layout_analysis.heat.redirect": "방향 전환"
 }

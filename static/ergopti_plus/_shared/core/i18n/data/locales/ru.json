@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Пригодность для компактных клавиатур",
 	"layout_analysis.metric.char_coverage": "Охват символов",
 	"layout_analysis.metric.direct_digits": "Цифры с прямым доступом",
-	"layout_analysis.metric.shortcut_left": "Сочетания под левой рукой"
+	"layout_analysis.metric.shortcut_left": "Сочетания под левой рукой",
+	"layout_analysis.details.heatmap": "Тепловая карта клавиш",
+	"layout_analysis.heat.presses": "Нажатия",
+	"layout_analysis.heat.scissors": "Ножницы (полные и полу-)",
+	"layout_analysis.heat.sfb": "Биграммы одним пальцем (SFB)",
+	"layout_analysis.heat.sfs": "Скипграммы одним пальцем (SFS)",
+	"layout_analysis.heat.lsb": "Боковые растяжки (LSB)",
+	"layout_analysis.heat.redirect": "Смены направления"
 }

@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Lämplighet för kompakta tangentbord",
 	"layout_analysis.metric.char_coverage": "Teckentäckning",
 	"layout_analysis.metric.direct_digits": "Siffror med direkt åtkomst",
-	"layout_analysis.metric.shortcut_left": "Kortkommandon med vänster hand"
+	"layout_analysis.metric.shortcut_left": "Kortkommandon med vänster hand",
+	"layout_analysis.details.heatmap": "Värmekarta över tangenterna",
+	"layout_analysis.heat.presses": "Tangenttryck",
+	"layout_analysis.heat.scissors": "Saxar (hela och halva)",
+	"layout_analysis.heat.sfb": "Bigram med samma finger (SFB)",
+	"layout_analysis.heat.sfs": "Skipgram med samma finger (SFS)",
+	"layout_analysis.heat.lsb": "Sidledes sträckningar (LSB)",
+	"layout_analysis.heat.redirect": "Riktningsbyten"
 }

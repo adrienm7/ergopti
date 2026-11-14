@@ -79,6 +79,16 @@
 
 			<section id="la-details" class="la-details" hidden>
 				<h2 id="la-details-title"></h2>
+				<h3 data-i18n="layout_analysis.details.heatmap"></h3>
+				<select id="la-heat-metric" data-i18n-option-prefix="layout_analysis.heat">
+					<option value="presses"></option>
+					<option value="sfb"></option>
+					<option value="sfs"></option>
+					<option value="lsb"></option>
+					<option value="scissors"></option>
+					<option value="redirect"></option>
+				</select>
+				<div id="la-heatmap" class="la-heatmap"></div>
 				<h3 data-i18n="layout_analysis.details.contributions"></h3>
 				<div id="la-contributions" class="la-bars"></div>
 				<h3 data-i18n="layout_analysis.details.fingers"></h3>

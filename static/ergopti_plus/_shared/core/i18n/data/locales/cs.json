@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Vhodnost pro kompaktní klávesnice",
 	"layout_analysis.metric.char_coverage": "Pokrytí znaků",
 	"layout_analysis.metric.direct_digits": "Číslice s přímým přístupem",
-	"layout_analysis.metric.shortcut_left": "Zkratky pod levou rukou"
+	"layout_analysis.metric.shortcut_left": "Zkratky pod levou rukou",
+	"layout_analysis.details.heatmap": "Tepelná mapa kláves",
+	"layout_analysis.heat.presses": "Stisky",
+	"layout_analysis.heat.scissors": "Nůžky (plné a poloviční)",
+	"layout_analysis.heat.sfb": "Bigramy stejným prstem (SFB)",
+	"layout_analysis.heat.sfs": "Skipgramy stejným prstem (SFS)",
+	"layout_analysis.heat.lsb": "Boční natažení (LSB)",
+	"layout_analysis.heat.redirect": "Změny směru"
 }

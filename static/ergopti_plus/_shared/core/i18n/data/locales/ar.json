@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "الملاءمة للوحات المفاتيح المدمجة",
 	"layout_analysis.metric.char_coverage": "تغطية الأحرف",
 	"layout_analysis.metric.direct_digits": "أرقام بوصول مباشر",
-	"layout_analysis.metric.shortcut_left": "اختصارات باليد اليسرى"
+	"layout_analysis.metric.shortcut_left": "اختصارات باليد اليسرى",
+	"layout_analysis.details.heatmap": "خريطة حرارية للمفاتيح",
+	"layout_analysis.heat.presses": "ضغطات المفاتيح",
+	"layout_analysis.heat.scissors": "المقصات (الكاملة والنصفية)",
+	"layout_analysis.heat.sfb": "ثنائيات بالإصبع نفسه (SFB)",
+	"layout_analysis.heat.sfs": "ثنائيات متخطية بالإصبع نفسه (SFS)",
+	"layout_analysis.heat.lsb": "تمدّدات جانبية (LSB)",
+	"layout_analysis.heat.redirect": "تغييرات الاتجاه"
 }

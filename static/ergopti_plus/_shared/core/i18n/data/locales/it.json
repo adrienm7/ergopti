@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Adattamento alle tastiere compatte",
 	"layout_analysis.metric.char_coverage": "Copertura dei caratteri",
 	"layout_analysis.metric.direct_digits": "Cifre ad accesso diretto",
-	"layout_analysis.metric.shortcut_left": "Scorciatoie con la mano sinistra"
+	"layout_analysis.metric.shortcut_left": "Scorciatoie con la mano sinistra",
+	"layout_analysis.details.heatmap": "Mappa di calore dei tasti",
+	"layout_analysis.heat.presses": "Battute",
+	"layout_analysis.heat.scissors": "Forbici (complete e mezze)",
+	"layout_analysis.heat.sfb": "Bigrammi con lo stesso dito (SFB)",
+	"layout_analysis.heat.sfs": "Skipgrammi con lo stesso dito (SFS)",
+	"layout_analysis.heat.lsb": "Allungamenti laterali (LSB)",
+	"layout_analysis.heat.redirect": "Reindirizzamenti"
 }

@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Kompakt klavyelere uygunluk",
 	"layout_analysis.metric.char_coverage": "Karakter kapsamı",
 	"layout_analysis.metric.direct_digits": "Doğrudan erişilen rakamlar",
-	"layout_analysis.metric.shortcut_left": "Sol eldeki kısayollar"
+	"layout_analysis.metric.shortcut_left": "Sol eldeki kısayollar",
+	"layout_analysis.details.heatmap": "Tuş ısı haritası",
+	"layout_analysis.heat.presses": "Tuş basışları",
+	"layout_analysis.heat.scissors": "Makaslar (tam ve yarım)",
+	"layout_analysis.heat.sfb": "Aynı parmakla bigramlar (SFB)",
+	"layout_analysis.heat.sfs": "Aynı parmakla atlamalı ikililer (SFS)",
+	"layout_analysis.heat.lsb": "Yanal uzanmalar (LSB)",
+	"layout_analysis.heat.redirect": "Yön değiştirmeler"
 }

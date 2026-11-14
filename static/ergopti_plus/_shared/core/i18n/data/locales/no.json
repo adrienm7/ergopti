@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Egnethet for kompakte tastaturer",
 	"layout_analysis.metric.char_coverage": "Tegndekning",
 	"layout_analysis.metric.direct_digits": "Sifre med direkte tilgang",
-	"layout_analysis.metric.shortcut_left": "Snarveier med venstre hånd"
+	"layout_analysis.metric.shortcut_left": "Snarveier med venstre hånd",
+	"layout_analysis.details.heatmap": "Varmekart over tastene",
+	"layout_analysis.heat.presses": "Tastetrykk",
+	"layout_analysis.heat.scissors": "Sakser (hele og halve)",
+	"layout_analysis.heat.sfb": "Bigrammer med samme finger (SFB)",
+	"layout_analysis.heat.sfs": "Skipgrammer med samme finger (SFS)",
+	"layout_analysis.heat.lsb": "Sideveis strekk (LSB)",
+	"layout_analysis.heat.redirect": "Retningsskift"
 }

@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "コンパクトキーボードへの適合",
 	"layout_analysis.metric.char_coverage": "文字の網羅率",
 	"layout_analysis.metric.direct_digits": "直接入力できる数字",
-	"layout_analysis.metric.shortcut_left": "左手のショートカット"
+	"layout_analysis.metric.shortcut_left": "左手のショートカット",
+	"layout_analysis.details.heatmap": "キーのヒートマップ",
+	"layout_analysis.heat.presses": "打鍵数",
+	"layout_analysis.heat.scissors": "シザー（完全とハーフ）",
+	"layout_analysis.heat.sfb": "同指連続（SFB）",
+	"layout_analysis.heat.sfs": "同指スキップ（SFS）",
+	"layout_analysis.heat.lsb": "横方向の伸び（LSB）",
+	"layout_analysis.heat.redirect": "方向転換"
 }

@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Geschiktheid voor compacte toetsenborden",
 	"layout_analysis.metric.char_coverage": "Tekendekking",
 	"layout_analysis.metric.direct_digits": "Cijfers direct bereikbaar",
-	"layout_analysis.metric.shortcut_left": "Sneltoetsen aan de linkerhand"
+	"layout_analysis.metric.shortcut_left": "Sneltoetsen aan de linkerhand",
+	"layout_analysis.details.heatmap": "Warmtekaart van de toetsen",
+	"layout_analysis.heat.presses": "Aanslagen",
+	"layout_analysis.heat.scissors": "Scharen (vol en half)",
+	"layout_analysis.heat.sfb": "Bigrammen met dezelfde vinger (SFB)",
+	"layout_analysis.heat.sfs": "Skipgrammen met dezelfde vinger (SFS)",
+	"layout_analysis.heat.lsb": "Zijwaartse strekkingen (LSB)",
+	"layout_analysis.heat.redirect": "Richtingswissels"
 }

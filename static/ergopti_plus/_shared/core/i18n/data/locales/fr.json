@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Adaptation aux claviers compacts",
 	"layout_analysis.metric.char_coverage": "Couverture des caractères",
 	"layout_analysis.metric.direct_digits": "Chiffres en accès direct",
-	"layout_analysis.metric.shortcut_left": "Raccourcis à la main gauche"
+	"layout_analysis.metric.shortcut_left": "Raccourcis à la main gauche",
+	"layout_analysis.details.heatmap": "Carte thermique des touches",
+	"layout_analysis.heat.presses": "Frappes",
+	"layout_analysis.heat.scissors": "Ciseaux (complets et demi)",
+	"layout_analysis.heat.sfb": "Bigrammes de même doigt (SFB)",
+	"layout_analysis.heat.sfs": "Skipgrammes de même doigt (SFS)",
+	"layout_analysis.heat.lsb": "Extensions latérales (LSB)",
+	"layout_analysis.heat.redirect": "Redirections"
 }

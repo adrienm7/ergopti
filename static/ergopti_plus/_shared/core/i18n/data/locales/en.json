@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Compact keyboard fitness",
 	"layout_analysis.metric.char_coverage": "Character coverage",
 	"layout_analysis.metric.direct_digits": "Direct digits",
-	"layout_analysis.metric.shortcut_left": "Shortcuts on the left hand"
+	"layout_analysis.metric.shortcut_left": "Shortcuts on the left hand",
+	"layout_analysis.details.heatmap": "Key heatmap",
+	"layout_analysis.heat.presses": "Key presses",
+	"layout_analysis.heat.scissors": "Scissors (full and half)",
+	"layout_analysis.heat.sfb": "Same-finger bigrams (SFB)",
+	"layout_analysis.heat.sfs": "Same-finger skipgrams (SFS)",
+	"layout_analysis.heat.lsb": "Lateral stretches (LSB)",
+	"layout_analysis.heat.redirect": "Redirects"
 }

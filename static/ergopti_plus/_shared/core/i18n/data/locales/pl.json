@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "Przydatność dla kompaktowych klawiatur",
 	"layout_analysis.metric.char_coverage": "Pokrycie znaków",
 	"layout_analysis.metric.direct_digits": "Cyfry z bezpośrednim dostępem",
-	"layout_analysis.metric.shortcut_left": "Skróty pod lewą ręką"
+	"layout_analysis.metric.shortcut_left": "Skróty pod lewą ręką",
+	"layout_analysis.details.heatmap": "Mapa cieplna klawiszy",
+	"layout_analysis.heat.presses": "Naciśnięcia",
+	"layout_analysis.heat.scissors": "Nożyce (pełne i półnożyce)",
+	"layout_analysis.heat.sfb": "Bigramy tym samym palcem (SFB)",
+	"layout_analysis.heat.sfs": "Skipgramy tym samym palcem (SFS)",
+	"layout_analysis.heat.lsb": "Rozciągnięcia boczne (LSB)",
+	"layout_analysis.heat.redirect": "Zmiany kierunku"
 }

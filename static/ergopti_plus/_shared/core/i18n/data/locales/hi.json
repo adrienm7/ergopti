@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "कॉम्पैक्ट कीबोर्ड के लिए उपयुक्तता",
 	"layout_analysis.metric.char_coverage": "अक्षर कवरेज",
 	"layout_analysis.metric.direct_digits": "सीधे टाइप होने वाले अंक",
-	"layout_analysis.metric.shortcut_left": "बाएँ हाथ के शॉर्टकट"
+	"layout_analysis.metric.shortcut_left": "बाएँ हाथ के शॉर्टकट",
+	"layout_analysis.details.heatmap": "कुंजी हीटमैप",
+	"layout_analysis.heat.presses": "कुंजी दबाव",
+	"layout_analysis.heat.scissors": "कैंचियाँ (पूरी और आधी)",
+	"layout_analysis.heat.sfb": "एक ही उँगली के द्विवर्ण (SFB)",
+	"layout_analysis.heat.sfs": "एक ही उँगली के स्किपग्राम (SFS)",
+	"layout_analysis.heat.lsb": "पार्श्व खिंचाव (LSB)",
+	"layout_analysis.heat.redirect": "दिशा परिवर्तन"
 }

@@ -4446,5 +4446,12 @@
 	"layout_analysis.metric.compact_fit": "התאמה למקלדות קומפקטיות",
 	"layout_analysis.metric.char_coverage": "כיסוי תווים",
 	"layout_analysis.metric.direct_digits": "ספרות בגישה ישירה",
-	"layout_analysis.metric.shortcut_left": "קיצורים ביד שמאל"
+	"layout_analysis.metric.shortcut_left": "קיצורים ביד שמאל",
+	"layout_analysis.details.heatmap": "מפת חום של המקשים",
+	"layout_analysis.heat.presses": "הקשות",
+	"layout_analysis.heat.scissors": "מספריים (מלאים וחצאיים)",
+	"layout_analysis.heat.sfb": "ביגרמות באותה אצבע (SFB)",
+	"layout_analysis.heat.sfs": "סקיפגרמות באותה אצבע (SFS)",
+	"layout_analysis.heat.lsb": "מתיחות צידיות (LSB)",
+	"layout_analysis.heat.redirect": "שינויי כיוון"
 }
