@@ -2364,9 +2364,11 @@ function scanFile(file, text, ctx) {
 			);
 			if (owners.length !== 1) continue;
 			const target = map.get(owners[0]);
-			if (!target || target === owners[0]) continue;
+			if (!target) continue;
+			// After the step the name must still find one file: the renamed one,
+			// or the unmoved one that another file's new name would now shadow
+			// (S10 named core/text/engine/utils.ahk like shortcuts/utils.ahk).
 			const fresh = target.slice(target.lastIndexOf('/') + 1);
-			if (fresh === m[1]) continue;
 			const sharing = [...map.values()].filter(
 				(t) =>
 					t &&
@@ -2378,6 +2380,7 @@ function scanFile(file, text, ctx) {
 				add('dir-split', m[0], '(split)', { oldRepo: `${PREFIX}${owners[0]}` });
 				continue;
 			}
+			if (fresh === m[1]) continue;
 			add('lua-module-quoted', m[0], m[0].replace(`"${m[1]}"`, `"${fresh}"`), {
 				oldRepo: `${PREFIX}${owners[0]}`,
 				newRepo: `${PREFIX}${target}`
