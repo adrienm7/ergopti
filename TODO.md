@@ -1352,9 +1352,9 @@ Each closes on a named green hosted or native run, recorded here.
 The questions answered on 2026-11-13 (OSM-002, the coordinator's decisions of 2026-11-11 and 2026-11-12) are
 under « Maintainer decisions of 2026-11-13, to implement » at the top.
 
-- [ ] **For the maintainer: name the in-app layout editor window Ergopti Studio?** The site now presents Ergopti as
-      the project and its three products (Disposition Ergopti, Ergopti+, Ergopti Studio); the editor page moved to
-      `/studio` (`/editeur` redirects there) and the menu reads « Studio » (2026-11-14). The ErgoptiPlus window and
-      menus that open the same editor keep their current names, out of that change's scope. Also open: the site
-      header still reads « Disposition clavier Ergopti » (left as is by the agent on 2026-11-14, to review by the
-      maintainer).
+- [x] **Name the in-app layout editor window Ergopti Studio?** Answered by the maintainer on 2026-11-14: yes, under
+      « Ergopti Studio inside Ergopti+ » (window and menu row « Ergopti Studio », 21 locales). The site already
+      presents Ergopti as the project with its three products, moved the editor page to `/studio` (`/editeur`
+      redirects there) and reads « Studio » in its menu.
+- [ ] **For the maintainer: the site header still reads « Disposition clavier Ergopti ».** Left as is when the site
+      was restructured around the project (decided by the agent on 2026-11-14, to review by the maintainer).
