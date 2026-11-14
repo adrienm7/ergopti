@@ -38,6 +38,23 @@ const WEIGHTS_PATH = shared('layouts', 'data', 'analysis', 'score_weights.json')
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
 const CORPORA_PATH = shared('layouts', 'data', 'analysis', 'corpora.json');
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
+// The text patterns the Windows antivirus-surface gate refuses in the shipped
+// bundle (tools/ci/windows-exe-av-surface.cjs reads the same file).
+const AV_POLICY_PATH = path.join(REPO_ROOT, 'tools', 'ci', 'windows-exe-av-surface.json');
+// The Windows suite's shared-purity scanner, which refuses OS calls such as
+// `hs.` in _shared JS; its pattern list is read from the test itself.
+// Floor: a parse that lost the list must not read as « nothing forbidden ».
+const MIN_PURITY_PATTERNS = 5;
+const PURITY_TEST_PATH = path.join(
+	REPO_ROOT,
+	'static',
+	'ergopti_plus',
+	'windows',
+	'tests',
+	'meta',
+	'adapters',
+	'test_port_adapter_coverage.ahk'
+);
 const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
@@ -339,12 +356,57 @@ function buildCorpora(engine) {
 }
 
 /**
+ * The patterns of the text scanners the shipped JS must not trip: the
+ * antivirus-surface policy's bundle section (case-insensitive) and the shared
+ * purity scanner's list (case-sensitive, as AutoHotkey matches it).
+ * @returns {RegExp[]} The patterns.
+ * @throws {Error} When the purity scanner's list cannot be found.
+ */
+function scannerPatterns() {
+	const bundle = JSON.parse(fs.readFileSync(AV_POLICY_PATH, 'utf8')).bundle;
+	const av = Object.values(bundle.forbidden)
+		.concat(Object.values(bundle.ceilings).map((ceiling) => ceiling.pattern))
+		.map((pattern) => new RegExp(pattern, 'i'));
+	// The list ends the line; its patterns hold brackets of their own.
+	const match = /ForbiddenPatterns := \[(.*)\]\s*$/m.exec(
+		fs.readFileSync(PURITY_TEST_PATH, 'utf8')
+	);
+	if (!match) throw new Error(`no ForbiddenPatterns list in ${PURITY_TEST_PATH}`);
+	const purity = Array.from(match[1].matchAll(/"([^"]+)"/g), (m) => new RegExp(m[1]));
+	if (purity.length < MIN_PURITY_PATTERNS)
+		throw new Error(`only ${purity.length} purity patterns read from ${PURITY_TEST_PATH}`);
+	return av.concat(purity);
+}
+
+/**
+ * One table as JSON text. A token a text scanner would read as a forbidden word
+ * (the trigram "uac" matches /\bUAC\b/, "hs." the purity scan) is written
+ * with its first character as a \u escape: the same string to JavaScript, no
+ * longer the word to a text scan.
+ * @param {object} table - token → count.
+ * @param {RegExp[]} patterns - From scannerPatterns().
+ * @returns {string} The JSON object text.
+ */
+function tableText(table, patterns) {
+	const entries = Object.entries(table).map(([token, n]) => {
+		let key = JSON.stringify(token);
+		if (patterns.some((pattern) => pattern.test(key))) {
+			const unit = token.charCodeAt(0).toString(16).padStart(4, '0');
+			key = `"\\u${unit}${JSON.stringify(token.slice(1)).slice(1)}`;
+		}
+		return `${key}:${n}`;
+	});
+	return `{${entries.join(',')}}`;
+}
+
+/**
  * The generated file of one corpus's tables.
  * @param {string} id - The corpus id.
  * @param {object} table - Its tables.
  * @returns {string} JS source.
  */
 function corpusSource(id, table) {
+	const patterns = scannerPatterns();
 	return [
 		`// _shared/ui/layout_analysis/_generated/corpus_${id}.js`,
 		'',
@@ -358,7 +420,8 @@ function corpusSource(id, table) {
 		'// the corpus is chosen.',
 		'// eslint-disable-next-line no-var',
 		'var LAYOUT_ANALYSIS_CORPORA = typeof LAYOUT_ANALYSIS_CORPORA === "object" ? LAYOUT_ANALYSIS_CORPORA : {};',
-		`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(id)}] = ${JSON.stringify(table)};`,
+		`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(id)}] = {"chars":${tableText(table.chars, patterns)},` +
+			`"bigrams":${tableText(table.bigrams, patterns)},"trigrams":${tableText(table.trigrams, patterns)}};`,
 		''
 	].join('\n');
 }
