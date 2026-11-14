@@ -1,0 +1,33 @@
+{
+	"_description": "Built-in corpora of the layout analysis. Only texts free to redistribute are listed (public domain), each with its source and licence; the codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter. Other corpora of static/corpus are linked, not shipped, until their licence is known.",
+	"schema_version": 1,
+	"corpora": [
+		{
+			"id": "fr_don_quichotte",
+			"title": "L'ingénieux chevalier Don Quichotte de la Manche (Cervantes, trad. Charles Furne)",
+			"language": "fr",
+			"file": "static/corpus/original/fr/don_quichotte.txt",
+			"licence": "Public domain",
+			"source": "Project Gutenberg, also the French corpus of Ergo-L (https://github.com/Nuclear-Squid/ergol/tree/main/corpus)",
+			"restore_dead_key_pairs": true
+		},
+		{
+			"id": "fr_swann",
+			"title": "Du côté de chez Swann (Marcel Proust, 1913)",
+			"language": "fr",
+			"file": "static/corpus/original/fr/corpus_johnix_swann10.txt",
+			"licence": "Public domain",
+			"source": "The « swann10 » corpus by Johnix, of the bépo community (origin of the file not verified; the text itself is in the public domain)",
+			"restore_dead_key_pairs": true
+		},
+		{
+			"id": "en_don_quixote",
+			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
+			"language": "en",
+			"file": "static/corpus/original/en/don_quixote_ormsby.txt",
+			"licence": "Public domain",
+			"source": "Project Gutenberg ebook 996, as kept by Ergo-L (https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en.txt)",
+			"restore_dead_key_pairs": false
+		}
+	]
+}

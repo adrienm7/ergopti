@@ -264,7 +264,12 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-layout-analysis-data-js.cjs',
-		outputs: ['static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js']
+		outputs: [
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_don_quichotte.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_swann.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_don_quixote.js'
+		]
 	},
 	{
 		script: 'codegen/codegen-layout-editor-tables-js.cjs',

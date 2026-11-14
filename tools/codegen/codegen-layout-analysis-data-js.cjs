@@ -28,19 +28,22 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { shared, sharedRel } = require('../lib/paths.cjs');
+const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
 const { loadComposer } = require('../lib/layout-composer.cjs');
 
 const OUT_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const MODEL_PATH = shared('layouts', 'data', 'analysis', 'analysis_model.json');
 const WEIGHTS_PATH = shared('layouts', 'data', 'analysis', 'score_weights.json');
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
+const CORPORA_PATH = shared('layouts', 'data', 'analysis', 'corpora.json');
+const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
 const SOURCES = [
 	'layouts/data/analysis/analysis_model.json',
 	'layouts/data/analysis/score_weights.json',
 	'layouts/data/analysis/layout_library.json',
+	'layouts/data/analysis/corpora.json',
 	'layouts/data/keycodes/physical_keys.json',
 	'../../layouts/registry (through layout_composer)'
 ];
@@ -225,8 +228,89 @@ function buildLibrary(model) {
 	return out;
 }
 
+// =========================
+// ======= 3/ Corpora ======
+// =========================
+
+const ACCENTS = {
+	'^': { a: 'â', e: 'ê', i: 'î', o: 'ô', u: 'û', A: 'Â', E: 'Ê', I: 'Î', O: 'Ô', U: 'Û' },
+	'¨': { a: 'ä', e: 'ë', i: 'ï', o: 'ö', u: 'ü', y: 'ÿ', A: 'Ä', E: 'Ë', I: 'Ï', O: 'Ö', U: 'Ü' }
+};
+
+/**
+ * Turns the two-character spellings of the old KLA conversion (^e, ¨i) back
+ * into the accented letter they stand for.
+ * @param {string} text - The corpus.
+ * @returns {string} The text with its accented letters.
+ */
+function restoreDeadKeyPairs(text) {
+	return text.replace(/([\^¨])([A-Za-z])/g, (pair, mark, letter) => ACCENTS[mark][letter] || pair);
+}
+
+/**
+ * The n-gram tables of every built-in corpus, counted by the engine itself.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {{catalogue: object[], tables: object}} The list the page shows and
+ *   the tables by corpus id.
+ */
+function buildCorpora(engine) {
+	const manifest = JSON.parse(fs.readFileSync(CORPORA_PATH, 'utf8'));
+	const catalogue = [];
+	const tables = {};
+	for (const corpus of manifest.corpora) {
+		let text = fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8').replace(/^\uFEFF/, '');
+		if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
+		const counts = engine.ngramsFromText(text);
+		const sorted = (table) =>
+			Object.fromEntries(
+				Object.entries(table).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+			);
+		tables[corpus.id] = {
+			chars: sorted(counts.chars),
+			bigrams: sorted(counts.bigrams),
+			trigrams: sorted(counts.trigrams)
+		};
+		const characters = Object.values(counts.chars).reduce((sum, n) => sum + n, 0);
+		catalogue.push({
+			id: corpus.id,
+			title: corpus.title,
+			language: corpus.language,
+			licence: corpus.licence,
+			source: corpus.source,
+			characters,
+			script: `_generated/corpus_${corpus.id}.js`
+		});
+	}
+	return { catalogue, tables };
+}
+
+/**
+ * The generated file of one corpus's tables.
+ * @param {string} id - The corpus id.
+ * @param {object} table - Its tables.
+ * @returns {string} JS source.
+ */
+function corpusSource(id, table) {
+	return [
+		`// _shared/ui/layout_analysis/_generated/corpus_${id}.js`,
+		'',
+		'// ==========================================',
+		'// AUTO-GENERATED — do not edit manually',
+		`// Source: ${sharedRel('layouts/data/analysis/corpora.json')}`,
+		'// Run: npm run codegen:layout-analysis-data:js',
+		'// ==========================================',
+		'',
+		'// The n-gram tables of one built-in corpus; the page loads this file when',
+		'// the corpus is chosen.',
+		'// eslint-disable-next-line no-var',
+		'var LAYOUT_ANALYSIS_CORPORA = typeof LAYOUT_ANALYSIS_CORPORA === "object" ? LAYOUT_ANALYSIS_CORPORA : {};',
+		`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(id)}] = ${JSON.stringify(table)};`,
+		''
+	].join('\n');
+}
+
 // ==========================
-// ======= 3/ JS source =====
+// ======= 4/ JS source =====
 // ==========================
 
 /**
@@ -237,6 +321,7 @@ function buildData() {
 	const model = JSON.parse(fs.readFileSync(MODEL_PATH, 'utf8'));
 	const weights = JSON.parse(fs.readFileSync(WEIGHTS_PATH, 'utf8'));
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
+	const corpora = buildCorpora(loadEngine());
 	delete model._description;
 	return {
 		schema_version: 1,
@@ -244,16 +329,18 @@ function buildData() {
 		geometry: buildGeometry(model),
 		weights: weights.weights,
 		library_sources: library.sources,
-		layouts: buildLibrary(model)
+		layouts: buildLibrary(model),
+		corpora: corpora.catalogue,
+		corpusTables: corpora.tables
 	};
 }
 
 /**
  * Builds the complete generated file.
+ * @param {object} data - buildData() output.
  * @returns {string} JS source with LF line ends and a final newline.
  */
-function buildSource() {
-	const data = buildData();
+function buildSource(data) {
 	const layoutLines = data.layouts.map((layout) => `\t\t${JSON.stringify(layout)}`).join(',\n');
 	const lines = [
 		'// _shared/ui/layout_analysis/_generated/analysis_data.js',
@@ -273,6 +360,7 @@ function buildSource() {
 		`\t"geometry": ${JSON.stringify(data.geometry)},`,
 		`\t"weights": ${JSON.stringify(data.weights)},`,
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,
+		`\t"corpora": ${JSON.stringify(data.corpora)},`,
 		'\t"layouts": [',
 		layoutLines,
 		'\t]',
@@ -288,10 +376,13 @@ function buildSource() {
 function main() {
 	console.log('codegen:layout-analysis-data:js — generating the layout analysis data…');
 	fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
-	fs.writeFileSync(OUT_PATH, buildSource());
+	const data = buildData();
+	fs.writeFileSync(OUT_PATH, buildSource(data));
+	for (const [id, table] of Object.entries(data.corpusTables))
+		fs.writeFileSync(path.join(CORPUS_OUT_DIR, `corpus_${id}.js`), corpusSource(id, table));
 	console.log(`codegen:layout-analysis-data:js — wrote ${OUT_PATH}`);
 }
 
 if (require.main === module) main();
 
-module.exports = { buildData, buildSource, OUT_PATH };
+module.exports = { buildData, buildSource, corpusSource, restoreDeadKeyPairs, OUT_PATH };
