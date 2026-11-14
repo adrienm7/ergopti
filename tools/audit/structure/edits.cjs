@@ -674,6 +674,10 @@ const SYNTHETIC_PATHS = [
  */
 const MODULE_NAME_FILES = [
 	{
+		file: 'tools/test/test-linux-portable-commands.cjs',
+		why: 'LUA_LAUNCHERS is keyed by the module names of the Linux launchers it scans'
+	},
+	{
 		file: 'tools/lib/menu-shared-delegation.cjs',
 		why: 'MODULES and its comparisons name the shared menu modules a driver delegates to'
 	},
