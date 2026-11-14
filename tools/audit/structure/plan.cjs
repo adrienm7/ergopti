@@ -2346,6 +2346,27 @@ function scanFile(file, text, ctx) {
 				add('lua-module-quoted', m[0], `$${m[1]}${fresh}`, hit);
 		}
 
+	// TestsRoot . "/../infra/reload_terminal_handoff.ahk" in a Windows test: a
+	// climb from the suite folder (windows/tests) joined onto a variable that
+	// holds it. S06 moved the handoff and the reload quiescence child included
+	// a file that no longer existed. The climb follows when it names a driver
+	// file from windows/tests and nothing from the test's own folder.
+	if (file.endsWith('.ahk') && file.startsWith(`${PREFIX}windows/tests/`))
+		for (const m of text.matchAll(/(\b\w+ \. ")([\\/])\.\.\2((?:[\w.-]+\2)*[\w.-]+\.ahk)"/g)) {
+			const sep = m[2];
+			const rest = m[3].split(sep).join('/');
+			const abs = `${PREFIX}windows/${rest}`;
+			const own = path.posix.normalize(`${path.posix.dirname(file)}/../${rest}`);
+			if (!EXISTING.has(abs) || EXISTING.has(own)) continue;
+			const target = byRepoPath.get(abs);
+			if (!target || target === PREFIX || target === SPLIT || target === abs) continue;
+			if (!target.startsWith(`${PREFIX}windows/`)) continue;
+			const rel = target.slice(`${PREFIX}windows/`.length).split('/').join(sep);
+			add('lua-module-quoted', m[0], `${m[1]}${sep}..${sep}${rel}"`, {
+				oldRepo: abs,
+				newRepo: target
+			});
+		}
 	// SplitPath(A_LineFile, , &TestDir) then TestDir . "/../../..": a climb
 	// from the file's own folder to a folder above it. When the file moves, the
 	// climb is recounted to name the same folder (S06 moved the reload
