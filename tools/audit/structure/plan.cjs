@@ -57,7 +57,23 @@ const NEVER_REWRITTEN = [
 
 /** True for a file no structure step rewrites. */
 function neverRewritten(file) {
-	return NEVER_REWRITTEN.some((re) => re.test(file));
+	return (
+		NEVER_REWRITTEN.some((re) => re.test(file)) ||
+		Edits.PUBLISHED_RECORDS.some(
+			(r) => !r.region && (r.file === file || (r.prefix && file.startsWith(r.prefix)))
+		)
+	);
+}
+
+/**
+ * The regions of `file` that describe a published artifact (edits.cjs
+ * PUBLISHED_RECORDS): a step holds them as written.
+ * @returns {RegExp[]}
+ */
+function publishedRegions(file) {
+	return Edits.PUBLISHED_RECORDS.filter((r) => r.region && r.file === file).map(
+		(r) => new RegExp(r.region.source, r.region.flags)
+	);
 }
 const TEXT_LIMIT_BYTES = 2 * 1024 * 1024;
 const BINARY =
@@ -3726,6 +3742,7 @@ module.exports = {
 	committedSteps,
 	SPLIT,
 	neverRewritten,
+	publishedRegions,
 	foreignBaseBefore,
 	isListedModuleSite,
 	isLuaLogTagSite,

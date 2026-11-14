@@ -857,6 +857,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-fixture-paths.cjs"],
 			"repro": "npm run test:structure-ahk-fixture-paths"
+		},
+		{
+			"id": "js-0534",
+			"ordinal": 653,
+			"name": "structure plan never rewrites a record of a published artifact or a past run",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-published-records.cjs"],
+			"repro": "npm run test:structure-published-records"
 		}
 	]
 }

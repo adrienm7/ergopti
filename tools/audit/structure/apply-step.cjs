@@ -157,6 +157,8 @@ function rewriteText(text, rows, movedRepo, file) {
 	// against go.mod wherever the module lives, and respelling it would
 	// change every committed binary built from the module.
 	text = text.replace(Plan.GO_MODULE_PATH, (m) => hold(m));
+	// A region describing a published artifact keeps the paths it ships.
+	for (const region of Plan.publishedRegions(file)) text = text.replace(region, (m) => hold(m));
 	for (const row of rows) {
 		// The root switch runs last, on what the path rewrites leave.
 		if (row.kind === 'shared-root') {

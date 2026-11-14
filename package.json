@@ -169,6 +169,7 @@
 		"test:structure-ahk-basename": "node ./tools/test/test-structure-ahk-basename.cjs",
 		"test:structure-ahk-dir-scans": "node ./tools/test/test-structure-ahk-dir-scans.cjs",
 		"test:structure-ahk-fixture-paths": "node ./tools/test/test-structure-ahk-fixture-paths.cjs",
+		"test:structure-published-records": "node ./tools/test/test-structure-published-records.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",
