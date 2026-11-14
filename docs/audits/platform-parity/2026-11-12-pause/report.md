@@ -78,6 +78,19 @@ a fading speed on screen and a key typed while paused brought the widget back.
 Windows and macOS hide both. The daemon tick now passes the live pause and
 both surfaces hide (`(wpm-pause-hides)` in `test_wpm_readouts`).
 
+## Fourth pass (2026-11-14, worker H): shared rows on all three drivers
+
+| Sequence                                                                                         | Before                                                                   | Regression                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pause, then open the personal hotstrings editor                                                  | Refused on every driver; the shared corpus pinned the pause              | `personal_editor_command.json`, `test_personal_editor_menu_scope.ahk`, `test_hotstring_editor_shortcut_transaction`                                       |
+| Pause, then a word expander row, a custom terminator, or an extension scope command              | Greyed or refused (Windows `A_IsSuspended`, macOS and Linux readiness)   | `test_word_expander_commands.ahk`, `test_terminator_admission.ahk`, `test_custom_terminator_add_transaction`, `test_terminator_bulk_mutation_transaction` |
+| Pause, then an AI privacy, trigger, Info Bar, streaming, indentation, Show-all or generation row | The shared policies and their AutoHotkey twins refused a paused snapshot | the four shared corpora (paused admitted, a malformed pause refused), each driver's settings suites                                                       |
+
+A pause stops typing, not configuration: each of these rows commits while
+paused and the engine reads the stored value when typing resumes. A missing or
+non-boolean pause is still refused. On macOS the AI settings groups grey only
+when the AI is off.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -89,13 +102,12 @@ source proofs reworked first:
   slots' rebinding under `KeyboardShortcuts`' lifecycle pause is not yet
   traced; each shortcut's own row, the wrap rows, the ChatGPT URL editor and
   the tap-key rows run while paused.
-- macOS and Linux AI menus: the parent row, the enable switch and the
-  privacy and trigger rows read the pause through shared policies.
-- The personal hotstrings editor row and the word expander rows on macOS and
-  Linux: their shared corpus (`personal_editor_command.json`) and contract
-  still pin the pause, so all drivers move together.
+- AI menus, all three drivers: the enable switch (it starts a model warmup,
+  which is not pause-aware on macOS), the model and profile rows, profile
+  creation, model deletion, the API entry rows, the whole-scope restore and
+  clear on Windows, and the Windows tray's greying of the AI submenu.
 - macOS hotstrings submenus: the personal legacy shortcut row (it binds a
-  hotkey), with the personal editor and word expander rows above.
+  hotkey).
 - macOS magic key source capture: it listens to a physical key press.
 - The audit that every typing feature is inert while paused, and that a
   setting changed while paused applies on resume. Layout emulation is done:
@@ -103,4 +115,6 @@ source proofs reworked first:
   `CoreState.processing_paused` on macOS, `script_actions.is_paused` on Linux),
   pinned by `test_layout_emulation` on each driver.
 - Windows: every `A_IsSuspended` gate is listed in
-  [the Windows inventory](windows-inventory.md); none was changed here.
+  [the Windows inventory](windows-inventory.md); the fourth pass removed the
+  personal editor, word expander, terminator, extension scope and AI settings
+  row gates above.
