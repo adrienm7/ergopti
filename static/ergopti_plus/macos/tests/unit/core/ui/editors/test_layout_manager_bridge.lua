@@ -406,3 +406,18 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 		helpers.assert_contains(host, 'local rev = require("modules.keystats.export").get_db_rev()')
 	end)
 end)
+
+helpers.describe("Ergopti Studio links (macOS)", function()
+	helpers.it("the Studio window opens only https links, the manager none (studio-open-link)", function()
+		local opened = {}
+		local instance = editor_controller({ editor_window = true,
+			open_url = function(url) opened[#opened + 1] = url end })
+		helpers.assert_true(instance.on_message({ action = "open_link", url = "https://ergopti.fr/studio" }) == true)
+		helpers.assert_true(instance.on_message({ action = "open_link", url = "http://example.org" }) == false)
+		helpers.assert_true(instance.on_message({ action = "open_link", url = "https://a b" }) == false)
+		helpers.assert_true(instance.on_message({ action = "open_link" }) == false)
+		local manager = editor_controller({ open_url = function(url) opened[#opened + 1] = url end })
+		helpers.assert_true(manager.on_message({ action = "open_link", url = "https://ergopti.fr" }) == false)
+		helpers.assert_eq(opened, { "https://ergopti.fr/studio" })
+	end)
+end)

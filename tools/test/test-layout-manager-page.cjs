@@ -862,6 +862,12 @@ check('Ergopti Studio reads « My typing » only on a click, from a host that of
 	assert.equal(document.events.length, 1);
 	assert.equal(document.events[0].type, 'studio-ngrams');
 	assert.deepEqual(plain(document.events[0].detail), ngrams);
+	// The analysis panels open their « i » links through the host.
+	window.LAYOUT_ANALYSIS_HOST.openLink('https://ergopti.fr/studio');
+	assert.deepEqual(plain(messages[messages.length - 1]), {
+		action: 'open_link',
+		url: 'https://ergopti.fr/studio'
+	});
 });
 
 check(

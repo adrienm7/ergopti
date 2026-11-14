@@ -233,6 +233,8 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
   ingest), Windows with a hash of the keystats files' paths, sizes and modification times; an unchanged store answers
   at once, without a read.
 - The page publishes the loaded counts as a `studio-ngrams` DOM event for the analysis panel.
+- The analysis panels open their « i » links through `window.LAYOUT_ANALYSIS_HOST.openLink(url)`: the page posts
+  `open_link`, and the host opens an https URL (and nothing else) in the system browser.
 
 ## Limits stated to the user
 

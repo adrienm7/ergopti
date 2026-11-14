@@ -237,6 +237,25 @@ helpers.describe("layout manager bridge (Linux)", function()
 	end)
 end)
 
+helpers.describe("Ergopti Studio links (Linux)", function()
+	helpers.it("the Studio window opens an https link through xdg-open (studio-open-link)", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		local Editor = Bridge.editor
+		Editor._reset()
+		local ok, err = pcall(function()
+			helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+			helpers.assert_true(Editor.on_message({ action = "open_link", url = "https://ergopti.fr/studio" }, daemon_state).handled)
+			helpers.assert_eq(state.commands[#state.commands], "xdg-open 'https://ergopti.fr/studio' >/dev/null 2>&1 &")
+			helpers.assert_true(Editor.on_message({ action = "open_link", url = "file:///etc/passwd" }, daemon_state).handled == false)
+			helpers.assert_eq(#state.commands, 1, "a non-https link is never opened")
+		end)
+		Editor._reset()
+		helpers.assert_true(ok, tostring(err))
+	end)
+end)
+
 helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 	helpers.it("the Studio window title is exactly « Ergopti Studio » in every locale (window-title-product-name)", function()
 		package.loaded["core.ui.engine.window_titles"] = nil

@@ -50,7 +50,7 @@ global _LayEdWin_StudioCache := 0
 global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"composer_open", true, "composer_save", true, "composer_emulate", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
-	"nav_save", true, "keystats_ngrams", true)
+	"nav_save", true, "keystats_ngrams", true, "open_link", true)
 
 
 
@@ -107,6 +107,16 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 	}
 	if (Action == "keystats_ngrams")
 		return LayoutEditorWindow_ReadKeystats(Deps)
+	; The Studio's analysis panels open their « i » links in the system browser:
+	; an https URL only.
+	if (Action == "open_link") {
+		Url := Payload.Get("url", "")
+		if !(Url is String) || !RegExMatch(Url, "^https://\S+$") {
+			LoggerWarn("LayoutEditorWindow", "Refused a Studio link that is not an https URL.")
+			return false
+		}
+		return Deps["open_url"].Call(Url)
+	}
 	return LayoutManager_HandleEditorAction(Action, Payload, Deps)
 }
 
@@ -195,7 +205,8 @@ _LayEdWin_Deps(Host) {
 		"stamp", KLR_StudioStoreStamp,
 		"request_studio", KLPF_RequestStudio,
 		"push_raw", _LayEdWin_PushRaw.Bind(Host),
-		"read_stage", FSRead
+		"read_stage", FSRead,
+		"open_url", (Url) => ExternalUrl_OpenHttp(Url)
 	)
 }
 

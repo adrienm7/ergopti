@@ -394,3 +394,18 @@ _KLRSource_StudioStampFollowsTheStore() {
 }
 Test("Keystats reader: the Ergopti Studio stamp follows the keystats files (studio-keystats-bridge)",
 	_KLRSource_StudioStampFollowsTheStore)
+
+; The Studio window opens its analysis panels' « i » links in the system
+; browser, and only an https URL.
+_KLRSource_StudioOpensHttpsLinks() {
+	Opened := []
+	Deps := Map("open_url", (Url) => (Opened.Push(Url), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "open_link", "url", "https://ergopti.fr/studio"), Deps))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "open_link", "url", "http://example.org"), Deps))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "open_link", "url", "https://a b"), Deps))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "open_link"), Deps))
+	AssertEqual(1, Opened.Length, "only the https link is opened")
+	AssertEqual("https://ergopti.fr/studio", Opened[1])
+}
+Test("Layout editor window: Ergopti Studio opens only https links (studio-open-link)",
+	_KLRSource_StudioOpensHttpsLinks)

@@ -45,7 +45,9 @@
 ---    read only and pushed to this page alone (keystatsNgrams {ok, ngrams} or
 ---    {ok = false, code}). Only the editor window offers it, and only when the
 ---    user asks: the page posts it from its « Analyse my typing » button.
---- 9. PURE Lua: the driver injects the layout registry client, the push to the
+--- 9. The Studio's analysis panels open their « i » links in the system browser
+---    (open_link {url}): only an https URL, and only from the editor window.
+--- 10. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -71,6 +73,7 @@ M.ACTIONS = {
 	nav_save = true,
 	open_editor = true,
 	keystats_ngrams = true,
+	open_link = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -457,6 +460,14 @@ function M.new(deps)
 		end
 		if action == "source_export" then
 			return M.handle_export(deps, payload)
+		end
+		if action == "open_link" then
+			if not editor_window or type(payload.url) ~= "string" or not payload.url:match("^https://[^%s]+$") then
+				deps.log("warn", "Refused a Studio link: only the Ergopti Studio window opens an https link.")
+				return false
+			end
+			deps.open_url(payload.url)
+			return true
 		end
 		if action == "keystats_ngrams" then
 			if not editor_window or type(deps.read_keystats) ~= "function" then

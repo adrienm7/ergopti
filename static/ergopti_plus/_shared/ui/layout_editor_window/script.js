@@ -40,7 +40,8 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'source_pick',
 	'source_export',
 	'nav_save',
-	'keystats_ngrams'
+	'keystats_ngrams',
+	'open_link'
 ]);
 
 // Locale strings, pushed by the host with initData.
@@ -469,6 +470,14 @@ window.keystatsNgrams = function (result) {
 };
 
 document.getElementById('studio-keystats-load').addEventListener('click', loadKeystats);
+
+// The analysis panels (_shared/ui/layout_analysis) open their « i » links
+// through the host, in the system browser, instead of a WebView tab.
+window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
+	openLink: function (url) {
+		send('open_link', { url: String(url) });
+	}
+});
 
 // ========================================
 // ========================================
