@@ -282,7 +282,13 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_it_subtitles_words.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_javascript.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_python.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_rust.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_rust.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_hugo_miserables.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_zola_germinal.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_verne_tour_du_monde.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_austen_pride.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_tatoeba.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_tatoeba.js'
 		]
 	},
 	{

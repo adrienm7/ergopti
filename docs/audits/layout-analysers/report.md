@@ -597,11 +597,11 @@ delete the others. The register `static/corpus/register.json` keeps the
 source, licence, attribution, status and evidence of each text, and the
 codegen refuses to ship a text it does not clear.
 
-| Status  | Texts                                                                                                                                                                                                                                         |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ship    | _Don Quichotte_ (Furne), _Don Quixote_ (Ormsby), _Du côté de chez Swann_, the Nemolivier anthology (public domain); _Autonomie_ (CC BY-SA 1.0); the two Hello World files (MIT); the two Leipzig samples (CC BY 4.0, the maintainer's choice) |
-| added   | Subtitle word frequencies in five languages (FrequencyWords, CC BY-SA 4.0); JavaScript (lodash), Python (rich) and Rust (ripgrep) code, all MIT                                                                                               |
-| refused | Marked for deletion by the maintainer: the 2003 e-mails, `romans.txt`, _Python for Everybody_, the GLM project, the eight KLAnext-style texts and Auxlang X                                                                                   |
+| Status  | Texts                                                                                                                                                                                                                                                                                  |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship    | _Don Quichotte_ (Furne), _Don Quixote_ (Ormsby), _Du côté de chez Swann_, the Nemolivier anthology (public domain); _Autonomie_ (CC BY-SA 1.0); the two Hello World files (MIT); the two Leipzig samples (CC BY 4.0, the maintainer's choice)                                          |
+| added   | Subtitle word frequencies in five languages (FrequencyWords, CC BY-SA 4.0); JavaScript (lodash), Python (rich) and Rust (ripgrep) code, all MIT; Hugo, Zola, Verne and Austen from Project Gutenberg (public domain); 30,000 Tatoeba sentences in French and in English (CC BY 2.0 FR) |
+| refused | Marked for deletion by the maintainer: the 2003 e-mails, `romans.txt`, _Python for Everybody_, the GLM project, the eight KLAnext-style texts and Auxlang X                                                                                                                            |
 
 Notes:
 
@@ -617,9 +617,13 @@ Notes:
   Wikipédia's contributors.
 - The e-mails come from the bépo corpus archive (source confirmed), but no
   licence is granted and they hold personal data.
+- Leipzig's licence page could still not be read: wortschatz.uni-leipzig.de
+  answers with an anti-bot challenge (Anubis) that asks automated clients to
+  stay out, so the maintainer has to read it.
+- KLAnext's « Copyright » section licenses « all images used and generated
+  by this app » under CC BY 4.0, and says nothing of its corpus texts.
 - Sources reachable from the build container on 2026-11-14 were
   raw.githubusercontent.com, gitlab.com, bepo.fr and storage.googleapis.com.
-  Blocked: gutenberg.org, wikisource and Wikipedia dumps, Tatoeba,
-  wortschatz.uni-leipzig.de, norvig.com, lexique.org, unicode.org and
-  huggingface.co. The Google Books Ngram files are reachable, but their
+  The maintainer then opened gutenberg.org, Wikipedia, Wikisource, Tatoeba,
+  Leipzig and KLAnext; norvig.com and lexique.org still did not answer. The Google Books Ngram files are reachable, but their
   one-gram shards (several GB per language) are too large to process here.

@@ -246,6 +246,15 @@ Shipped as of 2026-11-14:
   Rust (three files of ripgrep 14.1.0), all MIT, each with its licence text at
   the top of the file.
 
+- Project Gutenberg books, without its header and licence footer: _Les
+  Misérables_ I (Hugo), _Germinal_ (Zola), _Le Tour du monde en
+  quatre-vingts jours_ (Verne) and _Pride and Prejudice_ (Austen), all in
+  the public domain.
+- Tatoeba: the first 30,000 French and English sentences of the « detailed »
+  exports, CC BY 2.0 FR. Each line keeps its sentence id and author, as the
+  licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the
+  sentence.
+
 `static/corpus/frequency/` holds the downloaded frequency lists, which the
 register covers like the texts.
 

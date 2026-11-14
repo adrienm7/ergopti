@@ -49,7 +49,7 @@ const SHIP_STATUS = 'ship';
 const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
 // The folders of static/corpus the register covers: texts, and word frequency lists.
 const CORPUS_FOLDERS = ['original', 'frequency'];
-const CORPUS_FORMATS = ['text', 'word_frequencies'];
+const CORPUS_FORMATS = ['text', 'word_frequencies', 'tsv'];
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
 // The repository and the host a repository document is linked on (one source each).
@@ -454,8 +454,22 @@ function buildCorpora(engine) {
 		const format = corpus.format || 'text';
 		if (!CORPUS_FORMATS.includes(format))
 			throw new Error(`corpora.json: ${corpus.id} has format ${format}`);
+		// A tab-separated file (Tatoeba): one sentence per line, in one column.
+		if (format === 'tsv') {
+			if (!Number.isInteger(corpus.tsv_text_column))
+				throw new Error(`corpora.json: ${corpus.id} needs tsv_text_column`);
+			text = text
+				.split('\n')
+				.filter((line) => line !== '')
+				.map((line) => {
+					const cell = line.split('\t')[corpus.tsv_text_column];
+					if (cell === undefined) throw new Error(`corpora.json: ${corpus.id} has a short line`);
+					return cell;
+				})
+				.join('\n');
+		}
 		const counts =
-			format === 'text' ? engine.ngramsFromText(text) : wordListCounts(text, corpus.id);
+			format === 'word_frequencies' ? wordListCounts(text, corpus.id) : engine.ngramsFromText(text);
 		const sorted = (table) =>
 			Object.fromEntries(
 				Object.entries(table).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))

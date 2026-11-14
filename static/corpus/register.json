@@ -93,6 +93,15 @@
 			"status": "ship",
 			"note": "LICENSE-MIT of the tag (fetched 2026-11-14); the file keeps it at its top."
 		},
+		"original/en/austen_pride_and_prejudice.txt": {
+			"title": "Pride and Prejudice (Jane Austen, 1813)",
+			"source": "Project Gutenberg ebook 1342",
+			"url": "https://www.gutenberg.org/ebooks/1342",
+			"licence": "Public domain",
+			"attribution": "Jane Austen",
+			"status": "ship",
+			"note": "Jane Austen died in 1817. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
 		"original/en/don_quixote_ormsby.txt": {
 			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
 			"source": "Project Gutenberg ebook 996, as kept by Ergo-L",
@@ -101,6 +110,15 @@
 			"attribution": "Miguel de Cervantes, translated by John Ormsby",
 			"status": "ship",
 			"note": "Translation published in 1885, translator died in 1895; no Project Gutenberg boilerplate left."
+		},
+		"original/en/tatoeba_eng_30k.tsv": {
+			"title": "Tatoeba — 30,000 English sentences",
+			"source": "Tatoeba per-language export eng_sentences_detailed (2026-11-14)",
+			"url": "https://downloads.tatoeba.org/exports/per_language/eng/",
+			"licence": "CC BY 2.0 FR",
+			"attribution": "Tatoeba contributors; the author of each sentence is named in the file",
+			"status": "ship",
+			"note": "Tatoeba's terms of use (https://tatoeba.org/en/terms_of_use, read 2026-11-14): sentences use « the default Creative Commons Attribution 2.0 France license (CC-BY 2.0 FR) », whose one condition is to cite each sentence's author. The file keeps the first 30,000 sentences of the export (by sentence id) as « id<TAB>sentence<TAB>author »; « unknown » marks a sentence the export gives no author for. Short everyday sentences: a conversational register."
 		},
 		"original/fr/corpus_johnix_autonomy.txt": {
 			"title": "Autonomie, la liberté de pensée (J.-M. Smith, French translation)",
@@ -138,6 +156,15 @@
 			"status": "ship",
 			"note": "19th-century translation (the preface is signed « CH. FURNE. », line 243); no Project Gutenberg boilerplate left."
 		},
+		"original/fr/hugo_les_miserables_1.txt": {
+			"title": "Les Misérables, tome I : Fantine (Victor Hugo, 1862)",
+			"source": "Project Gutenberg ebook 17489 (produced by www.ebooksgratuits.com and Chuck Greif)",
+			"url": "https://www.gutenberg.org/ebooks/17489",
+			"licence": "Public domain",
+			"attribution": "Victor Hugo",
+			"status": "ship",
+			"note": "Victor Hugo died in 1885. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
 		"original/fr/leipzig_fra_news_2023_10K-sentences.txt": {
 			"title": "10,000 sentences of French news, 2023",
 			"source": "Leipzig Corpora Collection (fra_news_2023_10K)",
@@ -155,6 +182,33 @@
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
 			"status": "ship",
 			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14). The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container; third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting. The sentences come from Wikipédia, whose text is CC BY-SA: its contributors are credited too."
+		},
+		"original/fr/tatoeba_fra_30k.tsv": {
+			"title": "Tatoeba — 30,000 French sentences",
+			"source": "Tatoeba per-language export fra_sentences_detailed (2026-11-14)",
+			"url": "https://downloads.tatoeba.org/exports/per_language/fra/",
+			"licence": "CC BY 2.0 FR",
+			"attribution": "Tatoeba contributors; the author of each sentence is named in the file",
+			"status": "ship",
+			"note": "Tatoeba's terms of use (https://tatoeba.org/en/terms_of_use, read 2026-11-14): sentences use « the default Creative Commons Attribution 2.0 France license (CC-BY 2.0 FR) », whose one condition is to cite each sentence's author. The file keeps the first 30,000 sentences of the export (by sentence id) as « id<TAB>sentence<TAB>author »; « unknown » marks a sentence the export gives no author for. Short everyday sentences: a conversational register."
+		},
+		"original/fr/verne_tour_du_monde.txt": {
+			"title": "Le Tour du monde en quatre-vingts jours (Jules Verne, 1872)",
+			"source": "Project Gutenberg ebook 800",
+			"url": "https://www.gutenberg.org/ebooks/800",
+			"licence": "Public domain",
+			"attribution": "Jules Verne",
+			"status": "ship",
+			"note": "Jules Verne died in 1905. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/fr/zola_germinal.txt": {
+			"title": "Germinal (Émile Zola, 1885)",
+			"source": "Project Gutenberg ebook 5711",
+			"url": "https://www.gutenberg.org/ebooks/5711",
+			"licence": "Public domain",
+			"attribution": "Émile Zola",
+			"status": "ship",
+			"note": "Émile Zola died in 1902. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		}
 	}
 }

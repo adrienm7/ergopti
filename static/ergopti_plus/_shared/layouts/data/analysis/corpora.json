@@ -1,5 +1,5 @@
 {
-	"_description": "Built-in corpora of the layout analysis: each names a text of static/corpus whose entry in static/corpus/register.json has status « ship »; its licence, attribution and source are read from that register (one source). The codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js, with the licence in each file's header. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter; it stays off for code, where ^ is an operator. « strip_sentence_numbers » removes the « number<TAB> » prefix of each line of a Leipzig sentence file. « format »: « text » (the default) counts the text; « word_frequencies » reads « word count » lines and counts each word with a space on either side, so its n-grams stay inside words and at word boundaries.",
+	"_description": "Built-in corpora of the layout analysis: each names a text of static/corpus whose entry in static/corpus/register.json has status « ship »; its licence, attribution and source are read from that register (one source). The codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js, with the licence in each file's header. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter; it stays off for code, where ^ is an operator. « strip_sentence_numbers » removes the « number<TAB> » prefix of each line of a Leipzig sentence file. « format »: « text » (the default) counts the text; « word_frequencies » reads « word count » lines and counts each word with a space on either side, so its n-grams stay inside words and at word boundaries; « tsv » counts the column « tsv_text_column » (0-based) of each tab-separated line, one sentence per line.",
 	"schema_version": 1,
 	"corpora": [
 		{
@@ -127,6 +127,52 @@
 			"language": "code",
 			"file": "static/corpus/original/code/ripgrep_14.1.0.rs.txt",
 			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_hugo_miserables",
+			"title": "Les Misérables, tome I (Victor Hugo)",
+			"language": "fr",
+			"file": "static/corpus/original/fr/hugo_les_miserables_1.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_zola_germinal",
+			"title": "Germinal (Émile Zola)",
+			"language": "fr",
+			"file": "static/corpus/original/fr/zola_germinal.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_verne_tour_du_monde",
+			"title": "Le Tour du monde en quatre-vingts jours (Jules Verne)",
+			"language": "fr",
+			"file": "static/corpus/original/fr/verne_tour_du_monde.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "en_austen_pride",
+			"title": "Pride and Prejudice (Jane Austen)",
+			"language": "en",
+			"file": "static/corpus/original/en/austen_pride_and_prejudice.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_tatoeba",
+			"title": "Tatoeba — phrases du quotidien en français",
+			"language": "fr",
+			"file": "static/corpus/original/fr/tatoeba_fra_30k.tsv",
+			"restore_dead_key_pairs": false,
+			"format": "tsv",
+			"tsv_text_column": 1
+		},
+		{
+			"id": "en_tatoeba",
+			"title": "Tatoeba — everyday English sentences",
+			"language": "en",
+			"file": "static/corpus/original/en/tatoeba_eng_30k.tsv",
+			"restore_dead_key_pairs": false,
+			"format": "tsv",
+			"tsv_text_column": 1
 		}
 	]
 }
