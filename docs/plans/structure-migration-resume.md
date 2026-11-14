@@ -4,16 +4,24 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 11:35)
+## Where things stand (2026-11-14, 17:20)
 
-- Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
-  rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
-  each block lands linear (dev refuses merge commits). The old branch
-  `claude/ergopti-todo-structure-phase2` is frozen; nothing more is pushed
-  there.
-- Steps landed on dev: S01+S02 (dev `520bb24c8..42f8c1327`, landed by the
-  coordinator, its two flaky reds accepted). Next block: S03–S05, built on
-  the night branch.
+- Branch: `claude/ergopti-todo-structure-phase2-night2`, from dev
+  `984baf1c3`, fast-forward only. The `-night` branch could not fast-forward
+  onto dev after the S03–S12 landing rebase and is frozen, as is the older
+  `claude/ergopti-todo-structure-phase2`. Never merge dev into a branch:
+  rebase it, so each block lands linear (dev refuses merge commits).
+- Steps landed on dev: S01+S02 (dev `520bb24c8..42f8c1327`); S03–S12 (dev
+  `708161bc9..984baf1c3`, 115 commits, landed 16:37; dev push CI run
+  43611195865).
+- Landing flow (the coordinator, 2026-11-14): prove a block until its CI
+  shows only baseline names; tell the coordinator one line before the landing
+  rebase (the other workers hold their dev pushes); rebase onto the dev of
+  that moment and re-run the steps; land if the full local JS and both Lua
+  suites still match the baseline; the dev push CI is the check after.
+- Next block: S13–S17 (platform/\*), built cleanly on `a8ae41f9` (the
+  platform-domain rule of the OS-purity ratchet); local suites, then a proof.
+- History of the S03–S12 block follows.
 - S03–S05, proof 16 (run 43481259457): reds beyond the baseline in 7 Common
   JS jobs, Windows unit core and meta, Linux E2E network-ai. Local triage
   (full JS suite and both Lua suites against the night tip, which matches the
