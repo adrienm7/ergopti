@@ -62,7 +62,7 @@ _UFPS_FocusPollHasSuspendGuard() {
 Test("process_lifecycle: PLC_Poll has an A_IsSuspended guard (no-suspend-guard-on-background-tick-and-focus-poll)", _UFPS_FocusPollHasSuspendGuard)
 
 _UFPS_BackgroundTickHasSuspendGuard() {
-	Src := _UFPS_ReadSource("updater.ahk")
+	Src := _UFPS_ReadSource("Updater_BackgroundTick")
 	Seg := _DriverFuncBody("Updater_BackgroundTick")
 	Assert(Seg != "", "Updater_BackgroundTick(*) declaration must exist in modules/updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
