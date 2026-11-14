@@ -248,8 +248,14 @@ local function run(mode, tools, wayland)
 	local bin, log, out = root .. "/bin", root .. "/calls.log", root .. "/screen.png"
 	os.execute("mkdir " .. ShellRunner.quote(bin))
 	os.execute("ln -s /bin/rm " .. ShellRunner.quote(bin .. "/rm"))
+	-- Linked from where this host keeps them: Alpine's BusyBox applets live in
+	-- /usr/bin, not /bin.
 	for _, name in ipairs({ "mv", "tail", "od", "tr" }) do
-		os.execute("ln -s /bin/" .. name .. " " .. ShellRunner.quote(bin .. "/" .. name))
+		local found = io.popen("command -v " .. name)
+		local target = found:read("*l")
+		found:close()
+		assert(target and target:sub(1, 1) == "/", "the screen capture check needs " .. name)
+		os.execute("ln -s " .. ShellRunner.quote(target) .. " " .. ShellRunner.quote(bin .. "/" .. name))
 	end
 	for tool, behaviour in pairs(tools) do
 		local path = bin .. "/" .. tool
