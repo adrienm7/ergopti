@@ -60,6 +60,14 @@ paused: its pause retires every AI operation (`LLM_AuxInvalidate("suspend")`
 in `aux_ownership.ahk`) and its tray greys the AI submenu; that is the EDD-1 on
 AHK item.
 
+Item (1) landed on `dev` at 8b2214fe (CI run 43628135718).
+
+Decision for (2), by the maintainer on 2026-11-14 (relayed by the coordinator
+at 21:40 Paris): defer to resume. A shortcut slot changed while paused is
+saved at once but takes effect only on resume; the resume chord stays the one
+that was active when the pause started. Apply the same rule on Windows and
+Linux, or state per OS why it already holds, with regression tests.
+
 Notes for (2), from reading `macos/ui/menu/menu_shortcuts.lua`:
 
 - Script-chord slot rows (`script_control_shortcuts` provider): the
