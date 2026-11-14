@@ -91,8 +91,13 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms on the three OS. Decided by the
       agent, to review by the maintainer: LLM temperature 0 to 1.3 and context length 80 to 4000 (their engines'
       limits), CapsWord idle timeout at most 3600 s, URLs at most 2048 characters, the updater interval kept on its
-      snap-to-preset rule, a typed user-code delay the one menu refusal told in words. Left: the one-shot timeout,
-      once worker A lands « 0 = no time limit ».
+      snap-to-preset rule, a typed user-code delay the one menu refusal told in words. Worker J landed the remaining
+      families on 2026-11-14 after CI run [43573261329](https://github.com/adrienm7/ergopti/actions/runs/43573261329) (its macOS Install-and-launch rows passed on the same
+      macOS code in [43550976833](https://github.com/adrienm7/ergopti/actions/runs/43550976833)): the updater check interval, the metrics application score, the layer
+      editor repeat count, the layout editor's tap-hold threshold and virtual key, the prompt binding's prediction
+      count, the Linux stored proxy override, the Windows magic-key source and log level, and the macOS hotstring
+      editor shortcut, each at entry, load and boundary with tests per OS (« Migration status » rows of the
+      inventory, each with its agent decision). Left: the one-shot timeout, once worker A lands « 0 = no time limit ».
 - [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
