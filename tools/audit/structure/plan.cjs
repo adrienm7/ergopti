@@ -1626,11 +1626,15 @@ function scanFile(file, text, ctx) {
 	const namesWindows =
 		file.includes('windows') ||
 		text.includes('/windows') ||
+		/["'`]windows\//.test(text) ||
 		/\bpath\.(?:join|resolve)\([^)]*(["'])windows\1/.test(text);
 	const toolDriverOf = (token) => {
 		if (inTree) return null;
 		if (namesWindows && /\.(?:ahk|ps1)$/.test(token)) return 'windows';
-		return namedDrivers.length === 1 ? namedDrivers[0] : null;
+		if (namedDrivers.length === 1) return namedDrivers[0];
+		// A tool naming both Lua drivers: a bare path only one of them holds.
+		const holders = namedDrivers.filter((d) => EXISTING.has(`${PREFIX}${d}/${token}`));
+		return holders.length === 1 ? holders[0] : null;
 	};
 	const category = categoryOf(file);
 	const seen = new Set();
@@ -2203,15 +2207,16 @@ function scanFile(file, text, ctx) {
 	// _SharedDir (or the driver's own folder), checked with a regular expression.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
 		for (const m of text.matchAll(
-			/(?<![\w\\])(_shared)?(?:\\\\[\w-]+)+(?:\\\.[A-Za-z0-9]+)(?![\w\\])/g
+			/(?<![\w\\])(_shared|windows)?(?:\\\\[\w-]+)+(?:\\\.[A-Za-z0-9]+)(?![\w\\])/g
 		)) {
-			// _shared\\data\\x\.json: the shared root named first, without a separator.
-			const lead = m[1] ? '_shared\\\\' : '';
+			// _shared\\data\\x\.json or windows\\infra\\x\.ahk: the root named
+			// first, without a separator.
+			const lead = m[1] ? `${m[1]}\\\\` : '';
 			const plain = m[0]
 				.slice(m[1] ? m[1].length : 0)
 				.replace(/\\\\/g, '/')
 				.replace(/\\\./g, '.');
-			const base = (m[1] ? [`${PREFIX}_shared`] : [`${PREFIX}_shared`, `${PREFIX}windows`]).find(
+			const base = (m[1] ? [`${PREFIX}${m[1]}`] : [`${PREFIX}_shared`, `${PREFIX}windows`]).find(
 				(b) => EXISTING.has(b + plain)
 			);
 			if (!base) continue;
