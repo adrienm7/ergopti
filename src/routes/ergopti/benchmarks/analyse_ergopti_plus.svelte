@@ -37,7 +37,7 @@
 	</p>
 	<image-block>
 		<enhanced:img
-			src="../../lib/images/benchmarks/plus/ergopti+_reduction_SFBs.jpg"
+			src="../../../lib/images/benchmarks/plus/ergopti+_reduction_SFBs.jpg"
 			alt="Screenshot de benchmark Ergopti+"
 		/>
 	</image-block>
@@ -52,14 +52,14 @@
 	<h4><Ergopti></Ergopti></h4>
 	<image-block>
 		<enhanced:img
-			src="../../lib/images/benchmarks/plus/SFBs_ergopti.jpg"
+			src="../../../lib/images/benchmarks/plus/SFBs_ergopti.jpg"
 			alt="SFBs de la disposition Ergopti"
 		/>
 	</image-block>
 	<h4><ErgoptiPlus></ErgoptiPlus></h4>
 	<image-block>
 		<enhanced:img
-			src="../../lib/images/benchmarks/plus/SFBs_ergopti+.jpg"
+			src="../../../lib/images/benchmarks/plus/SFBs_ergopti+.jpg"
 			alt="SFBs de la disposition Ergopti+"
 		/>
 	</image-block>
@@ -97,7 +97,7 @@
 	<h3>Analyse de la fréquence d’utilisation des doigts</h3>
 	<image-block>
 		<enhanced:img
-			src="../../lib/images/benchmarks/plus/finger_usage_comparison.jpg"
+			src="../../../lib/images/benchmarks/plus/finger_usage_comparison.jpg"
 			alt="Comparaison de la fréquence d’utilisation des doigts"
 		/>
 	</image-block>

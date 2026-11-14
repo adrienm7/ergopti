@@ -10,6 +10,21 @@ const http = require('node:http');
 const artifact = require('../../ci/site-artifact.cjs');
 const { SITE_ROUTES } = artifact;
 
+// Site structure (src/lib/js/siteNavigation.js): the Disposition Ergopti pages
+// carry the reference keyboard; its « Essayer » sub-page carries the emulator;
+// each product's installation page carries its downloads.
+const LAYOUT_SECTION = '/ergopti';
+const NAVIGATION_FROM = '/ergopti';
+const EMULATION_ROUTE = '/ergopti/utilisation';
+const NAVIGATION_LINK = 'nav.subnav a[href$="ergopti/utilisation"]';
+const LAYOUT_DOWNLOADS_ROUTE = '/ergopti/installation';
+const PLUS_DOWNLOADS_ROUTE = '/ergopti-plus/installation';
+
+/** Whether a site route belongs to the Disposition Ergopti section. */
+function isLayoutRoute(route) {
+	return route === LAYOUT_SECTION || route.startsWith(LAYOUT_SECTION + '/');
+}
+
 const FIXTURE_TAG = 'v0.0.0-smoke-fixture';
 const FIXTURE_ASSETS = Object.freeze([
 	'Ergopti_windows.exe',
@@ -144,8 +159,8 @@ function authoredExternalFixture(url) {
 
 /** Genuine client navigation must preserve the document and use this artifact's target prefix. */
 async function exerciseNavigation(page, origin, basePath) {
-	const target = origin + basePath + '/utilisation';
-	const link = page.locator('header a[href="utilisation"]').first();
+	const target = origin + basePath + EMULATION_ROUTE;
+	const link = page.locator(NAVIGATION_LINK).first();
 	await link.waitFor({ state: 'visible' });
 	assert.equal(new URL(await link.getAttribute('href'), page.url()).href, target);
 	// A marker on the window proves the document survived: Chromium derives
@@ -180,9 +195,9 @@ async function exerciseEmulationReadiness(page) {
 /** Inspect live rendered release URLs; only local authored downloads receive real HTTP HEAD. */
 async function exerciseDownloads(page, origin, basePath, route) {
 	const names =
-		route === '/utilisation'
+		route === LAYOUT_DOWNLOADS_ROUTE
 			? FIXTURE_ASSETS.slice(0, 2)
-			: route === '/ergopti-plus'
+			: route === PLUS_DOWNLOADS_ROUTE
 				? FIXTURE_ASSETS.slice(2)
 				: [];
 	for (const name of names) {
@@ -191,10 +206,10 @@ async function exerciseDownloads(page, origin, basePath, route) {
 		await link.waitFor({ state: 'attached' });
 		assert.equal(await link.getAttribute('href'), expected, 'Rendered fixture asset URL');
 	}
-	if (route === '/utilisation') {
+	if (route === LAYOUT_DOWNLOADS_ROUTE) {
 		for (const name of ['printable_layout_v2.2.pdf', 'printable_layout_v2.2_full.pdf']) {
-			const href = 'documents/' + name;
-			const link = page.locator('a[download][href="' + href + '"]').first();
+			// The page renders the asset path relative to its own depth.
+			const link = page.locator('a[download][href$="/documents/' + name + '"]').first();
 			await link.waitFor({ state: 'attached' });
 			const url = new URL(await link.getAttribute('href'), page.url()).href;
 			assert.equal(url, origin + basePath + '/documents/' + name, 'Local download target prefix');
@@ -214,17 +229,19 @@ async function exercisePage(page, origin, basePath, errors) {
 		const response = await page.goto(origin + basePath + route, { waitUntil: 'networkidle' });
 		assert.ok(response?.ok(), 'Authored artifact route refused: ' + route);
 		await page.locator('main').first().waitFor({ state: 'visible' });
-		if (route === '/utilisation') await exerciseEmulationReadiness(page);
-		const toggle = page.locator('#afficher-clavier-reference');
-		const keyboard = page.locator('#clavier-ref');
-		await toggle.waitFor({ state: 'visible' });
-		assert.equal(await keyboard.isVisible(), false, 'Reference starts hidden');
-		await toggle.click();
-		await keyboard.waitFor({ state: 'visible' });
-		await toggle.click();
-		await keyboard.waitFor({ state: 'hidden' });
+		if (route === EMULATION_ROUTE) await exerciseEmulationReadiness(page);
+		if (isLayoutRoute(route)) {
+			const toggle = page.locator('#afficher-clavier-reference');
+			const keyboard = page.locator('#clavier-ref');
+			await toggle.waitFor({ state: 'visible' });
+			assert.equal(await keyboard.isVisible(), false, 'Reference starts hidden');
+			await toggle.click();
+			await keyboard.waitFor({ state: 'visible' });
+			await toggle.click();
+			await keyboard.waitFor({ state: 'hidden' });
+		}
 		await exerciseDownloads(page, origin, basePath, route);
-		if (route === '/') await exerciseNavigation(page, origin, basePath);
+		if (route === NAVIGATION_FROM) await exerciseNavigation(page, origin, basePath);
 		assert.equal(errors.local.length, 0, 'Local resource failures: ' + errors.local.join('; '));
 		assert.equal(errors.page.length, 0, 'Browser failures: ' + errors.page.join('; '));
 	}
@@ -378,6 +395,12 @@ async function main(args = process.argv.slice(2)) {
 
 module.exports = {
 	SITE_ROUTES,
+	NAVIGATION_FROM,
+	NAVIGATION_LINK,
+	EMULATION_ROUTE,
+	LAYOUT_DOWNLOADS_ROUTE,
+	PLUS_DOWNLOADS_ROUTE,
+	isLayoutRoute,
 	requestPath,
 	resolveRequest,
 	serveRequest,

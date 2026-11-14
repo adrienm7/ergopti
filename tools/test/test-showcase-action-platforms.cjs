@@ -79,7 +79,7 @@ const DRIVERS = ['ahk', 'hs', 'linux'];
 	// Execute the actual server loader against the physical shared catalogue.
 	// Picker structure is not dispatchable and must not become a marketed action.
 	const loader = fs.readFileSync(
-		path.join(ROOT, 'src/routes/ergopti-plus/+page.server.js'),
+		path.join(ROOT, 'src/routes/ergopti-plus/site-data.server.js'),
 		'utf8'
 	);
 	const first = loader.indexOf('function loadActionGroups() {');

@@ -100,7 +100,7 @@ async function checkHotstringSources() {
 	const urlOwner = fs.readFileSync(path.join(root, 'src/lib/js/hotstringDataUrls.js'), 'utf8');
 	const catalogue = '/ergopti_plus/_shared/hotstrings/data/catalogue';
 	const page = fs.readFileSync(
-		path.join(root, 'src/routes/utilisation/introduction_telechargements.svelte'),
+		path.join(root, 'src/routes/ergopti/utilisation/introduction_utilisation.svelte'),
 		'utf8'
 	);
 	const script = page.slice(page.indexOf('<script>') + 8, page.indexOf('</script>'));
@@ -179,7 +179,7 @@ async function checkHotstringSources() {
 			onMount: (callback) => mounts.push(callback),
 			console: { error: (...values) => errors.push(values) },
 			magicSampleToml: fs.readFileSync(
-				path.join(root, 'src/routes/utilisation/magic_sample.toml'),
+				path.join(root, 'src/routes/ergopti/utilisation/magic_sample.toml'),
 				'utf8'
 			)
 		});

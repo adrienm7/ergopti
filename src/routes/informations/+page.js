@@ -1,3 +1,5 @@
-// since there's no dynamic data here, we can prerender
-// it so that it gets served as a static asset in production
-export const prerender = true;
+// src/routes/informations/+page.js
+
+// Written as informations/index.html so that both /informations and /informations/ (the form the
+// former header link used) reach the redirect on a static host.
+export const trailingSlash = 'always';

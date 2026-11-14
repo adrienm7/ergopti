@@ -81,7 +81,7 @@
 	<tiny-space></tiny-space>
 
 	<div style="text-align:center;">
-		<a href={resolve('/utilisation')}>
+		<a href={resolve('/ergopti/utilisation')}>
 			<button class="alt-button">➜ Essayer en ligne / Installation</button>
 		</a>
 	</div>

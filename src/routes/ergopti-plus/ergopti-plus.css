@@ -637,3 +637,23 @@
 		animation: none;
 	}
 }
+
+/* ==========================================
+ * ==========================================
+ * ======= 9/ Sub-Page Title ================
+ * ==========================================
+ * ========================================== */
+
+/* Each sub-page opens with its own title; its first section then needs
+ * no extra top padding. */
+.ep-root .ep-subpage-title {
+	color: var(--ink);
+	font-size: clamp(2rem, 5vw, 3rem);
+	font-weight: 700;
+	margin: clamp(24px, 4vw, 48px) 0 0;
+	text-align: center;
+}
+
+.ep-root .ep-subpage-title + section {
+	padding-top: clamp(16px, 3vw, 40px);
+}

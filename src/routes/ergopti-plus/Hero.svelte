@@ -19,6 +19,7 @@ FEATURES & RATIONALE:
 <script>
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
+	import { resolve } from '$app/paths';
 	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
 	import WindowChrome from './WindowChrome.svelte';
 	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
@@ -185,7 +186,7 @@ FEATURES & RATIONALE:
 				<i class={primaryDownload.icon}></i>
 				<span>{primaryDownload.label}</span>
 			</a>
-			<a class="btn btn-secondary" href="#ep-telecharger">
+			<a class="btn btn-secondary" href={resolve('/ergopti-plus/installation') + '#ep-telecharger'}>
 				<span>{t('Installation & comparatif ↓')}</span>
 			</a>
 		</div>

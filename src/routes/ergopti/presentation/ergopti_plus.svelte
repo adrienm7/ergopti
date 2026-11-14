@@ -1,4 +1,5 @@
 <script>
+	import { resolve } from '$app/paths';
 	import '#lib/css/orb.css';
 
 	import Ergopti from '#lib/components/Ergopti.svelte';
@@ -33,7 +34,7 @@
 					parcourir. Découvrez cette amélioration (optionnelle) de la disposition en consultant la
 					page associée :
 				</p>
-				<a href="ergopti-plus" style="text-decoration: none;"
+				<a href={resolve('/ergopti-plus')} style="text-decoration: none;"
 					><button
 						style="display:block; margin: 0 auto; margin-bottom: 25px; background: rgba(0, 0, 0, 0.2); padding: 10px; padding-top: 6px; border-radius: 3px; border: 1px solid white;"
 						><ErgoptiPlus /></button

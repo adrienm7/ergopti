@@ -1,17 +1,17 @@
 <script>
 	import Ergopti from '../components/Ergopti.svelte';
-	import ErgoptiPlus from '../components/ErgoptiPlus.svelte';
 
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 
 	import { getKeyboardData } from '#lib/keyboard/data/getKeyboardData.js';
 	import { version, layoutData, versionsList, discordLink } from '#lib/stores_infos.js';
+	import { PRODUCTS, isInSection } from '#lib/js/siteNavigation.js';
 
 	function closeMenu() {
 		document.getElementById('menu-btn').checked = false;
-		document.getElementById('clavier-ref').style.zIndex =
-			'-999'; /* Si le clavier était ouvert, on le ferme */
+		const reference = document.getElementById('clavier-ref');
+		if (reference) reference.style.zIndex = '-999'; /* Si le clavier était ouvert, on le ferme */
 		document.body.style.overflowY = 'visible';
 	}
 
@@ -29,6 +29,10 @@
 			document.body.style.overflowY = 'visible';
 		}
 
+		// Pages without a table of contents (home, overviews, Studio) have nothing to move.
+		hasToc = Boolean(toc && tocPc);
+		if (!hasToc) return;
+
 		// Changement de l'emplacement du menu de la page selon qu’on soit sur pc ou mobile
 		if (siteWidth <= 1280) {
 			tocMobile.appendChild(toc);
@@ -37,8 +41,11 @@
 		}
 	}
 
+	let hasToc = $state(true);
+
 	// Exécuter la fonction après la mise à jour et au redimensionnement
 	$effect(() => {
+		page.url.pathname;
 		toggleOverflowMenu();
 		window.addEventListener('resize', toggleOverflowMenu);
 
@@ -47,9 +54,12 @@
 		};
 	});
 
-	function isCurrent(path) {
-		return page.url.pathname === path || page.url.pathname === resolve(path);
+	function isCurrent(route) {
+		return isInSection(page.url.pathname, resolve(route));
 	}
+
+	// The layout version selector belongs to the Disposition Ergopti pages only.
+	let onLayoutPages = $derived(isCurrent('/ergopti'));
 
 	$effect(() => {
 		getKeyboardData($version)
@@ -64,46 +74,49 @@
 
 <header>
 	<div id="ergopti-header">
-		<a href="./" aria-label="Accéder à la page d’accueil">
-			<img src="img/logo/logo.svg" class="logo" alt="Logo Ergopti" />
+		<a href={resolve('/')} aria-label="Accéder à la page d’accueil">
+			<img src={asset('img/logo/logo.svg')} class="logo" alt="Logo Ergopti" />
 		</a>
 		<div id="ergopti-title">
 			<strong class="no-gradient text-white">
-				<a href="./" aria-label="Accéder à la page d’accueil">
-					<span class="min-width-300">Disposition </span>
-					<span class="min-width-350">clavier </span>
-				</a>
-				<a href="./" aria-label="Accéder à la page d’accueil">
+				<a href={resolve('/')} aria-label="Accéder à la page d’accueil">
 					<Ergopti></Ergopti>
 				</a>
-				<div class="min-width-400">
-					<select id="version-selection" bind:value={$version}>
-						{#each versionsList as v}
-							<option value={v}>{v}</option>
-						{/each}
-					</select>
-					<a
-						href="informations/#changelog"
-						aria-label="Accéder à la page d’accueil"
-						style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
-					>
-						<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
-					</a>
+				<span class="min-width-400">
+					{#if onLayoutPages}
+						<select
+							id="version-selection"
+							bind:value={$version}
+							aria-label="Version de la Disposition Ergopti"
+						>
+							{#each versionsList as v}
+								<option value={v}>{v}</option>
+							{/each}
+						</select>
+						<a
+							href={resolve('/ergopti/informations') + '#changelog'}
+							aria-label="Voir l’historique des versions de la Disposition Ergopti"
+							style="position:relative; left:-0.1em; top:-0.65em; font-size:0.8em"
+						>
+							<i class="icon-circle-info"><span class="path1"></span><span class="path2"></span></i>
+						</a>
+					{/if}
 					<span style="display:inline-block; width:0.15em"></span>
 					<span class="links">
-						<a href="https://github.com/adrienm7/ergopti" target="_blank">
+						<a href="https://github.com/adrienm7/ergopti" target="_blank" aria-label="Repo GitHub">
 							<i class="icon-github" style="transform: scale(0.927536)"></i>
 						</a>
 						<span> – </span>
-						<a href={discordLink} target="_blank">
+						<a href={discordLink} target="_blank" aria-label="Serveur Discord">
 							<i class="icon-discord"></i>
 						</a>
 					</span>
-				</div>
+				</span>
 			</strong>
 			<p id="ergopti-subtitle">
-				<strong class="min-width-300" style="font-size:1.1em">Ergonomie optimisée</strong>
-				<span class="min-width-600"> pour le français, l’anglais et le code</span>
+				<strong class="min-width-300" style="font-size:1.1em"
+					>Optimisation de l’ergonomie clavier</strong
+				>
 			</p>
 		</div>
 	</div>
@@ -111,79 +124,31 @@
 	<label class="menu-icon" for="menu-btn"><span class="navicon"></span></label>
 	<nav id="menu">
 		<div id="menu-pages">
-			<a
-				href="./"
-				onclick={closeMenu}
-				aria-label="Accéder à la page d’accueil"
-				aria-current={isCurrent('/') ? 'page' : undefined}
-			>
-				<i class="icon-keyboard-duotone" style="margin-right:7px;">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title">Accueil</span>
-			</a>
-			<a
-				href="ergopti-plus"
-				onclick={closeMenu}
-				aria-label="Accéder à la page Ergopti+"
-				aria-current={isCurrent('/ergopti-plus') ? 'page' : undefined}
-			>
-				<i class="icon-circle-star" style="margin-right:3px; margin-top:1px">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title" style="margin-top:3px;">
-					Ergopti<span class="glow plus">+</span>
-				</span>
-			</a>
-			<a
-				href="studio"
-				onclick={closeMenu}
-				aria-label="Accéder à Ergopti Studio, l’éditeur de disposition"
-				aria-current={isCurrent('/studio') ? 'page' : undefined}
-			>
-				<i class="icon-keyboard-duotone" style="margin-right:7px;">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title">Studio</span>
-			</a>
-			<a
-				href="benchmarks"
-				onclick={closeMenu}
-				aria-label="Accéder à la page Benchmarks"
-				aria-current={isCurrent('/benchmarks') ? 'page' : undefined}
-			>
-				<i class="icon-chart-mixed" style="margin-right:7px;">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title" style="margin-top:3px;">Benchmarks</span>
-			</a>
-			<a
-				href="utilisation"
-				onclick={closeMenu}
-				aria-label="Accéder à la page Utilisation"
-				aria-current={isCurrent('/utilisation') ? 'page' : undefined}
-			>
-				<i class="icon-download" style="margin-right:5px">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title">Utilisation</span>
-			</a>
-			<a
-				href="informations"
-				onclick={closeMenu}
-				aria-current={isCurrent('/informations') ? 'page' : undefined}
-				aria-label="Accéder à la page Informations"
-			>
-				<i class="icon-circle-info" style="margin-right:5px; margin-top:2px">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title">Informations</span>
-			</a>
+			{#each PRODUCTS as product (product.id)}
+				<a
+					href={resolve(product.route)}
+					onclick={closeMenu}
+					data-product={product.id}
+					aria-label={'Accéder à la page ' + product.name}
+					aria-current={isCurrent(product.route) ? 'page' : undefined}
+				>
+					<img class="product-icon" src={asset(product.icon)} alt="" width="22" height="22" />
+					<span class="title">
+						{#if product.id === 'ergopti-plus'}
+							Ergopti<span class="glow plus">+</span>
+						{:else}
+							{product.menuLabel}
+						{/if}
+					</span>
+				</a>
+			{/each}
 		</div>
 		<div id="menu-page-content">
-			<nav id="menu-page-content-title">Contenu de la page</nav>
-			<hr />
-			<br />
+			{#if hasToc}
+				<nav id="menu-page-content-title">Contenu de la page</nav>
+				<hr />
+				<br />
+			{/if}
 			<div
 				id="page-toc-mobile"
 				onclick={closeMenu}
@@ -279,9 +244,7 @@
 	}
 
 	.min-width-300,
-	.min-width-350,
-	.min-width-400,
-	.min-width-600 {
+	.min-width-400 {
 		display: none;
 	}
 	@media (min-width: 300px) {
@@ -289,18 +252,8 @@
 			display: inline;
 		}
 	}
-	@media (min-width: 350px) {
-		.min-width-350 {
-			display: inline;
-		}
-	}
 	@media (min-width: 400px) {
 		.min-width-400 {
-			display: inline;
-		}
-	}
-	@media (min-width: 600px) {
-		.min-width-600 {
 			display: inline;
 		}
 	}
@@ -347,6 +300,13 @@
 		font-size: 0.95em;
 	}
 
+	#menu-pages .product-icon {
+		flex: none;
+		height: 22px;
+		margin-right: 7px;
+		width: 22px;
+	}
+
 	#menu-pages a:not([aria-current='page']) .title:hover {
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -362,9 +322,7 @@
 		padding: 0.08em 0;
 	}
 
-	#menu-pages a[aria-current='page'] .title,
-	#menu-pages a[aria-current='page'] i .path1::before,
-	#menu-pages a[aria-current='page'] i .path2::before {
+	#menu-pages a[aria-current='page'] .title {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -372,10 +330,6 @@
 		-webkit-box-decoration-break: clone;
 		box-decoration-break: clone;
 		color: transparent;
-	}
-
-	#menu-pages a[aria-current='page'] i .path1::before {
-		background-image: linear-gradient(var(--gradient-purple-dark));
 	}
 
 	/* Correct problem of the "+" of Ergopti+ title being too low */

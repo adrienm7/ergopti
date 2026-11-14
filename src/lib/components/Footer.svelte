@@ -5,7 +5,7 @@
 </script>
 
 <footer>
-	<div>— Disposition <Ergopti></Ergopti> —</div>
+	<div>— <Ergopti></Ergopti> —</div>
 	<div style="font-size: 0.8rem; margin-top: 0.2rem;">
 		<a href="https://github.com/adrienm7/ergopti" target="_blank" class="text-white"
 			>Repo GitHub <i class="icon-github"></i></a

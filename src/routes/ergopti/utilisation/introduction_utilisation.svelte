@@ -276,7 +276,7 @@
 </script>
 
 <div class="main">
-	<h1 data-aos="zoom-in">Utiliser <Ergopti></Ergopti></h1>
+	<h1 data-aos="zoom-in">Essayer la Disposition <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
 </div>
 

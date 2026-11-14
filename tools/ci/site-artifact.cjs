@@ -28,14 +28,27 @@ const LIMITS = Object.freeze({
 	totalBytes: 4 * 1024 * 1024 * 1024
 });
 
+// Real pages of the site, in browsing order; the former addresses (/editeur,
+// /benchmarks, /utilisation, /informations) are redirects that
+// site-structure.playwright.cjs exercises.
 const SITE_ROUTES = Object.freeze([
 	'/',
-	'/utilisation',
-	'/informations',
-	'/benchmarks',
-	'/studio',
+	'/ergopti',
+	'/ergopti/presentation',
+	'/ergopti/utilisation',
+	'/ergopti/installation',
+	'/ergopti/benchmarks',
+	'/ergopti/informations',
 	'/ergopti-plus',
-	'/ergopti-plus-old'
+	'/ergopti-plus/presentation',
+	'/ergopti-plus/hotstrings',
+	'/ergopti-plus/ia',
+	'/ergopti-plus/fonctionnalites',
+	'/ergopti-plus/configuration',
+	'/ergopti-plus/installation',
+	'/ergopti-plus/faq',
+	'/ergopti-plus-old',
+	'/studio'
 ]);
 const SITE_BROWSERS = Object.freeze(['chromium', 'webkit']);
 

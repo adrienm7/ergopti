@@ -698,7 +698,7 @@ if (!/build\/linux\/\$\{\{ env\.LINUX_BUNDLE_ASSET \}\}\.sha256/.test(packageLin
 // downloads; advertising them separately produces an installer that fails at
 // import time. Keep the uninstall command wired through Svelte interpolation,
 // not through a literal `${branch}` in markup.
-const LAYOUT_INSTALL_PAGE = 'src/routes/utilisation/installation_linux.svelte';
+const LAYOUT_INSTALL_PAGE = 'src/routes/ergopti/installation/installation_linux.svelte';
 const layoutInstallPageSrc = read(LAYOUT_INSTALL_PAGE);
 const scriptEnd = layoutInstallPageSrc.indexOf('</script>');
 const layoutInstallMarkup = layoutInstallPageSrc.slice(scriptEnd + '</script>'.length);

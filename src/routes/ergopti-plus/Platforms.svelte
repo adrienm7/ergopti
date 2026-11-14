@@ -13,6 +13,7 @@ under another configuration path.
 -->
 
 <script>
+	import { resolve } from '$app/paths';
 	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
 	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
@@ -26,6 +27,10 @@ under another configuration path.
 
 	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
 	let { macosApps } = $props();
+
+	// The five inventory tables hold thousands of cells: each one renders only
+	// while its panel is open, so the page does not build them up front.
+	let tablesOpen = $state([false, false, false, false, false]);
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
@@ -44,214 +49,224 @@ under another configuration path.
 			</p>
 		</header>
 
-		<details class="table-wrap" use:reveal>
+		<details class="table-wrap" use:reveal bind:open={tablesOpen[0]}>
 			<summary>{t('Inventaire des réglages et fonctionnalités')} ({matrix.length})</summary>
-			<table class="matrix">
-				<thead>
-					<tr>
-						<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
-						<th>
-							<i class="icon-windows"></i>
-							<span class="os-name">Windows</span>
-							<span class="os-driver">AutoHotkey v2</span>
-						</th>
-						<th>
-							<i class="icon-appleinc"></i>
-							<span class="os-name">macOS</span>
-							<span class="os-driver">Hammerspoon</span>
-						</th>
-						<th>
-							<i class="icon-linux"></i>
-							<span class="os-name">Linux</span>
-							<span class="os-driver">Lua · alpha</span>
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each matrix as row, i}
-						<tr style="--row: {i};">
-							<td class="feat-col"
-								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
-							>
-							{#each [row.platforms.windows, row.platforms.macos, row.platforms.linux] as available}
-								<td
-									class:ok={available}
-									class:off={!available}
-									class="cell"
-									title={!available ? row.reason?.[i18n.lang] : undefined}
-									>{available ? '✓' : '—'}</td
-								>
-							{/each}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</details>
-
-		<details class="table-wrap" use:reveal>
-			<summary>{t('Comportements examinés dans le code')} ({behaviors.length})</summary>
-			<p class="lead">
-				{t(
-					'Ce catalogue complémentaire couvre les comportements examinés. Il ne constitue pas un inventaire exhaustif ni une garantie de fonctionnement dans chaque application.'
-				)}
-			</p>
-			<table class="matrix">
-				<thead>
-					<tr>
-						<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
-						<th>Windows</th>
-						<th>macOS</th>
-						<th>Linux</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each behaviors as row}
+			{#if tablesOpen[0]}
+				<table class="matrix">
+					<thead>
 						<tr>
-							<td class="feat-col">{row.labels[i18n.lang]}</td>
-							{#each ['windows', 'macos', 'linux'] as os}
-								<td>
-									<span class:ok={row.platforms[os]} class:off={!row.platforms[os]} class="cell"
-										>{row.platforms[os] ? '✓' : '—'}</span
+							<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
+							<th>
+								<i class="icon-windows"></i>
+								<span class="os-name">Windows</span>
+								<span class="os-driver">AutoHotkey v2</span>
+							</th>
+							<th>
+								<i class="icon-appleinc"></i>
+								<span class="os-name">macOS</span>
+								<span class="os-driver">Hammerspoon</span>
+							</th>
+							<th>
+								<i class="icon-linux"></i>
+								<span class="os-name">Linux</span>
+								<span class="os-driver">Lua · alpha</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each matrix as row, i}
+							<tr style="--row: {i};">
+								<td class="feat-col"
+									>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+								>
+								{#each [row.platforms.windows, row.platforms.macos, row.platforms.linux] as available}
+									<td
+										class:ok={available}
+										class:off={!available}
+										class="cell"
+										title={!available ? row.reason?.[i18n.lang] : undefined}
+										>{available ? '✓' : '—'}</td
 									>
-									<small class="behavior-note">{row.notes[os][i18n.lang]}</small>
-								</td>
-							{/each}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
 		</details>
 
-		<details class="table-wrap" use:reveal>
+		<details class="table-wrap" use:reveal bind:open={tablesOpen[1]}>
+			<summary>{t('Comportements examinés dans le code')} ({behaviors.length})</summary>
+			{#if tablesOpen[1]}
+				<p class="lead">
+					{t(
+						'Ce catalogue complémentaire couvre les comportements examinés. Il ne constitue pas un inventaire exhaustif ni une garantie de fonctionnement dans chaque application.'
+					)}
+				</p>
+				<table class="matrix">
+					<thead>
+						<tr>
+							<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
+							<th>Windows</th>
+							<th>macOS</th>
+							<th>Linux</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each behaviors as row}
+							<tr>
+								<td class="feat-col">{row.labels[i18n.lang]}</td>
+								{#each ['windows', 'macos', 'linux'] as os}
+									<td>
+										<span class:ok={row.platforms[os]} class:off={!row.platforms[os]} class="cell"
+											>{row.platforms[os] ? '✓' : '—'}</span
+										>
+										<small class="behavior-note">{row.notes[os][i18n.lang]}</small>
+									</td>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+		</details>
+
+		<details class="table-wrap" use:reveal bind:open={tablesOpen[2]}>
 			<summary>{t('Inventaire des actions configurables')} ({actions.length})</summary>
-			<table class="matrix">
-				<thead>
-					<tr>
-						<th class="feat-col">{t('Action')}</th>
-						<th>
-							<i class="icon-windows"></i>
-							<span class="os-name">Windows</span>
-							<span class="os-driver">AutoHotkey v2</span>
-						</th>
-						<th>
-							<i class="icon-appleinc"></i>
-							<span class="os-name">macOS</span>
-							<span class="os-driver">Hammerspoon</span>
-						</th>
-						<th>
-							<i class="icon-linux"></i>
-							<span class="os-name">Linux</span>
-							<span class="os-driver">Lua · alpha</span>
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each actions as row, i}
-						<tr style="--row: {i};">
-							<td class="feat-col"
-								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
-							>
-							{#each ['windows', 'macos', 'linux'] as os}
-								{@const available = row.platforms[os]}
-								<td
-									class:ok={available}
-									class:off={!available}
-									class="cell"
-									title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
-								>
-							{/each}
+			{#if tablesOpen[2]}
+				<table class="matrix">
+					<thead>
+						<tr>
+							<th class="feat-col">{t('Action')}</th>
+							<th>
+								<i class="icon-windows"></i>
+								<span class="os-name">Windows</span>
+								<span class="os-driver">AutoHotkey v2</span>
+							</th>
+							<th>
+								<i class="icon-appleinc"></i>
+								<span class="os-name">macOS</span>
+								<span class="os-driver">Hammerspoon</span>
+							</th>
+							<th>
+								<i class="icon-linux"></i>
+								<span class="os-name">Linux</span>
+								<span class="os-driver">Lua · alpha</span>
+							</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each actions as row, i}
+							<tr style="--row: {i};">
+								<td class="feat-col"
+									>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+								>
+								{#each ['windows', 'macos', 'linux'] as os}
+									{@const available = row.platforms[os]}
+									<td
+										class:ok={available}
+										class:off={!available}
+										class="cell"
+										title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
+									>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
 		</details>
 
-		<details class="table-wrap" use:reveal>
+		<details class="table-wrap" use:reveal bind:open={tablesOpen[3]}>
 			<summary>{t('Touches tap-hold par système')} ({inputs.length})</summary>
-			<table class="matrix">
-				<thead>
-					<tr>
-						<th class="feat-col">{t('Action')}</th>
-						<th>
-							<i class="icon-windows"></i>
-							<span class="os-name">Windows</span>
-							<span class="os-driver">AutoHotkey v2</span>
-						</th>
-						<th>
-							<i class="icon-appleinc"></i>
-							<span class="os-name">macOS</span>
-							<span class="os-driver">Hammerspoon</span>
-						</th>
-						<th>
-							<i class="icon-linux"></i>
-							<span class="os-name">Linux</span>
-							<span class="os-driver">Lua · alpha</span>
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each inputs as row, i}
-						<tr style="--row: {i};">
-							<td class="feat-col"
-								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
-							>
-							{#each ['windows', 'macos', 'linux'] as os}
-								{@const available = row.platforms[os]}
-								<td
-									class:ok={available}
-									class:off={!available}
-									class="cell"
-									title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
-								>
-							{/each}
+			{#if tablesOpen[3]}
+				<table class="matrix">
+					<thead>
+						<tr>
+							<th class="feat-col">{t('Action')}</th>
+							<th>
+								<i class="icon-windows"></i>
+								<span class="os-name">Windows</span>
+								<span class="os-driver">AutoHotkey v2</span>
+							</th>
+							<th>
+								<i class="icon-appleinc"></i>
+								<span class="os-name">macOS</span>
+								<span class="os-driver">Hammerspoon</span>
+							</th>
+							<th>
+								<i class="icon-linux"></i>
+								<span class="os-name">Linux</span>
+								<span class="os-driver">Lua · alpha</span>
+							</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each inputs as row, i}
+							<tr style="--row: {i};">
+								<td class="feat-col"
+									>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+								>
+								{#each ['windows', 'macos', 'linux'] as os}
+									{@const available = row.platforms[os]}
+									<td
+										class:ok={available}
+										class:off={!available}
+										class="cell"
+										title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
+									>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
 		</details>
 
-		<details class="table-wrap" use:reveal>
+		<details class="table-wrap" use:reveal bind:open={tablesOpen[4]}>
 			<summary>{t('Options de menu propres à certains systèmes')} ({actions.length})</summary>
-			<table class="matrix">
-				<thead>
-					<tr>
-						<th class="feat-col">{t('Option')}</th>
-						<th>
-							<i class="icon-windows"></i>
-							<span class="os-name">Windows</span>
-							<span class="os-driver">AutoHotkey v2</span>
-						</th>
-						<th>
-							<i class="icon-appleinc"></i>
-							<span class="os-name">macOS</span>
-							<span class="os-driver">Hammerspoon</span>
-						</th>
-						<th>
-							<i class="icon-linux"></i>
-							<span class="os-name">Linux</span>
-							<span class="os-driver">Lua · alpha</span>
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each menuGaps as row, i}
-						<tr style="--row: {i};">
-							<td class="feat-col"
-								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
-							>
-							{#each ['windows', 'macos', 'linux'] as os}
-								{@const available = row.platforms[os]}
-								<td
-									class:ok={available}
-									class:off={!available}
-									class="cell"
-									title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
-								>
-							{/each}
+			{#if tablesOpen[4]}
+				<table class="matrix">
+					<thead>
+						<tr>
+							<th class="feat-col">{t('Option')}</th>
+							<th>
+								<i class="icon-windows"></i>
+								<span class="os-name">Windows</span>
+								<span class="os-driver">AutoHotkey v2</span>
+							</th>
+							<th>
+								<i class="icon-appleinc"></i>
+								<span class="os-name">macOS</span>
+								<span class="os-driver">Hammerspoon</span>
+							</th>
+							<th>
+								<i class="icon-linux"></i>
+								<span class="os-name">Linux</span>
+								<span class="os-driver">Lua · alpha</span>
+							</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{#each menuGaps as row, i}
+							<tr style="--row: {i};">
+								<td class="feat-col"
+									>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+								>
+								{#each ['windows', 'macos', 'linux'] as os}
+									{@const available = row.platforms[os]}
+									<td
+										class:ok={available}
+										class:off={!available}
+										class="cell"
+										title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
+									>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
 		</details>
 
 		<p class="legend" use:reveal>
@@ -381,7 +396,7 @@ under another configuration path.
 				{/if}
 			</p>
 			<p class="cta-foot">
-				<a href="utilisation" class="cta-link"
+				<a href={resolve('/ergopti/installation')} class="cta-link"
 					>{@html t(
 						'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →'
 					)}</a

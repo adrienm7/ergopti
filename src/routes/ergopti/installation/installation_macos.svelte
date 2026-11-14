@@ -1,4 +1,5 @@
 <script>
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import Ergopti from '#lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
@@ -31,7 +32,8 @@
 <tiny-space></tiny-space>
 
 <p>
-	Le driver <a href="ergopti-plus" class="link"><ErgoptiPlus /></a> s'installe aussi avec
+	Le driver <a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a> s'installe aussi
+	avec
 	<a href="https://brew.sh" class="link" target="_blank" rel="noopener">Homebrew</a>, en choisissant
 	son canal de mises à jour :
 </p>
@@ -76,28 +78,28 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 	», mais elle peut aussi parfois se trouver dans « Autres ».
 </p>
 <enhanced:img
-	src="../../lib/images/macos_installation_1.jpg"
+	src="../../../lib/images/macos_installation_1.jpg"
 	alt="Screenshot 1/4 des paramètres macOS pour changer sa disposition de clavier"
 />
 <div style="margin-top:15px"></div>
 <enhanced:img
-	src="../../lib/images/macos_installation_2.jpg"
+	src="../../../lib/images/macos_installation_2.jpg"
 	alt="Screenshot 2/4 des paramètres macOS pour changer sa disposition de clavier"
 />
 <div style="margin-top:15px"></div>
 <enhanced:img
-	src="../../lib/images/macos_installation_3.jpg"
+	src="../../../lib/images/macos_installation_3.jpg"
 	alt="Screenshot 3/4 des paramètres macOS pour changer sa disposition de clavier"
 />
 <div style="margin-top:15px"></div>
 <enhanced:img
-	src="../../lib/images/macos_installation_4.jpg"
+	src="../../../lib/images/macos_installation_4.jpg"
 	alt="Screenshot 4/4 des paramètres macOS pour changer sa disposition de clavier"
 />
 <div style="margin-top:15px"></div>
 <p>La disposition pourra ensuite être sélectionnée depuis la barre des tâches :</p>
 <enhanced:img
-	src="../../lib/images/macos_language_bar.jpg"
+	src="../../../lib/images/macos_language_bar.jpg"
 	alt="Screenshot de la sélection de clavier dans la barre des tâches"
 />
 <div style="margin-top:15px"></div>
@@ -131,7 +133,7 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 	verrouillage, ce qui peut carrément empêcher la saisie de son mot de passe. Enfin, la fermeture
 	automatique des parenthèses ne fonctionne pas dans les éditeurs de code. Pour toutes ces raisons,
 	il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec le driver
-	<a href="ergopti-plus" class="link"><ErgoptiPlus /></a> pour y définir ces roulements.
+	<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a> pour y définir ces roulements.
 </p>
 <p>
 	Des <strong>variantes ANSI</strong> de ces dispositions sont également disponibles. En effet, sur
@@ -158,7 +160,7 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 		Les touches mortes suivies d'<kbd>Entrée</kbd> nécessitent un double appui sur
 		<kbd>Entrée</kbd>. En effet, il faut un premier appui pour valider la touche morte, puis un
 		second appui pour envoyer <kbd>Entrée</kbd>. Ce problème peut se résoudre avec le driver
-		<a href="ergopti-plus" class="link"><ErgoptiPlus /></a>.
+		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>.
 	</li>
 	<li>
 		Les touches mortes ne fonctionnent pas sur l'écran de verrouillage, ni les touches envoyant plus
@@ -184,5 +186,5 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 		avant d'être partagé. Ces tests sont à la fois manuels et automatisés par de nombreux tests unitaires
 		Python.
 	</li>
-	<enhanced:img src="../../lib/images/macos_open_bundle.jpg" alt="Ouverture du bundle" />
+	<enhanced:img src="../../../lib/images/macos_open_bundle.jpg" alt="Ouverture du bundle" />
 </ul>

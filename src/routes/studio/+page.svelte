@@ -14,7 +14,7 @@ save as downloads; nothing leaves the visitor's computer.
 
 <script>
 	import { asset, resolve } from '$app/paths';
-	import PageWrapper from '../PageWrapper.svelte';
+	import PageWrapper from '#lib/components/PageWrapper.svelte';
 
 	/** Height of the framed editor; it scrolls inside the frame beyond that. */
 	const EDITOR_HEIGHT_PX = 1400;
@@ -60,7 +60,9 @@ save as downloads; nothing leaves the visitor's computer.
 					<a href={resolve('/ergopti-plus')}>ErgoptiPlus</a>, le menu « Disposition clavier » ouvre
 					le même éditeur, qui sait installer la disposition sur le système ou l’émuler sans rien
 					installer (sans droit administrateur).
-					<a href={resolve('/ergopti-plus') + '#ep-telecharger'}>Télécharger ErgoptiPlus</a>.
+					<a href={resolve('/ergopti-plus/installation') + '#ep-telecharger'}
+						>Télécharger ErgoptiPlus</a
+					>.
 				</li>
 			</ol>
 		</bloc-introduction>

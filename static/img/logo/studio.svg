@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ergopti Studio mark: a keycap being edited by a pencil, on the dark disc and with the palette of the Ergopti logos. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-256 -256 512 512">
+	<circle r="244" fill="#343048" stroke="#edebf0" stroke-width="20"/>
+	<rect x="-170" y="-150" width="280" height="280" rx="56" fill="#edebf0"/>
+	<rect x="-128" y="-128" width="196" height="186" rx="36" fill="none" stroke="#343048" stroke-width="18"/>
+	<g transform="rotate(45 60 60)">
+		<rect x="22" y="-150" width="76" height="230" fill="#343048"/>
+		<rect x="36" y="-136" width="48" height="56" fill="#e83030"/>
+		<rect x="36" y="-74" width="48" height="140" fill="#f4c025"/>
+		<polygon points="22,80 98,80 60,170" fill="#343048"/>
+		<polygon points="36,94 84,94 60,150" fill="#edebf0"/>
+		<polygon points="51,129 69,129 60,150" fill="#343048"/>
+	</g>
+</svg>

@@ -168,7 +168,7 @@
 	<p>
 		Attention toutefois, car ces fréquences vont varier selon le texte analysé et la langue de
 		celui-ci. Vous trouverez plus de détails sur la page <a
-			href={resolve('/benchmarks')}
+			href={resolve('/ergopti/benchmarks')}
 			class="link">Benchmarks</a
 		>.
 	</p>

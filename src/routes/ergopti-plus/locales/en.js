@@ -200,5 +200,45 @@ export default {
 	'★ {n} sur GitHub': '★ {n} on GitHub',
 	'Sur macOS, aussi avec Homebrew :': 'On macOS, also with Homebrew:',
 	'Vous tapez déjà en Ergopti&nbsp;? Installez la disposition pour le combo complet →':
-		'Already typing in Ergopti? Install the layout for the full combo →'
+		'Already typing in Ergopti? Install the layout for the full combo →',
+
+	// Section pages of the split Ergopti+ site (2026-11-14).
+	'Pages d’Ergopti+': 'Ergopti+ pages',
+	'Tout Ergopti+, page par page': 'All of Ergopti+, page by page',
+	Aperçu: 'Overview',
+	Présentation: 'Introduction',
+	Fonctionnalités: 'Features',
+	'Configuration — Ergopti+': 'Configuration — Ergopti+',
+	'Les réglages d’Ergopti+, ses langues d’interface et le respect de votre vie privée.':
+		'Ergopti+ settings, interface languages and respect for your privacy.',
+	'FAQ — Ergopti+': 'FAQ — Ergopti+',
+	'Les questions fréquentes sur Ergopti+ : vie privée, compatibilité, IA, installation.':
+		'Frequently asked questions about Ergopti+: privacy, compatibility, AI, installation.',
+	'Fonctionnalités — Ergopti+': 'Features — Ergopti+',
+	'Les tap-holds, raccourcis, gestes trackpad et métriques de frappe d’Ergopti+.':
+		'Ergopti+ tap-holds, shortcuts, trackpad gestures and typing metrics.',
+	'Hotstrings — Ergopti+': 'Hotstrings — Ergopti+',
+	'Les hotstrings d’Ergopti+ : expansions, corrections et vos propres hotstrings.':
+		'Ergopti+ hotstrings: expansions, corrections and your own hotstrings.',
+	'IA — Ergopti+': 'AI — Ergopti+',
+	'Les prédictions par IA d’Ergopti+ : modèles locaux ou distants, profils et réglages.':
+		'Ergopti+ AI predictions: local or remote models, profiles and settings.',
+	'Installation — Ergopti+': 'Installation — Ergopti+',
+	'Démarrer avec Ergopti+ et le télécharger pour Windows, macOS ou Linux.':
+		'Get started with Ergopti+ and download it for Windows, macOS or Linux.',
+	'Présentation — Ergopti+': 'Introduction — Ergopti+',
+	'Pour qui est Ergopti+, ce qu’il ajoute à la disposition Ergopti et comment il se compare aux autres outils.':
+		'Who Ergopti+ is for, what it adds to the Ergopti layout and how it compares with other tools.',
+	'Pour qui, ce qu’il ajoute à la disposition Ergopti et comment il se compare.':
+		'Who it is for, what it adds to the Ergopti layout and how it compares.',
+	'Expansions, corrections et vos propres hotstrings.':
+		'Expansions, corrections and your own hotstrings.',
+	'Prédictions par IA locale ou distante, modèles et profils.':
+		'Local or remote AI predictions, models and profiles.',
+	'Tap-holds, raccourcis, gestes trackpad et métriques de frappe.':
+		'Tap-holds, shortcuts, trackpad gestures and typing metrics.',
+	'Réglages, langues d’interface et vie privée.': 'Settings, interface languages and privacy.',
+	'Démarrer en quelques étapes et télécharger pour Windows, macOS ou Linux.':
+		'Get started in a few steps and download for Windows, macOS or Linux.',
+	'Les réponses aux questions fréquentes.': 'Answers to frequently asked questions.'
 };

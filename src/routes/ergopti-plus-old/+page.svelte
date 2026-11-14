@@ -10,7 +10,7 @@
 	import Raccourcis from './raccourcis.svelte';
 	import Roulements from './roulements.svelte';
 	import Reduction_SFBs from './reduction_sfbs.svelte';
-	import PageWrapper from '../PageWrapper.svelte';
+	import PageWrapper from '#lib/components/PageWrapper.svelte';
 </script>
 
 <svelte:head>

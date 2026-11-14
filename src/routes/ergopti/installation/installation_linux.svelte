@@ -1,4 +1,5 @@
 <script>
+	import { resolve } from '$app/paths';
 	import Ergopti from '#lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
 	import { branchForInstall } from '#lib/js/isDev.js';
@@ -241,6 +242,6 @@
 		où pour tapper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
 		<kbd>P</kbd>. Par conséquent, il est plutôt recommandé d'utiliser la version standard d'<Ergopti
 		></Ergopti> ou « Ergopti+ » (un seul +) avec le driver
-		<a href="ergopti-plus" class="link"><ErgoptiPlus /></a>.
+		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>.
 	</li>
 </ul>

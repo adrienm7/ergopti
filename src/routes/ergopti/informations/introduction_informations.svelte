@@ -5,6 +5,6 @@
 </script>
 
 <section class="main">
-	<h1 data-aos="zoom-in">Informations sur la disposition <Ergopti></Ergopti></h1>
+	<h1 data-aos="zoom-in">Informations sur la Disposition <Ergopti></Ergopti></h1>
 	<hr class="margin-h1" />
 </section>

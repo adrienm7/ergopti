@@ -1,4 +1,5 @@
 <script>
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import Ergopti from '#lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
@@ -47,7 +48,7 @@
 <enhanced:img
 	class="no-upscale"
 	style="width: min(400px, 100%)!important;"
-	src="../../lib/images/windows_installation_1.jpg"
+	src="../../../lib/images/windows_installation_1.jpg"
 	alt="Screenshot d'installation du pilote KbdEdit"
 />
 
@@ -59,7 +60,7 @@
 	la langue installée (ici <code>Français (France)</code>) :
 </p>
 <enhanced:img
-	src="../../lib/images/windows_installation_2.jpg"
+	src="../../../lib/images/windows_installation_2.jpg"
 	alt="Screenshot 1/2 des paramètres Windows 11 pour changer sa disposition de clavier"
 />
 
@@ -69,7 +70,7 @@
 	par l'installateur de KbdEdit :
 </p>
 <enhanced:img
-	src="../../lib/images/windows_installation_3.jpg"
+	src="../../../lib/images/windows_installation_3.jpg"
 	alt="Screenshot 2/2 des paramètres Windows 11 pour changer sa disposition de clavier"
 />
 <p>
@@ -84,7 +85,7 @@
 <enhanced:img
 	class="no-upscale"
 	style="width: min(400px, 100%)!important;"
-	src="../../lib/images/windows_installation_4.jpg"
+	src="../../../lib/images/windows_installation_4.jpg"
 	alt="Screenshot du menu menu linguistique de la barre des tâches"
 />
 
@@ -99,7 +100,7 @@
 		<kbd>P</kbd>
 		cause des problèmes d'édition de la cellule : tout ce qui est tapé avant disparaît et est remplacé
 		par un <kbd-output>+</kbd-output>.<br />➜ Ce problème se résout en utilisant le driver
-		<a href="ergopti-plus" class="link"><ErgoptiPlus /></a>
+		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>
 		pour émuler la disposition et garantir que ce soit bien un symbole <kbd-output>+</kbd-output> qui
 		soit envoyé et non un raccourci interne d'Excel qui interfère.
 	</li>

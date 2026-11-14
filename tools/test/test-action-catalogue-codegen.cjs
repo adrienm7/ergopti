@@ -393,7 +393,7 @@ check(
 
 // 6. The website reads the same canonical registry.
 const SITE_LOADER = fs.readFileSync(
-	path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'),
+	path.join(ROOT, 'src', 'routes', 'ergopti-plus', 'site-data.server.js'),
 	'utf8'
 );
 check(

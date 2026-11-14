@@ -12,6 +12,7 @@
 	import { page } from '$app/state';
 	import { discordLink } from '#lib/stores_infos.js';
 	import { resolve } from '$app/paths';
+	import { isInSection } from '#lib/js/siteNavigation.js';
 
 	import AOS from 'aos';
 	import 'aos/dist/aos.css';
@@ -56,7 +57,9 @@
 	afterUpdate(() => {
 		wrapKbdWithPunctuation(document);
 
-		makeIds(document.getElementById('main-content'));
+		// Home, overviews and Studio have no table of contents to feed.
+		const content = document.getElementById('main-content');
+		if (content) makeIds(content);
 		document.querySelectorAll('h2').forEach(function (h2) {
 			h2.setAttribute('data-aos', 'zoom-out');
 		});
@@ -77,6 +80,16 @@
 	}
 
 	const isDev = detectDev();
+
+	/**
+	 * The reference keyboard shows the layout, so it only sits on its pages.
+	 * Called from the template, like stableHref, to stay tracked on navigation.
+	 * @param {string} pathname - The current URL path.
+	 * @returns {boolean}
+	 */
+	function isLayoutPage(pathname) {
+		return isInSection(pathname, resolve('/ergopti'));
+	}
 
 	/**
 	 * Map the current development path to the same page on the stable site.
@@ -106,30 +119,36 @@
 	<Footer />
 </bloc-page>
 
-<keyboard-reference>
-	<button
-		id="afficher-clavier-reference"
-		onclick={toggleZIndex}
-		aria-label="Afficher la référence clavier"
-	>
-		<i
-			class="icon-keyboard-duotone"
-			style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"
-			><span class="path1"></span><span class="path2"></span></i
+{#if isLayoutPage(page.url.pathname)}
+	<keyboard-reference>
+		<button
+			id="afficher-clavier-reference"
+			onclick={toggleZIndex}
+			aria-label="Afficher la référence clavier"
 		>
-		<i class="icon-square-xmark" style="width:100%; display:{affiche}"
-			><span class="path1"></span><span class="path2"></span></i
-		>
-	</button>
+			<i
+				class="icon-keyboard-duotone"
+				style="width:100%; display:{affiche === 'none' ? 'block' : 'none'}"
+				><span class="path1"></span><span class="path2"></span></i
+			>
+			<i class="icon-square-xmark" style="width:100%; display:{affiche}"
+				><span class="path1"></span><span class="path2"></span></i
+			>
+		</button>
 
-	<clavier-reference id="clavier-ref" class="bg-blue" style="z-index: {zIndex}; display:{affiche}">
-		<div class="conteneur">
-			<KeyboardBasis id="reference" />
-			<tiny-space></tiny-space>
-			<KeyboardControls id="reference" />
-		</div>
-	</clavier-reference>
-</keyboard-reference>
+		<clavier-reference
+			id="clavier-ref"
+			class="bg-blue"
+			style="z-index: {zIndex}; display:{affiche}"
+		>
+			<div class="conteneur">
+				<KeyboardBasis id="reference" />
+				<tiny-space></tiny-space>
+				<KeyboardControls id="reference" />
+			</div>
+		</clavier-reference>
+	</keyboard-reference>
+{/if}
 
 <div class="banner">
 	{#if isDev}
@@ -142,7 +161,7 @@
 			</div>
 		</a>
 	{:else}
-		<a href={resolve('/informations') + '#changelog'}>
+		<a href={resolve('/ergopti/informations') + '#changelog'}>
 			<p>NOUVEAU : Ergopti v2.2.1</p>
 			<p class="subtitle">découvrez les nouveautés</p>
 		</a>

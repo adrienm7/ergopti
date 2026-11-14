@@ -42,7 +42,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DATA = path.join(SP, '_shared');
 const SITE_LOADER = fs.readFileSync(
-	path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'),
+	path.join(ROOT, 'src', 'routes', 'ergopti-plus', 'site-data.server.js'),
 	'utf8'
 );
 

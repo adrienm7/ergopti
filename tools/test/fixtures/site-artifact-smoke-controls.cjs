@@ -200,7 +200,7 @@ async function run() {
 					},
 					async click() {
 						clicks.push(selector);
-						if (selector.startsWith('header')) {
+						if (selector === smoke.NAVIGATION_LINK) {
 							url = navigationTarget;
 							navigated = true;
 							navigationWait();
@@ -211,9 +211,13 @@ async function run() {
 							assert.ok(['data-emulation-state', 'aria-busy'].includes(name));
 							return name === 'data-emulation-state' ? emulationState : emulationBusy;
 						}
-						if (selector.startsWith('header'))
-							return foreignNavigation ? '/foreign' : 'utilisation';
-						return wrongDownload ? '#' : selector.match(/href="([^"]+)"/)[1];
+						if (selector === smoke.NAVIGATION_LINK)
+							return foreignNavigation ? '/foreign' : 'ergopti/utilisation';
+						if (wrongDownload) return '#';
+						// Release binaries are absolute; local documents render relative
+						// to the two-level installation page, as SvelteKit writes them.
+						const exact = selector.match(/href="([^"]+)"/);
+						return exact ? exact[1] : '..' + selector.match(/href\$="([^"]+)"/)[1];
 					},
 					async isEnabled() {
 						assert.equal(selector, '#input-text');
@@ -250,19 +254,23 @@ async function run() {
 				page.routes,
 				smoke.SITE_ROUTES.map((route) => 'http://127.0.0.1:12345/dev' + route)
 			);
-			assert.equal(page.clicks.length, smoke.SITE_ROUTES.length * 2 + 1);
+			assert.equal(
+				page.clicks.length,
+				smoke.SITE_ROUTES.filter(smoke.isLayoutRoute).length * 2 + 1,
+				'the reference keyboard toggles twice on each layout page, plus one navigation'
+			);
 		}
 	);
 	await check('client navigation retains the target prefix and document identity', async () => {
 		for (const base of ['', '/dev']) {
 			const page = pagePort();
-			await page.goto('http://127.0.0.1:1' + base + '/');
+			await page.goto('http://127.0.0.1:1' + base + smoke.NAVIGATION_FROM);
 			await smoke.exerciseNavigation(page, 'http://127.0.0.1:1', base);
-			assert.equal(page.url(), 'http://127.0.0.1:1' + base + '/utilisation');
+			assert.equal(page.url(), 'http://127.0.0.1:1' + base + smoke.EMULATION_ROUTE);
 		}
 		for (const options of [{ foreignNavigation: true }, { reload: true }]) {
 			const page = pagePort(options);
-			await page.goto('http://127.0.0.1:1/dev/');
+			await page.goto('http://127.0.0.1:1/dev' + smoke.NAVIGATION_FROM);
 			await assert.rejects(() => smoke.exerciseNavigation(page, 'http://127.0.0.1:1', '/dev'));
 		}
 	});
@@ -288,7 +296,14 @@ async function run() {
 					})
 				]);
 				assert.equal(completed, false);
-				assert.deepEqual(page.routes, ['http://127.0.0.1:1' + base + '/']);
+				const beforeNavigation = smoke.SITE_ROUTES.slice(
+					0,
+					smoke.SITE_ROUTES.indexOf(smoke.NAVIGATION_FROM) + 1
+				);
+				assert.deepEqual(
+					page.routes,
+					beforeNavigation.map((route) => 'http://127.0.0.1:1' + base + route)
+				);
 				release();
 				await visit;
 				assert.equal(
@@ -306,7 +321,7 @@ async function run() {
 				{ emulationBusy: 'true' }
 			]) {
 				const page = pagePort(options);
-				await page.goto('http://127.0.0.1:1/');
+				await page.goto('http://127.0.0.1:1' + smoke.NAVIGATION_FROM);
 				await assert.rejects(
 					() => smoke.exerciseNavigation(page, 'http://127.0.0.1:1', ''),
 					/Emulation/
@@ -317,21 +332,21 @@ async function run() {
 	await check('rendered fixture downloads and local HEAD refusals remain distinct', async () => {
 		for (const base of ['', '/dev']) {
 			const page = pagePort();
-			await page.goto('http://127.0.0.1:1' + base + '/utilisation');
-			await smoke.exerciseDownloads(page, 'http://127.0.0.1:1', base, '/utilisation');
+			await page.goto('http://127.0.0.1:1' + base + smoke.LAYOUT_DOWNLOADS_ROUTE);
+			await smoke.exerciseDownloads(page, 'http://127.0.0.1:1', base, smoke.LAYOUT_DOWNLOADS_ROUTE);
 			assert.equal(page.heads.length, 2);
 			assert.equal(page.disposed, 2);
 			assert.ok(
 				page.heads.every((url) => url.startsWith('http://127.0.0.1:1' + base + '/documents/'))
 			);
-			await smoke.exerciseDownloads(page, 'http://127.0.0.1:1', base, '/ergopti-plus');
+			await smoke.exerciseDownloads(page, 'http://127.0.0.1:1', base, smoke.PLUS_DOWNLOADS_ROUTE);
 			assert.equal(page.heads.length, 2, 'remote binaries are never fetched');
 		}
 		for (const options of [{ wrongDownload: true }, { missingDownload: true }]) {
 			const page = pagePort(options);
-			await page.goto('http://127.0.0.1:1/utilisation');
+			await page.goto('http://127.0.0.1:1' + smoke.LAYOUT_DOWNLOADS_ROUTE);
 			await assert.rejects(() =>
-				smoke.exerciseDownloads(page, 'http://127.0.0.1:1', '', '/utilisation')
+				smoke.exerciseDownloads(page, 'http://127.0.0.1:1', '', smoke.LAYOUT_DOWNLOADS_ROUTE)
 			);
 			assert.equal(page.disposed, options.missingDownload ? 1 : 0);
 		}

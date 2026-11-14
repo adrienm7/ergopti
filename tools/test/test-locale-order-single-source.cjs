@@ -15,7 +15,7 @@
  *     locales behind, so both columns are generated now.
  *   - The Windows locale table (windows/_generated/locale_table.ahk) is emitted in
  *     that order.
- *   - The site loader (routes/ergopti-plus/+page.server.js) and the Linux
+ *   - The site loader (routes/ergopti-plus/site-data.server.js) and the Linux
  *     driver (linux/core/i18n/engine/i18n.lua) read locale_order.json at runtime rather
  *     than sorting on their own.
  *
@@ -97,9 +97,11 @@ if (order.length > 0) {
 }
 
 // ── 5. Site + Linux read the shared file (do not roll their own order) ───────
-const site = read('src/routes/ergopti-plus/+page.server.js');
+const site = read('src/routes/ergopti-plus/site-data.server.js');
 if (!/locale_order\.json/.test(site)) {
-	errors.push('+page.server.js does not read locale_order.json — it must single-source the order.');
+	errors.push(
+		'site-data.server.js does not read locale_order.json — it must single-source the order.'
+	);
 }
 const linux = read('static/ergopti_plus/linux/core/i18n/engine/i18n.lua');
 if (!/locale_order\.json/.test(linux)) {
