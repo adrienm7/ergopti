@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local MUTATED = {
 	"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
-	"adapters.timer_scheduler", "infra.logger", "infra.paths", "infra.timings",
+	"core.events.timer_scheduler", "infra.logger", "infra.paths", "infra.timings",
 }
 
 
@@ -186,7 +186,7 @@ local function fresh_fixture(options)
 		settle_timer(handle)
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	return {
 		actions = helpers.load_with_stubs("modules.shortcuts.actions.text"),

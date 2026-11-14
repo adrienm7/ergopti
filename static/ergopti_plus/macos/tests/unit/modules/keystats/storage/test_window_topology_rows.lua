@@ -91,7 +91,7 @@ helpers.describe("macOS window topology: the watcher", function()
 	helpers.it("macos-topology-private: the watchers ask the whole privacy context", function()
 		helpers.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger",
 			"modules.keystats.privacy_context", "modules.keystats.topology_watcher", "modules.keystats.network_watcher",
-			"adapters.window_info", "adapters.network_info", "adapters.timer_scheduler",
+			"adapters.window_info", "adapters.network_info", "core.events.timer_scheduler",
 			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local rows, refused, now, window, ids, reach = {}, true, 0, nil, {}, nil
@@ -105,8 +105,8 @@ helpers.describe("macOS window topology: the watcher", function()
 				watch_host_reachability = function(_, on_status) reach = on_status; return { stop = function() end } end,
 				probe_vpn_status = function(answer) answer("down"); return true end,
 			}
-			local real_scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
-			package.loaded["adapters.timer_scheduler"] = setmetatable({ now_ns = function() return now * 1000000 end },
+			local real_scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
+			package.loaded["core.events.timer_scheduler"] = setmetatable({ now_ns = function() return now * 1000000 end },
 				{ __index = real_scheduler })
 			local W = helpers.load_with_stubs("modules.keystats.watchers", {
 				wifi = false, battery = false, spaces = false, audiodevice = false,

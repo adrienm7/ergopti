@@ -89,8 +89,8 @@ local function with_personal_frame(body, options)
 	local cleaned, cleanup_error = pcall(function()
 		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
 		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			assert(scheduler.cancelAll() == true); assert(scheduler.activeCount() == 0)
 		end
 		if scratch then

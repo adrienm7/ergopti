@@ -10,7 +10,7 @@ function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
 	local names = {"lgi","infra.monotonic","infra.timings","infra.managed_http_deadline",
-		"adapters.event_loop","adapters.notifier","adapters.application_notifier","ui.webkit_host","ui.webview_manager"}
+		"core.events.loop","adapters.notifier","adapters.application_notifier","ui.webkit_host","ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local real_host = require("ui.webkit_host")
 	local host = setmetatable({}, {__index=real_host})
@@ -115,7 +115,7 @@ function M.new(app_name, handler, state)
 			function t:on_settled(cb)self.listeners[#self.listeners+1]=cb;return true end
 			function t:ack_close()self.settled=true;local callbacks=self.listeners;self.listeners={};for _,cb in ipairs(callbacks)do cb()end end
 			c.timers[#c.timers+1]=t;return t end}
-		package.loaded["adapters.event_loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
+		package.loaded["core.events.loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
 		package.loaded["adapters.notifier"]={send_owned=function(message,opts,admit)
 			if c.on_notice_probe then c.on_notice_probe() end
 			if not admit() then return false end

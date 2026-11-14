@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local MODULES = {
-	"adapters.keyboard_source_probe", "adapters.shell_runner", "adapters.timer_scheduler",
+	"adapters.keyboard_source_probe", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "infra.logger",
 }
 local SOURCE = "com.apple.keylayout.US"
@@ -90,7 +90,7 @@ local function fixture(options)
 			return task
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			context.delay, timeout = delay, callback
 			if options.timer_in_constructor then callback() end

@@ -14,7 +14,7 @@ local MODULE_NAMES = {
 	"adapters.http_client",
 	"adapters.json_codec",
 	"adapters.shell_runner",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"infra.notifications",
 	"modules.llm.api_mlx",

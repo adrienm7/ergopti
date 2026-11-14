@@ -26,7 +26,7 @@ local function with_editor(module_name, callback)
 			"adapters.webview_result", "infra.fs_dir", "infra.text_utils", "platform.remap.lease_helper",
 			"program_providers", "adapters.task_environment", "core.lifecycle.engine.compat.utf8", "diagnostics.engine.runtime_log",
 			"adapters.apple_shortcuts", "adapters.shell_runner", "adapters.apple_shortcuts_native",
-			"infra.deferred_work", "infra.launcher_environment", "adapters.timer_scheduler", "app_dirs",
+			"infra.deferred_work", "infra.launcher_environment", "core.events.timer_scheduler", "app_dirs",
 			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "infra.config_paths",
 			"infra.log_folders", "program_parameter", "user_action_parameter", "text_utils", "adapters.program_providers",
 			"adapters.file_system", "json",

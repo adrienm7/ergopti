@@ -24,7 +24,7 @@ helpers.describe("metrics disk cache reads", function()
 				end
 				package.loaded["hs.json"].decode = function() return {} end
 				package.loaded["infra.logger"].warn = function() warnings = warnings + 1 end
-				package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+				package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 					local handle = { timer = {} }
 					pending[#pending + 1] = function() handle.timer = nil; callback() end
 					return handle, true
@@ -51,7 +51,7 @@ helpers.describe("metrics disk cache reads", function()
 					package.loaded["infra.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
-					package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+					package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 						local handle = { timer = {} }
 						pending[#pending + 1] = function() handle.timer = nil; callback() end
 						return handle, true

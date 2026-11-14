@@ -51,14 +51,14 @@ end
 
 local function load_loop(branch)
 	local loaded, preload = package.loaded.ffi, package.preload.ffi
-	package.loaded["adapters.event_loop"] = nil
+	package.loaded["core.events.loop"] = nil
 	if branch == "no-FFI" and ffi_ok then
 		package.loaded.ffi = nil
 		package.preload.ffi = function() error("explicit test selects command fallback") end
 	elseif branch == "cdef refusal" then
 		package.loaded.ffi = { cdef = function() error("controlled native declaration refusal") end }
 	end
-	local ok, loop = pcall(require, "adapters.event_loop")
+	local ok, loop = pcall(require, "core.events.loop")
 	package.loaded.ffi, package.preload.ffi = loaded, preload
 	if not ok then error(loop, 0) end
 	return loop

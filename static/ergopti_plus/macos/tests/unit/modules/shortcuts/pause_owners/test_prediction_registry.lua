@@ -141,7 +141,7 @@ helpers.describe("HS-012 real warmup-controller pause snapshot", function()
 		local handles = {}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.timings"] = { sec = function() return 1 end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback, live = true }
 				handles[#handles + 1] = handle

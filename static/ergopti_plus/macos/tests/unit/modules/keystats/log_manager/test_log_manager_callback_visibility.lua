@@ -46,7 +46,7 @@ local function fresh_manager()
 	}
 	package.loaded["infra.i18n"] = {}
 	package.loaded["adapters.file_system"] = {}
-	package.loaded["adapters.timer_scheduler"] = {}
+	package.loaded["core.events.timer_scheduler"] = {}
 	package.loaded["modules.keystats.sqlite_writer"] = {
 		get_db = function() return db end,
 		close_db = function() return true end,

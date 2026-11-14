@@ -14,7 +14,7 @@ local function with_manager(selected, body)
 	local names = {
 		manager = "modules.shortcuts.manager",
 		clipboard = "adapters.clipboard",
-		event_loop = "adapters.event_loop",
+		event_loop = "core.events.loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",

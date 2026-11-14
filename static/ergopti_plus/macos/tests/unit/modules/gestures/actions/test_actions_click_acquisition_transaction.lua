@@ -17,7 +17,7 @@ local DEPENDENCIES = {
 	"infra.timings",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
 	"modules.gestures.actions_click",
@@ -289,7 +289,7 @@ local function with_fixture(config, body)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["diagnostics.engine.reports.error_description"] = nil
 	package.loaded["core.text.engine.number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil

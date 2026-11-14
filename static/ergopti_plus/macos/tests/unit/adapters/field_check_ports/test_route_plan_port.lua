@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.field_check_ports", "adapters.shell_runner", "adapters.timer_scheduler",
+	"infra.logger", "adapters.field_check_ports", "adapters.shell_runner", "core.events.timer_scheduler",
 	"platform.remap.lease_helper", "modules.llm.network_env",
 }
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
@@ -22,7 +22,7 @@ helpers.describe("field check command deadlines", function()
 		helpers.with_stub_scope(MODULES, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local observer, done, terminations = nil, nil, 0
-			package.loaded["adapters.timer_scheduler"] = { after = function() error("no timer after refused start") end,
+			package.loaded["core.events.timer_scheduler"] = { after = function() error("no timer after refused start") end,
 				cancel = function() return true end }
 			package.loaded["adapters.shell_runner"] = { spawn = function()
 				return { isSettled = function() return false end, start = function() return false end,
@@ -42,7 +42,7 @@ helpers.describe("field check command deadlines", function()
 		helpers.with_stub_scope(MODULES, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local observer, deadline, done = nil, nil, nil
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(_, callback) deadline = callback; return {}, true end, cancel = function() return true end,
 			}
 			package.loaded["adapters.shell_runner"] = { spawn = function()
@@ -64,7 +64,7 @@ helpers.describe("field check command deadlines", function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local completion, cancelled, result = nil, 0, nil
 			local handle = {}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() completion(0, "ok", ""); return handle, true end,
 				cancel = function(value) helpers.assert_eq(value, handle); cancelled = cancelled + 1; return true end,
 			}
@@ -82,7 +82,7 @@ helpers.describe("field check command deadlines", function()
 		helpers.with_stub_scope(MODULES, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local observer, done, terminations = nil, nil, 0
-			package.loaded["adapters.timer_scheduler"] = { after = function() return {}, false end, cancel = function() return true end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() return {}, false end, cancel = function() return true end }
 			package.loaded["adapters.shell_runner"] = { spawn = function()
 				return { isSettled = function() return false end, start = function() return true end,
 					onSettled = function(fn) observer = fn; return true end,
@@ -109,7 +109,7 @@ local function run(script, launcher)
 	local calls, answer, timers = {}, nil, {}
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() local handle = { stopped = false }; timers[#timers + 1] = handle; return handle end,
 			cancel = function() return true end,
 		}
@@ -178,9 +178,9 @@ helpers.describe("network check relay probe port", function()
 	local function probe(script, launcher, present)
 		local calls, answers = {}, {}
 		helpers.with_stub_scope({ "infra.logger", "adapters.field_check_ports", "adapters.shell_runner",
-			"adapters.timer_scheduler", "platform.remap.lease_helper", "adapters.file_system" }, function()
+			"core.events.timer_scheduler", "platform.remap.lease_helper", "adapters.file_system" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { stopped = false } end, cancel = function() return true end,
 			}
 			package.loaded["adapters.shell_runner"] = {

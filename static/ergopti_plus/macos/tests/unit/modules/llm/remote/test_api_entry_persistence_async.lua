@@ -31,7 +31,7 @@ local function with_persistence_fixture(options, body)
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote",
 		"modules.llm.api_token_crypto", "modules.llm.api_common",
-		"infra.logger", "infra.paths", "adapters.timer_scheduler", "adapters.storage",
+		"infra.logger", "infra.paths", "core.events.timer_scheduler", "adapters.storage",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -118,7 +118,7 @@ local function with_persistence_fixture(options, body)
 			return "static/ergopti_plus/_shared/" .. relative
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function() return { timer = true, committed = true }, true end,
 		cancel = function() return true end,
 		now = function() return 0 end,

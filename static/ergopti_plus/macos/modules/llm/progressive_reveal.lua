@@ -13,7 +13,7 @@ local M = {}
 
 local Logger         = require("infra.logger")
 local ApiCommon      = require("modules.llm.api_common")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "llm.progressive_reveal"
 

@@ -38,7 +38,7 @@ local _session = nil
 --- @return table ports
 local function default_ports()
 	local NetworkInfo = require("adapters.network_info")
-	local TimerScheduler = require("adapters.timer_scheduler")
+	local TimerScheduler = require("core.events.timer_scheduler")
 	return {
 		watch_reachability = NetworkInfo.watch_host_reachability,
 		probe_vpn = NetworkInfo.probe_vpn_status,

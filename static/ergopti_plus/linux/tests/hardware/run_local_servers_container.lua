@@ -28,7 +28,7 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 end
 
 local Servers = require("modules.llm.local_servers")
-local EventLoop = require("adapters.event_loop")
+local EventLoop = require("core.events.loop")
 
 local finished, changed = false, nil
 local started = Servers.rescan(function() return true end, function(value) finished, changed = true, value end)

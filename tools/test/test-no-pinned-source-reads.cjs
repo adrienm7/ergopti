@@ -105,7 +105,7 @@ const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // rename to infra/ and is kept only so a stray lib/ path cannot slip back in
 // unseen; `platform` is listed before it exists so Lot 3 cannot land unseen.
 const SOURCE_PATH_RE =
-	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
+	/["'][^"'\n]*(?:modules|lib|infra|ui|adapters|platform|core)[\\/][^"'\n]*\.ahk["']|["'][.\\/]*ErgoptiPlus\.ahk["']/i;
 const SOURCE_PATH_RE_G = new RegExp(SOURCE_PATH_RE.source, 'gi');
 
 /**

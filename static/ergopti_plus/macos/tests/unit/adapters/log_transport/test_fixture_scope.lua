@@ -11,7 +11,7 @@ local Fixture = require("tests.support.log_transport_fixture")
 
 local OWNERS = {
 	"adapters.log_transport", "tests.stubs.hs", "hs",
-	"adapters.timer_scheduler", "infra.logger",
+	"core.events.timer_scheduler", "infra.logger",
 }
 
 helpers.describe("Log transport fixture isolation", function()
@@ -23,7 +23,7 @@ helpers.describe("Log transport fixture isolation", function()
 				local prior_transport, prior_scheduler = {}, {}
 				local prior_stub = package.loaded["tests.stubs.hs"]
 				package.loaded["adapters.log_transport"] = prior_transport
-				package.loaded["adapters.timer_scheduler"] = prior_scheduler
+				package.loaded["core.events.timer_scheduler"] = prior_scheduler
 				package.loaded["infra.logger"] = false
 				package.loaded["hs"] = nil
 				local reached, sent = 0, 0
@@ -45,7 +45,7 @@ helpers.describe("Log transport fixture isolation", function()
 					if mode == "callback" then error("transport callback marker") end
 					if mode == "real_scheduler" then
 						package.loaded["infra.logger"] = helpers.make_logger_stub()
-						local scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+						local scheduler = helpers.load_with_stubs("core.events.timer_scheduler", {
 							timer = { absoluteTime = function() return 123456789 end },
 						})
 						helpers.assert_eq(scheduler.now_ns(), 123456789)
@@ -71,7 +71,7 @@ helpers.describe("Log transport fixture isolation", function()
 				helpers.assert_eq(sent, mode == "construction" and 0 or 1)
 				helpers.assert_true(_G.hs == prior_hs, "restore the predecessor native host")
 				helpers.assert_true(package.loaded["adapters.log_transport"] == prior_transport)
-				helpers.assert_true(package.loaded["adapters.timer_scheduler"] == prior_scheduler)
+				helpers.assert_true(package.loaded["core.events.timer_scheduler"] == prior_scheduler)
 				helpers.assert_true(package.loaded["tests.stubs.hs"] == prior_stub)
 				helpers.assert_nil(package.loaded["hs"])
 				helpers.assert_eq(package.loaded["infra.logger"], false)

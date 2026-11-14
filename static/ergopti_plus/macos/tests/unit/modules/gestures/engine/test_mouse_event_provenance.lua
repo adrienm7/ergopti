@@ -15,7 +15,7 @@ local function clear_mouse_stack()
 	for _, name in ipairs({
 		"adapters.event_provenance",
 		"adapters.synthetic_input",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"modules.gestures.actions",
 		"modules.gestures.actions_click",
 		"tests.stubs.hs",

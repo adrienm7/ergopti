@@ -14,7 +14,7 @@ local MODULES = {
 	"hs",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",

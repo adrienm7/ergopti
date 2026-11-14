@@ -13,7 +13,7 @@ local OWNED = {
 	"infra.logger", "infra.notifications", "infra.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "infra.paths", "adapters.storage",
 	"adapters.http_client", "adapters.json_codec", "adapters.shell_runner",
-	"adapters.timer_scheduler", "adapters.task_lifecycle", "modules.llm.profiles",
+	"core.events.timer_scheduler", "adapters.task_lifecycle", "modules.llm.profiles",
 	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx", "modules.llm.boot_cleanup",
@@ -58,7 +58,7 @@ function M.with_commands(callback)
 			package.loaded["adapters.http_client"] = { new = function() return {} end }
 			package.loaded["adapters.json_codec"] = { decode = function() return nil end }
 			package.loaded["adapters.shell_runner"] = { spawn = capture }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				awake_time = function() return 100 end,
 				after = function() return { timer = {} }, true end,
 			}

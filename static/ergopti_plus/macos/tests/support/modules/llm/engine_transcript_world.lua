@@ -151,7 +151,7 @@ function M.with_world(config, body)
 	debug.setupvalue(api.is_ready, ready_index, true)
 	local engine = require("modules.llm.prediction_engine")
 	-- The TimerScheduler port: the real adapter, recording the delays the engine arms.
-	local real_scheduler = require("adapters.timer_scheduler")
+	local real_scheduler = require("core.events.timer_scheduler")
 	local scheduler = {}
 	for key, value in pairs(real_scheduler) do scheduler[key] = value end
 	scheduler.after = function(delay_sec, fn)

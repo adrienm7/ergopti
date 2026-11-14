@@ -109,8 +109,8 @@ helpers.describe("synthetic input: a key-up waits only behind its own key-down (
 		local host_ns = 3600 * 1e9
 		local saved_absolute = hs.timer.absoluteTime
 		hs.timer.absoluteTime = function() return host_ns end
-		package.loaded["adapters.event_clock"] = nil
-		local EventClock = require("adapters.event_clock")
+		package.loaded["core.events.clock"] = nil
+		local EventClock = require("core.events.clock")
 		local function stamp_ms_ago(event, ms)
 			local stamp = math.floor(host_ns - ms * 1e6)
 			event.timestamp = function() return stamp end
@@ -133,7 +133,7 @@ helpers.describe("synthetic input: a key-up waits only behind its own key-down (
 				"a fresh key behind typing output is still replayed in order")
 		end)
 		hs.timer.absoluteTime = saved_absolute
-		package.loaded["adapters.event_clock"] = nil
+		package.loaded["core.events.clock"] = nil
 		if not ok then error(err, 0) end
 		drain(fixture, synthetic)
 	end)

@@ -65,7 +65,7 @@ hs.timer.absoluteTime = function() return CLOCK_NS end
 
 -- Force fresh modules so the profiler state, the journal and TimerScheduler's
 -- monotonic source mapper all start from these controlled clocks.
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["adapters.boot_journal"] = nil
 package.loaded["infra.boot_profiler"] = nil
 local BootJournal = require("adapters.boot_journal")
@@ -391,6 +391,6 @@ BootJournal.configure_for_tests(nil)
 hs.timer.secondsSinceEpoch = orig_sse
 hs.timer.absoluteTime = orig_abs
 package.loaded["infra.logger"] = _real_logger
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["adapters.boot_journal"] = nil
 package.loaded["infra.boot_profiler"] = nil

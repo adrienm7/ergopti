@@ -174,7 +174,7 @@ package.loaded["modules.dynamic_hotstrings"] = {}
 package.loaded["modules.gestures"] = {}
 package.loaded["infra.personal_shortcuts"] = { load = function() end }
 
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["ui.menu.init"] = nil
 local Menu = require("ui.menu.init")
 

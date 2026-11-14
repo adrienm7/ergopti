@@ -68,7 +68,7 @@ local MODULES = {
 	"adapters.file_system",
 	"adapters.task_lifecycle",
 	"adapters.shell_runner",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -273,7 +273,7 @@ local function with_fixture(spec, body)
 			end,
 		}
 
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local index = #timers + 1
 				local handle = {
@@ -485,7 +485,7 @@ local function with_fixture(spec, body)
 		helpers.assert_eq(#timers, 1)
 		helpers.assert_eq(timers[1].delay, 0)
 		helpers.assert_eq(
-			package.loaded["adapters.timer_scheduler"].cancel(timers[1].handle), true)
+			package.loaded["core.events.timer_scheduler"].cancel(timers[1].handle), true)
 		helpers.assert_eq(timers[1].handle.timer, nil)
 		table.remove(timers, 1)
 

@@ -31,7 +31,7 @@ local MODULES = {
 	"adapters.storage",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.profile_label",
@@ -142,7 +142,7 @@ local function with_fixture(save_results, callback)
 					}
 				end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {}
+			package.loaded["core.events.timer_scheduler"] = {}
 			package.loaded["adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {} }

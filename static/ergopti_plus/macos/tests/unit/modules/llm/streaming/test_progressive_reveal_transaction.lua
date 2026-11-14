@@ -10,14 +10,14 @@
 
 local helpers = require("tests.helpers")
 
-local saved_scheduler = package.loaded["adapters.timer_scheduler"]
+local saved_scheduler = package.loaded["core.events.timer_scheduler"]
 local saved_reveal = package.loaded["modules.llm.progressive_reveal"]
 
 helpers.describe("LLM progressive reveal owns every timer transaction", function()
 	helpers.it("falls forward to the complete batch when timer commit is refused", function()
 		local exact_handle = { timer = {} }
 		local cancel_calls = 0
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() return exact_handle, false end,
 			cancel = function(handle)
 				helpers.assert_eq(handle, exact_handle)
@@ -42,7 +42,7 @@ helpers.describe("LLM progressive reveal owns every timer transaction", function
 	helpers.it("generation-fences a committed reveal after the request becomes stale", function()
 		local callback
 		local handle = { timer = {} }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn) callback = fn; return handle, true end,
 			cancel = function(candidate)
 				helpers.assert_eq(candidate, handle)
@@ -67,7 +67,7 @@ helpers.describe("LLM progressive reveal owns every timer transaction", function
 		local callback
 		local handle = { timer = {} }
 		local attempts = 0
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn) callback = fn; return handle, true end,
 			cancel = function(candidate)
 				helpers.assert_eq(candidate, handle)
@@ -89,5 +89,5 @@ helpers.describe("LLM progressive reveal owns every timer transaction", function
 	end)
 end)
 
-package.loaded["adapters.timer_scheduler"] = saved_scheduler
+package.loaded["core.events.timer_scheduler"] = saved_scheduler
 package.loaded["modules.llm.progressive_reveal"] = saved_reveal

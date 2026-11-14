@@ -194,14 +194,14 @@ local function run_fixture(body, source)
 	end
 	-- Controlled physical native ports exercise actual production hook/consumer.
 	local timers, callback = {}, nil
-	local prior_timer = package.loaded["adapters.timer_scheduler"]
+	local prior_timer = package.loaded["core.events.timer_scheduler"]
 	local prior_broker = package.loaded["adapters.input_source_broker"]
 	local prior_provenance = require("adapters.event_provenance")
 	package.loaded["adapters.event_provenance"]={STATUS_FOREIGN="foreign",classify_with_fence=function(event, consumer)
 		if type(event.getProperty) == "function" then return prior_provenance.classify_with_fence(event, consumer) end
 		return nil,"foreign"
 	end}
-	package.loaded["adapters.timer_scheduler"]={
+	package.loaded["core.events.timer_scheduler"]={
 		after=function(_,fn) local timer={fn=fn};timers[timer]=true;return timer,true end,
 		onSettled=function(timer,fn) timer.settled=fn;return true end,
 		cancel=function(timer) timers[timer]=nil;if timer.settled then timer.settled() end;return true end,
@@ -209,7 +209,7 @@ local function run_fixture(body, source)
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["adapters.physical_shortcut_hook"]=nil
 	local Hook=require("adapters.physical_shortcut_hook")
-	package.loaded["adapters.timer_scheduler"],package.loaded["adapters.input_source_broker"],package.loaded["adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
+	package.loaded["core.events.timer_scheduler"],package.loaded["adapters.input_source_broker"],package.loaded["adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
 	local actual_new=hs.eventtap.new
 	hs.eventtap.new=function(types,fn)
 		if debug.getinfo(fn,"S").source:match("physical_shortcut_hook%.lua$") then callback=fn end

@@ -97,7 +97,7 @@ local function start_probe(run, id, timeout_ms, body)
 			for key, value in pairs(result) do parent_result[key] = value end
 			result = parent_result
 		end
-		if timer and require("adapters.timer_scheduler").cancel(timer) == true then
+		if timer and require("core.events.timer_scheduler").cancel(timer) == true then
 			timer = nil
 			run.watchdogs[id] = nil
 		end
@@ -135,7 +135,7 @@ local function start_probe(run, id, timeout_ms, body)
 		end
 		local retained = run.watchdogs[id]
 		if retained then
-			local ok, acknowledged = pcall(require("adapters.timer_scheduler").cancel, retained)
+			local ok, acknowledged = pcall(require("core.events.timer_scheduler").cancel, retained)
 			if ok and acknowledged == true then
 				if run.watchdogs[id] == retained then run.watchdogs[id] = nil end
 				if timer == retained then timer = nil end
@@ -143,12 +143,12 @@ local function start_probe(run, id, timeout_ms, body)
 		end
 	end
 	Logger.trace(LOG, "Probe '%s' started (timeout %d ms)…", id, timeout_ms)
-	local handle, committed = require("adapters.timer_scheduler").after(timeout_ms / 1000, function()
+	local handle, committed = require("core.events.timer_scheduler").after(timeout_ms / 1000, function()
 		finish({ state = "timeout" })
 	end)
 	if id == "appleevent_transport" and handle then
 		run.watchdogs[id] = handle
-		if require("adapters.timer_scheduler").onSettled(handle, function()
+		if require("core.events.timer_scheduler").onSettled(handle, function()
 			if run.watchdogs[id] == handle then run.watchdogs[id] = nil end
 		end) ~= true then
 			timer = handle
@@ -446,7 +446,7 @@ end
 --- @return function Probe body.
 local function configuration(schema, overrides)
 	return function(done, on_cancel)
-		local Timers = require("adapters.timer_scheduler")
+		local Timers = require("core.events.timer_scheduler")
 		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("diagnostics.engine.healthcheck.configuration").probe, context)
@@ -471,7 +471,7 @@ end
 --- @return function Probe body.
 local function local_state(slice_ms, snapshot)
 	return function(done, on_cancel)
-		local Timers = require("adapters.timer_scheduler")
+		local Timers = require("core.events.timer_scheduler")
 		local yield = require("infra.timings").sec("ui", "healthcheck_probe_yield_ms")
 		local steps, sections = require("ui.healthcheck.core").local_state_steps(snapshot)
 		local next_step, failures, handle = 1, {}, nil

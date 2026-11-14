@@ -17,7 +17,7 @@ local FIXTURE = "tests.support.modules.llm.backends.local_openai_backends_fixtur
 local OWNED_MODULES = {
 	"_generated.logger_sub_files",
 	"core.crypto.crypto",
-	"adapters.event_clock",
+	"core.events.clock",
 	"adapters.event_provenance",
 	"adapters.file_system",
 	"adapters.http_client",
@@ -34,7 +34,7 @@ local OWNED_MODULES = {
 	"adapters.synthetic_input",
 	"adapters.task_environment",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"app_dirs",
 	"core.lifecycle.engine.compat.utf8",
 	"config_defaults",

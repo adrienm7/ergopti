@@ -19,7 +19,7 @@
 
 local M = {}
 
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 --- Captures the current wall-clock instant without formatting it. Callers on
 --- an input callback can retain this scalar and defer os.date/string work.

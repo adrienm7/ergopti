@@ -14,7 +14,7 @@ local OWNED_MODULES = {
 	"adapters.event_provenance",
 	"adapters.key_state",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"ui.tooltip.config",
 	"ui.tooltip.renderer",
 	"ui.tooltip.tooltip_llm",

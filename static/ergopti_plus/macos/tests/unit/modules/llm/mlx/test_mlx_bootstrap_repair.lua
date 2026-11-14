@@ -35,7 +35,7 @@ local LAUNCHER_ENV = {
 local OWNED = {
 	"infra.logger", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
-	"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
+	"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
 	"modules.llm.ollama_deps_checker", "modules.llm.backend_detector",
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
@@ -223,7 +223,7 @@ local function load_world(world)
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	for _, name in ipairs({ "adapters.task_lifecycle", "adapters.timer_scheduler",
+	for _, name in ipairs({ "adapters.task_lifecycle", "core.events.timer_scheduler",
 		"modules.llm.backend_detector", "modules.llm.mlx_bootstrap_diagnosis" }) do
 		package.loaded[name] = nil
 	end

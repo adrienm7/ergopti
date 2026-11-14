@@ -43,7 +43,7 @@ end
 --- @param callback function Receives (Dialog, scripts).
 local function with_dialog(answer, callback)
 	helpers.with_fresh_modules({ "infra.dialog_util", "infra.logger", "adapters.shell_runner",
-		"adapters.timer_scheduler" }, function()
+		"core.events.timer_scheduler" }, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local scripts = {}
 		local Dialog = helpers.load_with_stubs("infra.dialog_util", {
