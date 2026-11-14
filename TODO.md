@@ -295,6 +295,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       editable in the Studio like the other weights. Goal of the whole analyser (maintainer): do better than every
       existing tool, Kalamine included.
 
+- [ ] **Instant analysis (maintainer, 2026-11-14, very important).** Analysing and comparing layouts must feel
+      instant, unlike KLAnext, which re-processes the corpus for every selected layout. Pre-process each corpus once
+      into character, bigram, trigram and skipgram frequency tables (the way Kalamine does), cache them (built-in
+      corpora shipped pre-computed; a user's corpus or keystats data processed once and kept in the browser/app
+      cache with a content hash), then score any layout by mapping those tables onto its keys: no pass over the text
+      per layout. Target: a hundred layouts compared on a large corpus in well under a second; measure it and keep a
+      performance test.
+- [ ] **Direct-access digits metric (maintainer, 2026-11-14), a small bonus in the global score.** A layout whose
+      digits are typed without a modifier (direct access) scores a little better; weight editable like the others.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
