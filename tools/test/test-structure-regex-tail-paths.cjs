@@ -44,6 +44,11 @@ function run() {
 	assert.ok(!rows.some((r) => Plan.REFUSED_KINDS.has(r.kind)), JSON.stringify(rows));
 	const out = Apply.rewriteText(text, rows, new Map(), FILE);
 	assert.ok(out.includes(`'${escape(fresh)}'`), out);
+	// The expression's own syntax after the path (\s*$) ends the path.
+	const anchored = `assert.match(src, /^#Include ${escape('infra/openssl_digest.lua')}\\s*$/m);\n`;
+	const anchoredRows = Plan.scanFile(FILE, anchored, Plan.referenceContext(stepMap));
+	const anchoredOut = Apply.rewriteText(anchored, anchoredRows, new Map(), FILE);
+	assert.ok(anchoredOut.includes(`#Include ${escape(fresh)}\\s*$`), anchoredOut);
 	// A tail no file ends with, or that several files end with, stays.
 	const loose = "assert.match(src, /'zz_probe\\/nothing\\.lua'|'init\\.lua'/);\n";
 	const looseRows = Plan.scanFile(FILE, loose, Plan.referenceContext(stepMap));
