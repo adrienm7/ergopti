@@ -338,14 +338,12 @@ helpers.describe("shared word-expander fixed commands", function()
 		helpers.assert_eq(fixture.calls.saves, 1)
 	end)
 
-	helpers.it("refuses an existing native command when the captured context becomes paused", function()
+	-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+	helpers.it("runs an existing native command when the captured context becomes paused", function()
 		for _, row in ipairs(corpus().rows) do
 			local fixture = run_action(i18n.get(row.i18n), "true", { pause_after_build = true })
-			helpers.assert_eq(fixture.result, false)
-			helpers.assert_eq(fixture.calls.batches, 0)
-			helpers.assert_eq(fixture.calls.saves, 0)
-			helpers.assert_eq(fixture.calls.updates, 0)
-			helpers.assert_eq(fixture.state.terminator_states, corpus().delimiter_states.initial)
+			helpers.assert_eq(fixture.result, true)
+			helpers.assert_eq(fixture.calls.saves, 1)
 		end
 	end)
 end)

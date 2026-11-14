@@ -109,17 +109,16 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 			helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
 		end)
 	end)
-	-- A pause stops typing, not configuration (EDD-1): the preview and delay
-	-- parents stay reachable; the word expanders follow their shared corpus.
-	helpers.it("keeps preview and delay parents reachable while paused (edd1-paused-writes)", function()
+	-- A pause stops typing, not configuration (EDD-1): the preview, delay and
+	-- word expander parents stay reachable.
+	helpers.it("keeps preview, delay and word expander parents reachable while paused (edd1-paused-writes)", function()
 		with_frame(function(f)
 			local menu = assert(f.build())
 			for _, row in ipairs(menu.menu) do
 				if row.title == f.captions("menu.hotstrings.preview_bubbles")
-					or row.title == f.captions("menu.hotstrings.delays_colors") then
+					or row.title == f.captions("menu.hotstrings.delays_colors")
+					or row.title == f.captions("menu.hotstrings.word_expanders") then
 					helpers.assert_true(row.disabled ~= true, row.title)
-				elseif row.title == f.captions("menu.hotstrings.word_expanders") then
-					helpers.assert_eq(row.disabled, true)
 				end
 			end
 			local preview = children(menu, f.captions("menu.hotstrings.preview_bubbles"))

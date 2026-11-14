@@ -273,10 +273,21 @@ helpers.describe("custom delimiter Add declaration and acknowledged native owner
 			end)
 		end)
 	end
-	for _, outcome in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "pause_after_invalid_alert", "input_cancel", "input_empty", "input_error", "consume_cancel", "consume_nil", "consume_unknown" }) do
-		helpers.it("keeps native Add unpublished after " .. outcome, function()
+	-- A pause stops typing, not configuration (EDD-1): a pause at any step of
+	-- the Add dialogs no longer withdraws it (edd1-paused-writes).
+	for _, outcome in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "pause_after_invalid_alert" }) do
+		helpers.it("publishes native Add after " .. outcome .. " (edd1-paused-writes)", function()
 			with_fixture(outcome, function(fixture)
 				if outcome == "late_pause" then fixture.context.paused = true end
+				helpers.assert_eq(fixture.action(), true)
+				helpers.assert_eq(runtime_has_definition(fixture), true)
+				helpers.assert_eq(fixture.calls.updates, 1)
+			end)
+		end)
+	end
+	for _, outcome in ipairs({ "input_cancel", "input_empty", "input_error", "consume_cancel", "consume_nil", "consume_unknown" }) do
+		helpers.it("keeps native Add unpublished after " .. outcome, function()
+			with_fixture(outcome, function(fixture)
 				local result = fixture.action()
 				helpers.assert_eq(runtime_has_definition(fixture), false)
 				helpers.assert_eq(fixture.read(), SOURCE)
@@ -284,9 +295,6 @@ helpers.describe("custom delimiter Add declaration and acknowledged native owner
 				helpers.assert_eq(fixture.calls.writes, 0)
 				helpers.assert_eq(fixture.calls.updates, 0)
 				helpers.assert_eq(result, false)
-				if outcome == "late_pause" then helpers.assert_eq(fixture.calls.prompts, 0) end
-				if outcome == "pause_after_prompt" then helpers.assert_eq(fixture.calls.consumes, 0) end
-				if outcome == "pause_after_invalid_alert" then helpers.assert_eq(fixture.calls.prompts, 1) end
 			end)
 		end)
 	end
