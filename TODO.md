@@ -122,13 +122,11 @@ the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_
       count, the Linux stored proxy override, the Windows magic-key source and log level, and the macOS hotstring
       editor shortcut, each at entry, load and boundary with tests per OS (« Migration status » rows of the
       inventory, each with its agent decision). Left: the one-shot timeout, once worker A lands « 0 = no time limit ».
-- [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
 - [x] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
       no longer dropped. What a format truly cannot express goes in the per-target omission report and is emulated
       by the driver. The existing layouts stay byte-for-byte regression fixtures.
-- [x] **Layout editor in its own window on the three OS.** Move the unified editor out of the layout manager
       Done 2026-11-13 (worker C, `claude/ergopti-todo-compilers`): `layout_composer/target_compiler.js` compiles a
       source straight to the writers' canonical form (no `.keylayout` text); XKB gets an eleven-level type with one
       modifier on the fifth level (a sided or custom modifier, on Caps Lock, Shift, Ctrl, Win, Left Alt or Menu),
@@ -140,7 +138,7 @@ the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_
       coordinator). The Linux install writes its XKB from the same compilation (the page's `target`, checked by
       `composer.lua` `check_target`, test `direct-xkb-install`); a real desktop check is in
       [TODO-tests-linux.md](TODO-tests-linux.md).
-- [ ] **Layout editor in its own window on the three OS.** Move the unified editor out of the layout manager
+- [x] **Layout editor in its own window on the three OS.** Move the unified editor out of the layout manager
       window into a separate window (macOS, Linux and Windows), and give the Windows WebView2 host
       `source_open`/`source_save`/`source_editor` so Windows also replaces the old composer.
       Done 2026-11-13 by worker E: page `_shared/ui/layout_editor_window` (manifest id `layout_editor_window`), opened
@@ -182,13 +180,6 @@ the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_
       Decided by the agent on 2026-11-13, to review by the maintainer: GTK_IM_MODULE only (Qt and libX11 read the
       includes), and only from the user installer (the site's system installer runs as root and cannot see the
       session's input method). Real-desktop check in TODO-tests-linux.md (`input_policies`).
-- [ ] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
-- [ ] **COSMIC focus: support `zcosmic_toplevel_info` v1 and v2+** (v2+ announces windows through
-      ext-foreign-toplevel-list); choose by what the compositor offers, with tests for both.
-- [ ] **GNOME layout switch through the Ergopti GNOME Shell extension** (the one planned for focused-app identity),
-      instead of rewriting the `sources` list; keep a clear refusal when the extension is absent.
-- [ ] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
-      keep the inlined single-character rules as the safety net, and state the remaining limit in the menu.
 - [x] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
       update prompt run while paused, as on macOS and Linux; background checks keep their pause drop.
       Done 2026-11-13 by worker E (see the « UPD-2 on AHK » line of « Remaining code work »).
@@ -486,20 +477,16 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       the three calls pass the edit source only, and the paused step now expects the copy to run (EDD-1: a pause stops
       typing, not configuration) and an unchanged copy to keep both files byte for byte; the paused session still
       forwards the pair. Needs `/dev/uinput`, so only the Linux E2E desktop-webview job runs it.
-- [x] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
       `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
       and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
       so the pause function lands in `expected_source` and Linux E2E
       desktop-webview fails (« original publisher clears only the known third slot », line 252). Drop the argument,
       then confirm with that E2E job.
       Claimed by worker A: both calls now pass only `edit_source()`, and the paused copy is expected to succeed
-      with identical bytes (EDD-1); `test_hardware_scope_calls_take_one_source.lua` guards the argument. Left:
-      the Linux E2E desktop-webview proof.
-- [x] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
       with identical bytes (EDD-1); `test_hardware_scope_calls_take_one_source.lua` guards the argument. Proof: run
       43535291046 (2026-11-14), whose Linux E2E desktop-webview job no longer fails « original publisher clears only
       the known third slot »; its remaining reds are the baseline ones.
-- [ ] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
+- [x] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
       `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
       cohort has the same handoff gap now that `[tap_holds]` and `[mod_combos]` live in `config.toml`.
