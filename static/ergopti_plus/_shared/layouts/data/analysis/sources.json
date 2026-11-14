@@ -116,6 +116,86 @@
 			"title": "QMK Firmware — keyboard layouts and default keymaps",
 			"url": "https://github.com/qmk/qmk_firmware/tree/master/keyboards",
 			"checked": "2026-11-14"
+		},
+		"analyser_doc_kla": {
+			"title": "Ergopti — how the KLA (Keyboard Layout Analyzer) score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "kla-keyboard-layout-analyzer"
+		},
+		"analyser_doc_kla_stevep": {
+			"title": "Ergopti — how the KLA, SteveP's fork score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "kla-steveps-fork"
+		},
+		"analyser_doc_klanext": {
+			"title": "Ergopti — how the KLAnext (reconstructed) score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "klanext-reconstructed"
+		},
+		"analyser_doc_a200": {
+			"title": "Ergopti — how the a200 (200-analyzer) score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "a200-200-analyzer"
+		},
+		"analyser_doc_carpalx": {
+			"title": "Ergopti — how the carpalx score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "carpalx"
+		},
+		"analyser_doc_keygen": {
+			"title": "Ergopti — how the keygen score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "keygen"
+		},
+		"analyser_doc_genkey": {
+			"title": "Ergopti — how the genkey score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "genkey"
+		},
+		"analyser_doc_oxeylyzer": {
+			"title": "Ergopti — how the Oxeylyzer score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "oxeylyzer"
+		},
+		"analyser_doc_dariogoetz": {
+			"title": "Ergopti — how the Keyboard Layout Optimizer (dariogoetz) score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "keyboard-layout-optimizer-dariogoetz"
+		},
+		"analyser_doc_cmini": {
+			"title": "Ergopti — how the cmini score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "cmini"
+		},
+		"analyser_doc_ergol": {
+			"title": "Ergopti — how the Ergo-L analyser and Kalamine statistics score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "ergo-l-analyser-and-kalamine-statistics"
+		},
+		"kla_stevep": {
+			"title": "Keyboard Layout Analyzer, SteveP's fork",
+			"url": "https://github.com/stevep99/keyboard-layout-analyzer",
+			"checked": "2026-11-14"
+		},
+		"klanext": {
+			"title": "KLAnext (Ian Douglas)",
+			"url": "https://klanext.keyboard-design.com",
+			"checked": null
+		},
+		"ergol_klanext_tables": {
+			"title": "Ergo-L article with KLAnext's result tables",
+			"url": "https://github.com/Nuclear-Squid/ergol/tree/main/www/content/articles/analyse_et_optimisation",
+			"checked": "2026-11-14"
+		},
+		"a200": {
+			"title": "a200 (ClemenPine), in akl-ws",
+			"url": "https://github.com/Waterdragen/akl-ws/tree/main/python/apps/a200",
+			"checked": "2026-11-14"
+		},
+		"carpalx": {
+			"title": "carpalx (Martin Krzywinski), GitHub mirror",
+			"url": "https://github.com/narze/carpalx",
+			"checked": "2026-11-14"
 		}
 	},
 	"items": {
@@ -160,6 +240,17 @@
 			"vscode_shortcuts"
 		],
 		"weights": ["study_weights"],
-		"fingering": ["engine_doc", "study", "kld", "qmk"]
+		"fingering": ["engine_doc", "study", "kld", "qmk"],
+		"analyser.kla": ["analyser_doc_kla", "kla"],
+		"analyser.kla_stevep": ["analyser_doc_kla_stevep", "kla_stevep", "kla"],
+		"analyser.klanext": ["analyser_doc_klanext", "klanext", "ergol_klanext_tables", "dariogoetz"],
+		"analyser.a200": ["analyser_doc_a200", "a200"],
+		"analyser.carpalx": ["analyser_doc_carpalx", "carpalx"],
+		"analyser.keygen": ["analyser_doc_keygen", "keygen"],
+		"analyser.genkey": ["analyser_doc_genkey", "genkey"],
+		"analyser.oxeylyzer": ["analyser_doc_oxeylyzer", "oxeylyzer"],
+		"analyser.dariogoetz": ["analyser_doc_dariogoetz", "dariogoetz"],
+		"analyser.cmini": ["analyser_doc_cmini", "cmini"],
+		"analyser.ergol": ["analyser_doc_ergol", "ergol_stats", "kalamine"]
 	}
 }

@@ -593,7 +593,11 @@ function headingAnchor(heading) {
  */
 function buildInfoSources(engine) {
 	const raw = JSON.parse(fs.readFileSync(INFO_SOURCES_PATH, 'utf8'));
-	const expected = Object.keys(engine.METRICS).concat(INFO_VALUES);
+	// Each analyser of analyser_scores.js has its « i » item, analyser.<id>.
+	const analyserItems = Object.keys(
+		JSON.parse(fs.readFileSync(ANALYSERS_PATH, 'utf8')).analysers
+	).map((id) => `analyser.${id}`);
+	const expected = Object.keys(engine.METRICS).concat(INFO_VALUES, analyserItems);
 	const items = raw.items;
 	for (const id of expected)
 		if (!Array.isArray(items[id]) || items[id].length === 0)
