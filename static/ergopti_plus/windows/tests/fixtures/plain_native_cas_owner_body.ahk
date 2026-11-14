@@ -90,11 +90,19 @@ _CB_PlainNativeMutationCAS(Record, Text) {
 				"The missing Close ACK must remain a typed unknown, with its original failure.")
 			_PNCO.NullHeld := DllCall("User32\OpenClipboard", "Ptr", 0, "Int") != 0
 			_PNCO_Require(_PNCO.NullHeld, "A real later NULL borrower must acquire its own lease after the original Close.")
-		} else if _PNCO.Mode == "foreign-wins" {
+		} else if _PNCO.Mode == "foreign-wins" || _PNCO.Mode == "foreign-wins-held" {
 			_PNCO_Publish("copy.request")
 			_PNCO.ForeignSequence := Integer(_PNCO_Wait("copy.receipt"))
 			_PNCO_Require(_PNCO.ForeignSequence > 0 && DllCall("User32\GetClipboardOwner", "Ptr") == _PNCO.WriterHwnd,
 				"The independent newer native writer must own the clipboard before authentication.")
+			; A clipboard listener reading the newer copy (the runner's clipboard
+			; history does) holds a lease exactly here; held mode makes it certain.
+			if _PNCO.Mode == "foreign-wins-held" {
+				_PNCO_Publish("hold.request")
+				_PNCO_Wait("held.receipt")
+				_PNCO_Require(DllCall("User32\GetOpenClipboardWindow", "Ptr") == _PNCO.WriterHwnd,
+					"The independent reader of the newer copy must hold its lease before authentication.")
+			}
 			CBClipboardOwner.settle_hook := _PNCO_AdmitSuccessor
 		} else if _PNCO.Mode == "auth-busy" || _PNCO.Mode == "set-null" || _PNCO.Mode == "arm-refused" {
 			_PNCO_Publish("hold.request")
@@ -180,6 +188,15 @@ _PNCO_Writer() {
 	FileAppend("PASS plain-native-cas-writer " . _PNCO.Mode . "`n", "*", "UTF-8-RAW")
 }
 
+_PNCO_AwaitSettlement() {
+	global _PNCO
+	Started := A_TickCount
+	while !_PNCO.HookCalls && CBClipboardOwner.restore_debt is Map && TickElapsed(Started) < 3000 {
+		CB_RetryRestoreDebt()
+		Sleep(10)
+	}
+}
+
 _PNCO_Drain() {
 	Started := A_TickCount
 	while CBClipboardOwner.restore_debt is Map && TickElapsed(Started) < 3000 {
@@ -251,8 +268,18 @@ _PNCO_Subject() {
 			_PNCO_ReleaseBorrower()
 			_PNCO_Publish("probe-after.request")
 			_PNCO_Wait("probe-after.receipt")
-		} else if _PNCO.Mode == "foreign-wins" {
-			_PNCO_Require(!IsObject(Caught) && !Published && !OwnedSequence && !Record["restoration_right"]
+		} else if _PNCO.Mode == "foreign-wins" || _PNCO.Mode == "foreign-wins-held" {
+			_PNCO_Require(!IsObject(Caught) && !Published && !OwnedSequence, "A newer native copy must refuse the old publication.")
+			if _PNCO.Mode == "foreign-wins-held" {
+				_PNCO_Require(_PNCO.HookCalls == 0 && CBClipboardOwner.restore_debt == Record && Record["restoration_right"]
+					&& CBClipboardOwner.active.Has(Token), "A lease held at authentication defers settlement; it never guesses the owner.")
+				_PNCO_ReleaseWriter()
+			}
+			; Authentication refuses to read under another window's lease, so a
+			; listener of the newer copy defers settlement to the real retry
+			; service: the successor is admitted when that retry settles.
+			_PNCO_AwaitSettlement()
+			_PNCO_Require(!Record["restoration_right"]
 				&& _PNCO.Next > Token && _PNCO.HookCalls == 1 && CBClipboardOwner.paste_transaction == _PNCO.Next
 				&& CBClipboardOwner.active.Count == 1 && CBClipboardOwner.active.Has(_PNCO.Next),
 				"Retiring the old restore right must preserve the real successor admitted at settlement.")
@@ -289,7 +316,7 @@ _PNCO_Subject() {
 		_PNCO_Drain()
 		_PNCO_Require(!CB_HasRestoreDebtForOwner(Token) && !CBClipboardOwner.active.Count && !CBClipboardOwner.paste_transaction,
 			"Real retry or terminal refusal must retire only the original owner and all its debt.")
-		if _PNCO.Mode != "foreign-wins"
+		if _PNCO.Mode != "foreign-wins" && _PNCO.Mode != "foreign-wins-held"
 			_PNCO_Require(CB_Read() == _PNCO.Seed, "Every known owned generation must finish with the real original A.")
 		if IsObject(_PNCO.Failure)
 			throw _PNCO.Failure

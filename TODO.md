@@ -703,6 +703,13 @@ Each closes on a named green hosted or native run, recorded here.
       `[WATCHDOG] run_llm_model_browser timed out` on test 23/29 (`model-browser-native-json`); single occurrence, not
       reproduced, kept listed. The macOS Intel `TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header`
       failure (43430776650 job 131906822890) belongs to worker G's fix. Nothing reproduced, so no code changed.
+      Worker A 2026-11-14: Windows core « Plain native CAS: a newer native copy retires only the old restore right
+      (plain-native-cas-owner) » failed once in [43535291046](https://github.com/adrienm7/ergopti/actions/runs/43535291046)
+      (job 132263577729, 2207/2208) and passed in 43530845290 and 43518505775. Cause: `_CB_PlainAuthenticate` refuses to
+      read while any other window holds the clipboard, so a listener reading the foreign copy (the runner's clipboard
+      history) defers settlement to the retry service, while the fixture asserted it at once. The production path is
+      right; the fixture now waits for that real retry, and the new `foreign-wins-held` case holds the reader's lease
+      at authentication so the deferred path runs on every run (branch `claude/ergopti-todo-cas-flake`).
 
 ## Maintainer decisions pending
 

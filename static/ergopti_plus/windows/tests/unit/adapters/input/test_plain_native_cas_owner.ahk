@@ -146,6 +146,10 @@ Test("Plain native CAS: a NULL borrower keeps its own native lease (plain-native
 Test("Plain native CAS: an own HWND borrower keeps its own native lease (plain-native-cas-owner)", _PNCOT_Case.Bind("borrow-own"))
 Test("Plain native CAS: a foreign read lock retains the exact pending owner (plain-native-cas-owner)", _PNCOT_Case.Bind("auth-busy"))
 Test("Plain native CAS: a newer native copy retires only the old restore right (plain-native-cas-owner)", _PNCOT_Case.Bind("foreign-wins"))
+; A reader of the newer copy holding its lease at authentication made the case
+; above intermittent on hosted runners (run 43535291046): settlement follows on
+; the retry service, and the successor must survive that later settlement.
+Test("Plain native CAS: a newer copy read under a held lease settles on retry (plain-native-cas-owner)", _PNCOT_Case.Bind("foreign-wins-held"))
 Test("Plain native CAS: a real refused setter retains the missing Close acknowledgement (plain-native-cas-owner)", _PNCOT_Case.Bind("set-null"))
 Test("Plain native CAS: a lost Close ACK cannot close a later NULL borrower (plain-native-cas-owner)", _PNCOT_Case.Bind("close-lost"))
 Test("Plain native CAS: a refused retry arm retains the same snapshot and token (plain-native-cas-owner)", _PNCOT_Case.Bind("arm-refused"))
