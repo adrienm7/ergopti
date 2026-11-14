@@ -425,7 +425,7 @@ body {
 
 @supports (width: 1cqi) {
 	.le-board {
-		--le-unit: clamp(34px, calc(100cqi / var(--le-cols)), 58px);
+		--le-unit: clamp(40px, calc(100cqi / var(--le-cols)), 58px);
 	}
 }
 

@@ -1172,11 +1172,12 @@ var LayoutEditorPage = (function () {
 						},
 						[
 							el('span', { class: 'le-legend', text: label }),
-							// A key the view cannot name (a character key with no base character)
-							// shows no hint rather than its raw code; the tooltip still names it.
+							// Only a key with a printed name (Tab, Shift, Esc) shows it: a character
+							// key shows the selected layer's value alone, never the base character
+							// or its raw code; the tooltip still names it.
 							el('span', {
 								class: 'le-code',
-								text: keyName(key.code) === key.code ? '' : keyName(key.code)
+								text: key.character || keyName(key.code) === key.code ? '' : keyName(key.code)
 							})
 						]
 					)

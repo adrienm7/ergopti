@@ -342,14 +342,22 @@ async function exerciseLayerSelector(browser, origin) {
 	// A missing level is added with its modifiers and shown at once.
 	await page.click('#le-layerbar [data-level="altgr"]');
 	await page.waitForSelector('[data-layer="altgr"].active');
-	await page.click('#le-board [data-code="KeyQ"]');
-	await page.selectOption('#le-kind', 'text');
-	await page.fill('#le-text', '@');
-	await page.click('#le-apply');
+	const map = async (code, text) => {
+		await page.click(`#le-board [data-code="${code}"]`);
+		await page.selectOption('#le-kind', 'text');
+		await page.fill('#le-text', text);
+		await page.click('#le-apply');
+	};
+	await map('KeyQ', '@');
 	const legendOf = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
 	assert.equal(await legendOf('KeyQ'), '@');
 	await page.click('[data-layer="base"]');
 	assert.equal(await legendOf('KeyQ'), '', 'the base layer keeps its own key');
+	await map('KeyW', 'w');
+	await page.click('[data-layer="altgr"]');
+	// Another layer shows its own value only, never the base character as a hint.
+	assert.equal(await legendOf('KeyW'), '');
+	assert.equal(await page.textContent('#le-board [data-code="KeyW"] .le-code'), '');
 	await page.click('[data-layer="altgr"]');
 	assert.equal(await legendOf('KeyQ'), '@');
 	const saved = await downloaded(page, () => page.click('#le-save'));
@@ -357,8 +365,8 @@ async function exerciseLayerSelector(browser, origin) {
 	// « Manage layers… » opens the layer tool; Undo removes the added level again.
 	await page.click('#le-manage-layers');
 	await page.waitForSelector('#le-layers #le-layer-add');
-	await page.click('#le-undo');
-	await page.click('#le-undo');
+	// Three edits: the AltGr layer, its KeyQ and the base KeyW.
+	for (let undo = 0; undo < 3; undo++) await page.click('#le-undo');
 	await page.waitForSelector('#le-layerbar [data-level="altgr"].missing');
 	// A source names its levels freely: AltGr is the layer held with Right Alt.
 	await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
@@ -515,6 +523,15 @@ async function exercisePhoneWidth(browser, origin) {
 				toolbarInside: inside('.le-toolbar button'),
 				levelsInside: inside('#le-layerbar [data-level]'),
 				toolTabsInside: inside('#le-tools [data-tool]'),
+				boardScrolls: (() => {
+					const scroller = document.querySelector('.le-board-scroll');
+					return scroller.scrollWidth > scroller.clientWidth;
+				})(),
+				smallestKey: Math.min(
+					...[...document.querySelectorAll('#le-board .le-key')].map(
+						(key) => key.getBoundingClientRect().width
+					)
+				),
 				inspectorBelowBoard: box('#le-inspector').top >= box('#le-board').bottom,
 				toolsBelowInspector: box('#le-tools').top >= box('#le-inspector').bottom,
 				background: getComputedStyle(document.querySelector('#layout-editor')).backgroundColor
@@ -526,6 +543,24 @@ async function exercisePhoneWidth(browser, origin) {
 		assert.ok(layout.inspectorBelowBoard, `${colorScheme}: the inspector stacks under the board`);
 		assert.ok(layout.toolsBelowInspector, `${colorScheme}: the tools come last`);
 		assert.ok(layout.toolTabsInside, `${colorScheme}: every tool tab is shown whole`);
+		// The keys keep a readable size: the board scrolls sideways on its own, the page does not.
+		assert.ok(layout.boardScrolls, `${colorScheme}: the board has its own sideways scroll`);
+		assert.ok(
+			layout.smallestKey >= 36,
+			`${colorScheme}: keys stay readable (${layout.smallestKey})`
+		);
+		// Every key can be reached: the last one scrolls into view and is clicked.
+		await page.locator('#le-board [data-code="ArrowRight"]').scrollIntoViewIfNeeded();
+		await page.click('#le-board [data-code="ArrowRight"]');
+		assert.equal(
+			await page.textContent('#le-inspector h2'),
+			await page.getAttribute('#le-board [data-code="ArrowRight"]', 'title')
+		);
+		assert.equal(
+			await page.evaluate(() => document.documentElement.scrollWidth),
+			layout.viewport,
+			`${colorScheme}: scrolling the board does not scroll the page`
+		);
 		// Every tool opens without widening the page.
 		for (const id of await page.$$eval('#le-tools [data-tool]', (tabs) =>
 			tabs.map((tab) => tab.dataset.tool)
