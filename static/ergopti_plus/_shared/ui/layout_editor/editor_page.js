@@ -1134,7 +1134,12 @@ var LayoutEditorPage = (function () {
 						},
 						[
 							el('span', { class: 'le-legend', text: label }),
-							el('span', { class: 'le-code', text: keyName(key.code) })
+							// A key the view cannot name (a character key with no base character)
+							// shows no hint rather than its raw code; the tooltip still names it.
+							el('span', {
+								class: 'le-code',
+								text: keyName(key.code) === key.code ? '' : keyName(key.code)
+							})
 						]
 					)
 				);

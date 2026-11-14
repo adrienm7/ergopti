@@ -332,6 +332,13 @@ async function exerciseLayerSelector(browser, origin) {
 		['shift_altgr', null, true]
 	]);
 	assert.equal(await page.getAttribute('[data-layer="base"]', 'aria-selected'), 'true');
+	// A blank layout names no key by its raw code (« KeyQ », « Digit1 », « MetaLeft »).
+	const codes = await page.$$eval('#le-board .le-key', (keys) =>
+		keys
+			.filter((key) => key.querySelector('.le-code').textContent === key.dataset.code)
+			.map((key) => key.dataset.code)
+	);
+	assert.deepEqual(codes, [], 'raw key codes shown on the board');
 	// A missing level is added with its modifiers and shown at once.
 	await page.click('#le-layerbar [data-level="altgr"]');
 	await page.waitForSelector('[data-layer="altgr"].active');
@@ -483,9 +490,9 @@ async function exercisePhoneWidth(browser, origin) {
 				viewport: window.innerWidth,
 				toolbarInside: inside('.le-toolbar button'),
 				levelsInside: inside('#le-layerbar [data-level]'),
+				toolTabsInside: inside('#le-tools [data-tool]'),
 				inspectorBelowBoard: box('#le-inspector').top >= box('#le-board').bottom,
 				toolsBelowInspector: box('#le-tools').top >= box('#le-inspector').bottom,
-				toolTabsScroll: getComputedStyle(document.querySelector('.le-tool-tabs')).overflowX,
 				background: getComputedStyle(document.querySelector('#layout-editor')).backgroundColor
 			};
 		});
@@ -494,7 +501,7 @@ async function exercisePhoneWidth(browser, origin) {
 		assert.ok(layout.levelsInside, `${colorScheme}: the four levels fit the screen`);
 		assert.ok(layout.inspectorBelowBoard, `${colorScheme}: the inspector stacks under the board`);
 		assert.ok(layout.toolsBelowInspector, `${colorScheme}: the tools come last`);
-		assert.equal(layout.toolTabsScroll, 'auto', 'the tool tabs scroll inside their strip');
+		assert.ok(layout.toolTabsInside, `${colorScheme}: every tool tab is shown whole`);
 		// Every tool opens without widening the page.
 		for (const id of await page.$$eval('#le-tools [data-tool]', (tabs) =>
 			tabs.map((tab) => tab.dataset.tool)

@@ -498,14 +498,13 @@ body {
 	min-width: 0;
 }
 
-/* One row of tabs that scrolls sideways on a narrow screen. */
+/* The tabs wrap onto a second row rather than hide one past the edge. */
 .le-tool-tabs {
 	border-bottom: 1px solid var(--le-border);
 	display: flex;
+	flex-wrap: wrap;
 	gap: 2px;
-	overflow-x: auto;
 	padding: 6px 6px 0;
-	scrollbar-width: thin;
 }
 
 .le-tool-tabs .le-tool-tab {
