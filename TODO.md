@@ -359,6 +359,9 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       Done 2026-11-13 by worker I without raising a ceiling (d10ad40fbc): the new key-state reads of the
       physical-shortcut capture and ILD-2 go through `adapters/key_state.ahk`, the gesture menu and onboarding share
       one elevated launch (`GestureRestartRunElevated`), and the touchpad reader loads `hid.dll` with `#DllLoad`.
+      Windows Build green on run 43536962831 (key_state_polling 58, elevated_run 3, elevation_wording 3,
+      injection_wording 11); the ceilings the shared launch dropped are lowered to that measure
+      (powershell_policy_bypass 16 -> 15, hidden_window_style 3 -> 2, powershell_mentions 52 -> 46).
       Same landing: Windows Integration Driver startup, red on `dev` since run 43306862276 (realistic-hotstrings
       `toml.flat_values` 1212/1201), follows its new owners: every boot reads the shared tap-hold `shared_file.toml`
       (Mac thumb positions, macOS-only modifiers), the schema v22 migration step and `tap_hold.max_activation_ms`.
