@@ -44,7 +44,7 @@ const SOURCES = [
 	'static/ergopti_plus/_shared/ai/engine/policy/finite_process_port.lua',
 	'static/ergopti_plus/_shared/ai/engine/policy/process_limits.lua',
 	'static/ergopti_plus/_shared/ai/engine/ollama/archive_installer.lua',
-	'static/ergopti_plus/linux/adapters/owned_process.lua',
+	'static/ergopti_plus/linux/core/process/adapters/owned_process.lua',
 	'static/ergopti_plus/linux/modules/llm/ollama_install_files.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_owned_process_native.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_finite_process_port_native.lua',

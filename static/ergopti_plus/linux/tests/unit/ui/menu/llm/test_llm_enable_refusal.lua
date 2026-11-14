@@ -10,13 +10,13 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 local labels = assert(Json.decode_lossless(file:read("*a")))
 file:close()
 
 local function with_notice(tool, body)
-	local names = { "core.i18n.engine.i18n", "adapters.shell_runner", "adapters.keyboard_hook",
+	local names = { "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "adapters.keyboard_hook",
 		"adapters.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -27,7 +27,7 @@ local function with_notice(tool, body)
 		return world.composed_title
 	end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return assert(labels[key], key) end }
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		has_command = function(name) return name == tool end,
 		quote = Shell.quote,
 		exec_checked = function(command)

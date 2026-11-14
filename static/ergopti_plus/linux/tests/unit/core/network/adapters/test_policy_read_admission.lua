@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local native = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Paths = require("core.fs.engine.paths")
 
 local policies = {

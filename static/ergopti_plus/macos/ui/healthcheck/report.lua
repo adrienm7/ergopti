@@ -137,7 +137,7 @@ local function open_with(args, done, current)
 	end
 	retained_openers[request] = function() return retiring end
 	if current() ~= true then request.cancel(); return request end
-	local built, candidate = pcall(require("adapters.shell_runner").spawn, OPEN_BIN, args, function(code)
+	local built, candidate = pcall(require("core.process.adapters.shell_runner").spawn, OPEN_BIN, args, function(code)
 		complete(code, code ~= 0 and "desktop opener refused" or nil)
 	end)
 	if not built or type(candidate) ~= "table" or type(candidate.start) ~= "function"

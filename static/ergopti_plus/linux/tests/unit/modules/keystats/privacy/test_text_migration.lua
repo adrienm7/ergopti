@@ -33,7 +33,7 @@ local TextCrypto = require("metrics.engine.privacy.text_crypto")
 --- Resolves the shell adapter at CALL time, never once at file scope: another
 --- test file reloads adapters.shell_runner, which replaces the cached instance.
 local function Shell()
-	return require("adapters.shell_runner")
+	return require("core.process.adapters.shell_runner")
 end
 
 --- A syntactically valid AES-256 key and IV, for the fake derivation.

@@ -180,8 +180,8 @@ function M.flush()
 		return false
 	end
 	local dir = NativePath.dirname(path)
-	if dir and not require("adapters.shell_runner").run("mkdir -p "
-		.. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
+	if dir and not require("core.process.adapters.shell_runner").run("mkdir -p "
+		.. require("core.process.adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
 		Logger.error(LOG, "The agent's learning folder could not be created.")
 		return false
 	end

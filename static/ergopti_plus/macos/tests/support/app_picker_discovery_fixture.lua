@@ -23,14 +23,14 @@ return function(run)
 			if key == "HOME" then return state.home end
 			return original_getenv(key)
 		end
-		helpers.with_fresh_modules({ "infra.app_picker", "adapters.shell_runner",
+		helpers.with_fresh_modules({ "infra.app_picker", "core.process.adapters.shell_runner",
 			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.text_utils", "infra.deferred_work" }, function()
 			package.loaded["infra.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
 				if state.defer_synchronous then callback() end
 				return state.defer_started
 			end }
-			package.loaded["adapters.shell_runner"] = { spawn = function(bin, args, callback)
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function(bin, args, callback)
 				state.pending[#state.pending + 1] = { bin = bin, args = args, callback = callback }
 				return { start = function()
 					if state.on_start then state.on_start(callback) end

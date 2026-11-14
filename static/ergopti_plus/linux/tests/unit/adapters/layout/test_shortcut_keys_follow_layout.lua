@@ -35,13 +35,13 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 
 	helpers.it("pastes with the key that types v on Ergopti", function()
 		with_layout(ERGOPTI)
-		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server" }
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		-- A clipboard that holds what was last written: the paste reads it back
 		-- before Ctrl+V, and refuses to press it over another owner's bytes.
 		local clipboard = "before"
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec = function() return clipboard end,
 			-- The paste refuses to borrow a clipboard holding formats it could

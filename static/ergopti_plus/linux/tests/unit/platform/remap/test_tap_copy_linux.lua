@@ -288,7 +288,7 @@ end)
 helpers.describe("X11 clipboard change counter (tap-copy-verified)", function()
 	--- Loads the clipboard adapter over a fake shell and display.
 	local function with_adapter(display, reply, body)
-		local names = { clipboard = "adapters.clipboard", shell = "adapters.shell_runner", display = "infra.display_server" }
+		local names = { clipboard = "adapters.clipboard", shell = "core.process.adapters.shell_runner", display = "infra.display_server" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {} }

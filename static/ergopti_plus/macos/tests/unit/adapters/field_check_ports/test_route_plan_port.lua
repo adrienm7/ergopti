@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"core.logger.engine.logger", "adapters.field_check_ports", "adapters.shell_runner", "core.events.timer_scheduler",
+	"core.logger.engine.logger", "adapters.field_check_ports", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"platform.remap.lease_helper", "modules.llm.network_env",
 }
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
@@ -24,7 +24,7 @@ helpers.describe("field check command deadlines", function()
 			local observer, done, terminations = nil, nil, 0
 			package.loaded["core.events.timer_scheduler"] = { after = function() error("no timer after refused start") end,
 				cancel = function() return true end }
-			package.loaded["adapters.shell_runner"] = { spawn = function()
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function()
 				return { isSettled = function() return false end, start = function() return false end,
 					onSettled = function(fn) observer = fn; return true end,
 					terminate = function() terminations = terminations + 1; return true, "pending" end }
@@ -45,7 +45,7 @@ helpers.describe("field check command deadlines", function()
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function(_, callback) deadline = callback; return {}, true end, cancel = function() return true end,
 			}
-			package.loaded["adapters.shell_runner"] = { spawn = function()
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function()
 				return { isSettled = function() return false end, start = function() return true end,
 					onSettled = function(fn) observer = fn; return true end,
 					terminate = function() return true, "pending" end }
@@ -68,7 +68,7 @@ helpers.describe("field check command deadlines", function()
 				after = function() completion(0, "ok", ""); return handle, true end,
 				cancel = function(value) helpers.assert_eq(value, handle); cancelled = cancelled + 1; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = { spawn = function(_, _, done)
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function(_, _, done)
 				completion = done
 				return { isSettled = function() return false end, start = function() return true end }
 			end }
@@ -83,7 +83,7 @@ helpers.describe("field check command deadlines", function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local observer, done, terminations = nil, nil, 0
 			package.loaded["core.events.timer_scheduler"] = { after = function() return {}, false end, cancel = function() return true end }
-			package.loaded["adapters.shell_runner"] = { spawn = function()
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function()
 				return { isSettled = function() return false end, start = function() return true end,
 					onSettled = function(fn) observer = fn; return true end,
 					terminate = function() terminations = terminations + 1; return true, "pending" end }
@@ -113,7 +113,7 @@ local function run(script, launcher)
 			after = function() local handle = { stopped = false }; timers[#timers + 1] = handle; return handle end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, callback)
 				calls[#calls + 1] = { executable = executable, args = args }
 				return {
@@ -177,13 +177,13 @@ end)
 helpers.describe("network check relay probe port", function()
 	local function probe(script, launcher, present)
 		local calls, answers = {}, {}
-		helpers.with_stub_scope({ "core.logger.engine.logger", "adapters.field_check_ports", "adapters.shell_runner",
+		helpers.with_stub_scope({ "core.logger.engine.logger", "adapters.field_check_ports", "core.process.adapters.shell_runner",
 			"core.events.timer_scheduler", "platform.remap.lease_helper", "core.fs.adapters.file_system" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { stopped = false } end, cancel = function() return true end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(executable, args, callback)
 					calls[#calls + 1] = { executable = executable, args = args }
 					return { isSettled = function() return false end,

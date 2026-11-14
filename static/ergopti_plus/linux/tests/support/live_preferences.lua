@@ -3,7 +3,7 @@
 --- Explicit configuration choices for live hardware and service fixtures.
 local M = {}
 local Paths = require("infra.config_paths")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 --- Creates the canonical preference folder before its conditional writers run.
 --- @return string directory The real configuration owner's resolved directory.

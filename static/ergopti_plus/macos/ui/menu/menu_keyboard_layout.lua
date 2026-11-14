@@ -634,7 +634,7 @@ function M.build(ctx)
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
 			[require("settings.engine.keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
 				local ok, started = pcall(function()
-					return require("adapters.shell_runner").open(KEYBOARD_PREFS_URL)
+					return require("core.process.adapters.shell_runner").open(KEYBOARD_PREFS_URL)
 				end)
 				if not ok or started ~= true then
 					Logger.error(LOG, "Keyboard settings could not be opened.")

@@ -168,7 +168,7 @@ end
 --- @return function
 local function proxy_pac(config, run)
 	return function(done)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local HttpClient = require("core.network.adapters.http_client")
 		if not Shell.HAS_ASYNC or not HttpClient.HAS_ASYNC then
 			done({ state = "unsupported" })
@@ -253,7 +253,7 @@ end
 --- @return function
 local function system_details(config, logs_dir, run)
 	return function(done)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		if not Shell.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return

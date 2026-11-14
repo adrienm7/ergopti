@@ -673,7 +673,7 @@ and updates") lexes the Linux tree without comments, inventories every launch
 OwnedProcess and `uv.spawn` calls, Python `subprocess`, every shell script) and
 checks each program against one list, `PROGRAMS`, by scope (driver, test, host).
 Action: read `/proc` or `/sys` instead of running a program (the process
-snapshot of `adapters/process_lifecycle.lua` reads `/proc/<pid>/stat` rather
+snapshot of `core/process/adapters/lifecycle.lua` reads `/proc/<pid>/stat` rather
 than forking `ps`, and the local-server scan reads `/proc/<pid>/cmdline`
 because Alpine's busybox `pgrep`, first on PATH even with procps-ng installed,
 has no `-a` or `-i`); when one is needed, add it to `PROGRAMS` with a proof the

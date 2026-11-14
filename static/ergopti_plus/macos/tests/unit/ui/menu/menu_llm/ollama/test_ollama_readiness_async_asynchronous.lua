@@ -390,7 +390,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				update = function() return true end,
 				complete = function() return true end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, executable, on_done, on_chunk_or_args, args)
 					local on_stream = type(on_chunk_or_args) == "function"
 						and on_chunk_or_args or nil
@@ -451,7 +451,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				urlevent = {openURL = function() return true end},
 			}
 
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 			local manager = require("ui.menu.menu_llm.models_manager_ollama").new({

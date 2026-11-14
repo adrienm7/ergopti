@@ -84,7 +84,7 @@ guarded(function()
 		owner.task = task
 		return task
 	end
-	local lifecycle = require("adapters.task_lifecycle")
+	local lifecycle = require("core.process.adapters.task_lifecycle")
 	local start = lifecycle.start
 	lifecycle.start = function(task, label)
 		local started = start(task, label)

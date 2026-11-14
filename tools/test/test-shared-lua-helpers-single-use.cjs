@@ -177,7 +177,7 @@ const ALLOWED = {
 	'macos/platform/remap/runtime_manifest.lua': {
 		basename: { count: 1, reason: 'file name of a download URL, not a native path' }
 	},
-	'macos/adapters/shell_runner.lua': {
+	'macos/core/process/adapters/shell_runner.lua': {
 		shell_quote: {
 			count: 1,
 			reason: "printf '%b' operand: backslashes and NUL are escaped before the quote"

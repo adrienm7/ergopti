@@ -25,7 +25,7 @@ if entry == "portable" then
 		return searchpath(name, ...)
 	end
 end
-local Shell, Writer = require("adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
+local Shell, Writer = require("core.process.adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
 package.searchpath = searchpath
 local adapter = entry == "adapter" and require("core.fs.adapters.file_system") or nil
 local function run(command) assert(Shell.run(command)) end

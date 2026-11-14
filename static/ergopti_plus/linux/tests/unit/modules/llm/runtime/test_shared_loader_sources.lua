@@ -80,7 +80,7 @@ local function observe(family, target, mode)
 			assert(uv.fs_unlink(path)); assert(uv.fs_mkdir(path, 448))
 		end
 		local receipt = base .. "/receipt.json"
-		operation = require("adapters.owned_process").start(assert(uv.exepath()), {
+		operation = require("core.process.adapters.owned_process").start(assert(uv.exepath()), {
 			root .. "/tests/fixtures/native_shared_loader.lua", root, driver, family, target, mode, receipt,
 		}, { owner = base, timeout_ms = CHILD_TIMEOUT_MS }, function() end)
 		local deadline = uv.hrtime() + CHILD_TIMEOUT_MS * 2 * 1000000

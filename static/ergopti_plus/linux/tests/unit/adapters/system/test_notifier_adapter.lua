@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 ---   rendered as one quoted line) and the log lines.
 local function with_shell(opts, body)
 	opts = opts or {}
-	local shell_name = "adapters.shell_runner"
+	local shell_name = "core.process.adapters.shell_runner"
 	local notifier_name = "adapters.notifier"
 	local logger_name = "core.logger.engine.shim"
 	local previous_shell = package.loaded[shell_name]

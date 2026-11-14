@@ -631,7 +631,7 @@ function M.prepare_dir(dir)
 	-- mktemp exclusively creates a mode-0600 file. Only that owned path may be
 	-- opened and removed; .write_probe may already belong to somebody else.
 	local created, probe_path = pcall(function()
-		local completed, path = require("adapters.shell_runner").exec_checked(
+		local completed, path = require("core.process.adapters.shell_runner").exec_checked(
 			"mktemp -- " .. M.shell_quote(dir .. "/.ergopti-log-probe-XXXXXXXXXX") .. " 2>/dev/null",
 			{ output_dir = dir })
 		if not completed then return nil end

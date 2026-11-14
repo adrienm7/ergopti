@@ -19,7 +19,7 @@ local function with_window(scenario)
 		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}
 	local saved, saved_hs = {}, _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { errors = {}, timers = {}, callbacks = {}, failure = nil }
 	local noop = function() end
@@ -36,7 +36,7 @@ local function with_window(scenario)
 	helpers.provide_timings()
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = {}
-	package.loaded["adapters.shell_runner"] = {}
+	package.loaded["core.process.adapters.shell_runner"] = {}
 	local view = {
 		evaluateJavaScript = function(self, _, callback)
 			if fixture.failure == "throw" then error("PRIVATE_NATIVE_SENTINEL") end
@@ -69,7 +69,7 @@ local function with_window(scenario)
 		scenario(window, fixture)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	_G.hs = saved_hs
 	if not ok then error(err, 0) end
 end

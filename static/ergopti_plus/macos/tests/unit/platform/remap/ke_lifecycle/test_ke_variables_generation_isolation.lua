@@ -67,7 +67,7 @@ local function replay_old_writer_after_reload(logical_name, personal_value)
 			return payload, nil
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			local task = {
 				executable = executable,
@@ -118,7 +118,7 @@ local function replay_old_writer_after_reload(logical_name, personal_value)
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
 	package.loaded["core.fs.adapters.json_codec"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 
 	return engine
 end

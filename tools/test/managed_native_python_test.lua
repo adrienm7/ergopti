@@ -39,7 +39,7 @@ package.loaded["core.events.timer_scheduler"] = {
 	onSettled = function() return true end,
 	cancel = function(timer) if close_result == true then timer.timer = nil; return true end; return false end,
 }
-package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, done)
+package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, done)
 	assert(executable == "/usr/bin/od" and args[4] == "4096")
 	local retired = false
 	return {
@@ -54,7 +54,7 @@ package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, d
 		terminate = function() return true end,
 	}
 end }
-package.loaded["adapters.task_lifecycle"] = {
+package.loaded["core.process.adapters.task_lifecycle"] = {
 	start = function(handle) return handle.start() end,
 	terminate = function(handle) return handle.terminate() end,
 }

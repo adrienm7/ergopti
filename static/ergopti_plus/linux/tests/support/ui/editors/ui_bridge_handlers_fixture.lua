@@ -24,7 +24,7 @@ local function opening_model(output)
 end
 
 local function with_opening_file(callback)
-	local Shell, Writer = require("adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
+	local Shell, Writer = require("core.process.adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
 	local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-view-consent"
 	assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
 	local path = directory .. "/personal.toml"
@@ -198,7 +198,7 @@ end
 -- Existing personal persistence tests now enter through an accepted displayed source.
 local function with_opened_spies(reader, writer, state, fn)
   local RealWriter = require("core.text.engine.toml_codec.writer")
-  local Shell = require("adapters.shell_runner")
+  local Shell = require("core.process.adapters.shell_runner")
   local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-opening"
   assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
   local path = directory .. "/personal.toml"

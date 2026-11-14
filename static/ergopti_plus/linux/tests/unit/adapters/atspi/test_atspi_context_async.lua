@@ -7,12 +7,12 @@ local Json = require("core.text.engine.json")
 require("adapters.atspi_focus")
 
 local function fixture(body, selection_mode)
-	local names = { "adapters.atspi_focus", "adapters.owned_process", "luv" }
+	local names = { "adapters.atspi_focus", "core.process.adapters.owned_process", "luv" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local state = { deliveries = 0 }
 	package.loaded["luv"] = { exepath = function() return "/owned/lua" end, os_getpid = function() return 1234 end }
-	package.loaded["adapters.owned_process"] = { start = function(executable, argv, options, callback)
+	package.loaded["core.process.adapters.owned_process"] = { start = function(executable, argv, options, callback)
 		state.executable, state.argv, state.options, state.callback = executable, argv, options, callback
 		state.operation = { on_settled = function(_, fn) state.settled_callback = fn end }
 		return state.operation

@@ -170,7 +170,7 @@ local function start_real_keystats()
 			return true
 		end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function() end,
 		start = function() return true end,
 		stop = function() return true end,

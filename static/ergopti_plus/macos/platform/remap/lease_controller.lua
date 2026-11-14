@@ -26,14 +26,14 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("core.logger.engine.logger")
-local ShellRunner    = require("adapters.shell_runner")
+local ShellRunner    = require("core.process.adapters.shell_runner")
 local Storage        = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local TokenReuse     = require("platform.remap.token_reuse")
 local LeaseHelper    = require("platform.remap.lease_helper")
-local TaskOutputTurn = require("adapters.task_output_turn")
+local TaskOutputTurn = require("core.process.adapters.task_output_turn")
 local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
@@ -77,7 +77,7 @@ local ACK_GRACE_SEC = 1.0
 -- output to Lua only in the default run loop mode, timers fire in every mode,
 -- and an open menubar menu runs the event tracking mode. Issue #100 failed
 -- seven healthy leases "0.00 s late" while the user browsed the Ergopti menu.
--- Such a deadline first waits for adapters/task_output_turn.lua to prove that
+-- Such a deadline first waits for core/process/adapters/task_output_turn.lua to prove that
 -- task output is read again, at most this long. Keepalive PINGs hold the
 -- worker's inner silence budget off meanwhile, so a menu left open costs
 -- nothing; the inner still fences on its own if Hammerspoon really went away.

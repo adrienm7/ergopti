@@ -142,7 +142,7 @@ local function new_handler(spec)
 				end
 			end
 		end
-		local shell = dependency(state, "shell", "adapters.shell_runner")
+		local shell = dependency(state, "shell", "core.process.adapters.shell_runner")
 		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
 		if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end

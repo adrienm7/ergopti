@@ -25,7 +25,7 @@ local i18n      = require("core.i18n.engine.i18n")
 local Paths     = require("core.fs.engine.paths")
 local TimerScheduler = require("core.events.timer_scheduler")
 local JsonCodec = require("core.fs.adapters.json_codec")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 local LOG = "menu_llm.models"

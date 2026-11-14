@@ -15,7 +15,7 @@ local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
 	"adapters.screen_capture",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
@@ -87,7 +87,7 @@ local function with_subject(options, scenario)
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			local role = executable == "/bin/mkdir" and "directory" or "capture"
 			fixture.role_counts[role] = fixture.role_counts[role] + 1
@@ -157,7 +157,7 @@ local function with_subject(options, scenario)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(SUBJECT_MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

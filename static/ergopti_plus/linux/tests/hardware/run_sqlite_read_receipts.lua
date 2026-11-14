@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 local real_sqlite = assert(Shell.exec_line("command -v sqlite3"))

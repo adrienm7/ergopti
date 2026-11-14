@@ -33,8 +33,8 @@ LoggerError(Tag, Message, Values*) => _RelayOwnerErrors.Push(Tag . ": " . Messag
 #Include ..\..\infra\json.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
 #Include ..\..\core\network\adapters\proxy_override.ahk
 #Include ..\..\modules\llm\ollama_runtime_owner.ahk
 

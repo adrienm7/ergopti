@@ -148,7 +148,7 @@ end
 --- The install command for this machine, or a generic sentence.
 --- @return string
 local function package_hint()
-	local ok_shell, Shell = pcall(require, "adapters.shell_runner")
+	local ok_shell, Shell = pcall(require, "core.process.adapters.shell_runner")
 	if ok_shell then
 		for _, entry in ipairs(PACKAGE_HINTS) do
 			if Shell.has_command(entry.probe) then return entry.hint end

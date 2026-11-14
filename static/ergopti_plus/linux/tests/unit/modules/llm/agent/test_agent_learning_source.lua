@@ -309,7 +309,7 @@ helpers.describe("agent learning quarantine ownership", function()
 		helpers.it("(agent-learning-quarantine) preserves an occupied " .. occupied .. " recovery path", function()
 			local source = "invalid original learning"
 			with_source(source, function(Learning, path, config)
-				local Shell = require("adapters.shell_runner")
+				local Shell = require("core.process.adapters.shell_runner")
 				if occupied == "file" then
 					local file = assert(io.open(path .. ".corrupt", "wb"))
 					assert(file:write("previous recovery")); assert(file:close())
@@ -378,7 +378,7 @@ helpers.describe("agent learning native source admission", function()
 		{ kind = "regular", mode = "threshold" },
 	}) do
 		helpers.it("(agent-learning-native-source) bounds " .. candidate.kind .. " " .. candidate.mode, function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			assert(os.remove(folder))
 			assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))

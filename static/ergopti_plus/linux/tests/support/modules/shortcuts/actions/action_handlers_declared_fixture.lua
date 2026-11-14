@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local function with_recorded_shell(body)
 	local commands = {}
 	local real = os.execute
-	local Process = require("adapters.owned_process")
+	local Process = require("core.process.adapters.owned_process")
 	local start = Process.start
 	Process.start = function(executable, args, options, callback)
 		if executable ~= "xdotool" then return start(executable, args, options, callback) end
