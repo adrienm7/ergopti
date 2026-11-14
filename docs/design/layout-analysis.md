@@ -104,6 +104,15 @@ form (« » “ ” „ → ", ’ ‘ → ', – — → -, … → ..., no-bre
 Kalamine rule), but does not count as covered. A character with no sequence is
 **unsupported**.
 
+**What is cached.** A corpus, a pasted text or the keystats store is reduced
+once to layout-independent counts: characters, character bigrams and character
+trigrams (no text, no word list). The distance-2 character pairs that the
+same-finger skipgram metric needs are the first and last characters of those
+trigrams, so they need no table of their own. Whether a pair is an SFB, a
+skipgram, a roll, an alternation or a redirect depends on the layout: that
+classification happens when a layout is scored, by mapping the cached n-grams
+onto its keys.
+
 **Key n-grams.** The key bigrams and trigrams are those of the stream of
 expanded keystrokes. They are rebuilt exactly from the character tables: the
 pairs inside a character's sequence come from its unigram count, the pair

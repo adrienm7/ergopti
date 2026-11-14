@@ -340,6 +340,38 @@ below are where the tools disagree.
    score **and** every metric with its contribution, so Ergo-L's « judge by the
    worst criterion » stays possible on the same page.
 
+### Where Ergopti does better, tool by tool
+
+- **KLA**: speed (115 layouts in about 0.3 s from cached tables instead of a
+  simulation of the whole text per layout), dead keys, AltGr layers, skipgrams,
+  scissors, lateral stretches, rolls and redirects (KLA has none), a score that
+  rewards rolls instead of penalising every same-hand press, French corpora, and
+  the installable layout (the editor compiles it for Windows, macOS and Linux).
+- **KLAnext**: instant ranking (KLAnext re-reads the corpus for every selected
+  layout), open source, the score's every contribution shown and every weight
+  editable, lateral stretches, scissors and finger load in the score (KLAnext
+  ignores them), the user's own text analysed in the page and, in the app, the
+  user's own typing; and again the generated installable layout, where KLAnext
+  only produces JSON.
+- **Ergo-L analyser and Kalamine**: any text (Ergo-L offers two books), capitals,
+  digits, Shift and AltGr counted (Ergo-L lower-cases the corpus and drops
+  digits), a real fingering per keyboard (ISO, ANSI, ortholinear, angle mod;
+  Ergo-L's geometry selector changes only the drawing), the distance metric,
+  3-key rolls and alternation (computed but hidden there), adjacency-based LSB
+  and scissor definitions, unsupported characters kept out of the shares instead
+  of diluting them, a global score for those who want one beside every raw
+  metric, and a layout source without Kalamine's six-level and one-custom-dead-key
+  limits.
+- **genkey, Oxeylyzer, cmini, Keysolve**: every layer and dead key (they measure
+  the 30-key base layer only), French and accented text, Shift and AltGr cost,
+  coverage and compact-keyboard fitness, shortcut placement, in the browser and
+  in the app with no install; Oxeylyzer's and genkey's distance-weighted finger
+  speed is the one model this engine does not reproduce (it reports SFB and
+  distance separately).
+- **dariogoetz's optimiser**: the same layer and modifier coverage, with far
+  fewer and documented weights, each contribution shown; no optimiser yet (a
+  possible next step: swap search on the same engine).
+
 ## 11. Default weights
 
 The weights are stored once in
