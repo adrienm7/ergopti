@@ -99,7 +99,9 @@ const NEVER_RUNTIME = [
 		'macOS Python bootstrap catalogue',
 		(arc) => arc === `${SHARED_REL}/ai/data/managed_python_release.json`
 	],
-	['Lua sources', (arc) => arc.startsWith(`${SHARED_REL}/`) || arc.endsWith('.lua')],
+	// The structure move put the shared Lua modules at the shared root, beside
+	// the data and pages the bundle ships: a Lua source is a .lua file.
+	['Lua sources', (arc) => arc.endsWith('.lua')],
 	['documentation', (arc) => arc.endsWith('.md') && !LICENSE_NOTICES.has(arc)],
 	['developer scripts', (arc) => /\.(?:py|sh)$/.test(arc)],
 	['test vectors', (arc) => /(?:^|\/)(?:test_vectors|[^/]*_vectors)\.(?:json|toml)$/.test(arc)],
