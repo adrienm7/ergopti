@@ -783,12 +783,16 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **Legacy Linux updater probes (remove later).** Installed Linux updaters before the structure move (v1.0.9 …
       v1.0.10-dev.175) admit a staged tarball only with `_shared/data/locales/en.json` and a `_shared/lua/` folder;
       `tools/build/add-linux-legacy-update-probes.sh` adds both to the release tarball (decided by the coordinator on
-      2026-11-13, to review by the maintainer; proved locally by the real v1.0.9 installer applying a post-move
-      tarball). Remove that step, its call and `test-linux-legacy-update-probes.cjs` once the first release whose
+      2026-11-13, confirmed by the maintainer on 2026-11-14; proved locally by the real v1.0.9 installer applying a
+      post-move tarball, and in CI by each release's own `ownership.sh`, frozen from the v1.0.9 and v1.0.10-dev.175
+      tags in `tools/test/fixtures/linux-pre-move-ownership`, recording the packed tarball). Remove that step, its
+      call, `test-linux-legacy-update-probes.cjs` and those frozen helpers once the first release whose
       updater finds a staged shared root by `build_stamp.txt` (835136bba0) has been out for one full release cycle.
       The structure step that moves `linux/infra/version.lua` (also required by v1.0.9) fails this build until it
       adds that probe too. macOS only loses the boot-health probation if `macos/infra/updater_boot_ready.lua` moves;
-      Windows replaces one exe and probes nothing. Landed by worker G on 2026-11-14; its check passed in CI run
+      Windows replaces one exe and probes nothing (rechecked on the v1.0.10-dev.175 sources on 2026-11-14: its
+      workers and caches are the installed build's). The live updater E2E step installs this checkout and updates
+      it to the newest published prerelease, so it stays red until a post-move dev prerelease exists. Landed by worker G on 2026-11-14; its check passed in CI run
       [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (Common Packaging and boot, 25/26).
 - [x] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation

@@ -23,7 +23,8 @@
 # moves later (linux/updater/engine/). That path is checked here, so the step
 # that moves it fails this build until it adds its own probe below.
 #
-# Remove this step, its call in build-linux-bundle-archive.sh and its test
+# Remove this step, its call in build-linux-bundle-archive.sh, its test and the
+# released helpers it runs (tools/test/fixtures/linux-pre-move-ownership)
 # once the first release whose updater finds a staged shared root by its
 # build stamp (modules/updater/installer.lua staged_shared_root) has been out
 # for one full release cycle (TODO.md « Legacy Linux updater probes »).
