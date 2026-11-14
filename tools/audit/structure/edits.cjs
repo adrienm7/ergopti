@@ -119,6 +119,21 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '"core/ui/engine/webview/" = "the WebView2 host helpers the windows share"'
 	},
 	{
+		// The trusted guardian controls stage the native receiver beside the
+		// guardian in a bundle tree built on self.platform; S08 moves the receiver
+		// to core/network/adapters, where the respelled guardian now looks.
+		file: 'tools/diagnostics/macos_trusted_native_guardian_test.py',
+		moves: 'macos/platform/network/native_http.py',
+		from: '        (self.platform / "network").mkdir(parents=True)',
+		to: '        self.platform.mkdir(parents=True)\n        (self.platform.parent / "core/network/adapters").mkdir(parents=True)'
+	},
+	{
+		file: 'tools/diagnostics/macos_trusted_native_guardian_test.py',
+		moves: 'macos/platform/network/native_http.py',
+		from: '            self.platform / "network/native_http.py",',
+		to: '            self.platform.parent / "core/network/adapters/native_http.py",'
+	},
+	{
 		// The literal AppDir contract runs workers from the driver root as its
 		// working directory (./adapters/x.lua); the plan reads ./ from the
 		// fixture's own folder. S09 moves the SQLite worker under core/process.
