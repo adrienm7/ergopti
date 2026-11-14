@@ -98,7 +98,7 @@ end
 
 --- The exit code of an os.execute result on LuaJIT and Lua 5.2+.
 local function exit_code(status, how, code)
-	return require("ui.native_dialog").exit_code(status, how, code)
+	return require("core.ui.ui.native_dialog").exit_code(status, how, code)
 end
 
 --- Runs a command and returns whether it exited 0.

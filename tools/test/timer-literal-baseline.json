@@ -22,6 +22,6 @@
 	"windows/modules/shortcuts/win.ahk": 1,
 	"windows/ui/healthcheck/collection.ahk": 2,
 	"windows/ui/menu/menu_llm/menu_api_entries.ahk": 1,
-	"windows/ui/spotlight/ownership.ahk": 1,
-	"windows/ui/tooltip/core.ahk": 1
+	"windows/core/ui/ui/spotlight/ownership.ahk": 1,
+	"windows/core/ui/ui/tooltip/core.ahk": 1
 }

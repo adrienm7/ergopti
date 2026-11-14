@@ -27,13 +27,13 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 local NativePath = require("core.fs.engine.native_path")
 
 local i18n         = require("core.i18n.engine.i18n")
 local toml_writer  = require("core.text.engine.toml.writer")
 local toml_codec   = require("core.text.engine.toml.codec")
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local Paths        = require("core.fs.engine.paths")
 local Logger       = require("core.logger.engine.logger")
 local DeferredWork = require("core.timing.engine.deferred_work")
@@ -181,7 +181,7 @@ end
 --- @return boolean applied
 local function retitle(owner, view, title)
 	if not publication_is_current(owner, view) then return false end
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui or type(ui_builder) ~= "table" or type(ui_builder.set_window_title) ~= "function" then
 		Logger.error(LOG, "Onboarding window title cannot follow the locale; ui_builder is unavailable.")
 		return false
@@ -674,7 +674,7 @@ end
 --- @param body string Localised alert body.
 local function fail_commit(title_key, body)
 	close_webview()
-	require("infra.dialog_util").block_alert(wizard_text(title_key), body, wizard_text("onboarding.btn.ok"))
+	require("core.ui.engine.dialog_util").block_alert(wizard_text(title_key), body, wizard_text("onboarding.btn.ok"))
 end
 
 --- Versions a config.toml the wizard is about to write: the boot migration
@@ -760,7 +760,7 @@ end
 --- @param after function|nil Work to run once the user dismissed it.
 local function deferred_notice(key, after)
 	local scheduled = DeferredWork.after(0, function()
-		require("infra.dialog_util").block_alert(wizard_text("onboarding.error.title"), wizard_text(key),
+		require("core.ui.engine.dialog_util").block_alert(wizard_text("onboarding.error.title"), wizard_text(key),
 			wizard_text("onboarding.btn.ok"))
 		if after then after() end
 	end, "onboarding.notice")
@@ -1205,7 +1205,7 @@ function M.run(config_path)
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
 		local view, focus_owner = _webview, _focus_owner
-		require("ui.ui_builder").force_focus(view, false, { is_current = function()
+		require("core.ui.ui.builder").force_focus(view, false, { is_current = function()
 			return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
 		end })
 		if focus_owner ~= nil and focus_owner.init_retry ~= nil and focus_owner.init_retry.path == config_path then
@@ -1223,7 +1223,7 @@ function M.run(config_path)
 
 	Logger.start(LOG, "Opening onboarding wizard…")
 
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui or not ui_builder then
 		Logger.error(LOG, "Failed to load ui_builder module.")
 		return false

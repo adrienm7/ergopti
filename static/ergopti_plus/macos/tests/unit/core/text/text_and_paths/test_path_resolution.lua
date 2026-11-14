@@ -120,7 +120,7 @@ helpers.describe("ui_builder and asset path resolution", function()
 	helpers.it("should have module-relative path as primary (not hs.configdir-only)", function()
 		-- This test verifies that ui_builder does NOT rely solely on hs.configdir.
 		-- The module should compute a path relative to its own location.
-		local UiBuilder = helpers.load_with_stubs("ui.ui_builder")
+		local UiBuilder = helpers.load_with_stubs("core.ui.ui.builder")
 		-- Verify the module is stable even if hs.configdir is unset
 		local original_configdir = hs.configdir
 		hs.configdir = nil

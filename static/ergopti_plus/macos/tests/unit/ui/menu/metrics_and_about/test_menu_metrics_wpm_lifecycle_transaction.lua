@@ -44,7 +44,7 @@ local function load_menu(options)
 	end
 	package.loaded["modules.keystats"] = keystats_module
 	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = nil

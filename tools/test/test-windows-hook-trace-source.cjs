@@ -455,7 +455,7 @@ const source = {
 	cmake: read(NATIVE + 'CMakeLists.txt'),
 	ownedTest: read(NATIVE + 'terminal_capture_owned_test.c'),
 	adapter: read('static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk'),
-	custodyAdapter: read('static/ergopti_plus/windows/adapters/terminal_output_custody.ahk'),
+	custodyAdapter: read('static/ergopti_plus/windows/core/ui/adapters/terminal_output_custody.ahk'),
 	builder: read('tools/build/build_windows_nav_owner.ps1'),
 	runner: read('tools/test/run-nav-event-owner-portable.cjs'),
 	harness: read('static/ergopti_plus/windows/tests/hardware/group7_hook_trace.ahk'),

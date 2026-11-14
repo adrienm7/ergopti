@@ -309,7 +309,7 @@ function auditSource(source, lua, locales, relative = '') {
 				caption[2].value === 'Title' &&
 				caption[3].value === ')';
 			if (
-				relative !== 'windows/infra/native_dialogs.ahk' ||
+				relative !== 'windows/core/ui/engine/native_dialogs.ahk' ||
 				scope?.name !== (name === '_Ui_FolderSelect' ? 'Ui_DirSelect' : 'Ui_' + name) ||
 				name === 'DirSelect' ||
 				!composed

@@ -74,7 +74,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		-- literal: hardcoding "Enregistrer" pinned the test to a French spelling
 		-- that only held while the button itself was hardcoded, so routing it
 		-- through i18n turned this green test red for no behavioural reason.
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		if type(dialog) == "table" then
 			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
 				return confirm, "https://example.com"
@@ -105,7 +105,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 			set_action_parameter = function() stored = stored + 1 end,
 		}
 		-- Echo the CANCEL label the caller passed, for the same reason as above.
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		if type(dialog) == "table" then
 			dialog.text_prompt = function(_title, _prompt, _prior, _confirm, cancel)
 				return cancel, nil
@@ -121,7 +121,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 	helpers.it("contains a native prompt exception and reports failure", function()
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		dialog.text_prompt = function() error("PROMPT_THROW") end
 
 		local setter_calls = 0
@@ -146,7 +146,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		helpers.it("reports " .. tostring(refusal) .. " storage refusal", function()
 			package.loaded["ui.menu.shortcut_utils"] = nil
 			local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
-			local dialog = package.loaded["infra.dialog_util"]
+			local dialog = package.loaded["core.ui.engine.dialog_util"]
 			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
 				return confirm, "https://example.com"
 			end
@@ -292,7 +292,7 @@ helpers.it("blank free-language input leaves the existing binding unchanged", fu
 		get_action_parameter = function() return "Esperanto" end,
 		validate_action_parameter = function() error("blank input must not acquire admission") end,
 		set_action_parameter = function() changes = changes + 1; return true end }
-	local dialog = package.loaded["infra.dialog_util"]
+	local dialog = package.loaded["core.ui.engine.dialog_util"]
 	dialog.text_prompt = function(_, _, prior, confirm)
 		helpers.assert_eq(prior, "Esperanto")
 		return confirm, ""

@@ -1232,7 +1232,7 @@ and call `hs.window.windowForID`, an alias of `hs.window.get`, i.e. `find()`
 over `hs.window.allWindows()`: every window of every application, on the main
 thread. Each webview open paid 2.8 s to 3.2 s on macOS 26 (#100), and the focus
 retry repeated it. Resolve webview and console windows through
-`adapters/own_window.lua`, which records that number with `windowForID`
+`core/ui/adapters/own_window.lua`, which records that number with `windowForID`
 swapped for the synchronous call and then matches it among this process's own
 windows (by PID). `tests/meta/runloop/test_app_lookup_never_scans_windows.lua`
 admits no other `hswindow()` caller and ratchets every global enumeration.
@@ -1607,7 +1607,7 @@ evaluation; the helper builds a table even for a nil NSError. Objective-C nil
 messaging yields code zero and no other fields, so successful execution supplies
 exactly `{code = 0}` despite the documented nil-error contract. A non-nil guard
 therefore reports successful UI delivery as failure. Use
-`adapters/webview_result.lua`; retain errors with any additional field or a
+`core/ui/adapters/webview_result.lua`; retain errors with any additional field or a
 metatable, including real code-zero errors with a domain. Model both nil and
 the native sentinel in callback fixtures. The pinned implementation is in
 [libwebview.m](https://github.com/Hammerspoon/hammerspoon/blob/1.1.1/extensions/webview/libwebview.m),
@@ -1619,7 +1619,7 @@ In packaged Hammerspoon 1.1.1, `deleteOnClose(true)` can recurse from
 `windowWillClose` into `userdata_gc`: GC clears `udRef` before closing, and
 `HSWebViewWindow_toLua` wraps the same native window again. A guard against GC
 on the same consumed userdata does not prevent `C stack overflow`. Keep native
-automatic GC disabled and use the factory's `ui/webview_close_owner.lua` to
+automatic GC disabled and use the factory's `core/ui/ui/webview_close_owner.lua` to
 retire user-closed windows outside their Cocoa notification. Check native
 consumption separately from business close callbacks. These failures can appear
 only in process `stderr` while `hs.console.getConsole()` is empty; qualify both

@@ -45,7 +45,7 @@ local i18n        = require("core.i18n.engine.i18n")
 local Paths       = require("core.fs.engine.paths")
 local ConfigPaths = require("infra.config_paths")
 local FileSystem  = require("core.fs.adapters.file_system")
-local ui_builder  = require("ui.ui_builder")
+local ui_builder  = require("core.ui.ui.builder")
 local Json        = require("core.text.engine.json")
 local TomlCodec   = require("core.text.engine.toml_codec")
 local TomlWriter  = require("core.text.engine.toml_codec.writer")
@@ -227,7 +227,7 @@ local function request_regeneration(karabiner)
 	local ok, accepted = pcall(karabiner.regenerate, function(done, reason)
 		if done ~= true then
 			Logger.warn(LOG, "The edited navigation layer is saved but not deployed yet: %s.", tostring(reason))
-			local sent, notify_err = require("infra.notifications").notify(i18n.get("layer_editor.window_title"),
+			local sent, notify_err = require("core.ui.engine.notifications").notify(i18n.get("layer_editor.window_title"),
 				i18n.get("layer_editor.apply_failed"), "error")
 			if not sent then
 				Logger.error(LOG, "The late regeneration failure could not be notified: %s.", tostring(notify_err))

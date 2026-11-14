@@ -14,7 +14,7 @@ local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
 local function with_world(scenario)
 	return helpers.with_fresh_modules({ "modules.llm.screen_answer", "modules.llm.local_model_offer",
-		"infra.dialog_util", "modules.shortcuts.script_control" }, function()
+		"core.ui.engine.dialog_util", "modules.shortcuts.script_control" }, function()
 		return Scope.run(function() return scenario(Fixture.build_world()) end)
 	end)
 end
@@ -53,7 +53,7 @@ helpers.describe("screen missing-model repair retains its own consent revision",
 
 	helpers.it("does not borrow the successor created while closing its failed surface", function()
 		with_world(function(world)
-			local tooltip = require("ui.tooltip")
+			local tooltip = require("core.ui.ui.tooltip")
 			local hide = tooltip.hide_forced_silent
 			local replaced = false
 			tooltip.hide_forced_silent = function(...)
@@ -75,7 +75,7 @@ helpers.describe("screen missing-model repair retains its own consent revision",
 		with_world(function(world)
 			helpers.assert_true(Fixture.trigger(world, "llm_screen_region", "local"))
 			world.captures[1].on_image("image", "iVBORw0KGgoAAAANSUhEUg==")
-			local tooltip = require("ui.tooltip")
+			local tooltip = require("core.ui.ui.tooltip")
 			local hides = 0
 			local function refuse_hide() hides = hides + 1; return false end
 			tooltip.hide_forced_silent, tooltip.hide = refuse_hide, refuse_hide
@@ -89,7 +89,7 @@ helpers.describe("screen missing-model repair retains its own consent revision",
 	for _, change in ipairs({ "reset", "preview off", "successor answer", "paused" }) do
 		helpers.it("refuses a Download after " .. change .. " inside the native dialog", function()
 			with_world(function(world)
-				local dialog = require("infra.dialog_util")
+				local dialog = require("core.ui.engine.dialog_util")
 				local native_alert = dialog.block_alert
 				local changed = false
 				dialog.block_alert = function(...)

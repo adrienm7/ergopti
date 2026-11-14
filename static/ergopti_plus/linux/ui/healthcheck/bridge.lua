@@ -235,7 +235,7 @@ end
 --- as an empty list, which would read as "nothing is open".
 --- @return table|nil Sorted process names, nil when the session cannot list windows.
 local function running_apps()
-	if not require("infra.display_server").is_x11() then
+	if not require("core.ui.engine.display_server").is_x11() then
 		Logger.info(LOG, "Open applications are not listed: this session is not X11 and Wayland exposes no window list.")
 		return nil
 	end
@@ -648,7 +648,7 @@ end
 --- @return boolean pushed
 local function push(session, message)
 	if _session ~= session then return false end
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if manager.current_epoch("healthcheck") ~= session.epoch then return false end
 	local ok, json = pcall(require("core.text.engine.json").encode, message)
 	if not ok then
@@ -829,7 +829,7 @@ local function perform(session, action, state, context)
 	local function current()
 		return _session == session and session.action_token == token and session.snapshot == token.snapshot
 			and session.snapshot.export_revision == token.revision
-			and require("ui.webview_manager").current_epoch("healthcheck") == session.epoch
+			and require("core.ui.ui.webview_manager").current_epoch("healthcheck") == session.epoch
 	end
 	local request = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot, {
 		current = current,
@@ -867,11 +867,11 @@ function M.on_message(payload, state, context)
 		}
 		_session = session
 		session.snapshot = M.build_snapshot(state, false)
-		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		if _session ~= session or require("core.ui.ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		local message = init_message(session)
-		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		if _session ~= session or require("core.ui.ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		start_probes(session, state)
-		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		if _session ~= session or require("core.ui.ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		return message
 	end
 	if not _session or _session.epoch ~= epoch then
@@ -908,7 +908,7 @@ end
 --- Windows: bringing it forward would keep its stale snapshot.
 --- @return boolean opened
 function M.open()
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local epoch = manager.current_epoch("healthcheck")
 	if epoch ~= nil and not manager.hide("healthcheck", epoch) then
 		Logger.error(LOG, "The open diagnostics window could not be replaced.")

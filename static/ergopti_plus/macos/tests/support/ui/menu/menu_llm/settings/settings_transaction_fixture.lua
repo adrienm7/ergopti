@@ -37,9 +37,9 @@ local MODULES = {
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"ui.menu.shortcut_utils",
 	"infra.app_picker",
 	"infra.manifest_menu",
@@ -309,7 +309,7 @@ local function with_fixture(options, callback)
 		load_api_entries = function() end,
 	}
 	package.loaded["core.logger.engine.logger"] = Logger
-	package.loaded["infra.notifications"] = {notify = function() end}
+	package.loaded["core.ui.engine.notifications"] = {notify = function() end}
 	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
@@ -319,7 +319,7 @@ local function with_fixture(options, callback)
 	end
 	package.loaded["core.i18n.engine.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function()
 			return "button.ok", prompt_value
 		end,

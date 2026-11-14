@@ -96,7 +96,7 @@ local function settings_opener(remap)
 		return remap.open_login_items(function(opened, detail)
 			if opened == true then return end
 			Logger.warn(LOG, "Login Items settings did not open from the steps: %s.", tostring(detail))
-			local ok, sent_or_err = pcall(require("infra.notifications").notify,
+			local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
 				i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
 			if not ok or sent_or_err ~= true then
 				Logger.error(LOG, "Login Items failure notice was not delivered: %s.", tostring(sent_or_err))

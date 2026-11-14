@@ -11,10 +11,10 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.fs.adapters.storage",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.settings_manager",
@@ -60,7 +60,7 @@ local function with_fixture(raw, callback)
 		read_exact = function() return true, nil end,
 		set = function() return true end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() return "button.ok", raw end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = {
@@ -76,7 +76,7 @@ local function with_fixture(raw, callback)
 		info = function() end,
 		warn = function() end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			observations.notifications[#observations.notifications + 1] = {
 				title = title,

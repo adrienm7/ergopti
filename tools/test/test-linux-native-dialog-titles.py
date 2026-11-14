@@ -1,6 +1,6 @@
 # tools/test/test-linux-native-dialog-titles.py
 """Real public captions, cancellation and results of Ergopti's own dialog host
-(static/ergopti_plus/linux/ui/dialog_host.lua) on an owned X11 display.
+(static/ergopti_plus/linux/core/ui/ui/dialog_host.lua) on an owned X11 display.
 
 Requires Node 22, LuaJIT, GTK 3, Xvfb and libXtst. Run inside dbus-run-session;
 optional signed runtime prefixes are supplied through the ordinary environment.
@@ -121,7 +121,7 @@ root = (
 xvfb = shutil.which("Xvfb")
 lua = shutil.which("luajit")
 assert xvfb and lua, "native title profile requires actual Xvfb and LuaJIT"
-host = root / "static/ergopti_plus/linux/ui/dialog_host.lua"
+host = root / "static/ergopti_plus/linux/core/ui/ui/dialog_host.lua"
 assert host.is_file(), "the owned dialog host must exist"
 r, w = os.pipe()
 server = subprocess.Popen(
@@ -318,7 +318,7 @@ try:
                         + "package.loaded['adapters.keyboard_hook'] = {while_released=function(fn) releases=releases+1; local result={fn()}; restores=restores+1; return unpack(result) end}\n"
                         + "local shell=require('core.process.adapters.shell_runner')\n"
                         + (
-                            "local value=require('ui.text_prompt').ask('Native entry','Preserved native body',' Exact café ')\n"
+                            "local value=require('core.ui.ui.text_prompt').ask('Native entry','Preserved native body',' Exact café ')\n"
                             if mode == "prompt"
                             else "local value=require('ui.app_chooser').pick(shell,'Native application')\n"
                             if mode == "application"

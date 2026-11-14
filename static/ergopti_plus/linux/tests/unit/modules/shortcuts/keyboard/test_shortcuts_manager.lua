@@ -419,7 +419,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					end
 					helpers.assert_eq(matches, 1)
 					helpers.assert_eq(type(action), "function")
-					local rename, execute, modal = os.rename, os.execute, require("ui.modal")
+					local rename, execute, modal = os.rename, os.execute, require("core.ui.ui.modal")
 					local run = modal.run
 					os.rename = function(from, to)
 						if from == helpers.stage_path(path) and to == path then

@@ -77,13 +77,13 @@ end
 local function gesture_commands(fixture)
 	local original_renderer = package.loaded["infra.manifest_menu"]
 	local original_menu = package.loaded["ui.menu.menu_gestures"]
-	local original_dialog = package.loaded["infra.dialog_util"]
+	local original_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local commands
 	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, context)
 		commands = context.commands
 		return {}
 	end)
-	package.loaded["infra.dialog_util"] = { block_alert = function(_, message, no)
+	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, no)
 		fixture.asked[#fixture.asked + 1] = message
 		return no
 	end }
@@ -97,11 +97,11 @@ local function gesture_commands(fixture)
 	package.loaded["infra.manifest_menu"] = original_renderer
 	package.loaded["ui.menu.menu_gestures"] = original_menu
 	if not ok then
-		package.loaded["infra.dialog_util"] = original_dialog
+		package.loaded["core.ui.engine.dialog_util"] = original_dialog
 		error(detail, 0)
 	end
 	-- The dialog double stays for the click; the caller's run restores it.
-	fixture.restore_dialog = function() package.loaded["infra.dialog_util"] = original_dialog end
+	fixture.restore_dialog = function() package.loaded["core.ui.engine.dialog_util"] = original_dialog end
 	return commands
 end
 
@@ -162,10 +162,10 @@ end
 --- @return table asked Dialog messages shown.
 --- @return number refreshes Menu refreshes.
 local function run_tap_hold_row(id)
-	local names = { "infra.dialog_util", "infra.config_paths", "infra.manifest_menu", "ui.menu.menu_tap_holds" }
+	local names = { "core.ui.engine.dialog_util", "infra.config_paths", "infra.manifest_menu", "ui.menu.menu_tap_holds" }
 	return helpers.with_fresh_modules(names, function()
 		local asked, requests, refreshes, commands = {}, {}, 0, nil
-		package.loaded["infra.dialog_util"] = { block_alert = function(_, message, no)
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, no)
 			asked[#asked + 1] = message
 			return no
 		end }
@@ -262,11 +262,11 @@ helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS
 		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ui.menu.llm_scope",
 			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "ui.menu.scoped_preferences",
 			"ui.menu.global_scope" }
-		local names = { "infra.dialog_util", "modules.hotstrings.hotstrings_config" }
+		local names = { "core.ui.engine.dialog_util", "modules.hotstrings.hotstrings_config" }
 		for _, name in ipairs(owners) do names[#names + 1] = name end
 		helpers.with_fresh_modules(names, function()
 			local asked, captured, applied = {}, {}, {}
-			package.loaded["infra.dialog_util"] = { block_alert = function(title, message, no, yes)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(title, message, no, yes)
 				asked[#asked + 1] = { title, message, no, yes }
 				return no
 			end }

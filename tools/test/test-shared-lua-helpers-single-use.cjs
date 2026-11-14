@@ -203,7 +203,7 @@ const ALLOWED = {
 				'ffi-only child whose arg[0] has its backslashes rewritten to "/" first, which native_path never does'
 		}
 	},
-	'linux/ui/webview_manager.lua': {
+	'linux/core/ui/ui/webview_manager.lua': {
 		percent_encode: {
 			count: 1,
 			reason: 'escapes every non-alphanumeric byte of a JS bridge payload, not a URL component'

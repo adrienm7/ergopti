@@ -89,7 +89,7 @@ local function load_fixture(reset_result)
 		set_colorization_enabled = function() end,
 		set_accent_color = function() end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 
 	local engine = setmetatable({
 		set_runtime_guard = function(guard) engine_guard = guard end,

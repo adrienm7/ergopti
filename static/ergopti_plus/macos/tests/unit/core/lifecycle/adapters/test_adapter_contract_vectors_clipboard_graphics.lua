@@ -96,7 +96,7 @@ end)
 -- port whose show() vector is exercised here only (the AHK twin keeps the window
 -- hidden to avoid flashing the real desktop).
 helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
-	local adapter = helpers.load_with_stubs("adapters.graphics_renderer")
+	local adapter = helpers.load_with_stubs("core.ui.adapters.graphics_renderer")
 
 	helpers.it("createWindow returns a non-zero handle (create_returns_nonzero_handle)", function()
 		local h = adapter.createWindow({ x = 100, y = 100, w = 200, h = 200 })

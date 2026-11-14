@@ -20,9 +20,9 @@ def main():
     if args.receiver.as_posix() != "tools/diagnostics/number_row_native_causal.py":
         raise ValueError("exact dedicated receiver path required")
     pins = {
-        "tools/diagnostics/number_row_native_causal.py": "5f5ee81e905a065d29a4879666a9cc64b9a4fa9da1f17f778a4ae7bcc8f03459",
+        "tools/diagnostics/number_row_native_causal.py": "dd35b5f5fca4a164ae6f94e387081f781a5b9795f42c8626bb2425baf1c1998f",
         "tools/diagnostics/keyboard_geometry_xctest_receipt.py": "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
-        "tools/diagnostics/test_number_row_native_causal.py": "7ed72b7951cd4e1145ccc195f47f65c27376aa60ebad9d40af31edd7fda9f0e7",
+        "tools/diagnostics/test_number_row_native_causal.py": "5331dc0899db4fa8b9a021407b0cad93a82cfc1d476bcfae51fce3636755d867",
         "tools/diagnostics/tis_evidence_transport.cjs": "f62344840267ab207370df974cc344fce83cbe3b758f2a25c986837a41d04269",
     }
     if subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != args.head:

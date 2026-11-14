@@ -16,10 +16,10 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"hs",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.utils",
 	"modules.llm",
 	"modules.llm.ollama_binary",
@@ -123,9 +123,9 @@ local function with_fixture(save_results, callback)
 			package.loaded["hs"] = hs_fixture
 			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.notifications"] = {notify = function() return true end}
+			package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
 			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return value end}
-			package.loaded["infra.dialog_util"] = {block_alert = function() return "button.cancel" end}
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return "button.cancel" end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama" end,
 			}

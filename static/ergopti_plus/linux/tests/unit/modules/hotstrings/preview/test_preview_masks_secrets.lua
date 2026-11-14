@@ -307,7 +307,7 @@ end)
 --- is pinned is what the renderer receives.
 helpers.describe("preview: a multi-field @-combo row", function()
 
-	local Preview = helpers.load_module("ui.tooltip.preview")
+	local Preview = helpers.load_module("core.ui.ui.tooltip.preview")
 
 	--- The single row build_rows produces for one candidate.
 	local function row_for(candidate)

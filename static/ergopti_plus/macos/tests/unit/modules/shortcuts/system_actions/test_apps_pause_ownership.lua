@@ -32,7 +32,7 @@ local function fresh_apps()
 		"adapters.synthetic_input",
 		"adapters.clipboard",
 		"core.logger.engine.logger",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
 		"core.text.engine.utils",
 		"tests.stubs.hs",
@@ -292,7 +292,7 @@ local function fresh_apps()
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(...)
 			fixture.notifications[#fixture.notifications + 1] = table.pack(...)
 			return true

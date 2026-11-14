@@ -62,11 +62,11 @@ if (!fs.existsSync(RESOLVER)) {
 
 // The resolver is allowed to know where the tree is; that is its job. Two more
 // are exempt with a reason:
-//   - ui/webkit_host.lua probes a candidate list for the file:// base a webview
+//   - core/ui/ui/webkit_host.lua probes a candidate list for the file:// base a webview
 //     needs before any module has loaded.
 const EXEMPT = new Set([
 	'core/fs/engine/paths.lua',
-	'ui/webkit_host.lua',
+	'core/ui/ui/webkit_host.lua',
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.
 	'ergopti_hotstrings.lua',

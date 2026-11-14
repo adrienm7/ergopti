@@ -5,7 +5,7 @@
 local M = {}
 function M.register(helpers)
 	local function run(callback)
-		local saved_host = package.loaded["ui.webview_manager"]
+		local saved_host = package.loaded["core.ui.ui.webview_manager"]
 		local saved_bridge = package.loaded["ui.download_window.bridge"]
 		local s = { writes = {}, retry = 0, cancel = 0, diagnostics = 0, paused = false }
 		local lease = { active = true }; s.lease = lease
@@ -33,7 +33,7 @@ function M.register(helpers)
 		end
 		function s.reload() lease.active = false; s.successor = { active = true } end
 		local state = { is_paused = function() return s.paused end }
-		package.loaded["ui.webview_manager"] = host
+		package.loaded["core.ui.ui.webview_manager"] = host
 		package.loaded["ui.download_window.bridge"] = nil
 		local ok, err = pcall(function()
 			local Bridge = require("ui.download_window.bridge"); s.bridge = Bridge
@@ -53,7 +53,7 @@ function M.register(helpers)
 			end
 			callback(s)
 		end)
-		package.loaded["ui.webview_manager"], package.loaded["ui.download_window.bridge"] = saved_host,saved_bridge
+		package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.download_window.bridge"] = saved_host,saved_bridge
 		if not ok then error(err) end
 	end
 	helpers.describe("Actual network progress retained document ownership",function()

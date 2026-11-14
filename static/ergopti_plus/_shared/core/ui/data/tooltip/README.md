@@ -18,9 +18,9 @@ Cross-driver specification and pure-JavaScript implementation of the tooltip ren
 
 ## Driver implementations
 
-| Driver  | Implementation path                           |
-| ------- | --------------------------------------------- |
-| Windows | `windows/ui/tooltip/` (AHK + WebView2 canvas) |
-| macOS   | `macos/ui/tooltip/` (Lua + `hs.canvas`)       |
+| Driver  | Implementation path                                   |
+| ------- | ----------------------------------------------------- |
+| Windows | `windows/core/ui/ui/tooltip/` (AHK + WebView2 canvas) |
+| macOS   | `macos/core/ui/ui/tooltip/` (Lua + `hs.canvas`)       |
 
 Both implementations must produce identical visual output for the same input state; the shared JS suite verifies this with snapshot tests.

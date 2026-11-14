@@ -94,8 +94,8 @@ end
 if not ok_webkit or not WebKit then abort("WebKit2GTK is not available to lgi.") end
 
 local Gtk = lgi.require("Gtk", "3.0")
-local WebkitHost = require("ui.webkit_host")
-local WebviewManager = require("ui.webview_manager")
+local WebkitHost = require("core.ui.ui.webkit_host")
+local WebviewManager = require("core.ui.ui.webview_manager")
 local Locale = require("core.i18n.engine.locale")
 
 -- Every page boots in English here, and the locale core follows, as the

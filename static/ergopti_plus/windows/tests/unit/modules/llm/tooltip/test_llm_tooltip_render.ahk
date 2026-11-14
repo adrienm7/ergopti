@@ -168,7 +168,7 @@ Test("render: each row's shortcut names the chord its binding consumes (llm-shor
 ; ==================================================================
 
 _TestRender_BuildGuardPresent() {
-	Body := _DriverDirConcat("ui/tooltip")
+	Body := _DriverDirConcat("core/ui/ui/tooltip")
 	; Defence in depth: even if some future formatter throws mid-build, the tooltip
 	; must not be left destroyed with a ghost "visible" flag. LLM_TooltipShow wraps
 	; the build and resets to a clean hidden state on error.

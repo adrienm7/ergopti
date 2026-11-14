@@ -31,7 +31,7 @@ end
 --- @param max_arrows number hotstrings.cascade_max_arrows.
 --- @return table state, table expander, table registry, table view
 local function fresh_engine(rules, max_arrows)
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
+	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,

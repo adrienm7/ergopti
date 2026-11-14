@@ -20,7 +20,7 @@ local M = {}
 
 local i18n   = require("core.i18n.engine.i18n")
 local Logger = require("core.logger.engine.logger")
-local dialog = require("infra.dialog_util")
+local dialog = require("core.ui.engine.dialog_util")
 local ModelIdentifier = require("ai.engine.local_servers.model_identifier")
 
 local LOG = "custom_models"

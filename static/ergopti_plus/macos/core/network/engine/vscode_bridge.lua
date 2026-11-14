@@ -735,7 +735,7 @@ function M.install_extension()
 	-- throw travelled out of install_extension and aborted setup() before
 	-- start_server() had run. The notice is cosmetic; it is also pcall'd, so it can
 	-- no longer take anything with it.
-	local ok_notify, notifications = pcall(require, "infra.notifications")
+	local ok_notify, notifications = pcall(require, "core.ui.engine.notifications")
 	if ok_notify and type(notifications.notify) == "function" then
 		local ok_toast, err = pcall(notifications.notify, i18n.get("vscode.reload_required"), nil, "info")
 		if not ok_toast then

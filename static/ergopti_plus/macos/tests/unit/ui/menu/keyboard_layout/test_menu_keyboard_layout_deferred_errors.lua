@@ -13,7 +13,7 @@ local OWNERS = {
 	"core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
 	"ui.menu.menu_keyboard_layout", "infra.manifest_menu",
-	"infra.notifications", "core.i18n.engine.i18n",
+	"core.ui.engine.notifications", "core.i18n.engine.i18n",
 }
 
 --- Exercises one real rendered action through both retained continuations.
@@ -48,7 +48,7 @@ local function exercise_failure(site)
 		end
 		install.pick_latest_bundle = function() return nil end
 		install.highest_installed = function() return nil end
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 
 		local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
 		local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))

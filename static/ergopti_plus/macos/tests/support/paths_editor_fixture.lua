@@ -57,7 +57,7 @@ local function load_fixture(show_result)
 			if calls.delete_throws then error("synthetic paths editor delete refusal") end
 		end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function(w, h) return { x = 0, y = 0, w = w, h = h } end,
 		show_webview = function(opts)

@@ -29,7 +29,7 @@ local MODULE_NAMES = {
 	"hs.caffeinate.watcher",
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.timing.engine.timings",
 	"modules.gestures",
 	"modules.gestures.actions",
@@ -101,7 +101,7 @@ function M.with_fixture(options, scenario)
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			if key == "health_check_interval_ms" then return 30 end

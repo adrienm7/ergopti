@@ -167,7 +167,7 @@ local function load_fixture()
 		t = function(key) return key end,
 	}
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		get_current_index = function() return nil end,
 		hide = function() return true end,
 		hide_forced = function() return true end,
@@ -183,7 +183,7 @@ local function load_fixture()
 		show_predictions = function() return true end,
 		tint = function() return nil end,
 	}
-	fixture.tooltip = package.loaded["ui.tooltip"]
+	fixture.tooltip = package.loaded["core.ui.ui.tooltip"]
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function()

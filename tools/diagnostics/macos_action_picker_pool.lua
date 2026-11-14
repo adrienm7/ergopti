@@ -16,7 +16,7 @@ function M.run(config, done)
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
 	assert(package.loaded["ui.action_picker"] == nil, "ActionPicker was already loaded")
-	assert(package.loaded["ui.webview_controller_pool"] == nil, "ControllerPool was already loaded")
+	assert(package.loaded["core.ui.ui.webview_controller_pool"] == nil, "ControllerPool was already loaded")
 	assert(rawequal(require("hs.webview"), hs.webview), "native WebView module identity differs")
 	assert(hs.screen.mainScreen(), "native GUI unavailable")
 	local native = { view_new = hs.webview.new, controller_new = hs.webview.usercontent.new }
@@ -41,18 +41,18 @@ function M.run(config, done)
 			invalidate = function() return true end }
 	end }
 	local Picker = require("ui.action_picker")
-	local UI = require("ui.ui_builder")
-	local Pool = require("ui.webview_controller_pool")
+	local UI = require("core.ui.ui.builder")
+	local Pool = require("core.ui.ui.webview_controller_pool")
 	local Scheduler = require("core.events.timer_scheduler")
 	local I18n = require("core.i18n.engine.i18n")
 	I18n.init()
 	for fn, suffix in pairs({ [Picker.open] = "/macos/ui/action_picker/init.lua",
-		[Pool.new] = "/macos/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/ui/ui_builder.lua",
+		[Pool.new] = "/macos/core/ui/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/core/ui/ui/builder.lua",
 		[Scheduler.activeCount] = "/macos/core/events/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")
 	end
 	local Json = require("core.text.engine.json")
-	local Result = require("adapters.webview_result")
+	local Result = require("core.ui.adapters.webview_result")
 	local state = { entries = {}, timers = {}, evaluations = {}, errors = {}, finished = false }
 	local baseline, started = Scheduler.activeCount(), hs.timer.absoluteTime()
 	local finish

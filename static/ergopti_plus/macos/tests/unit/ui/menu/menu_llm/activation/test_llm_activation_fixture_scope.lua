@@ -11,7 +11,7 @@ local with_activation = require("tests.support.llm_activation_fixture")
 
 local OWNED_MODULES = {
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
 	"modules.llm",
@@ -47,12 +47,12 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.profile_label",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.process.adapters.shell_runner",
 	"core.timing.engine.deferred_work",
 }
@@ -66,7 +66,7 @@ helpers.describe("LLM activation fixture scope", function()
 				for index, name in ipairs(OWNED_MODULES) do
 					local original = { name = name }
 					if name == REGISTRY then original = nil end
-					if name == "infra.notifications" then original = false end
+					if name == "core.ui.engine.notifications" then original = false end
 					saved[index] = original
 					package.loaded[name] = original
 				end

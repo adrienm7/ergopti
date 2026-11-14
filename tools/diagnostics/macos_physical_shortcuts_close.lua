@@ -16,10 +16,10 @@ function M.run(config, done)
  local policy_bytes = assert(policy:read('*a')); assert(policy:close())
  Logger.initialize_privacy(policy_bytes)
  local Host = require('ui.physical_shortcuts')
- local UI = require('ui.ui_builder')
+ local UI = require('core.ui.ui.builder')
  local Scheduler = require('core.events.timer_scheduler')
  for fn, suffix in pairs({ [Host.open] = '/macos/ui/physical_shortcuts/init.lua',
-  [UI.show_webview] = '/macos/ui/ui_builder.lua', [Scheduler.after] = '/macos/core/events/timer_scheduler.lua' }) do
+  [UI.show_webview] = '/macos/core/ui/ui/builder.lua', [Scheduler.after] = '/macos/core/events/timer_scheduler.lua' }) do
   assert(debug.getinfo(fn, 'S').source == '@' .. root .. suffix, 'foreign production owner')
  end
  assert(package.loaded['modules.keystats.physical_capture'] == nil, 'capture owner already present')

@@ -14,7 +14,7 @@ local MODULES = {
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.fs.engine.dir",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.utils",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_server_command",
@@ -25,7 +25,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"ui.download_window",
-	"ui.ui_builder",
+	"core.ui.ui.builder",
 	"core.fs.engine.paths", "core.timing.engine.timings",
 	"core.timing.engine.deferred_work",
 	"ui.download_window.javascript",
@@ -67,7 +67,7 @@ local function with_fixture(options, callback)
 			return xpcall(fn, debug.traceback, ...)
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(...)
 			notifications = notifications + 1
 			notification_records[#notification_records + 1] = table.pack(...)
@@ -216,7 +216,7 @@ local function with_fixture(options, callback)
 		end }
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.download_window.javascript"] = nil
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 460, height = 380 } end,
 			show_webview = function(opts)
 				native_window = { codes = {}, opts = opts }

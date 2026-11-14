@@ -89,7 +89,7 @@ local function load_fixture(buffer)
 		set_buffer = function() end,
 		log_hotstring = function() end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() end }
 
 	local synthetic = require("adapters.synthetic_input")
 	local expander = require("modules.keymap.expander")

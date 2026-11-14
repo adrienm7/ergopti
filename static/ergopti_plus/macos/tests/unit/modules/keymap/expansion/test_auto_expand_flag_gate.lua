@@ -58,7 +58,7 @@ local ONE_CODEPOINT = 1
 --- stubbed, so the auto-expansion path can be driven end to end.
 --- @return table state, table registry, table expander
 local function fresh_engine()
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
+	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,

@@ -21,7 +21,7 @@ Contract.run_agent(helpers, CORPUS .. "request_plan_agent_vectors.json")
 Contract.run_ports(helpers, {
 	HttpClient = require("core.network.adapters.http_client"),
 	TimerScheduler = require("core.events.timer_scheduler"),
-	TooltipRenderer = require("ui.tooltip.llm"),
+	TooltipRenderer = require("core.ui.ui.tooltip.llm"),
 })
 
 return true

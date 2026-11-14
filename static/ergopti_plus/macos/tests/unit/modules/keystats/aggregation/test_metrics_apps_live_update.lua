@@ -83,7 +83,7 @@ local function load_dashboard(options)
 	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
-	package.loaded["infra.dialog_util"] = {}
+	package.loaded["core.ui.engine.dialog_util"] = {}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() return "{}", "ok" end,
@@ -143,7 +143,7 @@ local function load_dashboard(options)
 		return webview
 	end
 
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		force_focus = function(webview)
 			webview.focused = webview.focused + 1
 			return true

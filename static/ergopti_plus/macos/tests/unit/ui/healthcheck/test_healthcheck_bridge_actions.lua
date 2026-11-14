@@ -29,8 +29,8 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
-		"adapters.clipboard", "adapters.webview_result",
+		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
+		"adapters.clipboard", "core.ui.adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -78,7 +78,7 @@ local function load_window(controls)
 			return { cancel = function() context.cancelled_probes = context.cancelled_probes + 1 end }
 		end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
@@ -400,7 +400,7 @@ helpers.describe("diagnostics user presentation admission", function()
 		helpers.it("diagnostics foreground refuses focus " .. mode, function()
 			as_jdoe(function()
 			local core, context = load_window()
-			package.loaded["ui.ui_builder"].force_focus = function()
+			package.loaded["core.ui.ui.builder"].force_focus = function()
 				if mode == "throw" then error("owned presentation failure") end
 				return false
 			end

@@ -31,7 +31,7 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			"modules.keymap.layout_install",
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
-			"infra.notifications",
+			"core.ui.engine.notifications",
 			"core.i18n.engine.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
@@ -59,7 +59,7 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			install.pick_latest_bundle = function() return nil end
 			install.highest_installed = function() return nil end
 
-			package.loaded["infra.notifications"] = { notify = function() end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 			local actual_manifest = actual_layout_binding()
 			package.loaded["infra.manifest_menu"] = {
 				template_rows = actual_manifest.template_rows,
@@ -112,7 +112,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 		"modules.keymap.layout_install",
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 			"core.i18n.engine.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
@@ -163,7 +163,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 			return { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } }
 		end
 
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(_title, _body, kind) notices[#notices + 1] = kind end,
 		}
 		local actual_manifest = actual_layout_binding()
@@ -245,7 +245,7 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 			"modules.keymap.layout_install",
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
-			"infra.notifications",
+			"core.ui.engine.notifications",
 			"core.i18n.engine.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")

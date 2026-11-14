@@ -9,7 +9,7 @@
 local M = {}
 
 local Logger         = require("core.logger.engine.logger")
-local Notifications  = require("infra.notifications")
+local Notifications  = require("core.ui.engine.notifications")
 local i18n           = require("core.i18n.engine.i18n")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")

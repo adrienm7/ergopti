@@ -25,8 +25,8 @@ local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.
 --- @return table asked Every zenity question command.
 local function with_zenity_answering_no(body)
 	local execute, asked = os.execute, {}
-	local previous_modal = package.loaded["ui.modal"]
-	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
+	local previous_modal = package.loaded["core.ui.ui.modal"]
+	package.loaded["core.ui.ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
 		if command:find("dialog_host.lua", 1, true) then
 			asked[#asked + 1] = command
@@ -36,7 +36,7 @@ local function with_zenity_answering_no(body)
 	end
 	local ok, err = pcall(body)
 	os.execute = execute
-	package.loaded["ui.modal"] = previous_modal
+	package.loaded["core.ui.ui.modal"] = previous_modal
 	if not ok then error(err, 0) end
 	return asked
 end

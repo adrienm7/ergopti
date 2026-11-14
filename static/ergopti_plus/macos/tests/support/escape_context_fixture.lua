@@ -18,7 +18,7 @@ local STUBBED_MODULES = {
 	"modules.llm",
 	"infra.keycodes",
 	"modules.keystats",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
@@ -96,7 +96,7 @@ local function load_fixture(options, lifetime)
 		hide_forced_silent = function() hides = hides + 1; return true end,
 		tint = function() return nil end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 
 	package.loaded["modules.llm.prediction_engine"] = setmetatable({
 		init = function() return true end,

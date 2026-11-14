@@ -45,7 +45,7 @@ local function run_action(label, outcome, options)
 	options = options or {}
 	local saved = {}
 	local module_names = {
-		"infra.manifest_menu", "infra.manifest_reader", "infra.notifications",
+		"infra.manifest_menu", "infra.manifest_reader", "core.ui.engine.notifications",
 		"modules.hotstrings.hotstrings_config", "ui.menu.keymap_lifecycle",
 		"ui.menu.menu_hotstrings_management",
 	}
@@ -53,7 +53,7 @@ local function run_action(label, outcome, options)
 	for _, name in ipairs({
 		"infra.manifest_menu",
 		"infra.manifest_reader",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.keymap_lifecycle",
 		"ui.menu.menu_hotstrings_management",
@@ -114,7 +114,7 @@ local function run_action(label, outcome, options)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(_title, _body, kind)
 			helpers.assert_eq(kind, "error")
 			calls.notices = calls.notices + 1

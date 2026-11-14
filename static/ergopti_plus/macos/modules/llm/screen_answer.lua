@@ -126,7 +126,7 @@ end
 --- Shows a notice explaining why a screen reading did nothing.
 --- @param key string Locale key of the notice.
 local function show_notice(key)
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local ok_show, shown = false, nil
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.show) == "function" then
 		ok_show, shown = pcall(tooltip.show, i18n.get(key), true, true)

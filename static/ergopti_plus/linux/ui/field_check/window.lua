@@ -44,11 +44,11 @@ local function native(spec)
 		notify = function(message) return require("adapters.application_notifier").send(message, { level = "info" }) end,
 		--- Shows the report; returns true when the user asked to copy it.
 		dialog = function(title, text, copy_label, close_label)
-			local command = require("ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("core.ui.engine.window_titles").compose(title))
+			local command = require("core.ui.ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("core.ui.engine.window_titles").compose(title))
 				.. " --text=" .. Shell.quote(text)
 				.. " --ok-label=" .. Shell.quote(copy_label)
 				.. " --cancel-label=" .. Shell.quote(close_label)
-			return (require("ui.modal").run(function() return Shell.exec_checked(command) end)) == true
+			return (require("core.ui.ui.modal").run(function() return Shell.exec_checked(command) end)) == true
 		end,
 		copy = function(text) return require("adapters.clipboard").write(text) end,
 		defer = function(fn) return require("core.events.loop").defer(fn, 0) end,

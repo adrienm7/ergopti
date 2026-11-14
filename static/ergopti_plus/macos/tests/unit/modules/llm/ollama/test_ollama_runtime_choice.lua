@@ -62,8 +62,8 @@ end)
 local function with_offer(selected, callback, native, user_ollama)
 	if user_ollama == nil then user_ollama = true end
 	helpers.with_stub_scope({ "ui.menu.menu_llm.runtime_install_offer", "modules.llm.ollama_binary",
-		"modules.llm.ollama_deps_checker", "infra.dialog_util", "core.i18n.engine.i18n", "core.logger.engine.logger",
-		"infra.notifications", "modules.llm.api_ollama",
+		"modules.llm.ollama_deps_checker", "core.ui.engine.dialog_util", "core.i18n.engine.i18n", "core.logger.engine.logger",
+		"core.ui.engine.notifications", "modules.llm.api_ollama",
 		"ui.menu.menu_llm.models_manager_ollama" }, function()
 		local fixture = { stock_calls = 0, stock_installs = 0, native_calls = 0, dialogs = 0, idle = true,
 			bodies = {}, pinned_calls = 0 }
@@ -81,8 +81,8 @@ local function with_offer(selected, callback, native, user_ollama)
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.dialog_util"] = { block_alert = function(_, body)
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, body)
 			fixture.dialogs = fixture.dialogs + 1
 			fixture.bodies[#fixture.bodies + 1] = body
 			if fixture.dialog_hook then fixture.dialog_hook() end

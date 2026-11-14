@@ -737,12 +737,14 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/process/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/timing/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/text/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/logger/engine'),
@@ -750,6 +752,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/network'),
 	// Portable AHK policy is audited with its native consumers.
 	join(REPO_ROOT, 'static/ergopti_plus/_shared')
@@ -775,12 +778,14 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/process/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/logger/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/ui/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/timing/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/text/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/logger/engine'),
@@ -789,14 +794,17 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/ui/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/process/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/ui/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/timing/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/text/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/logger/engine'),
@@ -805,6 +813,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/ui/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tests'),
 	// platform/ is where the OS seams live — the remap generator and the tray

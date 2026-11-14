@@ -189,13 +189,13 @@ helpers.describe("layout_install: transactional replacement", function()
 
 	helpers.it("warns when the post-install other-scope check becomes unreadable", function()
 		local old_dir, old_fs, old_notify = package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"],
-			package.loaded["infra.notifications"]
+			package.loaded["core.ui.engine.notifications"]
 		local reads, notices = 0, {}
 		package.loaded["core.fs.engine.dir"] = { try_entries = function()
 			reads = reads + 1; return {}, reads <= 2
 		end }
 		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
-		package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 		local ok, err = xpcall(function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				execute = function() return "", true end,
@@ -205,7 +205,7 @@ helpers.describe("layout_install: transactional replacement", function()
 			helpers.assert_eq(reason, "other_scope_unverified")
 			helpers.assert_eq(notices, {}, "a partial publication must not claim success")
 		end, debug.traceback)
-		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"], package.loaded["infra.notifications"] =
+		package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"], package.loaded["core.ui.engine.notifications"] =
 			old_dir, old_fs, old_notify
 		if not ok then error(err, 0) end
 	end)
@@ -342,8 +342,8 @@ helpers.describe("layout_install: transactional replacement", function()
 	helpers.it("preserves and reports an other-scope bundle that appears during installation", function()
 		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function(listing)
 			local notices, commands = {}, {}
-			local saved = package.loaded["infra.notifications"]
-			package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
+			local saved = package.loaded["core.ui.engine.notifications"]
+			package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 			local ok, err = xpcall(function()
 				local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 					execute = function(command)
@@ -358,7 +358,7 @@ helpers.describe("layout_install: transactional replacement", function()
 				helpers.assert_eq(#commands, 1, "no second command may delete the concurrent bundle")
 				helpers.assert_eq(notices, {}, "a partial publication must not claim success")
 			end, debug.traceback)
-			package.loaded["infra.notifications"] = saved
+			package.loaded["core.ui.engine.notifications"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)

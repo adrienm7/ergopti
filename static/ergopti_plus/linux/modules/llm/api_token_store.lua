@@ -14,7 +14,7 @@
 ---    answers, store() refuses with the reason and the caller refuses the save.
 --- 2. The key reaches secret-tool on its standard input, never in its
 ---    arguments: any local user can read every process's command line.
---- 3. Each call runs through ui/modal.lua: a locked keyring asks for its
+--- 3. Each call runs through core/ui/ui/modal.lua: a locked keyring asks for its
 ---    password in a desktop prompt, which needs the keyboard the daemon grabs.
 --- 4. secret-tool exits 1 both for an absent item and for a failed service;
 ---    a failure usually writes a message. A dismissed unlock prompt and a clear
@@ -239,7 +239,7 @@ end
 --- @return any
 local function with_keyboard(fn)
 	if _backend or _tool_override then return fn() end
-	return require("ui.modal").run(fn)
+	return require("core.ui.ui.modal").run(fn)
 end
 
 

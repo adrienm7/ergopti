@@ -16,7 +16,7 @@ SetWorkingDir(A_ScriptDir)
 
 #Include test_framework.ahk
 #Include ../vendor/Promise.ahk
-#Include ../infra/webview_script.ahk
+#Include ../core/ui/engine/webview/script.ahk
 ; Browser messages and JavaScript payloads share the actual native JSON owner.
 #Include ../core/text/engine/json.ahk
 #Include ../core/events/timer_scheduler.ahk

@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 local function build(latest, pending)
 	local recorded = { opens = {}, requests = {}, completions = 0, opened = true, checked = {}, notices = {} }
 	local saved = {
-		notifications = package.loaded["infra.notifications"],
+		notifications = package.loaded["core.ui.engine.notifications"],
 		window = package.loaded["ui.update_check"],
 		launcher = package.loaded["adapters.update_launcher"],
 		changelog = package.loaded["ui.changelog"],
@@ -32,7 +32,7 @@ local function build(latest, pending)
 	package.loaded["ui.update_check"] = {
 		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return recorded.opened end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			recorded.notices[#recorded.notices + 1] = { title = title, body = body, kind = kind }
 			return true
@@ -69,7 +69,7 @@ local function build(latest, pending)
 	Updater.is_local_source = real_local
 	package.loaded["ui.menu.menu_about"] = nil
 	local function restore()
-		package.loaded["infra.notifications"] = saved.notifications
+		package.loaded["core.ui.engine.notifications"] = saved.notifications
 		package.loaded["ui.update_check"] = saved.window
 		package.loaded["adapters.update_launcher"] = saved.launcher
 		package.loaded["ui.changelog"] = saved.changelog

@@ -25,7 +25,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		"core.logger.engine.logger",
 		"core.timing.engine.deferred_work",
 		"core.fs.engine.dir",
-		"infra.dialog_util",
+		"core.ui.engine.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
 		"core.i18n.engine.i18n",
@@ -64,7 +64,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
@@ -176,7 +176,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		"ui.menu.menu_gestures",
 		"modules.gestures",
 		"ui.menu.menu_utils",
-		"infra.dialog_util",
+		"core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n",
 		"infra.manifest_menu",
 		"menu.engine.renderer",
@@ -219,7 +219,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 			SINGLE_SLOTS = { "swipe_2_left" },
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,

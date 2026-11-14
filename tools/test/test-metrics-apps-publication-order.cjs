@@ -259,7 +259,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
   end
   return chooser
  end}
- package.loaded['infra.dialog_util'].text_prompt=function() return 'button.ok','1' end
+ package.loaded['core.ui.engine.dialog_util'].text_prompt=function() return 'button.ok','1' end
  local saved='{}'
  package.loaded['hs.json'].decode=json.decode
  package.loaded['core.fs.adapters.file_system'].read_with_status=function() return saved,'ok' end
@@ -328,7 +328,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
   end
   return chooser
  end}
- package.loaded['infra.dialog_util'].text_prompt=function() return 'button.ok','2' end
+ package.loaded['core.ui.engine.dialog_util'].text_prompt=function() return 'button.ok','2' end
  assert(dashboard.prompt_category('__proto__','Original',1))
  choose({_kind='pick',_value='Edited'})
  print('PUBLICATIONS='..json.encode({publication,evaluations[#evaluations].code}))

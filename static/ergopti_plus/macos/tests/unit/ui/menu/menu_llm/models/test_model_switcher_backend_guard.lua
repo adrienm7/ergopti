@@ -20,8 +20,8 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -94,8 +94,8 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local prediction_states = {}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -153,8 +153,8 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local prediction_states = {}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -209,8 +209,8 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local saves, updates = 0, 0
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -285,8 +285,8 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		end
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
-		package.loaded["infra.notifications"] = {notify = noop}
+		package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return false end}
+		package.loaded["core.ui.engine.notifications"] = {notify = noop}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}

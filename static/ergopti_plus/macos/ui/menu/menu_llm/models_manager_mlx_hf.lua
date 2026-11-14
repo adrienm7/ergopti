@@ -25,8 +25,8 @@ local Identifiers = require("core.text.engine.identifiers")
 local RunningApplication = require("adapters.running_application")
 
 local hs            = hs
-local notifications = require("infra.notifications")
-local ui_builder    = require("ui.ui_builder")
+local notifications = require("core.ui.engine.notifications")
+local ui_builder    = require("core.ui.ui.builder")
 local i18n          = require("core.i18n.engine.i18n")
 local Paths         = require("core.fs.engine.paths")
 local TaskLifecycle = require("core.process.adapters.task_lifecycle")

@@ -25,7 +25,7 @@
 local M = {}
 local Json = require("core.text.engine.json")
 local NativePath = require("core.fs.engine.native_path")
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
 local DeferredWork = require("core.timing.engine.deferred_work")
@@ -281,7 +281,7 @@ end
 
 local function report_save_failure(detail)
 	Logger.error(LOG, "Paths editor save failed: %s.", tostring(detail))
-	local ok_dialog, dialog = pcall(require, "infra.dialog_util")
+	local ok_dialog, dialog = pcall(require, "core.ui.engine.dialog_util")
 	if ok_dialog and dialog and type(dialog.block_alert) == "function" then
 		pcall(dialog.block_alert,
 			i18n.get("paths_editor.save_failed_title"),
@@ -500,7 +500,7 @@ local function open_editor_impl()
 		if _webview_committed ~= true then
 			if close_webview() ~= true then return false, true end
 		else
-			local ui_builder = require("ui.ui_builder")
+			local ui_builder = require("core.ui.ui.builder")
 			local view, controller, focus_owner = _webview, _usercontent, _focus_owner
 			ui_builder.force_focus(view, false, { is_current = function()
 				return focus_owner ~= nil and _focus_owner == focus_owner
@@ -525,7 +525,7 @@ local function open_editor_impl()
 		end
 	end)
 
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui or not ui_builder then
 		Logger.error(LOG, "Failed to load ui_builder module.")
 		return false

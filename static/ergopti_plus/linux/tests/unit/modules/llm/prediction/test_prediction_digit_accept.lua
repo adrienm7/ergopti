@@ -189,7 +189,7 @@ end)
 helpers.describe("prediction digit accept: the real tooltip's presented state", function()
 
 	helpers.it("presents candidates before its window maps, and none once hidden", function()
-		local overlay = helpers.load_module("ui.tooltip.llm")
+		local overlay = helpers.load_module("core.ui.ui.tooltip.llm")
 		helpers.assert_true(overlay.init({ style = {}, renderer = {
 			show = function() return true end, hide = function() return true end,
 			is_visible = function() return false end,

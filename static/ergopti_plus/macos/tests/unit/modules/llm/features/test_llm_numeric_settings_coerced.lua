@@ -125,7 +125,7 @@ package.loaded["core.i18n.engine.i18n"] = {
 
 package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,

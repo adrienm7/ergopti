@@ -14,7 +14,7 @@ local OWNED_MODULES = {
 	"ai.engine.settings.enable_admission_core",
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
 	"modules.llm",
@@ -55,12 +55,12 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.profile_label",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.process.adapters.shell_runner",
 	"core.timing.engine.deferred_work",
 	"ui.menu.menu_llm.local_server_panel",
@@ -163,7 +163,7 @@ local function build_fixture(backend, save_results, options)
 	calls.runtime_notices = {}
 	calls.offers = 0
 	calls.notices = {}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, body, kind, on_click)
 			calls.notices[#calls.notices + 1] = { title = message, body = body, kind = kind, on_click = on_click }
 			if message == "notify.llm_enabled" or message == "notify.llm_disabled" then
@@ -179,7 +179,7 @@ local function build_fixture(backend, save_results, options)
 	-- The unreachable-backend error picks through options.offer_pick(dialog),
 	-- which returns the chosen index, or nil to keep the AI off.
 	calls.offer_dialogs = {}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function()
 			calls.offers = calls.offers + 1
 			return options.ollama_offer_choice or "ollama.native_offer_keep"
@@ -642,7 +642,7 @@ local function build_fixture(backend, save_results, options)
 		package.loaded["platform.remap.onboarding"] = {
 			stop = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = nil

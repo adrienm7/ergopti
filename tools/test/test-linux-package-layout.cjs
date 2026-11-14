@@ -494,7 +494,7 @@ for (const rel of UNIT_SOURCES) {
 		if (/^Environment=DISPLAY/.test(line.trim())) {
 			errors.push(
 				`${rel}: "${line.trim()}" — the daemon probes the display server at runtime ` +
-					`(infra/display_server.lua). A pinned value is wrong on a second seat, wrong ` +
+					`(core/ui/engine/display_server.lua). A pinned value is wrong on a second seat, wrong ` +
 					`under Wayland, and breaks the X11-to-Wayland switch this unit exists to survive.`
 			);
 		}

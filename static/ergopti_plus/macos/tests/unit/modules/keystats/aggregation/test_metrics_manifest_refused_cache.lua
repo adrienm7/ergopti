@@ -141,9 +141,9 @@ end)
 local APP_OWNERS = {
 	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
 	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
-	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "ui.ui_builder",
-	"core.fs.engine.paths", "core.i18n.engine.i18n", "infra.dialog_util", "core.timing.engine.deferred_work", "infra.config_paths",
-	"core.fs.adapters.file_system", "core.events.timer_scheduler", "adapters.webview_result",
+	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "core.ui.ui.builder",
+	"core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "infra.config_paths",
+	"core.fs.adapters.file_system", "core.events.timer_scheduler", "core.ui.adapters.webview_result",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 }
 

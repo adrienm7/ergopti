@@ -333,7 +333,7 @@ end
 --- Runs a command and returns whether it exited 0.
 local function succeeded(command)
 	-- Both os.execute ABIs (a LuaJIT number, or Lua 5.2 true/exit/code) read as one code.
-	local code = require("ui.native_dialog").exit_code(os.execute(command))
+	local code = require("core.ui.ui.native_dialog").exit_code(os.execute(command))
 	return code == 0
 end
 

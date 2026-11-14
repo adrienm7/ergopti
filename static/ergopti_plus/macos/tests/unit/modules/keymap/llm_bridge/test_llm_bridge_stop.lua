@@ -190,7 +190,7 @@ end)
 
 helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-tap)", function()
 	helpers.it("M.stop() calls :stop() on the eventtap created by arm_escape_trap() (escape-trap-ghost-tap)", function()
-		local original_tooltip = package.loaded["ui.tooltip"]
+		local original_tooltip = package.loaded["core.ui.ui.tooltip"]
 		local original_hs = rawget(_G, "hs")
 		local partial_calls = 0
 		local partial_tooltip = {
@@ -215,7 +215,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 
 		helpers.assert_eq(partial_calls, 0,
 			"a partial tooltip left by another test must never satisfy this fixture")
-		helpers.assert_eq(package.loaded["ui.tooltip"], original_tooltip,
+		helpers.assert_eq(package.loaded["core.ui.ui.tooltip"], original_tooltip,
 			"the fixture must restore the caller's package cache")
 		helpers.assert_eq(rawget(_G, "hs"), original_hs,
 			"the fixture must restore the caller's Hammerspoon global")
@@ -224,7 +224,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 	end)
 
 	helpers.it("restores package.loaded and _G.hs when a scenario assertion raises (escape-trap-ghost-tap)", function()
-		local original_tooltip = package.loaded["ui.tooltip"]
+		local original_tooltip = package.loaded["core.ui.ui.tooltip"]
 		local original_engine = package.loaded["modules.llm.prediction_engine"]
 		local original_hs = rawget(_G, "hs")
 		local partial_tooltip = { hide = noop }
@@ -237,7 +237,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 		helpers.assert_eq(ok, false, "the sentinel scenario must actually raise")
 		helpers.assert_true(tostring(err):find("EXPECTED_FIXTURE_ASSERTION", 1, true) ~= nil,
 			"the fixture must preserve the original assertion failure")
-		helpers.assert_eq(package.loaded["ui.tooltip"], original_tooltip)
+		helpers.assert_eq(package.loaded["core.ui.ui.tooltip"], original_tooltip)
 		helpers.assert_eq(package.loaded["modules.llm.prediction_engine"], original_engine)
 		helpers.assert_eq(rawget(_G, "hs"), original_hs)
 	end)

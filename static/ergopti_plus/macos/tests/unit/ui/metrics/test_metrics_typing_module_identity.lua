@@ -14,7 +14,7 @@ helpers.describe("typing dashboard identity (typing-dashboard-single-owner)", fu
 	for _, opened_first in ipairs({ false, true }) do
 		helpers.it("shares the restored owner when direct opening comes " .. (opened_first and "first" or "last"), function()
 			helpers.with_stub_scope({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
-				"modules.keystats.log_manager", "ui.ui_builder", "hs.fs", "hs.json" }, function()
+				"modules.keystats.log_manager", "core.ui.ui.builder", "hs.fs", "hs.json" }, function()
 				Restore.with_fixture({ settings = { ["ergopti.ui_restore_state"] = { "metrics_typing" } } },
 					function(restore, scheduler)
 						package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return nil, "absent" end }

@@ -76,10 +76,10 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 -- Neither scope row asks (a question would be counted here) and both name a
 -- backup under the remap file; both boundaries are doubles for the whole
 -- module, restored at its end.
-local SAVED_DIALOGS = package.loaded["infra.dialog_util"]
+local SAVED_DIALOGS = package.loaded["core.ui.engine.dialog_util"]
 local SAVED_PATHS = package.loaded["infra.config_paths"]
 local CONFIRMATION = { answer = "yes", asked = 0 }
-package.loaded["infra.dialog_util"] = {
+package.loaded["core.ui.engine.dialog_util"] = {
 	block_alert = function(_, _, no, yes)
 		CONFIRMATION.asked = CONFIRMATION.asked + 1
 		return CONFIRMATION.answer == "yes" and yes or no

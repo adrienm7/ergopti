@@ -49,9 +49,9 @@ local DialogCore     = require("core.ui.engine.error_dialog_core")
 local Redact         = require("diagnostics.engine.reports.redact")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("core.timing.engine.deferred_work")
-local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
+local NativeClose = require("core.ui.ui.webview_close_owner").new(DeferredWork, Logger)
 local Storage        = require("core.fs.adapters.storage")
-local WebviewResult  = require("adapters.webview_result")
+local WebviewResult  = require("core.ui.adapters.webview_result")
 local ConfigKeys = require("settings.engine.keys")
 local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 
@@ -373,7 +373,7 @@ local function open_window(record)
 		Logger.error(LOG, "The error report could not be built: %s.", tostring(fields))
 		return false
 	end
-	local ui_builder = require("ui.ui_builder")
+	local ui_builder = require("core.ui.ui.builder")
 	local ok_html, html = pcall(ui_builder.build_injected_html, (Paths.shared("ui/error_dialog") or "") .. "/")
 	if not ok_html or type(html) ~= "string" then
 		Logger.error(LOG, "The error window page could not be built: %s.", tostring(html))

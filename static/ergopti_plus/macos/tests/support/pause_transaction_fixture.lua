@@ -11,7 +11,7 @@ local M = {}
 local OWNERS = {
 	"modules.shortcuts.script_control",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"infra.keycodes",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -24,7 +24,7 @@ local OWNERS = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 	"adapters.event_provenance",
 	"core.events.timer_scheduler",
@@ -131,7 +131,7 @@ local function load_context(options)
 		ctx.warnings[#ctx.warnings + 1] = string.format(format_string, ...)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			ctx.notifications[#ctx.notifications + 1] = {
 				title = title,
@@ -189,7 +189,7 @@ local function load_context(options)
 	package.loaded["platform.remap.onboarding"] = {
 		stop = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }
 	package.loaded["modules.keystats"] = {
 		resync_context = record("keystats_resync"),
 		log_shortcut = function() end,

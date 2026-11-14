@@ -53,12 +53,12 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 
 local Logger     = require("core.logger.engine.logger")
 local DeferredWork = require("core.timing.engine.deferred_work")
 local Paths      = require("core.fs.engine.paths")
-local ui_builder = require("ui.ui_builder")
+local ui_builder = require("core.ui.ui.builder")
 local i18n       = require("core.i18n.engine.i18n")
 local FileSystem = require("core.fs.adapters.file_system")
 local HttpClient = require("core.network.adapters.http_client")

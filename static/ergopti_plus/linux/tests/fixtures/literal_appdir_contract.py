@@ -325,7 +325,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         )
         assert watch.returncode == 1 and "stopped without authority" in watch.stderr, watch.stderr
         dialog = subprocess.run(
-            [usr / "bin/luajit", driver / "ui/dialog_host.lua", "--invalid"],
+            [usr / "bin/luajit", driver / "core/ui/ui/dialog_host.lua", "--invalid"],
             env=env,
             text=True,
             capture_output=True,

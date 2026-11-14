@@ -59,7 +59,7 @@ end
 --- Calls one of the page's functions with a JSON payload.
 --- @return boolean called
 local function call_page(state, fn_name, payload)
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" then
 		Logger.error(LOG, "No webview manager: the page's %s() cannot be called.", fn_name)
 		return false
@@ -78,7 +78,7 @@ local function close_page(state, context)
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		return context.close_owned_window() == true
 	end
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	return manager ~= nil and type(manager.hide) == "function" and manager.hide(APP_NAME) == true
 end
 
@@ -95,7 +95,7 @@ end
 --- Retains the page and exact file which supplied the editor's current draft.
 local function capture_opening(state, context, shared_root, config_dir, ctx)
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	local path = Layers.user_file_path(config_dir, ctx)
 	local content, status, detail = Writer.read_classified(path)
 	return {
@@ -110,7 +110,7 @@ end
 local function opening_page_matches(owner, state, context)
 	local epoch = type(context) == "table" and context.epoch or nil
 	return owner ~= nil and _opening == owner and epoch == owner.epoch
-		and dependency(state, "webview_manager", "ui.webview_manager") == owner.manager
+		and dependency(state, "webview_manager", "core.ui.ui.webview_manager") == owner.manager
 end
 
 --- A different page cannot receive this draft's save result or close request.
@@ -331,7 +331,7 @@ function M.on_message(payload, state, context)
 			legends = current_legends(state, ctx), layer_keys = layer_keys(state, ctx, shared_root),
 		})
 		owner.data = data
-		local manager = dependency(state, "webview_manager", "ui.webview_manager")
+		local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if manager and type(manager.set_title) == "function" and i18n and type(i18n.get) == "function" then
 			manager.set_title(APP_NAME, i18n.get("layer_editor.window_title"))

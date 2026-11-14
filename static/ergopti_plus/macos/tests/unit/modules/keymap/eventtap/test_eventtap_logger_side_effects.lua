@@ -22,7 +22,7 @@ local RESET_MODULES = {
 	"adapters.synthetic_input",
 	"core.fs.engine.paths", "core.timing.engine.timings",
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
-	"ui.tooltip", "modules.hotstrings.hotstrings_config", "adapters.tooltip_renderer",
+	"core.ui.ui.tooltip", "modules.hotstrings.hotstrings_config", "core.ui.adapters.tooltip_renderer",
 	"core.fs.adapters.file_system",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
@@ -138,7 +138,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			notify_synthetic = noop,
 			set_buffer = noop,
 		}, { __index = function() return noop end })
-		package.loaded["ui.tooltip"] = setmetatable({
+		package.loaded["core.ui.ui.tooltip"] = setmetatable({
 			tint = function() return {} end,
 			is_visible = function() return false end,
 			is_hotstring_visible = function() return false end,
@@ -147,7 +147,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = function() return nil end,
 		}
-		package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+		package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 
 		local sent = {}
 		local bootstrap_requests = {}

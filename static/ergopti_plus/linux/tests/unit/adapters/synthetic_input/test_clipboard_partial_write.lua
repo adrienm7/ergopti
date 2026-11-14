@@ -14,7 +14,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 require("adapters.clipboard")
 
 local function with_session(options, body)
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server",
+	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 		"adapters.keyboard_layout", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -44,7 +44,7 @@ local function with_session(options, body)
 			return true
 		end,
 	}
-	package.loaded["infra.display_server"] = {
+	package.loaded["core.ui.engine.display_server"] = {
 		is_wayland = function() return false end, is_x11 = function() return true end,
 		kind = function() return "x11" end,
 	}

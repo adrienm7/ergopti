@@ -95,7 +95,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 					with_exact_stdin = function(command, text) pending = text; return command end,
 					run = function() clipboard = pending; world.writes = world.writes + 1; return true end,
 				}
-				package.loaded["infra.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
+				package.loaded["core.ui.engine.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
 					is_x11 = function() return true end, is_wayland = function() return false end }
 				package.loaded["adapters.window_info"] = { focused_app_id = function() return "owned-editor" end }
 				local layout = require("adapters.keyboard_layout")

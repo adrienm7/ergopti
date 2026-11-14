@@ -4,7 +4,7 @@
 --- MODULE: Native Configuration Directory Picker
 --- DESCRIPTION:
 --- Owns the Linux folder selection policy shared by onboarding and the paths
---- editor, through Ergopti's own dialog (ui/native_dialog.lua). Returns one normalized absolute directory or a precise refusal.
+--- editor, through Ergopti's own dialog (core/ui/ui/native_dialog.lua). Returns one normalized absolute directory or a precise refusal.
 --- ==============================================================================
 
 local M = {}
@@ -49,9 +49,9 @@ function M.pick(shell, config_paths, i18n, current)
 	local title = type(i18n) == "table" and type(i18n.get) == "function"
 		and i18n.get("dialog.config_folder.select_title") or "Select configuration folder"
 	title = WindowTitles.compose(title)
-	local command = require("ui.native_dialog").command() .. " --file-selection --directory --title="
+	local command = require("core.ui.ui.native_dialog").command() .. " --file-selection --directory --title="
 		.. shell.quote(title) .. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null"
-	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
+	local completed, output = require("core.ui.ui.modal").run(function() return shell.exec_checked(command) end)
 	-- Partial stdout cannot turn native cancellation or command failure into a selection.
 	if completed ~= true or type(output) ~= "string" then return nil, "folder selection was cancelled or refused" end
 	-- The dialog appends one LF to the raw filename. A CR or another LF

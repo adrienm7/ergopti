@@ -75,7 +75,7 @@ local function load_keystats(options)
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,
 	}
-	package.loaded["infra.dialog_util"] = { alert = function() end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
 	package.loaded["modules.keystats.log_manager"] = {
 		init = function(state)

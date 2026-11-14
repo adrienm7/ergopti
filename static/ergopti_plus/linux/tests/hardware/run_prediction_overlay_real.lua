@@ -94,9 +94,9 @@ local function capture(name)
 end
 
 local passed, failure = xpcall(function()
-	local Renderer = require("adapters.graphics_renderer")
-	local Config = require("ui.tooltip.config")
-	Overlay = require("ui.tooltip.llm")
+	local Renderer = require("core.ui.adapters.graphics_renderer")
+	local Config = require("core.ui.ui.tooltip.config")
+	Overlay = require("core.ui.ui.tooltip.llm")
 	check(#Gtk.Window.list_toplevels() == 0, "the process starts without a foreign GTK window")
 	check(Renderer.is_available(), "the real GTK renderer is available")
 	check(Overlay.init({ style = Config.load(), screen_provider = function() return { x = 0, y = 0, w = 1024, h = 768 } end }), "the real tooltip configuration initializes the overlay")

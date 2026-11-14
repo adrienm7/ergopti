@@ -44,7 +44,7 @@ end
 --- A preview module initialised with a style stub and the config above.
 --- @return table
 local function preview()
-	local P = helpers.load_module("ui.tooltip.preview")
+	local P = helpers.load_module("core.ui.ui.tooltip.preview")
 	P.init({ style = { positioning = { window_bottom_inset = 0 } }, config = fake_config() })
 	return P
 end
@@ -158,12 +158,12 @@ end)
 -- and floor, as on Windows and macOS (preview-expiry-decrement).
 helpers.describe("preview expiry follows the shared decrement and floor", function()
 	helpers.it("(preview-expiry-decrement) arms the trigger delay minus the decrement", function()
-		local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview" }
+		local names = { "core.ui.adapters.graphics_renderer", "core.events.timer_scheduler", "core.ui.ui.tooltip.preview" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local delays = {}
 		local ok, err = pcall(function()
-			package.loaded["adapters.graphics_renderer"] = {
+			package.loaded["core.ui.adapters.graphics_renderer"] = {
 				is_available = function() return true end,
 				show = function() return true end,
 				hide = function() return true end,
@@ -172,13 +172,13 @@ helpers.describe("preview expiry follows the shared decrement and floor", functi
 				after = function(delay) delays[#delays + 1] = delay; return { armed = true } end,
 				cancel = function() return true end,
 			}
-			package.loaded["ui.tooltip.preview"] = nil
-			local P = require("ui.tooltip.preview")
+			package.loaded["core.ui.ui.tooltip.preview"] = nil
+			local P = require("core.ui.ui.tooltip.preview")
 			P.init({ style = { positioning = { window_bottom_inset = 0 } }, config = fake_config() })
 			P.resolve_anchor = function() return { x = 0, y = 0 } end
 			P.screen_frame = function() return { x = 0, y = 0, w = 100, h = 100 } end
 			helpers.assert_true(P.show(CANDIDATES, "star"))
-			local Config = require("ui.tooltip.config")
+			local Config = require("core.ui.ui.tooltip.config")
 			helpers.assert_eq(#delays, 1)
 			helpers.assert_true(math.abs(delays[1] - Config.effective_delay(0.75)) < 1e-9)
 			helpers.assert_true(delays[1] < 0.75, "the bubble hides before the trigger window closes")

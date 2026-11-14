@@ -60,7 +60,7 @@ local CONTRACTS = load_contracts()
 local ADAPTERS_UNDER_TEST = {
 	{ module = "adapters.keyboard_hook", port = "KeyboardHook" },
 	{ module = "adapters.text_sender", port = "TextSender" },
-	{ module = "adapters.tooltip_renderer", port = "TooltipRenderer" },
+	{ module = "core.ui.adapters.tooltip_renderer", port = "TooltipRenderer" },
 	{ module = "core.network.adapters.http_client", port = "HttpClient" },
 	{ module = "core.events.timer_scheduler", port = "TimerScheduler" },
 	{ module = "adapters.notifier", port = "Notifier" },

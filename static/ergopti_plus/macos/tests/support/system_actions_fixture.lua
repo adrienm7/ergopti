@@ -30,7 +30,7 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-		"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "infra.notifications",
+		"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
 		"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 		"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
@@ -177,7 +177,7 @@ local function make_sys_screenshot_spies(window_override)
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	-- The capture goes through adapters.shell_runner, which captures `local hs = hs`
 	-- at require-time. Cached from an earlier test file it stays bound to THAT file's
 	-- hs stub, so the module under test spawns correctly while the assertions below
@@ -330,7 +330,7 @@ local function load_h01_system(options)
 	options = options or {}
 	refresh_native_consumers()
 	package.loaded["adapters.key_state"] = nil
-	package.loaded["infra.notifications"] = nil
+	package.loaded["core.ui.engine.notifications"] = nil
 	local previous_logger = package.loaded["core.logger.engine.logger"]
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil

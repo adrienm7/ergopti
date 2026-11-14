@@ -59,10 +59,10 @@ local function load_editor(writer, reader, file_system)
 	package.loaded["core.text.engine.toml.writer"] = writer
 	package.loaded["core.text.engine.toml_codec.writer"] = nil
 	package.loaded["core.text.engine.toml.reader"] = reader
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1 end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 800, height = 700 } end,
 		get_centered_frame = function(width, height) return { w = width, h = height } end,
 		force_focus = function() end,

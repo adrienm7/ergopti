@@ -198,7 +198,7 @@ placed in fractions of a board that takes the width of the view, and only the
 composer body scrolls, so the action buttons stay in a footer below it. On
 Windows the controller is parented to a placeholder control, which every Size
 handler grows to the window through `WebView_FitToWindow` before filling it
-(`infra/webview_utils.ahk`); filling alone left the page at its opening size.
+(`core/ui/engine/webview/utils.ahk`); filling alone left the page at its opening size.
 `tools/test/browser/layout-composer.playwright.cjs` measures the page in
 Chromium and WebKit at four window sizes and the AHK test
 `test_webview_fit_to_window.ahk` covers the Windows host.

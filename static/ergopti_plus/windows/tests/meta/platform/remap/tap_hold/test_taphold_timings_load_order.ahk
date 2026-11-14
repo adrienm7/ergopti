@@ -59,7 +59,7 @@ _TTLO_EverySentinelFilePrecedesBoot() {
 		"infra/hotstrings/hotstrings_config.ahk",   "HotstringsConfigLoadSharedDefaults",
 		"modules/keystats/keystats_walker.ahk", "KeystatsWalkerLoadTimings",
 		"modules/llm/api_ollama.ahk",             "LLMApiLoadTimings",
-		"infra/ui_style.ahk",                       "UiStyle_LoadSharedConst"
+		"core/ui/engine/style.ahk",                       "UiStyle_LoadSharedConst"
 	)
 	for RelPath, Loader in Pairs {
 		Pos := InStr(Src, "#Include " . RelPath)

@@ -37,7 +37,7 @@
 ; ====================================================
 
 _CWRS_ReadLifecycleSrc() {
-	return _DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	return _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 }
 
 _CWRS_ReadCapswordSrc() {

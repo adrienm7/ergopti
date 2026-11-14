@@ -34,7 +34,7 @@ local STAR = "★"
 --- @param depth number hotstrings.cascade_max_arrows (arrows; 1 = a single expansion).
 --- @return table state, table expander, table log
 local function fresh_engine(entries, depth)
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
+	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,

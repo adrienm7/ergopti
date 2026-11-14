@@ -51,7 +51,7 @@ local TOOL_SECONDS = 10
 M.ERROR_SIGNALS = {
 	-- modules/gestures/init.lua: a touch frame without the trackpad's stamp.
 	{ step = "log_capture_stamp_errors", name = "capture_stamp" },
-	-- ui/window_toggle.lua: a window-toggle action that could not act.
+	-- core/ui/ui/window_toggle.lua: a window-toggle action that could not act.
 	{ step = "log_window_toggle_errors", name = "window_toggle" },
 	-- modules/dynamic_hotstrings: a personal or dynamic start rolled back.
 	{ step = "log_start_rollbacks", name = "start_rollback" },
@@ -68,7 +68,7 @@ M.COUNT_SIGNALS = {
 	-- modules/keymap/llm_bridge.lua: a prediction a window or application switch
 	-- cancelled; its reason holds spaces, which the generic count refuses.
 	{ step = "log_prediction_switch_cancels", name = "switch_cancel" },
-	-- ui/window_toggle.lua: a toggle that opened its page, or raised a covered or
+	-- core/ui/ui/window_toggle.lua: a toggle that opened its page, or raised a covered or
 	-- minimised one.
 	{ step = "log_window_toggle_opens", name = "toggle_open" },
 	{ step = "log_window_toggle_raises", name = "toggle_raise" },
@@ -89,7 +89,7 @@ M.COUNT_SIGNALS = {
 	{ step = "log_layout_emulations_on", name = "emulation_on" },
 	-- modules/keymap/number_row_live.lua: number-row options applied live.
 	{ step = "log_number_row_applies", name = "number_row_apply" },
-	-- ui/ui_builder.lua: a page's first load, per system appearance.
+	-- core/ui/ui/builder.lua: a page's first load, per system appearance.
 	{ step = "log_pages_dark", name = "page_dark" },
 	{ step = "log_pages_light", name = "page_light" },
 }

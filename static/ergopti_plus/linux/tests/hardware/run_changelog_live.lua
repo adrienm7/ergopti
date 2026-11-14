@@ -61,7 +61,7 @@ local function head_for(channel)
 end
 print("  newest published Ergopti release: " .. ergopti_tags[1])
 
-local Manager = require("ui.webview_manager")
+local Manager = require("core.ui.ui.webview_manager")
 local Updater = require("modules.updater.manager")
 -- Actual script-control pause state, with lifecycle callbacks scoped to the
 -- one native changelog window owned by this fixture.

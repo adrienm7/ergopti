@@ -38,8 +38,8 @@ function M.run(config, done)
 	assert(config.readiness_query == "typeof window.publishMetricsAppsData")
 	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
 		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
-	local Logger, UI = require("core.logger.engine.logger"), require("ui.ui_builder")
-	local Scheduler, Result = require("core.events.timer_scheduler"), require("adapters.webview_result")
+	local Logger, UI = require("core.logger.engine.logger"), require("core.ui.ui.builder")
+	local Scheduler, Result = require("core.events.timer_scheduler"), require("core.ui.adapters.webview_result")
 	local json = require("hs.json")
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
@@ -50,7 +50,7 @@ function M.run(config, done)
 	local methods, ucc_methods = hs.getObjectMetatable("hs.webview"), hs.getObjectMetatable("hs.webview.usercontent")
 	local native = { new = hs.webview.new, controller = hs.webview.usercontent.new, callback = ucc_methods.setCallback }
 	assert(debug.getinfo(native.new, "S").what == "C" and debug.getinfo(native.controller, "S").what == "C")
-	assert(debug.getinfo(UI.show_webview, "S").source == "@" .. root .. "/macos/ui/ui_builder.lua")
+	assert(debug.getinfo(UI.show_webview, "S").source == "@" .. root .. "/macos/core/ui/ui/builder.lua")
 	for _, name in ipairs({ "evaluateJavaScript", "delete", "hide", "windowCallback", "deleteOnClose", "allowNewWindows" }) do
 		native[name] = assert(methods[name])
 	end

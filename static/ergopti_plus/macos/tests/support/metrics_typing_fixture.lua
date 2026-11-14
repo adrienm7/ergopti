@@ -38,7 +38,7 @@ local function load_dashboard(scheduler, subscribe, controls)
 		decode = function() return {} end,
 	}
 	context.presented = 0
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		force_focus = function(view, is_new, lifecycle)
 			if view ~= webview or is_new ~= false or lifecycle.is_current() ~= true then return false end
 			context.presented = context.presented + 1

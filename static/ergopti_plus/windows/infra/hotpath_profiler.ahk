@@ -22,7 +22,7 @@
 ;    single-threaded but Gui creation and COM calls PUMP the message loop, so a
 ;    physically typed key's whole InputHook callback can run nested inside
 ;    Tooltip.Build, and the wall clock then bills that keystroke to the tooltip.
-;    The driver documents that re-entrancy itself (ui/tooltip/core.ahk, the
+;    The driver documents that re-entrancy itself (core/ui/ui/tooltip/core.ahk, the
 ;    generation counter exists because of it), and the largest number this
 ;    profiler ever reported was produced by it: 112.86 ms for a one-row tooltip
 ;    that benches at ~7 ms. The attribution and the line are those of macOS and

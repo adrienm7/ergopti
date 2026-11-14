@@ -25,7 +25,7 @@ local hs            = hs
 local Logger        = require("core.logger.engine.logger")
 local ConfigPaths   = require("infra.config_paths")
 local i18n          = require("core.i18n.engine.i18n")
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local FileSystem    = require("core.fs.adapters.file_system")
 
 local LOG = "log_openers"

@@ -471,10 +471,10 @@ end)
 --- rereads the native values; captured callbacks keep their original owners.
 local function with_delay_native(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"core.i18n.engine.i18n", "core.logger.engine.logger", "ui.menu.menu_utils", "infra.dialog_util" }, function()
+		"core.i18n.engine.i18n", "core.logger.engine.logger", "ui.menu.menu_utils", "core.ui.engine.dialog_util" }, function()
 		-- A refused typed value is shown through the native alert: recorded here.
 		local alerts = {}
-		package.loaded["infra.dialog_util"] = { block_alert = function(title, message)
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(title, message)
 			alerts[#alerts + 1] = { title, message }
 		end }
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})

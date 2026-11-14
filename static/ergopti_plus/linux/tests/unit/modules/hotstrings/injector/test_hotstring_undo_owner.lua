@@ -37,7 +37,7 @@ end
 --- @param body function Receives observations after the control callback.
 local function with_undo(options, body)
 	Fixture.with(function(guard, state)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server",
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
 			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -77,7 +77,7 @@ local function with_undo(options, body)
 				return false
 			end,
 		}
-		package.loaded["infra.display_server"] = { is_wayland = function() return false end,
+		package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end,
 			is_x11 = function() return true end, kind = function() return "x11" end }
 		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,

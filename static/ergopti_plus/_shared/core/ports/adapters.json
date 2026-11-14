@@ -21,9 +21,9 @@
 			"linux": "static/ergopti_plus/linux/core/fs/adapters/file_system.lua"
 		},
 		"GraphicsRenderer": {
-			"windows": "static/ergopti_plus/windows/adapters/graphics_renderer.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/graphics_renderer.lua",
-			"linux": "static/ergopti_plus/linux/adapters/graphics_renderer.lua"
+			"windows": "static/ergopti_plus/windows/core/ui/adapters/graphics_renderer.ahk",
+			"macos": "static/ergopti_plus/macos/core/ui/adapters/graphics_renderer.lua",
+			"linux": "static/ergopti_plus/linux/core/ui/adapters/graphics_renderer.lua"
 		},
 		"HotkeyRegistrar": {
 			"windows": "static/ergopti_plus/windows/adapters/hotkey_registrar.ahk",
@@ -81,8 +81,8 @@
 			"linux": "static/ergopti_plus/linux/core/events/timer_scheduler.lua"
 		},
 		"TooltipRenderer": {
-			"windows": "static/ergopti_plus/windows/adapters/tooltip_renderer.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/tooltip_renderer.lua"
+			"windows": "static/ergopti_plus/windows/core/ui/adapters/tooltip_renderer.ahk",
+			"macos": "static/ergopti_plus/macos/core/ui/adapters/tooltip_renderer.lua"
 		},
 		"TrayMenu": {
 			"windows": "static/ergopti_plus/windows/adapters/tray_menu.ahk",

@@ -68,7 +68,7 @@ local function load_fixture(opts)
 		logs.error[#logs.error + 1] = string.format(message, ...)
 	end
 	package.loaded["core.logger.engine.logger"] = Logger
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,

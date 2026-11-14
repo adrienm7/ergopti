@@ -15,7 +15,7 @@ local function fresh_runtime(effects)
 			or name == "modules.keystats"
 			or name == "modules.llm"
 			or name == "modules.llm.prediction_engine"
-			or name == "ui.tooltip"
+			or name == "core.ui.ui.tooltip"
 		) then
 			package.loaded[name] = nil
 		end
@@ -49,7 +49,7 @@ local function fresh_runtime(effects)
 		effects.visible = false
 		return true
 	end
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -76,7 +76,7 @@ local function fresh_runtime(effects)
 		end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 
 	local keymap = helpers.load_with_stubs("modules.keymap")
 	keymap.set_preview_enabled(true)

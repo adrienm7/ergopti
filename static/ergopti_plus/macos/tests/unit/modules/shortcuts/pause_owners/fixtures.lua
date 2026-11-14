@@ -130,7 +130,7 @@ local function load_inventory_context(options)
 	end
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
@@ -204,7 +204,7 @@ local function load_inventory_context(options)
 	package.loaded["platform.remap.onboarding"] = {
 		stop = invoke("remap_onboarding", "pause"),
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		hide_forced = invoke("tooltip", "pause"),
 	}
 	package.loaded["modules.keystats"] = {

@@ -10,9 +10,9 @@ function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
 	local names = {"lgi","core.logger.engine.monotonic","core.timing.engine.timings","core.network.engine.managed_http_deadline",
-		"core.events.loop","adapters.notifier","adapters.application_notifier","ui.webkit_host","ui.webview_manager"}
+		"core.events.loop","adapters.notifier","adapters.application_notifier","core.ui.ui.webkit_host","core.ui.ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
-	local real_host = require("ui.webkit_host")
+	local real_host = require("core.ui.ui.webkit_host")
 	local host = setmetatable({}, {__index=real_host})
 	local nonce_serial = 0
 	host.native_nonce = function() nonce_serial=nonce_serial+1;return string.rep("A",20)..string.format("%04d",nonce_serial) end
@@ -121,9 +121,9 @@ function M.new(app_name, handler, state)
 			if not admit() then return false end
 			c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
 		package.loaded["adapters.application_notifier"]=package.loaded["adapters.notifier"]
-		package.loaded["ui.webkit_host"]=host
-		package.loaded["ui.webview_manager"]=nil
-		Manager=require("ui.webview_manager");c.manager=Manager
+		package.loaded["core.ui.ui.webkit_host"]=host
+		package.loaded["core.ui.ui.webview_manager"]=nil
+		Manager=require("core.ui.ui.webview_manager");c.manager=Manager
 		native_shutdown = Manager.shutdown
 		local owned_state={}
 		for key,value in pairs(state or {})do owned_state[key]=value end

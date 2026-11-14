@@ -525,7 +525,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
-		local src = read_source("local function focus_hammerspoon") -- infra/dialog_util.lua
+		local src = read_source("local function focus_hammerspoon") -- core/ui/engine/dialog_util.lua
 		assert(src, "dialog_util.lua must exist")
 		-- After the fix, dialog_util uses hs.timer.doAfter instead of hs.task.
 		assert(not src:find("hs%.task%.new", 1, false),

@@ -5,7 +5,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = {
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
@@ -37,7 +37,7 @@ local function with_fixture(callback)
 		local logger_stub = helpers.make_logger_stub()
 		logger_stub.today_log_path = function() return "/tmp/ergopti-test.log" end
 		package.loaded["core.logger.engine.logger"] = logger_stub
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = {
 			get = function(key)

@@ -13,7 +13,7 @@ require("core.logger.engine")
 
 local function with_host(scenario)
 	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
-		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "ui.ui_builder", "ui.webview_close_owner",
+		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "core.ui.ui.builder", "core.ui.ui.webview_close_owner",
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.webview.i18n_seed", "core.fs.adapters.file_system",
 		"core.ui.engine.window_titles", "core.text.engine.json", "core.fs.adapters.json_codec", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
 		"core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "tests.support.webview_recursive_close_fixture",
@@ -106,7 +106,7 @@ local function with_host(scenario)
 			h.retirement_callbacks[#h.retirement_callbacks + 1] = callback
 			return after(delay, callback)
 		end
-		local builder = package.loaded["ui.ui_builder"]
+		local builder = package.loaded["core.ui.ui.builder"]
 		builder.get_app_geometry = function() return { width = 700, height = 600 } end
 		builder.get_centered_frame = function() return {} end
 		builder.build_injected_html = function() return "<html></html>" end

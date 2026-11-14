@@ -17,7 +17,7 @@ helpers.describe("metrics native presentation", function()
 	for _, refused in ipairs({ false, true }) do
 		helpers.it("reopens only after failed presentation cleanup, refusal=" .. tostring(refused), function()
 			with_window("ui.metrics_apps", function(dashboard, state)
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local create, creates, stale = builder.show_webview, 0, 0
 				builder.show_webview = function(options)
 					creates = creates + 1
@@ -64,7 +64,7 @@ helpers.describe("metrics native presentation", function()
 	end)
 	helpers.it("rolls back a synchronous native presentation exception without success", function()
 		with_window("ui.metrics_apps", function(dashboard, state)
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local create, successes = builder.show_webview, 0
 			builder.show_webview = function(options)
 				local view = create(options)

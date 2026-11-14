@@ -288,12 +288,19 @@ for (const test of children) {
 }
 
 // The v1.0.7 child that went red must resolve to the owners that warned.
-const errorChild = path.join(TESTS, 'unit', 'ui', 'webview', 'test_error_dialog_startup_owner.ahk');
+const errorChild = path.join(
+	TESTS,
+	'unit',
+	'core',
+	'ui',
+	'webview',
+	'test_error_dialog_startup_owner.ahk'
+);
 const errorClosure = new Set([...childClosure(readAhk(errorChild))].map(relative));
 for (const expected of [
 	'windows/vendor/WebView2.ahk',
 	'windows/vendor/Promise.ahk',
-	'windows/infra/webview_browser_warmup.ahk',
+	'windows/core/ui/engine/webview/browser_warmup.ahk',
 	'windows/ui/healthcheck/core.ahk',
 	'windows/tests/fixtures/error_dialog_startup_owner_body.ahk'
 ])

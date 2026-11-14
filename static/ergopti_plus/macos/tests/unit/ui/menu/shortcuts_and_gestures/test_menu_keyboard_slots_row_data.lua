@@ -436,7 +436,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 	it("asks for the parameter under the slot's dispatch binding before binding", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, stored = parameter_ctx()
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		helpers.assert_eq(type(dialog), "table",
 			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
 		local saved_prompt = dialog.text_prompt
@@ -468,7 +468,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 	it("hands the picker its editor and stores the value it collected without a prompt", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, stored = parameter_ctx()
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function() error("the value the picker's editor collected must not be asked again") end
 		local group = physical_groups(shortcuts)[1]
@@ -548,7 +548,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 	it("leaves the slot unbound when the parameter prompt is cancelled", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, stored = parameter_ctx()
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		helpers.assert_eq(type(dialog), "table",
 			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
 		local saved_prompt = dialog.text_prompt

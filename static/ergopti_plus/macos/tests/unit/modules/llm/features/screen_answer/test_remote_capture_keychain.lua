@@ -24,7 +24,7 @@ local MODULES = {
 	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
 	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "infra.keycodes",
-	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
+	"core.ui.ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "modules.llm.api_token_crypto", "core.network.adapters.http_client",
 	"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 	"modules.llm.provider_uses", "modules.llm.progressive_reveal", "modules.llm.parser",
@@ -125,7 +125,7 @@ local function with_capture(callback)
 				return true
 			end,
 		}
-		package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
+		package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = function() end,
 			set_enter_validates = function() end,
 			set_llm_timeout = function() end,

@@ -209,11 +209,11 @@ end
 --- stay up while one is.
 --- @return boolean
 function M.tooltip_visible()
-	local ok, Preview = pcall(require, "ui.tooltip.preview")
+	local ok, Preview = pcall(require, "core.ui.ui.tooltip.preview")
 	if ok and type(Preview) == "table" and type(Preview.is_visible) == "function" and Preview.is_visible() then
 		return true
 	end
-	local ok_llm, Llm = pcall(require, "ui.tooltip.llm")
+	local ok_llm, Llm = pcall(require, "core.ui.ui.tooltip.llm")
 	return ok_llm and type(Llm) == "table" and type(Llm.is_showing) == "function" and Llm.is_showing() == true
 end
 

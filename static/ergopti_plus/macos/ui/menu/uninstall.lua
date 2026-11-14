@@ -29,7 +29,7 @@ function M.run(deps)
 	local lifecycle = deps.lifecycle or require("core.lifecycle.engine.shutdown.termination_coordinator")
 	if lifecycle.is_pending() then return false end
 	local i18n = deps.i18n or require("core.i18n.engine.i18n")
-	local dialog = deps.dialog or require("infra.dialog_util")
+	local dialog = deps.dialog or require("core.ui.engine.dialog_util")
 	local resolver = deps.resolver or require("platform.remap.lease_helper")
 	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local title = i18n.get("menu.global.uninstall")

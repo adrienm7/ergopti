@@ -38,8 +38,8 @@ _TCLW_CountOccurrences(Haystack, Needle) {
 ; ================================================================
 
 _TCLW_TooltipWrapSafe() {
-	Src := _DriverDirConcat("ui/tooltip")
-	Assert(Src != "", "the ui/tooltip module must be readable")
+	Src := _DriverDirConcat("core/ui/ui/tooltip")
+	Assert(Src != "", "the core/ui/ui/tooltip module must be readable")
 
 	; Negative: bare subtraction without mask must not appear
 	Assert(!InStr(Src, "return (A_TickCount - Record.ShownAt) < _LLM_TOOLTIP_MIN_DISPLAY_MS"),

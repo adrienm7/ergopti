@@ -51,7 +51,7 @@ local function with_window(test)
 				end }
 			end },
 		} }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 10, height = 10 } end,
 			get_centered_frame = function() return {} end, force_focus = function() end,
 			show_webview = function(options)

@@ -48,7 +48,7 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 					if case[1] == "throw" then error("installation exception") end
 					return false, case[1]
 				end
-				package.loaded["infra.notifications"] = { notify = function(message, _, level)
+				package.loaded["core.ui.engine.notifications"] = { notify = function(message, _, level)
 					notices[#notices + 1] = { message, level }
 				end }
 			end)

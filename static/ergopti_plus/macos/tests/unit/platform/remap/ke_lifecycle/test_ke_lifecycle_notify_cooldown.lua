@@ -33,7 +33,7 @@ local function load_lifecycle()
 		logger[level] = function() end
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function()
 			ctx.notifications = ctx.notifications + 1
 		end,

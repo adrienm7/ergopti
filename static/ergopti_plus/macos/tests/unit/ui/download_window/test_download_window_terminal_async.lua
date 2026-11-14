@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"ui.download_window",
-	"ui.ui_builder", "ui.webview_close_owner",
+	"core.ui.ui.builder", "core.ui.ui.webview_close_owner",
 	"core.logger.engine.logger",
 	"core.process.adapters.shell_runner",
 }

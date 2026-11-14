@@ -21,7 +21,7 @@ local function copy_capture(mode)
 	local notices = {}
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.system_pixel", "core.process.adapters.task_lifecycle",
-		"core.fs.adapters.file_system", "infra.notifications", "core.i18n.engine.i18n", "core.logger.engine.logger",
+		"core.fs.adapters.file_system", "core.ui.engine.notifications", "core.i18n.engine.i18n", "core.logger.engine.logger",
 		"modules.shortcuts.actions.screen_capture_flow",
 	}, function()
 		local tasks = {}
@@ -42,7 +42,7 @@ local function copy_capture(mode)
 			remove_exact = function() return true end,
 			classify_no_follow = function() return nil, "absent" end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(_, _, level) notices[#notices + 1] = level end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }

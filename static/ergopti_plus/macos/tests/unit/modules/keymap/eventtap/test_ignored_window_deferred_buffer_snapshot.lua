@@ -41,7 +41,7 @@ local function install_collaborators(effects)
 			effects.llm_calls = effects.llm_calls + 1
 			-- Preserve the real engine.reset() contract that this integration test
 			-- exercises: a committed reset revokes native tooltip pixels.
-			local tooltip = package.loaded["ui.tooltip"]
+			local tooltip = package.loaded["core.ui.ui.tooltip"]
 			return tooltip and tooltip.hide_forced_silent()
 		end,
 		handle_chain_signal = function() effects.llm_calls = effects.llm_calls + 1; return false end,
@@ -59,7 +59,7 @@ local function install_collaborators(effects)
 		end,
 		set_buffer = function() effects.keystats_calls = effects.keystats_calls + 1 end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -97,7 +97,7 @@ local function install_collaborators(effects)
 		has_visible_hotstring_lease = function() return effects.tooltip_visible == true end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 end
 
 local function find_keydown_tap(hs_stub)

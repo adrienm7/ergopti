@@ -30,7 +30,7 @@ local OWNED = {
 	"core.fs.adapters.file_system",
 	"adapters.tcc_grant",
 	"adapters.window_info",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 }
@@ -47,7 +47,7 @@ local function with_system(body, options)
 		local record = { runs = {}, notices = {}, cleared = {}, moved = {}, created = {}, listeners = {} }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, body_text, kind)
 				record.notices[#record.notices + 1] = { message = message, body = body_text, kind = kind }
 				return true

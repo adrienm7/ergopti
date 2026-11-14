@@ -15,12 +15,12 @@ local FIXTURE_MODULES = {
 	"ui.wpm.shared",
 	"modules.keystats",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"core.fs.engine.paths",
 	"core.fs.adapters.storage",
-	"adapters.graphics_renderer",
+	"core.ui.adapters.graphics_renderer",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
@@ -32,7 +32,7 @@ local FIXTURE_MODULES = {
 	"modules.llm.api_ollama",
 	"modules.llm.api_remote",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 }
 
@@ -107,7 +107,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			end
 
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.notifications"] = { notify = function() end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.keycodes"] = {
 				F13_KARABINER_RETURN = 106,
@@ -146,7 +146,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 					return true
 				end,
 			}
-			package.loaded["adapters.graphics_renderer"] = {
+			package.loaded["core.ui.adapters.graphics_renderer"] = {
 				createWindow = function(frame)
 					local canvas = { current_frame = frame, deleted = false }
 					function canvas:level() return self end
@@ -174,7 +174,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 					return canvas
 				end,
 			}
-			package.loaded["ui.tooltip"] = {
+			package.loaded["core.ui.ui.tooltip"] = {
 				is_visible = function() return false end,
 				hide_forced = function() return true end,
 			}

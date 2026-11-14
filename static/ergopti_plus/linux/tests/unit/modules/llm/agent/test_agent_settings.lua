@@ -252,8 +252,8 @@ end
 --- @return table rows, table prompts
 local function build_menu(world, answers)
 	local prompts = {}
-	local previous = package.loaded["ui.text_prompt"]
-	package.loaded["ui.text_prompt"] = {
+	local previous = package.loaded["core.ui.ui.text_prompt"]
+	package.loaded["core.ui.ui.text_prompt"] = {
 		ask = function(title, prompt, initial, hidden, choices)
 			prompts[#prompts + 1] = { title = title, prompt = prompt, initial = initial, choices = choices }
 			local answer = table.remove(answers, 1)
@@ -268,7 +268,7 @@ local function build_menu(world, answers)
 		return menu_builder.build({ llm = world.engine, on_menu_changed = function() world.redraws =
 			(world.redraws or 0) + 1 end })
 	end)
-	world.restore_prompt = function() package.loaded["ui.text_prompt"] = previous end
+	world.restore_prompt = function() package.loaded["core.ui.ui.text_prompt"] = previous end
 	if not ok then
 		world.restore_prompt()
 		error(rows, 0)

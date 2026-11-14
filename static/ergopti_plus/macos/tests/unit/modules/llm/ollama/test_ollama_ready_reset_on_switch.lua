@@ -96,7 +96,7 @@ end)
 helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness", function()
 	helpers.it("a warmup response that lands after reset_ready() is discarded", function()
 		local saved_http   = package.loaded["core.network.adapters.http_client"]
-		local saved_notify = package.loaded["infra.notifications"]
+		local saved_notify = package.loaded["core.ui.engine.notifications"]
 		local saved_api    = package.loaded["modules.llm.api_ollama"]
 
 		-- Capture the callback rather than invoking it: the warmup POST for model-a
@@ -119,7 +119,7 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 
 		-- A stale 200 must not fire the user-facing "server ready" notification either.
 		local notify_count = 0
-		package.loaded["infra.notifications"] = { notify = function() notify_count = notify_count + 1 end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() notify_count = notify_count + 1 end }
 
 		package.loaded["modules.llm.api_ollama"] = nil
 		local ApiOllama = require("modules.llm.api_ollama")
@@ -139,7 +139,7 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 		local observed_posts  = post_count
 
 		package.loaded["core.network.adapters.http_client"]   = saved_http
-		package.loaded["infra.notifications"]      = saved_notify
+		package.loaded["core.ui.engine.notifications"]      = saved_notify
 		package.loaded["modules.llm.api_ollama"] = saved_api
 
 		-- Arrangement guard: if the POST never went out (or the callback was never

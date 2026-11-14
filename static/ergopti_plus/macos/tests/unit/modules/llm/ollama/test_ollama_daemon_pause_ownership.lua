@@ -148,7 +148,7 @@ local function load_fixture()
 	end
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() return true end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
@@ -248,7 +248,7 @@ local function load_fixture()
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-	package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control", hs_overrides)
 	return {
 		api = api,

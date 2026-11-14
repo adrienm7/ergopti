@@ -191,7 +191,7 @@ content = [
 "ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
 "ui/healthcheck/" = "the health check probes the device access"
 "ui/menu/menu_gestures.lua" = "the gestures menu edits the settings"
-"ui/modal.lua" = "releases the grab while a dialog is open, for every feature alike"
+"core/ui/ui/modal.lua" = "releases the grab while a dialog is open, for every feature alike"
 "ui/physical_shortcuts/" = "the shortcut editor captures one key combination to store it"
 
 [detection.linux.uinput]
@@ -219,7 +219,7 @@ content = ['["\x27]xdotool[ "\x27]']
 # The active file manager window behind the open_terminal_here and
 # new_text_file_here gesture actions (modules/gestures/system_actions.lua).
 "core/fs/adapters/file_manager_folder.lua" = ["gestures.*"]
-"ui/tooltip/preview.lua" = [
+"core/ui/ui/tooltip/preview.lua" = [
 	"hotstrings.preview_ai_enabled",
 	"hotstrings.preview_autocorrect_enabled",
 	"hotstrings.preview_colored_tooltips",
@@ -270,7 +270,7 @@ content = ['WebView2Loader', 'CreateCoreWebView2']
 "ui/error_dialog/" = ["script.show_error_dialog"]
 
 [detection.windows.webview2.plumbing]
-"infra/webview_" = "the WebView2 host helpers the windows share"
+"core/ui/engine/webview/" = "the WebView2 host helpers the windows share"
 "modules/updater/" = "application updates are not a manifest feature"
 "ui/action_picker_webview.ahk" = "the action picker edits a binding and keeps its native list as the fallback"
 "ui/changelog/" = "the changelog window is not a manifest feature"

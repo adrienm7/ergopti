@@ -30,10 +30,10 @@ local MODULE_NAMES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"hs",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"platform.remap.onboarding",
@@ -119,12 +119,12 @@ local function with_fixture(options, scenario)
 	local function noop() end
 	package.loaded["core.process.adapters.task_lifecycle"] = { start = function() return false end }
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return options.choice end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, kind)
 			calls.notices[#calls.notices + 1] = { message = message, kind = kind }
 		end,

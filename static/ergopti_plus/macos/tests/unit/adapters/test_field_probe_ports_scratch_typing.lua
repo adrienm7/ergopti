@@ -13,8 +13,8 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"core.logger.engine.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "adapters.own_window",
-	"adapters.synthetic_input", "ui.ui_builder", "modules.keymap", "infra.field_run_selftest",
+	"core.logger.engine.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "core.ui.adapters.own_window",
+	"adapters.synthetic_input", "core.ui.ui.builder", "modules.keymap", "infra.field_run_selftest",
 	"modules.keymap.utils",
 }
 
@@ -43,9 +43,9 @@ local function run(world, keys, options)
 			end,
 			cancel = function(entry) entry.cancelled = true; return true end,
 		}
-		package.loaded["adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
+		package.loaded["core.ui.adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
 		-- The shared chrome is its own owner's concern; the steps are recorded only
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			-- macOS tells the window it has the focus, unless the world scripts silence
 			force_focus = function()
 				world.refocused = (world.refocused or 0) + 1

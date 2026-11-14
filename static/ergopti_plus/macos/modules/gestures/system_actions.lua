@@ -29,7 +29,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.logger")
 local i18n = require("core.i18n.engine.i18n")
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local AuxOwner = require("modules.gestures.actions_aux_owner")
 local Clipboard = require("adapters.clipboard")
 local MouseControl = require("adapters.mouse_control")

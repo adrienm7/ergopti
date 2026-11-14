@@ -26,7 +26,7 @@ local SUBJECT_MODULES = {
 	"modules.shortcuts.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 }
 
@@ -91,7 +91,7 @@ local function with_subject(scenario)
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, kind)
 			fixture.notifications[#fixture.notifications + 1] = { message = message, kind = kind }
 			return true

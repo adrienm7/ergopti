@@ -35,7 +35,7 @@ local Actions  = require("diagnostics.engine.healthcheck.actions")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("core.timing.engine.deferred_work")
 local TableUtil = require("core.text.engine.table_util")
-local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
+local NativeClose = require("core.ui.ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
 
@@ -422,7 +422,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.webview_result",
+		id       = "core.ui.adapters.webview_result",
 		contract = { "is_error" },
 		wired    = true,
 	},
@@ -465,7 +465,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.own_window",
+		id       = "core.ui.adapters.own_window",
 		contract = { "webview_window_number", "for_webview", "console", "is_webview_focused" },
 		-- Every webview and console window lookup; none scans other applications.
 		wired    = true,
@@ -551,7 +551,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.graphics_renderer",
+		id       = "core.ui.adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
 		wired    = true,
 	},
@@ -711,7 +711,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.tooltip_renderer",
+		id       = "core.ui.adapters.tooltip_renderer",
 		contract = { "show", "hide" },
 		wired    = true,
 	},
@@ -1034,7 +1034,7 @@ local function send(session, message)
 		Logger.error(LOG, "A diagnostics message could not be encoded: %s.", tostring(json))
 		return false
 	end
-	local WebviewResult = require("adapters.webview_result")
+	local WebviewResult = require("core.ui.adapters.webview_result")
 	local ok, err = pcall(function()
 		session.webview:evaluateJavaScript("if(window.receiveDiagnostics)window.receiveDiagnostics(" .. json .. ")",
 			function(_, script_error)
@@ -1254,7 +1254,7 @@ function M.show_window(opts)
 	end
 
 	local i18n = require("core.i18n.engine.i18n")
-	local ui_builder = require("ui.ui_builder")
+	local ui_builder = require("core.ui.ui.builder")
 	local title = ui_builder.window_title(i18n.get("menu.debug.healthcheck"))
 	local shared_ui_dir = (Paths.shared("ui/healthcheck") or "") .. "/"
 	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)

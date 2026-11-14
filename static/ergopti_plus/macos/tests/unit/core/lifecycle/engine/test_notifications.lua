@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
-local notifications = helpers.load_with_stubs("infra.notifications")
+local notifications = helpers.load_with_stubs("core.ui.engine.notifications")
 
 
 
@@ -101,7 +101,7 @@ helpers.describe("notifications.notify", function()
 		helpers.assert_true(notifications.notify("hello"))
 		helpers.assert_eq(captured.withdrawAfter, require("core.timing.engine.timings").sec("ui", "notification_ttl_ms"),
 			"one declaration in _shared/core/timing/data/constants.toml, shared with Linux")
-		local source = assert(helpers.read_module_source("infra.notifications"))
+		local source = assert(helpers.read_module_source("core.ui.engine.notifications"))
 		helpers.assert_true(source:find("RETENTION_SEC = 5", 1, true) == nil and source:find("withdrawAfter   = 5", 1, true) == nil, "no typed copy of the duration")
 	end)
 

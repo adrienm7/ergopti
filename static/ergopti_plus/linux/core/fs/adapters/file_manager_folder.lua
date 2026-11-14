@@ -266,7 +266,7 @@ local DEFAULT_DEPS = {
 		return called and type(attributes) == "table" and attributes.type == "directory"
 	end,
 	is_x11 = function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		return Display.kind() == Display.X11
 	end,
 }

@@ -11,7 +11,7 @@
 --- macOS drew this first, inside its canvas code. Linux then drew plain text
 --- with the indentation read the other way round, and Windows painted a whole
 --- line in the correction colour. One rule, read by the two Lua drivers and
---- ported by the Windows one (ui/tooltip/llm.ahk), pinned on the three by
+--- ported by the Windows one (core/ui/ui/tooltip/llm.ahk), pinned on the three by
 --- _shared/tests/corpus/tooltip/llm_line_vectors.json. The shortcut labels
 --- once differed the same way (glyphs on Windows, no hint for bare digits,
 --- inline after the text); llm_shortcut_vectors.json pins them now.

@@ -676,7 +676,7 @@ end
 ---        from the last key to the effect, nil when it never came.
 local function scratch_typing(keys, callback, options)
 	local Timer = require("core.events.timer_scheduler")
-	local OwnWindow = require("adapters.own_window")
+	local OwnWindow = require("core.ui.adapters.own_window")
 	local Selftest = require("infra.field_run_selftest")
 	options = options or {}
 	local outcome = { focused = false, posted = 0 }
@@ -741,7 +741,7 @@ local function scratch_typing(keys, callback, options)
 		-- The shared chrome keeps the normal level: the field is focused before
 		-- each key and the run aborts when it loses the focus, so floating it
 		-- would only leave it above the windows the user opens meanwhile
-		local UiBuilder = require("ui.ui_builder")
+		local UiBuilder = require("core.ui.ui.builder")
 		for _, step in ipairs(UiBuilder.window_chrome_steps(view)) do step.apply() end
 		view:windowTitle("Ergopti field run"):allowTextEntry(true):html(SCRATCH_HTML):show()
 		UiBuilder.force_focus(view, true)
@@ -823,7 +823,7 @@ local function scratch_typing(keys, callback, options)
 		if not focused then
 			if focus_polls >= SCRATCH_FOCUS_POLLS then return settle(reason) end
 			if focus_polls > 0 and focus_polls % SCRATCH_REFOCUS_POLLS == 0 then
-				pcall(require("ui.ui_builder").force_focus, view, false)
+				pcall(require("core.ui.ui.builder").force_focus, view, false)
 			end
 			return Timer.after(SCRATCH_POLL_SECONDS, function() await_classification(0, nil, focus_polls + 1) end)
 		end

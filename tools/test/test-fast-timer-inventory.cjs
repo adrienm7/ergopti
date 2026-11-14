@@ -84,11 +84,11 @@ const INVENTORY = {
 		'Runs ONLY while a suspend is deferred waiting for held prefix keys to be released, ' +
 		'and stops as soon as they are. 25 ms because the user is mid-chord and any visible ' +
 		'lag between releasing the keys and the driver suspending reads as a stuck modifier.',
-	'ui/tooltip/core.ahk:_TooltipDequeuePollFn':
+	'core/ui/ui/tooltip/core.ahk:_TooltipDequeuePollFn':
 		'Drains the tooltip render queue. 100 ms is the upper bound on how long a queued ' +
 		'prediction can sit unrendered, and the tooltip is the only place a prediction is ' +
 		'shown before it is typed — a slower drain shows the user stale text.',
-	'ui/spotlight/ownership.ahk:_SpotlightTick':
+	'core/ui/ui/spotlight/ownership.ahk:_SpotlightTick':
 		'Armed only while a Spotlight session owns visible overlay windows. 100 ms bounds ' +
 		'the delay before mouse movement or expiry dismisses those windows, and the timer is ' +
 		'stopped atomically whenever the session is replaced, cancelled, or dismissed.',

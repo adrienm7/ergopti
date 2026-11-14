@@ -283,7 +283,7 @@ local STUBBED_MODULES = {
 	"ui.download_window", "modules.llm.ollama_binary", "modules.llm.api_ollama",
 	"modules.llm.pty_process_group", "core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler", "modules.llm.ollama_deps_checker",
-	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
+	"modules.llm.mlx_deps_checker", "core.ui.engine.dialog_util", "core.ui.engine.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
 	"modules.llm.network_env", "core.fs.adapters.file_system",
 	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",

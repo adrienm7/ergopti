@@ -9,9 +9,9 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work", "core.logger.engine.logger",
+local OWNED = { "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 	"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
-	"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "adapters.webview_result", "hs.json", "lfs" }
+	"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "core.ui.adapters.webview_result", "hs.json", "lfs" }
 
 --- Runs one diagnostic transaction with native messages and completions held apart.
 --- @param scenario function Assertions over the controlled observation.
@@ -131,7 +131,7 @@ local function with_diagnostic(scenario)
 				h.writes[path:match("[^/]+$")] = value
 				local file = assert(io.open(path, "wb")); assert(file:write(json.encode(value))); assert(file:close()); return true
 			end }
-		local builder = helpers.load_with_stubs("ui.ui_builder", {
+		local builder = helpers.load_with_stubs("core.ui.ui.builder", {
 			webview = { new = new_view, usercontent = { new = new_controller }, windowMasks = { titled = 1, closable = 2 } },
 			timer = { new = timer, doAfter = function(delay, fn) return timer(delay, fn):start() end,
 				absoluteTime = function() return h.now * 1e9 end },

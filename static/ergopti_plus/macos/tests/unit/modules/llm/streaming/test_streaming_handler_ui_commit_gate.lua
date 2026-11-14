@@ -234,9 +234,9 @@ end
 
 local function with_reentrant_facade(callback)
 	helpers.with_fresh_modules({
-		"ui.tooltip.init",
-		"ui.tooltip.tooltip_llm",
-		"ui.tooltip.tooltip_hotstring",
+		"core.ui.ui.tooltip.init",
+		"core.ui.ui.tooltip.llm",
+		"core.ui.ui.tooltip.hotstring",
 	}, function()
 		local fixture = {
 			live_id = 1,
@@ -313,9 +313,9 @@ local function with_reentrant_facade(callback)
 		tooltip_llm.hide_silent = tooltip_llm.hide
 		function tooltip_llm.is_visible() return fixture.surface_session ~= nil end
 
-		package.loaded["ui.tooltip.tooltip_llm"] = tooltip_llm
-		package.loaded["ui.tooltip.tooltip_hotstring"] = tooltip_hotstring
-		facade = require("ui.tooltip.init")
+		package.loaded["core.ui.ui.tooltip.llm"] = tooltip_llm
+		package.loaded["core.ui.ui.tooltip.hotstring"] = tooltip_hotstring
+		facade = require("core.ui.ui.tooltip.init")
 		fixture.facade = facade
 		facade.set_on_show_callback(function()
 			fixture.publish_calls = fixture.publish_calls + 1

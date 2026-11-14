@@ -60,7 +60,7 @@ local function with_picker(options, callback)
 		local logger = helpers.make_logger_stub()
 		logger.error = function() fixture.errors = fixture.errors + 1 end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, confirm, cancel)
 				if options.cancel then return cancel end
 				return confirm, scalar

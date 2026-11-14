@@ -309,7 +309,7 @@ end)
 
 helpers.describe("wrap on type (linux): the probe never types into the window", function()
 	helpers.it("reads PRIMARY with no key sent and no clipboard write", function()
-		local names = { shell = "core.process.adapters.shell_runner", display = "infra.display_server", clip = "adapters.clipboard" }
+		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "adapters.clipboard" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {}, writes = 0 }

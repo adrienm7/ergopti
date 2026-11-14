@@ -3,9 +3,9 @@
 --- Presents the shared configuration cleanup session in an owned WebView.
 local M = {}
 local Logger = require("core.logger.engine.logger")
-local ui_builder = require("ui.ui_builder")
+local ui_builder = require("core.ui.ui.builder")
 local Session = require("settings.engine.migration.cleanup_session")
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 local LOG = "config_cleanup"
 local BRIDGE = "config_cleanup_bridge"
 local active, retiring

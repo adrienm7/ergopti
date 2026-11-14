@@ -16,7 +16,7 @@ local BUNDLE_ID = "com.ergoptiplus.app.hammerspoon"
 
 local SUBJECT_MODULES = {
 	"adapters.screen_capture",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"modules.shortcuts.actions.screen_capture_flow",
@@ -48,7 +48,7 @@ local function with_gate(options, scenario)
 			request_permission = function() event("prompt"); return true end,
 			open_permission_settings = function() event("settings"); return true end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				event("notice:" .. tostring(body))
 				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind,

@@ -133,12 +133,12 @@ end)
 --- @param answers table { texts = {...}, choices = {...} } consumed in order.
 --- @param body function fn(ShortcutUtils, seen)
 local function with_editor(answers, body)
-	helpers.with_fresh_modules({ "ui.menu.shortcut_utils", "infra.dialog_util", "adapters.apple_shortcuts_cli",
+	helpers.with_fresh_modules({ "ui.menu.shortcut_utils", "core.ui.engine.dialog_util", "adapters.apple_shortcuts_cli",
 		"core.i18n.engine.i18n" }, function()
 		local seen = { choices = {}, alerts = {} }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 			format = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, initial, save)
 				seen.initial = initial
 				return save, table.remove(answers.texts, 1)
@@ -213,7 +213,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 	end)
 
 	helpers.it("the file-or-folder panel accepts both and the listing is bounded", function()
-		local Dialog = helpers.load_with_stubs("infra.dialog_util")
+		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util")
 		local script = Dialog.path_picker_script("Message", "Title")
 		helpers.assert_true(script:find("setCanChooseFiles:true", 1, true) ~= nil, "files")
 		helpers.assert_true(script:find("setCanChooseDirectories:true", 1, true) ~= nil, "folders")

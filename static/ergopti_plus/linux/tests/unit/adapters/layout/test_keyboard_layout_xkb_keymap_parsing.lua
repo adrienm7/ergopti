@@ -744,7 +744,7 @@ helpers.describe("keyboard_layout: exact native authority and preserved logical 
 	end)
 	helpers.it("keeps Wayland logical refresh without manufacturing a native seat receipt", function()
 		cohort_fixture(function(_, layout, _, backend)
-			local display = require("infra.display_server")
+			local display = require("core.ui.engine.display_server")
 			local shell = require("core.process.adapters.shell_runner")
 			local old_exec = shell.exec_checked
 			display._set_for_test("wayland")
@@ -847,7 +847,7 @@ end)
 
 helpers.describe("explicit keymap admission", function()
 	helpers.it("an unreadable explicit keymap never falls back to the server", function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local Shell = require("core.process.adapters.shell_runner")
 		local saved_kind, saved_desktop = Display.kind(), Display.desktop()
 		local original_exec, previous_layout = Shell.exec_checked, package.loaded["adapters.keyboard_layout"]

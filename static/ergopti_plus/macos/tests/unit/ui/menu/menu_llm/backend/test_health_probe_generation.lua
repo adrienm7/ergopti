@@ -16,7 +16,7 @@ local MODULES = {
 	"modules.llm",
 	"ui.menu.shortcut_utils",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.profiles_manager",
@@ -80,7 +80,7 @@ local function build_fixture(callback, options)
 		}
 
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 		assert(locale_file:close())

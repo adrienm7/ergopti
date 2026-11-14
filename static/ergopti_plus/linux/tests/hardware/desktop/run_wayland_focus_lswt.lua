@@ -23,7 +23,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
 local Logger = require("core.logger.engine.shim")
-local Display = require("infra.display_server")
+local Display = require("core.ui.engine.display_server")
 local Shell = require("core.process.adapters.shell_runner")
 
 local NO_QUERY_LINE = "No focused-window query on this compositor"

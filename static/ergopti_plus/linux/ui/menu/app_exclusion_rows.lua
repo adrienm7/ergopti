@@ -14,7 +14,7 @@
 ---    at click time, so a list changed since the menu was drawn is never
 ---    overwritten by a stale copy.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
----    window the keyboard grab would starve (ui/modal.lua).
+---    window the keyboard grab would starve (core/ui/ui/modal.lua).
 --- ==============================================================================
 
 local M = {}

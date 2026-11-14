@@ -13,7 +13,7 @@
  *   t ∈ [0, 0.8 s]   — both rows visible (effective 1 s − 0.2 s decrement)
  *   t ∈ [0.8 s, 1.8 s] — only output2 visible (its effective window is 1.8 s)
  *
- * Both AHK (lib/tooltip.ahk) and Hammerspoon (ui/tooltip/tooltip_hotstring.lua)
+ * Both AHK (lib/tooltip.ahk) and Hammerspoon (core/ui/ui/tooltip/hotstring.lua)
  * MUST implement this module's contract. Test vectors in dequeueTestVectors()
  * are the cross-driver ground truth.
  * ==============================================================================

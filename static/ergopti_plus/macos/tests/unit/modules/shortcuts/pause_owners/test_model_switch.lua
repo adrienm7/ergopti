@@ -81,8 +81,8 @@ local function load_real_model_switch_owner(options)
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-	package.loaded["infra.notifications"] = { notify = function() return true end }
+	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 	package.loaded["ui.menu.menu_llm.profile_label"] = {
 		format = function(label) return label end,
 	}

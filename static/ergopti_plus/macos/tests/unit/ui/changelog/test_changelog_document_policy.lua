@@ -69,7 +69,7 @@ end
 helpers.describe("changelog: document policy and terminal fetch", function()
 	helpers.it("every inlined page script runs under exactly one policy (changelog-document-policy)", function()
 		with_changelog(function(window, state)
-			package.loaded["ui.ui_builder"].build_injected_html = inlined_shared_document
+			package.loaded["core.ui.ui.builder"].build_injected_html = inlined_shared_document
 			helpers.assert_true(window.open({ channel = "main" }))
 			local html = state.view.options.html_string
 			helpers.assert_type(html, "string")

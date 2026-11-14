@@ -14,7 +14,7 @@
  *
  * Canonical form (matches the in-driver tests' ``rel = abs - DRIVER_ROOT``):
  *   - under windows/ , macos/ , linux/  → path relative to that driver root
- *     (e.g. ``infra/window_utils.ahk``, ``ui/menu/init.lua``).
+ *     (e.g. ``core/ui/engine/window_utils.ahk``, ``ui/menu/init.lua``).
  *   - under _shared/                    → ``_shared/<rest>`` (it is shared by all
  *     drivers, so the header keeps the _shared/ identifier).
  *
@@ -39,6 +39,7 @@ const FIX = process.argv.includes('--fix');
 // Source trees to validate, and the file extensions that carry a path header.
 const TREES = [
 	'windows/infra',
+	'windows/core/ui/engine',
 	'windows/core/timing/engine',
 	'windows/core/text/engine',
 	'windows/core/logger/engine',
@@ -47,14 +48,17 @@ const TREES = [
 	'windows/modules',
 	'windows/platform',
 	'windows/ui',
+	'windows/core/ui/ui',
 	'windows/core/network',
 	'windows/adapters',
+	'windows/core/ui/adapters',
 	'windows/core/process/adapters',
 	'windows/core/lifecycle',
 	'windows/core/fs/adapters',
 	'windows/core/events',
 	'windows/core/crypto',
 	'macos/infra',
+	'macos/core/ui/engine',
 	'macos/core/timing/engine',
 	'macos/core/text/engine',
 	'macos/core/logger/engine',
@@ -64,8 +68,10 @@ const TREES = [
 	'macos/modules',
 	'macos/platform',
 	'macos/ui',
+	'macos/core/ui/ui',
 	'macos/core/network',
 	'macos/adapters',
+	'macos/core/ui/adapters',
 	'macos/core/process/adapters',
 	'macos/core/logger/adapters',
 	'macos/core/fs/adapters',
@@ -73,11 +79,13 @@ const TREES = [
 	'macos/core/crypto',
 	'linux/modules',
 	'linux/adapters',
+	'linux/core/ui/adapters',
 	'linux/core/process/adapters',
 	'linux/core/fs/adapters',
 	'linux/core/events',
 	'linux/core/crypto',
 	'linux/infra',
+	'linux/core/ui/engine',
 	'linux/core/timing/engine',
 	'linux/core/text/engine',
 	'linux/core/logger/engine',
@@ -86,6 +94,7 @@ const TREES = [
 	'linux/core/fs/engine',
 	'linux/bin',
 	'linux/ui',
+	'linux/core/ui/ui',
 	'linux/core/network',
 	// _shared (the port specs) and _shared were outside the audit,
 	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)

@@ -22,7 +22,7 @@
  * baseline is ZERO: every shared JS module is now runtime-mirrored or an oracle,
  * and the next one that is neither has to be declared here deliberately.
  *
- * `lifecycle.js` looked like a second case and is not: windows/ui/tooltip/
+ * `lifecycle.js` looked like a second case and is not: windows/core/ui/ui/tooltip/
  * helpers.ahk names it as the canonical phase list it implements, which is this
  * repo's way of declaring a ported twin. What it lacks is a CORPUS — the mirror
  * is a claim, not a gate — and that is a smaller, separate follow-up.

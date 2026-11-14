@@ -40,7 +40,7 @@ local function install_collaborators(effects)
 		get_llm_enabled = function() return false end,
 		reset = function()
 			effects.llm_resets = effects.llm_resets + 1
-			local tooltip = package.loaded["ui.tooltip"]
+			local tooltip = package.loaded["core.ui.ui.tooltip"]
 			return tooltip and tooltip.hide_forced_silent()
 		end,
 		handle_chain_signal = function() return false end,
@@ -61,7 +61,7 @@ local function install_collaborators(effects)
 		end,
 		set_buffer = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -91,7 +91,7 @@ local function install_collaborators(effects)
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = {
 		hide = function() effects.visible = false; return true end,
 	}
 end

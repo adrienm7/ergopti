@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 helpers.describe("API panel durable persistence gate", function()
 	helpers.it("rolls back a validated Add when Keychain persistence fails", function()
 		local module_names = {
-			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved = {}
 		for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -63,13 +63,13 @@ helpers.describe("API panel durable persistence gate", function()
 		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				prompt_index = prompt_index + 1
 				return "button.ok", prompt_values[prompt_index]
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, level)
 				notifications[#notifications + 1] = { title = title, body = body, level = level }
 				return true

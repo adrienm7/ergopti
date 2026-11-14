@@ -22,11 +22,11 @@ local MODULES = {
 	"core.text.engine.number_policy",
 	"keyboard.engine.chord",
 	"infra.app_picker",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.manifest_menu",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.text.engine.json",
 	"core.logger.engine.shim",
 	"menu.engine.renderer",
@@ -424,7 +424,7 @@ local function with_delete_fixture(options, body)
 		profile_shortcuts = {user_p = {mods = {"ctrl"}, key = "p"}},
 	}, function(fixture)
 		local recommendation_dialog_count = 0
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function(_, _, confirm_label)
 				if confirm_label == "button.delete" then return "button.delete" end
 				recommendation_dialog_count = recommendation_dialog_count + 1
@@ -448,7 +448,7 @@ local function with_delete_fixture(options, body)
 			template_rows = renderer.template_rows,
 			get_array = renderer.get_array,
 		}
-		package.loaded["infra.notifications"] = {notify = function() return true end}
+		package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}

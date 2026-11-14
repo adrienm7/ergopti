@@ -25,12 +25,12 @@ local helpers, key, with_position_capture =
 helpers.describe("Position capture native effect ownership", function()
 	helpers.it("refuses a replaced native effect port and permits a fresh original request after restoration", function()
 		with_position_capture(nil, function(s)
-			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
+			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "modules.gestures.manager",
 				"core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
 			local called, detail = pcall(function()
-				package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+				package.loaded["core.ui.ui.webview_manager"] = { native_available = function() return true end,
 					current_epoch = function() return epoch > 0 and epoch or nil end,
 					page_current = function(_, exact) return epoch > 0 and epoch == exact end,
 					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,
@@ -52,7 +52,7 @@ helpers.describe("Position capture native effect ownership", function()
 				local function message(value) return host.on_message(value, {}, { app_name = "physical_shortcuts", epoch = epoch }) end
 				helpers.assert_true(message({ action = "ready" }))
 				helpers.assert_true(message({ action = "capture_position", request = { request_id = 7 } }))
-				local manager = package.loaded["ui.webview_manager"]
+				local manager = package.loaded["core.ui.ui.webview_manager"]
 				local original_eval = manager.eval_js
 				local foreign_calls = 0
 				manager.eval_js = function(_, script)
@@ -96,13 +96,13 @@ helpers.describe("Position capture native effect ownership", function()
 
 	helpers.it("refuses effect replacement inside an original canonical getter before delivery", function()
 		with_position_capture(nil, function(s)
-			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
+			local names = { "ui.physical_shortcuts.bridge", "core.ui.ui.webview_manager", "modules.gestures.manager",
 				"core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim" }
 			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
 			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
 			local replace_on_current
 			local called, detail = pcall(function()
-				package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+				package.loaded["core.ui.ui.webview_manager"] = { native_available = function() return true end,
 					current_epoch = function() return epoch > 0 and epoch or nil end,
 					page_current = function(_, exact) return epoch > 0 and epoch == exact end,
 					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,
@@ -127,7 +127,7 @@ helpers.describe("Position capture native effect ownership", function()
 				local function message(value) return host.on_message(value, {}, { app_name = "physical_shortcuts", epoch = epoch }) end
 				helpers.assert_true(message({ action = "ready" }))
 				helpers.assert_true(message({ action = "capture_position", request = { request_id = 7 } }))
-				local manager = package.loaded["ui.webview_manager"]
+				local manager = package.loaded["core.ui.ui.webview_manager"]
 				local original_eval = manager.eval_js
 				local foreign_calls = 0
 				replace_on_current = function() manager.eval_js = function(_, script)

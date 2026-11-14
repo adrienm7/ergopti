@@ -318,7 +318,7 @@ helpers.describe("the user action editors store one canonical value (Linux)", fu
 	helpers.it("a file or folder is picked with the owned dialog (user-actions)", function()
 		local shell = { quote = require("core.text.engine.utils_core").shell_quote }
 		local Chooser = helpers.load_module("ui.app_chooser")
-		local dialog = require("ui.native_dialog").command()
+		local dialog = require("core.ui.ui.native_dialog").command()
 		helpers.assert_eq(Chooser.path_picker_command(shell, "T", true, "/home/me/"),
 			dialog .. " --file-selection --directory --title='T' --filename='/home/me/' 2>/dev/null")
 		helpers.assert_eq(Chooser.path_picker_command(shell, "T", false, "/home/me/"),

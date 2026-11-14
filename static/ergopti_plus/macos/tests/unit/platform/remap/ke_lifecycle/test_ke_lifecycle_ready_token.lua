@@ -23,7 +23,7 @@ local function load_lifecycle()
 		end,
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() ctx.notifications = ctx.notifications + 1 end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }

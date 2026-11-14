@@ -15,7 +15,7 @@ local h = require("tests.helpers")
 --- @param strings table|nil Canonical translation input for the owned renderer.
 local function scenario(choice, body, strings)
 	local names = { "ui.gesture_conflicts", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.process.adapters.shell_runner",
-		"core.logger.engine.shim", "core.events.loop", "ui.modal", "infra.manifest_menu", "menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
+		"core.logger.engine.shim", "core.events.loop", "core.ui.ui.modal", "infra.manifest_menu", "menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local saved, store, queued = {}, {}, {}
 	local observed = { shells = 0, modals = 0, dialogs = 0 }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -34,7 +34,7 @@ local function scenario(choice, body, strings)
 	}
 	package.loaded["core.logger.engine.shim"] = { warn = function() end, error = function() end }
 	package.loaded["core.events.loop"] = { defer = function(fn) queued[#queued + 1] = fn; return true end }
-	package.loaded["ui.modal"] = { run = function(fn) observed.modals = observed.modals + 1; return fn() end }
+	package.loaded["core.ui.ui.modal"] = { run = function(fn) observed.modals = observed.modals + 1; return fn() end }
 	local ok, err = xpcall(function() body(require("ui.gesture_conflicts"), observed, store, queued) end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end

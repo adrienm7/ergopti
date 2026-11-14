@@ -23,7 +23,7 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local Logger        = require("core.logger.engine.logger")
 local NetworkEnv    = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")

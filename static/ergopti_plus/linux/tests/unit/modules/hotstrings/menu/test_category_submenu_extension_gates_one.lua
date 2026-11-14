@@ -50,7 +50,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		error("the native extension gate command was not rendered")
 	end
 	local function observe_click(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
@@ -285,7 +285,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		return found
 	end
 	local function observe(action, answer, before_return)
-		local prompt, modal = require("ui.text_prompt"), require("ui.modal")
+		local prompt, modal = require("core.ui.ui.text_prompt"), require("core.ui.ui.modal")
 		local ask, run, execute = prompt.ask, modal.run, os.execute
 		local asks, notices, releases = {}, {}, 0
 		prompt.ask = function(...)

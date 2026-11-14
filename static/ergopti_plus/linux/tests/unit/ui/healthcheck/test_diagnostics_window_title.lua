@@ -12,9 +12,9 @@ local Json = require("core.text.engine.json")
 
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
-		local names = { "lgi", "ui.webview_manager", "core.i18n.engine.i18n", "core.events.loop",
+		local names = { "lgi", "core.ui.ui.webview_manager", "core.i18n.engine.i18n", "core.events.loop",
 			"core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline", "adapters.notifier",
-			"ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
+			"core.ui.ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
 		local saved = {}
 		local close_fixture
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -82,8 +82,8 @@ helpers.describe("shared application native window titles", function()
 				assert(key == label_key)
 				return label
 			end }
-			package.loaded["ui.webview_manager"] = nil
-			local native_manager = require("ui.webview_manager")
+			package.loaded["core.ui.ui.webview_manager"] = nil
+			local native_manager = require("core.ui.ui.webview_manager")
 			native_manager.init()
 			-- Managed documents require the real show() reservation and handshake.
 			-- Keep the original low-level GTK path for all other applications.
@@ -129,7 +129,7 @@ helpers.describe("shared application native window titles", function()
 					local key = entry.title_key
 					label_key, label = key, strings[key]
 					helpers.assert_true(type(label) == "string" and label ~= "", locale .. " has " .. key)
-					local bridge = require("ui.webkit_host").bridge_for_app(app)
+					local bridge = require("core.ui.ui.webkit_host").bridge_for_app(app)
 					if bridge then
 						helpers.assert_true(manager._create_gtk_window(app, "<html></html>", { bridge_name = bridge }))
 						helpers.assert_eq(captured, "ErgoptiPlus — " .. label, locale .. " native " .. app .. " title")

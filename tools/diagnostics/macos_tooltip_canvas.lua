@@ -108,10 +108,10 @@ guarded(function()
 			return true
 		end,
 	}
-	local Tooltip = require("ui.tooltip.tooltip_llm")
+	local Tooltip = require("core.ui.ui.tooltip.llm")
 	assert(probe.storage_reads == 1 and probe.storage_writes == 1, "input-tag isolation was not exercised")
-	Renderer = require("ui.tooltip.renderer")
-	local Config = require("ui.tooltip.config")
+	Renderer = require("core.ui.ui.tooltip.renderer")
+	local Config = require("core.ui.ui.tooltip.config")
 	assert(type(Renderer.canvas) == "userdata", "actual canvas unavailable")
 	local assemble
 	for index = 1, 100 do
@@ -121,7 +121,7 @@ guarded(function()
 	end
 	assert(type(assemble) == "function", "production formatter upvalue missing")
 	local origin = debug.getinfo(assemble, "S")
-	assert(origin.source == "@" .. root .. "/macos/ui/tooltip/tooltip_llm.lua",
+	assert(origin.source == "@" .. root .. "/macos/core/ui/ui/tooltip/llm.lua",
 		"formatter did not come from the frozen production source")
 	local regular = hs.styledtext.fontInfo({ name = ".AppleSystemUIFont", size = 14 })
 	local bold = hs.styledtext.fontInfo({ name = ".AppleSystemUIFontBold", size = 14 })

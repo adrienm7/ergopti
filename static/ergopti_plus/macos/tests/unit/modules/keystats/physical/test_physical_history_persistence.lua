@@ -170,7 +170,7 @@ shell.run(function(capture, observed, native)
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
-	package.loaded["infra.dialog_util"]={alert=function() end}
+	package.loaded["core.ui.engine.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
@@ -517,7 +517,7 @@ shell.run(function(capture, observed, native)
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
-	package.loaded["infra.dialog_util"]={alert=function() end}
+	package.loaded["core.ui.engine.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}

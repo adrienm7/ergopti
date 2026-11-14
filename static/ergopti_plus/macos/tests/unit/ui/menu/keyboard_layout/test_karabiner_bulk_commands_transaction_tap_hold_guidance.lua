@@ -25,7 +25,7 @@ local with_guidance_declaration = Fixture.with_guidance_declaration
 
 
 
-package.loaded["infra.dialog_util"] = SAVED_DIALOGS
+package.loaded["core.ui.engine.dialog_util"] = SAVED_DIALOGS
 package.loaded["infra.config_paths"] = SAVED_PATHS
 
 --- Mutates actual decoded shared metadata and always restores original rows.

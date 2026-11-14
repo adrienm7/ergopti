@@ -413,7 +413,7 @@ end)
 -- =========================================
 
 local OLLAMA_MODULES = {
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"core.text.engine.utils",
@@ -449,7 +449,7 @@ local function with_ollama_manager(enabled, body)
 			task = { new = function() hs_tasks = hs_tasks + 1; return nil end },
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.text.engine.utils"] = {}
 		package.loaded["modules.llm.ollama_binary"] = {

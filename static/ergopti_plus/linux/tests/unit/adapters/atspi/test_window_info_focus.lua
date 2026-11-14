@@ -80,9 +80,9 @@ end
 --- @param routes table Shell routes.
 --- @return table wi, table log
 local function under(kind, desktop, routes)
-	local ds = helpers.load_module("infra.display_server")
+	local ds = helpers.load_module("core.ui.engine.display_server")
 	ds._set_for_test(kind, desktop or "")
-	package.loaded["infra.display_server"] = ds
+	package.loaded["core.ui.engine.display_server"] = ds
 	local log = stub_shell(routes)
 	local wi = helpers.load_module("adapters.window_info")
 	wi._reset_state()
@@ -109,7 +109,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("(linux-focus-coherent-poll) retains one window's metadata and identity while focus changes", function()
 		local shell = helpers.load_module("core.process.adapters.shell_runner")
-		local display = helpers.load_module("infra.display_server")
+		local display = helpers.load_module("core.ui.engine.display_server")
 		display._set_for_test(display.X11, "coherent focus fixture")
 		local queries, id = 0, "1"
 		shell._set_runner(function(command)
@@ -142,9 +142,9 @@ helpers.describe("window_info: X11", function()
 	helpers.it("(linux-focus-window-identity) distinguishes identically titled windows of one process", function()
 		local id = "0x1"
 		local Shell = helpers.load_module("core.process.adapters.shell_runner")
-		local ds = helpers.load_module("infra.display_server")
+		local ds = helpers.load_module("core.ui.engine.display_server")
 		ds._set_for_test("x11", "xfce")
-		package.loaded["infra.display_server"] = ds
+		package.loaded["core.ui.engine.display_server"] = ds
 		Shell._set_runner(function(cmd)
 			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
 			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
@@ -167,9 +167,9 @@ helpers.describe("window_info: X11", function()
 	helpers.it("(linux-focus-window-identity) distinguishes applications with the same window title", function()
 		local id, comm = "0x1", "firefox"
 		local Shell = helpers.load_module("core.process.adapters.shell_runner")
-		local ds = helpers.load_module("infra.display_server")
+		local ds = helpers.load_module("core.ui.engine.display_server")
 		ds._set_for_test("x11", "xfce")
-		package.loaded["infra.display_server"] = ds
+		package.loaded["core.ui.engine.display_server"] = ds
 		Shell._set_runner(function(cmd)
 			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
 			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
@@ -190,9 +190,9 @@ helpers.describe("window_info: X11", function()
 	helpers.it("(linux-focus-window-identity) retries an unavailable process identity", function()
 		local comm = ""
 		local Shell = helpers.load_module("core.process.adapters.shell_runner")
-		local ds = helpers.load_module("infra.display_server")
+		local ds = helpers.load_module("core.ui.engine.display_server")
 		ds._set_for_test("x11", "xfce")
-		package.loaded["infra.display_server"] = ds
+		package.loaded["core.ui.engine.display_server"] = ds
 		Shell._set_runner(function(cmd)
 			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
 			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
@@ -245,9 +245,9 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("(linux-focus-reused-xid) detects a new owner in the xdotool fallback", function()
 		local Shell = helpers.load_module("core.process.adapters.shell_runner")
-		local ds = helpers.load_module("infra.display_server")
+		local ds = helpers.load_module("core.ui.engine.display_server")
 		ds._set_for_test("x11", "xfce")
-		package.loaded["infra.display_server"] = ds
+		package.loaded["core.ui.engine.display_server"] = ds
 		local previous = package.loaded["adapters.x11_focus"]
 		package.loaded["adapters.x11_focus"] = { has_transport = function() return false end }
 		local pid = 101
@@ -274,9 +274,9 @@ helpers.describe("window_info: X11", function()
 	helpers.it("re-resolves the identity when the title changes", function()
 		local title = "First Window"
 		local Shell = helpers.load_module("core.process.adapters.shell_runner")
-		local ds = helpers.load_module("infra.display_server")
+		local ds = helpers.load_module("core.ui.engine.display_server")
 		ds._set_for_test("x11", "xfce")
-		package.loaded["infra.display_server"] = ds
+		package.loaded["core.ui.engine.display_server"] = ds
 		local comm = "firefox"
 		Shell._set_runner(function(cmd)
 			if cmd:find("xdotool getwindowname", 1, true) then return title .. "\n" end

@@ -54,7 +54,7 @@ end
 
 local MODULES = {
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.text.engine.utils",
 	"modules.llm.api_ollama",
@@ -190,7 +190,7 @@ local function with_fixture(spec, body)
 		local menu_updates = 0
 
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(...)
 				notifications[#notifications + 1] = table.pack(...)
 				return true

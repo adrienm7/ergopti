@@ -12,7 +12,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Shell = require("core.process.adapters.shell_runner")
-local Display = require("infra.display_server")
+local Display = require("core.ui.engine.display_server")
 local FAILURE_STATUS = 73
 local cases = {
 	{ name = "sway", binary = "swaymsg", arguments = "-t get_tree",

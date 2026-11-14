@@ -203,7 +203,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		log_hotstring_suggested = function() fixture.suggested = fixture.suggested + 1 end,
 		log_hotstring_dismissed = function() fixture.dismissed = fixture.dismissed + 1 end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,

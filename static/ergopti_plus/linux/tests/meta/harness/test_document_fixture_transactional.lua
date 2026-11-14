@@ -17,7 +17,7 @@ local DocumentFixture = require("tests.support.document_fixture")
 local SWAPPED = {
 	"lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
 	"core.events.loop", "adapters.notifier", "adapters.application_notifier",
-	"ui.webkit_host", "ui.webview_manager",
+	"core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
 }
 
 --- Records the current package.loaded value of each swapped name.

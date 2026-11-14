@@ -53,8 +53,8 @@ end
 local function with_fixture(outcome, callback, locale)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
-		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
-		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
+		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
+		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 		"ui.hotstrings_config_window",
 	}, function()
@@ -80,7 +80,7 @@ local function with_fixture(outcome, callback, locale)
 		local translate = function(key) return translations[key] or key end
 		package.loaded["core.i18n.engine.i18n"] = { get = translate }
 		local active_context, current_outcome = nil, outcome
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, affirmative, cancel)
 				calls.prompts = calls.prompts + 1
 				if current_outcome == "pause_after_prompt" then active_context.paused = true end
@@ -132,7 +132,7 @@ local function with_fixture(outcome, callback, locale)
 			end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
-		package.loaded["infra.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = function() return { delay = 0.1, has_override = false } end,
 		}

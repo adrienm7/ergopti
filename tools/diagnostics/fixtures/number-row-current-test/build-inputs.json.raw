@@ -915,11 +915,11 @@
       "git_blob": "a7e03c67327dc3fc9997d13dfb86f0c7292ccdeb",
       "historical_git_blob": "a7e03c67327dc3fc9997d13dfb86f0c7292ccdeb",
       "historical_roster_member": true,
-      "historical_sha256": "c821c6f6e3c116feed3a4e2426c3582bdd6c9976ca57ecafc98b10a1d68bd8fb",
+      "historical_sha256": "f06f43f5f310b6b9ca4bcbb360c1a79102db7f51bd442d8b60d822cf5b1bfb5c",
       "input_kind": "target-input",
       "mode": "100644",
       "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ApplicationPickerPanelTests.swift",
-      "sha256": "c821c6f6e3c116feed3a4e2426c3582bdd6c9976ca57ecafc98b10a1d68bd8fb"
+      "sha256": "f06f43f5f310b6b9ca4bcbb360c1a79102db7f51bd442d8b60d822cf5b1bfb5c"
     },
     {
       "git_blob": "be052cb57c6bd23c7f1be7a7716724ff48c7c938",

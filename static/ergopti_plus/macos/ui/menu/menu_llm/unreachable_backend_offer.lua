@@ -39,8 +39,8 @@ local BACKEND_LABEL = "Ollama"
 
 -- The collaborators are resolved at call time: the dialogs and the sweep are
 -- stateful singletons, and tests replace them
-local function dialogs() return require("infra.dialog_util") end
-local function notifications() return require("infra.notifications") end
+local function dialogs() return require("core.ui.engine.dialog_util") end
+local function notifications() return require("core.ui.engine.notifications") end
 local function runtime_offer() return require("ui.menu.menu_llm.runtime_install_offer") end
 local function servers() return require("modules.llm.local_servers") end
 local function endpoint() return require("modules.llm.ollama_endpoint") end

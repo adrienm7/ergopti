@@ -20,7 +20,7 @@ local function run_action(responses)
 		"core.logger.engine.logger",
 		"core.timing.engine.deferred_work",
 		"core.fs.engine.dir",
-		"infra.dialog_util",
+		"core.ui.engine.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
 		"core.i18n.engine.i18n",
@@ -37,7 +37,7 @@ local function run_action(responses)
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				prompt_index = prompt_index + 1
 				local response = responses[prompt_index]

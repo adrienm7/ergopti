@@ -21,11 +21,11 @@ static/ergopti_plus/_shared/core/ui/data/tooltip/
 
 Driver-side files that MUST stay in sync with this spec:
 
-| Driver      | Constants file                                   | Renderer                                                |
-| ----------- | ------------------------------------------------ | ------------------------------------------------------- |
-| AHK         | `lib/ui_style.ahk`                               | `lib/tooltip.ahk`, `ui/tooltip_llm.ahk`                 |
-| Hammerspoon | `ui/tooltip/config.lua`                          | `ui/tooltip/renderer.lua`, `ui/tooltip/tooltip_llm.lua` |
-| Future      | Read `constants.toml` at boot or codegen from it | Implement the draw_calls[] adapter                      |
+| Driver      | Constants file                                   | Renderer                                                        |
+| ----------- | ------------------------------------------------ | --------------------------------------------------------------- |
+| AHK         | `lib/ui_style.ahk`                               | `lib/tooltip.ahk`, `ui/tooltip_llm.ahk`                         |
+| Hammerspoon | `core/ui/ui/tooltip/config.lua`                  | `core/ui/ui/tooltip/renderer.lua`, `core/ui/ui/tooltip/llm.lua` |
+| Future      | Read `constants.toml` at boot or codegen from it | Implement the draw_calls[] adapter                              |
 
 ---
 
@@ -82,7 +82,7 @@ This communicates "this option exists but is not active" without hiding it.
 
 The canonical algorithm is implemented in `tint.js:mixTint()`. Every driver
 MUST use this exact formula. Test coverage is provided via
-`macos/tests/unit/ui/tooltip/test_tooltip_tint_contract.lua` on the Hammerspoon side;
+`macos/tests/unit/core/ui/tooltip/test_tint_contract.lua` on the Hammerspoon side;
 the reference vectors live in `tint.js:tintTestVectors()`.
 
 ### Algorithm
@@ -100,7 +100,7 @@ Given an accent color `{r, g, b}` in [0.0, 1.0]:
 | Driver      | Function                        | File                                   |
 | ----------- | ------------------------------- | -------------------------------------- |
 | AHK         | `_TooltipMixTintHex(AccentHex)` | `lib/tooltip.ahk`                      |
-| Hammerspoon | `M.apply_tint(requested_tint)`  | `ui/tooltip/renderer.lua`              |
+| Hammerspoon | `M.apply_tint(requested_tint)`  | `core/ui/ui/tooltip/renderer.lua`      |
 | Reference   | `mixTint(accent)`               | `_shared/core/ui/data/tooltip/tint.js` |
 
 The AHK function accepts and returns hex strings (`"RRGGBB"`). The HS function
@@ -324,11 +324,11 @@ External hide requests (mouse move, lookup miss) are **suppressed** during an
 active dequeue cycle so longer rows are not killed when a shorter row expires.
 Authoritative hides (real keystroke, forced hide, new show) bypass the guard.
 
-| Driver      | Implementation                                                       |
-| ----------- | -------------------------------------------------------------------- |
-| AHK         | `lib/tooltip.ahk` — `_TooltipDequeuePollFn`, `_TooltipDequeueActive` |
-| Hammerspoon | `ui/tooltip/dequeue.lua` + `ui/tooltip/tooltip_hotstring.lua`        |
-| Reference   | `dequeue.js:dequeueTestVectors()`                                    |
+| Driver      | Implementation                                                        |
+| ----------- | --------------------------------------------------------------------- |
+| AHK         | `lib/tooltip.ahk` — `_TooltipDequeuePollFn`, `_TooltipDequeueActive`  |
+| Hammerspoon | `core/ui/ui/tooltip/dequeue.lua` + `core/ui/ui/tooltip/hotstring.lua` |
+| Reference   | `dequeue.js:dequeueTestVectors()`                                     |
 
 ### 7.2 Effective duration
 
@@ -411,6 +411,6 @@ A driver is considered compliant with this spec when:
 - AHK implementation: [`lib/tooltip.ahk`](../../windows/lib/tooltip.ahk),
   [`ui/tooltip_llm.ahk`](../../windows/ui/tooltip_llm.ahk),
   [`lib/ui_style.ahk`](../../windows/lib/ui_style.ahk)
-- HS implementation: [`ui/tooltip/renderer.lua`](../../macos/ui/tooltip/renderer.lua),
-  [`ui/tooltip/config.lua`](../../macos/ui/tooltip/config.lua),
-  [`ui/tooltip/tooltip_llm.lua`](../../macos/ui/tooltip/tooltip_llm.lua)
+- HS implementation: [`core/ui/ui/tooltip/renderer.lua`](../../macos/core/ui/ui/tooltip/renderer.lua),
+  [`core/ui/ui/tooltip/config.lua`](../../macos/core/ui/ui/tooltip/config.lua),
+  [`core/ui/ui/tooltip/llm.lua`](../../macos/core/ui/ui/tooltip/llm.lua)

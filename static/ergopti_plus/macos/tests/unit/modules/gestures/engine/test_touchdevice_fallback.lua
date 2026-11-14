@@ -69,7 +69,7 @@ end)
 
 helpers.describe("gestures startup degraded mode", function()
 	local original_logger = package.loaded["core.logger.engine.logger"]
-	local original_notifications = package.loaded["infra.notifications"]
+	local original_notifications = package.loaded["core.ui.engine.notifications"]
 	local original_actions = package.loaded["modules.gestures.actions"]
 	local original_engine = package.loaded["modules.gestures.engine"]
 	local original_conflicts = package.loaded["modules.gestures.conflicts"]
@@ -113,7 +113,7 @@ helpers.describe("gestures startup degraded mode", function()
 	}
 
 	package.loaded["core.logger.engine.logger"] = logger_stub
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["modules.gestures.actions"] = {
 		AX_NAMES = {},
 		SG_NAMES = {},
@@ -163,7 +163,7 @@ helpers.describe("gestures startup degraded mode", function()
 	end)
 
 	package.loaded["core.logger.engine.logger"] = original_logger
-	package.loaded["infra.notifications"] = original_notifications
+	package.loaded["core.ui.engine.notifications"] = original_notifications
 	package.loaded["modules.gestures.actions"] = original_actions
 	package.loaded["modules.gestures.engine"] = original_engine
 	package.loaded["modules.gestures.conflicts"] = original_conflicts

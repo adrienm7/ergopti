@@ -42,7 +42,7 @@ local function fresh_mouse_owner()
 		"adapters.mouse_control",
 		"adapters.synthetic_input",
 		"core.logger.engine.logger",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
@@ -345,7 +345,7 @@ local function fresh_mouse_owner()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, level)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,

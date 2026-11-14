@@ -12,7 +12,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ParentSource = require("menu.engine.frames.parent_source")
-local TextPrompt = require("ui.text_prompt")
+local TextPrompt = require("core.ui.ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 

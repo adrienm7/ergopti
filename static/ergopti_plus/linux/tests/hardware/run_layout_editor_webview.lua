@@ -152,7 +152,7 @@ end
 local Manager
 
 local function run()
-	Manager = require("ui.webview_manager")
+	Manager = require("core.ui.ui.webview_manager")
 	Manager.set_daemon_state({})
 	check(Manager.show("layout_manager") == true, "the layout manager window opens")
 	local webview = Manager.webview_for("layout_manager")

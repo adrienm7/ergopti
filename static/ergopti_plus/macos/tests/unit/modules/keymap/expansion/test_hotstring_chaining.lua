@@ -34,7 +34,7 @@ local SIGN = "\u{26A0}\u{FE0F}"
 --- @param entries table Array of { trigger, replacement } star (auto) entries.
 --- @return table state, table expander
 local function fresh_engine(entries)
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
+	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,

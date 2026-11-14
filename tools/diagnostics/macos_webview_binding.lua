@@ -237,12 +237,12 @@ guarded(function()
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())
 	Logger.initialize_privacy(raw_policy)
-	WebViewResult = require("adapters.webview_result")
-	UI = require("ui.ui_builder")
-	local Owner = require("ui.webview_close_owner")
-	assert(debug.getinfo(UI.show_webview, "S").source == "@" .. root .. "/macos/ui/ui_builder.lua",
+	WebViewResult = require("core.ui.adapters.webview_result")
+	UI = require("core.ui.ui.builder")
+	local Owner = require("core.ui.ui.webview_close_owner")
+	assert(debug.getinfo(UI.show_webview, "S").source == "@" .. root .. "/macos/core/ui/ui/builder.lua",
 		"factory did not load from frozen production source")
-	assert(debug.getinfo(Owner.new, "S").source == "@" .. root .. "/macos/ui/webview_close_owner.lua",
+	assert(debug.getinfo(Owner.new, "S").source == "@" .. root .. "/macos/core/ui/ui/webview_close_owner.lua",
 		"close owner did not load from frozen production source")
 	assert(hs.processInfo.version == config.expected_version, "unexpected native runtime")
 	assert(hs.screen.mainScreen(), "no native GUI screen")
