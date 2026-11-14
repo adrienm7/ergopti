@@ -79,6 +79,18 @@ _LPIL_InitFiltersBeforeDraining() {
 }
 Test("logger: LoggerInit applies the configured level to the pre-init queue before draining it (logger-preinit-level-drop)", _LPIL_InitFiltersBeforeDraining)
 
+; A stored level that is no log level falls back to the default with a warning,
+; never silently (value-validation).
+_LPIL_UnknownLevelIsReported() {
+	Body := _DriverFuncBody("LoggerInit")
+	WarnPos := InStr(Body, "script.log_level '{1}' is not a log level")
+	Assert(WarnPos > 0, "LoggerInit must report a stored log_level that is no log level")
+	Assert(WarnPos > InStr(Body, "_LoggerRefreshFastFlags()"),
+		"the report follows the level resolution, so it is filtered by the level in force")
+	Assert(InStr(Body, "if !LevelKnown") > 0, "only an unknown level is reported")
+}
+Test("logger: an unknown stored log_level is reported (value-validation)", _LPIL_UnknownLevelIsReported)
+
 
 
 
