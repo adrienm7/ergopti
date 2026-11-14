@@ -163,7 +163,10 @@ class NativeGoEvidenceTests(unittest.TestCase):
         self.assertEqual(len(original), 74)
         self.assertEqual(len(set(original)), 74)
         added_304 = ["TestNotModifiedRepresentationLengthDoesNotRequireBody"]
-        subjects = original + ADDED_IDENTITIES + added_304
+        # The peer started late on a slow runner (2026-11-13): the case that
+        # proves cancellation waits for the peer's receipt.
+        added_slow_start = ["TestCancellationAndConcurrentClosePhysicallyRetirePeer/slow-start"]
+        subjects = original + ADDED_IDENTITIES + added_304 + added_slow_start
         self.assertEqual(len(added), 17)
         self.assertEqual(len(set(added)), 17)
         events = [{"Action": "start", "Package": PACKAGE}]
@@ -178,7 +181,7 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (93, 52, 41)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (94, 52, 42)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
         for name in added + ADDED_IDENTITIES + added_304:
