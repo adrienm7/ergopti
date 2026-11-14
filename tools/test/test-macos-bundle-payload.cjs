@@ -388,7 +388,7 @@ const CURATED_READS = [
 	},
 	{
 		reader: 'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
-		needles: ['Path(__file__).parent.parent / "core/network/data/proxy_policy.json"'],
+		needles: ['Path(__file__).parent.parent / "data/proxy_policy.json"'],
 		targets: ['ergopti_plus/_shared/core/network/data/proxy_policy.json'],
 		why: 'Python routing consumes the same canonical proxy policy as the other clients'
 	}
