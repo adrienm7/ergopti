@@ -297,9 +297,20 @@ var LAYOUT_ANALYSIS = (function () {
 	function compileLayout(layout, board, missing) {
 		const best = new Map();
 		const deadSeq = new Map();
+		// Equal costs are settled the same way whatever order the file lists its
+		// keys in: fewer AltGr presses (the lower level, as Kalamine prefers),
+		// then fewer keys, then the lower key indexes.
+		const better = (a, b) => {
+			if (a.cost !== b.cost) return a.cost < b.cost;
+			if (a.altgr !== b.altgr) return a.altgr < b.altgr;
+			if (a.keys.length !== b.keys.length) return a.keys.length < b.keys.length;
+			for (let i = 0; i < a.keys.length; i++)
+				if (a.keys[i] !== b.keys[i]) return a.keys[i] < b.keys[i];
+			return false;
+		};
 		const offer = (map, key, candidate) => {
 			const current = map.get(key);
-			if (!current || candidate.cost < current.cost) map.set(key, candidate);
+			if (!current || better(candidate, current)) map.set(key, candidate);
 		};
 		for (const [code, row] of Object.entries(layout.rows)) {
 			const k = board.index.get(code);
