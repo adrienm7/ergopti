@@ -445,6 +445,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-analysis-engine.cjs"],
 			"repro": "npm run test:layout-analysis-engine"
+		},
+		{
+			"id": "layout-comparer-page",
+			"ordinal": 663,
+			"name": "the Studio's layout comparer page loads the engine in order, finds every string it shows in all 21 locales and has the tables of every built-in corpus",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-comparer-page.cjs"],
+			"repro": "npm run test:layout-comparer-page"
 		}
 	]
 }

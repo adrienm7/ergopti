@@ -169,6 +169,37 @@ The defaults and their justification are in the study, section « Default
 weights ». A weight of 0 removes a metric from the score; the Studio shows each
 contribution beside the metric.
 
+## Built-in corpora
+
+`_shared/layouts/data/analysis/corpora.json` lists the corpora free to
+redistribute (public domain): the French _Don Quichotte_ (Furne), Proust's _Du
+côté de chez Swann_ and the English _Don Quixote_ (Ormsby). The codegen counts
+their n-grams with the engine's own `ngramsFromText` and writes only the tables,
+one file per corpus (`_generated/corpus_<id>.js`, loaded when the corpus is
+chosen); `LAYOUT_ANALYSIS_DATA.corpora` lists them with their source, licence
+and size. The other texts of `static/corpus` are not offered until their
+licence is known.
+
+## Comparer page
+
+`_shared/ui/layout_analysis/index.html` is the « Comparer » tab: corpus
+(built-in, pasted text, or a .txt, .md, .csv, .html, .docx or .odt file read in
+the page), keyboard, layout selection, the global score chart, the sortable
+ranking, each layout's contributions, finger load and metrics, and the weights
+editor with « restore the defaults ». The site embeds it like the editor
+(`?lang=<code>`); the app's Studio window loads the same page. A host may
+define, before the page script runs:
+
+```js
+window.LAYOUT_ANALYSIS_HOST = {
+	corpora: [{ id: 'my_typing', title: '…', tables: { chars, bigrams, trigrams } }], // listed first, selected
+	layouts: [{ id, name, rows, dead, command }] // the user's own layouts, ticked
+};
+```
+
+Weights, selection, corpus and keyboard are remembered in `localStorage` when
+the browser allows it; nothing is sent anywhere.
+
 ## Performance
 
 The library (115 layouts) on a 2.5 MB French corpus takes about 0.3 s from

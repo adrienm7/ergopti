@@ -1,0 +1,99 @@
+<!-- _shared/ui/layout_analysis/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="layout_analysis.title"></title>
+		<link rel="stylesheet" href="../theme.css" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="_generated/analysis_data.js"></script>
+		<script src="analysis_engine.js"></script>
+		<script src="corpus_files.js"></script>
+		<script src="comparer_page.js"></script>
+	</head>
+	<body>
+		<main id="layout-analysis" class="layout-analysis">
+			<h1 data-i18n="layout_analysis.title"></h1>
+			<section class="la-controls" aria-labelledby="la-corpus-label">
+				<div class="la-field">
+					<label
+						id="la-corpus-label"
+						for="la-corpus"
+						data-i18n="layout_analysis.corpus.label"
+					></label>
+					<select id="la-corpus"></select>
+					<p id="la-corpus-info" class="la-muted"></p>
+				</div>
+				<div id="la-custom" class="la-field la-custom" hidden>
+					<textarea
+						id="la-text"
+						rows="5"
+						data-i18n-placeholder="layout_analysis.corpus.paste_placeholder"
+					></textarea>
+					<label class="la-file">
+						<span data-i18n="layout_analysis.corpus.file"></span>
+						<input
+							id="la-file"
+							type="file"
+							accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt"
+						/>
+					</label>
+					<p id="la-file-error" class="la-error" hidden></p>
+				</div>
+				<div class="la-field">
+					<label for="la-keyboard" data-i18n="layout_analysis.keyboard.label"></label>
+					<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard">
+						<option value="iso"></option>
+						<option value="iso_angle"></option>
+						<option value="ansi"></option>
+						<option value="ortho"></option>
+					</select>
+				</div>
+			</section>
+
+			<section class="la-layouts" aria-labelledby="la-layouts-label">
+				<h2 id="la-layouts-label" data-i18n="layout_analysis.layouts.label"></h2>
+				<div class="la-row">
+					<input
+						id="la-filter"
+						type="search"
+						data-i18n-placeholder="layout_analysis.layouts.filter_placeholder"
+					/>
+					<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
+					<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
+				</div>
+				<div id="la-layout-list" class="la-layout-list"></div>
+			</section>
+
+			<p id="la-status" class="la-status" role="status"></p>
+
+			<section class="la-results">
+				<h2 data-i18n="layout_analysis.chart.title"></h2>
+				<div id="la-chart" class="la-chart"></div>
+				<div class="la-table-wrap">
+					<table id="la-table" class="la-table"></table>
+				</div>
+			</section>
+
+			<section id="la-details" class="la-details" hidden>
+				<h2 id="la-details-title"></h2>
+				<h3 data-i18n="layout_analysis.details.contributions"></h3>
+				<div id="la-contributions" class="la-bars"></div>
+				<h3 data-i18n="layout_analysis.details.fingers"></h3>
+				<div id="la-fingers" class="la-bars"></div>
+				<h3 data-i18n="layout_analysis.details.metrics"></h3>
+				<table id="la-metrics" class="la-table"></table>
+				<p id="la-unsupported" class="la-muted"></p>
+			</section>
+
+			<section class="la-weights" aria-labelledby="la-weights-label">
+				<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
+				<p class="la-muted" data-i18n="layout_analysis.weights.help"></p>
+				<button id="la-restore" type="button" data-i18n="layout_analysis.weights.restore"></button>
+				<div id="la-weight-list" class="la-weight-list"></div>
+			</section>
+		</main>
+	</body>
+</html>
