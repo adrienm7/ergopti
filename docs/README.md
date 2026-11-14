@@ -19,7 +19,8 @@ a task list.
 - [`tooling/`](tooling/): maintainer how-tos (RTK, update signing, Windows live
   checks and diagnostics, SignPath application, antivirus false positives).
 - [`audits/`](audits/): the three 28 October audit handovers, whose evidence
-  archives are the only copy, and two data files that a test or a tool reads.
+  archives are the only copy, two data files that a test or a tool reads, and
+  the [study of the public layout analysers](audits/layout-analysers/report.md).
 
 Older handovers, prompts and reports were removed on 29 October; they stay in
 Git history at commit `49c62d77a1`.
