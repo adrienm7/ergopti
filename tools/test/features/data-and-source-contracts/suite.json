@@ -737,6 +737,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-value-schema.cjs"],
 			"repro": "npm run test:value-schema"
+		},
+		{
+			"id": "js-linux-layout-bom-gate",
+			"ordinal": 641,
+			"name": "Linux layout workflow refuses a stray UTF-8 BOM and admits the Windows-written tap-hold corpus",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-layout-bom-gate.cjs"],
+			"repro": "npm run test:linux-layout-bom-gate",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }
