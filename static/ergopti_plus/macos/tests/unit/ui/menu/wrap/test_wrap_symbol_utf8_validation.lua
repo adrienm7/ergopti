@@ -23,7 +23,7 @@ local function run_action(responses)
 		"infra.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"ui.menu.menu_utils",
 		"infra.manifest_menu",
 		"ui.menu.shortcut_utils",
@@ -56,7 +56,7 @@ local function run_action(responses)
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,

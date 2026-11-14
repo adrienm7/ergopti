@@ -95,7 +95,7 @@ end
 local function find_delay_row(mb, manager)
 	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = manager,
 		is_paused = function() return false end })
-	local title = require("infra.i18n").get("menu.tapholds.title")
+	local title = require("core.i18n.engine.i18n").get("menu.tapholds.title")
 	local section = nil
 	for _, item in ipairs(items) do
 		if item.title == title then section = item end

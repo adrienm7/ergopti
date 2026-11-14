@@ -7,7 +7,7 @@ return function(helpers, driver)
 		settings = settings or {}
 		local saved = {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
-		local names = { "core.fs.adapters.storage", "infra.script_scope", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+		local names = { "core.fs.adapters.storage", "infra.script_scope", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"infra.script_settings", "infra.logger", "infra.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
 			"settings.engine.scope.script_scope_runtime", "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "settings.engine.scope.transaction", "ui.menu.scoped_preferences",
 			"ui.menu.preferences_transaction" }
@@ -53,7 +53,7 @@ return function(helpers, driver)
 					delete = function(name) os.remove(name); return true end }
 				package.loaded["core.fs.adapters.file_system"] = files
 			end
-			local i18n, backend = require("infra.i18n"), require("infra.locale")
+			local i18n, backend = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 			if driver == "macos" then i18n.set_locale_injector(backend.set_locale) end
 			i18n.init()
 			local logger = require(driver == "linux" and "infra.script_settings" or "infra.logger")
@@ -127,7 +127,7 @@ return function(helpers, driver)
 				local owner = ctx.create()
 				helpers.assert_eq(owner.apply("clear"), true)
 				helpers.assert_eq(owner.release(), true)
-				local locale_name, log_name = "infra.i18n", driver == "linux" and "infra.script_settings" or "infra.logger"
+				local locale_name, log_name = "core.i18n.engine.i18n", driver == "linux" and "infra.script_settings" or "infra.logger"
 				local dialog_name = driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog"
 				package.loaded[locale_name], package.loaded[log_name], package.loaded[dialog_name] = nil, nil, nil
 				local locale, logger, dialog = require(locale_name), require(log_name), require(dialog_name)

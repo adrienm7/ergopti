@@ -28,7 +28,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		"infra.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"ui.menu.menu_utils",
 		"infra.manifest_menu",
 		"ui.menu.shortcut_utils",
@@ -72,7 +72,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,
@@ -177,7 +177,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		"modules.gestures",
 		"ui.menu.menu_utils",
 		"infra.dialog_util",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.manifest_menu",
 		"menu.engine.renderer",
 		"core.text.engine.json",
@@ -220,7 +220,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
 		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
@@ -230,7 +230,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 			platform = "hs",
 			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode,
-			i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
+			i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub(),
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,

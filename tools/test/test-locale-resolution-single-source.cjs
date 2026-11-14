@@ -6,14 +6,14 @@
  * DESCRIPTION:
  * Verifies that the locale resolution cascade is single-sourced:
  *   - The shared module _shared/core/i18n/engine/core.lua exists and is consumed by
- *     both macOS (macos/infra/locale.lua) and Linux (linux/infra/locale.lua)
+ *     both macOS (macos/core/i18n/engine/locale.lua) and Linux (linux/core/i18n/engine/locale.lua)
  *     drivers via `require("core.i18n.engine.core")`.
  *   - The cross-driver corpus _shared/tests/corpus/locale/resolution_vectors.json
  *     exists and has at least one vector.
  *   - macOS has a corpus consumer test (test_corpus_locale_resolution.lua).
  *   - AHK has a corpus consumer test (test_corpus_locale_resolution.ahk)
  *     included in run_all.ahk.
- *   - The AHK t() function lives in windows/infra/locale.ahk (the single source
+ *   - The AHK t() function lives in windows/core/i18n/engine/locale.ahk (the single source
  *     for AHK locale resolution).
  *
  * ROOT CAUSE ENCODED:
@@ -54,29 +54,29 @@ if (!fileExistsSP('_shared/core/i18n/engine/core.lua')) {
 }
 
 // ── 2. macOS must consume it ───────────────────────────────────────────────
-const macLocale = fileExistsSP('macos/infra/locale.lua')
-	? read('static/ergopti_plus/macos/infra/locale.lua')
+const macLocale = fileExistsSP('macos/core/i18n/engine/locale.lua')
+	? read('static/ergopti_plus/macos/core/i18n/engine/locale.lua')
 	: '';
 if (!macLocale.includes('require("core.i18n.engine.core")')) {
 	errors.push(
-		'macos/infra/locale.lua: must require("core.i18n.engine.core") — not a hand-rolled copy'
+		'macos/core/i18n/engine/locale.lua: must require("core.i18n.engine.core") — not a hand-rolled copy'
 	);
 }
 
 // ── 3. Linux must consume it ───────────────────────────────────────────────
-const lnxLocale = fileExistsSP('linux/infra/locale.lua')
-	? read('static/ergopti_plus/linux/infra/locale.lua')
+const lnxLocale = fileExistsSP('linux/core/i18n/engine/locale.lua')
+	? read('static/ergopti_plus/linux/core/i18n/engine/locale.lua')
 	: '';
 if (!lnxLocale.includes('require("core.i18n.engine.core")')) {
 	errors.push(
-		'linux/infra/locale.lua: must require("core.i18n.engine.core") — not a hand-rolled copy'
+		'linux/core/i18n/engine/locale.lua: must require("core.i18n.engine.core") — not a hand-rolled copy'
 	);
 }
 
 // ── 4. Neither driver may re-implement the cascade inline ───────────────────
 for (const [relPath, name] of [
-	['static/ergopti_plus/macos/infra/locale.lua', 'macos'],
-	['static/ergopti_plus/linux/infra/locale.lua', 'linux']
+	['static/ergopti_plus/macos/core/i18n/engine/locale.lua', 'macos'],
+	['static/ergopti_plus/linux/core/i18n/engine/locale.lua', 'linux']
 ]) {
 	const src = fileExists(relPath) ? fs.readFileSync(p.join(ROOT, relPath), 'utf8') : '';
 	// These functions should live in locale.core, not re-declared here
@@ -121,9 +121,9 @@ if (!fileExistsSP('windows/tests/meta/corpus/test_corpus_locale_resolution.ahk')
 	}
 }
 
-// ── 8. AHK t() must live in windows/infra/locale.ahk (single source) ─────────
-if (!fileExistsSP('windows/infra/locale.ahk')) {
-	errors.push('windows/infra/locale.ahk: missing — t() must be single-sourced here');
+// ── 8. AHK t() must live in windows/core/i18n/engine/locale.ahk (single source) ─────────
+if (!fileExistsSP('windows/core/i18n/engine/locale.ahk')) {
+	errors.push('windows/core/i18n/engine/locale.ahk: missing — t() must be single-sourced here');
 }
 
 // ── 9. The old macOS hand-rolled copy must NOT exist — it was fused ────────

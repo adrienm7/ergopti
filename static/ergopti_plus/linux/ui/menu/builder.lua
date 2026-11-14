@@ -256,7 +256,7 @@ local _build_debug = require("ui.menu.menu_debug").build
 --- @param key string i18n key.
 --- @return string The translation, or the key itself.
 function i18n_safe(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	if ok and i18n and type(i18n.get) == "function" then
 		local val = i18n.get(key)
 		if val and val ~= key then return val end

@@ -114,7 +114,7 @@ function M.boot(opts)
 	for _, name in ipairs(REAL_MODULES) do package.loaded[name] = nil end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["infra.text_utils"] = {
 		escape_gsub_replacement = function(value) return value end,

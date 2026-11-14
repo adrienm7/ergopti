@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
 	"infra.dialog_util", "ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
-	"infra.logger", "infra.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
+	"infra.logger", "core.i18n.engine.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
 	"modules.llm.local_servers", "ui.menu.menu_llm.local_server_panel",
 }
 
@@ -68,8 +68,8 @@ local function with_panel(state, scenario, language)
 		}
 		local Panel = helpers.load_with_stubs("ui.menu.menu_llm.agent_panel")
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local i18n = require("infra.i18n")
-		local Locale = require("infra.locale")
+		local i18n = require("core.i18n.engine.i18n")
+		local Locale = require("core.i18n.engine.locale")
 		local previous_locale = Locale.all()["_meta.locale"]
 		Locale.set_locale(language or "en")
 		i18n.get = function(key)

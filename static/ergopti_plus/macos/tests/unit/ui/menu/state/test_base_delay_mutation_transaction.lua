@@ -33,7 +33,7 @@ end
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
 		"infra.preferences", "core.fs.adapters.file_system", "infra.logger", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config", "ui.menu.base_delay_transaction",
 		"ui.menu.preferences_transaction", "ui.menu.global_actions_transaction", "ui.menu.menu_state",
 	}, function()
@@ -43,7 +43,7 @@ local function with_fixture(outcome, callback)
 		local Global = require("ui.menu.global_actions_transaction")
 		local Baseline = require("ui.menu.base_delay_transaction")
 		local MenuState = require("ui.menu.menu_state")
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode,

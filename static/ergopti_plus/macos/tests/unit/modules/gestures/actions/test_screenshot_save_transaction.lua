@@ -17,7 +17,7 @@ local SUBJECT_MODULES = {
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"modules.shortcuts.actions.screenshot_save",
@@ -61,7 +61,7 @@ local function with_subject(options, scenario)
 		copy_image_file_to_clipboard = function() return true end,
 	}
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			if key == "shortcuts.screenshot_failed" then return "Screenshot failed" end

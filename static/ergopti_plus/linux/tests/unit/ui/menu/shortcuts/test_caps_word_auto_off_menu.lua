@@ -39,7 +39,7 @@ local function with_menu(source, body)
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			package.loaded["modules.shortcuts.caps_word_auto_off"] = nil
 			local context = { path = path, changes = 0, errors = 0 }
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local builder = load_builder({
 				Logger = require("core.logger.engine.shim"), i18n = i18n.get,
 				show_error = function() context.errors = context.errors + 1 end,

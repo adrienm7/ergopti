@@ -155,7 +155,7 @@ helpers.describe("macOS complete gesture scope", function()
 			helpers.assert_eq(menu_commands(owner, gestures, state).scope_restore(), true)
 			for _, fn in ipairs(deferred) do fn() end
 			helpers.assert_eq(#dialogs, 1, "one dialog names the macOS gesture still on")
-			helpers.assert_eq(dialogs[1], require("infra.i18n").get("menu.gestures.recommended_reason_macos"))
+			helpers.assert_eq(dialogs[1], require("core.i18n.engine.i18n").get("menu.gestures.recommended_reason_macos"))
 			helpers.assert_eq(opened, 1, "its first button opens the Trackpad settings")
 			dialogs, deferred = {}, {}
 			free_gestures.system_slot_state = function() return "free" end

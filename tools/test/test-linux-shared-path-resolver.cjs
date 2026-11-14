@@ -11,7 +11,7 @@
  * Twelve independent `_shared` expressions existed across the Linux driver, at
  * four different depths, and two of them were wrong:
  *
- *   * infra/i18n.lua walked "../../" from the driver root for
+ *   * core/i18n/engine/i18n.lua walked "../../" from the driver root for
  *     _shared/data/locales. One level too high. `ls` on the missing directory
  *     printed nothing, the scan collected zero codes, and the {"en","fr"}
  *     fallback took over — so the language menu offered 2 locales out of the 21

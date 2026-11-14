@@ -3809,7 +3809,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'shadowed native caption owner'
 			],
 			[
-				'local ok, i18n = pcall(require, "infra.i18n")',
+				'local ok, i18n = pcall(require, "core.i18n.engine.i18n")',
 				'local ok, i18n = pcall(require, "foreign.i18n")',
 				'foreign caption import'
 			],

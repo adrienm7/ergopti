@@ -76,7 +76,7 @@ local function build(latest, pending)
 	end
 	if not ok then restore(); error(rows, 0) end
 	recorded.owner, recorded.checks, recorded.refresh, recorded.restore = owner, checks, refresh, restore
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	for _, row in ipairs(rows) do
 		if row.title == i18n.get("menu.about.check_for_updates")
 			or (latest and type(row.title) == "string" and row.title:find(latest.tag, 1, true))
@@ -113,7 +113,7 @@ helpers.describe("menu_about: the check row (macOS)", function()
 			helpers.assert_eq(#recorded.checked, 1, "the check still runs")
 			helpers.assert_eq(recorded.checked[1].channel, "dev", "on the menu session's channel")
 			recorded.checked[1].on_result({ state = "up_to_date", channel = "dev", current = "1.2.3" })
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(#recorded.notices, 1, "the answer is notified")
 			helpers.assert_eq(recorded.notices[1].title, i18n.get("updater.window_title"))
 			helpers.assert_eq(recorded.notices[1].body, (i18n.get("updater.up_to_date"):gsub("{1}", "1.2.3")))
@@ -132,7 +132,7 @@ helpers.describe("menu_about: the check row (macOS)", function()
 		local recorded = build({ tag = "v0.0.0-dev.150", channel = "dev" }, { tag = "v0.0.0-dev.139" })
 		local ok, err = pcall(function()
 			helpers.assert_not_nil(recorded.row, "the row names the waiting release")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local wording = i18n.get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
 			helpers.assert_true(recorded.row.title:find(wording, 1, true) == 1, recorded.row.title)
 			helpers.assert_true(recorded.row.title:find("v0.0.0-dev.139", 1, true) ~= nil, recorded.row.title)
@@ -162,7 +162,7 @@ end)
 --- Exercises the actual source-only provider through its native-bound renderer.
 --- @param alternative boolean True to independently replace the declared label and reason.
 local function with_source_row(alternative, callback)
-	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n",
+	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"infra.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
 		"ui.changelog", "adapters.update_launcher", "ui.menu.start_at_login", "hs", "tests.stubs.hs" }, function()
 		local native = require("tests.stubs.hs")
@@ -174,7 +174,7 @@ local function with_source_row(alternative, callback)
 		local labels = { ["menu.about.source_run_reason"] = "Source checkout: use an installed release.",
 			["common.restore_recommended"] = "Canonical alternate label",
 			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
-		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
@@ -443,8 +443,8 @@ helpers.describe("Packaged About check consumes the existing shared command", fu
 			local labels = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 			-- The native binding captures its catalogue object at construction.
 			-- Bind each real catalogue before the existing build helper resets stubs.
-			helpers.with_stub_scope({"infra.manifest_menu", "infra.i18n", "ui.menu.menu_about"}, function()
-				local native_i18n = require("infra.i18n")
+			helpers.with_stub_scope({"infra.manifest_menu", "core.i18n.engine.i18n", "ui.menu.menu_about"}, function()
+				local native_i18n = require("core.i18n.engine.i18n")
 				native_i18n.get = function(key) return labels[key] or key end
 				package.loaded["infra.manifest_menu"] = nil
 				local renderer = require("infra.manifest_menu")

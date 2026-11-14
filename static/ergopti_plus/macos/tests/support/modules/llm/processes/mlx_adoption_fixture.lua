@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"infra.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
 	"infra.log_folders", "_generated.logger_sub_files", "adapters.log_transport",
-	"infra.launcher_environment", "infra.notifications", "infra.i18n",
+	"infra.launcher_environment", "infra.notifications", "core.i18n.engine.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
 	"adapters.task_lifecycle", "adapters.shell_runner", "core.events.timer_scheduler",
 	"core.fs.adapters.json_codec", "modules.llm.api_mlx",
@@ -52,7 +52,7 @@ local function with_adoption(scenario)
 				return true, "exit", 0
 			end
 			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
 			package.loaded["infra.text_utils"] = { shell_quote = function(value) return "'" .. value .. "'" end }
 			package.loaded["modules.llm.api_common"] = {

@@ -36,7 +36,7 @@
 ; ======================================================
 
 _HDEC_ReadSource() {
-	return _DriverDirsConcat("infra", "core/fs/engine")
+	return _DriverDirsConcat("infra", "core/i18n/engine", "core/fs/engine")
 }
 
 

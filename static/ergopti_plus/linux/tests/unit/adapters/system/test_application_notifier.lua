@@ -45,13 +45,13 @@ end)
 --- @param body function Receives recording ports and actual notice owners.
 local function with_owned_notice(body)
 	local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
-		"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "infra.i18n", "infra.locale" }
+		"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.i18n.engine.locale" }
 	local saved, native = {}, nil
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local c = { commands = {}, argv = {}, quoted = {}, available = true, native_result = true }
 	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	package.loaded["core.ui.engine.window_titles"] = nil
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get_locale = function() return "en" end,
 		get = function(key)
 			if key == "error_dialog.heading" then return "Refusal heading" end
@@ -59,7 +59,7 @@ local function with_owned_notice(body)
 			return "Ordinary app label"
 		end,
 	}
-	package.loaded["infra.locale"] = { catalogue = function() return { ordinary = "Controlled locale" } end }
+	package.loaded["core.i18n.engine.locale"] = { catalogue = function() return { ordinary = "Controlled locale" } end }
 	package.loaded["adapters.shell_runner"] = {
 		has_command = function(command)
 			helpers.assert_eq(command, "notify-send")
@@ -183,7 +183,7 @@ helpers.describe("owned application notifications", function()
 	end)
 	helpers.it("restores the exact scoped dependency owners after a fixture-body refusal", function()
 		local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
-			"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "infra.i18n", "infra.locale",
+			"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.i18n.engine.locale",
 			"lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline", "core.events.loop",
 			"ui.webkit_host", "ui.webview_manager", "ui.changelog.bridge" }
 		local previous = {}

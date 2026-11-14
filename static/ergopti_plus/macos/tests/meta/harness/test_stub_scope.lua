@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 
-local KEYS = { "hs", "hs.timer", "tests.stubs.hs", "infra.i18n",
+local KEYS = { "hs", "hs.timer", "tests.stubs.hs", "core.i18n.engine.i18n",
 	"ui.menu.scope_fixture", "modules.keymap.registry_scope_fixture" }
 
 helpers.describe("native stub scope", function()
@@ -47,8 +47,8 @@ helpers.describe("native stub scope", function()
 			local original_hs = rawget(_G, "hs")
 			local result = table.pack(helpers.with_stub_scope({}, function()
 				local outer = helpers.load_with_stubs("hs")
-				local outer_i18n = package.loaded["infra.i18n"]
-				local ok, reason = pcall(helpers.with_stub_scope, { "infra.i18n" }, function()
+				local outer_i18n = package.loaded["core.i18n.engine.i18n"]
+				local ok, reason = pcall(helpers.with_stub_scope, { "core.i18n.engine.i18n" }, function()
 					local inner = helpers.load_with_stubs("hs")
 					helpers.assert_true(inner ~= outer)
 					error("nested scope failure", 0)
@@ -57,7 +57,7 @@ helpers.describe("native stub scope", function()
 				helpers.assert_true(reason:find("nested scope failure", 1, true) ~= nil)
 				helpers.assert_true(_G.hs == outer)
 				helpers.assert_true(package.loaded["hs"] == outer)
-				helpers.assert_true(package.loaded["infra.i18n"] == outer_i18n)
+				helpers.assert_true(package.loaded["core.i18n.engine.i18n"] == outer_i18n)
 				helpers.assert_true(helpers.load_with_stubs("hs") ~= outer)
 				return nil, false, "tail"
 			end))

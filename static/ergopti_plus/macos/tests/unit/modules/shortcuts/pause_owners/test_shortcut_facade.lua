@@ -139,7 +139,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			escape_gsub_replacement = function(value) return value end,
 			shell_quote = function(value) return value end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.ui_restore"] = {}
 		package.loaded["infra.preferences"] = {
 			build_initial_state = function() return state end,
@@ -301,7 +301,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			get_profile_hks = function() return {} end,
 		})
 
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -344,7 +344,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 		assert(locale_file:close())
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 			return key
 		end }
@@ -430,7 +430,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			platform = "hs",
 			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode,
-			i18n = {get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get},
+			i18n = {get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get},
 			logger = package.loaded["infra.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {

@@ -24,7 +24,7 @@ local OWNED_MODULES = {
 	"infra.logger",
 	"infra.text_utils",
 	"infra.timings",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"modules.keymap.control_sentinels",
 	"adapters.key_state",
@@ -115,7 +115,7 @@ local function with_awake(callback)
 					return seconds[key]
 				end,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.keycodes"] = { F18_WAKE_OS = 79 }
 			local stored = {}
 			package.loaded["core.fs.adapters.storage"] = {

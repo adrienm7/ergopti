@@ -84,7 +84,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		"infra.logger",
 		"infra.notifications",
 		"core.fs.engine.paths",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"hs",
 		"tests.stubs.hs",
 	}
@@ -99,7 +99,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	package.loaded["hs"] = hs_stub
 
 	-- Standard stubs (mirror what load_with_stubs injects)
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get        = function(key) return key end,
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
@@ -182,7 +182,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"modules.llm.api_common", "modules.llm.parser", "adapters.http_client",
 		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "adapters.shell_runner",
-		"infra.logger", "infra.notifications", "core.fs.engine.paths", "infra.i18n", "hs", "tests.stubs.hs",
+		"infra.logger", "infra.notifications", "core.fs.engine.paths", "core.i18n.engine.i18n", "hs", "tests.stubs.hs",
 	}
 	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end
 
@@ -191,7 +191,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get        = function(key) return key end,
 		get_locale = function() return "fr" end,
 		set_locale = function() end,

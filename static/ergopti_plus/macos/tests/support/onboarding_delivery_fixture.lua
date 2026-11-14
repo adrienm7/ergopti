@@ -44,7 +44,7 @@ local function with_delivery(callback, native_timers)
 		with_window("ui.onboarding", function(onboarding, state)
 			require("tests.support.onboarding_shared_data").install()
 			local pending, errors, evaluations = {}, {}, {}
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			i18n.get_locale = function() return "en" end
 			i18n.format = function(key) return key end
 			i18n.get_sorted_locales = function() return {} end

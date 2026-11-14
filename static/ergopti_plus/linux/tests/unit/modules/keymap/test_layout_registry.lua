@@ -519,9 +519,9 @@ helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("asks once before downloading Ergopti's own Python, naming its size (layout-registry-managed-python)", function()
 		local saved = { registry = package.loaded["modules.keymap.layout_registry"],
 			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["ui.menu.menu_dialogs"],
-			i18n = package.loaded["infra.i18n"] }
+			i18n = package.loaded["core.i18n.engine.i18n"] }
 		local asked, answer = {}, nil
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			return key == "layouts.managed_python_offer" and "Download {1} MB <now>?" or key
 		end }
 		package.loaded["ui.menu.menu_dialogs"] = {
@@ -548,7 +548,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		package.loaded["modules.keymap.layout_registry"] = saved.registry
 		package.loaded["modules.keymap.managed_python"] = saved.managed
 		package.loaded["ui.menu.menu_dialogs"] = saved.dialogs
-		package.loaded["infra.i18n"] = saved.i18n
+		package.loaded["core.i18n.engine.i18n"] = saved.i18n
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(asked[1], { title = "layouts.managed_python_title", text = "Download 31 MB &lt;now&gt;?",
 			ok = "menu.llm.btn_download", cancel = "common.cancel" })

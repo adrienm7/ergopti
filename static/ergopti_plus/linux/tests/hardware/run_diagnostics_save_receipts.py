@@ -21,7 +21,7 @@ local schema = config.schema
 local rules = config.redaction
 local catalogue = shared("core/i18n/data/locales/en.json")
 local notice = assert(catalogue[schema.share_policy.notice_key])
-package.loaded["infra.i18n"] = {get=function(key)
+package.loaded["core.i18n.engine.i18n"] = {get=function(key)
  local value = catalogue[key]
  assert(type(value)=="string", "fixture catalogue lacks declared key: "..key)
  return value

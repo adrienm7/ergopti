@@ -28,7 +28,7 @@ local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local Paths      = require("core.fs.engine.paths")
 local ui_builder = require("ui.ui_builder")
-local i18n       = require("infra.i18n")
+local i18n       = require("core.i18n.engine.i18n")
 local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 
 local LOG = "model_browser"

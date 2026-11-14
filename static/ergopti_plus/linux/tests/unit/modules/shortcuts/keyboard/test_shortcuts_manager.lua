@@ -410,7 +410,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					local redraws, attempts, notices, releases = 0, 0, {}, 0
 					local tree = builder.build({ shortcuts = manager, _version = "9.9.9",
 						on_menu_changed = function() redraws = redraws + 1 end })
-					local title = require("infra.i18n").get("menu.shortcuts.enable")
+					local title = require("core.i18n.engine.i18n").get("menu.shortcuts.enable")
 					local action, matches = nil, 0
 					for _, group in ipairs(tree) do
 						for _, row in ipairs(group.menu or {}) do

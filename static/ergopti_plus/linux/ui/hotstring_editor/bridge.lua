@@ -566,7 +566,7 @@ end
 --- @param key string
 --- @return string
 local function i18n_label(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	if not ok or type(i18n.get) ~= "function" then return key end
 	local value = i18n.get(key)
 	return (type(value) == "string" and value ~= "") and value or key

@@ -51,7 +51,7 @@ local function with_editor(body, options)
 			if command:find("dialog_host.lua' --error", 1, true) then s.notices = s.notices + 1; return 1 end
 			return execute(command)
 		end
-		local I18n = require("infra.i18n"); I18n.init()
+		local I18n = require("core.i18n.engine.i18n"); I18n.init()
 		s.context = { tap_holds = manager, is_paused = function() return s.paused end, on_menu_changed = function() end }
 		local rows = require(MODULES[3]).build(s.context)
 		local label

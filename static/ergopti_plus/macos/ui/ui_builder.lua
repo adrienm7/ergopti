@@ -43,8 +43,8 @@ local Presentation = require("core.ui.engine.webview.presentation")
 local PresentationPrepareOwner = rawget(Presentation, "prepare")
 local PresentationTitlePrepareOwner = rawget(Presentation, "prepare_window_title")
 local PresentationContextPrepareOwner = rawget(Presentation, "prepare_contextual_title")
-local PresentationI18n = require("infra.i18n")
-local PresentationLocale = require("infra.locale")
+local PresentationI18n = require("core.i18n.engine.i18n")
+local PresentationLocale = require("core.i18n.engine.locale")
 local PresentationTranslateOwner = rawget(PresentationI18n, "get")
 local PresentationLocaleGetOwner = rawget(PresentationLocale, "get")
 local PresentationLocaleCurrentOwner = rawget(PresentationLocale, "current_locale")
@@ -179,7 +179,7 @@ end)()
 --- @param html_path string Page being built, named in the error log.
 --- @return string The statement, or "" when the strings are unavailable.
 local function strings_seed(html_path)
-	local ok_cat, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	local ok_cat, catalogue = pcall(function() return require("core.i18n.engine.locale").catalogue() end)
 	local statement, seed_err = nil, catalogue
 	if ok_cat then statement, seed_err = I18nSeed.statement(catalogue) end
 	if not statement then
@@ -224,7 +224,7 @@ function M.build_injected_html(assets_dir, html_name)
 	html_name = html_name or "index.html"
 	-- The locale is part of the key: the page carries its strings, so a page
 	-- built before a language switch must not be served after it.
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
 	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale
 	if _html_cache[cache_key] then
@@ -671,8 +671,8 @@ local function presentation_owners_current()
 		and rawget(package.loaded, "ui.ui_builder") == M
 		and rawget(package.loaded, "core.ui.engine.window_titles") == WindowTitles
 		and rawget(package.loaded, "core.ui.engine.webview.presentation") == Presentation
-		and rawget(package.loaded, "infra.i18n") == PresentationI18n
-		and rawget(package.loaded, "infra.locale") == PresentationLocale
+		and rawget(package.loaded, "core.i18n.engine.i18n") == PresentationI18n
+		and rawget(package.loaded, "core.i18n.engine.locale") == PresentationLocale
 		and rawget(package.loaded, "core.i18n.engine.core") == PresentationLocaleCore
 		and rawget(PresentationLocaleCore, "get") == PresentationCoreGetOwner
 		and rawget(PresentationLocaleCore, "current_locale") == PresentationCoreCurrentOwner
@@ -809,7 +809,7 @@ local function declared_window_title(opts)
 	end
 	if type(app_id) ~= "string" or not app_id:match("^[a-z][a-z0-9_]*$")
 		or rawget(opts, "title") ~= nil then return nil end
-	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	local ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 	if not ok_i18n or type(i18n) ~= "table" then return nil end
 	local translate = rawget(i18n, "get")
 	local function live()
@@ -817,7 +817,7 @@ local function declared_window_title(opts)
 			and rawget(opts, "title") == nil
 			and getmetatable(WindowTitles) == nil and getmetatable(i18n) == nil
 			and rawget(package.loaded, "core.ui.engine.window_titles") == WindowTitles
-			and rawget(package.loaded, "infra.i18n") == i18n
+			and rawget(package.loaded, "core.i18n.engine.i18n") == i18n
 			and rawget(WindowTitles, "key_for_app") == WindowTitleKeyOwner
 			and rawget(WindowTitles, "compose") == WindowTitleComposeOwner
 			and rawget(i18n, "get") == translate
@@ -1068,7 +1068,7 @@ function M.show_webview(opts)
 			if action == "didFinishNavigation" and opts.inject_i18n ~= false then
 				schedule_webview_timer(0.08, function()
 					if not wv or not wv2 or not webview_current() then return end
-					local ok_mod, locale_mod = pcall(require, "infra.locale")
+					local ok_mod, locale_mod = pcall(require, "core.i18n.engine.locale")
 					if not ok_mod or not locale_mod then return end
 					local all_strings = locale_mod.catalogue()
 					if type(all_strings) ~= "table" then return end

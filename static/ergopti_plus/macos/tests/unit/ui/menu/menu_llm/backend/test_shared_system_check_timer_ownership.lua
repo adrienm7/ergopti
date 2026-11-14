@@ -9,7 +9,7 @@ local MODULES = {
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"core.fs.engine.paths", "infra.timings",
 	"modules.llm",
@@ -124,7 +124,7 @@ local function with_fixture(callback)
 				return "menu.llm.btn_download"
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if fixture.i18n_throw_key == key then
 				error("system-check i18n continuation failure")
 			end

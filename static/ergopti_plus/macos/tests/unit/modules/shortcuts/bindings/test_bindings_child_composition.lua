@@ -307,13 +307,13 @@ local function load_subject(options)
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.logger",
 	}, function()
 		package.loaded["modules.shortcuts.actions.text"] = text
 		package.loaded["modules.shortcuts.actions.apps"] = apps
 		package.loaded["modules.shortcuts.actions.system"] = system
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local subject = helpers.load_with_stubs("modules.shortcuts.bindings", {
 			hotkey = {

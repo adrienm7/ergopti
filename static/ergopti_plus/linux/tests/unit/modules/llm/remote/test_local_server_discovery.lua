@@ -342,10 +342,10 @@ helpers.describe("Linux local server discovery ownership", function()
 			local function build() return ServerRows.rows(llm,dialogs,function() end,context) end
 			local rows=build()
 			helpers.assert_eq(#calls,0,"no local server is probed while the AI is off")
-			local rescan=find(rows,require("infra.i18n").get("menu.llm.local_servers.rescan"))
+			local rescan=find(rows,require("core.i18n.engine.i18n").get("menu.llm.local_servers.rescan"))
 			helpers.assert_true(rescan~=nil and rescan.action==nil and rescan.disabled==true,
 				"the rescan row is inert while the AI is off")
-			local address=find(rows,require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address=find(rows,require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address~=nil)
 			for _,item in ipairs(address.items or {}) do
 				helpers.assert_nil(item.action,"another address cannot be typed while the AI is off")
@@ -925,7 +925,7 @@ helpers.describe("Linux local server discovery ownership", function()
 				error = function() errors = errors + 1 end }
 			local rows = require("ui.menu.local_server_rows").rows(llm, dialogs, function() end,
 				{ is_paused = function() return false end, page_current = function() return live end })
-			local address = find(rows, require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address = find(rows, require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address ~= nil)
 			helpers.assert_eq(address.items[1].action(), false)
 			helpers.assert_eq(errors, 0)
@@ -942,7 +942,7 @@ helpers.describe("Linux local server discovery ownership", function()
 				error = function() end }
 			local rows = require("ui.menu.local_server_rows").rows(llm, dialogs, function() end,
 				{ is_paused = function() return false end, page_current = function() return live end })
-			local address = find(rows, require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address = find(rows, require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address ~= nil)
 			helpers.assert_eq(address.items[1].action(), false)
 			helpers.assert_eq(servers.target("omlx").base_url, "http://127.0.0.1:8000/v1")
@@ -959,7 +959,7 @@ helpers.describe("Linux local server discovery ownership", function()
 			local dialogs={prompt=function() allowed=false;return "http://localhost:9876/v1" end,error=function() end}
 			local Rows=require("ui.menu.local_server_rows")
 			local rows=Rows.rows(llm,dialogs,function() end,{is_paused=function() return false end})
-			local address=find(rows,require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address=find(rows,require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address~=nil)
 			local result=address.items[1].action()
 			helpers.assert_eq(result,false)
@@ -1243,13 +1243,13 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
 					can_configure_local_servers=function() return true end,is_enabled=function() return true end}, {},function() end,{is_paused=function() return false end})
-				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
+				local failed=find(rows,require("core.i18n.engine.i18n").get("healthcheck.status.failed"))
 				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
 				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
 				local catalogue=require("core.text.engine.json").decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"),"rb")):read("*a"))
 				local labels={}
 				for _,id in ipairs(catalogue.server_order) do labels[#labels+1]=catalogue.servers[id].label end
-				local none=require("infra.i18n").get("menu.llm.local_servers.none_detected")
+				local none=require("core.i18n.engine.i18n").get("menu.llm.local_servers.none_detected")
 				helpers.assert_nil(find(rows,none),"infrastructure refusal cannot become a no-server claim")
 				helpers.assert_eq(servers.cancel(),false,"no flag acknowledges still retained native debt")
 				if failure~="throw" and failure~="unsupported" then
@@ -1336,7 +1336,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 				helpers.assert_nil(servers.apply(servers.capture(id),{model="invented"},function() return true end))
 			end
 			local count=0
-			local label=require("infra.i18n").get("menu.llm.local_servers.no_models")
+			local label=require("core.i18n.engine.i18n").get("menu.llm.local_servers.no_models")
 			for _,row in ipairs(build()) do
 				for _,child in ipairs(row.items or {}) do
 					if child.label==label then
@@ -1361,7 +1361,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
 					can_configure_local_servers=function() return true end,is_enabled=function() return true end},{},function() end,{is_paused=function() return false end})
-				helpers.assert_nil(find(rows,require("infra.i18n").get("healthcheck.status.failed")))
+				helpers.assert_nil(find(rows,require("core.i18n.engine.i18n").get("healthcheck.status.failed")))
 			end)
 		end)
 	end

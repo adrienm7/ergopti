@@ -24,7 +24,7 @@ local SyntheticInput = require("adapters.synthetic_input")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("infra.logger")
 local Notifier = require("adapters.application_notifier")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local Manifest = require("infra.manifest_reader")
 
 --- Notification kind per severity on this driver's notifier.

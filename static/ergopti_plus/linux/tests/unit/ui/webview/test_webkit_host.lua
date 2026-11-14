@@ -472,7 +472,7 @@ helpers.describe("ui.webkit_host", function()
       -- ui/webview_manager, selected by a declaration unique to it.
       local source = helpers.read_driver_unit("function M.prepare_app_contextual_title(")
       helpers.assert_true(type(source) == "string" and source ~= "", "webview_manager.lua must be readable")
-      helpers.assert_true(source:find('require("infra.locale").catalogue()', 1, true) ~= nil,
+      helpers.assert_true(source:find('require("core.i18n.engine.locale").catalogue()', 1, true) ~= nil,
         "show() must read the full catalogue, active over English over French")
       helpers.assert_true(source:find("build_app_html(root, app_name, active_locale, catalogue)", 1, true) ~= nil,
         "show() must pass that catalogue to the page builder")
@@ -488,7 +488,7 @@ helpers.describe("ui.webkit_host", function()
       local manager = require("ui.webview_manager")
       helpers.assert_true(type(manager.build_page_html) == "function",
         "webview_manager must expose the one builder show() loads")
-      local catalogue = require("infra.locale").catalogue()
+      local catalogue = require("core.i18n.engine.locale").catalogue()
       local expected = 0
       for _ in pairs(catalogue) do expected = expected + 1 end
       helpers.assert_true(expected > 1000, "the locale catalogue must load for this check to mean anything")

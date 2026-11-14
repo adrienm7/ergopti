@@ -238,7 +238,7 @@ end
 local function install_script_control_dependencies(options)
 	options = options or {}
 	local function settled() return true end
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["adapters.event_provenance"] = {}
 	package.loaded["adapters.key_state"] = {
 		is_right_altgr_held = function() return false end,

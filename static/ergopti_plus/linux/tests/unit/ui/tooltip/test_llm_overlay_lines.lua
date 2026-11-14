@@ -166,7 +166,7 @@ helpers.describe("AI overlay: the shortcut column (llm-shortcut-column)", functi
 			local chrome = require("ui.tooltip.config").llm_line()
 			-- {id} stands for the key name table's Linux name of that modifier,
 			-- in the active language (cmd reads Super).
-			local translate = require("infra.i18n").get
+			local translate = require("core.i18n.engine.i18n").get
 			local expected = vector.expected.linux:gsub("{(%a+)}", function(id)
 				return require("platform.input.keycodes.key_names").label(id, "linux", translate)
 			end)
@@ -183,7 +183,7 @@ helpers.describe("AI overlay: the shortcut column (llm-shortcut-column)", functi
 		helpers.assert_eq(rows[1].label_color, chrome.colors.label, "the selected row is muted too")
 		helpers.assert_eq(rows[2].label_color, chrome.colors.label)
 		rows = overlay.build_rows({ CONTINUING }, 1, { validation_modifiers = { "shift", "ctrl" } })
-		local translate = require("infra.i18n").get
+		local translate = require("core.i18n.engine.i18n").get
 		helpers.assert_eq(rows[1].label, translate("key_name.ctrl") .. "+" .. translate("key_name.shift") .. "+1",
 			"the modifiers read in the active language (« Ctrl+Maj+1 »)")
 	end)

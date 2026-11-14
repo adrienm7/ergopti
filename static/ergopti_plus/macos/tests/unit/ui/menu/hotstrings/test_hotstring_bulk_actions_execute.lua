@@ -57,7 +57,7 @@ end
 
 helpers.describe("hotstring bulk commands: no whole-tree row, language actions reach clicks", function()
 	helpers.it("the rendered Hotstrings menu draws no whole-tree « all sections » row", CaptionFixture.scoped(function()
-		local translator = helpers.load_with_stubs("infra.i18n")
+		local translator = helpers.load_with_stubs("core.i18n.engine.i18n")
 		CaptionFixture.install(translator)
 		package.loaded["ui.menu.builder"] = nil
 		local builder = require("ui.menu.builder")

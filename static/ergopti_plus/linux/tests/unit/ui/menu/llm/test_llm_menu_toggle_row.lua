@@ -23,7 +23,7 @@ local table_unpack = table.unpack or unpack
 --- @param key string
 --- @return table|nil
 local function submenu_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:find(label, 1, true) then return item.menu end
 	end
@@ -35,7 +35,7 @@ end
 --- @param key string
 --- @return table|nil
 local function parent_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:find(label, 1, true) then return item end
 	end
@@ -74,7 +74,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		local items = build(llm)
 		local rows = submenu_of(items, "menu.llm.title")
 		helpers.assert_true(rows ~= nil and rows[1] ~= nil, "the AI submenu must be drawn")
-		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.enable"))
+		helpers.assert_eq(rows[1].title, require("core.i18n.engine.i18n").get("menu.llm.enable"))
 		helpers.assert_eq(rows[1].checked, false, "the switch is a checkbox, unticked while off")
 		helpers.assert_eq(type(rows[1].fn), "function", "the toggle row must act")
 		helpers.assert_eq(parent_of(items, "menu.llm.title").checked, false, "the parent is unticked too")
@@ -84,7 +84,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		local llm = fake_llm(true)
 		local items = build(llm)
 		local rows = submenu_of(items, "menu.llm.title")
-		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.enable"))
+		helpers.assert_eq(rows[1].title, require("core.i18n.engine.i18n").get("menu.llm.enable"))
 		helpers.assert_eq(rows[1].checked, true, "the switch is ticked while on")
 		helpers.assert_eq(parent_of(items, "menu.llm.title").checked, true, "the parent row is ticked too")
 	end)
@@ -103,7 +103,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 	-- place; the maintainer retired it. « Restaurer les valeurs conseillées »
 	-- stays the one row between the switch and the separator.
 	helpers.it("draws the restore row under the switch and no clear row", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = submenu_of(build(fake_llm(true)), "menu.llm.title")
 		helpers.assert_true(rows ~= nil and #rows > 3, "the AI submenu must be drawn")
 		helpers.assert_eq(rows[2].title, i18n.get("common.restore_recommended"), "the restore row follows the switch")
@@ -120,7 +120,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 	-- groups with one separator as the submenu of the other drivers.
 	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
 		helpers.it("draws the generation groups with the AI " .. state, function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = submenu_of(build(fake_llm(enabled)), "menu.llm.title")
 			local head = function(key) return i18n.get(key):match("^[^%%]*") end
 			local first, last
@@ -143,7 +143,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
 		for model_state, model in pairs({ ["a model"] = "local-a", ["no model"] = false }) do
 			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local llm = fake_llm(enabled)
 				llm.get_current_model = function() return model or nil end
 				llm.get_prediction_model = llm.get_current_model
@@ -287,7 +287,7 @@ local function with_slot_frame(locale, mutation, body)
 		local function translate(key) return catalogue[key] or key end
 		-- Both the old native path and shared rendering receive the same real
 		-- catalogue, so predecessor comparisons do not invent a locale failure.
-		package.loaded["infra.i18n"] = { get = translate, section = translate,
+		package.loaded["core.i18n.engine.i18n"] = { get = translate, section = translate,
 			get_locale = function() return locale end }
 		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",

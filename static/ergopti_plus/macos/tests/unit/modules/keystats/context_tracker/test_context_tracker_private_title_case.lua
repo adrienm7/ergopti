@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local function with_tracker(callback)
-	helpers.with_stub_scope({ "modules.keystats.context_tracker", "infra.i18n" }, function()
+	helpers.with_stub_scope({ "modules.keystats.context_tracker", "core.i18n.engine.i18n" }, function()
 		local title = "Private Browsing"
 		local tracker = helpers.load_with_stubs("modules.keystats.context_tracker", {
 			window = { focusedWindow = function()
@@ -28,7 +28,7 @@ local function with_tracker(callback)
 			title = next_title
 			tracker.update_private_status()
 			return state.is_private_window
-		end, require("infra.i18n"))
+		end, require("core.i18n.engine.i18n"))
 	end)
 end
 

@@ -173,7 +173,7 @@ local function with_wizard(answer, scenario)
 			--- The real tray's Hotstrings row.
 			function world.row()
 				local mb = helpers.load_module("ui.menu.builder")
-				local title = require("infra.i18n").get("menu.hotstrings.title")
+				local title = require("core.i18n.engine.i18n").get("menu.hotstrings.title")
 				local ctx = { config = Config, _version = "9.9.9", dyn_hotstrings = world.dyn }
 				for _, item in ipairs(mb.build(ctx) or {}) do
 					if type(item.title) == "string" and item.title:sub(1, #title) == title then return item end
@@ -183,7 +183,7 @@ local function with_wizard(answer, scenario)
 			--- The switch, first row of the Hotstrings submenu.
 			function world.switch()
 				local first = world.row().menu[1]
-				helpers.assert_eq(first.title, require("infra.i18n").get("menu.hotstrings.enable"),
+				helpers.assert_eq(first.title, require("core.i18n.engine.i18n").get("menu.hotstrings.enable"),
 					"the Hotstrings submenu opens with its switch")
 				return first
 			end

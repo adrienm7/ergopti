@@ -80,7 +80,7 @@ helpers.describe("open_app application chooser (Linux)", function()
 		helpers.assert_eq(#commands, 2)
 		helpers.assert_true(commands[2]:find(" --error --no-markup ", 1, true) ~= nil)
 		helpers.assert_true(commands[2]:find(" --title='ErgoptiPlus — Applications'", 1, true) ~= nil)
-		helpers.assert_true(commands[2]:find(require("infra.i18n").get("dialog.app_picker.selection_unverified"), 1, true) ~= nil)
+		helpers.assert_true(commands[2]:find(require("core.i18n.engine.i18n").get("dialog.app_picker.selection_unverified"), 1, true) ~= nil)
 	end)
 
 	helpers.it("a cancelled dialog or another file chooses nothing", function()

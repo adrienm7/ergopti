@@ -126,9 +126,9 @@ local function with_fixed_controls_locale(locale, scenario)
 		local paths = require("infra.config_paths")
 		helpers.assert_eq(paths.init(scratch .. "/"), true)
 		helpers.assert_eq(paths.get_config_dir(), scratch .. "/")
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -241,7 +241,7 @@ helpers.describe("Complete LLM outer boundary context", function()
 			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
 				with_fixture({parent_only = true}, function(fixture)
 					fixture.state.llm_enabled, fixture.state.llm_model = enabled, model
-					local i18n = require("infra.i18n")
+					local i18n = require("core.i18n.engine.i18n")
 					local head = function(key) return (i18n.get(key):match("^[^%%{]*")) end
 					require("tests.lua.ai.menu_layout_contract").assert_block(helpers, fixture.top_level_callbacks().rebuild(), {
 						profile = head("menu.profiles.profile_label_prefix"),

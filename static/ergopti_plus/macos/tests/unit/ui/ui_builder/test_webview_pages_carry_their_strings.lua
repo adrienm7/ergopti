@@ -60,9 +60,9 @@ describe("locale catalogue: active over English over French", function()
 		assert_eq(catalogue.d, "", "a key every locale leaves empty stays empty rather than missing")
 	end)
 
-	it("is re-exported by infra.locale", function()
-		local locale = helpers.load_with_stubs("infra.locale")
-		assert_true(type(locale.catalogue) == "function", "infra.locale must re-export catalogue()")
+	it("is re-exported by core.i18n.engine.locale", function()
+		local locale = helpers.load_with_stubs("core.i18n.engine.locale")
+		assert_true(type(locale.catalogue) == "function", "core.i18n.engine.locale must re-export catalogue()")
 	end)
 end)
 
@@ -94,9 +94,9 @@ end
 --- @param catalogue table Strings infra.locale.catalogue() returns.
 --- @return string html, table errors
 local function build(locale, catalogue)
-	local saved_locale, saved_i18n = package.loaded["infra.locale"], package.loaded["infra.i18n"]
-	package.loaded["infra.locale"] = { catalogue = function() return catalogue end }
-	package.loaded["infra.i18n"] = { get_locale = function() return locale end }
+	local saved_locale, saved_i18n = package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.i18n"]
+	package.loaded["core.i18n.engine.locale"] = { catalogue = function() return catalogue end }
+	package.loaded["core.i18n.engine.i18n"] = { get_locale = function() return locale end }
 	local builder = require("ui.ui_builder")
 	local logger = require("infra.logger")
 	helpers.admit_logger_privacy(logger)
@@ -109,7 +109,7 @@ local function build(locale, catalogue)
 	local dir, name = fixture()
 	local ok_build, html = pcall(builder.build_injected_html, dir, name)
 	logger.error = original
-	package.loaded["infra.locale"], package.loaded["infra.i18n"] = saved_locale, saved_i18n
+	package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.i18n"] = saved_locale, saved_i18n
 	return ok_build and html or "", errors
 end
 

@@ -33,7 +33,7 @@ local function run_window(module_name, scenario)
 		"ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"core.fs.engine.app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+		"core.fs.engine.app_dirs", "infra.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, controllers = {}, timers = {} }
@@ -78,7 +78,7 @@ local function run_window(module_name, scenario)
 		})
 		-- The cleanup window is named by the shared manifest through the real
 		-- translator; the loader's passthrough would leave it a bare key, refused.
-		if module_name == "ui.config_cleanup" then package.loaded["infra.i18n"] = nil end
+		if module_name == "ui.config_cleanup" then package.loaded["core.i18n.engine.i18n"] = nil end
 		if module_name == "ui.onboarding" then require("tests.support.onboarding_shared_data").install() end
 		if module_name == "ui.changelog" then
 			local files = require("core.fs.adapters.file_system")

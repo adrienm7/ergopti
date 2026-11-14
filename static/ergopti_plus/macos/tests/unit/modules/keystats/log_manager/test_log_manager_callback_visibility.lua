@@ -44,7 +44,7 @@ local function fresh_manager()
 		ms = function() return 1000 end,
 		sec = function() return 1 end,
 	}
-	package.loaded["infra.i18n"] = {}
+	package.loaded["core.i18n.engine.i18n"] = {}
 	package.loaded["core.fs.adapters.file_system"] = {}
 	package.loaded["core.events.timer_scheduler"] = {}
 	package.loaded["modules.keystats.sqlite_writer"] = {

@@ -12,7 +12,7 @@ local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths", "core.fs.engine.dir",
-			"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
+			"core.i18n.engine.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
 			"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
 				output = "", status = true, kind = "exit", code = 0 }
@@ -22,7 +22,7 @@ local function with_apps(callback)
 			end
 			package.loaded["infra.logger"] = logger
 			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/locales" end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 				state.calls[#state.calls + 1] = directory
 				if directory:find("/Contents/Resources", 1, true) then
@@ -230,7 +230,7 @@ helpers.describe("the shared empty Applications caption", function()
 				local catalogue = assert(Json.decode(locale_file:read("*a")))
 				locale_file:close()
 				helpers.assert_eq(catalogue[corpus.row.i18n], expected)
-				package.loaded["infra.i18n"].get = function(key) return catalogue[key] or key end
+				package.loaded["core.i18n.engine.i18n"].get = function(key) return catalogue[key] or key end
 				local rows = module.build(ctx).submenu
 				helpers.assert_eq(rows, { { title = expected, disabled = true } })
 				helpers.assert_nil(rows[1].fn)
@@ -275,7 +275,7 @@ local function with_native_apps_parent(language, body)
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local native, owner, receipt, acquired, scratch
 	local result, detail = xpcall(function()
-		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+		for _, name in ipairs({ "ui.menu.menu_apps", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"infra.manifest_menu", "infra.config_paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
 			"adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
@@ -291,9 +291,9 @@ local function with_native_apps_parent(language, body)
 			return previous_getenv(name)
 		end
 		local paths = require("infra.config_paths"); helpers.assert_eq(paths.init(scratch .. "/"), true)
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end); native.init()
 		owner = { pending = function() return false end }
 		acquired = native.scope_acquire(owner); helpers.assert_eq(acquired, true)
@@ -492,7 +492,7 @@ helpers.describe("Apps native locale cohort restoration", function()
 	for _, raises in ipairs({ false, true }) do
 		helpers.it("(apps-parent-native) restores a genuine French predecessor after " .. (raises and "raise" or "success"), function()
 			with_native_apps_parent("fr", function(_, renderer, _, _, native)
-				local names = { "infra.i18n", "infra.locale", "infra.manifest_menu", "ui.menu.menu_apps" }
+				local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu", "ui.menu.menu_apps" }
 				local prior = {}
 				for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 				local ok, message = pcall(function()

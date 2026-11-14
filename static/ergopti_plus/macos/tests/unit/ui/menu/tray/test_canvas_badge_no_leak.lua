@@ -267,7 +267,7 @@ end
 --- @param body function Receives actual module, native effects, renderer and i18n.
 local function with_badge_frame(body)
 	return helpers.with_stub_scope({ "ui.menu.canvas_badge", "infra.manifest_menu", "menu.engine.renderer",
-		"infra.i18n", "infra.logger" }, function()
+		"core.i18n.engine.i18n", "infra.logger" }, function()
 		local canvas, counters = make_canvas_stub()
 		counters.draws, counters.texts, counters.events = 0, {}, {}
 		local new_canvas = canvas.new
@@ -297,7 +297,7 @@ local function with_badge_frame(body)
 			return measure(...)
 		end
 		local module = helpers.load_with_stubs("ui.menu.canvas_badge", { canvas = canvas, drawing = drawing })
-		return body(module, counters, require("infra.manifest_menu"), require("infra.i18n"))
+		return body(module, counters, require("infra.manifest_menu"), require("core.i18n.engine.i18n"))
 	end)
 end
 

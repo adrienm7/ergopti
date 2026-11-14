@@ -31,7 +31,7 @@ local function with_window(module_name, scenario)
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.deferred_work"] = { after = function(_, callback)
 			state.deferred[#state.deferred + 1] = callback

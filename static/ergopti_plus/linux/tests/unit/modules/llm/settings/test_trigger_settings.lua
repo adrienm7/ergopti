@@ -375,7 +375,7 @@ end)
 helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("renders the declared trigger submenu and changes a privacy filter", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
@@ -412,7 +412,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 
 	helpers.it("offers the minimum request interval next to the idle time and saves a preset (request-floor-setting)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
@@ -445,7 +445,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 
 	helpers.it("offers the \"never\" idle time as macOS does and shows it as the current choice (llm-debounce-never)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local function build()
 			return menu_builder.build({
@@ -557,7 +557,7 @@ local function with_trigger_menu(options, body)
 				end
 				return root
 			end,
-			i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
+			i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
 	end
@@ -584,7 +584,7 @@ local function with_trigger_menu(options, body)
 	local parent
 	local function walk(rows)
 		for _, row in ipairs(rows or {}) do
-			if row.title == require("infra.i18n").get("menu.llm.trigger_menu_title") and type(row.menu) == "table" then parent = row end
+			if row.title == require("core.i18n.engine.i18n").get("menu.llm.trigger_menu_title") and type(row.menu) == "table" then parent = row end
 			if row.menu then walk(row.menu) end
 		end
 	end
@@ -601,7 +601,7 @@ end
 local function trigger_row(parent, key)
 	-- A greyed row is drawn « label — reason » (33c0db4fa4 gave the privacy
 	-- filters their save_unavailable reason), so the label is its prefix.
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(parent.menu) do
 		if type(row.title) == "string" and (row.title == label or row.title:sub(1, #label + 1) == label .. " ") then
 			return row
@@ -639,7 +639,7 @@ helpers.describe("LLM shared automatic trigger controls", function()
 	helpers.it("takes shared labels and reordering into actual projection (shared-automatic-triggers)", function()
 		local corpus = trigger_corpus()
 		with_trigger_menu({states = {false, true}, label = corpus.alternate_i18n, first = true}, function(parent, _, _, observed)
-			helpers.assert_eq(parent.menu[1].title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(parent.menu[1].title, require("core.i18n.engine.i18n").get(corpus.alternate_i18n))
 			helpers.assert_true(parent.menu[2].menu ~= nil, "numeric debounce provider follows the reordered shared check")
 			helpers.assert_eq(observed.writes, 0)
 		end)

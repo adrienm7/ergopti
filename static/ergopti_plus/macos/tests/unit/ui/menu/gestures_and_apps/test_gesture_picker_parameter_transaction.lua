@@ -56,7 +56,7 @@ local function with_picker(options, callback)
 	local ok, failure = xpcall(function()
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
 		package.loaded["ui.menu.menu_utils"] = {}
-		package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function() fixture.errors = fixture.errors + 1 end
 		package.loaded["infra.logger"] = logger
@@ -76,7 +76,7 @@ local function with_picker(options, callback)
 			platform = "hs",
 			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode,
-			i18n = package.loaded["infra.i18n"], logger = logger,
+			i18n = package.loaded["core.i18n.engine.i18n"], logger = logger,
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,

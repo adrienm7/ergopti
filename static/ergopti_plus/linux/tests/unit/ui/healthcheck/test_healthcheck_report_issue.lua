@@ -112,7 +112,7 @@ end
 local function approved_text(long)
 	local config = documents()
 	return Share.document(host_snapshot(long), config.schema,
-		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+		require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key)).text
 end
 
 --- Receives the explicit completion from these deliberately inline effect ports.
@@ -379,7 +379,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		overrides = recording(calls)
 		overrides.save = nil
 		local snapshot, config = host_snapshot(false), documents()
-		local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+		local document = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 		local paths = { diagnostics_dir = dir, logs_dir = dir }
 		local function save()
 			return completed(Report, { action = "save", text = document.text, name = document.name }, paths,
@@ -402,7 +402,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 			local dir = os.tmpname(); os.remove(dir); local executed = os.execute("mkdir -p '" .. dir .. "'"); assert(executed == true or executed == 0)
 			local calls, overrides = {}, nil; overrides = recording(calls); overrides.save = nil
 			local snapshot, config = host_snapshot(false), documents()
-			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+			local document = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			local target, collision = dir .. "/protected", dir .. "/" .. document.name
 			local f = assert(io.open(target, "wb")); f:write("protected"); f:close()
 			local command = kind == "symlink" and ("ln -s '" .. target .. "' '" .. collision .. "'")
@@ -466,7 +466,7 @@ helpers.describe("closed diagnostic sharing corpus", function()
 		local config = documents()
 		for _, vector in ipairs(corpus.vectors) do
 			local document = Share.document(vector.snapshot, config.schema,
-				require("infra.i18n").get(config.schema.share_policy.notice_key))
+				require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			for _, canary in ipairs(vector.canaries) do
 				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
 			end
@@ -774,7 +774,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 			return completed_action_for(Report, action, config, context, overrides, snapshot)
 		end
 		local function text(with_log)
-			return Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key),
+			return Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key),
 				with_log).text
 		end
 		return { calls = calls, config = config, snapshot = snapshot, context = context, run = run, text = text }
@@ -813,7 +813,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local text = f.text(true)
 		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
 		local document = Share.document(f.snapshot, f.config.schema,
-			require("infra.i18n").get(f.config.schema.share_policy.notice_key), true)
+			require("core.i18n.engine.i18n").get(f.config.schema.share_policy.notice_key), true)
 		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#f.calls.save, 2)

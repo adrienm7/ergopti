@@ -28,7 +28,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local engine_keys = 0
 			for _ in pairs(require("platform.remap.tap_hold_engine").KEY_CODES) do engine_keys = engine_keys + 1 end
 			helpers.assert_eq(#key_rows(section), engine_keys, "every key the engine can remap has its row")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local reset = find(section.menu, i18n.get("common.restore_recommended"))
 			local disable = find(section.menu, i18n.get("common.clear_to_system"))
 			local toggle = find(section.menu, i18n.get("menu.tapholds.enable"))
@@ -80,7 +80,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local caps = find(key_rows(section), i18n.get("key_name.caps_lock"))
 			helpers.assert_true(caps ~= nil, "a CapsLock row")
 			local hold = find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
@@ -112,7 +112,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local HoldOptions = require("tap_hold.engine.hold_options")
 			local options = Manager.hold_options()
 			local shift = find(key_rows(section), i18n.get("key_name.left_shift"))
@@ -138,7 +138,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local set_hold = writer.set_hold
 			local execute = os.execute
 			local ok, err = pcall(function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				if receipt == "false" then writer.set_hold = function() return false end
 				elseif receipt == "nil" then writer.set_hold = function() return nil end
 				elseif receipt == "throw" then writer.set_hold = function() error("controlled write failure") end end
@@ -163,7 +163,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local shift = find(key_rows(section), i18n.get("key_name.left_shift"))
 			local tap = find(shift.menu, string.format(i18n.get("tap_hold.picker.tap"), ""):sub(1, 4))
 			tap.fn()
@@ -187,7 +187,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local alt_gr = find(key_rows(section), i18n.get("key_name.alt_gr"))
 			helpers.assert_true(alt_gr ~= nil, "an AltGr row")
 			helpers.assert_contains(alt_gr.title, "  /  " .. i18n.get("key_name.alt_gr"),
@@ -213,7 +213,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked, '[tap_hold.keys.caps_lock]\nhold_modifier = "Shift + Ctrl"\n')
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local combo = i18n.get("key_name.ctrl") .. " + " .. i18n.get("key_name.shift")
 			local caps = find(key_rows(section), i18n.get("key_name.caps_lock"))
 			helpers.assert_contains(caps.title, "  /  " .. combo)
@@ -262,7 +262,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local ctrl = find(key_rows(section), i18n.get("key_name.left_ctrl"))
 			helpers.assert_true(ctrl.checked, "a configured key is ticked")
 			find(ctrl.menu, i18n.get("tap_hold.action.disable")).fn()
@@ -281,7 +281,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = section.menu
 			local function index_of(title)
 				for index, row in ipairs(rows) do
@@ -324,7 +324,7 @@ helpers.describe("declared per-key native command", function()
 			local calls, picked = {}, {}
 			local section, Manager = build(calls, picked)
 			local ok, err = pcall(function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local key = configured and "left_ctrl" or "escape"
 				local parent = assert(find(key_rows(section), i18n.get("key_name." .. key)))
 				local row = parent.menu[1]
@@ -350,7 +350,7 @@ helpers.describe("declared per-key native command", function()
 			local calls, picked = {}, {}
 			local section
 			section, Manager = build(calls, picked)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local ctrl = assert(find(key_rows(section), i18n.get("key_name.left_ctrl")))
 			helpers.assert_eq(ctrl.menu[1].title, i18n.get("menu.shortcuts.title"))
 			ctrl.menu[1].fn()
@@ -440,7 +440,7 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 				_version = "test", on_quit = function() end, tap_holds = Manager,
 				on_menu_changed = function() refreshes = refreshes + 1 end,
 			})
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("key_name.left_ctrl")))
 			local callback = ctrl.menu[1].fn
@@ -486,7 +486,7 @@ helpers.describe("declared complete per-key head", function()
 			if mutate then mutate(declaration) end
 			local calls, picked, section = {}, {}, nil
 			section, Manager = build(calls, picked)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local key = assert(find(key_rows(section), i18n.get("key_name.left_shift")))
 			body(key.menu, calls, picked, i18n)
 		end)
@@ -699,7 +699,7 @@ helpers.describe("declared complete per-key delay tail", function()
 			group.i18n, group.caption_getter = "tap_hold.picker.hold", "tap_hold_key_hold_caption"
 			local section, current = build({}, {})
 			Manager = current
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local key = assert(find(key_rows(section), i18n.get("key_name.left_shift")))
 			helpers.assert_eq(key.menu[6].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("key_name.shift")))
 			helpers.assert_nil(key.menu[6].menu, "the delay row is a command, not a submenu")
@@ -741,7 +741,7 @@ helpers.describe("declared complete per-key delay tail", function()
 			local items = helpers.load_module("ui.menu.builder").build({ _version = "test",
 				on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 				on_menu_changed = function() refreshes = refreshes + 1 end })
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("key_name.left_ctrl")))
 			helpers.assert_nil(ctrl.menu[6].menu, "the delay row opens the prompt itself")

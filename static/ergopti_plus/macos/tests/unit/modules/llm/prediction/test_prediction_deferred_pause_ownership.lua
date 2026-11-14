@@ -162,7 +162,7 @@ local function load_fixture()
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.1 end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		t = function(key) return key end,
 	}

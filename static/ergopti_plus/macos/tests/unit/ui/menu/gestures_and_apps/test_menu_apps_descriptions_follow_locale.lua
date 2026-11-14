@@ -18,7 +18,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({ "ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths",
-				"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
+				"core.i18n.engine.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },
@@ -51,7 +51,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 				provider_view.group_row = binding.group_row
 				-- load_with_stubs installs its own i18n table and the module keeps that
 				-- reference, so the language switch is made on that very table.
-				package.loaded["infra.i18n"].get = function(key)
+				package.loaded["core.i18n.engine.i18n"].get = function(key)
 					return texts[locale][key] or key
 				end
 				local ctx = { base_dir = "/virtual/apps-fixture" }

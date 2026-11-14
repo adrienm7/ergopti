@@ -70,7 +70,7 @@ end
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
 	local o = type(opts) == "table" and opts or {}
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 
 	local items = type(o.items) == "table" and o.items or nil
 	if not items then

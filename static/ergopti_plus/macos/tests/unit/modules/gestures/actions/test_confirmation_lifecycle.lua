@@ -91,7 +91,7 @@ local function with_world(callback)
 			local Actions = require("modules.gestures.actions")
 			Actions.init({ action_params = {} })
 			local Confirm = require("modules.gestures.action_confirm")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			w.actions, w.confirm_owner = Actions, Confirm
 			function w.ask()
 				helpers.assert_eq(Actions.execute_single("force_quit_frontmost", "tap_3"), true)

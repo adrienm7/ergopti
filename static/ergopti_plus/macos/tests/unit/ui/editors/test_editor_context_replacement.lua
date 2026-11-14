@@ -20,7 +20,7 @@ local function with_editor(module_name, callback)
 			"ui.ui_builder",
 			"infra.logger",
 			"core.fs.engine.paths",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"hs",
 			"tests.stubs.hs",
 			"adapters.webview_result", "core.fs.engine.dir", "infra.text_utils", "platform.remap.lease_helper",
@@ -71,7 +71,7 @@ local function with_editor(module_name, callback)
 			package.loaded["core.fs.engine.paths"] = {
 				shared = function(relative) return "/shared/" .. tostring(relative) end,
 			}
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 			}
 			package.loaded["ui.ui_builder"] = {

@@ -21,7 +21,7 @@ local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
 local llm_mod       = require("modules.llm")
-local i18n          = require("infra.i18n")
+local i18n          = require("core.i18n.engine.i18n")
 local Logger        = require("infra.logger")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")

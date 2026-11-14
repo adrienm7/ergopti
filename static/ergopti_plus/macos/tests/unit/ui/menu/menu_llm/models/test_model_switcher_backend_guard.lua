@@ -19,7 +19,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local prediction_states = {}
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -93,7 +93,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local pending_ok
 		local prediction_states = {}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -152,7 +152,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local runtime_available = true
 		local prediction_states = {}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -208,7 +208,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local display_models = {}
 		local saves, updates = 0, 0
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -284,7 +284,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			return table.unpack(results, 1, results.n)
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
 		package.loaded["infra.notifications"] = {notify = noop}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {

@@ -332,7 +332,7 @@ function M.on_message(payload, state, context)
 		})
 		owner.data = data
 		local manager = dependency(state, "webview_manager", "ui.webview_manager")
-		local i18n = dependency(state, "i18n", "infra.i18n")
+		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if manager and type(manager.set_title) == "function" and i18n and type(i18n.get) == "function" then
 			manager.set_title(APP_NAME, i18n.get("layer_editor.window_title"))
 		end

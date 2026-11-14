@@ -90,7 +90,7 @@ helpers.describe("menu provider kind matches the manifest declaration (macOS)", 
 		input.build_kl_name_to_tis_id = function() return {} end
 		input.resolve_installed_ergopti_version = function() return nil end
 		input.ergopti_in_active_layouts = function() return false end
-		local renderer = LayoutFixture.install(require("infra.i18n"))
+		local renderer = LayoutFixture.install(require("core.i18n.engine.i18n"))
 		package.loaded["ui.menu.menu_keyboard_layout"] = nil
 		local Layout = require("ui.menu.menu_keyboard_layout")
 		local source_rows, source_refs

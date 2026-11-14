@@ -206,7 +206,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 				set = function() error("metrics scope must not write legacy storage") end,
 			}
 			with_scope(function(_, collector)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				package.loaded["ui.menu.builder"] = nil
 				local passed, detail = pcall(function()
 					local rows = require("ui.menu.builder").build({ keystats = collector,
@@ -275,7 +275,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						local action
 						local function find(items)
 							for _, row in ipairs(items) do
-								if row.title == require("infra.i18n").get(key) then action = row.fn end
+								if row.title == require("core.i18n.engine.i18n").get(key) then action = row.fn end
 								if row.menu then find(row.menu) end
 							end
 						end

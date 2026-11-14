@@ -193,7 +193,7 @@ function M.report_bug(overrides, complete)
 		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
 			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
 		local document = Share.document(snapshot, documents.schema,
-			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		return M.perform({ action = "report", text = document.text, fields = document.fields },
 			snapshot.sections.paths, documents, M.redaction_context(overrides), overrides, snapshot, owner)
 	end)
@@ -207,7 +207,7 @@ function M.suggest_feature(overrides, complete)
 	return menu_request(ConfigKeys.COMMAND.SUGGEST_FEATURE, overrides, complete, function(owner)
 		local snapshot, documents = menu_snapshot()
 		local document = Share.document(snapshot, documents.schema,
-			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
 		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
 	end)

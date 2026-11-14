@@ -47,7 +47,7 @@ end
 --- @param row_key string i18n key of the row label.
 --- @return table|nil row
 local function tray_row(ctx, section_key, row_key)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	package.loaded["ui.menu.builder"] = nil
 	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string" and section.title:find(i18n.get(section_key), 1, true) == 1 then

@@ -224,7 +224,7 @@ helpers.describe("pause and resume notices", function()
 		local construction = assert(source:match("local script_actions = ScriptActions%.new%(%{(.-)\n\t%}%)"))
 		helpers.assert_true(construction:find(
 			"notify = notifier and function(key, level)\n"
-				.. "\t\t\treturn notifier.send(require(\"infra.i18n\").get(key), { level = level })", 1, true) ~= nil,
+				.. "\t\t\treturn notifier.send(require(\"core.i18n.engine.i18n\").get(key), { level = level })", 1, true) ~= nil,
 			"the daemon must pass the notice to the desktop, translated, at its level")
 	end)
 

@@ -54,8 +54,8 @@ helpers.load_with_stubs("modules.keymap.registry")
 --- @return table, table state, Registry module reference
 local function fresh_registry()
 	-- Clear the dependency chain that calls hs.settings.get at load-time
-	package.loaded["infra.i18n"]                   = nil
-	package.loaded["infra.locale"]                 = nil
+	package.loaded["core.i18n.engine.i18n"]                   = nil
+	package.loaded["core.i18n.engine.locale"]                 = nil
 	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	-- Refresh the hs stub so hs.settings is available for the new require chain

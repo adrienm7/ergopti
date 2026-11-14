@@ -105,7 +105,7 @@ helpers.describe("llm_language parameter: what the binding editors show", functi
 	local names = read_json("core/i18n/data/locale_names.json")
 	local order = read_json("core/i18n/data/locale_order.json")
 	local config = read_json("ai/data/translate.json")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 
 	--- The label of the interface-language choice for the current locale.
 	--- @return string

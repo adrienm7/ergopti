@@ -20,7 +20,7 @@ local MODULE_NAMES = {
 	"core.fs.adapters.file_system",
 	"infra.deferred_work",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"core.fs.engine.paths",
@@ -258,7 +258,7 @@ function M.with_finish(opts, scenario)
 	if opts.menu_paths then package.loaded["ui.menu.menu_paths"] = opts.menu_paths end
 	state.active_locale = opts.active_locale or "en"
 	state.persisted_locales, state.switched_locales = {}, {}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		get_locale = function() return state.active_locale end,
 		set_locale_no_reload = function(code)

@@ -19,7 +19,7 @@ local function with_fixture(listing, callback)
 		"modules.diagnostics.crash_reporter",
 		"core.fs.adapters.file_system",
 		"infra.config_paths",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.logger",
 		"core.fs.engine.dir",
 	}
@@ -38,7 +38,7 @@ local function with_fixture(listing, callback)
 				return true
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local logger_stub = helpers.make_logger_stub()
 		logger_stub.crash_reports_dir = function() return "/virtual/logs/crash_reports/" end
 		logger_stub.warn = function(_, fmt, ...) state.warnings[#state.warnings + 1] = string.format(fmt, ...) end

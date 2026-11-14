@@ -134,7 +134,7 @@ local function version_row(identity)
 	local ok, items = pcall(mb.build, { on_quit = function() end })
 	Version.identity = real_identity
 	if not ok then error(items, 0) end
-	local title = require("infra.i18n").get("menu.about.title")
+	local title = require("core.i18n.engine.i18n").get("menu.about.title")
 	for _, item in ipairs(items) do
 		if item.title == title then return item.menu[1].title end
 	end
@@ -146,7 +146,7 @@ end
 --- @param values table Placeholder → value.
 --- @return string
 local function expected(key, values)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for placeholder, value in pairs(values) do
 		local at = text:find(placeholder, 1, true)
 		assert(at, key .. " must carry " .. placeholder)
@@ -212,7 +212,7 @@ helpers.describe("tray (linux): the About version row names the build and its co
 		end)
 		helpers.assert_eq(identity, { kind = "local", version = "", commit = "" })
 		helpers.assert_eq(row, expected("menu.about.version_local", {
-			["{commit}"] = require("infra.i18n").get("menu.about.commit_unknown"),
+			["{commit}"] = require("core.i18n.engine.i18n").get("menu.about.commit_unknown"),
 		}))
 		local warned = lines_with(lines, "WARNING", "Build commit unknown")
 		helpers.assert_eq(#warned, 1, "expected one WARNING naming the missing data; got:\n" .. table.concat(lines, "\n"))

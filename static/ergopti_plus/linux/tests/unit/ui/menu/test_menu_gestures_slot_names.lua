@@ -18,7 +18,7 @@ local SHARED_ROOT = "../_shared"
 helpers.describe("gesture slot names", function()
 	helpers.it("names every slot by its translated gesture.slots text", function()
 		local Manager = require("modules.gestures.manager")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local saved = i18n.get
 		local ok, err = pcall(function()
 			local slots = {}

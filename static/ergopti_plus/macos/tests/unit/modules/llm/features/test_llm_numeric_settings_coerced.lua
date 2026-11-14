@@ -118,7 +118,7 @@ package.loaded["modules.llm.api_common"] = {
 	get_retry_policy              = function() return 2, 0.18, 5 end,
 }
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }

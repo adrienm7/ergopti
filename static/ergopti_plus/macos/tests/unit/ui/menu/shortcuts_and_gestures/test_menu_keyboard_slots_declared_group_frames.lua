@@ -56,7 +56,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "a"
 		local fixed = { label = "Independent fixed row", action = function() error("a fixed row must not run during build") end }
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local add_label = (i18n.get("menu.shortcuts.alt_add"):gsub("{1}", i18n.get("key_name.option")))
 		local restore_label = i18n.get("common.restore_recommended")
 		local clear_label = i18n.get("common.clear_to_system")
@@ -104,7 +104,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 	it("names each group's modifiers in its heading and Add row in all twenty-one catalogues", function()
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local locales = keyboard_frame_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21, "this assertion covers every actual supported catalogue")
 		-- Spelled here, not read from the driver: the groups are Option, Ctrl,

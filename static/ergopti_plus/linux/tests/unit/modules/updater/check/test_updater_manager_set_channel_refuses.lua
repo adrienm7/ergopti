@@ -127,7 +127,7 @@ helpers.describe("modules.updater.manager", function()
 	-- never have caught that, and neither can it catch i18n.get echoing the raw
 	-- key back on a miss.
 	helpers.it("the idle label comes from the shared catalogue", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		M.clear_cached_release()
 		local label = M.get_menu_label()
 		-- The registry channel is displayed on its own checked row.
@@ -143,7 +143,7 @@ helpers.describe("modules.updater.manager", function()
 	-- only got another check, next to the "Download and install <tag>" row that
 	-- really installs it.
 	helpers.it("the check row still names a check while a release is available", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
 		local label = M.get_menu_label()
 		local expected = i18n.get("menu.about.check_for_updates")

@@ -192,8 +192,8 @@ function M.build_world(options)
 	}
 	-- The harness's i18n stub echoes keys: the labels and notices are read from
 	-- the real French catalogue instead, so their arguments are compared too
-	local i18n = require("infra.i18n")
-	local Locale = require("infra.locale")
+	local i18n = require("core.i18n.engine.i18n")
+	local Locale = require("core.i18n.engine.locale")
 	Locale.set_locale("fr")
 	i18n.get_locale = function() return "fr" end
 	i18n.get = function(key)

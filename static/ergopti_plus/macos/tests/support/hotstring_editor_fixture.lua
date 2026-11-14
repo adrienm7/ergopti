@@ -26,7 +26,7 @@ local function with_editor(test)
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.notifications"] = { notify = function()
 			state.notifications = state.notifications + 1
 		end }

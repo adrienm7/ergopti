@@ -62,7 +62,7 @@ end
 --- @return table|nil rows
 local function configuration_rows(paused, fired)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
 	local ok, menu = pcall(builder.generate, { config = { log_level = 2 }, paused = paused }, {},
@@ -157,7 +157,7 @@ end)
 --- @return table|nil rows
 local function rows_with_karabiner(enabled, calls)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
 	local karabiner = {
@@ -221,11 +221,11 @@ end)
 --- @param body function Independent source and finished-row assertions.
 local function configuration_parent_fixture(body)
 	local saved = {}
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
 	helpers.load_with_stubs("core.fs.engine.paths")
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
 	local native = require("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	local callbacks, actions = {}, {}
 	local getter_observer = { calls = 0 }
@@ -242,7 +242,7 @@ local function configuration_parent_fixture(body)
 	local function build(paused) return native.generate({ paused = paused }, {}, published_actions) end
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, getter_observer) end, debug.traceback)
 	locale.set_locale(language)
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
 	if not ok then error(detail, 0) end
 end
 

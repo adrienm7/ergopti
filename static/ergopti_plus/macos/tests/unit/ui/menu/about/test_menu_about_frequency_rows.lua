@@ -70,7 +70,7 @@ end
 
 --- The row whose submenu is the frequency picker.
 local function picker(rows)
-	local prefix = require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.about.frequency_menu"), "")
+	local prefix = require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get("menu.about.frequency_menu"), "")
 	for _, row in ipairs(rows) do
 		if type(row.title) == "string" and row.title:find(prefix, 1, true) == 1 then return row end
 	end
@@ -81,7 +81,7 @@ helpers.describe("menu_about: the check frequency (macOS)", function()
 	helpers.it("lists the shared presets after the check row, ticked on the interval in force", function()
 		local checks = fake_checks("1d")
 		local rows = build(checks)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local row = picker(rows)
 		helpers.assert_not_nil(row, "the About submenu must offer the check frequency")
 		helpers.assert_eq(row.title, i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency.1d"),
@@ -140,12 +140,12 @@ helpers.describe("menu_about: the check frequency (macOS)", function()
 		--- The reason as the renderer shortens it: its text before the first colon.
 		--- Read after a build, which loads the locale module the page was drawn with.
 		local function reason_head()
-			local reason = require("infra.i18n").get("menu.about.source_run_reason")
+			local reason = require("core.i18n.engine.i18n").get("menu.about.source_run_reason")
 			return reason:match("^(.-)%s*[:：]") or reason
 		end
 		for _, case in ipairs({ { state = {}, code = "1d" }, { state = { update_check_interval_seconds = 604800 }, code = "1w" } }) do
 			local rows = build(nil, true, case.state)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local head = reason_head()
 			local expected = {
 				i18n.get("menu.about.check_for_updates"),
@@ -243,7 +243,7 @@ helpers.describe("shared updater frequency choices (macOS)", function()
 			local obs = actual_checks(nil, expected.stored)
 			local row = assert(picker(build(obs.owner)))
 			helpers.assert_eq(#row.menu, #corpus.choices)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
 			for index, choice in ipairs(corpus.choices) do
 				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
@@ -310,7 +310,7 @@ helpers.describe("published updater frequency choices (macOS)", function()
 			local row = assert(picker(build(checks)))
 			helpers.assert_eq(#row.menu, #choices)
 			for index, choice in ipairs(choices) do
-				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, require("core.i18n.engine.i18n").get(choice.i18n))
 				row.menu[index].fn()
 				helpers.assert_eq(calls[index], choice.value, "the published seconds reach the existing owner")
 			end

@@ -29,7 +29,7 @@ local CONFIRM_OWNED = {
 	"adapters.mouse_control",
 	"adapters.window_info",
 	"adapters.window_manager",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 }
 
@@ -52,7 +52,7 @@ local function with_confirm(body, frame, focus)
 			end,
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, value) return key .. ":" .. tostring(value) end,
 		}

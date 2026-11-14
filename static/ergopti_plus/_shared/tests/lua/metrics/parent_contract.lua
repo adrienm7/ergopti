@@ -160,7 +160,7 @@ function M.register(helpers, fixture, corpus, platform)
 		end)
 		helpers.it("independent final physical Metrics caption callback cannot withdraw parent authority", function()
 			with_case(function(root, _, build, observed)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local old_get, old_group, top = i18n.get, require("infra.manifest_menu").group_row, root.top_level
 				local renderer = require("infra.manifest_menu")
 				local in_parent, calls = false, 0
@@ -188,7 +188,7 @@ function M.register(helpers, fixture, corpus, platform)
 		end)
 		helpers.it("metrics-parent refuses direct source field drift during the final physical caption", function()
 			with_case(function(_, parent, build)
-				local i18n, renderer = require("infra.i18n"), require("infra.manifest_menu")
+				local i18n, renderer = require("core.i18n.engine.i18n"), require("infra.manifest_menu")
 				local original_get, original_group = i18n.get, renderer.group_row
 				local inside, calls = false, 0
 				renderer.group_row = function(...)

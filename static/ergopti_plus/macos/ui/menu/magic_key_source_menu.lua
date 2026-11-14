@@ -26,7 +26,7 @@ local M = {}
 
 local hs              = hs
 local Logger          = require("infra.logger")
-local i18n            = require("infra.i18n")
+local i18n            = require("core.i18n.engine.i18n")
 local Keycodes        = require("infra.keycodes")
 local Notifications   = require("infra.notifications")
 local Timings         = require("infra.timings")

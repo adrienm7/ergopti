@@ -46,7 +46,7 @@ local function load_fixture()
 			return { frame = function() return { w = 1440, h = 900 } end }
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
 	package.loaded["infra.deferred_work"] = { after = function() return true end }
 	package.loaded["ui.ui_builder"] = {

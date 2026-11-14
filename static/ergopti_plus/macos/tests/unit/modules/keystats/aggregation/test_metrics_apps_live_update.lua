@@ -84,7 +84,7 @@ local function load_dashboard(options)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.dialog_util"] = {}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() return "{}", "ok" end,
 		write = function() return true end,

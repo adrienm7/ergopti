@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.i18n"] = { get = function(k) return k end, t = function(k) return k end }
+package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, t = function(k) return k end }
 local Export = helpers.load_with_stubs("modules.keystats.export")
 
 local function fixture()

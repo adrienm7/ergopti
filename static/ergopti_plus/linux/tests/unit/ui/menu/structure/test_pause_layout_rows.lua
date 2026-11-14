@@ -107,7 +107,7 @@ helpers.describe("pause layout rows", function()
 		state.backend = nil
 		local rows = Rows.rows(state.ctx)
 		helpers.assert_eq(#rows, 1, "one status line, no switch and no pickers")
-		helpers.assert_eq(rows[1].label, require("infra.i18n").get("menu.layout.pause_layout_unsupported_desktop"))
+		helpers.assert_eq(rows[1].label, require("core.i18n.engine.i18n").get("menu.layout.pause_layout_unsupported_desktop"))
 		helpers.assert_true(rows[1].label:find("GNOME", 1, true) ~= nil, rows[1].label)
 		helpers.assert_eq(rows[1].disabled, true, "the status line is inert")
 		helpers.assert_eq(state.refreshes, 0, "nothing is listed on such a desktop")

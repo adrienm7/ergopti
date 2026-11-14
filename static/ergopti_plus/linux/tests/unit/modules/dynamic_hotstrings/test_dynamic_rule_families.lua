@@ -385,7 +385,7 @@ helpers.describe("dynamic rule families: the rows", function()
 		for index, key in ipairs({ "menu.hotstrings.scope_enable_all", "menu.hotstrings.scope_disable_all" }) do
 			local command = (sub or {})[index]
 			helpers.assert_not_nil(command)
-			helpers.assert_eq(command.title, require("infra.i18n").get(key))
+			helpers.assert_eq(command.title, require("core.i18n.engine.i18n").get(key))
 			helpers.assert_nil(command.checked)
 			helpers.assert_eq(command.disabled == true, false)
 			helpers.assert_type(command.fn, "function")

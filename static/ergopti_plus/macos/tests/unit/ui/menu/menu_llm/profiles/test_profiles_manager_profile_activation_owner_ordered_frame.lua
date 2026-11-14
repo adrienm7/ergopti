@@ -43,7 +43,7 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 		if options.custom then options.user_profiles = { { id = "user_canonical", label = "Canonical" } } end
 		with_profiles_fixture(options, function(fixture)
 			local document = read("menu/data/menu_manifest.json")
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			i18n.section = function(key) return "— " .. i18n.get(key) .. " —" end
 			local Menu = assert(require("menu.engine.renderer").new({ platform = "hs",
 				manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,

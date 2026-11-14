@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local ContentDigest = require("tests.support.content_digest")
 local RunloopTimers = require("tests.support.runloop_timers")
 
-package.loaded["infra.i18n"] = { get = function(k) return k end, t = function(k) return k end }
+package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, t = function(k) return k end }
 local Export = helpers.load_with_stubs("modules.keystats.export")
 
 local BATCH = "\nBEGIN TRANSACTION;\nINSERT OR IGNORE INTO events VALUES (1);\nCOMMIT;\n"

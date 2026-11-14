@@ -89,7 +89,7 @@ assert.ok(
 for (const statement of [
 	'local TextPrompt = require("ui.text_prompt")',
 	'local WindowTitles = require("core.ui.engine.window_titles")',
-	'local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")'
+	'local uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")'
 ])
 	assert.equal(
 		whole.split(statement).length - 1,

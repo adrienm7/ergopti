@@ -13,7 +13,7 @@
 
 local M = {}
 
-local i18n            = require("infra.i18n")
+local i18n            = require("core.i18n.engine.i18n")
 local ManifestMenu    = require("infra.manifest_menu")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
 local CapsWordPolicy  = require("keyboard.engine.caps_word_auto_off")

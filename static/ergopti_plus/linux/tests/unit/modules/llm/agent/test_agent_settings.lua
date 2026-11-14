@@ -17,7 +17,7 @@
 
 local helpers = require("tests.helpers")
 local ActualScenario = require("tests.support.agent_scenario")
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 
 helpers.it("refuses fractional agent count limits", function()
 	local Json = require("core.text.engine.json")
@@ -749,12 +749,12 @@ end
 --- @param code string Runtime-only fixture locale.
 --- @param scenario function Receives the authentic production i18n owner.
 local function with_system_model_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired
 	local ok, err = pcall(function()
-		native = require("infra.i18n")
+		native = require("core.i18n.engine.i18n")
 		native.init()
 		owner = { pending = function() return false end }
 		acquired = native.scope_acquire(owner)
@@ -763,7 +763,7 @@ local function with_system_model_locale(code, scenario)
 		helpers.assert_not_nil(receipt)
 		helpers.assert_eq(native.scope_apply(owner, receipt, code), true)
 		helpers.assert_eq(native.get_locale(), code)
-		helpers.assert_eq(require("infra.locale").current_locale(), code)
+		helpers.assert_eq(require("core.i18n.engine.locale").current_locale(), code)
 		if component_depth > 0 then
 			with_agent_declaration(true, function() scenario(native) end)
 		else
@@ -924,17 +924,17 @@ end)
 --- @param scenario function Receives the French owner and newer backend.
 local function with_system_model_french_seed(scenario)
 	with_system_model_locale("fr", function(native)
-		local backend, core = package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"]
+		local backend, core = package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"]
 		local ok, err = pcall(function()
 			require("infra.manifest_menu").get_root()
-			local newer = helpers.load_module("infra.locale")
+			local newer = helpers.load_module("core.i18n.engine.locale")
 			newer.set_locale("en")
 			helpers.assert_eq(newer.get("menu.agent.model"), "Model… ({1})")
 			helpers.assert_eq(native.get("menu.agent.model"), "Modèle… ({1})",
 				"the old fixture changes a different genuine backend than the native producer")
 			scenario(native, newer)
 		end)
-		package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = backend, core
+		package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"] = backend, core
 		if not ok then error(err, 0) end
 	end)
 end
@@ -942,7 +942,7 @@ end
 helpers.describe("Agent model locale cohort isolation (agent-system-model)", function()
 	helpers.it("uses actual English producers and restores the split French cohort exactly (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -966,7 +966,7 @@ helpers.describe("Agent model locale cohort isolation (agent-system-model)", fun
 
 	helpers.it("restores prior owners on a raised English scenario and permits a genuine retry (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -1035,7 +1035,7 @@ local function with_disabled_apps_frame(apps, last, answers, scenario)
 		if last then world.type("a", last) end
 		local ok, err = pcall(function()
 			local rows, prompts = build_menu(world, answers or {})
-			local agent = assert(find(rows, require("infra.i18n").get("menu.agent.title")))
+			local agent = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title")))
 			local count = #require("modules.llm.agent_settings").get_disabled_apps()
 			local parent = find(agent.menu, Scenario.text("menu.agent.disabled_apps", { count }))
 			scenario(world, parent, prompts, agent)
@@ -1186,8 +1186,8 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 					helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "editor" })
 					helpers.assert_eq(world.redraws or 0, 0)
 					callback()
-					helpers.assert_eq(prompts[1].title, require("infra.i18n").get("menu.agent.title"))
-					helpers.assert_eq(prompts[1].prompt, require("infra.i18n").get("app_picker.search_placeholder"))
+					helpers.assert_eq(prompts[1].title, require("core.i18n.engine.i18n").get("menu.agent.title"))
+					helpers.assert_eq(prompts[1].prompt, require("core.i18n.engine.i18n").get("app_picker.search_placeholder"))
 					helpers.assert_eq(prompts[1].initial, "")
 					helpers.assert_eq(prompts[1].choices, { "a", "z" })
 					helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "editor", "a" })
@@ -1259,7 +1259,7 @@ local function with_agent_system_frames(spec, answers, scenario)
 	Scenario.run({ stored = { ["llm.agent_system1"] = spec, ["llm.agent_system2"] = spec } }, function(world)
 		local ok, err = pcall(function()
 			local rows, prompts = build_menu(world, answers or {})
-			local agent = assert(find(rows, require("infra.i18n").get("menu.agent.title")))
+			local agent = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title")))
 			scenario(world, agent, prompts)
 		end)
 		if world.restore_prompt then world.restore_prompt() end
@@ -1322,7 +1322,7 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 				local ok, err = pcall(function()
 					descriptor.label = corpus.provider_literal
 					local rows = build_menu(world, {})
-					local agent = assert(find(rows, require("infra.i18n").get("menu.agent.title")))
+					local agent = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title")))
 					for index, system in ipairs({ "system1", "system2" }) do
 						local parent = agent.menu[index + 2]
 						helpers.assert_eq(parent.title, corpus.locales.en.systems[system].native_literal)
@@ -1486,7 +1486,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 					local context = { llm = world.engine, is_paused = function() return world.paused end,
 						on_menu_changed = function() world.redraws = (world.redraws or 0) + 1 end }
 					if state == "absent" then context.llm = nil end
-					local native_i18n = require("infra.i18n")
+					local native_i18n = require("core.i18n.engine.i18n")
 					local caption, found = native_i18n.get("menu.agent.title"), nil
 					for _, row in ipairs(helpers.load_module("ui.menu.builder").build(context)) do
 						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
@@ -1524,7 +1524,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 			Scenario.run({}, function(world)
 				local rows = with_actual_ai_parent_probe(function() return build_menu(world, {}) end)
 				world.restore_prompt()
-				local retained = assert(find(rows, require("infra.i18n").get("menu.agent.title"))).menu[1].menu[1].fn
+				local retained = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title"))).menu[1].menu[1].fn
 				helpers.assert_type(retained, "function", "the genuine mode callback is retained")
 				local component_agent
 				for _, row in ipairs(renderer.get_root().top_level) do if row.id == "agent" then component_agent = row end end

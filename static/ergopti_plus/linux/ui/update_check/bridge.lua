@@ -108,7 +108,7 @@ function M.download_offered(updater, release, ctx)
 	local channel = updater.get_channel()
 	local owner = { active = false, terminal = false, attempt = 0, failed_download = false }
 	local session_id
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	local DownloadWindow = require("ui.download_window.bridge")
 	local function current()
 		if serial ~= _offer_serial or owner.cancelled or owner.succeeded

@@ -13,7 +13,7 @@ helpers.load_with_stubs("infra.logger")
 -- inert stub is indistinguishable from a working one from inside the test, which
 -- is why they survived; test-stubs-intercept-something.cjs now says so out loud.
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get = function(key) return key end
 }
 

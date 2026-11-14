@@ -22,7 +22,7 @@ local function isolated(body)
 	end
 	replace("core.logger.engine.shim", { debug = function() end, info = function() end, warn = function() end,
 		error = function() end, start = function() end, success = function() end, done = function() end })
-	replace("infra.i18n", { get = function(key) return key end })
+	replace("core.i18n.engine.i18n", { get = function(key) return key end })
 	local ok, err = xpcall(function() body(replace) end, debug.traceback)
 	for index = #fixture_cleanups, 1, -1 do
 		local closed, failure = pcall(fixture_cleanups[index])

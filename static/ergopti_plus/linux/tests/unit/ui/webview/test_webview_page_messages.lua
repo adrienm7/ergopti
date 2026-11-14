@@ -80,18 +80,18 @@ helpers.describe("webview pages: shown in the interface's language", function()
 		local previous = {
 			host = package.loaded["ui.webkit_host"],
 			manager = package.loaded["ui.webview_manager"],
-			i18n = package.loaded["infra.i18n"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
 		}
 		local host = {}
 		for key, value in pairs(require("ui.webkit_host")) do host[key] = value end
 		host.build_app_html = function(_, _, locale) built_with = locale; return "" end
 		package.loaded["ui.webkit_host"] = host
-		package.loaded["infra.i18n"] = { get_locale = function() return "en" end, get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get_locale = function() return "en" end, get = function(key) return key end }
 		package.loaded["ui.webview_manager"] = nil
 		local ok, err = pcall(function() require("ui.webview_manager").show("numeric_prompt") end)
 		package.loaded["ui.webkit_host"] = previous.host
 		package.loaded["ui.webview_manager"] = previous.manager
-		package.loaded["infra.i18n"] = previous.i18n
+		package.loaded["core.i18n.engine.i18n"] = previous.i18n
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(built_with, "en", "every window used to be French")
 	end)

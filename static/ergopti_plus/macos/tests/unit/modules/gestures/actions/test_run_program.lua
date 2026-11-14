@@ -16,7 +16,7 @@ local function with_program(callback, program_admission)
 	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
 		"adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
 		"adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
-		"infra.config_paths", "core.fs.engine.paths", "infra.i18n", "infra.logger", "infra.timings",
+		"infra.config_paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "infra.logger", "infra.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
 	local ok, failure = xpcall(function()
@@ -25,7 +25,7 @@ local function with_program(callback, program_admission)
 		_G.hs = native
 		package.loaded["hs"] = native
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end, format = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, format = function(key) return key end }
 		package.loaded["infra.config_paths"] = { get = function() return path end }
 		package.loaded["platform.remap.lease_helper"] = { resolve = function()
 			return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER,

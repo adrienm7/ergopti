@@ -47,9 +47,9 @@ local function load_menu(options)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
-	package.loaded["infra.i18n"] = nil
-	local renderer_i18n = require("infra.i18n")
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = nil
+	local renderer_i18n = require("core.i18n.engine.i18n")
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function()

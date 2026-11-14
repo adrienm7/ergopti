@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.script_control_callback_fixture")
 
 local OWNERS = {
-	"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n", "core.fs.engine.paths",
+	"infra.logger", "infra.notifications", "infra.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 	"adapters.event_provenance", "adapters.synthetic_input", "core.events.timer_scheduler",
 	"adapters.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",

@@ -503,7 +503,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 				"the llm_prompt editor offers the AI menu's prompts")
 			helpers.assert_eq(opts.default_count, 3, "and names the AI menu's prediction count")
 			helpers.assert_eq(opts.edit_current_label,
-				package.loaded["infra.i18n"].get("dialog.action_picker.edit_current"))
+				package.loaded["core.i18n.engine.i18n"].get("dialog.action_picker.edit_current"))
 			helpers.assert_eq(opts.parameter_strings.prompts.llm_prompt, "prompt")
 			helpers.assert_eq(opts.parameter_strings.errors.llm_prompt, "refused")
 			helpers.assert_type(opts.parameter_strings.countDefault, "string")
@@ -515,7 +515,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 				"the llm_vision editor offers the vision backends")
 			helpers.assert_eq(opts.parameter_strings.prompts.llm_vision, "prompt")
 			helpers.assert_eq(opts.parameter_strings.errors.llm_vision, "refused")
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			for field, key in pairs({
 				visionProviderLabel = "dialog.action_picker.vision_provider_label",
 				visionModelLabel = "dialog.action_picker.vision_model_label",

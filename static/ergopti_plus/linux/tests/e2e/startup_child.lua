@@ -256,7 +256,7 @@ end
 --- @param label string The custom delimiter's label.
 --- @return table|nil toggle, table|nil delete
 local function delimiter_rows(label)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local section = i18n.get("menu.hotstrings.word_expanders")
 	local delete = i18n.get("menu.hotstrings.delete_delimiter")
 	local function title_of(row)
@@ -282,7 +282,7 @@ end
 --- row of that submenu an off category leaves clickable.
 --- @return table|nil row
 local function hotstrings_switch()
-	local title = require("infra.i18n").get("menu.hotstrings.enable")
+	local title = require("core.i18n.engine.i18n").get("menu.hotstrings.enable")
 	local function search(items)
 		for _, row in ipairs(items or {}) do
 			if type(row) == "table" and row.title == title and type(row.fn) == "function" then return row end
@@ -437,7 +437,7 @@ package.preload["core.events.loop"] = function()
 			local function click_toggle()
 				local toggle = delimiter_rows("¤")
 				if not toggle then return false end
-				expected_off_notice = string.format(require("infra.i18n").get("notify.word_expander_prefix"),
+				expected_off_notice = string.format(require("core.i18n.engine.i18n").get("notify.word_expander_prefix"),
 					(toggle.title:gsub("^%s+", "")))
 				click(toggle)
 				expected_off_notice = nil

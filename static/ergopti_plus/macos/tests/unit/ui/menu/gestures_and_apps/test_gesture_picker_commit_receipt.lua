@@ -82,8 +82,8 @@ local function with_gesture(mode, conflict, scenario)
 				local renderer = assert(require("menu.engine.renderer").new({
 					platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.text.engine.json").decode,
-					i18n = { get = package.loaded["infra.i18n"].get,
-						section = package.loaded["infra.i18n"].get }, logger = logger,
+					i18n = { get = package.loaded["core.i18n.engine.i18n"].get,
+						section = package.loaded["core.i18n.engine.i18n"].get }, logger = logger,
 				}))
 				local provider
 				package.loaded["infra.manifest_menu"] = {

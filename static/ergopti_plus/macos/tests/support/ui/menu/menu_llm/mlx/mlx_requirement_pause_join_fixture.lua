@@ -15,7 +15,7 @@ local OWNED_MODULES = {
 	"tests.stubs.hs",
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"core.fs.engine.dir",
 	"infra.dialog_util",
 	"infra.keycodes",
@@ -146,7 +146,7 @@ end
 local function install_subject_stubs(native)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = function() return true end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 	package.loaded["infra.keycodes"] = {

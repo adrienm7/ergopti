@@ -16,7 +16,7 @@ local OWNED = {
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
 	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "adapters.shell_runner",
 	"infra.preferences",
-	"adapters.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "infra.i18n",
+	"adapters.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "core.i18n.engine.i18n",
 	"adapters.secure_field_detector",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
@@ -807,7 +807,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 		helpers.it("(user-menu-publication-inverse) restores exact native timing after " .. refusal, function()
 			with_native(function(f)
 				package.loaded["infra.dialog_util"] = {
-					text_prompt = function() return require("infra.i18n").get("common.ok"), "125" end,
+					text_prompt = function() return require("core.i18n.engine.i18n").get("common.ok"), "125" end,
 					block_alert = function() error("a refused publication opens no dialog") end,
 				}
 				local set_time = f.Keymap.set_user_hotstring_time_activation

@@ -85,7 +85,7 @@ helpers.describe("category submenu: its rows", function()
 		helpers.it("offers the explicit category scope command " .. tostring(enabled), function()
 			local config, log = fake_config({})
 			local row = rolls_row(config)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(row.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
 			helpers.assert_eq(row.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
 			helpers.assert_nil(row.menu[enabled and 1 or 2].checked)
@@ -128,7 +128,7 @@ helpers.describe("category submenu: its rows", function()
 				if notices > 0 then
 					helpers.assert_true(asked[1]:find("--error", 1, true) ~= nil)
 					helpers.assert_true(asked[1]:find("--text=" .. require("adapters.shell_runner").quote(
-						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
+						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
 				end
 			end)
 		end
@@ -265,7 +265,7 @@ helpers.describe("personal category scope parity", function()
 				end
 				find(mb.build({ config = config, _version = "9.9.9", paused = false }))
 				helpers.assert_true(captured ~= nil, "the actual personal provider must render its category")
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				helpers.assert_eq(captured.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
 				helpers.assert_eq(captured.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
 				helpers.assert_nil(captured.menu[enabled and 1 or 2].checked)
@@ -399,7 +399,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 			if #notices > 0 then
 				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
 				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+					require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 			end
 		end)
 	end
@@ -524,7 +524,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local getter = config.get_category
 		config.get_category = function(id) if id == "rolls" then return category end; return getter(id) end
 		local mb = helpers.load_module("ui.menu.builder")
-		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -574,7 +574,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 			if #notices > 0 then
 				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
 				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+					require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 			end
 		end)
 	end

@@ -29,7 +29,7 @@ local function failure_for(code, stdout, key)
 		helpers.assert_true(Fixture.start_verification(state, checker, function() end))
 		state.tasks[1].done(code, stdout or "", "")
 		message = checker.get_failure_message()
-		if key then expected = require("infra.i18n").get(key) end
+		if key then expected = require("core.i18n.engine.i18n").get(key) end
 	end)()
 	return message, expected
 end
@@ -67,8 +67,8 @@ local function missing_catalogue_failure(developer)
 			state.tasks[1].done(78, "", "[OLLAMA-DEPS] stage: runtime_install\nOLLAMA_MANAGED_CATALOGUE_MISSING\n"
 				.. "[OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.\n")
 			message = checker.get_failure_message()
-			developer_words = require("infra.i18n").get("ollama.error_dev_catalogue_missing")
-			refused_words = require("infra.i18n").get("ollama.error_runtime_refused")
+			developer_words = require("core.i18n.engine.i18n").get("ollama.error_dev_catalogue_missing")
+			refused_words = require("core.i18n.engine.i18n").get("ollama.error_runtime_refused")
 		end)()
 	end)
 	return message, developer_words, refused_words
@@ -108,13 +108,13 @@ local function signalled_failure(code, streamed)
 			local state = Fixture.new_state()
 			local checker = Fixture.load_ollama_checker(state)
 			-- The suite's locale stub answers keys; keep the substituted value visible.
-			require("infra.i18n").format = function(key, ...) return key .. "(" .. table.concat({ ... }, ",") .. ")" end
+			require("core.i18n.engine.i18n").format = function(key, ...) return key .. "(" .. table.concat({ ... }, ",") .. ")" end
 			helpers.assert_true(Fixture.start_verification(state, checker, function() end))
 			local task = state.tasks[1]
 			if streamed then helpers.assert_true(task.stream(task, "", streamed)) end
 			task.done(code, "", "")
 			message = checker.get_failure_message()
-			expected = require("infra.i18n").format("ollama.error_killed", "SIGKILL")
+			expected = require("core.i18n.engine.i18n").format("ollama.error_killed", "SIGKILL")
 		end)()
 	end)
 	return message, expected, errors

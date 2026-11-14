@@ -31,7 +31,7 @@ local OWNED = {
 	"adapters.tcc_grant",
 	"adapters.window_info",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 }
 
@@ -46,7 +46,7 @@ local function with_system(body, options)
 	helpers.with_fresh_modules(OWNED, function()
 		local record = { runs = {}, notices = {}, cleared = {}, moved = {}, created = {}, listeners = {} }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.notifications"] = {
 			notify = function(message, body_text, kind)
 				record.notices[#record.notices + 1] = { message = message, body = body_text, kind = kind }

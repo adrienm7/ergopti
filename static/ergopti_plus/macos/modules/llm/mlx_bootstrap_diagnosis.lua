@@ -31,7 +31,7 @@ local M = {}
 
 -- Resolved per call: the locale owner is a stateful singleton that tests and
 -- reloads replace, and a captured copy would keep speaking the old one.
-local function i18n() return require("infra.i18n") end
+local function i18n() return require("core.i18n.engine.i18n") end
 
 -- Lines kept per tail. The installer retries uv six times and each attempt
 -- prints its own verbose lines, so the cause line of the last attempt can sit

@@ -24,7 +24,7 @@ local function _build_language(ctx)
 
 	-- Try to load i18n for real locale list + switching.
 	local i18n = nil
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n then i18n = i18n_mod end
 
 	if i18n then

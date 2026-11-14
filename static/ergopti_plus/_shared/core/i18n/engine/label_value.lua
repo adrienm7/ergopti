@@ -6,7 +6,7 @@
 --- Joins a translated label to its value through common.label_value, the one
 --- place the locale spells it: French puts a space before the colon, Chinese and
 --- Japanese use a full-width colon, others a plain one. Windows has the same
---- rule in LabelValue (windows/infra/locale.ahk).
+--- rule in LabelValue (windows/core/i18n/engine/locale.ahk).
 --- ==============================================================================
 
 local M = {}

@@ -168,7 +168,7 @@ helpers.describe("onboarding commit() honours the retarget", function()
 			package.loaded["infra.notifications"] = { notify = function() notified = notified + 1; return true end }
 			require("tests.support.dashboard_window_fixture")("ui.onboarding", function(onboarding, state)
 				require("tests.support.onboarding_shared_data").install()
-				package.loaded["infra.i18n"].persist_locale = function() return true end
+				package.loaded["core.i18n.engine.i18n"].persist_locale = function() return true end
 				helpers.assert_true(onboarding.run(OLD_CONFIG_PATH))
 				state.receiver({ body = { action = "finish", answers = {
 					locale = "en", config_dir = NEW_DIR,

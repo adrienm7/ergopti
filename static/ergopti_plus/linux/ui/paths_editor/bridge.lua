@@ -90,7 +90,7 @@ local function build_initial_payload(state)
 		logsDir = config_paths.get_logs_dir(),
 		defaultLogsDir = config_paths.default_logs_dir(),
 		version = state._version or Version.VERSION,
-		strings = build_strings(dependency(state, "i18n", "infra.i18n")),
+		strings = build_strings(dependency(state, "i18n", "core.i18n.engine.i18n")),
 	}
 end
 
@@ -151,7 +151,7 @@ function M.on_message(payload, state, context)
 		local selected, select_err = ConfigDirPicker.pick(
 			dependency(state, "shell", "adapters.shell_runner"),
 			config_paths,
-			dependency(state, "i18n", "infra.i18n"),
+			dependency(state, "i18n", "core.i18n.engine.i18n"),
 			current
 		)
 		if not page_current() then return { picked = false } end

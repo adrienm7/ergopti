@@ -11,7 +11,7 @@ local run_contract = function(helpers, load_host, load_builder)
   local logger={info=noop,debug=noop,warn=noop,error=function(_,fmt,...)c.diagnostics[#c.diagnostics+1]=fmt end}
   package.loaded['infra.logger']=logger
   package.loaded['core.fs.engine.paths']={shared=function(p)return p end}
-  package.loaded['infra.i18n']={get=function(k)return k end}
+  package.loaded['core.i18n.engine.i18n']={get=function(k)return k end}
   package.loaded['core.ui.engine.webview.i18n_seed']={}
   package.loaded['infra.deferred_work']={after=function()return true end}
   package.loaded['core.events.timer_scheduler']=nil -- Exercise actual timer ownership through the native-shaped port.

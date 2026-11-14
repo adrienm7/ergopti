@@ -24,15 +24,15 @@ end
 --- @param callback function Receives the actual menu, locale wrapper and codec.
 local function with_menu(callback)
 	helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.storage",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.storage",
 		"infra.timer_scheduler", "tap_hold.engine.combination_labels", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
-		local captured = package.loaded["infra.i18n"]
-		package.loaded["infra.i18n"] = nil
-		local real = require("infra.i18n")
-		real.set_locale_injector(require("infra.locale").set_locale)
+		local captured = package.loaded["core.i18n.engine.i18n"]
+		package.loaded["core.i18n.engine.i18n"] = nil
+		local real = require("core.i18n.engine.i18n")
+		real.set_locale_injector(require("core.i18n.engine.locale").set_locale)
 		for key, value in pairs(real) do captured[key] = value end
-		package.loaded["infra.i18n"] = captured
+		package.loaded["core.i18n.engine.i18n"] = captured
 		callback(menu, real, require("core.fs.adapters.json_codec"))
 	end)
 end

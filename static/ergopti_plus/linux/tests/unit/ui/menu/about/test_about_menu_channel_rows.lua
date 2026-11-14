@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 
 --- The submenu of the top-level row whose title is the translation of `key`.
 local function submenu_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if item.title == label then return item.menu end
 	end
@@ -39,7 +39,7 @@ local function fake_updater(subscribed)
 			return true
 		end,
 		get_check_interval = function() return real.INTERVAL_PRESETS[1].seconds end,
-		get_menu_label = function() return require("infra.i18n").get("menu.about.check_for_updates") end,
+		get_menu_label = function() return require("core.i18n.engine.i18n").get("menu.about.check_for_updates") end,
 		get_state = function() return "idle" end,
 		get_cached_release = function() return nil end,
 		check_for_updates = function() calls.checks = calls.checks + 1 return true end,
@@ -146,7 +146,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	end)
 
 	helpers.it("one channel submenu, titled with the subscribed channel, right before the check row", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local template = i18n.get("menu.about.channel_menu")
 		helpers.assert_true(template:find("{channel}", 1, true) ~= nil,
 			"the title template must carry its placeholder, got '" .. template .. "'")
@@ -182,7 +182,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	end)
 
 	helpers.it("a local version greys the channel submenu with its reason", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = submenu_of(build(fake_updater("dev"), nil, true), "menu.about.title")
 		helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
 		local picker = rows[CHANNEL_AT]
@@ -197,7 +197,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	helpers.it("no channel is a flat row of the About submenu any more", function()
 		local up = fake_updater("dev")
 		local rows = submenu_of(build(up), "menu.about.title")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, row in ipairs(rows) do
 			for _, id in ipairs(up.CHANNELS.ids()) do
 				helpers.assert_true(row.title ~= i18n.get(up.CHANNELS.channel(id).menu_label_key),
@@ -215,7 +215,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		end
 		helpers.assert_eq(calls.set, ids, "each row must subscribe to its own channel, in registry order")
 		helpers.assert_eq(changed.count, #ids, "the tray is redrawn so the tick follows the channel")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = submenu_of(build(up), "menu.about.title")
 		helpers.assert_eq(rows[CHANNEL_AT].title, (i18n.get("menu.about.channel_menu"):gsub("{channel}",
 			i18n.get(up.CHANNELS.channel(ids[#ids]).label_key))),
@@ -256,7 +256,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local ok, err = pcall(function()
 			local rows = submenu_of(build(up, changed), "menu.about.title")
 			local row = rows[CHANNEL_AT + 1]
-			local wording = require("infra.i18n").get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
+			local wording = require("core.i18n.engine.i18n").get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
 			helpers.assert_true(row.title:find(wording, 1, true) == 1, row.title)
 			helpers.assert_true(row.title:find("v0.0.0-dev.139", 1, true) ~= nil, row.title)
 			row.fn()
@@ -279,7 +279,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local presets = Json.decode(handle:read("*a")).timing.check_interval_presets
 		handle:close()
 		helpers.assert_true(#presets >= 5, "the shared presets must be present")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, pair in ipairs({ { 86400, "1d" }, { 600, "5m" }, { 0, "never" } }) do
 			local up = fake_updater("dev")
 			up.get_check_interval = function() return pair[1] end
@@ -307,7 +307,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- left live, they offered a check whose result could not be installed, and
 	-- left out (as on Windows and macOS) nobody could tell the feature existed.
 	helpers.it("(update-rows-greyed-on-local-2026-10-01) a local version draws the update rows greyed with their reason", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local up, calls = fake_updater("dev")
 		local rows = submenu_of(build(up, nil, true), "menu.about.title")
 		local reason = i18n.get("menu.about.source_run_reason")
@@ -343,7 +343,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- to replace it: the frequency row is greyed with that reason (no background
 	-- check runs) and an available release offers no live Update row.
 	helpers.it("a system package greys the frequency and update rows with the package reason", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local up, calls = fake_updater("dev")
 		up.installation_kind = function() return "package" end
 		up.get_state = function() return "available" end
@@ -372,7 +372,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- and no digest: its Update row is greyed with the check-only reason and the
 	-- bridge starts no download for it.
 	helpers.it("check-only: a feed-only release greys the update row and starts no download", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local up = fake_updater("dev")
 		up.get_state = function() return "available" end
 		local release = { tag = "v9.9.9", notes = "", download_url = "", checksum_url = "", check_only = true }
@@ -466,7 +466,7 @@ end
 helpers.describe("tray (linux): published About channel choices", function()
 	helpers.it("retains the captured two states through the actual About provider", function()
 		local corpus = channel_corpus()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local prior = i18n.get
 		local ok, detail = pcall(function()
 			for _, locale in ipairs({ "en", "fr" }) do
@@ -510,7 +510,7 @@ helpers.describe("tray (linux): published About channel choices", function()
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT]
 			helpers.assert_eq(#row.menu, 2)
 			for index, choice in ipairs(choices) do
-				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, require("core.i18n.engine.i18n").get(choice.i18n))
 				row.menu[index].fn()
 			end
 			helpers.assert_eq(requests.set, corpus.reordered_values)
@@ -615,7 +615,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 			local up = fake_updater("dev")
 			up.get_check_interval = function() return expected.stored end
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
 			helpers.assert_eq(#row.menu, #corpus.choices)
 			for index, choice in ipairs(corpus.choices) do
@@ -739,7 +739,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
 			helpers.assert_eq(#row.menu, #choices)
 			for index, choice in ipairs(choices) do
-				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, require("core.i18n.engine.i18n").get(choice.i18n))
 				row.menu[index].fn()
 				helpers.assert_eq(calls[index], choice.value)
 			end
@@ -753,7 +753,7 @@ end)
 --- Exercises the real About provider with unrelated tray surfaces isolated.
 --- @param alternative boolean True to independently replace the declaration's label and reason.
 local function with_source_command(alternative, callback)
-	local names = { "ui.menu.builder", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
@@ -766,7 +766,7 @@ local function with_source_command(alternative, callback)
 		local labels = { ["menu.about.source_run_reason"] = "Source checkout: use an installed release.",
 			["common.restore_recommended"] = "Canonical alternate label",
 			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
-		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
@@ -957,7 +957,7 @@ helpers.describe("About version separator shared fragment (Linux)", function()
 	helpers.it("consumes alternate presentation and platform hiding in the actual provider", function()
 		with_version_fragment({{type = "label", id = "version_fragment_probe", i18n = "menu.about.title"}}, function()
 			local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
-			helpers.assert_eq(rows[2].title, require("infra.i18n").get("menu.about.title"))
+			helpers.assert_eq(rows[2].title, require("core.i18n.engine.i18n").get("menu.about.title"))
 			helpers.assert_eq(rows[2].disabled, true)
 			helpers.assert_eq(rows[2].fn, nil)
 		end)

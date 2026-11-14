@@ -58,7 +58,7 @@ local function load_bridge_with_throwing_notice()
 			error("notify raised", 0)
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 
 	local started = { count = 0 }
 	local bridge = helpers.load_with_stubs("infra.vscode_bridge", {
@@ -145,7 +145,7 @@ helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the ser
 		package.loaded["infra.vscode_bridge"] = nil
 		package.loaded["infra.dialog_util"] = { alert = function() end, block_alert = function() end }
 		package.loaded["infra.notifications"] = { notify = function() end }
-		package.loaded["infra.i18n"] = { get = function(k) return k end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 
 		local started = { count = 0 }
 		local bridge = helpers.load_with_stubs("infra.vscode_bridge", {

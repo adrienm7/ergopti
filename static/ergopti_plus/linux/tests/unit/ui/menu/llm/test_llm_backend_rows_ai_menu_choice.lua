@@ -178,7 +178,7 @@ helpers.describe("model selector test ownership", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
 		state.entries = { entry }
-		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		find(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action()
 		helpers.assert_eq(#state.tests, 1)
 		state.entries = {}
 		state.finish_test(true, "OK", 10)
@@ -191,7 +191,7 @@ helpers.describe("model selector test ownership", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
 		state.entries, state.active = { entry }, entry
-		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		find(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action()
 		helpers.assert_eq(#state.tests, 1)
 		state.active = { id = "chosen", provider = "cerebras", model = "other", token = "test" }
 		state.finish_test(true, "OK", 10)
@@ -208,7 +208,7 @@ helpers.describe("model selector test ownership", function()
 			if kind == "manual" then
 				local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
 				state.entries, state.active = { entry }, entry
-				find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+				find(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action()
 			else
 				state.answers = { "test-key", kind == "new chat" and "qwen" or "jev-latest" }
 				find(build(), kind == "new chat" and "➕ Cerebras" or "➕ TypeSafe").action()
@@ -308,7 +308,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		state.finish_test(false, "HTTP 401: Wrong API Key", 90)
 		restore()
 		helpers.assert_true(state.errors[1]:find("Wrong API Key", 1, true) ~= nil)
-		helpers.assert_eq(state.error_titles[1], require("infra.i18n").get("menu.llm.api_key_refused_title"),
+		helpers.assert_eq(state.error_titles[1], require("core.i18n.engine.i18n").get("menu.llm.api_key_refused_title"),
 			"a 401 proves the server answered, so the title names the refused key")
 	end)
 
@@ -318,7 +318,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		find(build(), "➕ Cerebras").action()
 		state.finish_test(false, "connection refused", 90)
 		restore()
-		helpers.assert_eq(state.error_titles[1], require("infra.i18n").get("menu.llm.api_unreachable_title"))
+		helpers.assert_eq(state.error_titles[1], require("core.i18n.engine.i18n").get("menu.llm.api_unreachable_title"))
 	end)
 
 	helpers.it("adds nothing when the key prompt is cancelled", function()
@@ -638,7 +638,7 @@ helpers.describe("AI active API commands: live selection", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
 		state.entries, state.active = { entry }, entry
-		local held = exact(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action
+		local held = exact(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action
 		state.active = nil
 		local observed = held()
 		restore()

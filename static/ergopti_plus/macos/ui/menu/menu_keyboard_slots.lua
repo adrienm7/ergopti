@@ -29,7 +29,7 @@ local M = {}
 local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
 local hs           = hs
-local i18n         = require("infra.i18n")
+local i18n         = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")

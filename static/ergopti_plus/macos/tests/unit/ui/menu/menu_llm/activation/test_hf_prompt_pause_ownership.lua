@@ -7,7 +7,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"adapters.task_environment", "infra.launcher_environment", "diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy", "adapters.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"core.fs.engine.paths", "infra.timings",
@@ -150,7 +150,7 @@ local function with_fixture(options, callback)
 		end
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.notifications"] = {
 			notify = function()
 				fixture.notifications = fixture.notifications + 1

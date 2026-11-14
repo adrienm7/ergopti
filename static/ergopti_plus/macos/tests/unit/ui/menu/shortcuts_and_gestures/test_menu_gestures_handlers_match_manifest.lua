@@ -92,7 +92,7 @@ helpers.describe("menu_gestures: every id-bearing row is rendered by the manifes
 	-- rows stood below the system rows until then.
 	helpers.it("ManifestMenu.build opens the menu with the switch, the restore and the clear", function()
 		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local fired = {}
 		local function record(name) return function() fired[#fired + 1] = name end end
 		local built = ManifestMenu.build("gestures_menu", "Gestures", make_dyn_handlers(), nil, {
@@ -117,7 +117,7 @@ end)
 -- Independent mode expectations predate this presentation migration. Drive the
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
-	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "infra.i18n", "infra.logger",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
 }
@@ -168,7 +168,7 @@ local function with_mode_fixture(options, callback)
 			end,
 		}
 		package.loaded["infra.manifest_menu"] = renderer
-		package.loaded["infra.i18n"] = i18n
+		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["infra.logger"] = logger
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
 		for _, name in ipairs({ "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
@@ -416,7 +416,7 @@ local function with_gesture_controls(options, callback)
 	return with_mode_fixture({ locale = options.locale, platform = options.platform, mode = "incremental" }, function(f)
 		local controls = mode_json(helpers.shared("tests/corpus/menus/gesture_slot_controls.json"))
 		local labels = require("menu.engine.labels")
-		package.loaded["infra.i18n"].section = function(key)
+		package.loaded["core.i18n.engine.i18n"].section = function(key)
 			return labels.decorate_section(f.strings[key] or key)
 		end
 		f.control_state = { gestures = true }

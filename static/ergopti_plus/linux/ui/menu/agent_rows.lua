@@ -34,7 +34,7 @@ local LOG = "ui.menu.agent_rows"
 --- @param key string
 --- @return string
 local function tr(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	local value = ok and type(i18n.get) == "function" and i18n.get(key) or nil
 	return type(value) == "string" and value ~= "" and value or key
 end

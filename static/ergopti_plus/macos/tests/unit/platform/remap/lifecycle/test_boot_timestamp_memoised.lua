@@ -18,7 +18,7 @@ helpers.describe("karabiner status never consults process or boot identity", fun
 			status = function() return "active", { phase = "active", token = "abc" } end,
 		}
 		package.loaded["infra.notifications"] = { notify = function() end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["platform.remap.ke_lifecycle"] = nil
 
 		local KE = helpers.load_with_stubs("platform.remap.ke_lifecycle", {

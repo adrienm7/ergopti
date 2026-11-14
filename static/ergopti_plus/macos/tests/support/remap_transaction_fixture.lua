@@ -26,7 +26,7 @@ local OWNED_MODULES = {
 	"platform.remap.onboarding",
 	"platform.remap",
 	"infra.logger",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.notifications",
 	"infra.text_utils",
 	"platform.remap.ke_paths",
@@ -627,7 +627,7 @@ return function(run, dependencies)
 			local absent_module = {}
 			local isolated_module_names = {
 				"infra.logger",
-				"infra.i18n",
+				"core.i18n.engine.i18n",
 				"infra.notifications",
 				"infra.text_utils",
 				"platform.remap.ke_paths",
@@ -684,7 +684,7 @@ return function(run, dependencies)
 			local function noop() end
 			_G.hs = hs_stub
 			package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-			package.loaded["infra.i18n"] = { get = function(key) return key end, has = function() return false end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, has = function() return false end }
 			package.loaded["infra.notifications"] = { notify = noop }
 			package.loaded["infra.text_utils"] = {
 				applescript_format = function(format, value) return string.format(format, value) end,

@@ -6,7 +6,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 local MODULES = {
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
@@ -38,7 +38,7 @@ local function with_fixture(callback)
 		logger_stub.today_log_path = function() return "/tmp/ergopti-test.log" end
 		package.loaded["infra.logger"] = logger_stub
 		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = {
 			get = function(key)
 				helpers.assert_eq(key, "MlxActiveModelPath")

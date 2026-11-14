@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 
 -- The modules this file stubs, restored after each case so later files see the real ones.
-local STUBBED = { "infra.i18n", "infra.dialog_util", "infra.deferred_work", "ui.virtual_hid_update" }
+local STUBBED = { "core.i18n.engine.i18n", "infra.dialog_util", "infra.deferred_work", "ui.virtual_hid_update" }
 local ORIGINALS = {}
 for _, name in ipairs(STUBBED) do ORIGINALS[name] = package.loaded[name] end
 
@@ -31,7 +31,7 @@ end
 --- @return table world { alerts, reloads }
 local function load(answer)
 	local world = { alerts = {}, reloads = 0 }
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		format = function(key, ...) return key .. "|" .. table.concat({ ... }, "|") end,
 	}

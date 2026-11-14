@@ -28,7 +28,7 @@ local COMMON_STUBS = {
 		warn = function() end,
 		error = function() end,
 	},
-	["infra.i18n"] = { get = function(key) return key end },
+	["core.i18n.engine.i18n"] = { get = function(key) return key end },
 	["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end },
 	["infra.toml.reader"] = {},
 	["infra.toml.writer"] = {},

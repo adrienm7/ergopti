@@ -26,7 +26,7 @@ local function choose(parameter, clicked, refusal, picked)
 	end
 	local names = {
 		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
 		"infra.logger", "infra.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
 	}
@@ -79,7 +79,7 @@ local function choose(parameter, clicked, refusal, picked)
 		text_prompt = function() observed.prompts = observed.prompts + 1; return "button.save", "https://example.com" end,
 		block_alert = function() observed.dialogs = observed.dialogs + 1; return clicked end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if key == "gestures.system.conflicts" then return "{1} conflicts" end
 		if key == "gestures.system.conflicts_caption" then return "%s conflicts" end
 		return key
@@ -88,7 +88,7 @@ local function choose(parameter, clicked, refusal, picked)
 		platform = "hs",
 		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = require("core.text.engine.json").decode,
-		i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
+		i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub(),
 	}))
 	package.loaded["infra.manifest_menu"] = {
 		group_receiver = renderer.group_receiver,
@@ -174,7 +174,7 @@ end)
 -- Exercise the real status provider and renderer; status probes and platform
 -- ports remain controlled so menu construction cannot hide native work.
 local refresh_modules = {
-	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "infra.i18n", "infra.logger",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
 }
@@ -212,7 +212,7 @@ local function with_status_refresh(options, callback)
 			end,
 		}
 		package.loaded["modules.gestures"] = fixture.gestures
-		package.loaded["infra.i18n"] = i18n
+		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.menu_utils"] = { section = function(title) return { title = title } end }
 		package.loaded["infra.dialog_util"] = {}

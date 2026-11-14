@@ -52,7 +52,7 @@ local ACTIONS_JSON = helpers.driver_root() .. "/platform/remap/data/actions.json
 --- @return table config
 local function fresh()
 	local config = helpers.load_with_stubs("platform.remap.config")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key)
 		if key == "sg_actions." .. KEYED_ID then return TRANSLATED end
 		-- Everything else answers with the key, which is what the real module does
@@ -145,7 +145,7 @@ helpers.describe("remap action labels: localisation", function()
 		-- probes made every boot decode it, although every shipped catalogue
 		-- carries the same keys, so the miss was certain.
 		local config = fresh()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local translate = i18n.get
 		local probed = {}
 		i18n.get = function(key)
@@ -174,7 +174,7 @@ helpers.describe("remap action labels: picker headings and key actions", functio
 		-- The headings read « Modificateurs », « Touches » or « Keyboard shortcuts »
 		-- whatever the user's language: the catalogue held the French text.
 		local config = fresh()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(key) return key:find("^remap%.category%.") and "<" .. key .. ">" or key end
 		local actions = config.load_available_actions(ACTIONS_JSON)
 		helpers.assert_eq(type(actions), "table", "the catalogue must load")
@@ -193,7 +193,7 @@ helpers.describe("remap action labels: picker headings and key actions", functio
 
 	helpers.it("AltGr is named from the key name table", function()
 		local config = fresh()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(key) return key == "key_name.right_option" and "RIGHT-OPTION" or key end
 		local altgr = find(config.load_available_actions(ACTIONS_JSON), "altgr")
 		helpers.assert_true(altgr ~= nil, "'altgr' must be in the catalogue")

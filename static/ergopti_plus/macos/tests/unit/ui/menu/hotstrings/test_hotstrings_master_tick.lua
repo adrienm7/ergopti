@@ -208,7 +208,7 @@ local function hotstrings_row(world)
 	local actions = setmetatable({}, { __index = function() return function() end end })
 	local ok, tray = pcall(Builder.generate, ctx, mods, actions)
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(tray))
-	local title = require("infra.i18n").get("menu.hotstrings.title")
+	local title = require("core.i18n.engine.i18n").get("menu.hotstrings.title")
 	for _, row in ipairs(tray) do
 		if type(row.title) == "string" and row.title:sub(1, #title) == title then return row end
 	end
@@ -222,7 +222,7 @@ local function with_wizard(answer, scenario)
 	helpers.with_stub_scope({
 		"infra.preferences", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"ui.menu.menu_state", "ui.menu.builder", "ui.menu.menu_hotstrings", "ui.menu.keymap_lifecycle",
-		"infra.notifications", "infra.i18n", "infra.manifest_menu",
+		"infra.notifications", "core.i18n.engine.i18n", "infra.manifest_menu",
 	}, function()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		local Preferences = helpers.load_with_stubs("infra.preferences")
@@ -241,7 +241,7 @@ local function with_wizard(answer, scenario)
 				local fh = assert(io.open(path, "w"))
 				fh:close()
 			end
-			CaptionFixture.install(require("infra.i18n"))
+			CaptionFixture.install(require("core.i18n.engine.i18n"))
 			package.loaded["ui.menu.builder"] = nil
 			local world = {
 				path = path, hotfiles = hotfiles, groups = groups,
@@ -273,7 +273,7 @@ end
 --- @return table
 local function switch_of(parent)
 	local first = parent.menu and parent.menu[1]
-	helpers.assert_eq(first and first.title, require("infra.i18n").get("menu.hotstrings.enable"),
+	helpers.assert_eq(first and first.title, require("core.i18n.engine.i18n").get("menu.hotstrings.enable"),
 		"the Hotstrings submenu opens with its switch")
 	return first
 end

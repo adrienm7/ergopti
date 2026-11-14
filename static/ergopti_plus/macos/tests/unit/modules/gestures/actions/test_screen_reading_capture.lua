@@ -24,7 +24,7 @@ local SUBJECT_MODULES = {
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"modules.shortcuts.actions.screenshot_save",
@@ -84,7 +84,7 @@ local function with_subject(scenario)
 		encode_base64 = function(data) return "B64(" .. data .. ")" end,
 	}
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.logger"] = {
 		debug = function() end,
 		info = function(_, message, ...) fixture.infos[#fixture.infos + 1] = string.format(message, ...) end,

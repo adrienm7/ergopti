@@ -35,7 +35,7 @@ end
 --- @param key string
 --- @return table|nil
 local function row_for(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:find(label, 1, true) then return item end
 	end
@@ -100,7 +100,7 @@ helpers.describe("tray (linux): a pause keeps every feature row live", function(
 		local resumed = { count = 0 }
 		local items = build(true, resumed)
 		local title = items[1]
-		local paused_label = require("infra.i18n").get("menu.builder.title_paused")
+		local paused_label = require("core.i18n.engine.i18n").get("menu.builder.title_paused")
 		helpers.assert_true(title.title:find(paused_label, 1, true) ~= nil, "title says paused: " .. title.title)
 		helpers.assert_true(title.title:find("v0.0.0-dev.12", 1, true) ~= nil, "title keeps the version")
 		helpers.assert_true(title.disabled ~= true, "the paused title row must be clickable")
@@ -154,7 +154,7 @@ end)
 -- The real registered pause host also owns the shared header's publication.
 local function with_shared_header(options, body)
 	local ManifestMenu = require("infra.manifest_menu")
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	local old_builder = package.loaded["ui.menu.builder"]
 	local old_facade = package.loaded["infra.manifest_menu"]
 	local old_template, old_command, old_get = ManifestMenu.template_rows, ManifestMenu.command_row, I18n.get

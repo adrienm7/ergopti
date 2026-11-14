@@ -16,7 +16,7 @@
  *   - The Windows locale table (windows/_generated/locale_table.ahk) is emitted in
  *     that order.
  *   - The site loader (routes/ergopti-plus/+page.server.js) and the Linux
- *     driver (linux/infra/i18n.lua) read locale_order.json at runtime rather
+ *     driver (linux/core/i18n/engine/i18n.lua) read locale_order.json at runtime rather
  *     than sorting on their own.
  *
  * ROOT CAUSE ENCODED:
@@ -101,10 +101,10 @@ const site = read('src/routes/ergopti-plus/+page.server.js');
 if (!/locale_order\.json/.test(site)) {
 	errors.push('+page.server.js does not read locale_order.json — it must single-source the order.');
 }
-const linux = read('static/ergopti_plus/linux/infra/i18n.lua');
+const linux = read('static/ergopti_plus/linux/core/i18n/engine/i18n.lua');
 if (!/locale_order\.json/.test(linux)) {
 	errors.push(
-		'linux/infra/i18n.lua does not read locale_order.json — it must single-source the order.'
+		'linux/core/i18n/engine/i18n.lua does not read locale_order.json — it must single-source the order.'
 	);
 }
 

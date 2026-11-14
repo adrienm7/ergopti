@@ -31,7 +31,7 @@ local M = {}
 --- @param callback function Receives the constructed subject and observations.
 function M.with_sentinel(callback)
 	local names = {
-		"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n",
+		"infra.logger", "infra.notifications", "infra.keycodes", "core.i18n.engine.i18n",
 		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 		"adapters.event_provenance", "adapters.synthetic_input",
 		"core.events.timer_scheduler", "adapters.key_state",
@@ -43,7 +43,7 @@ function M.with_sentinel(callback)
 		local tap_handler
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.notifications"] = {notify = function() end}
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.keycodes"] = {
 			F13_KARABINER_RETURN = 0x6A,
 			F14_KARABINER_BACKSPACE = 0x6B,

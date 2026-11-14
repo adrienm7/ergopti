@@ -37,7 +37,7 @@ local MAX_HELD_CLICKS = 8
 --- Shows the notice for held clicks the refreshed tree could not match.
 --- @return boolean admitted
 local function notify_lost()
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	-- A notification, not a menu row: named first so the menu-row census of
 	-- ui/menu/ does not read `title = I18n.get(...)` as a row built here.
 	local title = I18n.get("menu.reload_replay.lost_title")

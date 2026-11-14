@@ -128,7 +128,7 @@ local function with_menu(body, public_chords)
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
 		local renderer=require("infra.manifest_menu")
-		local i18n=require("infra.i18n")
+		local i18n=require("core.i18n.engine.i18n")
 		local Holds=require("tap_hold.engine.hold_options")
 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}
 		if public_chords==true then

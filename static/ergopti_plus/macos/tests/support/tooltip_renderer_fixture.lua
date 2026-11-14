@@ -11,7 +11,7 @@ local M = {}
 local OWNERS = {
 	"core.lifecycle.engine.compat.utf8",
 	"core.fs.adapters.json_codec",
-	"infra.logger", "infra.i18n", "core.fs.engine.paths", "infra.text_utils", "core.text.engine.utils_core",
+	"infra.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.text_utils", "core.text.engine.utils_core",
 	"infra.toml.reader", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
 	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
 	-- The real TOML reader opens its source through this shared owner.

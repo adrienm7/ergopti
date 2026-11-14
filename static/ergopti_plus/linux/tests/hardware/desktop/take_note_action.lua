@@ -16,7 +16,7 @@ local Logger = require("core.logger.engine.shim")
 Logger.set_level("info")
 -- The driver routes its lines to a file sink; this runner prints them for the proof.
 Logger.set_sink(function(line) io.stdout:write(line, "\n"); io.stdout:flush() end)
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 i18n.init()
 
 local Manager = require("modules.gestures.manager")

@@ -55,7 +55,7 @@ local ReleaseSources = require("updater.engine.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
-local i18n      = require("infra.i18n")
+local i18n      = require("core.i18n.engine.i18n")
 
 local LOG = "updater.auto_check"
 

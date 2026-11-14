@@ -20,7 +20,7 @@ local function with_config_fixture(callback)
 			"modules.keymap.layout",
 			"modules.gestures.actions",
 			"core.fs.adapters.file_system",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"core.fs.engine.paths",
 			"infra.toml.codec",
@@ -74,7 +74,7 @@ local function with_config_fixture(callback)
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 			}
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				has = function() return false end,
 			}

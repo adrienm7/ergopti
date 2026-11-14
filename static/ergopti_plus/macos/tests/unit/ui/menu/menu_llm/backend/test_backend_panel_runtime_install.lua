@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
+	"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
@@ -108,7 +108,7 @@ local function with_rows(opts, scenario)
 			end,
 			load_api_entries = function() return true end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key) return key end,
 		}
@@ -389,7 +389,7 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 				llm_model_ollama = "candidate" }
 			local observed = { backend = source, menus = {}, model_setters = 0 }
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
 			package.loaded["infra.notifications"] = { notify = function() return true end }
 			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }

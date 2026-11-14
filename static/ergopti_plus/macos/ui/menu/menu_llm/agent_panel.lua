@@ -33,7 +33,7 @@
 local M = {}
 
 local Logger       = require("infra.logger")
-local i18n         = require("infra.i18n")
+local i18n         = require("core.i18n.engine.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local AppPickerLib = require("infra.app_picker")
 local dialog       = require("infra.dialog_util")

@@ -152,7 +152,7 @@ helpers.describe("shared command provider policy", function()
 			local items = Menu.get_array("editor")
 			items[1].i18n = "menu.hotstrings.open_file"
 			local row = Menu.command_row("editor", "open", { open = function() end }, { ready = function() return true end })
-			helpers.assert_eq(row.label, require("infra.i18n").get("menu.hotstrings.open_file"))
+			helpers.assert_eq(row.label, require("core.i18n.engine.i18n").get("menu.hotstrings.open_file"))
 		end)
 	end)
 	helpers.it("shared-personal-editor-policy: absent declaration or owner refuses provider data", function()
@@ -197,7 +197,7 @@ helpers.describe("inert existing-provider status data", function()
 			helpers.assert_type(rows, "table")
 			helpers.assert_eq(#rows, 3)
 			helpers.assert_true(rows[1].separator)
-			local tr = require("infra.i18n").get
+			local tr = require("core.i18n.engine.i18n").get
 			helpers.assert_eq(rows[2].label, tr(Mutate and "menu.llm.local_servers.rescan" or "menu.llm.local_servers.header"))
 			helpers.assert_eq(rows[3].label, tr(Mutate and "menu.llm.local_servers.header" or "menu.llm.unavailable"))
 			for index = 2, 3 do
@@ -634,7 +634,7 @@ require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos
 
 -- Actual component factories consume genuine existing fixture-owned data modules.
 local function fixed_parent_native_cohort(body)
-	local names = {"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "infra.logger",
+	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "infra.logger",
 		"ui.menu.menu_shortcuts", "ui.menu.menu_gestures", "ui.menu.menu_tap_holds",
 		"ui.menu.menu_utils", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
@@ -643,9 +643,9 @@ local function fixed_parent_native_cohort(body)
 			helpers.load_with_stubs("infra.logger")
 			-- The native loader installs an i18n baseline double; reload the genuine
 			-- native locale owner after that setup, as existing presentation fixtures do.
-			package.loaded["infra.i18n"] = nil
-			local locale = require("infra.locale")
-			local translator = require("infra.i18n")
+			package.loaded["core.i18n.engine.i18n"] = nil
+			local locale = require("core.i18n.engine.locale")
+			local translator = require("core.i18n.engine.i18n")
 			translator.set_locale_injector(function(code) locale.set_locale(code) end)
 			translator.init()
 			local owner = {pending = function() return false end}
@@ -762,7 +762,7 @@ helpers.describe("reasoned toggle presentation", function()
 	helpers.it("reasoned-toggle: disabled state names the reason and removes the command", function()
 		local document = [[{"reasoned_toggle":[{"type":"toggle","id":"power","category":"LLM","i18n":"contract.toggle","checked_when":["on"],"disabled_when":["ready"],"disabled_reason_key":"contract.reason"}]}]]
 		fixture.with_manifest(document, nil, function(Menu, manifest_path)
-			local translated = package.loaded["infra.i18n"]
+			local translated = package.loaded["core.i18n.engine.i18n"]
 			local old_get = translated.get
 			translated.get = function(key)
 				if key == "contract.toggle" then return "AI suggestions" end

@@ -100,7 +100,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"modules.shortcuts.script_control",
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",

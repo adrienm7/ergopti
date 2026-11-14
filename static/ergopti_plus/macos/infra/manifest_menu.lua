@@ -22,7 +22,7 @@
 local JsonCodec = require("core.fs.adapters.json_codec")
 local Logger = require("infra.logger")
 local Paths  = require("core.fs.engine.paths")
-local i18n   = require("infra.i18n")
+local i18n   = require("core.i18n.engine.i18n")
 local Renderer = require("menu.engine.renderer")
 
 local LOG = "manifest_menu"

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local Shell = require("adapters.shell_runner")
 local Modal = require("ui.modal")
 local Logger = require("core.logger.engine.shim")
