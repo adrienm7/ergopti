@@ -160,6 +160,88 @@ for (const [label, mutate, message] of [
 	checks++;
 }
 
+// A key's shortcut_key: every combination but the text levels (and Ctrl+Alt, which
+// Windows reports for AltGr) acts as the chosen key, on the three platforms; an
+// explicit shortcut of the same combination wins; the native targets report it.
+{
+	const source = clone(fixture);
+	source.keys = Object.assign({}, source.keys, { KeyW: { shortcut_key: 'KeyC' } });
+	source.shortcuts = (source.shortcuts || []).concat([
+		{ key: 'KeyW', modifiers: ['control', 'shift'], send_key: 'KeyX', send_modifiers: ['control'] }
+	]);
+	// It survives a write and a read of the TOML source.
+	assert.deepEqual(clone(Source.read(Source.write(source)).keys.KeyW), { shortcut_key: 'KeyC' });
+	const combinations = clone(Source.shortcutKeyCombinations()).map((ids) =>
+		ids.slice().sort().join('+')
+	);
+	assert.deepEqual(combinations, [
+		'control',
+		'control+shift',
+		'meta',
+		'meta+shift',
+		'control+meta',
+		'control+meta+shift',
+		'alt+meta',
+		'alt+meta+shift'
+	]);
+	for (const platform of ['macos', 'linux', 'windows']) {
+		const table = Source.compileEmulation(source, { platform });
+		const own = table.shortcuts.filter((entry) => entry.key === 'KeyW');
+		assert.equal(own.length, combinations.length, `${platform}: one shortcut per combination`);
+		const explicit = own.filter((entry) => entry.send_key === 'KeyX');
+		assert.deepEqual(clone(explicit.map((entry) => entry.modifiers)), [['control', 'shift']]);
+		const session = Engine.newSession(Engine.compile(table));
+		const press = (held) => clone(Engine.press(session, 'KeyW', held, 0));
+		assert.deepEqual(press(['control']).actions, [
+			{ type: 'key', key: 'KeyC', modifiers: ['control'] }
+		]);
+		const altMeta = press(['meta', 'alt']).actions;
+		assert.equal(altMeta.length, 1);
+		assert.equal(altMeta[0].key, 'KeyC');
+		assert.deepEqual(altMeta[0].modifiers.slice().sort(), ['alt', 'meta']);
+		assert.deepEqual(press(['control', 'shift']).actions, [
+			{ type: 'key', key: 'KeyX', modifiers: ['control'] }
+		]);
+		// The text levels and AltGr (Ctrl+Alt on Windows) stay text.
+		for (const held of [[], ['shift'], ['alt'], ['shift', 'alt'], ['control', 'alt']])
+			assert.ok(
+				!press(held).actions.some((action) => action.type === 'key' && action.key === 'KeyC'),
+				`${platform}: ${held.join('+') || 'base'} is not a shortcut`
+			);
+		checks++;
+	}
+	// A key the drivers cannot send is reported, never dropped silently.
+	const unsendable = clone(source);
+	unsendable.keys.KeyW.shortcut_key = 'MacCode66';
+	assert.ok(
+		Source.compileEmulation(unsendable, { platform: 'linux' }).not_emulated.some(
+			(entry) =>
+				entry.path === 'keys.KeyW.shortcut_key' && entry.reason === 'physical_key_not_emulated'
+		)
+	);
+	// The native targets name it as a shortcut they cannot hold; the drivers emulate it.
+	const reports = targetReport(source);
+	// (The Windows KLC report is checked in test-layout-source.cjs, with its metadata.)
+	for (const target of ['macos', 'linux']) {
+		const report = reports.find((entry) => entry.target === target);
+		assert.ok(
+			report.omitted.some(
+				(entry) =>
+					entry.path === 'keys.KeyW.shortcut_key' && /^shortcut_output_not_in_/.test(entry.reason)
+			),
+			`${target}: shortcut_key is reported`
+		);
+	}
+	for (const target of ['driver_macos', 'driver_linux']) {
+		const report = reports.find((entry) => entry.target === target);
+		assert.ok(
+			!report.omitted.some((entry) => entry.path === 'keys.KeyW.shortcut_key'),
+			`${target}: shortcut_key is emulated`
+		);
+	}
+	checks++;
+}
+
 // export-all publishes the emulation tables and the web emulation.
 {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'layout-source-emulation-'));

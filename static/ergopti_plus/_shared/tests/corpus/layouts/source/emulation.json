@@ -168,6 +168,102 @@
 				],
 				"send_key": "Escape",
 				"send_modifiers": []
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"control"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"control"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"control"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"control",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"control",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"control",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"control",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"alt",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"alt",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"alt",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"alt",
+					"meta"
+				]
 			}
 		],
 		"tap_holds": [
@@ -420,6 +516,102 @@
 				],
 				"send_key": "Escape",
 				"send_modifiers": []
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"control"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"control"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"control"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"control",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"control",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"control",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"control",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"alt",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"alt",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"alt",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"alt",
+					"meta"
+				]
 			}
 		],
 		"tap_holds": [
@@ -672,6 +864,102 @@
 				],
 				"send_key": "Escape",
 				"send_modifiers": []
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"control"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"control"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"control"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"control"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"control",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"control",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"control",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"control",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"alt",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"alt",
+					"meta"
+				]
+			},
+			{
+				"key": "KeyW",
+				"modifiers": [
+					"shift",
+					"alt",
+					"meta"
+				],
+				"send_key": "KeyC",
+				"send_modifiers": [
+					"shift",
+					"alt",
+					"meta"
+				]
 			}
 		],
 		"tap_holds": [

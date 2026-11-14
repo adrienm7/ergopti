@@ -35,20 +35,16 @@ var LayoutSourceIO = (function () {
 
 	// The composer reader's levels and the modifiers each one holds (macOS
 	// semantics: Option is the AltGr level, Command the shortcuts level).
-	const PROJECTED_LAYERS = [
-		{ id: 'base', composer: 'base', required: [] },
-		{ id: 'shift', composer: 'shift', required: ['shift'] },
-		{ id: 'altgr', composer: 'altgr', required: ['alt'] },
-		{ id: 'shift_altgr', composer: 'shift_altgr', required: ['shift', 'alt'] },
-		{ id: 'command', composer: 'command', required: ['meta'] }
-	];
+	// The four character levels come from the format owner (LayoutSource.TEXT_LEVELS);
+	// each composer level of the same name, then Command for the shortcuts level.
+	const PROJECTED_LAYERS = LayoutSource.TEXT_LEVELS.map((level) => ({
+		id: level.id,
+		composer: level.id,
+		required: level.required.slice()
+	})).concat([{ id: 'command', composer: 'command', required: ['meta'] }]);
 	// The four character levels the editor's layer selector always shows, with the
 	// modifiers a missing one is added with.
-	const LEVEL_LAYERS = Object.freeze(
-		PROJECTED_LAYERS.filter((level) => level.id !== 'command').map((level) =>
-			Object.freeze({ id: level.id, required: Object.freeze(level.required.slice()) })
-		)
-	);
+	const LEVEL_LAYERS = LayoutSource.TEXT_LEVELS;
 	// layers.toml modifier tokens and the source's built-in names.
 	const NAV_MODIFIERS = { ctrl: 'control', alt: 'alt', shift: 'shift', meta: 'meta', fn: 'fn' };
 	const NAV_LAYER = 'nav';

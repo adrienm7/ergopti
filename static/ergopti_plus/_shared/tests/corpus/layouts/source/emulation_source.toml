@@ -99,6 +99,10 @@ terminator = "´"
 input = "a"
 text = "á"
 
+# Every combination but the text levels acts as KeyC (keys.<code>.shortcut_key).
+[keys.KeyW]
+shortcut_key = "KeyC"
+
 [remap]
 Home = "End"
 Pause = "Escape"

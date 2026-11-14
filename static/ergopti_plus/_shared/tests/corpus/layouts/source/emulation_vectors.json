@@ -869,6 +869,64 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "a key's shortcut_key acts as another key in every combination but the text levels",
+			"steps": [
+				{
+					"press": "KeyW",
+					"held": ["control"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyC",
+							"modifiers": ["control"]
+						}
+					]
+				},
+				{
+					"press": "KeyW",
+					"held": ["meta"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyC",
+							"modifiers": ["meta"]
+						}
+					]
+				},
+				{
+					"press": "KeyW",
+					"held": ["control", "caps_lock"],
+					"at": 0,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "key",
+							"key": "KeyC",
+							"modifiers": ["control"]
+						}
+					]
+				},
+				{
+					"press": "KeyW",
+					"held": ["alt"],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				},
+				{
+					"press": "KeyW",
+					"held": ["control", "alt"],
+					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
 		}
 	]
 }

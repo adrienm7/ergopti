@@ -47,6 +47,19 @@ var LayoutSource = (function () {
 		// place of AltGr; each target maps it to its closest native level.
 		'kana'
 	];
+	// The four character levels every target types text on, by the modifiers that
+	// select them (macOS semantics: Option is AltGr). The one definition of the text
+	// levels: the editor's layer selector and a key's shortcut_key read it.
+	const TEXT_LEVELS = Object.freeze(
+		[
+			{ id: 'base', required: [] },
+			{ id: 'shift', required: ['shift'] },
+			{ id: 'altgr', required: ['alt'] },
+			{ id: 'shift_altgr', required: ['shift', 'alt'] }
+		].map((level) => Object.freeze({ id: level.id, required: Object.freeze(level.required) }))
+	);
+	// The modifiers a key's shortcut_key covers in every combination but the text levels.
+	const SHORTCUT_MODIFIERS = Object.freeze(['shift', 'control', 'alt', 'meta']);
 	const TARGETS = [
 		{ target: 'macos', artifact: 'keylayout' },
 		{ target: 'linux', artifact: 'xkb', unavailable: 'tooling_export_required' },
@@ -399,7 +412,15 @@ var LayoutSource = (function () {
 				keyCode(key, at);
 				record(
 					entry,
-					['name', 'caps_lock', 'caps_layer', 'caps_shift_layer', 'caps_altgr', 'virtual_key'],
+					[
+						'name',
+						'caps_lock',
+						'caps_layer',
+						'caps_shift_layer',
+						'caps_altgr',
+						'virtual_key',
+						'shortcut_key'
+					],
 					[],
 					at
 				);
@@ -418,6 +439,14 @@ var LayoutSource = (function () {
 				}
 				if (own(entry, 'caps_altgr'))
 					requireValue(typeof entry.caps_altgr === 'boolean', `${at}.caps_altgr`);
+				if (own(entry, 'shortcut_key')) {
+					keyCode(entry.shortcut_key, `${at}.shortcut_key`);
+					requireValue(
+						entry.shortcut_key !== key,
+						`${at}.shortcut_key`,
+						'source_shortcut_key_self'
+					);
+				}
 				if (own(entry, 'virtual_key'))
 					requireValue(
 						Number.isInteger(entry.virtual_key) &&
@@ -661,9 +690,30 @@ var LayoutSource = (function () {
 		return codec.stringify(source);
 	}
 
+	/**
+	 * The modifier combinations a key's shortcut_key covers: every combination of
+	 * SHORTCUT_MODIFIERS that selects no text level, except Control with Alt, which
+	 * Windows reports for AltGr (AltGr typing must never become a shortcut).
+	 * @returns {string[][]} Each combination in SHORTCUT_MODIFIERS order.
+	 */
+	function shortcutKeyCombinations() {
+		const text = new Set(TEXT_LEVELS.map((level) => level.required.slice().sort().join('+')));
+		const combinations = [];
+		for (let mask = 1; mask < 1 << SHORTCUT_MODIFIERS.length; mask++) {
+			const ids = SHORTCUT_MODIFIERS.filter((id, bit) => mask & (1 << bit));
+			if (text.has(ids.slice().sort().join('+'))) continue;
+			if (ids.includes('control') && ids.includes('alt')) continue;
+			combinations.push(ids);
+		}
+		return combinations;
+	}
+
 	return {
 		FORMAT,
 		VERSION,
+		TEXT_LEVELS,
+		SHORTCUT_MODIFIERS,
+		shortcutKeyCombinations,
 		ISO_EXTRA_KEY,
 		ANSI_EXTRA_KEY,
 		BUILTIN_MODIFIERS,

@@ -321,6 +321,18 @@ const invalid = [
 		(s) => {
 			s.layers = s.layers.filter((layer) => layer.id !== 'base');
 		}
+	],
+	[
+		'source_shortcut_key_self',
+		(s) => {
+			s.keys.KeyA.shortcut_key = 'KeyA';
+		}
+	],
+	[
+		'source_invalid',
+		(s) => {
+			s.keys.KeyA.shortcut_key = 'not a key';
+		}
 	]
 ];
 for (const [code, mutate] of invalid) {
@@ -773,6 +785,22 @@ try {
 	);
 	assert.deepEqual(nativeKlc.report.system_keys, [], 'no system mappings is an array');
 	assert.equal(nativeKlc.report.virtual_keys.find((key) => key.key === 'KeyA').virtual_key, 'A');
+	// A key's shortcut_key is reported by the KLC, never dropped: the driver emulates it.
+	const structured = Source.read(
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'direct_levels.toml'), 'utf8')
+	);
+	const shortcutKlc = exportKlc({
+		...structured,
+		keys: { ...(structured.keys || {}), KeyA: { shortcut_key: 'KeyB' } },
+		exports: { ...(structured.exports || {}), windows: clone(windowsMetadata) }
+	});
+	assert.ok(
+		shortcutKlc.report.omitted.some(
+			(entry) =>
+				entry.path === 'keys.KeyA.shortcut_key' && entry.reason === 'shortcut_output_not_in_klc'
+		),
+		JSON.stringify(shortcutKlc.report.omitted)
+	);
 	assert.throws(
 		() =>
 			exportKlc({ ...windowsSource, exports: { windows: { ...windowsMetadata, unknown: true } } }),

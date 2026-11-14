@@ -357,7 +357,11 @@ var LayoutSourceCompiler = (function () {
 		if (source.windows) note('windows', 'windows_only_flags');
 		for (const [key, entry] of Object.entries(source.keys || {}))
 			for (const field of Object.keys(entry))
-				if (field !== 'name') note(`keys.${key}.${field}`, 'layer_selection_owns_caps_lock');
+				if (field === 'shortcut_key')
+					// The shortcut level of a native layout follows the typed character; the
+					// driver's emulation table performs a key's shortcut_key instead.
+					note(`keys.${key}.${field}`, `shortcut_output_not_in_${format}`);
+				else if (field !== 'name') note(`keys.${key}.${field}`, 'layer_selection_owns_caps_lock');
 		return omitted;
 	}
 
@@ -762,6 +766,29 @@ var LayoutSourceCompiler = (function () {
 					send_key: shortcut.send_key,
 					send_modifiers: shortcut.send_modifiers.slice()
 				});
+		}
+
+		// A key's shortcut_key: every combination it covers sends the same combination
+		// on that key, as one shortcut each, so the drivers' existing shortcut engine
+		// performs it; an explicit shortcut of the same combination wins.
+		const chord = (key, modifiers) => `${key}:${modifiers.slice().sort().join(',')}`;
+		const explicit = new Set(shortcuts.map((entry) => chord(entry.key, entry.modifiers)));
+		for (const [key, entry] of Object.entries(source.keys || {})) {
+			if (!own(entry, 'shortcut_key')) continue;
+			const path = `keys.${key}.shortcut_key`;
+			if (!pressable(key, path)) continue;
+			if (!sendable(entry.shortcut_key)) {
+				skip(path, 'physical_key_not_emulated');
+				continue;
+			}
+			for (const modifiers of LayoutSource.shortcutKeyCombinations())
+				if (!explicit.has(chord(key, modifiers)))
+					shortcuts.push({
+						key,
+						modifiers: modifiers.slice(),
+						send_key: entry.shortcut_key,
+						send_modifiers: modifiers.slice()
+					});
 		}
 
 		const tapHolds = [];
