@@ -414,8 +414,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       attribution; word-level lists miss cross-word bigrams, said in their popover.
 
 - [ ] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
-      and app) the user sets, per physical key, the finger and hand that press it; the home row (row 1, 2, 3 or 4);
-      and a per-finger home key (e.g. the index or ring home key one column off the others). Defaults stay the
+      and app) the user sets, per physical key, the finger and hand that press it; then, for each finger, its home key
+      anywhere inside the zone of keys assigned to that finger (e.g. the right pinky covers 3 columns × 4 rows and its
+      home key can be any of those 12 keys); no global home-row setting, metrics use each finger's own home key. Defaults stay the
       current model (Digit6 right index, space bar left thumb). Every metric and every other analyser's scorer follows
       the user's mapping; the profile is saved with the user's layouts, exportable, importable and resettable.
 - [ ] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
