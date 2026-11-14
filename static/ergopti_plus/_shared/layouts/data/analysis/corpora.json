@@ -180,6 +180,13 @@
 			"language": "fr",
 			"file": "static/corpus/original/fr/wikipedia_fr_20_articles.txt",
 			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "en_wikipedia",
+			"title": "Wikipedia — 20 articles",
+			"language": "en",
+			"file": "static/corpus/original/en/wikipedia_en_20_articles.txt",
+			"restore_dead_key_pairs": false
 		}
 	]
 }

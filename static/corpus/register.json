@@ -120,6 +120,15 @@
 			"status": "ship",
 			"note": "Tatoeba's terms of use (https://tatoeba.org/en/terms_of_use, read 2026-11-14): sentences use « the default Creative Commons Attribution 2.0 France license (CC-BY 2.0 FR) », whose one condition is to cite each sentence's author. The file keeps the first 30,000 sentences of the export (by sentence id) as « id<TAB>sentence<TAB>author »; « unknown » marks a sentence the export gives no author for. Short everyday sentences: a conversational register."
 		},
+		"original/en/wikipedia_en_20_articles.txt": {
+			"title": "English Wikipedia — 20 articles",
+			"source": "English Wikipedia, plain-text extracts of 20 articles through the MediaWiki API (2026-11-14), section headings removed",
+			"url": "https://en.wikipedia.org/",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "English Wikipedia contributors; the articles and revisions are listed in the note",
+			"status": "ship",
+			"note": "Wikipedia's text is licensed CC BY-SA 4.0; each article's authors are in its history at https://en.wikipedia.org/. Articles: United Kingdom (revision 1385707382); London (revision 1385705591); English language (revision 1385405086); French Revolution (revision 1384853060); William Shakespeare (revision 1383380297); Computer science (revision 1380596843); Mathematics (revision 1385556937); Classical music (revision 1385484715); Cuisine (revision 1385138448); Association football (revision 1384532641); Climate change (revision 1385272921); European Union (revision 1384741164); History of art (revision 1385167240); Chemistry (revision 1384268382); Biology (revision 1383003680); Astronomy (revision 1377879713); Internet (revision 1384979951); English literature (revision 1381089443); Film (revision 1384636104); Philosophy (revision 1385238382)."
+		},
 		"original/fr/corpus_johnix_autonomy.txt": {
 			"title": "Autonomie, la liberté de pensée (J.-M. Smith, French translation)",
 			"source": "« autonomy » of the bépo corpus by Johnix (corpus-johnix.zip), re-imported from its ISO-8859-1 original",
