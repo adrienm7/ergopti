@@ -181,3 +181,37 @@ _ValueCheckTest_HotstringPromptsShowRefusal() {
 	AssertEqual(3600000, Typed["max"], "the range is given in the typed unit (ms)")
 }
 Test("Value check: a refused hotstring delay is shown with its range", _ValueCheckTest_HotstringPromptsShowRefusal)
+
+; Regression: the ChatGPT link editor wrote any text, and the opener ran any
+; non-empty string; the search actions launched whatever config.toml held.
+; The link editor now refuses a non-web address with the shared message and
+; writes nothing; the openers refuse it before the launch.
+global _ValueCheckTest_LinkWrites := 0
+_ValueCheckTest_LinkWriter(*) {
+	global _ValueCheckTest_LinkWrites
+	_ValueCheckTest_LinkWrites += 1
+	return false
+}
+_ValueCheckTest_WebAddresses() {
+	global _ValueCheckTest_Refusals, _ValueCheckTest_LinkWrites, Features
+	for Refused in ["file:///C:/Windows/System32/calc.exe", "javascript:alert(1)", "https://bad url", "chat.example"] {
+		Before := _ValueCheckTest_Refusals.Length
+		_ValueCheckTest_LinkWrites := 0
+		AssertFalse(ModifyLink(0, Refused, _ValueCheckTest_LinkWriter), Refused)
+		AssertEqual(0, _ValueCheckTest_LinkWrites, "nothing is written for " . Refused)
+		AssertEqual(Before + 1, _ValueCheckTest_Refusals.Length)
+		AssertEqual(ConfigKey.SHORTCUTS_CHATGPT_URL, _ValueCheckTest_Refusals[-1]["key"])
+	}
+	Saved := Features
+	Launches := []
+	Launch := (Target, *) => Launches.Push(Target)
+	try {
+		Features := Map("shortcuts", Map(ConfigLeaf.SEARCH, Map(
+			ConfigLeaf.SEARCH_ENGINE, "file:///C:/Windows/System32/calc.exe",
+			ConfigLeaf.SEARCH_ENGINE_URL_QUERY, "cmd /c start ")))
+		SearchPath("", Launch)
+		SearchPath("ergopti", Launch)
+		AssertEqual(0, Launches.Length, "a refused search address is never launched")
+	} finally Features := Saved
+}
+Test("Value check: the ChatGPT link and the search addresses must be web addresses", _ValueCheckTest_WebAddresses)

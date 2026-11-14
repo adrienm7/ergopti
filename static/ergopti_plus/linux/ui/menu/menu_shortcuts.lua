@@ -782,11 +782,17 @@ local function _build_shortcuts(ctx)
 			i18n_safe("dialog.shortcuts.chatgpt_prompt"),
 			ChatGPT.get_url())
 		if value == nil then return end
-		if type(ChatGPT.is_valid) ~= "function" or not ChatGPT.is_valid(value) then
-			show_error(i18n_safe("dialog.gestures.param_err_url"))
+		-- The shared value check names what a web address needs; the module's
+		-- setter checks the same declaration again at its boundary.
+		local ValueCheck = require("settings.engine.value_check")
+		local key = ValueCheck.KEY.SHORTCUTS_CHATGPT_URL
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), value)
+		if not typed.ok then
+			Logger.warn(LOG, "Typed ChatGPT URL refused (%s).", typed.reason)
+			show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 			return
 		end
-		if ChatGPT.set_url(value) and type(ctx.on_menu_changed) == "function" then
+		if ChatGPT.set_url(typed.value) and type(ctx.on_menu_changed) == "function" then
 			ctx.on_menu_changed()
 		end
 	end

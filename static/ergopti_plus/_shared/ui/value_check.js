@@ -47,10 +47,16 @@ const REASONS = [
 	'below_minimum',
 	'above_maximum',
 	'not_allowed',
-	'too_long'
+	'too_long',
+	'not_url'
 ];
 
-const TYPES = ['integer', 'decimal', 'boolean', 'enum', 'string', 'path'];
+const TYPES = ['integer', 'decimal', 'boolean', 'enum', 'string', 'path', 'url'];
+
+// A web address: a lowercase http or https scheme, then at least one
+// character and no ASCII space or control character anywhere, so a stored
+// link never reaches a browser or a shell carrying a line break or a space.
+const URL_TEXT = /^https?:\/\/[^\x00-\x20\x7f]+$/;
 
 // Plain decimal text: an optional sign, digits, an optional fraction.
 const DECIMAL_TEXT = /^[+-]?[0-9]+(?:[.,][0-9]+)?$/;
@@ -137,6 +143,7 @@ function checkValue(entry, value) {
 			if (entry.max_length !== undefined && Array.from(value).length > entry.max_length) {
 				return refusal('too_long', entry);
 			}
+			if (entry.type === 'url' && !URL_TEXT.test(value)) return refusal('not_url', entry);
 			return { ok: true, value };
 		}
 	}
@@ -226,6 +233,8 @@ function messageParts(entry, result) {
 		parts.push({ key: 'dialog.value_check.too_long', args: [entry.max_length] });
 	} else if (result.reason === 'not_allowed') {
 		parts.push({ key: 'dialog.value_check.not_allowed', args: [] });
+	} else if (result.reason === 'not_url') {
+		parts.push({ key: 'dialog.value_check.not_url', args: [] });
 	} else {
 		parts.push({ key: 'dialog.value_check.empty', args: [] });
 	}
@@ -544,6 +553,30 @@ function requireValue(schema, key, value) {
 				"unit": "mm",
 				"min": 1,
 				"max": 60
+			},
+			"shortcuts.chatgpt_url": {
+				"file": "config.toml",
+				"type": "url",
+				"max_length": 2048,
+				"default_from": {
+					"manifest": "shortcuts.chatgpt_url"
+				}
+			},
+			"shortcuts.search.search_engine": {
+				"file": "config.toml",
+				"type": "url",
+				"max_length": 2048,
+				"default_from": {
+					"manifest": "shortcuts.search.search_engine"
+				}
+			},
+			"shortcuts.search.search_engine_url_query": {
+				"file": "config.toml",
+				"type": "url",
+				"max_length": 2048,
+				"default_from": {
+					"manifest": "shortcuts.search.search_engine_url_query"
+				}
 			}
 		}
 	};
@@ -568,7 +601,10 @@ function requireValue(schema, key, value) {
 		"LLM_TRIGGER_DEBOUNCE_MS": "llm.trigger.debounce_ms",
 		"LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS": "llm.trigger.min_request_interval_ms",
 		"SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS": "shortcuts.caps_word.idle_timeout_seconds",
-		"GESTURES_SENSITIVITIES_ANY": "gestures.sensitivities.*"
+		"GESTURES_SENSITIVITIES_ANY": "gestures.sensitivities.*",
+		"SHORTCUTS_CHATGPT_URL": "shortcuts.chatgpt_url",
+		"SHORTCUTS_SEARCH_SEARCH_ENGINE": "shortcuts.search.search_engine",
+		"SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY": "shortcuts.search.search_engine_url_query"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

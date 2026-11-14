@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} تعني: {2}.",
 	"dialog.value_check.too_long": "أدخل {1} أحرف على الأكثر.",
 	"dialog.value_check.not_allowed": "اختر إحدى القيم المقترحة.",
+	"dialog.value_check.not_url": "أدخل عنوان ويب يبدأ بـ https:// أو http://، بدون مسافات.",
 	"dialog.value_check.empty": "أدخل قيمة.",
 	"value_check.unit.ms": "ملي ثانية",
 	"value_check.unit.s": "ثوانٍ",

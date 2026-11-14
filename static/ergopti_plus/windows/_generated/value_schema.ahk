@@ -178,6 +178,24 @@ ValueSchemaData() {
 				"label_key", "value_check.special.never")],
 			"default_from", Map(
 				"manifest", "shortcuts.caps_word.idle_timeout_seconds")),
+		"shortcuts.chatgpt_url", Map(
+			"file", "config.toml",
+			"type", "url",
+			"max_length", 2048,
+			"default_from", Map(
+				"manifest", "shortcuts.chatgpt_url")),
+		"shortcuts.search.search_engine", Map(
+			"file", "config.toml",
+			"type", "url",
+			"max_length", 2048,
+			"default_from", Map(
+				"manifest", "shortcuts.search.search_engine")),
+		"shortcuts.search.search_engine_url_query", Map(
+			"file", "config.toml",
+			"type", "url",
+			"max_length", 2048,
+			"default_from", Map(
+				"manifest", "shortcuts.search.search_engine_url_query")),
 		"tap_hold.keys.*.time_activation_seconds", Map(
 			"file", "tap_hold.toml",
 			"type", "decimal",

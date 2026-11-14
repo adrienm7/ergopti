@@ -26,10 +26,20 @@ local M = {}
 --- Every refusal reason; the localized message is `dialog.value_check.<reason>`.
 M.REASONS = {
 	"empty", "wrong_type", "not_finite", "not_integer",
-	"below_minimum", "above_maximum", "not_allowed", "too_long",
+	"below_minimum", "above_maximum", "not_allowed", "too_long", "not_url",
 }
 
-local TYPES = { integer = true, decimal = true, boolean = true, enum = true, string = true, path = true }
+local TYPES = { integer = true, decimal = true, boolean = true, enum = true, string = true, path = true, url = true }
+
+--- A web address: a lowercase http or https scheme, then at least one
+--- character and no ASCII space or control character anywhere (the JS and AHK
+--- ports' [^\x00-\x20\x7f]; %c is exactly 0-31 and 127 in the C locale).
+--- @param value string Candidate.
+--- @return boolean
+local function is_url(value)
+	local rest = value:match("^https?://(.*)$")
+	return rest ~= nil and rest ~= "" and value:find("[%c ]") == nil
+end
 
 
 
@@ -152,6 +162,7 @@ function M.check_value(entry, value)
 	if type(value) ~= "string" then return refusal("wrong_type", entry) end
 	if value == "" and entry.allow_empty ~= true then return refusal("empty", entry) end
 	if entry.max_length ~= nil and char_count(value) > entry.max_length then return refusal("too_long", entry) end
+	if kind == "url" and not is_url(value) then return refusal("not_url", entry) end
 	return { ok = true, value = value }
 end
 
@@ -239,6 +250,8 @@ function M.message_parts(entry, result)
 		parts[1] = { key = "dialog.value_check.too_long", args = { entry.max_length } }
 	elseif result.reason == "not_allowed" then
 		parts[1] = { key = "dialog.value_check.not_allowed", args = {} }
+	elseif result.reason == "not_url" then
+		parts[1] = { key = "dialog.value_check.not_url", args = {} }
 	else
 		parts[1] = { key = "dialog.value_check.empty", args = {} }
 	end

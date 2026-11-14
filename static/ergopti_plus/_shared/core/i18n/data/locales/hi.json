@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} का अर्थ है: {2}।",
 	"dialog.value_check.too_long": "अधिकतम {1} वर्ण दर्ज करें।",
 	"dialog.value_check.not_allowed": "प्रस्तावित मानों में से एक चुनें।",
+	"dialog.value_check.not_url": "https:// या http:// से शुरू होने वाला, बिना रिक्त स्थान का वेब पता दर्ज करें।",
 	"dialog.value_check.empty": "एक मान दर्ज करें।",
 	"value_check.unit.ms": "मिलीसेकंड",
 	"value_check.unit.s": "सेकंड",

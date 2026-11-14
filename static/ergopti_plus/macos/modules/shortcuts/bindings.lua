@@ -1139,8 +1139,20 @@ end
 --- so the action always reflects config.toml (the SSoT) instead of the hardcoded
 --- manifest default. No re-arm is needed: the action reads M.get_chatgpt_url()
 --- on every run rather than capturing the value once.
+--- A URL its shared value schema declaration refuses (another scheme, a
+--- space or control character, past 2048 characters) fails fast with a log
+--- line and leaves the current one in place.
 --- @param url string|nil The configured URL, or nil to fall back to the default.
+--- @return boolean applied
 function M.set_chatgpt_url(url)
+	if url ~= nil and url ~= "" then
+		local ValueCheck = require("settings.engine.value_check")
+		local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.SHORTCUTS_CHATGPT_URL), url)
+		if not checked.ok then
+			Logger.error(LOG, "ChatGPT URL refused by its value schema declaration (%s).", checked.reason)
+			return false
+		end
+	end
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
 	Logger.debug(LOG, "ChatGPT URL updated.")
 	return true

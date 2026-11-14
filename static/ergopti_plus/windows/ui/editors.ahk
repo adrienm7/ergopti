@@ -870,6 +870,13 @@ ModifyLink(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 		try return ModifyLink(gui, NewValue, WriterFn, NotifyFn, ReloadFn)
 		finally Critical(InheritedCritical)
 	}
+	; The shared value check names what a web address needs; nothing is written.
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.SHORTCUTS_CHATGPT_URL), NewValue)
+	if !Typed["ok"] {
+		ValueCheckShowRefusal(ConfigKey.SHORTCUTS_CHATGPT_URL, Typed, NewValue)
+		return false
+	}
+	NewValue := Typed["value"]
 	if !_EditorWriteToml(ConfigurationFile, "the ChatGPT link",
 			_EditorBuildLinkPlan.Bind(NewValue), WriterFn, NotifyFn)
 		return false

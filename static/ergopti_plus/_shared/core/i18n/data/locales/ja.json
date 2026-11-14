@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1}は「{2}」を意味します。",
 	"dialog.value_check.too_long": "{1}文字以内で入力してください。",
 	"dialog.value_check.not_allowed": "提示された値から選んでください。",
+	"dialog.value_check.not_url": "https:// または http:// で始まる、空白を含まないウェブアドレスを入力してください。",
 	"dialog.value_check.empty": "値を入力してください。",
 	"value_check.unit.ms": "ミリ秒",
 	"value_check.unit.s": "秒",

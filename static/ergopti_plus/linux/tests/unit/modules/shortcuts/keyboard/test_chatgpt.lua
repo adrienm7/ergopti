@@ -89,7 +89,9 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 
 	helpers.it("refuses invalid setter values without changing the configuration", function()
 		with_subject(SOURCE, function(subject, controls, path)
-			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url" }) do
+			-- The last one passes the declared 2048 characters.
+			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url",
+				"https://example.invalid/" .. string.rep("a", 2048) }) do
 				helpers.assert_eq(subject.set_url(value), false)
 			end
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)

@@ -14,6 +14,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(
@@ -580,9 +581,9 @@ GestureOpenConfiguredURL(BindingId := "") {
 GestureOpenChatGpt() {
 		global Features
 		try {
-				Link := Features["shortcuts"][ConfigLeaf.CHATGPT_URL]
-				if (Type(Link) != "String" or Trim(Link) = "")
-						throw Error("the configured ChatGPT link is empty or invalid")
+				; A link its shared value schema declaration refuses never reaches Run.
+				Link := ValueCheckRequire(ConfigKey.SHORTCUTS_CHATGPT_URL,
+						Features["shortcuts"][ConfigLeaf.CHATGPT_URL])
 				Run(Link)
 		} catch as Err {
 				LoggerError("gestures", "open_chatgpt failed: {1}", Err.Message)

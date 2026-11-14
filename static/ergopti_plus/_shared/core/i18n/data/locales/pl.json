@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} oznacza: {2}.",
 	"dialog.value_check.too_long": "Wpisz co najwyżej {1} znaków.",
 	"dialog.value_check.not_allowed": "Wybierz jedną z proponowanych wartości.",
+	"dialog.value_check.not_url": "Wpisz adres internetowy zaczynający się od https:// lub http://, bez spacji.",
 	"dialog.value_check.empty": "Wpisz wartość.",
 	"value_check.unit.ms": "milisekundy",
 	"value_check.unit.s": "sekundy",

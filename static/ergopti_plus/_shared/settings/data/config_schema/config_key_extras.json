@@ -3,6 +3,8 @@
 	"paths": [
 		"gestures.action_parameters",
 		"shortcuts.keyboard",
+		"shortcuts.search.search_engine",
+		"shortcuts.search.search_engine_url_query",
 		"shortcuts.tap_keys",
 		"tap_holds.timeout_ms"
 	]

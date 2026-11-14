@@ -4268,6 +4268,7 @@
 	"dialog.value_check.special": "{1} 表示{2}。",
 	"dialog.value_check.too_long": "最多输入 {1} 个字符。",
 	"dialog.value_check.not_allowed": "请从提供的值中选择一个。",
+	"dialog.value_check.not_url": "请输入以 https:// 或 http:// 开头且不含空格的网址。",
 	"dialog.value_check.empty": "请输入一个值。",
 	"value_check.unit.ms": "毫秒",
 	"value_check.unit.s": "秒",

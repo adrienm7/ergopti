@@ -61,6 +61,7 @@ const FIELDS = {
 	enum: ['values'],
 	string: ['max_length', 'allow_empty'],
 	path: ['allow_empty'],
+	url: ['max_length', 'allow_empty'],
 	boolean: []
 };
 const MESSAGE_KEYS = [
@@ -72,6 +73,7 @@ const MESSAGE_KEYS = [
 	'dialog.value_check.special',
 	'dialog.value_check.too_long',
 	'dialog.value_check.not_allowed',
+	'dialog.value_check.not_url',
 	'dialog.value_check.empty'
 ];
 
