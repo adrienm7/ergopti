@@ -794,8 +794,10 @@ _THD_NumericPromptDomain(GlobalDelay) {
  for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "", "0",
    "0x3", "3.4", "3e0", "10001"]
   _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 0))
- for Raw in ["3", "0003", "+3", " 3 ", "10000"]
+ for Raw in ["3", "0003", "+3", " 3 "]
   _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 3))
+ ; The declared maximum itself is admitted.
+ _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, "10000", 10000))
 }
 Test("Tap-hold global delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(true))
 Test("Tap-hold key delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(false))
