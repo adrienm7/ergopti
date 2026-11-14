@@ -10,7 +10,7 @@
  * .keylayout, export it unchanged, convert it, import the navigation layer,
  * show and add the Base, Shift, AltGr and Shift+AltGr layers from the layer
  * selector, lay out at phone width in light and dark without a sideways page
- * scroll, and check that no raw locale key is shown in any tool tab of the 21
+ * scroll, fit every key label inside its key, and check that no raw locale key is shown in any tool tab of the 21
  * locales. Page errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
  */
@@ -377,6 +377,82 @@ async function exerciseLayerSelector(browser, origin) {
 		),
 		[]
 	);
+	assert.deepEqual(errors, []);
+	await page.context().close();
+}
+
+/**
+ * Every key label stays inside its key: a long one shrinks to fit, and one still
+ * too long at the smallest size is cut with an ellipsis and shown whole in the
+ * key's tooltip, on every layer, both geometries, wide and at phone width.
+ */
+async function exerciseLongLabels(browser, origin) {
+	const { page, errors } = await open(browser, origin, 'en');
+	const map = async (code, text) => {
+		await page.click(`#le-board [data-code="${code}"]`);
+		await page.selectOption('#le-kind', 'text');
+		await page.fill('#le-text', text);
+		await page.click('#le-apply');
+	};
+	const LONG = 'Bonjour tout le monde, voici un très long texte';
+	await map('KeyA', LONG);
+	await map('KeyS', 'ÉÉÉÉ');
+	await map('Space', '→ → → → → → → → → → → →');
+	await map('Backspace', 'Effacer en arrière');
+	// A dead key with a long terminator, and the same labels on a second layer.
+	await tool(page, 'dead_keys');
+	await page.fill('#le-dead-id', 'long');
+	await page.fill('#le-dead-terminator', 'ˆ˜¨˝˘');
+	await page.click('#le-dead-add');
+	await page.click('#le-board [data-code="KeyD"]');
+	await page.selectOption('#le-kind', 'dead_key');
+	await page.selectOption('#le-dead', 'long');
+	await page.click('#le-apply');
+	await page.click('#le-layerbar [data-level="altgr"]');
+	await page.waitForSelector('[data-layer="altgr"].active');
+	await map('KeyQ', LONG);
+	await map('Digit1', '«»«»«»«»');
+	const overflowing = () =>
+		page.$$eval('#le-board .le-key', (keys) =>
+			keys
+				.map((key) => {
+					const legend = key.querySelector('.le-legend');
+					const box = key.getBoundingClientRect();
+					const text = legend.getBoundingClientRect();
+					const inside =
+						legend.scrollWidth <= legend.clientWidth ||
+						getComputedStyle(legend).textOverflow === 'ellipsis';
+					const fits = text.left >= box.left - 0.5 && text.right <= box.right + 0.5;
+					const whole = !legend.textContent || key.title.includes(legend.textContent);
+					return inside && fits && whole ? null : key.dataset.code;
+				})
+				.filter(Boolean)
+		);
+	for (const width of [1440, 375]) {
+		await page.setViewportSize({ width, height: 900 });
+		for (const form of ['iso', 'ansi']) {
+			await page.selectOption('#le-board-form', form);
+			for (const layer of ['base', 'altgr']) {
+				await page.click(`[data-layer="${layer}"]`);
+				assert.deepEqual(await overflowing(), [], `${width}px ${form} ${layer}: labels overflow`);
+			}
+		}
+	}
+	// The long sentence is cut and named whole by its tooltip; a short one only shrinks.
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.click('[data-layer="base"]');
+	assert.ok(
+		await page.$eval('#le-board [data-code="KeyA"] .le-legend', (n) => n.classList.contains('cut'))
+	);
+	assert.ok(
+		(await page.getAttribute('#le-board [data-code="KeyA"]', 'title')).endsWith(LONG),
+		'the tooltip holds the whole label'
+	);
+	const ss = await page.$eval('#le-board [data-code="KeyS"] .le-legend', (n) => ({
+		cut: n.classList.contains('cut'),
+		size: parseFloat(getComputedStyle(n).fontSize)
+	}));
+	assert.ok(!ss.cut && ss.size >= 9, 'a short label is not cut');
 	assert.deepEqual(errors, []);
 	await page.context().close();
 }
@@ -758,6 +834,7 @@ async function exercisePhoneWidth(browser, origin) {
 		await exerciseManager(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
+		await exerciseLongLabels(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

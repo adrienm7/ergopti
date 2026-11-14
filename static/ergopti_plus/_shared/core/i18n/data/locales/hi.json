@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "स्टिकरों पर स्तर",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "स्टिकर का आकार (मिमी):",
-	"layout_editor.subtitle": "अपने लेआउट की हर लेयर संपादित करें, उसका Ergopti स्रोत (TOML) सहेजें और उसे निर्यात करें।",
 	"layout_editor.tap_hold.hold": "होल्ड करने पर मिलता है",
 	"layout_editor.tap_hold.layer": "लेयर {id}",
 	"layout_editor.tap_hold.modifier": "मॉडिफ़ायर {id}",

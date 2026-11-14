@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "المستويات على الملصقات",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "حجم الملصقات (مم):",
-	"layout_editor.subtitle": "حرّر كل طبقة من تخطيطك، واحفظ مصدر Ergopti الخاص به (TOML) وصدّره.",
 	"layout_editor.tap_hold.hold": "الضغط المطوّل يعطي",
 	"layout_editor.tap_hold.layer": "الطبقة {id}",
 	"layout_editor.tap_hold.modifier": "المعدِّل {id}",

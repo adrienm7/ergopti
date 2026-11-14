@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "רמות על המדבקות",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "גודל מדבקות (מ״מ):",
-	"layout_editor.subtitle": "ערכו כל שכבה בפריסה, שמרו את מקור ה-Ergopti שלה (TOML) וייצאו אותה.",
 	"layout_editor.tap_hold.hold": "החזקה מפעילה",
 	"layout_editor.tap_hold.layer": "את השכבה {id}",
 	"layout_editor.tap_hold.modifier": "את מקש הצירוף {id}",

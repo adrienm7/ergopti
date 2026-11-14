@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "ステッカーに載せるレベル",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "ステッカーのサイズ（mm）：",
-	"layout_editor.subtitle": "配列のすべてのレイヤーを編集し、Ergopti ソース（TOML）を保存してエクスポートします。",
 	"layout_editor.tap_hold.hold": "長押しの動作",
 	"layout_editor.tap_hold.layer": "レイヤー {id}",
 	"layout_editor.tap_hold.modifier": "修飾キー {id}",

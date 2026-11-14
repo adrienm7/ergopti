@@ -73,6 +73,8 @@ var LayoutEditorPage = (function () {
 	const PREVIEW_PLATFORM = 'macos';
 	// Exact sticker sizes the print accepts, in millimetres (keycaps are about 18 mm).
 	const STICKER_MIN_MM = 8;
+	// The smallest font a key label shrinks to before it is cut with an ellipsis.
+	const LEGEND_MIN_PX = 9;
 	// The levels of another layout a layer can be filled from (the composer's levels).
 	const FILL_LEVELS = ['base', 'shift', 'altgr', 'shift_altgr', 'command'];
 	const STICKER_MAX_MM = 30;
@@ -1075,6 +1077,7 @@ var LayoutEditorPage = (function () {
 			for (const key of keys) {
 				const g = key.geometry[form];
 				const found = currentMapping(key.code);
+				const label = found ? legend(found.mapping, doc()) : '';
 				const classes = ['le-key'];
 				if (found) classes.push(found.scope === 'all' ? 'mapped' : 'platform');
 				if (key.code === state.selected) classes.push('selected');
@@ -1086,7 +1089,8 @@ var LayoutEditorPage = (function () {
 							type: 'button',
 							class: classes.join(' '),
 							'data-code': key.code,
-							title: keyName(key.code),
+							// The full label, which a long one only shows here once fitted.
+							title: label ? `${keyName(key.code)}: ${label}` : keyName(key.code),
 							style: `--x:${g.col};--y:${g.row};--w:${g.width};--h:${g.height || 1}`,
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
@@ -1129,7 +1133,7 @@ var LayoutEditorPage = (function () {
 							}
 						},
 						[
-							el('span', { class: 'le-legend', text: found ? legend(found.mapping, doc()) : '' }),
+							el('span', { class: 'le-legend', text: label }),
 							el('span', { class: 'le-code', text: keyName(key.code) })
 						]
 					)
@@ -2783,10 +2787,6 @@ var LayoutEditorPage = (function () {
 			if (state.layer && !ids.includes(state.layer))
 				state.layer = ids.includes('base') ? 'base' : null;
 			const parts = [
-				el('header', { class: 'le-header' }, [
-					el('h1', { text: tl('title') }),
-					el('p', { class: 'le-subtitle', text: tl('subtitle') })
-				]),
 				toolbar(),
 				startPanel(),
 				messageBar(),
@@ -2801,8 +2801,44 @@ var LayoutEditorPage = (function () {
 			];
 			// A section a state hides is null: it must not reach the page as text.
 			root.replaceChildren(...parts.filter(Boolean));
+			fitLegends();
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
 			if (analysisPanel) analysisPanel.update(doc());
+		}
+
+		/**
+		 * Fits every key label inside its key: the font shrinks in proportion to the
+		 * overflow down to LEGEND_MIN_PX, then a label still too long is cut with an
+		 * ellipsis (the key's title holds it whole). A board not laid out yet (a
+		 * hidden frame) is measured at the next resize.
+		 */
+		function fitLegends() {
+			const legends = [...root.querySelectorAll('#le-board .le-legend')];
+			legends.forEach((node) => {
+				node.style.fontSize = '';
+				node.classList.remove('cut');
+			});
+			const widths = legends.map((node) => [node.clientWidth, node.scrollWidth]);
+			legends.forEach((node, index) => {
+				const [room, needed] = widths[index];
+				if (room === 0 || needed <= room) return;
+				const size = parseFloat(getComputedStyle(node).fontSize);
+				node.style.fontSize = `${Math.max(LEGEND_MIN_PX, Math.floor((size * room) / needed))}px`;
+			});
+			legends.forEach((node) => {
+				if (node.scrollWidth > node.clientWidth) node.classList.add('cut');
+			});
+		}
+
+		// The board's key unit follows the editor's width: refit the labels when it changes.
+		if (typeof ResizeObserver === 'function') {
+			let lastWidth = -1;
+			new ResizeObserver((entries) => {
+				const width = Math.round(entries[0].contentRect.width);
+				if (width === lastWidth) return;
+				lastWidth = width;
+				fitLegends();
+			}).observe(root);
 		}
 
 		// One persistent element for a host's side panel (the analysis of the Studio):

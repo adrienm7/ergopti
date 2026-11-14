@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Niveles en las pegatinas",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Tamaño de las pegatinas (mm):",
-	"layout_editor.subtitle": "Edita cada capa de tu distribución, guarda su fuente Ergopti (TOML) y expórtala.",
 	"layout_editor.tap_hold.hold": "Mantener da",
 	"layout_editor.tap_hold.layer": "la capa {id}",
 	"layout_editor.tap_hold.modifier": "el modificador {id}",

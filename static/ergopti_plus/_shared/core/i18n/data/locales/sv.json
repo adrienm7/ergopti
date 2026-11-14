@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Nivåer på dekalerna",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Etikettstorlek (mm):",
-	"layout_editor.subtitle": "Redigera varje lager i din layout, spara dess Ergopti-källa (TOML) och exportera den.",
 	"layout_editor.tap_hold.hold": "Håll ger",
 	"layout_editor.tap_hold.layer": "lagret {id}",
 	"layout_editor.tap_hold.modifier": "modifieraren {id}",

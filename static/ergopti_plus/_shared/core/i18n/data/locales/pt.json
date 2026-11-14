@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Níveis nos autocolantes",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Tamanho dos autocolantes (mm):",
-	"layout_editor.subtitle": "Edite cada camada do seu layout, guarde a sua fonte Ergopti (TOML) e exporte-o.",
 	"layout_editor.tap_hold.hold": "A pressão longa dá",
 	"layout_editor.tap_hold.layer": "a camada {id}",
 	"layout_editor.tap_hold.modifier": "o modificador {id}",

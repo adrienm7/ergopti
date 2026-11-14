@@ -26,5 +26,6 @@ body {
 	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
 	font-size: 13px;
 	margin: 0;
-	padding: 12px 16px;
+	/* The editor page sets its own gutters and fills the window. */
+	padding: 0;
 }

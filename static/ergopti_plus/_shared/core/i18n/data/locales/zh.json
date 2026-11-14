@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "贴纸上的层级",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "贴纸尺寸（毫米）：",
-	"layout_editor.subtitle": "编辑布局的每一层，保存其 Ergopti 源文件（TOML）并导出。",
 	"layout_editor.tap_hold.hold": "长按触发",
 	"layout_editor.tap_hold.layer": "层 {id}",
 	"layout_editor.tap_hold.modifier": "修饰键 {id}",

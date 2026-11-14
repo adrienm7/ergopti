@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Рівні на наліпках",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Розмір наліпок (мм):",
-	"layout_editor.subtitle": "Редагуйте кожен шар розкладки, зберігайте її джерело Ergopti (TOML) та експортуйте її.",
 	"layout_editor.tap_hold.hold": "Утримання дає",
 	"layout_editor.tap_hold.layer": "шар {id}",
 	"layout_editor.tap_hold.modifier": "модифікатор {id}",

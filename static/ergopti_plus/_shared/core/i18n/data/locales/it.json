@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Livelli sugli adesivi",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Dimensione degli adesivi (mm):",
-	"layout_editor.subtitle": "Modifica ogni livello del tuo layout, salva la sua sorgente Ergopti (TOML) ed esportalo.",
 	"layout_editor.tap_hold.hold": "La pressione prolungata dà",
 	"layout_editor.tap_hold.layer": "il livello {id}",
 	"layout_editor.tap_hold.modifier": "il modificatore {id}",

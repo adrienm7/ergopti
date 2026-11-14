@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Çıkartmalardaki seviyeler",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Etiket boyutu (mm):",
-	"layout_editor.subtitle": "Düzeninizin her katmanını düzenleyin, Ergopti kaynağını (TOML) kaydedin ve dışa aktarın.",
 	"layout_editor.tap_hold.hold": "Basılı tutma verir",
 	"layout_editor.tap_hold.layer": "{id} katmanı",
 	"layout_editor.tap_hold.modifier": "{id} değiştiricisi",

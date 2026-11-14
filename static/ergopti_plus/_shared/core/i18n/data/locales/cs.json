@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Úrovně na nálepkách",
 	"layout_editor.sticker.note": "Print one sticker per key with its characters, to stick on your keycaps.",
 	"layout_editor.sticker.size": "Velikost nálepek (mm):",
-	"layout_editor.subtitle": "Upravte každou vrstvu svého rozložení, uložte jeho zdroj Ergopti (TOML) a exportujte jej.",
 	"layout_editor.tap_hold.hold": "Podržení dává",
 	"layout_editor.tap_hold.layer": "vrstvu {id}",
 	"layout_editor.tap_hold.modifier": "modifikátor {id}",

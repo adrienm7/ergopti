@@ -547,7 +547,6 @@
 	"layout_editor.sticker.levels": "Niveaux sur les autocollants",
 	"layout_editor.sticker.note": "Imprimez un autocollant par touche avec ses caractères, à coller sur vos touches.",
 	"layout_editor.sticker.size": "Taille des autocollants (mm) :",
-	"layout_editor.subtitle": "Modifiez chaque couche de votre disposition, enregistrez sa source Ergopti (TOML) et exportez-la.",
 	"layout_editor.tap_hold.hold": "Le maintien donne",
 	"layout_editor.tap_hold.layer": "la couche {id}",
 	"layout_editor.tap_hold.modifier": "le modificateur {id}",

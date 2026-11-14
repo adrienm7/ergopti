@@ -48,15 +48,19 @@
 	padding: 16px clamp(12px, 2.5vw, 28px) 32px;
 }
 
+html,
+body {
+	min-height: 100%;
+}
+
 body {
 	background: var(--theme-bg);
 	margin: 0;
 }
 
-.layout-editor h1 {
-	font-size: 1.3em;
-	font-weight: 650;
-	margin: 0;
+/* The page is the editor: it fills the frame or the window. */
+.layout-editor {
+	min-height: 100vh;
 }
 
 .layout-editor h2 {
@@ -133,21 +137,9 @@ body {
 /* =============================== */
 /* =============================== */
 
-.le-header {
-	align-items: baseline;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 2px 12px;
-}
-
-.le-subtitle,
 .le-note {
 	color: var(--le-sub);
 	margin: 0 0 6px;
-}
-
-.le-subtitle {
-	margin: 0;
 }
 
 .le-toolbar {
@@ -472,9 +464,17 @@ body {
 }
 
 .le-legend {
+	display: block;
 	font-size: calc(var(--le-unit) * 0.38);
-	line-height: 1.1;
+	line-height: 1.15;
+	overflow: hidden;
 	white-space: nowrap;
+	width: 100%;
+}
+
+/* A label too long even at the smallest size (editor_page.js, fitLegends). */
+.le-legend.cut {
+	text-overflow: ellipsis;
 }
 
 .le-code {
@@ -718,10 +718,6 @@ body {
 /* =============================== */
 
 @container layout-editor (max-width: 600px) {
-	.le-subtitle {
-		display: none;
-	}
-
 	.le-toolbar {
 		gap: 6px;
 		padding: 6px;
