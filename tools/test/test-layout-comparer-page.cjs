@@ -21,6 +21,8 @@
  *    declares with a top-level const or let, which is a page global but not
  *    a window property (the .keylayout import once read window.LAYOUT_COMPOSER_DATA
  *    and got undefined).
+ * 6. Editor panel: the site's editor page and the app's editor window load
+ *    the panel's scripts in the same order, before editor_page.js.
  * ==============================================================================
  */
 
@@ -149,6 +151,27 @@ for (const file of ['comparer_page.js', 'analysis_panel.js', 'info_popover.js', 
 		.readFileSync(path.join(PAGE_DIR, file), 'utf8')
 		.matchAll(/window\.([A-Za-z_$][\w$]*)/g))
 		check(!lexical.has(m[1]), `${file}: window.${m[1]} is undefined (a top-level const)`);
+
+// 6/ Editor panel
+const PANEL_SCRIPTS = [
+	'../layout_analysis/_generated/analysis_data.js',
+	'../layout_analysis/analysis_engine.js',
+	'../layout_analysis/info_popover.js',
+	'../layout_analysis/corpus_files.js',
+	'../layout_analysis/analysis_panel.js',
+	'../layout_editor/editor_page.js'
+];
+for (const page of ['layout_editor', 'layout_editor_window']) {
+	const listed = Array.from(
+		fs.readFileSync(shared('ui', page, 'index.html'), 'utf8').matchAll(/<script src="([^"]+)"/g),
+		// The editor page names its own folder's scripts without the prefix.
+		(m) => (m[1].startsWith('../') ? m[1] : `../${page}/${m[1]}`)
+	).filter((src) => PANEL_SCRIPTS.includes(src));
+	check(
+		JSON.stringify(listed) === JSON.stringify(PANEL_SCRIPTS),
+		`${page}/index.html: panel scripts ${listed.join(', ')}`
+	);
+}
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
