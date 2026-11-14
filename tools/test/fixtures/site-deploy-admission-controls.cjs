@@ -46,6 +46,17 @@ function fixture(target = 'main') {
 			]
 		}))
 	);
+	// The site tests the admission requires besides the per-target rows; no writer marker.
+	jobs.push({
+		id: 250,
+		name: 'Common / E2E tests (Shared UI rendering)',
+		run_id: 123,
+		head_sha: source,
+		run_attempt: 1,
+		status: 'completed',
+		conclusion: 'success',
+		steps: [{ name: 'Set up job', number: 1, status: 'completed', conclusion: 'success' }]
+	});
 	const artifacts = ['common-site-build-', 'common-site-testbuild-'].map((name, i) => ({
 		id: 301 + i,
 		name: name + target,
@@ -1033,9 +1044,76 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		);
 		controls++;
 	}
+	// dev publishes from a red run when every site job succeeded (maintainer, 2026-11-14);
+	// main keeps the whole-run success, and a cancelled run never publishes.
+	const redDev = () => {
+		const model = fixture('dev');
+		model.run.conclusion = 'failure';
+		return model;
+	};
+	const lines = [];
+	const admittedRed = await owner.admitProducer(
+		redDev().selection,
+		reader(redDev()).readApi,
+		(line) => lines.push(line)
+	);
+	assert.equal(admittedRed.target, 'dev');
+	assert.deepEqual(lines, [
+		'Site publication gated by run 123 (failure) on: Common / E2E tests (Shared UI rendering) #250, ' +
+			'Common / Build (Stable site) #211, Common / Install and launch (Stable site) #212, ' +
+			'Common / Build (Development site) #201, Common / Install and launch (Development site) #202.'
+	]);
+	controls++;
+	for (const [name, mutate, reason] of [
+		['cancelled dev run', (m) => (m.run.conclusion = 'cancelled'), /successful push/],
+		[
+			'red dev run with failed site tests',
+			(m) => (m.jobs[4].conclusion = 'failure'),
+			/site test job is not successful/
+		],
+		[
+			'red dev run with skipped site tests',
+			(m) => (m.jobs[4].conclusion = 'skipped'),
+			/site test job is not successful/
+		],
+		['red dev run without site tests', (m) => m.jobs.splice(4, 1), /missing site test job/],
+		[
+			'red dev run with a failed dev Build',
+			(m) => (m.jobs[0].conclusion = 'failure'),
+			/not successful/
+		],
+		[
+			'red dev run with a skipped Stable site Install and launch',
+			(m) => (m.jobs[3].conclusion = 'skipped'),
+			/not successful/
+		]
+	]) {
+		const model = redDev();
+		mutate(model);
+		await assert.rejects(
+			() => owner.admitProducer(model.selection, reader(model).readApi),
+			reason,
+			name
+		);
+		controls++;
+	}
+	const redMain = fixture('main');
+	redMain.run.conclusion = 'failure';
+	await assert.rejects(
+		() => owner.admitProducer(redMain.selection, reader(redMain).readApi),
+		/successful push/,
+		'red main run'
+	);
+	controls++;
+	const redEvent = structuredClone(event);
+	redEvent.workflow_run = redDev().run;
+	assert.deepEqual(owner.selectionFromEvent(env, redEvent), redDev().selection);
+	redEvent.workflow_run.conclusion = 'cancelled';
+	assert.throws(() => owner.selectionFromEvent(env, redEvent), /successful push/);
+	controls++;
 	assert.equal(
 		controls,
-		156,
+		165,
 		'all original controls and both-target writer custody controls execute'
 	);
 	return {

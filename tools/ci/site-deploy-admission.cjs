@@ -181,6 +181,32 @@ function producingAttempt(job, matches) {
 	return String(Math.min(...copies.map((row) => Number(number(row.job.run_attempt)))));
 }
 
+/**
+ * Whole-run conclusions a completed push may have to publish its target. main
+ * publishes only from a fully green run. dev (decided by the maintainer on
+ * 2026-11-14) publishes from a completed run whose site jobs below all
+ * succeeded, whatever the other lanes concluded, so a red elsewhere no longer
+ * freezes ergopti.fr/dev; a cancelled run never publishes.
+ */
+const PRODUCER_CONCLUSIONS = Object.freeze({
+	main: Object.freeze(['success']),
+	dev: Object.freeze(['success', 'failure'])
+});
+/** The site tests every published run passed, beside the per-target Build and Install and launch rows. */
+const SITE_TEST_JOBS = Object.freeze(['Common / E2E tests (Shared UI rendering)']);
+
+/**
+ * Whether a completed run of this branch may publish, by its whole-run conclusion.
+ * @param {string} branch Producer branch.
+ * @param {string} conclusion Whole-run conclusion.
+ * @returns {boolean}
+ */
+function producerConclusionAdmitted(branch, conclusion) {
+	return (
+		Object.hasOwn(PRODUCER_CONCLUSIONS, branch) && PRODUCER_CONCLUSIONS[branch].includes(conclusion)
+	);
+}
+
 /** Select the exact successful receipt writers for both targets across all actual attempts. */
 async function selectSiteJobs(identity, readApi) {
 	closed(identity, ['head_sha', 'run_id', 'run_attempt']);
@@ -241,6 +267,22 @@ async function selectSiteJobs(identity, readApi) {
 		);
 		cells[identity.stage].get(identity.target).push({ job, writer: markers[0] });
 	}
+	const gated = [];
+	for (const name of SITE_TEST_JOBS) {
+		const matches = jobs.filter(
+			(job) => job.name === name && number(job.run_id) === runId && job.head_sha === headSha
+		);
+		refuse(matches.length > 0, 'missing site test job: ' + name + '.');
+		const latest = Math.max(...matches.map((job) => Number(number(job.run_attempt))));
+		refuse(latest <= Number(attempt), 'future site test job attempt.');
+		const current = matches.filter((job) => Number(number(job.run_attempt)) === latest);
+		refuse(current.length === 1, 'duplicate site test job: ' + name + '.');
+		refuse(
+			current[0].status === 'completed' && current[0].conclusion === 'success',
+			'site test job is not successful: ' + name + '.'
+		);
+		gated.push(name + ' #' + number(current[0].id));
+	}
 	const selectedTargets = {};
 	for (const cellTarget of targets) {
 		const selected = cells.map((stage) => {
@@ -258,6 +300,7 @@ async function selectSiteJobs(identity, readApi) {
 				writer.status === 'completed' && writer.conclusion === 'success',
 				'selected stage receipt writer is not successful.'
 			);
+			gated.push(job.name + ' #' + number(job.id));
 			return { job_id: number(job.id), run_attempt: producingAttempt(job, matches) };
 		});
 		refuse(
@@ -266,11 +309,12 @@ async function selectSiteJobs(identity, readApi) {
 		);
 		selectedTargets[cellTarget] = { build: selected[0], testbuild: selected[1] };
 	}
+	Object.defineProperty(selectedTargets, 'gated', { value: Object.freeze(gated) });
 	return selectedTargets;
 }
 
 /** Admit metadata only; downloaded build bytes and browser evidence must be received separately. */
-async function admitProducer(selection, readApi) {
+async function admitProducer(selection, readApi, report = () => {}) {
 	closed(selection, ['repository', 'trigger']);
 	refuse(
 		selection.repository === REPOSITORY && typeof readApi === 'function',
@@ -298,12 +342,14 @@ async function admitProducer(selection, readApi) {
 	const headRepositoryId = number(run.head_repository.id);
 	refuse(repositoryId === headRepositoryId, 'fork repository identity.');
 	refuse(
-		run.event === 'push' && run.status === 'completed' && run.conclusion === 'success',
-		'producer must be a completed successful push.'
-	);
-	refuse(
 		run.head_branch === 'main' || run.head_branch === 'dev',
 		'producer branch is not a deployment target.'
+	);
+	refuse(
+		run.event === 'push' &&
+			run.status === 'completed' &&
+			producerConclusionAdmitted(run.head_branch, run.conclusion),
+		'producer must be a completed successful push (dev: completed with every site job successful).'
 	);
 	refuse(
 		typeof run.head_sha === 'string' && /^[a-f0-9]{40}$/.test(run.head_sha),
@@ -323,7 +369,10 @@ async function admitProducer(selection, readApi) {
 		'producer workflow is not canonical CI.'
 	);
 	const target = run.head_branch;
-	await selectSiteJobs({ head_sha: run.head_sha, run_id: runId, run_attempt: attempt }, readApi);
+	const siteJobs = await selectSiteJobs(
+		{ head_sha: run.head_sha, run_id: runId, run_attempt: attempt },
+		readApi
+	);
 	const artifacts = await collect(readApi, prefix + '/runs/' + runId + '/artifacts', 'artifacts');
 	const artifactIds = ['common-site-build-', 'common-site-testbuild-'].map((name) => {
 		const matches = artifacts.filter((row) => row.name === name + target);
@@ -372,6 +421,15 @@ async function admitProducer(selection, readApi) {
 		testbuild_artifact_id: artifactIds[1]
 	};
 	await requireCurrentTarget(admitted, readApi);
+	report(
+		'Site publication gated by run ' +
+			runId +
+			' (' +
+			run.conclusion +
+			') on: ' +
+			siteJobs.gated.join(', ') +
+			'.'
+	);
 	return admitted;
 }
 
@@ -478,8 +536,8 @@ function selectionFromEvent(env, event) {
 		refuse(
 			event.workflow_run?.event === 'push' &&
 				event.workflow_run.status === 'completed' &&
-				event.workflow_run.conclusion === 'success',
-			'event must be a completed successful push.'
+				producerConclusionAdmitted(event.workflow_run.head_branch, event.workflow_run.conclusion),
+			'event must be a completed successful push (dev: completed, site jobs checked next).'
 		);
 		trigger = {
 			kind: 'workflow_run',
@@ -530,7 +588,9 @@ async function main(argv = process.argv.slice(2), env = process.env, ports = {})
 		);
 		let admitted;
 		try {
-			admitted = await admitProducer(selectionFromEvent(env, event), readApi);
+			admitted = await admitProducer(selectionFromEvent(env, event), readApi, (line) =>
+				console.log(line)
+			);
 		} catch (error) {
 			if (!(error instanceof SupersededSource)) throw error;
 			// Not a failure: the run that moved the branch deploys its own source.
@@ -590,6 +650,9 @@ module.exports = {
 	readCurrentRun,
 	selectSiteJobs,
 	admitProducer,
+	producerConclusionAdmitted,
+	PRODUCER_CONCLUSIONS,
+	SITE_TEST_JOBS,
 	verifyDownloaded,
 	selectionFromEvent,
 	readAdmission,

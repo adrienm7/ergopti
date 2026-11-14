@@ -920,6 +920,17 @@ coordinator on 2026-11-11, to review by the maintainer.
 
 Each closes on a named green hosted or native run, recorded here.
 
+- [ ] **Dev site deployment gated on its site jobs (maintainer, 2026-11-14).** ergopti.fr/dev was last deployed
+      on 2026-11-10 at 21:03: `deploy-site.yml` published only from a ci.yml run that concluded success, and `dev`
+      never does while a baseline red remains. A `dev` push now publishes from a completed red run when Common / E2E
+      tests (Shared UI rendering), Common / Build and Common / Install and launch (Stable site and Development site)
+      all succeeded; `main` keeps the whole-run success and a cancelled run never publishes
+      (`tools/ci/site-deploy-admission.cjs`, which logs the jobs that gated it; same exact tested bytes, no rebuild).
+      Those site jobs still follow Common Integration, so a red Common lot (today Packaging and boot) skips them and
+      nothing deploys until it is green. GitHub runs a `workflow_run` workflow from the default branch, so the
+      gate takes effect once `main` carries this change (the maintainer's merge); until then a manual Deploy site
+      dispatch on `dev` with a run ID uses it. Worker G. Closes on the first `dev` push that deploys with ergopti.fr/dev/editeur
+      in gh-pages `dev/`.
 - [ ] **16/38.** One complete non-release three-OS checkpoint on the final source (units, E2E, packaging,
       installation, launch) with exact receipts; it also carries the first hosted run of: the Linux X11 window list
       (962a25a973), AppImage Build and `install-linux` rows (dce846a0bd), the Linux per-step installs (17e80f2882),

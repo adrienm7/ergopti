@@ -2550,7 +2550,7 @@ function commonSiteProblems(source) {
 
 /** Publication gets write permission only after receiving the exact tested artifact. */
 const SITE_PRODUCER_CONDITION =
-	"${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}";
+	"${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && (github.event.workflow_run.conclusion == 'success' || (github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'failure'))) }}";
 
 const SITE_NOT_SUPERSEDED_STEP = "steps.admit.outputs.superseded == 'false'";
 const SITE_NOT_SUPERSEDED_JOB = "needs.preflight.outputs.superseded == 'false'";
@@ -2946,13 +2946,23 @@ const SITE_DEPLOY_REFUSALS = [
 	],
 	[
 		'receiver switched off',
-		" || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}\n",
+		" || (github.event.workflow_run.event == 'push' && (github.event.workflow_run.conclusion == 'success' || (github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'failure'))) }}\n",
 		' && false }}\n'
 	],
 	[
-		'receiver admits a failed producer',
-		"github.event.workflow_run.conclusion == 'success'",
-		"github.event.workflow_run.conclusion != 'cancelled'"
+		'receiver admits a failed main producer',
+		"github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'failure'",
+		"github.event.workflow_run.conclusion == 'failure'"
+	],
+	[
+		'receiver admits a cancelled dev producer',
+		"github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'failure'",
+		"github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion != 'success'"
+	],
+	[
+		'receiver refuses a red dev producer',
+		" || (github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'failure')",
+		''
 	],
 	[
 		'publication job skipped on its own',

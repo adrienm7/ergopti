@@ -1,6 +1,7 @@
 # .github/workflows/deploy-site.yml
 #
-# Publish the exact production bytes tested by a completed main/dev CI run.
+# Publish the exact production bytes tested by a completed main/dev CI run:
+# a green one for main, one whose site jobs all succeeded for dev.
 # Every completed source change is eligible, including domain-only changes.
 # The read-only receiver must finish before publication receives write permission.
 
@@ -29,9 +30,11 @@ permissions:
 jobs:
   preflight:
     name: Receive tested site without write permission
-    # A failed, cancelled or dispatched CI run has no site to publish; the
-    # admission below still refuses anything else this lets through.
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}
+    # A cancelled or dispatched CI run has no site to publish. main publishes
+    # only from a green run; dev also from a red one, whose site jobs the
+    # admission below requires to have succeeded (maintainer, 2026-11-14), so a
+    # red lane elsewhere no longer freezes ergopti.fr/dev.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && (github.event.workflow_run.conclusion == 'success' || (github.event.workflow_run.head_branch == 'dev' && github.event.workflow_run.conclusion == 'failure'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
