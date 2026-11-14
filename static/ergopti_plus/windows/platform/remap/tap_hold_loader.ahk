@@ -35,7 +35,7 @@
 ; The loader reads the generated config leaf names (ConfigLeaf); include their
 ; owner here so a runner that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 ; The loader reads a file the boot has not migrated as the migration leaves it.
 #Include %A_LineFile%\..\tap_hold_migration.ahk
 

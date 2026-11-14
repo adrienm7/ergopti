@@ -33,11 +33,11 @@ _CTIM_BootRecoversBeforeLocatorRead() {
 	CoreInclude := InStr(Entry, "#Include infra/config_transition.ahk", true)
 	RuntimeInclude := InStr(Entry,
 		"#Include infra/config_transition_runtime.ahk", true)
-	BootInclude := InStr(Entry, "#Include infra/boot.ahk", true)
+	BootInclude := InStr(Entry, "#Include core/lifecycle/engine/boot.ahk", true)
 	Assert(CoreInclude > 0 && RuntimeInclude > CoreInclude
 		&& BootInclude > RuntimeInclude,
 		"production must load core then runtime before boot auto-execute")
-	Boot := _StripFullLineComments(_DriverFuncOrFileText("infra/boot.ahk"))
+	Boot := _StripFullLineComments(_DriverFuncOrFileText("core/lifecycle/engine/boot.ahk"))
 	Locator := InStr(Boot, "global _PathsFile :=", true)
 	Recover := InStr(Boot,
 		"ConfigTransitionRecoverAtBootOrThrow(_PathsFile)", true)
@@ -72,7 +72,7 @@ Test("config transition integration: recovery precedes paths.toml read "
 ; ==============================================
 
 ; A launched Reload is refused, if ever, only after the caller returned (see
-; infra/reload_terminal_handoff.ahk). So the rollback lives in one helper that
+; core/lifecycle/engine/reload/terminal_handoff.ahk). So the rollback lives in one helper that
 ; runs both when no successor launched and from the refusal callback, and a
 ; pending Reload keeps the bundle instead of the caller releasing it.
 _CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle, RollbackName,

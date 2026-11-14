@@ -152,7 +152,7 @@ helpers.describe("actual STARTED and successor before native install acceptance"
 	for _, port in ipairs({"blocked","find"})do
 		helpers.it("reload during actual "..port.." cannot borrow successor for backup",function()
 			run(function(c,Bridge,calls)
-				local Installation=require("infra.installation")
+				local Installation=require("core.lifecycle.engine.installation")
 				local Parser=require("updater.engine.release_parser")
 				local old_source,old_parse=Installation.is_source_run,Parser.parse_tag
 				local old_manager=package.loaded["modules.updater.manager"]

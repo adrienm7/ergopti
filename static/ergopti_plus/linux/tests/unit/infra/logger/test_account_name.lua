@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AccountName = helpers.load_module("infra.account_name")
+local AccountName = helpers.load_module("core.lifecycle.engine.account_name")
 
 local function env_of(values)
 	return function(name) return values[name] end

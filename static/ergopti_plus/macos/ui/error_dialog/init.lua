@@ -53,7 +53,7 @@ local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 local Storage        = require("core.fs.adapters.storage")
 local WebviewResult  = require("adapters.webview_result")
 local ConfigKeys = require("settings.engine.keys")
-local TerminationCoordinator = require("infra.termination_coordinator")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 
 local LOG = "error_dialog"
 

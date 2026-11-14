@@ -6,7 +6,7 @@
 local M = {}
 function M.with_fixture(body)
  local original_tmpname = os.tmpname -- Restore even when decoration fails before old inner cleanup.
- local names = { "modules.updater.manager", "infra.archive_output", "infra.monotonic", "infra.installation" }
+ local names = { "modules.updater.manager", "infra.archive_output", "infra.monotonic", "core.lifecycle.engine.installation" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local Fs = require("core.fs.adapters.file_system")
  local Move = require("core.fs.engine.no_replace_move")
@@ -156,9 +156,9 @@ function M.with_fixture(body)
   manager = require("modules.updater.manager")
   manager._http_client = { cancel = function() return true end }
   manager._file_digest = { cancel = function() return true end }
-  package.loaded["infra.installation"] = { is_source_run = function() return true end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
   manager.init({ config_path = config_path, is_paused = function() return false end })
-  package.loaded["infra.installation"] = saved["infra.installation"].value
+  package.loaded["core.lifecycle.engine.installation"] = saved["core.lifecycle.engine.installation"].value
   body(manager, decorate_http)
  end, debug.traceback)
  local cleanup_error

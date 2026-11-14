@@ -39,7 +39,7 @@ local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owne
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local PythonInterpreter = require("adapters.python_interpreter")
 local ExitSignal = require("modules.llm.bootstrap_exit_signal")
-local DevSource = require("infra.dev_source")
+local DevSource = require("core.lifecycle.engine.dev_source")
 
 local LOG = "ollama_deps"
 
@@ -210,7 +210,7 @@ end
 
 --- Names the real cause of a missing catalogue in a developer app.
 --- A built app seals its catalogue, so there a missing one stays a refused
---- pinned runtime. A developer app (infra/dev_source.lua) builds it from the
+--- pinned runtime. A developer app (core/lifecycle/engine/dev_source.lua) builds it from the
 --- clone's pinned sources (tools/dev/stage-macos-dev-ollama-catalogue.py): a
 --- missing one means that build has not succeeded, not a failed integrity check.
 --- @param exit_code integer Installer exit status.

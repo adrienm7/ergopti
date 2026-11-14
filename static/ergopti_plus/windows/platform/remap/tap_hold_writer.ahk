@@ -30,7 +30,7 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 #Include %A_LineFile%\..\..\..\infra\key_names.ahk
 #Include ../../adapters/native_number.ahk
 

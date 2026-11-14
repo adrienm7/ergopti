@@ -76,7 +76,7 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 	; The master controls activation; its children remain configurable. Pause
 	; greying remains owned by the shared menu renderer.
 	; A feature an emulated registry layout replaces is off while one is emulated
-	; (infra/master_gates.ahk): grey its row and say why, so the unticked box does
+	; (core/lifecycle/engine/master_gates.ahk): grey its row and say why, so the unticked box does
 	; not read as a setting the user can turn back on.
 	SupersededReason := LayoutSupersededReason(ManifestEntry)
 	if (SupersededReason != "") {
@@ -254,7 +254,7 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 ; enabled flag and the letter to config.toml via infra/feature_io.ahk so the
 ; change survives reload, then reloads to wire the new shortcut at the layer
 ; level. The Reload runs the boot pipeline which re-derives the v1 Features Map
-; from Features via infra/master_gates.ahk — no need to mutate v1 in-place.
+; from Features via core/lifecycle/engine/master_gates.ahk — no need to mutate v1 in-place.
 ; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
 SetFeatureLetter(V2Path, Letter) {
 	global Features

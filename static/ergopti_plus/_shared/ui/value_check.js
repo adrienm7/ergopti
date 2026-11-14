@@ -13,7 +13,7 @@
  * Checks one user-entered or stored setting value against its declaration in
  * value_schema.json, the single source of every setting's type, bounds and
  * special values. The shared Lua port (_shared/settings/engine/value_check.lua,
- * macOS and Linux) and the AHK port (windows/infra/value_check.ahk) replay
+ * macOS and Linux) and the AHK port (windows/core/lifecycle/engine/value_check.ahk) replay
  * value_check_vectors.json with it, so the three drivers and the web pages
  * accept and refuse the same values.
  *

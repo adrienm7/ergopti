@@ -66,7 +66,7 @@ local function bind_action_owners(items, source_run)
 		if type(item.fn) == "function" then
 			local action = item.fn
 			item.fn = function(...)
-				local Installation = require("infra.installation")
+				local Installation = require("core.lifecycle.engine.installation")
 				local original_owner = Installation.is_source_run
 				local original_progress = package.loaded["ui.download_window.bridge"]
 				local original_webview = package.loaded["ui.webview_manager"]
@@ -94,7 +94,7 @@ end
 --- @param source_run boolean|nil True to build the tray of a local version.
 local function build(up, changed, source_run)
 	local Version = require("infra.version")
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_identity = Version.identity
 	local real_is_source_run = Installation.is_source_run
 	Version.identity = function() return IDENTITY end
@@ -115,7 +115,7 @@ end
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
 
 	helpers.it("restores exact click owners after the controlled action raises", function()
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local original_owner = Installation.is_source_run
 		local original_progress = package.loaded["ui.download_window.bridge"]
 		local original_webview = package.loaded["ui.webview_manager"]
@@ -398,7 +398,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			download_update = function() touched = touched + 1 return true end,
 			install_update_async = function() touched = touched + 1 return true end,
 		}
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local ok, started = pcall(function()
@@ -411,7 +411,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	end)
 
 	helpers.it("a system package is offered no download by the update-check bridge", function()
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local release = { tag = "v9.9.9", download_url = "https://release/archive", checksum_url = "https://release/sum" }
@@ -565,7 +565,7 @@ local function with_frequency_owner(refusal, body)
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local writer = require("core.text.engine.toml_codec.writer")
 	local previous_write = writer.batch_write
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local previous_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return false end
 	local obs = {timers = {}, cancels = 0, writes = 0, redraws = {count = 0}, requests = 0}
@@ -757,7 +757,7 @@ local function with_source_command(alternative, callback)
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
-		"ai.engine.policy.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
+		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "ui.menu.start_at_login" }
 	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
 	local ok, err = xpcall(function()
@@ -782,7 +782,7 @@ local function with_source_command(alternative, callback)
 		package.loaded["infra.version"] = { identity = function()
 			return {kind = "local", version = "", commit = "known"}
 		end }
-		package.loaded["infra.installation"] = { is_source_run = function() return true end }
+		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
 		package.loaded["ui.menu.start_at_login"] = {
 			command_available = function() return true end,
 			enabled = function() return false end,

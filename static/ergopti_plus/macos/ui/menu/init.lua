@@ -39,7 +39,7 @@ local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
-local TerminationCoordinator = require("infra.termination_coordinator")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local SessionDemotions = require("ui.menu.session_demotions")
 local ProgramParameterTransaction = require("ui.menu.program_parameter_transaction")
@@ -261,7 +261,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return TerminationCoordinator.is_pending() == true
 		end,
-		is_reloading = function() return require("infra.reload_guard").is_reloading() == true end,
+		is_reloading = function() return require("core.lifecycle.engine.reload.guard").is_reloading() == true end,
 		stale = function() return _menu_dirty == true end,
 		refresh = function() return refresh_for_click() end,
 		current_items = function() return _cached_menu_items end,

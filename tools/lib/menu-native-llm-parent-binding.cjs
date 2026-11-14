@@ -707,7 +707,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 		ProgrammableHotstrings: 'ui.menu.programmatic_hotstrings',
 		ProgrammableMenuPolicy: 'menu.engine.programmable_hotstrings',
 		Version: 'infra.version',
-		Installation: 'infra.installation',
+		Installation: 'core.lifecycle.engine.installation',
 		VersionLabel: 'updater.engine.version_label',
 		Schedule: 'updater.engine.schedule',
 		AgentSettings: 'modules.llm.agent_settings',

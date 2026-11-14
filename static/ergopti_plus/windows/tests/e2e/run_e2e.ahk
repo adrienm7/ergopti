@@ -82,7 +82,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 ; Production engine dependencies (same order as run_all.ahk).
 #Include ../../infra/json.ahk
-#Include ../../infra/app_state.ahk
+#Include ../../core/lifecycle/engine/app_state.ahk
 #Include ../../_generated/window_titles.ahk
 #Include ../../infra/native_dialogs.ahk
 #Include ../../infra/ui_style.ahk
@@ -116,7 +116,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 ; of modules/keymap/layout.ahk read and run, in run_all.ahk's order. None of
 ; them registers a hotkey at load; layout.ahk itself, which does, stays out.
 #Include ../../core/fs/adapters/file_system.ahk
-#Include ../../infra/master_gates.ahk
+#Include ../../core/lifecycle/engine/master_gates.ahk
 #Include ../../_generated/features_manifest.ahk
 #Include ../../infra/manifest_reader.ahk
 #Include ../../modules/keymap/layout/layout_ergopti.ahk

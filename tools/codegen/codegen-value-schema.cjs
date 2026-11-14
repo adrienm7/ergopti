@@ -5,7 +5,7 @@
  * MODULE: User Value Schema Codegen
  * DESCRIPTION:
  * Emits the declarations of _shared/settings/data/value_schema/value_schema.json
- * as the data the Windows value check (windows/infra/value_check.ahk) reads and
+ * as the data the Windows value check (windows/core/lifecycle/engine/value_check.ahk) reads and
  * as the Lua table both Lua drivers require (_shared/settings/engine/
  * value_schema_data.lua), so no driver resolves a path to read the schema,
  * and as the classic script the shared WebView pages load (_shared/ui/
@@ -223,7 +223,7 @@ function render() {
 		'; MODULE: User Value Schema Data (Windows)\n' +
 		'; DESCRIPTION:\n' +
 		'; The declaration of every user-entered setting value, as the data\n' +
-		'; infra/value_check.ahk checks against. A compiled build has no JSON reader\n' +
+		'; core/lifecycle/engine/value_check.ahk checks against. A compiled build has no JSON reader\n' +
 		'; at include time, and a hand-maintained copy would drift.\n' +
 		'; ==============================================================================\n' +
 		'\n' +

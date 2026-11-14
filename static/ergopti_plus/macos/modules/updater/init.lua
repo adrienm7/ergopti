@@ -22,7 +22,7 @@ local JsonCodec  = require("core.fs.adapters.json_codec")
 local Channels   = require("updater.engine.channels")
 local VersionLabel = require("updater.engine.version_label")
 local Snapshot   = require("diagnostics.engine.snapshot")
-local DevSource  = require("infra.dev_source")
+local DevSource  = require("core.lifecycle.engine.dev_source")
 
 local LOG = "updater"
 local BUNDLED_ID = Identifiers.bundle_ids.hammerspoon
@@ -77,7 +77,7 @@ M.GH_OWNER = github.owner
 M.GH_REPO = github.repo
 
 --- Reports whether Lua is running outside the packaged nested Hammerspoon app.
---- A developer app (infra/dev_source.lua) runs in that app but from a clone: it
+--- A developer app (core/lifecycle/engine/dev_source.lua) runs in that app but from a clone: it
 --- is a source run, so its update checks, installs and uninstall stay off.
 --- Raises when the developer root does not name the running driver.
 --- @return boolean local_source

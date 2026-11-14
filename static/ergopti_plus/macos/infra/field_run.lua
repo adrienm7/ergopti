@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Developer source mode only. M.start() refuses without the clone root
----    that only a developer launcher exports (infra/dev_source.lua); a packaged
+---    that only a developer launcher exports (core/lifecycle/engine/dev_source.lua); a packaged
 ---    runtime never receives it, so a release build never watches anything.
 --- 2. A request file in <clone>/build/field-run, noticed by a folder watcher.
 ---    The work runs on a later timer, never inside the watcher callback, and a
@@ -51,7 +51,7 @@ local Logger = require("infra.logger")
 local Json = require("core.text.engine.json")
 local Report = require("diagnostics.engine.field_check.report")
 local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
-local TerminationCoordinator = require("infra.termination_coordinator")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local Guided = require("infra.field_run_guided")
 
 local LOG = "field_run"

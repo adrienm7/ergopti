@@ -21,7 +21,7 @@
 ;    is backed up before its text changes. The shared vectors
 ;    (_shared/tests/corpus/paths/legacy_folder_migration_vectors.json) pin both;
 ;    _shared/settings/engine/migration/legacy_folder_migration_core.lua is the Lua twin.
-; 2. Before paths.toml: infra/boot.ahk runs it before the configuration
+; 2. Before paths.toml: core/lifecycle/engine/boot.ahk runs it before the configuration
 ;    transition recovery reads paths.toml, and before the logger opens its
 ;    folder; its lines are queued until LoggerInit. A transition journal the
 ;    old build left beside its own paths.toml is recovered there first.

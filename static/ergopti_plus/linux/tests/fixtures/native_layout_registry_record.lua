@@ -29,7 +29,7 @@ assert(local_dir:sub(1, #folder + 1) == folder .. "/", "the actual production lo
 assert(Shell.run("mkdir -p -- " .. Shell.quote(local_dir)))
 local path, target = local_dir .. settings.installed_file, folder .. "/target"
 -- The native writer stages under this process's name (CFD-1).
-local stage = require("infra.stage_owner").stage_path(path)
+local stage = require("core.lifecycle.engine.stage_owner").stage_path(path)
 local function write(candidate, bytes)
 	local file = assert(open(candidate, "wb")); assert(file:write(bytes)); assert(file:close())
 end

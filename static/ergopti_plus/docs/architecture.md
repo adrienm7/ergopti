@@ -178,7 +178,6 @@ graph TD
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
-        WINDOWS_driver_control["DriverControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
         WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]

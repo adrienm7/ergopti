@@ -154,7 +154,7 @@ local function daemon_paths_callback(environment)
   local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
   local source = assert(file:read("*a")); assert(file:close())
   local restart_first = assert(source:find("local function restart_daemon(reason, paused)", 1, true))
-  local owner_first = assert(source:find("local perform_reload, reload_in_flight, abandon_reload = require(\"infra.reload_restart\")", restart_first, true))
+  local owner_first = assert(source:find("local perform_reload, reload_in_flight, abandon_reload = require(\"core.lifecycle.engine.reload.restart\")", restart_first, true))
   local restart_last = assert(source:find("\n\n\n--- Emits facts", owner_first, true))
   local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
   local callback = assert(source:sub(wiring):match(
@@ -182,7 +182,7 @@ local function with_paths_restart(mode, body)
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
     for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.manager",
-      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "infra.restart_pause" }) do package.loaded[name] = nil end
+      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
     local gestures = require("modules.gestures.manager")
     gestures.init({ persist = true, enabled = false })
     local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
@@ -200,7 +200,7 @@ local function with_paths_restart(mode, body)
     state.controller = require("modules.shortcuts.script_actions").new({ reset = function() end,
       reload = function() end, quit = function() end })
     local actual_require = require
-    local restart = require("infra.daemon_restart")
+    local restart = require("core.lifecycle.engine.reload.daemon_restart")
     local restarter = require("modules.updater.restarter")
     local environment = {
       LOG = "test.paths_restart", gestures = gestures,
@@ -208,7 +208,7 @@ local function with_paths_restart(mode, body)
       Logger = require("core.logger.engine.shim"), arg = state.args,
       shutdown = { request = function(reason) state.shutdowns = state.shutdowns + 1; state.reason = reason; return true end },
       require = function(name)
-        if name ~= "infra.daemon_restart" then return actual_require(name) end
+        if name ~= "core.lifecycle.engine.reload.daemon_restart" then return actual_require(name) end
         return { restart = function(options)
           state.restart_calls = state.restart_calls + 1
           state.request_reason, state.request_args = options.reason, options.args
@@ -307,7 +307,7 @@ helpers.describe("paths restart live pause", function()
     local installed = assert(source:find("\n\tprivacy_owners.script_actions = script_actions\n", created, true),
       "main must hand its controller to the Reload owner")
     for _, trigger in ipairs({ "install_signal_handlers()", 'perform_reload("the tray menu")',
-      "webview_manager.set_daemon_state({", 'require("infra.driver_control").start({' }) do
+      "webview_manager.set_daemon_state({", 'require("core.lifecycle.engine.driver_control").start({' }) do
       local at = assert(source:find(trigger, main, true), trigger .. " must be present in main")
       helpers.assert_true(installed < at, trigger .. " follows the controller installation")
     end
@@ -773,7 +773,7 @@ helpers.describe("daemon startup-capture-publication", function()
 				end
 			end
 			local polls = 0
-			local shutdown = require("infra.shutdown_coordinator").new({
+			local shutdown = require("core.lifecycle.engine.shutdown.coordinator").new({
 				keyboard_hook = hook, event_loop = loop,
 				pre_wait = { { name = "controlled startup native owner", wait_for_ack = true, stop = function()
 					polls = polls + 1

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ReloadRestart = require("infra.reload_restart")
+local ReloadRestart = require("core.lifecycle.engine.reload.restart")
 
 --- Builds a gestures fake whose cleanup answers can be refused.
 local function gestures(windows_ok, programs_ok)

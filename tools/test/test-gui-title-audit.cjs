@@ -981,14 +981,14 @@ const cases = [
 		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(6) + '}',
 		1,
 		'all six former bootstrap exceptions now require shared policy',
-		'static/ergopti_plus/windows/infra/bundle.ahk'
+		'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk'
 	],
 	[
 		'windows',
 		'Bundle_Init() {\n' + 'MsgBox("Fatal", "ErgoptiPlus")\n'.repeat(7) + '}',
 		1,
 		'additional bootstrap native calls cannot bypass shared policy',
-		'static/ergopti_plus/windows/infra/bundle.ahk'
+		'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk'
 	],
 	[
 		'windows',
@@ -1002,7 +1002,7 @@ const cases = [
 		'Bundle_Init() {\n' + 'Ui_MsgBox("Fatal", "")\n'.repeat(6) + '}',
 		0,
 		'all six bundle startup calls use the shared owner',
-		'static/ergopti_plus/windows/infra/bundle.ahk'
+		'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk'
 	],
 	[
 		'windows',
@@ -1226,7 +1226,11 @@ try {
 		})
 	);
 	for (const [platform, source, expected, label, override] of cases) {
-		for (const relative of ['infra/native_dialogs.ahk', 'infra/bundle.ahk', 'infra/error_net.ahk'])
+		for (const relative of [
+			'infra/native_dialogs.ahk',
+			'core/lifecycle/engine/bundle.ahk',
+			'infra/error_net.ahk'
+		])
 			fs.rmSync(path.join(root, 'static/ergopti_plus/windows', relative), { force: true });
 		for (const other of ['windows', 'macos', 'linux'])
 			put(sourcePath(other), other === platform && !override ? source : '');

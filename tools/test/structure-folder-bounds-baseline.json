@@ -13,7 +13,7 @@
 	"linux.tests_oversized": 3,
 	"linux.tests_singleton": 28,
 	"_shared.code_oversized": 2,
-	"_shared.code_singleton": 24,
+	"_shared.code_singleton": 21,
 	"_shared.tests_oversized": 1,
 	"_shared.tests_singleton": 1,
 	"drivers.mismatched_top_level": 4
