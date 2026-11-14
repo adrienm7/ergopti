@@ -44,6 +44,8 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
    (run 43481259457) failed and is being triaged. 33 steps remain; the approved shared module predicate handles
    the Lua module-prefix sweeps. Land in blocks of a few steps.
 2. **The maintainer decisions of 2026-11-13 below** (section « Maintainer decisions of 2026-11-13, to implement »).
+   State at 03:00 Paris (2026-11-14): the one-shot modifiers item is done (worker A, branch
+   `claude/ergopti-todo-oneshot`, CI run 43535291046); the validation contract builds on its one timeout rule per OS.
 3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
    or a release stay for the maintainer; say so on the item and move on.
 
@@ -368,15 +370,16 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       key_state_polling 69/58. The excess is already on `dev` (Build was skipped on every earlier run), at most +2
       key_state_polling from ILD-2 `_KLE_RealCtrlHeld`. The maintainer sets the new ceilings; they guard the antivirus
       surface, so no agent raises them alone.
-- [ ] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
+- [x] **Linux hardware test still passes the removed pause argument (found 2026-11-12).**
       `linux/tests/hardware/run_simultaneous_configuration_real.lua` still passes `script.is_paused` to `Scope.edit`
       and `Scope.copy_taps_to_chords`, which take `expected_source` there since the EDD-1 pause-argument removal,
       so the pause function lands in `expected_source` and Linux E2E
       desktop-webview fails (« original publisher clears only the known third slot », line 252). Drop the argument,
       then confirm with that E2E job.
       Claimed by worker A: both calls now pass only `edit_source()`, and the paused copy is expected to succeed
-      with identical bytes (EDD-1); `test_hardware_scope_calls_take_one_source.lua` guards the argument. Left:
-      the Linux E2E desktop-webview proof.
+      with identical bytes (EDD-1); `test_hardware_scope_calls_take_one_source.lua` guards the argument. Proof: run
+      43535291046 (2026-11-14), whose Linux E2E desktop-webview job no longer fails « original publisher clears only
+      the known third slot »; its remaining reds are the baseline ones.
 - [ ] **Windows global restore and the preferences source (found 2026-11-12).** On macOS the remap save wrote
       `config.toml` without handing the bytes to the preferences, so « Restore recommended values » refused at the
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
