@@ -1,4 +1,4 @@
---- infra/reload_timing.lua
+--- core/timing/engine/reload_timing.lua
 
 --- ==============================================================================
 --- MODULE: Reload Duration Across The Restart (Linux)
@@ -33,7 +33,7 @@ local NativePath = require("core.fs.engine.native_path")
 local Shell = require("core.process.adapters.shell_runner")
 local Storage = require("core.fs.adapters.storage")
 
-local LOG = "infra.reload_timing"
+local LOG = "core.timing.engine.reload_timing"
 
 -- The stamp's whole content; the version names its grammar.
 local STAMP_FORMAT = "ERGOPTI_RELOAD_REQUEST_V1\nrequested_at_ms=%d\n"
@@ -94,7 +94,7 @@ function M.complete()
 	end
 	Logger.info(LOG, "Reload completed in %.0f ms (reload request to boot complete).", reload_ms)
 	require("core.logger.engine.perf_budget").judge(Logger, LOG, "reload", reload_ms,
-		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
+		function() return require("core.timing.engine.timings").ms("budgets", "driver_reload_ms") end)
 	return reload_ms
 end
 

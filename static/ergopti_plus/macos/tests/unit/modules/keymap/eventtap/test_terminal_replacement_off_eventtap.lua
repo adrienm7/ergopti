@@ -42,7 +42,7 @@ end
 local function with_fixture(seal_result, body)
 	local trace = {}
 	local previous_keystats = package.loaded["modules.keystats"]
-	local previous_timings = package.loaded["infra.timings"]
+	local previous_timings = package.loaded["core.timing.engine.timings"]
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function()
 			trace[#trace + 1] = "telemetry"
@@ -51,7 +51,7 @@ local function with_fixture(seal_result, body)
 			trace[#trace + 1] = "keystats-buffer"
 		end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function() return 12 end,
 	}
 
@@ -60,7 +60,7 @@ local function with_fixture(seal_result, body)
 		return expander, adapter
 	end)
 	package.loaded["modules.keystats"] = previous_keystats
-	package.loaded["infra.timings"] = previous_timings
+	package.loaded["core.timing.engine.timings"] = previous_timings
 	if not loaded_ok then error(expander_or_err, 0) end
 	local expander = expander_or_err
 	local text_sender = require("adapters.text_sender")

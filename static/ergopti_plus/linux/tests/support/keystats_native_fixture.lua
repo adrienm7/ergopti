@@ -10,7 +10,7 @@
 
 local M = {}
 local helpers = require("tests.helpers")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local uv = require("luv")
 
 local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer",

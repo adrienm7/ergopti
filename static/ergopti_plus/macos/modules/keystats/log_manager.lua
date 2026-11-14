@@ -45,7 +45,7 @@ local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
 
 local Logger  = require("core.logger.engine.logger")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Literal = require("core.fs.engine.sqlite.literal")
 local Queries = require("metrics.engine.queries")
 local i18n    = require("core.i18n.engine.i18n")  -- kept for MAC_CATEGORIES_FR still used by export

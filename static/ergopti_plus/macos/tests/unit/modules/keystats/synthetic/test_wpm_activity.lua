@@ -15,7 +15,7 @@ helpers.describe("keystats WPM activity", function()
 		fixture.start()
 		local now = 10000
 		fixture.hs.timer.absoluteTime = function() return now * 1000000 end
-		local hold = require("infra.timings").ms("ui", "wpm_color_hold_ms")
+		local hold = require("core.timing.engine.timings").ms("ui", "wpm_color_hold_ms")
 		local canon = require("ui.wpm.shared").canon()
 		local log = package.loaded["modules.keystats.log_manager"]
 		log.append_log = function() return true end

@@ -15,14 +15,14 @@ helpers.describe("HS-098 remote request timeout wiring", function()
 		local module_names = {
 			"modules.llm.api_remote",
 			"core.network.adapters.http_client",
-			"infra.timings",
+			"core.timing.engine.timings",
 		}
 		local saved = {}
 		for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
 
 		local cancelled = {}
 		local timings_calls = 0
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 10 end,
 			ms = function(section, key)
 				timings_calls = timings_calls + 1

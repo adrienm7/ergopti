@@ -332,7 +332,7 @@ end
 --- @param first_signal string Actual initial terminal signal.
 local function signal_shutdown(first_signal)
 	local uv = require("luv")
-	local NativeTimer = require("infra.native_timer")
+	local NativeTimer = require("core.timing.engine.native_timer")
 	local signals = require("core.lifecycle.engine.shutdown.signal_handlers")
 	assert(signals.is_settled(), "no preceding signal installation may remain owned")
 	local file = assert(io.open("ergopti_hotstrings.lua", "r"))

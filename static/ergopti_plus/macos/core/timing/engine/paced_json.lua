@@ -1,4 +1,4 @@
---- infra/paced_json.lua
+--- core/timing/engine/paced_json.lua
 
 --- ==============================================================================
 --- MODULE: Paced JSON Encoder

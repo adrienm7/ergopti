@@ -102,7 +102,7 @@ assert(type(manager.get_action_names()) == "table")
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end
@@ -130,7 +130,7 @@ assert(manager.is_enabled() == false)
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end
@@ -162,7 +162,7 @@ assert(calls == 0, "a special endpoint must not be opened as a file")
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end

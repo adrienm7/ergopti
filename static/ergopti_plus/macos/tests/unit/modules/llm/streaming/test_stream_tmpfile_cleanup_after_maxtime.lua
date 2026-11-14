@@ -44,7 +44,7 @@ do
 
 	-- Test 1: the --max-time ceiling is the shared local Ollama budget (NET-003).
 	helpers.assert_true(
-		src:find('require("infra.timings").sec("llm", "ollama_request_timeout_ms")', 1, true) ~= nil,
+		src:find('require("core.timing.engine.timings").sec("llm", "ollama_request_timeout_ms")', 1, true) ~= nil,
 		"api_ollama.lua must read its --max-time ceiling from [llm] ollama_request_timeout_ms (NET-003)"
 	)
 	helpers.assert_true(src:find('"--max-time", tostring(stream_max_time_sec())', 1, true) ~= nil,

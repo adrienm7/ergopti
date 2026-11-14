@@ -32,7 +32,7 @@ end
 --- physically retired. It does not bypass the production writer's debt fence.
 function M.control(writer, sql)
 	local request = assert(require("core.fs.engine.sqlite_batch_process").start(writer.get_db_path(), sql,
-		{ owner = "native-sqlite-fault-controller", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
+		{ owner = "native-sqlite-fault-controller", timeout_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	local deadline = uv.hrtime() + 4000000000
 	local result
 	repeat uv.run("nowait"); result = request:poll(); if not result then uv.sleep(1) end until result or uv.hrtime() >= deadline

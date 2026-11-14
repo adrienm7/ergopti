@@ -31,7 +31,7 @@ function M.run(build, ctx)
 	Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms,
 		type(items) == "table" and #items or 0)
 	require("core.logger.engine.perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
-		function() return require("infra.timings").ms("budgets", "menu_rebuild_ms") end)
+		function() return require("core.timing.engine.timings").ms("budgets", "menu_rebuild_ms") end)
 	return items
 end
 

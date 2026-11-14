@@ -65,8 +65,8 @@ local function swipe(peak_frames, frame_dt, after_frames)
 	package.loaded["modules.gestures.engine"] = nil
 	-- Production timings: a stubbed table that answers 0 confirms every
 	-- candidate at once and hides the override this file is about.
-	local saved_timings = package.loaded["infra.timings"]
-	package.loaded["infra.timings"] = nil
+	local saved_timings = package.loaded["core.timing.engine.timings"]
+	package.loaded["core.timing.engine.timings"] = nil
 	local hs = _G.hs
 	local saved_clock = hs.timer.secondsSinceEpoch
 	local saved_absolute_clock = hs.timer.absoluteTime
@@ -119,7 +119,7 @@ local function swipe(peak_frames, frame_dt, after_frames)
 	hs.timer.secondsSinceEpoch = saved_clock
 	hs.timer.absoluteTime = saved_absolute_clock
 	package.loaded["core.events.timer_scheduler"] = saved_scheduler
-	package.loaded["infra.timings"] = saved_timings
+	package.loaded["core.timing.engine.timings"] = saved_timings
 	package.loaded["modules.gestures.engine"] = nil
 	if not ok then error(failure, 0) end
 	return fired

@@ -4,7 +4,7 @@
 --- MODULE: Regression — a leaked partial lib.timings stub is isolated
 --- DESCRIPTION:
 --- test_apply_prediction_paste_ops.lua installs a minimal
---- `package.loaded["infra.timings"] = { sec = function() ... end }` stub (no
+--- `package.loaded["core.timing.engine.timings"] = { sec = function() ... end }` stub (no
 --- M.ms) and never restores it. Once modules.keystats is not already cached,
 --- the next test whose require chain reaches modules.keystats (e.g. via
 --- modules.keymap.llm_bridge, which requires modules.keystats directly) hits
@@ -23,22 +23,22 @@ helpers.describe("load_with_stubs isolates modules.keystats from a leaked lib.ti
 	helpers.it("clears a cached partial lib.timings stub so the real module reloads with M.ms", function()
 		-- Simulate the polluting predecessor: a lib.timings stub missing M.ms,
 		-- exactly what test_apply_prediction_paste_ops.lua installs.
-		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
 
 		-- Any load_with_stubs call must drop the cached partial stub.
 		helpers.load_with_stubs("core.logger.engine.logger")
-		helpers.assert_nil(package.loaded["infra.timings"], "load_with_stubs must clear a cached lib.timings entry")
+		helpers.assert_nil(package.loaded["core.timing.engine.timings"], "load_with_stubs must clear a cached lib.timings entry")
 
 		-- The next require must load the real module, whose M.ms is callable
 		-- and returns a real registry value (not nil, not an error).
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		helpers.assert_eq(type(Timings.ms), "function", "the real lib.timings must expose M.ms")
 		helpers.assert_eq(type(Timings.ms("keystats", "micro_idle_timeout_ms")), "number",
 			"Timings.ms(\"keystats\", \"micro_idle_timeout_ms\") must resolve to a real registry value")
 	end)
 
 	helpers.it("modules.keystats loads cleanly after a leaked partial lib.timings stub", function()
-		package.loaded["infra.timings"]       = { sec = function() return 0.1 end }
+		package.loaded["core.timing.engine.timings"]       = { sec = function() return 0.1 end }
 		package.loaded["modules.keystats"] = nil
 
 		helpers.load_with_stubs("core.logger.engine.logger")

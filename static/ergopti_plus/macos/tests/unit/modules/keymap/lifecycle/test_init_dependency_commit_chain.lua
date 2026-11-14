@@ -259,7 +259,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 	helpers.it("WarmupController refuses a different dependency set", function()
 		with_stubbed_module("modules.llm.warmup_controller", {
 			["core.logger.engine.logger"] = LOGGER_STUB,
-			["infra.timings"] = { sec = function() return 0.1 end },
+			["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 			["core.events.timer_scheduler"] = {},
 		}, function(warmup)
 			local core1 = {}
@@ -284,7 +284,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 		with_stubbed_module("modules.llm.streaming_handler", {
 			["modules.llm.parser"] = {},
 			["core.logger.engine.logger"] = LOGGER_STUB,
-			["infra.timings"] = { sec = function() return 0.1 end },
+			["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 			["core.i18n.engine.i18n"] = {},
 		}, function(streaming)
 			local core = {}
@@ -344,7 +344,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		["modules.llm.app_filter"] = {},
 		["modules.llm.api_common"] = {},
 		["core.logger.engine.logger"] = LOGGER_STUB,
-		["infra.timings"] = { sec = function() return 0.1 end },
+		["core.timing.engine.timings"] = { sec = function() return 0.1 end },
 		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),
 		["core.i18n.engine.i18n"] = {},
 		["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },

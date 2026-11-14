@@ -71,7 +71,7 @@ end
 --- requiring the timings at load would parse them for every reader of trust.
 --- @return number seconds
 function M.unanswered_cooldown_sec()
-	return require("infra.timings").sec("adapters", "unresponsive_ax_backoff_ms")
+	return require("core.timing.engine.timings").sec("adapters", "unresponsive_ax_backoff_ms")
 end
 
 -- A read that took this share of the messaging timeout waited it out: the

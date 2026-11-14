@@ -31,7 +31,7 @@
 local M = {}
 
 local Logger         = require("core.logger.engine.logger")
-local Timings        = require("infra.timings")
+local Timings        = require("core.timing.engine.timings")
 local FileSystem     = require("core.fs.adapters.file_system")
 local JsonCodec      = require("core.fs.adapters.json_codec")
 local ShellRunner    = require("core.process.adapters.shell_runner")

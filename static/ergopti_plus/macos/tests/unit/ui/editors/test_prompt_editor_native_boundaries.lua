@@ -14,7 +14,7 @@ local function with_editor(callback)
 		helpers.with_fresh_modules({
 			"ui.prompt_editor", "ui.ui_builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n",
 			"hs", "tests.stubs.hs",
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 		}, function()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -94,7 +94,7 @@ helpers.describe("prompt editor native boundaries", function()
 	helpers.it("(prompt-editor-construction-owner) revokes deferred native focus when cleanup begins", function()
 		with_editor(function(editor, state)
 			local pending = {}
-			package.loaded["infra.deferred_work"] = { after = function(_, callback)
+			package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 				pending[#pending + 1] = callback
 				return true
 			end }

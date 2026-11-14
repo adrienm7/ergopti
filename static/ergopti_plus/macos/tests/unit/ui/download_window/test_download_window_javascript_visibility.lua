@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_window(scenario)
 	local names = {
 		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
-		"core.logger.engine.logger", "infra.deferred_work", "core.fs.engine.paths", "infra.timings", "core.i18n.engine.i18n",
+		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.engine.paths", "core.timing.engine.timings", "core.i18n.engine.i18n",
 		"core.text.engine.utils",
 		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}
@@ -29,7 +29,7 @@ local function with_window(scenario)
 			fixture.errors[#fixture.errors + 1] = string.format(message, ...)
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback) fixture.timers[#fixture.timers + 1] = callback; return true end,
 	}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/assets" end }

@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll-idle-gate)", function()
 	helpers.it("(layout-poll-idle-gate) reads after input, skips while idle, and still reads at the idle bound", function()

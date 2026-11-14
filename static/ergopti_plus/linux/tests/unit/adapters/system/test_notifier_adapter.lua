@@ -123,7 +123,7 @@ helpers.describe("notifier: sending", function()
 	helpers.it("(nui-006-notification-ttl) keeps the notice up for the registry's duration", function()
 		with_shell(nil, function(notifier, commands)
 			notifier.send("bonjour")
-			local ttl = require("infra.timings").ms("ui", "notification_ttl_ms")
+			local ttl = require("core.timing.engine.timings").ms("ui", "notification_ttl_ms")
 			helpers.assert_true(commands[1]:find("--expire-time=" .. string.format("%d", ttl), 1, true) ~= nil,
 				"one declaration in _shared/core/timing/data/constants.toml, shared with macOS")
 		end)

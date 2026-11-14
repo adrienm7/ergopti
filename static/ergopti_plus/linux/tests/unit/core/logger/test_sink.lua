@@ -716,7 +716,7 @@ local function with_private_log_sink(options, body)
 	local policy = assert(read_file(policy_path))
 	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
 	local saved_stdout, saved_stderr = io.stdout, io.stderr
-	local names = { "core.fs.engine.paths", "infra.config_paths", "infra.timings", "core.logger.engine.sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
+	local names = { "core.fs.engine.paths", "infra.config_paths", "core.timing.engine.timings", "core.logger.engine.sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { main = {}, errors = {}, console = {}, diagnostics = {}, commands = 0, policy_reads = 0,
@@ -743,7 +743,7 @@ local function with_private_log_sink(options, body)
 			return options.resolved_home or DirectoryResolver.account_home()
 		end,
 	}
-	package.loaded["infra.timings"] = { count = function() return 7 end }
+	package.loaded["core.timing.engine.timings"] = { count = function() return 7 end }
 	os.getenv = function(name)
 		state.environment_reads = state.environment_reads + 1
 		if options.missing_identity then return nil end

@@ -22,7 +22,7 @@ local RESET_MODULES = {
 	"modules.keystats.watchers", "core.process.adapters.lifecycle",
 	"adapters.keyboard_hook", "adapters.event_provenance",
 	"adapters.synthetic_input", "adapters.input_source_broker",
-	"core.logger.engine.logger", "infra.timings",
+	"core.logger.engine.logger", "core.timing.engine.timings",
 	"infra.manifest_reader", "core.i18n.engine.i18n", "infra.dialog_util",
 	"metrics.engine.metrics", "modules.keymap",
 }
@@ -253,7 +253,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		unsubscribe = function() return true end,
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
 				micro_idle_timeout_ms = 30000,
@@ -426,7 +426,7 @@ local function load_fixture()
 			return pcall(fn, ...)
 		end,
 	})
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
 				micro_idle_timeout_ms = 30000,

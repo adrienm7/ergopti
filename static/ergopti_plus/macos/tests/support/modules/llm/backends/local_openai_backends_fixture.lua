@@ -122,7 +122,7 @@ end
 local function with_panel(scenario)
 	local owned = {
 		"ui.menu.menu_llm.local_server_panel", "ui.menu.menu_llm.api_panel", "modules.llm",
-		"infra.dialog_util", "infra.notifications", "infra.deferred_work",
+		"infra.dialog_util", "infra.notifications", "core.timing.engine.deferred_work",
 	}
 	with_backend(function(api, LocalServers, world)
 		helpers.with_fresh_modules(owned, function()
@@ -131,7 +131,7 @@ local function with_panel(scenario)
 			-- Deferred work runs at once unless a scenario holds it to model the
 			-- menu build that has not returned yet.
 			world.deferred, world.hold_deferred = {}, false
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(delay, callback, label)
 					world.deferred[#world.deferred + 1] = { delay = delay, label = label, callback = callback }
 					if not world.hold_deferred then callback() end

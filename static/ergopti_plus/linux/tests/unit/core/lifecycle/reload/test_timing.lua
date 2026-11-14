@@ -9,7 +9,7 @@
 --- the delivered log lines the field log analyser reads (linux-reload-budget).
 --- ==============================================================================
 
-local helpers = require("tests.support.logger_fixture").helpers({ "infra.reload_timing", "core.logger.engine.perf_budget" })
+local helpers = require("tests.support.logger_fixture").helpers({ "core.timing.engine.reload_timing", "core.logger.engine.perf_budget" })
 
 --- Loads a fresh module whose stamp lives in a private folder, with the real logger.
 --- @param budget_ms number The driver_reload_ms the judge reads.
@@ -23,14 +23,14 @@ local function fixture(budget_ms)
 	logger.set_level(20)
 	local root = assert(require("luv").fs_mkdtemp("/var/tmp/eg-reload-XXXXXX"))
 	local Storage = require("core.fs.adapters.storage")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local held_path, held_ms = Storage.path, Timings.ms
 	Storage.path = function() return root .. "/store/state.json" end
 	Timings.ms = function(section, key)
 		if section == "budgets" and key == "driver_reload_ms" then return budget_ms end
 		return held_ms(section, key)
 	end
-	local timing = helpers.load_module("infra.reload_timing")
+	local timing = helpers.load_module("core.timing.engine.reload_timing")
 	local clock = { now = 1700000000000 }
 	timing._use_clock(function() return clock.now end)
 	local function cleanup()

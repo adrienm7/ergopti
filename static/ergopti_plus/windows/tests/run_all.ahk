@@ -201,7 +201,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../core/text/engine/toml/helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
-#Include ../infra/timings/timings_config.ahk
+#Include ../core/timing/engine/config.ahk
 
 #Include ../infra/window_utils.ahk
 #Include ../core/network/engine/external_url_policy.ahk

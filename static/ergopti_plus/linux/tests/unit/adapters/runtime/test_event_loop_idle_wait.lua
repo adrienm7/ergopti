@@ -48,7 +48,7 @@ helpers.describe("event loop idle wait: the luv idle tick yields", function()
 	end)
 
 	helpers.it("sleeps in the supplied wait and passes it the cadence bound", function()
-		local sleep = require("infra.native_sleep").bind(require("ffi"))
+		local sleep = require("core.timing.engine.native_sleep").bind(require("ffi"))
 		local requested = {}
 		local ticks = count_ticks({ idleWait = function(timeout_ms)
 			requested[#requested + 1] = timeout_ms

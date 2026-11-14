@@ -67,10 +67,10 @@ local PREFIX_FOR_LEVEL = {
 }
 
 -- How long a notification stays up, in milliseconds (the shared registry).
-local TIMEOUT_MS = require("infra.timings").ms("ui", "notification_ttl_ms")
+local TIMEOUT_MS = require("core.timing.engine.timings").ms("ui", "notification_ttl_ms")
 
 -- How long notify-send may take to hand the notice over (the shared registry).
-local SEND_TIMEOUT_MS = require("infra.timings").ms("ui", "notification_send_timeout_ms")
+local SEND_TIMEOUT_MS = require("core.timing.engine.timings").ms("ui", "notification_send_timeout_ms")
 
 -- Whether `notify-send` is present. nil until the first send probes for it.
 local _available = nil

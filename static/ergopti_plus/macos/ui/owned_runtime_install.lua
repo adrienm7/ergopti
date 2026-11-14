@@ -75,7 +75,7 @@ local function report(offer, ok, reason, detail, reload)
 	if not ok and reason == REASON.CANCELLED then return false end
 	local message = ok and i18n.get(offer.texts.done)
 		or i18n.format(offer.texts.failed, tostring(detail or reason))
-	local committed = require("infra.deferred_work").after(0, function()
+	local committed = require("core.timing.engine.deferred_work").after(0, function()
 		require("infra.dialog_util").block_alert(i18n.get(offer.texts.title), message,
 			i18n.get("common.ok"))
 		if ok then reload() end

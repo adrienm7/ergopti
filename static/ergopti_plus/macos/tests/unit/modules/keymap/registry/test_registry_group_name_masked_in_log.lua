@@ -17,7 +17,7 @@ local PATH = "/user/packs/" .. SECRET .. ".toml"
 local OWNED_MODULES = {
 	"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 	"modules.keymap.terminators", "modules.keymap.state", "modules.keymap.utils",
-	"core.text.engine.toml.reader", "infra.timings", "modules.hotstrings.hotstrings_config",
+	"core.text.engine.toml.reader", "core.timing.engine.timings", "modules.hotstrings.hotstrings_config",
 }
 
 helpers.describe("Registry: a group name is masked in the log", function()
@@ -39,7 +39,7 @@ helpers.describe("Registry: a group name is masked in the log", function()
 				}
 				package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
 				local State = helpers.load_with_stubs("modules.keymap.state")
-				package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+				package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 				local Registry = require("modules.keymap.registry")
 				helpers.assert_eq(Registry.init(State.new({ trigger_char = "★", expansion_delay = 0.4 }, { [SECRET] = 0.4 })), true)
 				helpers.assert_eq(Registry.load_toml(SECRET, PATH), true)

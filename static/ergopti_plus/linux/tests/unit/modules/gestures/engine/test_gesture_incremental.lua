@@ -206,7 +206,7 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 	-- direction from the shared 3.0 mm minimum, as macOS; three fingers 1.5 mm.
 	helpers.it("incremental: a pair needs the shared pair minimum before it counts (pair-incremental-minimum)", function()
 		local Direction = require("gestures.engine.direction")
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		helpers.assert_eq(Direction.minimums_mm(2, { swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
 			pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
 			pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm") }), 3.0,

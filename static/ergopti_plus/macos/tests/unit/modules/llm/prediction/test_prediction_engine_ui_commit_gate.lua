@@ -71,7 +71,7 @@ local function load_fixture(loading_result, options)
 	fixture.options = options
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_section, key)
 			return 0.1
 		end,

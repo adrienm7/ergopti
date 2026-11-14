@@ -293,7 +293,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 				end
 			end
 		end
-		local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		local restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		local restore_timers = {}
 		for _, timer in ipairs(f.hs.timer.__timers) do
 			if timer.running and timer.delay == restore_delay then restore_timers[#restore_timers + 1] = timer end
@@ -344,7 +344,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 			f.hs.pasteboard.setContents("original clipboard")
 			local Scheduler = require("core.events.timer_scheduler")
 			local original, timer_stop, owned_handle = Scheduler.after, nil, nil
-			local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+			local restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 			Scheduler.after = function(delay, callback)
 				local handle, committed = original(delay, callback)
 				if delay == restore_delay and handle.timer then

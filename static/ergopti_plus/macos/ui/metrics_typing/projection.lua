@@ -29,7 +29,7 @@
 local M = {}
 
 local Logger    = require("core.logger.engine.logger")
-local PacedJson = require("infra.paced_json")
+local PacedJson = require("core.timing.engine.paced_json")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "metrics_typing.projection"

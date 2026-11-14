@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the real editor and native records.
 local function with_editor(scenario)
 	local keys = { "ui.personal_info_editor", "core.logger.engine.logger", "core.i18n.engine.i18n",
-		"core.fs.engine.paths", "infra.timings", "infra.deferred_work", "ui.ui_builder" }
+		"core.fs.engine.paths", "core.timing.engine.timings", "core.timing.engine.deferred_work", "ui.ui_builder" }
 	local saved, prior_hs = {}, _G.hs
 	for _, key in ipairs(keys) do saved[key] = package.loaded[key] end
 	local records = { windows = {}, bridges = {}, deferred = {}, errors = {} }
@@ -34,7 +34,7 @@ local function with_editor(scenario)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
 		helpers.provide_timings()
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			records.deferred[#records.deferred + 1] = callback
 			return true
 		end }

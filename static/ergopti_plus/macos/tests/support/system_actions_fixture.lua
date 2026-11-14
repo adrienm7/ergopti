@@ -9,7 +9,7 @@ local helpers = require("tests.helpers")
 
 local NATIVE_CONSUMERS = {
 	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
-	"infra.deferred_work", "core.fs.engine.dir",
+	"core.timing.engine.deferred_work", "core.fs.engine.dir",
 }
 
 local function refresh_native_consumers()
@@ -34,7 +34,7 @@ local function with_fixture(callback)
 		"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 		"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
-		"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
+		"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 	}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
