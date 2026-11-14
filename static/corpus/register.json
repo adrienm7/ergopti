@@ -3,49 +3,6 @@
 	"schema_version": 1,
 	"audited": "2026-11-14",
 	"files": {
-		"original/autre/Auxlang_X.txt": {
-			"title": "Auxlang X",
-			"source": "Unknown",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Generated pseudo-words with no author or licence line; nothing found online. Held until the maintainer says where it came from. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/code/Chained Code Bigrams 7.txt": {
-			"title": "Chained Code Bigrams 7 (1 MB)",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/code/Programming Punctuation.txt": {
-			"title": "Programming Punctuation",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/code/Projet GLM sur R.txt": {
-			"title": "Projet – Modélisation GLM avec R (2022)",
-			"source": "Coursework by Adrien Moyaux and Jonathan Munier",
-			"licence": "None granted (co-authored)",
-			"attribution": "Adrien Moyaux and Jonathan Munier",
-			"status": "refused",
-			"note": "Co-owned with Jonathan Munier: ship once he agrees in writing. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/code/Python for Everybody.txt": {
-			"title": "Python for Everybody (Charles R. Severance)",
-			"source": "The book, py4e.com",
-			"url": "https://www.py4e.com",
-			"licence": "CC BY-NC-SA 3.0",
-			"attribution": "Charles R. Severance",
-			"status": "refused",
-			"note": "Lines 10–16: CC BY-NC-SA 3.0, which cannot go into the MIT project. The author invites permission requests (lines 8286–8320): ship only with his permission. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
 		"original/code/corpus_johnix_prog.txt": {
 			"title": "Hello World programs in many languages",
 			"source": "« prog » of the bépo corpus by Johnix (a 2004 snapshot of the Hello World Collection)",
@@ -64,60 +21,6 @@
 			"status": "ship",
 			"note": "Derived from corpus_johnix_prog.txt; same terms."
 		},
-		"original/en/500 Common Words in Prose.txt": {
-			"title": "500 Common Words in Prose",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/en/Chained English Bigrams 7.txt": {
-			"title": "Chained English Bigrams 7 (1 MB)",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/en/Chained English Bigrams 9.txt": {
-			"title": "Chained English Bigrams 9 (3 MB)",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/en/Chained Proglish Bigrams 7.txt": {
-			"title": "Chained Proglish Bigrams 7 (1 MB)",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/en/Common English Words.txt": {
-			"title": "Common English Words",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
-		"original/en/Common SAT Words.txt": {
-			"title": "Common SAT Words",
-			"source": "Unconfirmed (likely KLAnext)",
-			"url": "https://klanext.keyboard-design.com",
-			"licence": "Unknown",
-			"attribution": "",
-			"status": "refused",
-			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
-		},
 		"original/en/don_quixote_ormsby.txt": {
 			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
 			"source": "Project Gutenberg ebook 996, as kept by Ergo-L",
@@ -135,15 +38,6 @@
 			"attribution": "Jean-Michel Smith; French translation by Thomas Tempé, Frédéric Henry, Thibaud Choné, Germain Chazot and Cédric Corazza",
 			"status": "ship",
 			"note": "Lines 9 and 1485–1500 grant CC BY-SA 1.0, on condition that Jean-Michel Smith's name is not used to promote a derived work. The n-gram tables are shipped in their own file under CC BY-SA 1.0. The earlier copy had lost every accent (9,945 U+FFFD)."
-		},
-		"original/fr/corpus_johnix_mail.txt": {
-			"title": "French e-mails, 2003",
-			"source": "« mail » of the bépo corpus by Johnix",
-			"licence": "None granted",
-			"attribution": "",
-			"status": "refused",
-			"note": "Source confirmed: « johnix/mail » of the bépo corpus archive linked from https://bepo.fr/wiki/Corpus (« Le corpus utilisé pour la génération de la version 0.1 est disponible ici »). Neither that page nor the archive grants any licence, and the e-mails carry 34 addresses, named senders and phone numbers. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending.",
-			"url": "https://cdn.bepo.fr/donnees/corpus/corpus-johnix.zip"
 		},
 		"original/fr/corpus_johnix_swann10.txt": {
 			"title": "Du côté de chez Swann (Marcel Proust, 1913)",
@@ -189,15 +83,6 @@
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
 			"status": "ship",
 			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14). The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container; third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting. The sentences come from Wikipédia, whose text is CC BY-SA: its contributors are credited too."
-		},
-		"original/fr/romans.txt": {
-			"title": "Novels from Ebooks libres et gratuits (24 MB)",
-			"source": "« romans.txt » of the bépo wiki corpus table, from www.ebooksgratuits.com",
-			"url": "https://bepo.fr/wiki/Corpus",
-			"licence": "Mixed",
-			"attribution": "",
-			"status": "refused",
-			"note": "Mostly public domain, but it contains Pierre Duc's contemporary « Autour de Bray » (« toute utilisation commerciale ou professionnelle est soumise à une demande d'autorisation », line 9604), a « Tous droits réservés © 2007 » note (line 2844), five Leblanc books of 1931–1935 still protected in the US, and five translations whose translator is not named. Shippable only as a cleaned subset. The maintainer decided on 2026-11-14 to delete this text from the repository (no clearly compatible licence recorded); the deletion itself is pending."
 		}
 	}
 }
