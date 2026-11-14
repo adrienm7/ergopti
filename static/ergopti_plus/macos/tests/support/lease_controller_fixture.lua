@@ -19,8 +19,8 @@ local UUIDS = {
 local function load_controller(options)
 	options = options or {}
 	package.loaded["platform.remap.lease_controller"] = nil
-	package.loaded["adapters.task_output_turn"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.task_output_turn"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
@@ -65,7 +65,7 @@ local function load_controller(options)
 		ctx.helper_error = "test helper unavailable"
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		_active_tasks = {},
 		spawn = function(executable, args, on_done, on_chunk, environment)
 			local start_result = ctx.next_start_result
@@ -346,7 +346,7 @@ end
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "core.fs.adapters.storage",
+		"platform.remap.lease_controller", "core.process.adapters.task_output_turn", "core.process.adapters.shell_runner", "core.fs.adapters.storage",
 		"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
 		"core.logger.engine.logger",
 	}, function()

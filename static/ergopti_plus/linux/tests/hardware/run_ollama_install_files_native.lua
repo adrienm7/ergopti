@@ -16,7 +16,7 @@ package.path = native_driver .. "/?.lua;" .. native_shared .. "/?.lua;"
 	.. driver .. "/?.lua;" .. shared .. "/?.lua;" .. package.path
 local uv = require("luv")
 local Files = require("modules.llm.ollama_install_files")
-local Process = require("adapters.owned_process")
+local Process = require("core.process.adapters.owned_process")
 local Installer = require("ai.engine.ollama.archive_installer")
 local passed = 0
 local process_serial = 0

@@ -104,16 +104,16 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 	--- @param started boolean What the stubbed open reports.
 	--- @param body function Receives the adapter and the recorded targets.
 	local function with_open(started, body)
-		local saved = package.loaded["adapters.shell_runner"]
+		local saved = package.loaded["core.process.adapters.shell_runner"]
 		local targets = {}
-		package.loaded["adapters.shell_runner"] = { open = function(target)
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(target)
 			targets[#targets + 1] = target
 			return started
 		end }
 		-- Mirrors Hammerspoon: openURL refuses a URL lacking "://".
 		local native = { urlevent = { openURL = function(url) return url:find("://", 1, true) ~= nil end } }
 		local ok, err = pcall(with_native, native, function(adapter) body(adapter, targets) end)
-		package.loaded["adapters.shell_runner"] = saved
+		package.loaded["core.process.adapters.shell_runner"] = saved
 		if not ok then error(err, 0) end
 	end
 
@@ -135,9 +135,9 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 	end)
 
 	helpers.it("retains a refused but unsettled TCC launch until its exact exit (tcc-reset-start-race)", function()
-		local saved = package.loaded["adapters.shell_runner"]
+		local saved = package.loaded["core.process.adapters.shell_runner"]
 		local observer, result = nil, nil
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function()
 				return {
 					start = function() return false end,
@@ -155,22 +155,22 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 				observer()
 				helpers.assert_eq(result[1], false)
 				helpers.assert_contains(result[2], "unsettled launch")
-				package.loaded["adapters.shell_runner"].spawn = function()
+				package.loaded["core.process.adapters.shell_runner"].spawn = function()
 					return { start = function() return false end, isSettled = function() return true end }
 				end
 				helpers.assert_eq(adapter.reset_permission("com.ergoptiplus.app.hammerspoon", function() end), false,
 					"a proven unlaunched task remains an immediate refusal")
 			end)
 		end)
-		package.loaded["adapters.shell_runner"] = saved
+		package.loaded["core.process.adapters.shell_runner"] = saved
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("resets only this app's Screen Recording entry through tccutil (screen-recording-stale-reset)",
 		function()
-			local saved = package.loaded["adapters.shell_runner"]
+			local saved = package.loaded["core.process.adapters.shell_runner"]
 			local spawned = nil
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(executable, args, on_done)
 					spawned = { executable = executable, args = args, on_done = on_done }
 					return { start = function() return true end }
@@ -208,7 +208,7 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 					helpers.assert_nil(spawned, "an unknown process identity must never invoke tccutil")
 				end)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 end)

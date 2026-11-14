@@ -80,7 +80,7 @@ end
 local function with_probe_receipts(failure, test)
 	local Sink = helpers.load_module("core.logger.engine.sink")
 	local saved_writer = package.loaded["core.fs.engine.regular_file_writer"]
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	local previous_capture = shell.exec_checked
 	local previous_execute, previous_remove = os.execute, os.remove
 	local state = { opened = {}, removed = {}, written = 0, flushed = 0, closed = 0 }
@@ -129,7 +129,7 @@ end
 
 helpers.describe("linux-logger-probe-receipts", function()
 	helpers.it("logger-probe-exit: failed native allocation preserves unrelated files and links", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit") and shell.has_command("mktemp"),
 			"native logger probe receipts require Python, LuaJIT and the real mktemp")
 		local quote = require("core.text.engine.utils_core").shell_quote
@@ -690,7 +690,7 @@ end)
 helpers.describe("logger sink — quoting parity with shell_runner", function()
 	helpers.it("shell_quote matches adapters/shell_runner.quote", function()
 		local Sink  = helpers.load_module("core.logger.engine.sink")
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 
 		local cases = {
 			"/home/user/.local/share/ergopti/logs",

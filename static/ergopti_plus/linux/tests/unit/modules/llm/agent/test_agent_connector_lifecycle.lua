@@ -423,7 +423,7 @@ helpers.describe("agent connector native deadline admission", function()
 	for _, mode in ipairs({ "fresh clock", "stop during refresh" }) do
 		helpers.it("(agent-connector-clock) " .. mode .. " before native allocation", function()
 			local uv = require("luv")
-			local old_clock, old_backend = uv.update_time, package.loaded["adapters.owned_process"]
+			local old_clock, old_backend = uv.update_time, package.loaded["core.process.adapters.owned_process"]
 			local old_connector = package.loaded["modules.llm.agent_connectors"]
 			package.loaded["modules.llm.agent_connectors"] = nil
 			local Connector = require("modules.llm.agent_connectors")
@@ -432,7 +432,7 @@ helpers.describe("agent connector native deadline admission", function()
 				refreshed = true
 				if mode == "stop during refresh" then stop_ack = Connector.shutdown() end
 			end
-			package.loaded["adapters.owned_process"] = { start = function(_, _, options, callback)
+			package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, options, callback)
 				assert(refreshed, "native deadline was armed against a stale loop clock")
 				if not options.authorized() then return nil, "revoked before allocation" end
 				allocated = allocated + 1
@@ -454,7 +454,7 @@ helpers.describe("agent connector native deadline admission", function()
 				end
 				helpers.assert_true(Connector.shutdown())
 			end, debug.traceback)
-			uv.update_time, package.loaded["adapters.owned_process"] = old_clock, old_backend
+			uv.update_time, package.loaded["core.process.adapters.owned_process"] = old_clock, old_backend
 			package.loaded["modules.llm.agent_connectors"] = old_connector
 			if not ok then error(why, 0) end
 		end)

@@ -410,7 +410,7 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 		local handles = {}
 		local native = {}
 		local outcome = table.pack(xpcall(function()
-			helpers.with_stub_scope({ "adapters.shell_runner" }, function()
+			helpers.with_stub_scope({ "core.process.adapters.shell_runner" }, function()
 				local controlled_new = function(_, done)
 					local environment = { HOME = "/fixture/home" }
 					local task = { starts = 0, complete = done }
@@ -422,7 +422,7 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 					native[#native + 1] = task
 					return task
 				end
-				local runner = helpers.load_with_stubs("adapters.shell_runner", { task = { new = controlled_new } })
+				local runner = helpers.load_with_stubs("core.process.adapters.shell_runner", { task = { new = controlled_new } })
 				local prepared = runner.spawn("/fixture/managed-serve", {}, nil, nil, nil, true, true)
 				handles[#handles + 1] = prepared
 				local _, nonce = owned_task()
@@ -457,7 +457,7 @@ end)
 
 helpers.describe("Managed daemon refusal diagnostic", function()
 	helpers.it("(daemon-refusal-logged) logs the serve owner's fixed refusal line and nothing else", function()
-		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "adapters.shell_runner",
+		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
 			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "core.logger.engine.logger" }, function()
 			local logs = {}
 			local Logger = helpers.make_logger_stub()
@@ -466,7 +466,7 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 			end
 			package.loaded["core.logger.engine.logger"] = Logger
 			local callbacks = {}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(_, _, on_done, on_chunk)
 					callbacks.done, callbacks.chunk = on_done, on_chunk
 					local task = {}

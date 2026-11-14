@@ -3,8 +3,8 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"platform.remap.watchers", "adapters.shell_runner", "core.events.timer_scheduler",
-	"adapters.input_source_broker", "adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"platform.remap.watchers", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
+	"adapters.input_source_broker", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"infra.deferred_work", "diagnostics.engine.runtime_log", "core.logger.engine.logger", "infra.timings", "infra.keycodes",
 	"adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
 	"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",
@@ -62,7 +62,7 @@ function M.with_world(options, callback)
 				return native
 			end },
 		}
-		w.shell = require("adapters.shell_runner")
+		w.shell = require("core.process.adapters.shell_runner")
 		w.scheduler = require("core.events.timer_scheduler")
 		w.watchers = require("platform.remap.watchers")
 		function w.start()

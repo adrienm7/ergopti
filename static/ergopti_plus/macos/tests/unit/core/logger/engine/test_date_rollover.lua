@@ -16,10 +16,10 @@ local helpers = require("tests.helpers")
 
 -- Reload the logger from scratch so init_log_path picks up our shell stub.
 local _real_logger = package.loaded["core.logger.engine.logger"]
-local _real_shell  = package.loaded["adapters.shell_runner"]
+local _real_shell  = package.loaded["core.process.adapters.shell_runner"]
 
 local exec_log = {}
-package.loaded["adapters.shell_runner"] = {
+package.loaded["core.process.adapters.shell_runner"] = {
 	exec = function(cmd) exec_log[#exec_log + 1] = tostring(cmd); return "" end,
 }
 package.loaded["core.logger.engine.logger"] = nil
@@ -121,5 +121,5 @@ helpers.describe("Logger date rollover — the daily files advance on midnight",
 end)
 
 -- Restore the originals so subsequent test files are unaffected.
-package.loaded["adapters.shell_runner"] = _real_shell
+package.loaded["core.process.adapters.shell_runner"] = _real_shell
 package.loaded["core.logger.engine.logger"]            = _real_logger

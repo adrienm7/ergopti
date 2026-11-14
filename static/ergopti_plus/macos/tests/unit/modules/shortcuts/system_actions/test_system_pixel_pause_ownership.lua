@@ -180,7 +180,7 @@ local function fresh_pixel_owner()
 			return nil, "absent"
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["adapters.screen_capture"] = nil
 	package.loaded["adapters.python_interpreter"] = helpers.healthy_python_resolver()
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil

@@ -16,7 +16,7 @@ local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 local Paths = require("core.fs.engine.paths")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local APP_NAME = "model_browser"
 local LOG = "bridge.model_browser"

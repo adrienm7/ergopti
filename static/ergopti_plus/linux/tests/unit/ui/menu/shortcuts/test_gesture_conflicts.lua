@@ -14,7 +14,7 @@ local h = require("tests.helpers")
 --- @param body function Assertions against the real module and observed effects.
 --- @param strings table|nil Canonical translation input for the owned renderer.
 local function scenario(choice, body, strings)
-	local names = { "ui.gesture_conflicts", "core.i18n.engine.i18n", "core.fs.adapters.storage", "adapters.shell_runner",
+	local names = { "ui.gesture_conflicts", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.process.adapters.shell_runner",
 		"core.logger.engine.shim", "core.events.loop", "ui.modal", "infra.manifest_menu", "menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local saved, store, queued = {}, {}, {}
 	local observed = { shells = 0, modals = 0, dialogs = 0 }
@@ -26,7 +26,7 @@ local function scenario(choice, body, strings)
 	end, section = function(key) return strings and strings[key] or key end }
 	package.loaded["core.fs.adapters.storage"] = { get = function(key) return store[key] end,
 		set = function(key, value) store[key] = value; return true end }
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		quote = function(value) return "'" .. value .. "'" end,
 		has_command = function() observed.shells = observed.shells + 1; return false end,
 		run = function() observed.shells = observed.shells + 1; return true end,

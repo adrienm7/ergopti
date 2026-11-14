@@ -16,7 +16,7 @@ local text_owner = require("tests.support.text_owner_fixture")
 function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
-			"adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
+			"adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
 			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -51,7 +51,7 @@ function M.with(body)
 		end
 		package.loaded["adapters.atspi_focus"], package.loaded["adapters.selection_transaction"] = native, nil
 		local pending
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
 				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end

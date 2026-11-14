@@ -231,7 +231,7 @@ end
 --- Opens System Settings on the Accessibility list, without blocking.
 --- @return boolean started True when the pane opener was started.
 function M.open_settings()
-	return require("adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
+	return require("core.process.adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
 end
 
 return M

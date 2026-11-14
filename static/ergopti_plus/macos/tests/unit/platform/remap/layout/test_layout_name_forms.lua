@@ -39,7 +39,7 @@ local function load_watcher(localised)
 		end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(_, _, on_done)
 			h.reads[#h.reads + 1] = on_done
 			return { start = function() return true end, terminate = function() return true end }
@@ -102,7 +102,7 @@ end
 
 --- Restores the real adapters for later test files.
 local function restore_adapters()
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.input_source_broker"] = nil
 	package.loaded["platform.remap.watchers"] = nil

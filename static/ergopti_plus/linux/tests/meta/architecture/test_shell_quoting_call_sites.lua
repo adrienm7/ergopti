@@ -26,7 +26,7 @@
 --- clipboard and the tooltip both decided their tool was absent and no-opped.
 
 local helpers = require("tests.helpers")
-local Shell   = helpers.load_module("adapters.shell_runner")
+local Shell   = helpers.load_module("core.process.adapters.shell_runner")
 
 -- Every metacharacter class at once: command substitution (both spellings),
 -- a command separator, and a quote that would close the word.

@@ -57,9 +57,9 @@
 			"linux": "static/ergopti_plus/linux/adapters/notifier.lua"
 		},
 		"ProcessLifecycle": {
-			"windows": "static/ergopti_plus/windows/adapters/process_lifecycle.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/process_lifecycle.lua",
-			"linux": "static/ergopti_plus/linux/adapters/process_lifecycle.lua"
+			"windows": "static/ergopti_plus/windows/core/process/adapters/lifecycle.ahk",
+			"macos": "static/ergopti_plus/macos/core/process/adapters/lifecycle.lua",
+			"linux": "static/ergopti_plus/linux/core/process/adapters/lifecycle.lua"
 		},
 		"SecureFieldDetector": {
 			"windows": "static/ergopti_plus/windows/adapters/secure_field_detector.ahk",

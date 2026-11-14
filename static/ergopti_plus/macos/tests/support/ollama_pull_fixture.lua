@@ -20,8 +20,8 @@ local MODULES = {
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	"modules.llm.opaque_network_admission",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"ui.download_window",
@@ -86,7 +86,7 @@ local function with_fixture(options, callback)
 		prelude = function() return "", nil end,
 		opaque_prelude = function() return "", nil end,
 	}
-	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function() return nil end }
 	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return 0 end,
 		after = function(_, fn)
@@ -159,7 +159,7 @@ local function with_fixture(options, callback)
 		end,
 		complete = function() progress.completes = progress.completes + 1; return true end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(label, executable, on_done, on_stream, args)
 			if label == "Ollama model pull" and options.construct_result == false then
 				return nil
@@ -282,7 +282,7 @@ local function with_fixture(options, callback)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

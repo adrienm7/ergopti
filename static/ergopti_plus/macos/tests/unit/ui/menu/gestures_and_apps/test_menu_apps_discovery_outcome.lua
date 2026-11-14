@@ -12,7 +12,7 @@ local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths", "core.fs.engine.dir",
-			"core.i18n.engine.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
+			"core.i18n.engine.i18n", "infra.manifest_menu", "core.process.adapters.task_lifecycle", "infra.text_utils",
 			"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
 				output = "", status = true, kind = "exit", code = 0 }
@@ -42,7 +42,7 @@ local function with_apps(callback)
 				end
 				return providers.apps_installed()
 			end }
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(_, _, callback)
 					local task = { isRunning = function()
 						if state.running == "throw" then error("probe failed") end
@@ -277,7 +277,7 @@ local function with_native_apps_parent(language, body)
 	local result, detail = xpcall(function()
 		for _, name in ipairs({ "ui.menu.menu_apps", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"infra.manifest_menu", "infra.config_paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
-			"adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }) do
+			"core.process.adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
 		end
 		helpers.load_with_stubs("core.logger.engine.logger")
@@ -316,7 +316,7 @@ local function with_native_apps_parent(language, body)
 		local icon = {}
 		hs.image.imageFromPath = function() return icon end
 		local renderer = require("infra.manifest_menu")
-		local lifecycle = require("adapters.task_lifecycle")
+		local lifecycle = require("core.process.adapters.task_lifecycle")
 		local original_task = lifecycle.native
 		lifecycle.native = function(...)
 			state.launches = state.launches + 1

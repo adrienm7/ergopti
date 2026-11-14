@@ -208,7 +208,7 @@ end
 -- The real child-process owners: an earlier suite module may leave a stand-in
 -- that "succeeds" at once without spawning anything, and every case here is
 -- about a real child (CI 43024025237: each attempt ended "done" at once).
-local PROCESS_OWNERS = { "adapters.owned_process", "adapters.shell_runner", "diagnostics.engine.adapter_errors" }
+local PROCESS_OWNERS = { "core.process.adapters.owned_process", "core.process.adapters.shell_runner", "diagnostics.engine.adapter_errors" }
 
 -- Longest wait for a child to answer: a bound on a loaded runner, never a
 -- timing the case relies on.

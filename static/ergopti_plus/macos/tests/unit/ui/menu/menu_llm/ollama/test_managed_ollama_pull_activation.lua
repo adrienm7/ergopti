@@ -16,7 +16,7 @@ local ARGUMENTS = { "-I", "/fixture/managed_ollama_pull.py", "--maximum-bytes", 
 local function with_activation(options, callback)
 	options = options or {}
 	local names = { "adapters.managed_ollama_pull", "modules.llm.managed_native_python", "modules.llm.ollama_endpoint",
-		"adapters.task_environment", "core.lifecycle.engine.launcher_environment" }
+		"core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local handle, bound, attempted, removed, fixture = nil, nil, false, false, nil
@@ -31,7 +31,7 @@ local function with_activation(options, callback)
 			calls.model = model
 			helpers.assert_eq(port, 12345)
 			helpers.assert_eq(python, PYTHON)
-			local lifecycle = package.loaded["adapters.task_lifecycle"]
+			local lifecycle = package.loaded["core.process.adapters.task_lifecycle"]
 			local native = lifecycle.native
 			lifecycle.native = function(...)
 				if options.construct_throw then error("controlled construction refusal") end
@@ -113,7 +113,7 @@ local function with_activation(options, callback)
 					{ is_current = function() return true end, _requirement_lifecycle = options.requirement_lifecycle })
 			end
 			if options.native_port then
-				local lifecycle = package.loaded["adapters.task_lifecycle"]
+				local lifecycle = package.loaded["core.process.adapters.task_lifecycle"]
 				f.native_calls = { construct = 0, start = 0, terminate = 0 }
 				_G.hs.task = { new = function(executable, on_done, on_stream, arguments)
 					f.native_calls.construct = f.native_calls.construct + 1
@@ -140,8 +140,8 @@ local function with_activation(options, callback)
 					f.pulls[#f.pulls + 1] = task
 					return task
 				end }
-				local actual = helpers.with_fresh_modules({ "adapters.task_lifecycle" }, function()
-					return require("adapters.task_lifecycle")
+				local actual = helpers.with_fresh_modules({ "core.process.adapters.task_lifecycle" }, function()
+					return require("core.process.adapters.task_lifecycle")
 				end)
 				for _, name in ipairs({ "native", "start", "terminate" }) do lifecycle[name] = actual[name] end
 				f.retirement_ready = function() options.retired = true end

@@ -108,7 +108,7 @@ helpers.describe("file_watchers developer source trees", function()
 	}) do
 		helpers.it("(source-watch-path-framing) refuses " .. refusal.name .. " and retires prior watches", function()
 			local root = source_tree()
-			local shell = require("adapters.shell_runner")
+			local shell = require("core.process.adapters.shell_runner")
 			local query_count = 0
 			local controlled = setmetatable({ exec_checked = function(command, ...)
 				if command:sub(1, 5) == "find " then
@@ -117,7 +117,7 @@ helpers.describe("file_watchers developer source trees", function()
 				end
 				return shell.exec_checked(command, ...)
 			end }, { __index = shell })
-			local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "adapters.shell_runner", controlled)
+			local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "core.process.adapters.shell_runner", controlled)
 			local ok, err = pcall(watcher.start, { hotstrings_dir = root, source_dirs = { root },
 				on_source_change = function() error("a refused census cannot reload") end })
 			watcher.stop()

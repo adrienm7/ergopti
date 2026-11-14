@@ -62,7 +62,7 @@ local function native()
 	return {
 		environment = function() return require("core.network.engine.proxy_policy").environment() end,
 		exec = function(command)
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local ok, output = Shell.exec_checked("timeout " .. M.SETTINGS_TIMEOUT_SECONDS .. " " .. command)
 			if not ok then return nil end
 			if command == GNOME_MODE or command == GNOME_PAC then
@@ -72,7 +72,7 @@ local function native()
 			end
 			return ((output or ""):gsub("%s+$", ""))
 		end,
-		has_command = function(name) return require("adapters.shell_runner").has_command(name) end,
+		has_command = function(name) return require("core.process.adapters.shell_runner").has_command(name) end,
 		http_get = function(url, headers, options, callback)
 			return require("core.network.adapters.http_client").get(url, headers, options, callback)
 		end,

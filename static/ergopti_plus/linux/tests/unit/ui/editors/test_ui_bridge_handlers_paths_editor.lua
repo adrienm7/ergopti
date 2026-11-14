@@ -506,7 +506,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	end
 	local function with_native_owners(body)
 		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-personal-reload"
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local quote = Shell.quote
 		assert(Shell.run("mkdir -p " .. quote(directory)) == true)
 		local path, choices, empty = directory .. "/personal_info.toml", directory .. "/config.toml", directory .. "/personal_hotstrings.toml"

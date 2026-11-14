@@ -42,7 +42,7 @@ end
 --- @param answer function (script) -> ok, result, raw
 --- @param callback function Receives (Dialog, scripts).
 local function with_dialog(answer, callback)
-	helpers.with_fresh_modules({ "infra.dialog_util", "core.logger.engine.logger", "adapters.shell_runner",
+	helpers.with_fresh_modules({ "infra.dialog_util", "core.logger.engine.logger", "core.process.adapters.shell_runner",
 		"core.events.timer_scheduler" }, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local scripts = {}

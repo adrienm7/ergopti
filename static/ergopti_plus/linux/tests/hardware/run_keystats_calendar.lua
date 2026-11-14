@@ -221,7 +221,7 @@ scenario({ month = 10, day = 25 }, function(k, writer, advance, rows)
 end)
 
 scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	local original_line, original_has = shell.exec_line, shell.has_command
 	local system = require("modules.keystats.system_metrics")
 	local network = "network-one"

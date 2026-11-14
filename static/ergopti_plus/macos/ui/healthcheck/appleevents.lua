@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Scheduler = require("core.events.timer_scheduler")
 local Logger = require("core.logger.engine.logger")
 local TableUtil = require("core.text.engine.table_util")

@@ -100,7 +100,7 @@ function M.probe(upstream, authority, options, callback)
 		callback(active.read_probe(type(result) == "table" and result.exit_code or nil,
 			type(result) == "table" and result.stdout or nil))
 	end
-	local operation = require("adapters.owned_process").start(executable, args, {
+	local operation = require("core.process.adapters.owned_process").start(executable, args, {
 		owner = options.owner, timeout_ms = options.timeout_ms, max_output_bytes = MAX_PROBE_OUTPUT_BYTES,
 		authorized = options.authorized,
 	}, function(result)

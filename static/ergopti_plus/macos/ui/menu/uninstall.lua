@@ -31,7 +31,7 @@ function M.run(deps)
 	local i18n = deps.i18n or require("core.i18n.engine.i18n")
 	local dialog = deps.dialog or require("infra.dialog_util")
 	local resolver = deps.resolver or require("platform.remap.lease_helper")
-	local shell = deps.shell or require("adapters.shell_runner")
+	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local title = i18n.get("menu.global.uninstall")
 	local failure = i18n.get("dialog.uninstall.failed")
 	local transaction = { buffer = "", phase = "confirming" }

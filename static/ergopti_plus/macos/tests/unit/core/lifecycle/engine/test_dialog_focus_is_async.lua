@@ -102,7 +102,7 @@ end)
 --- @param scenario function Scenario receiving Dialog, counters, and handle getter.
 local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	local previous_logger = package.loaded["core.logger.engine.logger"]
-	local previous_shell_runner = package.loaded["adapters.shell_runner"]
+	local previous_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 	local previous_dialog = package.loaded["infra.dialog_util"]
 	local previous_hs_module = package.loaded["hs"]
@@ -113,7 +113,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	package.loaded["core.logger.engine.logger"] = setmetatable({
 		error = function() calls.errors = calls.errors + 1 end,
 	}, { __index = function() return function() end end })
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function()
 			calls.spawns = calls.spawns + 1
 			return { start = function() calls.starts = calls.starts + 1; return true end }
@@ -153,7 +153,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 		scenario(Dialog, calls, function() return candidate end)
 	end, debug.traceback)
 	package.loaded["core.logger.engine.logger"] = previous_logger
-	package.loaded["adapters.shell_runner"] = previous_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = previous_shell_runner
 	package.loaded["core.events.timer_scheduler"] = previous_scheduler
 	package.loaded["infra.dialog_util"] = previous_dialog
 	package.loaded["hs"] = previous_hs_module

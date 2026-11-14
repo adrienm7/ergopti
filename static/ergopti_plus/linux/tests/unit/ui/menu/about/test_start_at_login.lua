@@ -93,7 +93,7 @@ end)
 --- @param body function Receives the menu, desktop path and actual command ledger.
 local function with_installed_startup(mode, body)
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local loaded = { "adapters.shell_runner", "ui.menu.start_at_login" }
+	local loaded = { "core.process.adapters.shell_runner", "ui.menu.start_at_login" }
 	local previous = {}
 	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
 	local Shell, menu
@@ -106,7 +106,7 @@ local function with_installed_startup(mode, body)
 	local saved = {}
 	for key in pairs(environment) do saved[key] = os.getenv(key) end
 	local okay, detail = xpcall(function()
-		Shell = helpers.load_module("adapters.shell_runner")
+		Shell = helpers.load_module("core.process.adapters.shell_runner")
 		menu = helpers.load_module("ui.menu.start_at_login")
 		for _, relative in ipairs({ "/a space d'été Ω", "/a space d'été Ω/lib", "/a space d'été Ω/lib/ergopti",
 			"/a space d'été Ω/lib/ergopti/linux", "/a space d'été Ω/lib/ergopti/linux/install", "/commands", "/runtime" }) do
@@ -197,7 +197,7 @@ end)
 --- @param body function Receives the menu, the checkout's launcher, the entry path and a writer.
 local function with_source_startup(body)
 	local uv, Paths = require("luv"), require("core.fs.engine.paths")
-	local loaded = { "adapters.shell_runner", "ui.menu.start_at_login" }
+	local loaded = { "core.process.adapters.shell_runner", "ui.menu.start_at_login" }
 	local previous = {}
 	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
 	local Shell
@@ -211,7 +211,7 @@ local function with_source_startup(body)
 		local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 	end
 	local okay, detail = xpcall(function()
-		Shell = helpers.load_module("adapters.shell_runner")
+		Shell = helpers.load_module("core.process.adapters.shell_runner")
 		local menu = helpers.load_module("ui.menu.start_at_login")
 		assert(Shell.run("mkdir -p -- " .. Shell.quote(driver .. "/install") .. " " .. Shell.quote(driver .. "/bin")
 			.. " " .. Shell.quote(driver .. "/../_shared/core/i18n/data/locales") .. " " .. Shell.quote(root .. "/commands")))
@@ -264,8 +264,8 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 	end)
 	helpers.it("(login-source-run) reports an entry whose launcher is gone and rewrites it on enable", function()
 		with_source_startup(function(menu, launcher, desktop, write)
-			assert(require("adapters.shell_runner").run("mkdir -p -- "
-				.. require("adapters.shell_runner").quote(desktop:match("^(.*)/[^/]+$"))))
+			assert(require("core.process.adapters.shell_runner").run("mkdir -p -- "
+				.. require("core.process.adapters.shell_runner").quote(desktop:match("^(.*)/[^/]+$"))))
 			write(desktop, '[Desktop Entry]\nType=Application\nName=Ergopti\n'
 				.. 'Exec=/bin/bash "/moved/clone/static/ergopti_plus/linux/bin/ergopti-hotstrings" --tray\n'
 				.. 'Terminal=false\nHidden=false\nX-Ergopti-Startup=true\n')
@@ -293,8 +293,8 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 	end)
 	helpers.it("(login-source-run) keeps a live foreign entry as another command", function()
 		with_source_startup(function(menu, _, desktop, write)
-			assert(require("adapters.shell_runner").run("mkdir -p -- "
-				.. require("adapters.shell_runner").quote(desktop:match("^(.*)/[^/]+$"))))
+			assert(require("core.process.adapters.shell_runner").run("mkdir -p -- "
+				.. require("core.process.adapters.shell_runner").quote(desktop:match("^(.*)/[^/]+$"))))
 			write(desktop, '[Desktop Entry]\nType=Application\nExec=/bin/bash "/bin/sh" --tray\n'
 				.. 'X-Ergopti-Startup=true\n')
 			helpers.assert_eq(menu.command_available(), false)

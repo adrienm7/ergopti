@@ -30,7 +30,7 @@ end
 helpers.describe("tap-hold config: the user file over the shared defaults", function()
 	helpers.it("refuses a FIFO tap-hold source without blocking or calling it absent", function()
 		local uv = require("luv")
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local path = os.tmpname()
 		os.remove(path)
 		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))

@@ -44,7 +44,7 @@ local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local PrivacyPolicy = require("core.fs.engine.sqlite_privacy_policy")
 
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local SqliteLiteral = require("core.fs.engine.sqlite.literal")
 
 

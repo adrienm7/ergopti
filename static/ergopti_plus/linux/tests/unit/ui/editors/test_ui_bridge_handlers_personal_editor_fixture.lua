@@ -140,13 +140,13 @@ end)
 
 helpers.describe("personal editor fixture process ABI", function()
 	local function with_real_shell(body)
-		local prior = package.loaded["adapters.shell_runner"]
-		package.loaded["adapters.shell_runner"] = nil
-		local Shell = require("adapters.shell_runner")
+		local prior = package.loaded["core.process.adapters.shell_runner"]
+		package.loaded["core.process.adapters.shell_runner"] = nil
+		local Shell = require("core.process.adapters.shell_runner")
 		local native_execute = os.execute
 		local called, failure = pcall(body, Shell, native_execute)
 		os.execute = native_execute
-		package.loaded["adapters.shell_runner"] = prior
+		package.loaded["core.process.adapters.shell_runner"] = prior
 		if not called then error(failure, 0) end
 	end
 	helpers.it("requires physical mkdir, exact data readback and cleanup through the existing status owner", function()

@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 local Double = require("tests.support.keystats.cipher_shell_double")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
-local MODULES = { "core.crypto.crypto", "adapters.shell_runner", "modules.keystats.text_cipher", "core.logger.engine.logger" }
+local MODULES = { "core.crypto.crypto", "core.process.adapters.shell_runner", "modules.keystats.text_cipher", "core.logger.engine.logger" }
 
 --- Runs a callback against a real cipher over the native shell double.
 --- @param faults table|nil Faults forwarded to the double.
@@ -31,19 +31,19 @@ local MODULES = { "core.crypto.crypto", "adapters.shell_runner", "modules.keysta
 local function with_cipher(faults, callback)
 	helpers.with_fresh_modules(MODULES, function()
 		local execute, seen, native = Double.new(faults)
-		helpers.load_with_stubs("adapters.shell_runner", { execute = execute, hash = Double.native_hash() })
+		helpers.load_with_stubs("core.process.adapters.shell_runner", { execute = execute, hash = Double.native_hash() })
 		local logs = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.crypto.crypto"] = nil
-		require("adapters.shell_runner")._set_private_stdin_native(native)
+		require("core.process.adapters.shell_runner")._set_private_stdin_native(native)
 		local cipher = require("modules.keystats.text_cipher")
 		cipher._set_machine_id_command("/usr/sbin/ioreg -rd1 -c IOPlatformExpertDevice")
 		cipher.set_enabled(true)
 		local ok, err = pcall(callback, cipher, seen, logs, native)
-		require("adapters.shell_runner")._set_private_stdin_native(nil)
+		require("core.process.adapters.shell_runner")._set_private_stdin_native(nil)
 		if not ok then error(err, 0) end
 	end)
 end

@@ -142,8 +142,8 @@ helpers.describe("shell_runner: crash report is deferred off the hs.task complet
 			},
 		}
 
-		package.loaded["adapters.shell_runner"] = nil
-		local sr = helpers.load_with_stubs("adapters.shell_runner", hs_overrides)
+		package.loaded["core.process.adapters.shell_runner"] = nil
+		local sr = helpers.load_with_stubs("core.process.adapters.shell_runner", hs_overrides)
 
 		local reported = false
 		_G.ergopti_report_crash = function() reported = true end

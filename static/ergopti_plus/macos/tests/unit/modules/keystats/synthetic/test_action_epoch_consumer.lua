@@ -19,7 +19,7 @@ local RESET_MODULES = {
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"modules.keystats.timestamp",
 	"modules.keystats.context_tracker", "modules.keystats.kc_bridge",
-	"modules.keystats.watchers", "adapters.process_lifecycle",
+	"modules.keystats.watchers", "core.process.adapters.lifecycle",
 	"adapters.keyboard_hook", "adapters.event_provenance",
 	"adapters.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "infra.timings",
@@ -232,7 +232,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.process_lifecycle"] = api({
+	package.loaded["core.process.adapters.lifecycle"] = api({
 		start = function() return true end,
 		stop = function() return true end,
 	})
@@ -381,7 +381,7 @@ local function load_fixture()
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.process_lifecycle"] = api({
+	package.loaded["core.process.adapters.lifecycle"] = api({
 		start = function() return true end,
 		stop = function() return true end,
 	})

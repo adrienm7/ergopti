@@ -16,7 +16,7 @@ local MODULES = {
 	"core.fs.adapters.file_system",
 	"core.network.adapters.http_client",
 	"core.fs.adapters.json_codec",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"infra.config_paths",
 	"core.logger.engine.logger",
@@ -72,7 +72,7 @@ local function with_fixture(run)
 		encode = function() return "{}" end,
 		decode = function() return {} end,
 	}
-	package.loaded["adapters.shell_runner"] = {}
+	package.loaded["core.process.adapters.shell_runner"] = {}
 	package.loaded["core.events.timer_scheduler"] = {}
 	package.loaded["infra.timings"] = { sec = function() return 1 end }
 	package.loaded["modules.llm.api_common"] = {
@@ -108,7 +108,7 @@ local function with_fixture(run)
 
 	io.open = original_open
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(detail, 0) end
 end
 

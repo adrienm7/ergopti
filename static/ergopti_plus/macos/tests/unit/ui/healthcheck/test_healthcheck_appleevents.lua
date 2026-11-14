@@ -9,12 +9,12 @@
 
 local helpers = require("tests.helpers")
 local MODULE = "ui.healthcheck.appleevents"
-local FIXTURE_MODULES = { MODULE, "adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger" }
+local FIXTURE_MODULES = { MODULE, "core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger" }
 local NONCE = "00000000000000000000000000000001"
 
 local function with_probe(options, body)
 	options = options or {}
-	local saved_shell = package.loaded["adapters.shell_runner"]
+	local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 	local saved_hs = hs
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
 		local world = { now = 0, tasks = {}, timers = {}, replies = {}, cancelled = 0, log = {} }
@@ -48,7 +48,7 @@ local function with_probe(options, body)
 				return true
 			end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, completed, chunk, environment, private)
 				assert(executable == "/usr/bin/osascript" and chunk == nil and environment == nil and private == true)
 				local task = { args = args, completed = completed, settled = false }
@@ -92,7 +92,7 @@ local function with_probe(options, body)
 		hs = saved_hs
 		if not okay then error(failure, 0) end
 	end)
-	package.loaded["adapters.shell_runner"] = saved_shell
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell
 	hs = saved_hs
 end
 

@@ -39,7 +39,7 @@ local function with_pending_tools(options, scenario)
 					pending[#pending + 1] = function()
 						running = false
 						callback(0, "Mode focus\n", "")
-						helpers.assert_nil(require("adapters.shell_runner")._active_tasks[task],
+						helpers.assert_nil(require("core.process.adapters.shell_runner")._active_tasks[task],
 							"the exact native completion must release the real shell runner pin")
 					end
 				end

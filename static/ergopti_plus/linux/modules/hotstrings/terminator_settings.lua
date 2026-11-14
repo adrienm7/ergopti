@@ -46,7 +46,7 @@ local ConfigOutdated = require("settings.engine.migration.outdated")
 local Writer = require("core.text.engine.toml_codec.writer")
 local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
 local Codec = require("core.text.engine.toml_codec")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Logger = require("core.logger.engine.shim")
 local NativePath = require("core.fs.engine.native_path")
 

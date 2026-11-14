@@ -11,7 +11,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shar
 	.. root .. "/../_shared/?/init.lua;" .. package.path
 package.cpath = ""
 assert(package.loaded.luv == nil and not pcall(require, "luv"), "the native luv provider must actually be unavailable")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 assert(Shell.run("false") == false, "a real failed shell command must never satisfy fixture setup")
 local database = os.tmpname()
 local ok, failure = xpcall(function()

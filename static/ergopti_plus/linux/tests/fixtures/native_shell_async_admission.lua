@@ -12,7 +12,7 @@ local root = assert(source:match("^(.*)/tests/fixtures/native_shell_async_admiss
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local checks, failures = 0, 0
 local originals = { spawn = uv.spawn, timer_start = uv.timer_start, read_start = uv.read_start,
 	new_pipe = uv.new_pipe, new_timer = uv.new_timer }

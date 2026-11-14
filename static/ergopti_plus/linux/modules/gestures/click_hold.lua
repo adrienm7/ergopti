@@ -3,7 +3,7 @@
 --- Retains exact synthetic buttons and bounded native helpers through retirement.
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
-local Process = require("adapters.owned_process")
+local Process = require("core.process.adapters.owned_process")
 local Timings = require("infra.timings")
 local Clock = require("core.logger.engine.monotonic")
 local warn = require("core.logger.engine.shim").warn

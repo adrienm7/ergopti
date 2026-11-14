@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local OwnedProcess = require("adapters.owned_process")
+local OwnedProcess = require("core.process.adapters.owned_process")
 local Paths = require("core.fs.engine.paths")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end
@@ -35,7 +35,7 @@ function M.start(path, sql, options)
 	Native.update_time()
 	local executable = rawget(_G, "jit") and Native.exepath() or "luajit"
 	local args = {
-		Paths.driver_root() .. "/adapters/sqlite_process_worker.lua", string.format("%d", Native.os_getpid()),
+		Paths.driver_root() .. "/core/process/adapters/sqlite_process_worker.lua", string.format("%d", Native.os_getpid()),
 		path:sub(1, 1) == "/" and path or ("./" .. path),
 	}
 	local pipe = Native.new_pipe(false)

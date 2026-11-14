@@ -123,7 +123,7 @@ end)
 
 check("native FIFO existence never waits for a writer", function()
 	local fifo = root .. "/fifo"
-	assert(require("adapters.shell_runner").run("mkfifo -- " .. require("adapters.shell_runner").quote(fifo)))
+	assert(require("core.process.adapters.shell_runner").run("mkfifo -- " .. require("core.process.adapters.shell_runner").quote(fifo)))
 	paths[#paths + 1] = fifo
 	assert(child_exists(fifo, native_luv), "native FIFO existence was refused")
 end)

@@ -8,9 +8,9 @@ ffi.cdef[[
 	int waitpid(int pid, int *status, int options);
 ]]
 assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "private program fixture requires child-subreaper support")
-local Runner = require("adapters.program_runner")
+local Runner = require("core.process.adapters.program_runner")
 local Owner = require("modules.gestures.program_owner")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Json = require("core.text.engine.json")
 local python = assert(Shell.exec_line("command -v python3"))
 assert(python:sub(1, 1) == "/", "the native fixture requires an absolute Python executable")

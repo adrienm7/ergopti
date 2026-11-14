@@ -26,7 +26,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 

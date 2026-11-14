@@ -173,7 +173,7 @@ local function fresh_harness()
 	})
 	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(_command, _args, callback)
 			local read_index = #h.reads + 1
 			local handle = {
@@ -880,8 +880,8 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 		helpers.with_stub_scope({
 			"tests.stubs.hs", "platform.remap.watchers", "modules.keymap.control_sentinels",
 			"adapters.synthetic_input", "adapters.input_source_broker", "core.logger.engine.logger",
-			"core.events.timer_scheduler", "adapters.shell_runner", "adapters.hotkey_registrar",
-			"adapters.key_state", "adapters.mouse_control", "adapters.task_lifecycle",
+			"core.events.timer_scheduler", "core.process.adapters.shell_runner", "adapters.hotkey_registrar",
+			"adapters.key_state", "adapters.mouse_control", "core.process.adapters.task_lifecycle",
 			"platform.remap.ke_paths", "platform.remap.lease_contract", "platform.remap.ke_variables",
 		}, function()
 			local h = fresh_harness()
@@ -1047,4 +1047,4 @@ end)
 
 -- This file installs a module-level test double. Restore the loader slot so a
 -- later test file cannot capture it order-dependently at require time.
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil

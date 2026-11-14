@@ -63,11 +63,11 @@ end
 local DEFAULT_EFFECTS = {
 	copy = function(text) return require("adapters.clipboard").write(text) == true end,
 	make_dir = function(dir)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		return Shell.run("mkdir -p " .. Shell.quote(dir))
 	end,
 	save = function(dir, name, text)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		if not Shell.run("mkdir -p " .. Shell.quote(dir)) then return nil, "cannot create " .. dir end
 		local stem, extension = name:match("^(.*)(%.[^.]+)$")
 		stem, extension = stem or name, extension or ""

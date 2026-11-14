@@ -29,8 +29,8 @@ local MODULES = {
 	"core.fs.adapters.file_system",
 	-- Storage captures hs too: the prelude reads the proxy override through it.
 	"core.fs.adapters.storage",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"ui.download_window",
@@ -66,7 +66,7 @@ end
 --- @param callback function Fixture body.
 local function with_fixture(save_results, callback)
 	local saved_hs = _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(MODULES, function()
 			local pull_done
@@ -132,7 +132,7 @@ local function with_fixture(save_results, callback)
 			package.loaded["modules.llm.ollama_server_command"] = {
 				build = function() return "fixture" end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(_, _, done)
 					return {
 						start = function()
@@ -183,7 +183,7 @@ local function with_fixture(save_results, callback)
 			package.loaded["ui.menu.menu_llm.profile_label"] = {
 				format = function(label) return label end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
 					local task = {label = label, on_done = on_done}
 					if label == "Ollama model pull" then pull_done = on_done end
@@ -281,7 +281,7 @@ local function with_fixture(save_results, callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 

@@ -21,7 +21,7 @@ LoggerError(Args*) => ""
 
 #Include %A_ScriptDir%\..\..\vendor\UIA.ahk
 #Include %A_ScriptDir%\..\..\adapters\window_info.ahk
-#Include %A_ScriptDir%\..\..\adapters\uia_worker.ahk
+#Include %A_ScriptDir%\..\..\core\process\adapters\uia_worker.ahk
 
 UIASW_WorkerMain()
 ExitApp(2)

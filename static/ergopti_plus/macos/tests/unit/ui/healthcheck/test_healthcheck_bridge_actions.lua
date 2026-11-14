@@ -265,8 +265,8 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local focused_at_open = context.focused
 			context.effects = {}
 			-- /usr/bin/open: what revealing a file in Finder would run
-			local previous_shell = package.loaded["adapters.shell_runner"]
-			package.loaded["adapters.shell_runner"] = {
+			local previous_shell = package.loaded["core.process.adapters.shell_runner"]
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(bin, args, done)
 					context.spawned[#context.spawned + 1] = { bin = bin, args = args }
 					context.effects[#context.effects + 1] = "spawn"
@@ -307,7 +307,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } })
 			package.loaded["core.fs.adapters.file_system"] = previous_files
 			io.open, hs.fs.attributes = previous_open, previous_attributes
-			package.loaded["adapters.shell_runner"] = previous_shell
+			package.loaded["core.process.adapters.shell_runner"] = previous_shell
 			helpers.assert_true(ok, tostring(approved))
 			helpers.assert_eq(context.copied, { approved })
 			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")

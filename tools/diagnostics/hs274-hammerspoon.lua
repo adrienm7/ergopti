@@ -27,7 +27,7 @@ local function prepare_modules()
 end
 
 local function run()
-	local ShellRunner = require("adapters.shell_runner")
+	local ShellRunner = require("core.process.adapters.shell_runner")
 	local JsonCodec = require("core.fs.adapters.json_codec")
 	local Delivery = require("modules.keystats.physical_delivery")
 	local Transport = require("modules.keystats.physical_transport")

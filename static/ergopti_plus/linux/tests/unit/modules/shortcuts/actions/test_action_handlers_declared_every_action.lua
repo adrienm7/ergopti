@@ -517,7 +517,7 @@ helpers.describe("linux actions: workspace switch", function()
 	--- @return table commands Every other command run (xdotool fallbacks).
 	local function switch(action, listing, uinput_ok)
 		local Display = require("infra.display_server")
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local saved = package.loaded["modules.gestures.combo_emitter"]
 		local saved_writer = package.loaded["adapters.uinput_writer"]
 		if not uinput_ok then

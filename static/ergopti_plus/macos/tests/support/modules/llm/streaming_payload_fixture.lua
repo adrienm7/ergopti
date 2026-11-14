@@ -12,13 +12,13 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
-	"adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
+	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
 	"core.logger.engine.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
-	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
+	"adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
 	"infra.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "modules.llm.network_env",
 	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
@@ -47,7 +47,7 @@ local function with_stream(backend, callback)
 			if not file then return nil, err end
 			local content = file:read("*a"); assert(file:close()); return content
 		end }
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["core.events.timer_scheduler"] = { now = function() return 0 end }
 		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end, done = function() end,

@@ -293,7 +293,7 @@ end)
 helpers.describe("personal-file discovery: exact owners preserve source and choice intent", function()
 	helpers.it("retains recursive provenance, refuses ambiguous legacy choices and publishes independent exact owners", function()
 		local root = os.tmpname(); os.remove(root)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		assert(Shell.run("mkdir -p " .. Shell.quote(root .. "/a") .. " " .. Shell.quote(root .. "/work")
 			.. " " .. Shell.quote(root .. "/home") .. " " .. Shell.quote(root .. "/Équipe")))
 		local files = { ["a__b.toml"] = "flatx", ["a/b.toml"] = "nestedx", ["words.old.toml"] = "dottedx",
@@ -518,7 +518,7 @@ helpers.describe("native hotstring discovery preserves filename bytes", function
 			return
 		end
 		local root = os.tmpname(); os.remove(root)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local relatives = { "line\nbreak.toml", "return\rname.toml", "nested\nfolder/words.toml" }
 		assert(Shell.run("mkdir -p " .. Shell.quote(root .. "/nested\nfolder")))
 		local ok, err = pcall(function()
@@ -548,7 +548,7 @@ helpers.describe("native hotstring discovery preserves filename bytes", function
 			return
 		end
 		local root = os.tmpname(); os.remove(root)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local expected = { root .. "/line\nbreak", root .. "/return\rname", root .. "/trailing " }
 		for _, path in ipairs(expected) do assert(Shell.run("mkdir -p " .. Shell.quote(path))) end
 		local ok, err = pcall(function()
@@ -577,7 +577,7 @@ helpers.describe("literal POSIX backslash filenames", function()
 			return
 		end
 		local root = os.tmpname(); os.remove(root)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		assert(Shell.run("mkdir -p " .. Shell.quote(root)))
 		local path = root .. "/team\\autocorrection.toml"
 		local file = assert(io.open(path, "w"))
@@ -613,7 +613,7 @@ helpers.describe("literal POSIX backslash filenames", function()
 			return
 		end
 		local root = os.tmpname(); os.remove(root)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		assert(Shell.run("mkdir -p " .. Shell.quote(root)))
 		local ok, err = pcall(function()
 			for _, name in ipairs({ "team\\_index.toml", "team\\defaults.toml", "team\\.backup-20261017.toml", "_index.toml" }) do

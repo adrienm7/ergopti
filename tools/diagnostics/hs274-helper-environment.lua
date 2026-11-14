@@ -28,7 +28,7 @@ local function run()
 	local logger = {}
 	for _, name in ipairs({ "debug", "info", "warn", "error", "start", "success" }) do logger[name] = print end
 	package.loaded["core.logger.engine.logger"] = logger
-	local runner = require("adapters.shell_runner")
+	local runner = require("core.process.adapters.shell_runner")
 	local function rejected_identity()
 		local environment = {}
 		for key, value in pairs(config.environment) do environment[key] = value end

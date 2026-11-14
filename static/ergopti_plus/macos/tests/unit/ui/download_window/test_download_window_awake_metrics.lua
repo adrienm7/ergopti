@@ -9,7 +9,7 @@ local OWNED = {
 	"ui.download_window.pending_queue", "adapters.webview_result",
 	"infra.deferred_work", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.logger.engine.logger", "core.fs.engine.paths", "infra.timings", "core.i18n.engine.i18n", "infra.text_utils",
-	"adapters.shell_runner", "adapters.own_window", "ui.ui_builder",
+	"core.process.adapters.shell_runner", "adapters.own_window", "ui.ui_builder",
 }
 
 --- Composes real presentation/queue/scheduler owners over independent clocks.
@@ -27,7 +27,7 @@ local function with_window(scenario)
 		helpers.provide_timings()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.text_utils"] = {}
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["adapters.own_window"] = {}
 		_G.hs = {
 			timer = {

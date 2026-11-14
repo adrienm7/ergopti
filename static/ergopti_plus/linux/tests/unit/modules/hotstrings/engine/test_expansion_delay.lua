@@ -179,9 +179,9 @@ end)
 --- @param files table Map of file name to content, created before init.
 --- @param body function Called with (config, directory, read).
 local function with_config(files, body)
-	local shell = helpers.load_module("adapters.shell_runner")
+	local shell = helpers.load_module("core.process.adapters.shell_runner")
 	shell._reset_runner()
-	package.loaded["adapters.shell_runner"] = shell
+	package.loaded["core.process.adapters.shell_runner"] = shell
 	local directory = os.tmpname()
 	os.remove(directory)
 	assert(shell.run("mkdir -p " .. shell.quote(directory)))

@@ -26,7 +26,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		package.cpath = ""
 		package.loaded.luv = setmetatable({}, { __index = function() return blocked end })
 		package.loaded.ffi, package.preload.ffi = nil, blocked
-		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "core.logger.engine.monotonic", "infra.display_server", "adapters.shell_runner", "adapters.clipboard" }) do
+		for _, name in ipairs({ "core.logger.engine", "core.logger.engine.shim", "core.logger.engine.monotonic", "infra.display_server", "core.process.adapters.shell_runner", "adapters.clipboard" }) do
 			package.loaded[name] = nil
 		end
 		logger = require("core.logger.engine")
@@ -39,7 +39,7 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 		logger.set_sink(function(line) logs[#logs + 1] = line end)
 		local display = require("infra.display_server")
 		display._set_for_test(display.X11, "private-memory")
-		shell = require("adapters.shell_runner")
+		shell = require("core.process.adapters.shell_runner")
 		local validate, run, checked, exact = shell.validate_spawn_args, shell.run, shell.exec_checked, shell.with_exact_stdin
 		local s = { value = saved, writes = {}, reads = {}, settles = {}, emits = {}, transforms = 0, layout_calls = 0,
 			listings = 0, targets = targets or "TARGETS\nTIMESTAMP\nUTF8_STRING\ntext/plain;charset=utf-8\n" }

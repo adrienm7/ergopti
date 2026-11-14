@@ -12,10 +12,10 @@ local helpers = require("tests.helpers")
 
 
 local function fresh_screenshot()
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.screenshot_save",
-		"adapters.shell_runner",
+		"core.process.adapters.shell_runner",
 		"core.fs.adapters.file_system",
 		"adapters.screen_capture",
 		"modules.shortcuts.actions.screen_capture_flow",
@@ -35,7 +35,7 @@ local function fresh_screenshot()
 		fixture.next_options[#fixture.next_options + 1] = options or {}
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, callback)
 			local options = table.remove(fixture.next_options, 1) or {}
 			local task = {
@@ -158,7 +158,7 @@ local function fresh_screenshot()
 	}
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	fixture.subject = require("modules.shortcuts.actions.screenshot_save")
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

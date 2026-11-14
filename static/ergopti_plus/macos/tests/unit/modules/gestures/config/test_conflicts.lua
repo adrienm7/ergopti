@@ -15,7 +15,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 -- Earlier test files (karabiner layout polling) install a shell_runner stub
 -- without exec(); purge it so conflicts.lua captures the real adapter — the
 -- CI runner's file order differs from local and made this leak fatal there
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil
 
 local Conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
 
@@ -94,7 +94,7 @@ local function load_with_macos_preferences(defaults_output)
 		trace   = function() end,
 		done    = function() end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(command, args, callback)
 			table.insert(commands, { command, args })
 			callback(0, defaults_output, "")
@@ -107,7 +107,7 @@ local function load_with_macos_preferences(defaults_output)
 	local function cleanup()
 		package.loaded["modules.gestures.conflicts"] = nil
 		package.loaded["core.logger.engine.logger"] = nil
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 	end
 	return conflicts, warnings, commands, cleanup, infos
 end
@@ -249,7 +249,7 @@ helpers.describe("Conflicts — slots taken by a macOS gesture", function()
 	helpers.it("rechecks: a macOS gesture turned on, then off, greys then restores its slot", function()
 		local output = "{\n    TrackpadFourFingerHorizSwipeGesture = 0;\n}\n"
 		local conflicts, _warnings, _commands, cleanup = load_with_macos_preferences(output)
-		package.loaded["adapters.shell_runner"].spawn = function(_command, _args, callback)
+		package.loaded["core.process.adapters.shell_runner"].spawn = function(_command, _args, callback)
 			callback(0, output, "")
 			return { isSettled = function() return true end }
 		end
@@ -396,7 +396,7 @@ helpers.describe("Conflicts — the macOS settings read is started", function()
 		local started, pending = 0, {}
 		package.loaded["modules.gestures.conflicts"] = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_, _, callback)
 				local settled = false
 				-- The real ShellRunner handle contract: start, isSettled and terminate.
@@ -421,6 +421,6 @@ helpers.describe("Conflicts — the macOS settings read is started", function()
 		helpers.assert_eq(conflicts.slot_system_state("swipe_4_up"), "taken")
 		package.loaded["modules.gestures.conflicts"] = nil
 		package.loaded["core.logger.engine.logger"] = nil
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 	end)
 end)

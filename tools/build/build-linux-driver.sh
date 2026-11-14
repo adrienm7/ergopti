@@ -295,7 +295,7 @@ REQUIRED_FILES=(
 	"_shared/layouts/data/defaults.json"
 	"_shared/layouts/data/mac_keycodes.json"
 	"linux/modules/keymap/layout_registry.lua"
-	"linux/adapters/process_runner.lua"
+	"linux/core/process/adapters/runner.lua"
 	"linux/xkb_generation/data/key_sym.json"
 	"linux/xkb_generation/data/xkb_symbols.txt"
 	"linux/xkb_generation/data/xkb_types.txt"

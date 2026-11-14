@@ -28,7 +28,7 @@ function M.run(config, done)
 		native[name] = assert(view_methods[name])
 	end
 	native.setCallback = assert(controller_methods.setCallback)
-	local ports = { "adapters.program_providers", "adapters.apple_shortcuts_native" }
+	local ports = { "core.process.adapters.program_providers", "adapters.apple_shortcuts_native" }
 	local saved = {}
 	for _, name in ipairs(ports) do saved[name] = package.loaded[name] end
 	package.loaded[ports[1]] = { create = function()

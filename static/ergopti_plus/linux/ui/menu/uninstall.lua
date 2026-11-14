@@ -13,7 +13,7 @@
 local M = {}
 local WindowTitles = require("core.ui.engine.window_titles")
 
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Paths = require("core.fs.engine.paths")
 local Installation = require("core.lifecycle.engine.installation")
 local Logger = require("core.logger.engine.shim")

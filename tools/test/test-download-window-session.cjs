@@ -121,7 +121,7 @@ local helpers = require('tests.helpers')
 local bridge, native, navigation
 local created, calls = 0, 0
 package.loaded['infra.deferred_work'] = { after = function() return true end }
-package.loaded['adapters.shell_runner'] = { applescript = function()
+package.loaded['core.process.adapters.shell_runner'] = { applescript = function()
 	error('a stale terminal action must not launch a process')
 end }
 package.loaded['ui.ui_builder'] = {

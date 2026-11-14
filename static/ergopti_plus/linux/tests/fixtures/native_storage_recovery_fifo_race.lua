@@ -14,7 +14,7 @@ write(path, "{broken")
 write(backup, "older")
 local getenv = os.getenv
 os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return getenv(name) end
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local run, inspected, swapped = Shell.exec_checked, false, false
 Shell.exec_checked = function(command)
 	local ok, output, detail = run(command)

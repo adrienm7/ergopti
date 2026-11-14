@@ -128,7 +128,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 	helpers.it("(mlx-startup-waiter-failure) (mlx-native-callback-protection) notifies every joined caller when the shared startup fails", function()
 		local module_names = {
 			"infra.notifications", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.config_paths",
-			"modules.llm.api_common", "adapters.task_lifecycle",
+			"modules.llm.api_common", "core.process.adapters.task_lifecycle",
 			"modules.llm.api_mlx", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
 		local saved_modules = {}
@@ -168,7 +168,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				return table.unpack(results, 1, results.n)
 			end,
 		}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			create = function(factory) return factory() end,
 			native = function(_, path, completion, stream_or_args, args)
 				return _G.hs.task.new(path, completion, stream_or_args, args)

@@ -37,7 +37,7 @@ elseif mode == "retained" then
 	local _, committed = Config.load_all()
 	assert(committed and loads == 1, "healthy catalogue must be published first")
 	local target = root .. "/french/autocorrection.toml"
-	assert(require("adapters.shell_runner").run("mkfifo " .. require("adapters.shell_runner").quote(target)))
+	assert(require("core.process.adapters.shell_runner").run("mkfifo " .. require("core.process.adapters.shell_runner").quote(target)))
 	local _, next_committed, reason = Config.load_all()
 	assert(not next_committed and reason == "source-unavailable" and loads == 1,
 		"refused override must preserve the active catalogue")

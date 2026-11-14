@@ -24,7 +24,7 @@ local SUBJECT = "modules.shortcuts.input_source_conflict"
 --- @return table conflict, table spawned
 local function fresh(reply, path_status)
 	local spawned = {}
-	local saved = package.loaded["adapters.shell_runner"]
+	local saved = package.loaded["core.process.adapters.shell_runner"]
 	local saved_fs = package.loaded["core.fs.adapters.file_system"]
 	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local logger = helpers.make_logger_stub()
@@ -36,7 +36,7 @@ local function fresh(reply, path_status)
 	package.loaded["core.fs.adapters.file_system"] = {
 		path_status = function() return path_status or "present", "injected inspection failure" end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			spawned[#spawned + 1] = { executable = executable, args = args }
 			return {
@@ -49,7 +49,7 @@ local function fresh(reply, path_status)
 	}
 	package.loaded[SUBJECT] = nil
 	local ok, conflict = pcall(helpers.load_with_stubs, SUBJECT)
-	package.loaded["adapters.shell_runner"] = saved
+	package.loaded["core.process.adapters.shell_runner"] = saved
 	package.loaded["core.fs.adapters.file_system"] = saved_fs
 	package.loaded["core.logger.engine.logger"] = saved_logger
 	if not ok then error(conflict, 0) end

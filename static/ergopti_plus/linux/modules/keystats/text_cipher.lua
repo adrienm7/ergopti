@@ -96,7 +96,7 @@ local function derive_key()
 	end
 
 	-- The private runtime's openssl (infra/owned_programs.lua), never a host copy.
-	local openssl = require("adapters.shell_runner").quote(require("infra.owned_programs").path("openssl"))
+	local openssl = require("core.process.adapters.shell_runner").quote(require("infra.owned_programs").path("openssl"))
 	local cmd, reason = TextCrypto.derive_key_command("file:" .. path, openssl)
 	if not cmd then
 		Logger.error(LOG, "Cannot compose the key derivation: %s.", reason)

@@ -22,7 +22,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Shell  = require("adapters.shell_runner")
+local Shell  = require("core.process.adapters.shell_runner")
 local NoReplaceMove = require("core.fs.engine.no_replace_move")
 
 -- Shared pure-Lua JSON codec (single source of truth for all Lua drivers). The

@@ -12,8 +12,8 @@ local TEST_SHA = string.rep("a", 64)
 local CACHE_PATH = "/cache/Karabiner-Elements.dmg"
 
 local MODULE_NAMES = {
-	"adapters.task_environment",
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_environment",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	-- The onboarding names its download cache from the shared folder table.
 	"core.fs.engine.app_dirs",
@@ -327,7 +327,7 @@ local function run_fixture(options, scenario)
 			return "/bin/sh", args, function() return nil end
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["platform.remap.onboarding"] = nil
 	onboarding = require("platform.remap.onboarding")
 	onboarding.load_manifest = function()

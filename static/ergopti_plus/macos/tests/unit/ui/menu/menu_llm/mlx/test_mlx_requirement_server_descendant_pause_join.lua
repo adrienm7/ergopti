@@ -10,7 +10,7 @@ local MODULES = {
 	"infra.config_paths",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_mlx_server",
@@ -132,7 +132,7 @@ local function with_fixture(callback)
 			return helpers.attach_native_task_environment(task)
 		end
 
-		package.loaded["adapters.task_lifecycle"] = nil
+		package.loaded["core.process.adapters.task_lifecycle"] = nil
 		os.execute = function() return true, "exit", 0 end
 		local obj = {
 			get_mlx_repo = function() return "fixture/repo" end,

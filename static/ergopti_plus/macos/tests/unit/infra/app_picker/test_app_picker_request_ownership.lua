@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"infra.app_picker",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"core.fs.adapters.file_system",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
@@ -32,7 +32,7 @@ local function with_picker(run, options)
 			helpers.assert_type(callback, "function", "expected an owned presentation handoff")
 			callback()
 		end
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				pending[#pending + 1] = on_done
 				return { start = function() return true end }
@@ -410,4 +410,4 @@ end)
 
 -- The focused helper restores its captured package entry after each case. Keep
 -- the explicit terminal assignment as a suite-order fence for source scanners.
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil

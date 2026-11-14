@@ -11,7 +11,7 @@
 ; firing while the driver was paused, violating the documented "pause must
 ; silence ALL features" invariant:
 ;
-;   1. PLC_Poll (adapters/process_lifecycle.ahk) fires every 250 ms, reading the
+;   1. PLC_Poll (core/process/adapters/lifecycle.ahk) fires every 250 ms, reading the
 ;      foreground window and fanning out to every focus callback (which downstream
 ;      feed keystats app-switch events). It must early-return on A_IsSuspended.
 ;

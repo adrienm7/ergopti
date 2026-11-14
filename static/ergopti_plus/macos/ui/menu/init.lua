@@ -50,7 +50,7 @@ local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 local BootProfiler = require("core.logger.engine.boot_profiler")
 local ConfigPaths = require("infra.config_paths")
 local LogOpeners = require("ui.log_openers")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "menu"
 local load_errors = {}

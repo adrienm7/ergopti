@@ -52,7 +52,7 @@ end)
 
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
-	"modules.gestures.user_actions", "core.logger.engine.shim", "core.i18n.engine.i18n", "adapters.shell_runner",
+	"modules.gestures.user_actions", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner",
 	"adapters.application_notifier", "adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
 }
 
@@ -80,7 +80,7 @@ local function with_world(body)
 			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,
 		}
 		package.loaded["core.fs.adapters.file_system"] = { exists = function(path) return world.present[path] == true end }
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			quote = require("core.text.engine.utils_core").shell_quote,
 			has_command = function(binary) return world.installed[binary] == true end,
 			run = function(command) world.shell[#world.shell + 1] = command; return true end,
@@ -214,7 +214,7 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 			local settled
 			local debt = { cancel = function() return false end,
 				on_settled = function(listener) settled = listener; return true end }
-			package.loaded["adapters.shell_runner"].run_async = function()
+			package.loaded["core.process.adapters.shell_runner"].run_async = function()
 				return nil, "pipe activation failed", debt
 			end
 			helpers.assert_eq(User.run_command({ command = "sleep 99", mode = "hidden", output = "none" }, 500), false)
@@ -339,7 +339,7 @@ end)
 
 helpers.describe("ShellRunner.run_async takes a caller's output bound (Linux)", function()
 	helpers.it("refuses a bound that is not a positive integer (user-actions)", function()
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 		if not Shell.HAS_ASYNC then return end
 		local handle, refusal = Shell.run_async("/bin/true", {}, { timeout_ms = 1000, max_output_bytes = 0 }, function() end)
 		helpers.assert_eq(handle, nil)
@@ -350,7 +350,7 @@ end)
 helpers.describe("private user-action notification fallback", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("does not log command stderr when notifier is " .. mode, function()
-			local names = { "core.logger.engine.shim", "core.i18n.engine.i18n", "adapters.shell_runner", "adapters.notifier",
+			local names = { "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "adapters.notifier",
 				"adapters.application_notifier", "modules.gestures.user_actions" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
@@ -358,7 +358,7 @@ helpers.describe("private user-action notification fallback", function()
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["core.i18n.engine.i18n"] = { get = function() return "Command failed: {1}: {2}" end }
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function() return false end,

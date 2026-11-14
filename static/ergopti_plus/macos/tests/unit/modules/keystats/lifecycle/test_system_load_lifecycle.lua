@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param scenario function Scenario receiving watcher, shared state and fixture.
 local function with_fixture(scenario)
 	local names = {
-		"core.logger.engine.logger", "infra.timings", "adapters.task_lifecycle",
+		"core.logger.engine.logger", "infra.timings", "core.process.adapters.task_lifecycle",
 		"core.events.timer_scheduler", "modules.keystats.log_manager",
 		"modules.keystats.watchers",
 	}
@@ -27,7 +27,7 @@ local function with_fixture(scenario)
 	}
 	package.loaded["infra.timings"] = { ms = function() return 1 end }
 	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(_, _, callback)
 			local task = { complete = callback }
 			fixture.tasks[#fixture.tasks + 1] = task

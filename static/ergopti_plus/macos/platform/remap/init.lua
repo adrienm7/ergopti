@@ -3413,7 +3413,7 @@ function M.open_login_items(on_done)
 		invoke_public_callback("open Login Items", on_done, ok, reason)
 	end
 	local call_ok, accepted_or_err = pcall(function()
-		return require("adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
+		return require("core.process.adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
 			-- The runner answers a launch it refused synchronously, after
 			-- logging that refusal itself.
 			settle(ok == true, ok == true and "opened"

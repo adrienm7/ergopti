@@ -61,7 +61,7 @@ RegistryNotifyArm(Handle, Event, Filter) {
 }
 
 ; Whether Event is signaled; a true answer resets the auto-reset event. The
-; wait results are PLC_WAIT_OBJECT_0 / PLC_WAIT_TIMEOUT (process_lifecycle.ahk).
+; wait results are PLC_WAIT_OBJECT_0 / PLC_WAIT_TIMEOUT (../core/process/adapters/lifecycle.ahk).
 ; @param Event {Integer} RegistryNotifyCreateEvent's handle.
 ; @returns {Boolean}
 ; @throws {OSError} When the wait fails.

@@ -34,7 +34,7 @@ local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
 local Monotonic = require("core.logger.engine.monotonic")
-local ProcessRunner = require("adapters.process_runner")
+local ProcessRunner = require("core.process.adapters.runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
 local Policy = require("ai.engine.local_servers.ports_core")
@@ -369,7 +369,7 @@ function M.scan_owned(entries, on_done, admission)
 	return scope
 end
 
-M._owned_process = function(...) return require("adapters.owned_process").start(...) end
+M._owned_process = function(...) return require("core.process.adapters.owned_process").start(...) end
 M._owned_timer = function(...) return require("core.network.engine.managed_http_deadline").start(...) end
 
 return M

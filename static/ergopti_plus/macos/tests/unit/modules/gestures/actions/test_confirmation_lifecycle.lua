@@ -15,7 +15,7 @@ local OWNED = {
 	"modules.gestures.action_confirm", "modules.gestures.system_actions",
 	"infra.dialog_util", "adapters.mouse_control", "adapters.window_info",
 	"adapters.window_manager", "adapters.running_application", "adapters.tcc_grant",
-	"adapters.shell_runner", "adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"core.process.adapters.shell_runner", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"infra.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",
 }
 
@@ -82,7 +82,7 @@ local function with_world(callback)
 
 			-- Replace the central fixture's Aux facade before constructing Actions:
 			-- both the aggregate and SystemActions must share the real same owner.
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 			package.loaded["infra.dialog_util"] = nil
 			package.loaded["modules.gestures.system_actions"] = nil
 			package.loaded["modules.gestures.action_confirm"] = nil

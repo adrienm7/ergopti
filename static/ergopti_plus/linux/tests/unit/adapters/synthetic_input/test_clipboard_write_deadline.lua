@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local uv, Shell = require("luv"), require("adapters.shell_runner")
+local uv, Shell = require("luv"), require("core.process.adapters.shell_runner")
 -- Complete native constructors before replacing the session-specific ports.
 require("adapters.clipboard")
 
@@ -29,7 +29,7 @@ end
 --- @param route string Desktop clipboard executable.
 --- @param body function Receives clipboard and the private process state.
 local function with_backend(route, body)
-	local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server" }
+	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-clipboard-bound-XXXXXX"))
@@ -43,7 +43,7 @@ local function with_backend(route, body)
 			.. "cat " .. Shell.quote(root .. "/stdin") .. " > " .. Shell.quote(root .. "/current")
 			.. "\nprintf done > " .. Shell.quote(root .. "/completed") .. "\n")
 		assert(Shell.run("chmod 700 " .. Shell.quote(root .. "/" .. route)))
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function(name)
 				return name == route or (route == "wl-copy" and name == "wl-paste")
 			end,

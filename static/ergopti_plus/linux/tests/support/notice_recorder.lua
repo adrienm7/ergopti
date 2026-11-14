@@ -25,7 +25,7 @@
 local M = {}
 
 local NOTIFIER = "adapters.notifier"
-local SHELL = "adapters.shell_runner"
+local SHELL = "core.process.adapters.shell_runner"
 
 -- The recording notifier, built by install().
 local _notifier = nil

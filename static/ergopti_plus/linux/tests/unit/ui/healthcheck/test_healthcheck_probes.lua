@@ -37,7 +37,7 @@ local PROC_AFTER = {
 --- @param body function(Probes, world)
 --- @param absent table|nil Programs the probe of has_command answers absent for.
 local function with_probes(async, body, absent)
-	local names = { "ui.healthcheck.probes", "core.network.adapters.http_client", "adapters.shell_runner",
+	local names = { "ui.healthcheck.probes", "core.network.adapters.http_client", "core.process.adapters.shell_runner",
 		"core.events.timer_scheduler" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -70,7 +70,7 @@ local function with_probes(async, body, absent)
 		end,
 		cancel = function(owner) world.cancelled_owners[#world.cancelled_owners + 1] = owner; return true end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		HAS_ASYNC = async,
 		has_command = function(binary)
 			world.probed = world.probed or {}
@@ -429,7 +429,7 @@ helpers.describe("healthcheck native source admission", function()
 	end
 
 	helpers.it("(healthcheck-source-fifo) reads regular sources and rejects special files without blocking", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))

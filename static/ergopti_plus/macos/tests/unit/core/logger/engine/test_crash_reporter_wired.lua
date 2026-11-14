@@ -8,7 +8,7 @@
 --- F-HIGH-5 (still enforced): `_G.ergopti_report_crash` must never become
 --- unreachable dead code. It was once defined but wired to nothing, so a genuine
 --- crash left no report on disk. Its live entry point is now
---- `adapters/shell_runner.lua` `report_callback_throw`, which forwards a throw
+--- `core/process/adapters/shell_runner.lua` `report_callback_throw`, which forwards a throw
 --- from an hs.task completion/streaming callback — see section 3.
 ---
 --- 2026-07-20 audit (H-06, superseding the old F-HIGH-5 wiring): the logger's
@@ -95,8 +95,8 @@ helpers.describe("shell_runner: the crash reporter stays reachable for genuine t
 		-- This is the invariant the old logger wiring used to carry. If this ever
 		-- fails, crash_reporter has become unreachable dead code again and a real
 		-- crash leaves nothing on disk — exactly the F-HIGH-5 regression.
-		package.loaded["adapters.shell_runner"] = nil
-		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner")
+		package.loaded["core.process.adapters.shell_runner"] = nil
+		local ShellRunner = helpers.load_with_stubs("core.process.adapters.shell_runner")
 
 		local reported = nil
 		_G.ergopti_report_crash = function(ctx) reported = ctx end

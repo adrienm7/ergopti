@@ -45,7 +45,7 @@ const CONTRACT = 'tools/test/test-linux-window-switch-registration.cjs';
 const SOURCES = [
 	'static/ergopti_plus/linux/adapters/window_switch.lua',
 	'static/ergopti_plus/linux/platform/window_switch_worker.lua',
-	'static/ergopti_plus/linux/adapters/program_runner.lua',
+	'static/ergopti_plus/linux/core/process/adapters/program_runner.lua',
 	'static/ergopti_plus/linux/core/lifecycle/engine/libuv_process_group.lua',
 	'static/ergopti_plus/linux/core/lifecycle/engine/shutdown/libuv_exit.lua',
 	'static/ergopti_plus/linux/modules/gestures/manager.lua',

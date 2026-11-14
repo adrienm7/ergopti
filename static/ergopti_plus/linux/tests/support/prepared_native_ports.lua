@@ -185,7 +185,7 @@ end
 --- @return table
 local function load_against_fake(module_name, fake)
 	local saved = {}
-	for _, name in ipairs({ "luv", module_name, "adapters.shell_runner", "core.logger.engine.monotonic" }) do
+	for _, name in ipairs({ "luv", module_name, "core.process.adapters.shell_runner", "core.logger.engine.monotonic" }) do
 		saved[#saved + 1] = { name = name, value = package.loaded[name] }
 	end
 	package.loaded["luv"] = fake

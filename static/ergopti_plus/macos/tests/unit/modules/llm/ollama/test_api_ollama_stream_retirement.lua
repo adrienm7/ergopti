@@ -26,7 +26,7 @@ local function exists(path)
 end
 
 local function with_stream(callback)
-	helpers.with_stub_scope({ "modules.llm.api_ollama", "adapters.shell_runner" }, function()
+	helpers.with_stub_scope({ "modules.llm.api_ollama", "core.process.adapters.shell_runner" }, function()
 		local api = helpers.load_with_stubs("modules.llm.api_ollama")
 		local stream = upvalue(api.fetch_batch, "post_and_parse_streaming")
 		local runner = upvalue(stream, "ShellRunner")

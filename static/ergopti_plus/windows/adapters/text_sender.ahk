@@ -291,7 +291,7 @@ _TextSenderNormalizeModifierKey(Token) {
 
 ; Invokes an optional completion callback, logging (never propagating) any
 ; exception it throws. Mirrors the try/catch + LoggerError pattern used by
-; sibling adapters (adapters/shell_runner.ahk's on_done wrapper,
+; sibling adapters (core/process/adapters/shell_runner.ahk's on_done wrapper,
 ; core/events/timer_scheduler.ahk's _OneShot/_Repeating wrappers) so a throwing
 ; Callback cannot silently vanish — unlike a bare "try Callback()" with no
 ; catch, which swallows the exception with zero log trace.

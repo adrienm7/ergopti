@@ -39,7 +39,7 @@ end
 --- @param body function Receives the observations after dispatch.
 local function with_action(session, action, change, body)
 	local names = {
-		"adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
+		"core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
 		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
 		"core.events.loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
@@ -61,7 +61,7 @@ local function with_action(session, action, change, body)
 				if change == "privacy" then state.role = 40 else state.path = "/field/successor" end
 				if point == "key-down" then watch.barrier() end
 			end
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
 				exec_checked = function(command)
@@ -242,7 +242,7 @@ end)
 --- @param change string Controlled destination retirement or native refusal.
 --- @return table world Independently recorded output and handler result.
 local function observe_compound_action(action, change)
-	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
+	local names = { "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
 		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
@@ -260,7 +260,7 @@ local function observe_compound_action(action, change)
 				watch.barrier()
 				if change == "aba" then state.path = "/field/original"; watch.barrier() end
 			end
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(v) return "'" .. v .. "'" end,
 				has_command = function() return false end,
 			}
@@ -374,7 +374,7 @@ end)
 --- @param change string The desktop boundary which retires the original field.
 --- @return table observations Independent output, clipboard and owner receipts.
 local function observe_configured_insertion(session, action, route, change)
-	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
+	local names = { "core.process.adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
 		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
@@ -397,7 +397,7 @@ local function observe_configured_insertion(session, action, route, change)
 				if change == "aba" then state.path = "/field/original"; watch.barrier() end
 			end
 			local pending
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
 				exec_checked = function(command)

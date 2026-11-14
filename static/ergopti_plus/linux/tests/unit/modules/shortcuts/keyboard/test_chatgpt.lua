@@ -29,7 +29,7 @@ local function with_subject(source, body)
 				get = function(_, default) return controls.legacy_url or default end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 				run = function(command) controls.commands[#controls.commands + 1] = command; return true end,

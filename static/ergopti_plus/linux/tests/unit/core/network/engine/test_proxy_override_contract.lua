@@ -161,7 +161,7 @@ end)
 helpers.it("external process writes during the open proxy dialog", function()
     if package.config:sub(1, 1) == "\\" then return end
     local fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
-    local shell = require("adapters.shell_runner")
+    local shell = require("core.process.adapters.shell_runner")
     for _, mode in ipairs({ "conflict", "other" }) do
         fixture.storage_cohort_fixture('{"network.proxy_override":"direct","other":1}', function(_, _, path, _, _, read_file)
             local names = { "core.network.proxy_override", "ui.menu.menu_dialogs", "core.i18n.engine.i18n" }

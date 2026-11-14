@@ -40,7 +40,7 @@
 local M = {}
 
 local Logger      = require("core.logger.engine.shim")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Identifiers = require("core.text.engine.identifiers")
 
 local LOG = "modules.llm.api_token_store"
@@ -390,7 +390,7 @@ end
 --- @return table|nil operation Its cancel() kills the child's process group.
 local function run_async(program, args, env, timeout_ms, callback)
 	_async_sequence = _async_sequence + 1
-	local start = _start_override or require("adapters.owned_process").start
+	local start = _start_override or require("core.process.adapters.owned_process").start
 	local called, operation = pcall(start, program, args, {
 		owner = "api_token_store:" .. _async_sequence, timeout_ms = timeout_ms, env = env,
 	}, function(result)

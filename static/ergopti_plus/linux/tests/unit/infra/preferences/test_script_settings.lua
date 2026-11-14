@@ -196,7 +196,7 @@ helpers.describe("script settings edits (script-edit-backups)", function()
 	--- Names of the edit backups in the scratch configuration folder.
 	local function edit_backups(dir)
 		local found = {}
-		local listing = assert(io.popen("ls -1A " .. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null"))
+		local listing = assert(io.popen("ls -1A " .. require("core.process.adapters.shell_runner").quote(dir) .. " 2>/dev/null"))
 		for name in listing:lines() do
 			if name:find("%.edit%-.*%.bak$") then found[#found + 1] = name end
 		end
@@ -211,7 +211,7 @@ helpers.describe("script settings edits (script-edit-backups)", function()
 		local Settings = require("infra.script_settings")
 		local before = Settings.current()
 		local config = Paths.config("config.toml")
-		assert(os.execute("mkdir -p " .. require("adapters.shell_runner").quote(dir)))
+		assert(os.execute("mkdir -p " .. require("core.process.adapters.shell_runner").quote(dir)))
 		local handle = assert(io.open(config, "w"))
 		handle:write('[script]\nlog_level = "INFO"\n')
 		handle:close()

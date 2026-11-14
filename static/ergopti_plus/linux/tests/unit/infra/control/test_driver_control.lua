@@ -421,7 +421,7 @@ helpers.describe("driver-control-declaration", function()
 			helpers.it("(driver-control-declaration) classifies native " .. variant, function()
 				local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/erg-control-XXXXXX"))
 				local source, target = root .. "/declaration\\source\n", root .. "/target"
-				local Shell = require("adapters.shell_runner")
+				local Shell = require("core.process.adapters.shell_runner")
 				local expired, status, signal, exited = false, nil, nil, false
 				local ok, err = xpcall(function()
 					if variant:find("fifo", 1, true) then

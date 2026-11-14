@@ -43,7 +43,7 @@ local function with_case(options, callback)
 		}, "ok" end,
 	}
 	_G.hs = { processInfo = { arch = "arm64" }, fs = { pathToAbsolute = function(path) return fixture.path or path end } }
-	package.loaded["adapters.shell_runner"] = { spawn = function(executable, arguments, done)
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, arguments, done)
 		check(executable, "/usr/bin/od")
 		check(table.concat(arguments, "\0"), table.concat({ "-An", "-v", "-N", "4096", "-t", "x1", fixture.expected }, "\0"))
 		local task = { done = done, closed = false, observers = {}, starts = 0, terminations = 0 }
@@ -71,7 +71,7 @@ local function with_case(options, callback)
 		fixture.clock = fixture.clock + (options.constructor_delay or 0)
 		return task
 	end }
-	package.loaded["adapters.task_lifecycle"] = { start = function(task) return task.start() end,
+	package.loaded["core.process.adapters.task_lifecycle"] = { start = function(task) return task.start() end,
 		terminate = function(task) return task.terminate() end }
 	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function()

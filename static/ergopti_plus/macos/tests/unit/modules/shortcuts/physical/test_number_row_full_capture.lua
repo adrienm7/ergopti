@@ -21,7 +21,7 @@ local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
 	"adapters.screen_capture",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.notifications",
@@ -49,7 +49,7 @@ local function with_screenshot(displays, scenario)
 			end,
 			remove_exact = function(path) f.files[path] = nil return true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local record = { executable = executable, args = args }
 				f.tasks[#f.tasks + 1] = record
@@ -98,7 +98,7 @@ local function with_screenshot(displays, scenario)
 			scenario(require("modules.shortcuts.actions.screenshot_save"), f)
 		end, debug.traceback)
 		_G.hs = saved_hs
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not ok then error(err, 0) end
 	end)
 end

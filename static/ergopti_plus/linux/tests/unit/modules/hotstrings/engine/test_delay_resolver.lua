@@ -262,9 +262,9 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 	-- which tests had run before it. Asserting the EFFECT instead of the return
 	-- value removes the ambiguity entirely.
 	helpers.it("accepts the fields it owns and ignores the ones it does not", function()
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		shell._reset_runner()
-		package.loaded["adapters.shell_runner"] = shell
+		package.loaded["core.process.adapters.shell_runner"] = shell
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local config_dir = os.tmpname()
 		os.remove(config_dir)

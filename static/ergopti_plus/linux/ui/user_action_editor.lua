@@ -86,7 +86,7 @@ end
 function M.ask_path(title, prompt, prior, deps)
 	deps = deps or {}
 	local pick = deps.pick or ChoicePrompt.pick
-	local shell = deps.shell or require("adapters.shell_runner")
+	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local stored = Parameter.parse("path", prior)
 	local kind = pick(title, prompt, labelled({
 		{ value = "file", key = "dialog.gestures.param_path_kind_file" },

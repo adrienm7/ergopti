@@ -30,7 +30,7 @@ local M = {}
 local Files = require("core.fs.adapters.file_system")
 local Logger = require("core.logger.engine.shim")
 local NativePath = require("core.fs.engine.native_path")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Storage = require("core.fs.adapters.storage")
 
 local LOG = "infra.reload_timing"

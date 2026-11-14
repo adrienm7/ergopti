@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Keeps only the native window port and provider factory inert.
 --- @param body function Real bridge scenario.
 local function with_picker(body)
-	local names = { "ui.action_picker.bridge", "ui.webview_manager", "adapters.program_providers" }
+	local names = { "ui.action_picker.bridge", "ui.webview_manager", "core.process.adapters.program_providers" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local seen = { visible = false, shows = 0, closes = 0, pushes = {}, picks = {} }
@@ -27,7 +27,7 @@ local function with_picker(body)
 		eval_js = function(app, script) seen.pushes[#seen.pushes + 1] = { app, script }; return true end,
 	}
 	package.loaded["ui.webview_manager"] = host
-	package.loaded["adapters.program_providers"] = {}
+	package.loaded["core.process.adapters.program_providers"] = {}
 	local bridge = helpers.load_module("ui.action_picker.bridge")
 	local fixture = { bridge = bridge, seen = seen, host = host }
 	fixture.open = function(title)

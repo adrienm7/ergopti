@@ -57,7 +57,7 @@ function M.new(root, production, options)
 		state.pull_calls = state.pull_calls + 1; return options.pull_supported
 	end }
 	modules["platform.remap.lease_helper"], modules["core.text.engine.json"] = {}, {}
-	modules["adapters.shell_runner"] = { spawn = function(executable, arguments, done, streaming, environment, private, owned)
+	modules["core.process.adapters.shell_runner"] = { spawn = function(executable, arguments, done, streaming, environment, private, owned)
 		local task = { executable = executable, arguments = arguments, streaming = streaming,
 			environment = environment, private = private, owned = owned, attempted = false,
 			settled = false, observers = {}, terminate_calls = 0 }
@@ -95,7 +95,7 @@ function M.new(root, production, options)
 		["ai.engine.request_plan.ports"] = "_shared/ai/engine/request_plan/ports.lua",
 		["diagnostics.engine.adapter_errors"] = "_shared/diagnostics/engine/adapter_errors.lua",
 		["adapters.managed_ollama_daemon"] = "macos/adapters/managed_ollama_daemon.lua",
-		["adapters.owned_program_runner"] = "macos/adapters/owned_program_runner.lua",
+		["core.process.adapters.owned_program_runner"] = "macos/core/process/adapters/owned_program_runner.lua",
 		["core.lifecycle.engine.core.ollama_runtime_choice"] = "_shared/core/lifecycle/engine/core/ollama_runtime_choice.lua",
 		["core.lifecycle.engine.core.managed_ollama_daemon_receipt"] = "_shared/core/lifecycle/engine/core/managed_ollama_daemon_receipt.lua",
 		["core.lifecycle.engine.core.managed_ollama_daemon_lifecycle"] = "_shared/core/lifecycle/engine/core/managed_ollama_daemon_lifecycle.lua",

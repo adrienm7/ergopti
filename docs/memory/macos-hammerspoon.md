@@ -589,7 +589,7 @@ child's answer sits unread, and a completion can arrive before the last
 streamed chunk, which `shell_runner` then drops: issue #100 lost seven leases
 "0.00 s late" with no worker stderr at all. Never judge a streaming child
 silent from a timer alone; prove a read turn with
-`adapters/task_output_turn.lua` (a `/bin/cat` echo) first, as the lease ACK
+`core/process/adapters/task_output_turn.lua` (a `/bin/cat` echo) first, as the lease ACK
 deadlines do (`lease-output-turn`). Writing stdin works in every mode, so while
 that probe is pending the lease writes keepalive PINGs (at the deadline, then
 every heartbeat tick, never two within the outer's 2.5 s command budget: the

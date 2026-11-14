@@ -16,7 +16,7 @@ local function fixture(body)
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["infra.timings"] = Timings
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/owned/ErgoptiPlus" end }
-		package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, done, chunks, environment, private, owned, limit)
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, done, chunks, environment, private, owned, limit)
 			H.assert_eq(executable, "/owned/ErgoptiAutomationQuery"); H.assert_true(private); H.assert_true(owned)
 			H.assert_eq(limit, 90000); H.assert_nil(environment)
 			local task = { args = args, inputs = {}, physical = false, observers = {}, closes = 0 }
@@ -49,8 +49,8 @@ local function fixture(body)
 		end }, fs = { symlinkAttributes = metadata, attributes = metadata, pathToAbsolute = function(path) return path end } }
 		f.native = require("adapters.apple_shortcuts_native")
 		function f.use_actual_shell()
-			package.loaded["adapters.shell_runner"] = nil
-			f.shell = require("adapters.shell_runner")
+			package.loaded["core.process.adapters.shell_runner"] = nil
+			f.shell = require("core.process.adapters.shell_runner")
 			package.loaded["adapters.apple_shortcuts_native"] = nil
 			f.native = require("adapters.apple_shortcuts_native")
 		end
@@ -68,7 +68,7 @@ local function fixture(body)
 	for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
 	for key, value in pairs(saved) do package.loaded[key] = value end
 	-- Keep the shared shell-runner slot explicit for the suite ownership scanner.
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(failure, 0) end
 end
 

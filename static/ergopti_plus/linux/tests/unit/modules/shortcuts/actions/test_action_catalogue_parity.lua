@@ -65,7 +65,7 @@ end
 --- that compositor instead of the session the test scripts.
 --- @param body function
 local function without_tools(body)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local real_getenv = os.getenv
 	os.getenv = function(name)
 		if name == "HYPRLAND_INSTANCE_SIGNATURE" or name == "SWAYSOCK" then return nil end
@@ -284,7 +284,7 @@ helpers.describe("action picker items (Linux)", function()
 
 	helpers.it("greys the folder actions with the reason when no file manager publishes its folder", function()
 		local Display = require("infra.display_server")
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local M = recording_manager()
 		local function rows(nautilus)
 			Display._set_for_test(Display.X11, "xfce")
@@ -359,7 +359,7 @@ helpers.describe("action picker items (Linux)", function()
 		local Display = require("infra.display_server")
 		Display._set_for_test(Display.X11, "xfce")
 		local ok, err = pcall(function()
-			local stale = helpers.load_module_with_dependency(name, "adapters.shell_runner", {
+			local stale = helpers.load_module_with_dependency(name, "core.process.adapters.shell_runner", {
 				has_command = function() return true end,
 			})
 			helpers.assert_eq(stale.detect().name, "wmctrl", "the earlier fixture captured a different tool provider")
@@ -486,8 +486,8 @@ helpers.describe("Cursor-window native picker admission", function()
 	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
 		helpers.it("uses actual GNU timeout admission in the picker: " .. receipt, function()
 			local Display = require("infra.display_server")
-			local Runner = require("adapters.program_runner")
-			local Shell = require("adapters.shell_runner")
+			local Runner = require("core.process.adapters.program_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local previous = Display.kind()
 			local cached_switch = package.loaded["adapters.window_switch"]
 			local supported, has_command, run = Runner.supported, Shell.has_command, Shell.run

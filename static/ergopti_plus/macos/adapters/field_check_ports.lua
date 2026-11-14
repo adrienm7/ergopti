@@ -21,7 +21,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.logger")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Timer = require("core.events.timer_scheduler")
 local FileSystem = require("core.fs.adapters.file_system")
 local NativePath = require("core.fs.engine.native_path")

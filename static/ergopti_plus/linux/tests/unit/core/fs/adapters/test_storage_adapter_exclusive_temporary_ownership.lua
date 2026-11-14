@@ -45,7 +45,7 @@ helpers.describe("storage exclusive temporary ownership", function()
 				end
 				write(path, original)
 				if alias ~= "dangling" then write(target, foreign) end
-				local Shell = require("adapters.shell_runner")
+				local Shell = require("core.process.adapters.shell_runner")
 				if alias == "regular" then write(helpers.stage_path(path), foreign)
 				else helpers.assert_true(Shell.run("ln " .. (alias == "hardlink" and "" or "-s ") .. "-- " .. Shell.quote(target) .. " " .. Shell.quote(helpers.stage_path(path)))) end
 				local real_getenv = os.getenv
@@ -141,7 +141,7 @@ helpers.describe("storage concurrent backup ownership", function()
 						claimed = true
 						if alias == "regular" then write(backup, history)
 						else
-							local Shell = require("adapters.shell_runner")
+							local Shell = require("core.process.adapters.shell_runner")
 							helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(root .. "/missing") .. " " .. Shell.quote(backup)))
 						end
 					end
@@ -158,7 +158,7 @@ helpers.describe("storage concurrent backup ownership", function()
 					helpers.assert_eq(read(next_backup), original)
 					if alias == "regular" then helpers.assert_eq(read(backup), history)
 					else
-						local Shell = require("adapters.shell_runner")
+						local Shell = require("core.process.adapters.shell_runner")
 						helpers.assert_true(Shell.run("test -L " .. Shell.quote(backup)))
 						helpers.assert_nil(real_open(root .. "/missing", "r"))
 					end
@@ -194,7 +194,7 @@ helpers.describe("storage backup path inspection", function()
 				end
 				write(path, original)
 				if depth == 1 then write(path .. ".corrupt", history) end
-				local Shell = require("adapters.shell_runner")
+				local Shell = require("core.process.adapters.shell_runner")
 				if alias == "regular" then write(backup, history)
 				elseif alias == "directory" then helpers.assert_true(Shell.run("mkdir -- " .. Shell.quote(backup)))
 				else
@@ -231,7 +231,7 @@ helpers.describe("storage backup path inspection", function()
 			local root = make_temp_config_root()
 			local path, original = root .. "/" .. FOLDER .. "/storage.json", "{malformed original bytes"
 			local file = assert(io.open(path, "wb")); assert(file:write(original) and file:close())
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local real_checked, real_getenv = Shell.exec_checked, os.getenv
 			os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
 			Shell.exec_checked = function()
@@ -567,7 +567,7 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 		local uv_open = native_uv and native_uv.fs_open
 		local uv_write = native_uv and native_uv.fs_write
 		local uv_close = native_uv and native_uv.fs_close
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		os.getenv = function(name)
 			if name == "XDG_CONFIG_HOME" then return temp_root end
 			return real_getenv(name)
@@ -730,7 +730,7 @@ helpers.describe("storage file mode (linux-storage-private-mode)", function()
 	helpers.it("publishes storage.json private to the user on every runtime (linux-storage-private-mode)", function()
 		local root = make_temp_config_root()
 		local path = root .. "/" .. FOLDER .. "/storage.json"
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local real_getenv = os.getenv
 		os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
 		local ok, err = xpcall(function()

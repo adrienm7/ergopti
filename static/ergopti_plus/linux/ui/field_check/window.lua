@@ -37,7 +37,7 @@ end
 --- @return table
 local function native(spec)
 	local I18n = require("core.i18n.engine.i18n")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	return {
 		translate = I18n.get,
 		env = spec.env,

@@ -449,7 +449,7 @@ end)
 -- ProcessLifecycle vectors (ProcessLifecycle.spec.js). start/stop drive a focus
 -- watcher; each test that starts also stops so no watcher leaks past the suite.
 helpers.describe("Adapter contract vectors: ProcessLifecycle", function()
-	local adapter = helpers.load_with_stubs("adapters.process_lifecycle")
+	local adapter = helpers.load_with_stubs("core.process.adapters.lifecycle")
 
 	helpers.it("getForegroundApp returns {appId, windowTitle} strings (getForegroundApp_returns_shape)", function()
 		local app = adapter.getForegroundApp()

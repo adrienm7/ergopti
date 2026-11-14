@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 
 local function scope(callback)
-	helpers.with_stub_scope({ "hs", "modules.keystats.timestamp", "adapters.process_lifecycle",
+	helpers.with_stub_scope({ "hs", "modules.keystats.timestamp", "core.process.adapters.lifecycle",
 		"adapters.secure_field_detector" }, function()
 		local state = { now = 10, secure = false, stop_refused = false, watch_refused = false, lifecycle_stops = 0 }
 		local observers, callbacks, observations, errors = {}, {}, {}, {}
@@ -17,7 +17,7 @@ local function scope(callback)
 			axuielement = { windowElement = function() return {} end },
 			timer = { absoluteTime = function() state.now = state.now + 10; return state.now end } }
 		package.loaded["modules.keystats.timestamp"] = { now_epoch = function() return 1000 end, format_epoch = tostring }
-		package.loaded["adapters.process_lifecycle"] = {
+		package.loaded["core.process.adapters.lifecycle"] = {
 			onAppActivate = function(fn) callbacks.app = fn end,
 			onFocusChange = function(fn) callbacks.focus = fn end,
 			start = function() return true end,

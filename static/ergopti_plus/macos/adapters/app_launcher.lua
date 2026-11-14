@@ -20,7 +20,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local RunningApplication = require("adapters.running_application")
 
 local LOG = "adapters.app_launcher"

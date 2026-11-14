@@ -19,9 +19,9 @@ end
 local function with_observer(callback)
 	local saved = snapshot()
 	local native, open, remove, rename = _G.hs, io.open, os.remove, os.rename
-	local loader = package.preload["adapters.task_lifecycle"]
+	local loader = package.preload["core.process.adapters.task_lifecycle"]
 	local outcome = table.pack(xpcall(callback, debug.traceback))
-	package.preload["adapters.task_lifecycle"] = loader
+	package.preload["core.process.adapters.task_lifecycle"] = loader
 	_G.hs, io.open, os.remove, os.rename = native, open, remove, rename
 	for name in pairs(package.loaded) do
 		if saved[name] == nil then package.loaded[name] = nil end
@@ -38,8 +38,8 @@ helpers.describe("Onboarding fixture ownership (onboarding-fixture-scope)", func
 					local sentinel
 					if initial == "false" then sentinel = false end
 					if initial == "existing" then sentinel = {} end
-					for _, name in ipairs({ "platform.remap.onboarding", "adapters.task_lifecycle",
-						"adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+					for _, name in ipairs({ "platform.remap.onboarding", "core.process.adapters.task_lifecycle",
+						"core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 						"core.events.timer_scheduler", "core.logger.engine.logger", "hs", "tests.stubs.hs" }) do
 						package.loaded[name] = sentinel
 					end
@@ -49,7 +49,7 @@ helpers.describe("Onboarding fixture ownership (onboarding-fixture-scope)", func
 					local marker = "injected onboarding fixture failure"
 					local constructions, scenarios = 0, 0
 					if mode == "construction failure" then
-						package.preload["adapters.task_lifecycle"] = function()
+						package.preload["core.process.adapters.task_lifecycle"] = function()
 							constructions = constructions + 1
 							error(marker, 0)
 						end

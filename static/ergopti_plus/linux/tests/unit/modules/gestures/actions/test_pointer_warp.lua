@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Display = require("infra.display_server")
 
 local TWO_MONITORS = "Monitors: 2\n"

@@ -88,7 +88,7 @@ runner cannot answer.
 - **The evdev struct decoder.** `M.new`, `parse_event` and the byte-order
   helpers were dead code with a test that asserted nothing. Both are gone;
   `input_reader` now exports `get_layouts` and `resolve_char` only.
-- **`adapters/shell_runner.lua` exists.** New shell-outs go through it. There
+- **`core/process/adapters/shell_runner.lua` exists.** New shell-outs go through it. There
   are still ~150 direct `io.popen`/`os.execute` sites outside it; migrating one
   is welcome, re-deriving quoting at a new site is not.
 - **The race test's apostrophe hole.** It has a case named "types an apostrophe

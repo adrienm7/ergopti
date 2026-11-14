@@ -40,7 +40,7 @@ local M = {}
 local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
 local Keysym = require("infra.keysym")

@@ -159,7 +159,7 @@ end
 --- @return boolean prepared
 local function prepare_config_directory(normalized)
 	local target = normalized == "" and M.default_config_dir() or normalized
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local called, ready = pcall(Shell.run, "mkdir -p -- " .. Shell.quote(target) .. " 2>/dev/null")
 	if called and ready == true then return true end
 	require("core.logger.engine.shim").error("infra.config_paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")

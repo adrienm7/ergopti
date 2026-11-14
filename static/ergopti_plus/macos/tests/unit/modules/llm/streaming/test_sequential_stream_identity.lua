@@ -98,7 +98,7 @@ local function run_backend(backend, requested, fail_first)
 	helpers.with_stub_scope({
 		backend.module_name, "modules.llm.api_common", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "core.network.adapters.http_client",
-		"core.events.timer_scheduler", "adapters.shell_runner",
+		"core.events.timer_scheduler", "core.process.adapters.shell_runner",
 	}, function()
 		local module = helpers.load_with_stubs(backend.module_name)
 		local fetch = module.fetch_sequential

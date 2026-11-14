@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local native = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 --- Runs one controlled stream receipt through the actual declaration parser.
 --- @param stream table Read and close operations with Lua file receipt shapes.

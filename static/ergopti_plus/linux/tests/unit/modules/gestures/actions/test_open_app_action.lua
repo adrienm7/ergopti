@@ -75,7 +75,7 @@ helpers.describe("open_app replays the shared app corpus (Linux)", function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action("open_app", "tap_3")
 				helpers.assert_eq(#commands, 1)
-				local quoted = require("adapters.shell_runner").quote(application)
+				local quoted = require("core.process.adapters.shell_runner").quote(application)
 				helpers.assert_eq(commands[1], "gtk-launch -- " .. quoted .. " 2>/dev/null &")
 			end)
 		end

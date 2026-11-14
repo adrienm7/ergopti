@@ -30,7 +30,7 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Agent = require("ai.engine.agent.agent")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "modules.llm.agent_connectors"
 
@@ -144,7 +144,7 @@ local DEFAULT_DEPS = {
 		if not loaded or type(native.update_time) ~= "function" then return nil, "native clock unavailable" end
 		local refreshed = pcall(native.update_time)
 		if not refreshed then return nil, "native clock refresh refused" end
-		return require("adapters.owned_process").start(executable, args, options, function(result)
+		return require("core.process.adapters.owned_process").start(executable, args, options, function(result)
 			callback({ ok = result.ok, code = result.exit_code, error = result.error })
 		end)
 	end,

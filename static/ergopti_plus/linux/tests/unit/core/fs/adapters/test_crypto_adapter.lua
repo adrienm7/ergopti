@@ -41,7 +41,7 @@ helpers.describe("crypto adapter", function()
 		for _, status in ipairs({ 1, 7, 23, 143, 137, false }) do
 			helpers.it("linux-crypto-cli-exit-receipts: rejects useful " .. kind .. " digest after status " .. tostring(status), function()
 				local subject = fresh_crypto({ available = false })
-				local shell = require("adapters.shell_runner")
+				local shell = require("core.process.adapters.shell_runner")
 				shell._set_runner(function(command)
 					if command:find("command -v", 1, true) then return true end
 					return helpers.openssl_stdout_receipt(command, "SHA2-256(stdin)= " .. string.rep("a", 64) .. "\n", status)
@@ -60,7 +60,7 @@ helpers.describe("crypto adapter", function()
 				transport = { command = command, input = input, options = options }
 				return "SHA2-256(stdin)= " .. string.rep("a", 64) .. "\n"
 			end
-			local shell = require("adapters.shell_runner")
+			local shell = require("core.process.adapters.shell_runner")
 			shell._set_runner(function() return "SHA2-256(stdin)= " .. string.rep("a", 64) .. "\n" end)
 			local ok, result = pcall(subject.sha256, data)
 			native.exec = previous
@@ -83,7 +83,7 @@ helpers.describe("crypto adapter", function()
 		helpers.it("linux-crypto-byte-receipts: frames " .. row.id .. " without argv NUL", function()
 			local subject = fresh_crypto({ available = false,
 				sha256 = function() return nil, "native primitive unavailable" end })
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local command, calls = nil, 0
 			local probes = 0
 			Shell._set_runner(function(value)
@@ -108,7 +108,7 @@ helpers.describe("crypto adapter", function()
 				native_calls, received = native_calls + 1, data
 				return row.sha256, nil
 			end })
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			Shell._set_runner(function() shell_calls = shell_calls + 1; error("native hashing must not shell out") end)
 			local ok, result = pcall(subject.sha256, row.input)
 			Shell._reset_runner()
@@ -125,7 +125,7 @@ helpers.describe("crypto adapter", function()
 			native_calls = native_calls + 1
 			return nil, "native primitive refused"
 		end })
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		Shell._set_runner(function() shell_calls = shell_calls + 1; return "" end)
 		local ok, result = pcall(subject.sha256, "abc")
 		Shell._reset_runner()

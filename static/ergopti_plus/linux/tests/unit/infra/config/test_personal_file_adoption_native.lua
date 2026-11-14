@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Config = require("modules.hotstrings.hotstrings_config")
 local Choices = require("tests.support.hotstring_choices")
 

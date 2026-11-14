@@ -21,9 +21,9 @@ local OWNED_MODULES = {
 	"core.logger.adapters.log_transport",
 	"adapters.python_interpreter",
 	"adapters.running_application",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"core.fs.adapters.storage",
-	"adapters.task_environment",
+	"core.process.adapters.task_environment",
 	"core.events.timer_scheduler",
 	"adapters.tray_menu",
 	"adapters.update_launcher",
@@ -175,7 +175,7 @@ local function with_menu(body)
 							return native
 						end,
 					}
-					package.loaded["adapters.shell_runner"].open = function(path)
+					package.loaded["core.process.adapters.shell_runner"].open = function(path)
 						assert(path == "/virtual/init.lua" or path == "/virtual/config.toml",
 							"only the actual deferred file-open commands may cross this boundary")
 						world.opened[#world.opened + 1] = path

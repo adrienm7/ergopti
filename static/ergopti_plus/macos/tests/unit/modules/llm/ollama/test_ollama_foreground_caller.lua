@@ -9,7 +9,7 @@ local function with_api(kind, callback)
 	nonce_counter = nonce_counter + 1
 	nonce = string.format("%032x", nonce_counter)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "adapters.managed_ollama_daemon",
-		"adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
+		"core.process.adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
@@ -40,7 +40,7 @@ local function with_api(kind, callback)
 			shell.tasks[#shell.tasks + 1] = task
 			return task
 		end
-		package.loaded["adapters.shell_runner"] = shell
+		package.loaded["core.process.adapters.shell_runner"] = shell
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }

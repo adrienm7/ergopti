@@ -716,7 +716,7 @@ end
 local function save_thinking_refused()
 	local path = thinking_refused_path()
 	local dir = require("core.fs.engine.native_path").dirname(path)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
 	local text = Json.encode(_thinking_refused)
 	local temp = path .. ".tmp"

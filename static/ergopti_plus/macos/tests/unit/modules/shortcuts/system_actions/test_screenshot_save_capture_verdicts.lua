@@ -19,7 +19,7 @@ local SETTINGS_URL =
 local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.notifications",
@@ -86,7 +86,7 @@ local function with_screenshot(options, scenario)
 				return { mode = "file", size = f.files[path] }, "ok"
 			end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(target)
 				f.opened[#f.opened + 1] = target
 				return true
@@ -187,7 +187,7 @@ local function with_screenshot(options, scenario)
 		_G.hs = saved_hs
 		-- with_fresh_modules restores the original entry; clearing the stub here
 		-- keeps the dangling-install scanner (test_shell_runner_stub_restore) exact.
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not ok then error(err, 0) end
 	end)
 end

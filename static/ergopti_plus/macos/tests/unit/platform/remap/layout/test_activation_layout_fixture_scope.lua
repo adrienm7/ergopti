@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.activation_layout_fixture")
 local OWNERS = {
 	"core.fs.adapters.file_system", "core.fs.engine.dir", "platform.remap.ke_variables",
-	"core.fs.adapters.json_codec", "adapters.shell_runner", "infra.deferred_work",
+	"core.fs.adapters.json_codec", "core.process.adapters.shell_runner", "infra.deferred_work",
 }
 
 helpers.describe("Activation layout fixture ownership", function()

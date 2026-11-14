@@ -15,7 +15,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 			local names = { "ui.gesture_conflict_notice", "infra.dialog_util", "core.i18n.engine.i18n", "core.fs.adapters.storage",
 				"infra.deferred_work", "core.logger.engine.logger" }
 			local saved, store, timers = {}, {}, {}
-			local saved_shell = package.loaded["adapters.shell_runner"]
+			local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 			local opened, dialogs, errors, reject_schedule = 0, 0, 0, true
 			local on_dialog
 			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -36,7 +36,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 				if reject_schedule then return false end
 				timers[#timers + 1] = fn; return true
 			end }
-			package.loaded["adapters.shell_runner"] = { open = function() opened = opened + 1; return true end }
+			package.loaded["core.process.adapters.shell_runner"] = { open = function() opened = opened + 1; return true end }
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.logger.engine.logger"].error = function() errors = errors + 1 end
 			local ok, err = xpcall(function()
@@ -60,7 +60,7 @@ helpers.describe("gesture warning consent (gesture-conflicts)", function()
 				helpers.assert_eq(#timers, choice == "gestures.system.dismiss" and 0 or 1)
 			end, debug.traceback)
 			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-			package.loaded["adapters.shell_runner"] = saved_shell
+			package.loaded["core.process.adapters.shell_runner"] = saved_shell
 			if not ok then error(err, 0) end
 		end)
 	end

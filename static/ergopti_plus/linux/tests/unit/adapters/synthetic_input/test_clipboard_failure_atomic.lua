@@ -14,7 +14,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 local function with_clipboard(read_ok, read_value, body)
 	local names = {
 		clipboard = "adapters.clipboard",
-		shell = "adapters.shell_runner",
+		shell = "core.process.adapters.shell_runner",
 		display = "infra.display_server",
 	}
 	local previous = {}

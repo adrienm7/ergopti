@@ -480,7 +480,7 @@ helpers.describe("HS-012 real reattached MLX work fence", function()
 		end
 		reset_module("core.events.timer_scheduler")
 		require("core.events.timer_scheduler")
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(_, _, on_done, on_stream)
 				native_task = {
 					on_done = on_done,

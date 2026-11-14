@@ -92,7 +92,7 @@ Each `.spec.js` file exports:
 | SecureFieldDetector | `adapters/secure_field_detector.ahk`    | `adapters/secure_field_detector.lua`    |
 | Clipboard           | `adapters/clipboard.ahk`                | `adapters/clipboard.lua`                |
 | Storage             | `core/fs/adapters/storage.ahk`          | `core/fs/adapters/storage.lua`          |
-| ProcessLifecycle    | `adapters/process_lifecycle.ahk`        | `adapters/process_lifecycle.lua`        |
+| ProcessLifecycle    | `core/process/adapters/lifecycle.ahk`   | `core/process/adapters/lifecycle.lua`   |
 | KeyState            | `adapters/key_state.ahk`                | `adapters/key_state.lua`                |
 | MouseControl        | `adapters/mouse_control.ahk`            | `adapters/mouse_control.lua`            |
 | NetworkInfo         | `core/network/adapters/info.ahk`        | `core/network/adapters/info.lua`        |

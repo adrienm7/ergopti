@@ -10,7 +10,7 @@
 
 local M = {}
 local Helper = require("platform.remap.lease_helper")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Owner = require("adapters.apple_shortcuts")
 local Parameter = require("settings.engine.program_parameter")
 local Json = require("core.text.engine.json")

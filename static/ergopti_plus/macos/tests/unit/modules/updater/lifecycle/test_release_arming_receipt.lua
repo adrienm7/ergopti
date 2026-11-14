@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local function with_installer(options, check)
 	options = options or {}
 	helpers.with_stub_scope({ "modules.updater.release_installer", "core.logger.engine.logger", "core.fs.engine.paths",
-		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "adapters.shell_runner" }, function()
+		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner" }, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = function(path)
 			helpers.assert_eq(path, "../macos/adapters/release_stage.sh")
@@ -26,7 +26,7 @@ local function with_installer(options, check)
 			local content = assert(file:read("a")); assert(file:close()); return content
 		end }
 		package.loaded["core.fs.adapters.json_codec"] = require("core.text.engine.json")
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		local installer = require("modules.updater.release_installer")
 		installer._getenv = function(name)
 			if name == "ERGOPTI_LAUNCHER_EXECUTABLE" and not options.source then

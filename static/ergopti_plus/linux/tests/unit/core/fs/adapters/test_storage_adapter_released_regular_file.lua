@@ -31,7 +31,7 @@ helpers.describe("storage released regular-file link admission", function()
 	local source = ' {"a":false,"foreign":[9007199254740993,{},[],null]} '
 	local function linked(body, dangling)
 		storage_cohort_fixture(nil, function(storage, files, path, target, write, read)
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			if not dangling then write(target, source) end
 			helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(target) .. " " .. Shell.quote(path)))
 			body(storage, files, path, target, write, read, Shell)

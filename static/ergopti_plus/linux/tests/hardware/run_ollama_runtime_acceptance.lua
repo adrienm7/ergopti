@@ -31,7 +31,7 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 	end
 end
 local Http = require("core.network.adapters.http_client")
-local Native = require("adapters.owned_process")
+local Native = require("core.process.adapters.owned_process")
 local Timings = require("infra.timings")
 local Engine, Profiles
 local chronological, native_services = {}, {}

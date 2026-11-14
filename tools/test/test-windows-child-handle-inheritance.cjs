@@ -157,10 +157,14 @@ for (const rel of productionFiles()) {
 	if (/\bPLC_CreateProcessWithInheritedHandles\b/.test(withoutDefinition)) plcCallers.add(rel);
 }
 check(
-	inheritingCreators.length === 1 && inheritingCreators[0] === 'adapters/process_lifecycle.ahk',
+	inheritingCreators.length === 1 &&
+		inheritingCreators[0] === 'core/process/adapters/lifecycle.ahk',
 	`only PLC_CreateProcessWithInheritedHandles may create a process with inherited handles, found: ${inheritingCreators.join(', ')}`
 );
-const expectedCallers = ['adapters/shell_runner.ahk', ...Object.keys(INHERITING_LAUNCHES)].sort();
+const expectedCallers = [
+	'core/process/adapters/shell_runner.ahk',
+	...Object.keys(INHERITING_LAUNCHES)
+].sort();
 check(
 	JSON.stringify([...plcCallers].sort()) === JSON.stringify(expectedCallers),
 	`inheriting launches changed: found ${[...plcCallers].sort().join(', ')}; a new one passes an ` +
@@ -168,7 +172,7 @@ check(
 );
 
 // 2. The shell runner's launch window.
-const runner = stripComments(read('adapters/shell_runner.ahk'));
+const runner = stripComments(read('core/process/adapters/shell_runner.ahk'));
 const constant = (name) => {
 	const match = runner.match(new RegExp(`^global ${name} := (.+)$`, 'm'));
 	return match ? match[1].trim() : '';
@@ -186,7 +190,7 @@ check(
 	'STARTUPINFOW is 104 bytes on x64 and 68 on x86; the attribute-list pointer follows it'
 );
 const create = bodyOf(runner, '_SR_TreeCreateSuspended');
-check(create !== '', 'adapters/shell_runner.ahk must define _SR_TreeCreateSuspended');
+check(create !== '', 'core/process/adapters/shell_runner.ahk must define _SR_TreeCreateSuspended');
 const at = (needle, from = 0) => create.indexOf(needle, from);
 const criticalOn = at('Critical("On")');
 const firstStream = at('CreateFileW');
@@ -320,9 +324,9 @@ check(
 );
 
 // 4. The behavioural regression runs in the AHK suite.
-const testFile = 'tests/unit/adapters/shell_runner/test_shell_runner_capture_lock.ahk';
+const testFile = 'tests/unit/core/process/shell_runner/test_capture_lock.ahk';
 check(
-	/^#Include unit\/adapters\/shell_runner\/test_shell_runner_capture_lock\.ahk\s*$/m.test(
+	/^#Include unit\/core\/process\/shell_runner\/test_capture_lock\.ahk\s*$/m.test(
 		read('tests/run_all.ahk')
 	),
 	`tests/run_all.ahk must include ${testFile}`

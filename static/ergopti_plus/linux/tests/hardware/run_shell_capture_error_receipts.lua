@@ -21,10 +21,10 @@ local checks, failures = 0, 0
 Logger.set_level("debug")
 
 local function fresh_shell()
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	Logger.ring_buffer_clear()
 	Logger.reset_dedup()
-	return require("adapters.shell_runner")
+	return require("core.process.adapters.shell_runner")
 end
 
 local function assert_private_failure(shell, command)

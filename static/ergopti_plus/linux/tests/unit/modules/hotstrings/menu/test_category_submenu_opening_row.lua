@@ -127,7 +127,7 @@ helpers.describe("category submenu: its rows", function()
 				helpers.assert_eq(modals, notices, "the failure dialog uses the keyboard-release boundary")
 				if notices > 0 then
 					helpers.assert_true(asked[1]:find("--error", 1, true) ~= nil)
-					helpers.assert_true(asked[1]:find("--text=" .. require("adapters.shell_runner").quote(
+					helpers.assert_true(asked[1]:find("--text=" .. require("core.process.adapters.shell_runner").quote(
 						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
 				end
 			end)
@@ -398,7 +398,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
 			if #notices > 0 then
 				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
-				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+				helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
 					require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 			end
 		end)
@@ -408,8 +408,8 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		local directory = os.tmpname()
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-section-ack"
-		local quote = require("adapters.shell_runner").quote
-		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local quote = require("core.process.adapters.shell_runner").quote
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
 			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
@@ -451,7 +451,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		local removed = require("core.process.adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
 		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
@@ -573,7 +573,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
 			if #notices > 0 then
 				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
-				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+				helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
 					require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 			end
 		end)
@@ -583,8 +583,8 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local directory = os.tmpname()
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-section-ack"
-		local quote = require("adapters.shell_runner").quote
-		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local quote = require("core.process.adapters.shell_runner").quote
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
 			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
@@ -626,7 +626,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		local removed = require("core.process.adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
 		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end

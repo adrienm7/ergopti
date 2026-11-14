@@ -90,7 +90,7 @@ local function scenario(action, phase, body)
 		local commands = {}
 		-- A completed write is what the next read sees, as on a real clipboard.
 		local clipboard = "SAVED"
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
 				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end

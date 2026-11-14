@@ -89,7 +89,7 @@ function M.find(bundle_id, own_path, on_done)
 		error("accessibility_copies.find: own_path must be an absolute path", 2)
 	end
 	if type(on_done) ~= "function" then error("accessibility_copies.find: on_done must be a function", 2) end
-	local ShellRunner = require("adapters.shell_runner")
+	local ShellRunner = require("core.process.adapters.shell_runner")
 	local handle = ShellRunner.spawn("/bin/sh", { "-c", M.SCRIPT, "accessibility_copies", bundle_id, own_path,
 		LSREGISTER, M.REGISTERED_PATHS_AWK }, function(exit_code, stdout, stderr)
 		if exit_code == 0 then

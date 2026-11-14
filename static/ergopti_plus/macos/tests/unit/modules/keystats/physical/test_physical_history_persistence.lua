@@ -145,7 +145,7 @@ local function find(fn, key)
 end
 package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
 helpers.load_with_stubs("adapters.physical_observation_clock")
-helpers.with_fresh_modules({ "adapters.shell_runner" }, function()
+helpers.with_fresh_modules({ "core.process.adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
 	native.frames.clock={version=1,domain="mach_absolute_time",numer=1,denom=1}
 	local leaf=hs
@@ -173,7 +173,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["infra.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
-	package.loaded["adapters.process_lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
+	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["adapters.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
 	package.loaded["modules.keymap"]={is_running=function() return false end}
@@ -199,7 +199,7 @@ shell.run(function(capture, observed, native)
 		local ct,kt=c.identity(),k.identity(owner)
 		return Accepted.new(owner,{current=function() return c.current(ct)==true and c.admitted(ct)~=nil and k.current(owner,kt)==true end,revision=history.retained_count,convert=tonumber,resolve_interval=function(first,last) return history.resolve_interval(ct,kt,first,last) end,calendar=function() return calendar end,on_refused=function() history.stop(ct) end})
 	end}
-	package.loaded["adapters.shell_runner"]={spawn=native.dependencies.spawn}
+	package.loaded["core.process.adapters.shell_runner"]={spawn=native.dependencies.spawn}
 	control=require("modules.shortcuts.script_control")
 	manager=require("modules.keystats.log_manager")
 	local keystats=require("modules.keystats")
@@ -492,7 +492,7 @@ local function find(fn, key)
 end
 package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
 helpers.load_with_stubs("adapters.physical_observation_clock")
-helpers.with_fresh_modules({ "adapters.shell_runner" }, function()
+helpers.with_fresh_modules({ "core.process.adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
 	native.frames.clock={version=1,domain="mach_absolute_time",numer=1,denom=1}
 	local leaf=hs
@@ -520,7 +520,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["infra.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
-	package.loaded["adapters.process_lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
+	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["adapters.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
 	package.loaded["modules.keymap"]={is_running=function() return false end}
@@ -546,7 +546,7 @@ shell.run(function(capture, observed, native)
 		local ct,kt=c.identity(),k.identity(owner)
 		return Accepted.new(owner,{current=function() return c.current(ct)==true and c.admitted(ct)~=nil and k.current(owner,kt)==true end,revision=history.retained_count,convert=tonumber,resolve_interval=function(first,last) return history.resolve_interval(ct,kt,first,last) end,calendar=function() return calendar end,on_refused=function() history.stop(ct) end})
 	end}
-	package.loaded["adapters.shell_runner"]={spawn=native.dependencies.spawn}
+	package.loaded["core.process.adapters.shell_runner"]={spawn=native.dependencies.spawn}
 	control=require("modules.shortcuts.script_control")
 	manager=require("modules.keystats.log_manager")
 	local keystats=require("modules.keystats")

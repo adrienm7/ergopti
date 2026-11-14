@@ -16,7 +16,7 @@
 
 local M = {}
 local Logger = require("core.logger.engine.shim")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Files = require("core.fs.adapters.file_system")
 local Paths = require("infra.config_paths")
 local i18n = require("core.i18n.engine.i18n")

@@ -1,7 +1,7 @@
 --- modules/gestures/program_owner.lua
 
 --- Private user programs use the shared native worker lifecycle policy.
-local Runner = require("adapters.program_runner")
+local Runner = require("core.process.adapters.program_runner")
 local Worker = require("core.lifecycle.engine.native_worker_owner")
 local Parameter = require("settings.engine.program_parameter")
 local Timings = require("infra.timings")

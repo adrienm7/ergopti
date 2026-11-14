@@ -16,7 +16,7 @@ local root = arg[1]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
   .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
 local sink = require('core.logger.engine.sink')
-assert(package.loaded['adapters.shell_runner'] == nil, 'cold sink must not import the shell adapter')
+assert(package.loaded['core.process.adapters.shell_runner'] == nil, 'cold sink must not import the shell adapter')
 local ok, reason = sink.prepare_dir(arg[2])
 print(require('core.text.engine.json').encode({ok=ok,reason=reason or ''}))
 """

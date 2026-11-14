@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local Store = require("modules.llm.api_token_store")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local PASSWORD = assert(arg[1], "usage: run_keyring_receipts.lua <keyring password>")
 for _, program in ipairs({ "secret-tool", "gdbus" }) do

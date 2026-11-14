@@ -10,7 +10,7 @@ end
 --- Fixed X11 worker: blocking native queries run only in an owned child group.
 -- The parent supplies the authoritative driver/shared search path as literal argv.
 require("core.lifecycle.engine.compat.utf8").install()
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Policy = require("core.ui.engine.cursor_window_policy")
 local LIMIT = 65536
 local SLEEP_MS = require("infra.timings").ms("adapters", "window_switch_worker_sleep_ms")

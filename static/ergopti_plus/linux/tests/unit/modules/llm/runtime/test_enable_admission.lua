@@ -16,7 +16,7 @@ local function with_owner(body, options)
 	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences",
 		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "adapters.keyboard_hook",
-		"adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }
+		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
@@ -108,7 +108,7 @@ local function with_owner(body, options)
 		return world.engine, preferences
 	end
 	function world.use_native_notice()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function(name) return name == "zenity" end,
 			quote = function(value) return "'" .. value:gsub("'", "'\\''") .. "'" end,
 			exec_checked = function()

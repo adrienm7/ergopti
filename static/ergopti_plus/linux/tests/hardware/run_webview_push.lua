@@ -78,7 +78,7 @@ local PERSONAL_SOURCE = '[meta]\nname = "WebKit fixture"\n[General]\n"probe" = {
 --- Creates an independently authored source for the real editor opening owner.
 --- @return string directory An exclusively created temporary directory.
 local function prepare_personal_source()
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local Writer = require("core.text.engine.toml_codec.writer")
 	local Reader = require("core.text.engine.toml_codec.reader")
 	local directory = os.tmpname()
@@ -105,7 +105,7 @@ end
 --- @return boolean
 local function retire_personal_source()
 	if personal_directory == nil then return true end
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local removed = os.remove(personal_directory .. "/personal.toml")
 	if not removed then return false end
 	local retired = Shell.run("rmdir " .. Shell.quote(personal_directory)) == true
