@@ -15,7 +15,7 @@ local names = {
 	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
-	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
+	"core.timing.engine.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
 	"core.fs.engine.paths", "menu.engine.renderer",
 }
 
@@ -64,7 +64,7 @@ helpers.describe("configured shortcut row labels", function()
 					decorate_section = function(label) return label end,
 				}
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.deferred_work"] = {}
+				package.loaded["core.timing.engine.deferred_work"] = {}
 				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["ui.menu.menu_utils"] = {}
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }

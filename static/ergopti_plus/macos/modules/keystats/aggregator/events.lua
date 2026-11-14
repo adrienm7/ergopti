@@ -216,7 +216,7 @@ function M.walk_system_event(entry)
 	elseif action == "unlock" then s.locked_ms = s.locked_ms + (entry.duration_ms or 0)
 	elseif action == "wake"   then
 		s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
-		if AggHelper.is_night_wake(entry.timestamp, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
+		if AggHelper.is_night_wake(entry.timestamp, require("core.timing.engine.timings").ms("keystats", "night_wake_end_ms")) then
 			s.night_wake_count = s.night_wake_count + 1
 		end
 	end

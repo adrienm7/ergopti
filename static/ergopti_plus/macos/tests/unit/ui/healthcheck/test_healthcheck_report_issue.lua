@@ -109,7 +109,7 @@ end
 -- Direct injections and the timing reader's native path consumer form one fixture.
 local NATIVE_MODULES = {
 	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "ui.healthcheck.report",
-	"core.logger.engine.logger", "infra.timings", "core.fs.engine.paths",
+	"core.logger.engine.logger", "core.timing.engine.timings", "core.fs.engine.paths",
 }
 
 --- Keeps the complete asynchronous fixture body under one restoration boundary.
@@ -181,10 +181,10 @@ end
 helpers.describe("macOS diagnostics native opener completion (macos-opener-terminal)", function()
 	native_case("refuses a throwing timing reader before constructing a native capability", function()
 		local native, run = native_opener()
-		local previous = package.loaded["infra.timings"]
-		package.loaded["infra.timings"] = { sec = function() error("controlled timing admission refusal") end }
+		local previous = package.loaded["core.timing.engine.timings"]
+		package.loaded["core.timing.engine.timings"] = { sec = function() error("controlled timing admission refusal") end }
 		local ok, detail = pcall(run)
-		package.loaded["infra.timings"] = previous
+		package.loaded["core.timing.engine.timings"] = previous
 		helpers.assert_true(ok, tostring(detail))
 		helpers.assert_eq(#native.callbacks, 1)
 		helpers.assert_eq(native.callbacks[1].ok, false)
@@ -267,7 +267,7 @@ helpers.describe("macOS diagnostics native opener completion (macos-opener-termi
 		local native, run = native_opener()
 		run()
 		helpers.assert_eq(native.tasks[1].deadline_count_at_start, 1)
-		helpers.assert_eq(native.timers[1].delay, require("infra.timings").sec("ui", "desktop_open_timeout_ms"))
+		helpers.assert_eq(native.timers[1].delay, require("core.timing.engine.timings").sec("ui", "desktop_open_timeout_ms"))
 		native.tasks[1].finish(0)
 		helpers.assert_true(native.timers[1].cancelled)
 		helpers.assert_eq(native.callbacks[1].ok, true)

@@ -60,7 +60,7 @@ local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("core.process.adapters.shell_runner")
 local TimerScheduler      = require("core.events.timer_scheduler")
-local Timings             = require("infra.timings")
+local Timings             = require("core.timing.engine.timings")
 
 local LOG = "menu_llm"
 

@@ -49,7 +49,7 @@ package.loaded["modules.keystats.sqlite_writer"] = {
 -- crash when aggregator.lua initialises its module-level timing constants.
 -- Inject a complete stub before the load so the real TOML path is never hit
 -- and the module loads cleanly in CI regardless of test ordering.
-package.loaded["infra.timings"] = {
+package.loaded["core.timing.engine.timings"] = {
 	ms  = function(_section, _key) return 1000 end,
 	sec = function(_section, _key) return 1.0  end,
 }

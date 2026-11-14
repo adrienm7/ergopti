@@ -19,7 +19,7 @@ local OWNED_MODULES = {
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
-	"infra.deferred_work", "modules.llm.backend_detector",
+	"core.timing.engine.deferred_work", "modules.llm.backend_detector",
 }
 
 local ROW = { mlx = 1, ollama = 2, api = 3 }
@@ -297,7 +297,7 @@ helpers.describe("The MLX row explains an unsupported Mac and offers Ollama (mlx
 			helpers.assert_true(mlx_row.label:find("(menu.llm.backend_mlx_unsupported)", 1, true) ~= nil,
 				"the disabled row must say why: " .. mlx_row.label)
 
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(_, callback) callback(); return true end,
 			}
 			package.loaded["infra.dialog_util"].block_alert = function(_, _, primary)

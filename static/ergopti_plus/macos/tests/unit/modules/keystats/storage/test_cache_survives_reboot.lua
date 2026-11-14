@@ -88,7 +88,7 @@ local function start(root, prepare, revision)
 	}
 	package.loaded["core.logger.engine.logger"] = nil
 	helpers.load_with_stubs("core.logger.engine.logger")
-	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1 end,
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1 end,
 		count = function() return 4096 end }
 	package.loaded["modules.keystats.sqlite_writer"] = {
 		SYNCHRONOUS_PRAGMA = "PRAGMA synchronous = FULL;",

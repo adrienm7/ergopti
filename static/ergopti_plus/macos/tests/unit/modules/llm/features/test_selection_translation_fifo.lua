@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.modules.llm.selection_translation_fixture")
 local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
-local function seconds(key) return require("infra.timings").sec("debounce", key) end
+local function seconds(key) return require("core.timing.engine.timings").sec("debounce", key) end
 
 local function accepted(world)
 	helpers.assert_true(world.flow.run("en"))

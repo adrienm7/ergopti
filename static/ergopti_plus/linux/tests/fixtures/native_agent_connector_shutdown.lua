@@ -107,7 +107,7 @@ print('tool-finished',flush=True)
 	assert(uv.fs_chmod(tools .. "/held-tool", 448))
 	local callbacks, ready, completed_ok = 0, nil, nil
 	watchdog = assert(uv.new_timer())
-	require("infra.native_timer").start(uv, watchdog, 5000, 0, function() timed_out = true; Loop.stop() end)
+	require("core.timing.engine.native_timer").start(uv, watchdog, 5000, 0, function() timed_out = true; Loop.stop() end)
 	assert(Connectors.run({ max_tools = 4 }, { type = "shortcut", name = "held-tool", input = arg[1] == "normal" and "normal" or nil },
 		function(success)
 			callbacks = callbacks + 1

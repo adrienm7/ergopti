@@ -18,7 +18,7 @@ local function noop() end
 helpers.describe("core.logger.engine.key_event_health (key-event-pairing)", function()
 	local saved = {
 		logger = package.loaded["core.logger.engine.logger"],
-		deferred = package.loaded["infra.deferred_work"],
+		deferred = package.loaded["core.timing.engine.deferred_work"],
 		timer = package.loaded["core.events.timer_scheduler"],
 		clock = package.loaded["core.events.clock"],
 		subject = package.loaded["core.logger.engine.key_event_health"],
@@ -34,7 +34,7 @@ helpers.describe("core.logger.engine.key_event_health (key-event-pairing)", func
 		info = function(_, fmt, ...) lines[#lines + 1] = { level = "info", text = string.format(fmt, ...) } end,
 		debug = noop, error = noop,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback) deferred[#deferred + 1] = callback; return true end,
 	}
 	package.loaded["core.events.timer_scheduler"] = {
@@ -242,7 +242,7 @@ helpers.describe("core.logger.engine.key_event_health (key-event-pairing)", func
 	end)
 
 	package.loaded["core.logger.engine.logger"] = saved.logger
-	package.loaded["infra.deferred_work"] = saved.deferred
+	package.loaded["core.timing.engine.deferred_work"] = saved.deferred
 	package.loaded["core.events.timer_scheduler"] = saved.timer
 	package.loaded["core.events.clock"] = saved.clock
 	package.loaded["core.logger.engine.key_event_health"] = saved.subject

@@ -15,7 +15,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("core.logger.engine.logger")
-local Timings  = require("infra.timings")
+local Timings  = require("core.timing.engine.timings")
 local Geometry = require("modules.gestures.geometry")
 local ContactJoin = require("gestures.engine.contact_join")
 local Direction = require("gestures.engine.direction")

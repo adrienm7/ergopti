@@ -352,7 +352,7 @@ end
 --- @param confirm function|nil The consent; the owned dialog by default.
 --- @return function python(callback) -> callback(ok, interpreter_or_code, detail)
 local function managed_python(confirm)
-	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
+	local timeout_ms = require("core.timing.engine.timings").ms("adapters", "managed_python_download_timeout_ms")
 	local native = require("luv")
 	local function managed_process(program, args, callback)
 		local delivered, constructing, pending = false, true, nil

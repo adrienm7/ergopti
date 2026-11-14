@@ -131,7 +131,7 @@ end
 function M.reap(directory, opts)
 	opts = opts or {}
 	local Directory = opts.directory or require("core.fs.engine.native_directory")
-	local max_age_ms = opts.max_age_ms or require("infra.timings").ms("adapters", "stale_temp_age_ms")
+	local max_age_ms = opts.max_age_ms or require("core.timing.engine.timings").ms("adapters", "stale_temp_age_ms")
 	local now = opts.now or os.time()
 	local entries, message, code = Directory.entries(directory)
 	if entries == nil then

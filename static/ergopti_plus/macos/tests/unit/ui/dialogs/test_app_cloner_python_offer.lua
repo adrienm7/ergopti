@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 
-local STUBBED = { "core.i18n.engine.i18n", "infra.dialog_util", "infra.deferred_work", "infra.notifications",
+local STUBBED = { "core.i18n.engine.i18n", "infra.dialog_util", "core.timing.engine.deferred_work", "infra.notifications",
 	"ui.app_cloner_python_offer" }
 local ORIGINALS = {}
 for _, name in ipairs(STUBBED) do ORIGINALS[name] = package.loaded[name] end
@@ -44,7 +44,7 @@ local function load(answer)
 			return first
 		end,
 	}
-	package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
 	package.loaded["infra.notifications"] = { notify = function() world.notices = world.notices + 1 end }
 	package.loaded["ui.app_cloner_python_offer"] = nil
 	return require("ui.app_cloner_python_offer"), world

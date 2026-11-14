@@ -830,7 +830,7 @@ local INPUT_MODULES = {
 	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
 	"modules.keymap.one_shot_shift", "modules.keymap.control_sentinels",
 	"modules.keymap.magic_key_source", "core.events.clock",
-	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "infra.deferred_work",
+	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "core.timing.engine.deferred_work",
 	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
 	"infra.hotstring_engine", "hotstrings.engine.matcher", "core.text.engine.utils", "core.text.engine.utils_core",
 	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",

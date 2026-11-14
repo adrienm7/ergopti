@@ -30,7 +30,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 			helpers.with_fresh_modules({
 				"ui.menu.menu_shortcuts",
 				"core.logger.engine.logger",
-				"infra.deferred_work",
+				"core.timing.engine.deferred_work",
 				"core.fs.engine.dir",
 				"infra.dialog_util",
 				"modules.shortcuts",
@@ -60,7 +60,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				_G.hs = hs_stub
 				package.loaded["hs"] = hs_stub
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.deferred_work"] = {
+				package.loaded["core.timing.engine.deferred_work"] = {
 					after = function() return true end,
 				}
 				package.loaded["core.fs.engine.dir"] = {
@@ -180,7 +180,7 @@ end)
 --- @param callback function Native provider and initialized owner assertions.
 local function with_extension_boundary(callback)
 	local names = {
-		"ui.menu.menu_shortcuts", "core.logger.engine.logger", "infra.deferred_work", "core.fs.engine.dir",
+		"ui.menu.menu_shortcuts", "core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.engine.dir",
 		"infra.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
@@ -217,7 +217,7 @@ local function with_extension_boundary(callback)
 			end
 			native_hs.extension_boundary = { loads = 0, actions = {}, accept = false }
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 			package.loaded["infra.dialog_util"] = {}
 			package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }

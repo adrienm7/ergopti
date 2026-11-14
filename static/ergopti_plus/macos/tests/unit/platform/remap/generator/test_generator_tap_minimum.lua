@@ -20,7 +20,7 @@ local SourceFile     = require("tests.support.source_file")
 local TOKEN    = "0123456789abcdef0123456789abcdef"
 local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 local TIMEOUT_PARAMETER = "basic.to_if_alone_timeout_milliseconds"
-local TAP_MIN_MS = require("infra.timings").ms("tap_hold", "tap_min_duration_ms")
+local TAP_MIN_MS = require("core.timing.engine.timings").ms("tap_hold", "tap_min_duration_ms")
 
 helpers.with_fresh_modules({
 	"core.fs.adapters.file_system",

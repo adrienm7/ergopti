@@ -813,8 +813,8 @@ end)
 
 helpers.describe("input-source confirm: a fresh process reads the state (composer-macos26)", function()
 	status_test("passes the canonical settle delay to every refresh child (input-source-refresh-timing)", function()
-		local previous_timings = require("infra.timings")
-		local previous_loader = package.preload["infra.timings"]
+		local previous_timings = require("core.timing.engine.timings")
+		local previous_loader = package.preload["core.timing.engine.timings"]
 		local original_sec = previous_timings.sec
 		local injected, reads = 0.137, 0
 		local deadline = original_sec("ui", "input_source_operation_timeout_ms")
@@ -828,9 +828,9 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 		end
 		local ok, detail = xpcall(function()
 			-- The normal loader clears timings; the preload owns this one injection
-			package.preload["infra.timings"] = function() return timing_port end
+			package.preload["core.timing.engine.timings"] = function() return timing_port end
 			local f = load_fixture()
-			package.preload["infra.timings"] = previous_loader
+			package.preload["core.timing.engine.timings"] = previous_loader
 			local answers = 0
 			for _, refresh in ipairs({ true, false }) do
 				helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = refresh }, function(confirmed)
@@ -848,8 +848,8 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 			helpers.assert_eq(answers, 2)
 			helpers.assert_eq(f.timers[1].delay, deadline, "the overall operation deadline is independent")
 		end, debug.traceback)
-		package.preload["infra.timings"] = previous_loader
-		package.loaded["infra.timings"] = previous_timings
+		package.preload["core.timing.engine.timings"] = previous_loader
+		package.loaded["core.timing.engine.timings"] = previous_timings
 		reset_fixture_modules()
 		if not ok then error(detail, 0) end
 	end)
@@ -869,7 +869,7 @@ helpers.describe("input-source confirm: a fresh process reads the state (compose
 		helpers.assert_eq(args[3], "Composer Check")
 		helpers.assert_eq(args[4], "/u/composed.keylayout")
 		helpers.assert_eq(args[5], "refresh")
-		helpers.assert_eq(args[6], tostring(require("infra.timings").sec("ui", "input_source_reselect_settle_ms")),
+		helpers.assert_eq(args[6], tostring(require("core.timing.engine.timings").sec("ui", "input_source_reselect_settle_ms")),
 			"the refresh pause comes from the timing registry")
 		f.tasks[1]:complete(0, '{"listed": true, "enabled": true, "selected": false, "register": 0, "refreshed": null}\n', "")
 		helpers.assert_eq(#answers, 1)
@@ -940,9 +940,9 @@ end)
 helpers.describe("input-source refresh: one admitted settling delay", function()
 	status_test("forwards the timing reader's value to the actual confirmation program (input-source-refresh-delay)", function()
 		BaseHelpers.provide_timings()
-		local real = require("infra.timings")
-		local previous_loader = package.preload["infra.timings"]
-		local previous_loaded = package.loaded["infra.timings"]
+		local real = require("core.timing.engine.timings")
+		local previous_loader = package.preload["core.timing.engine.timings"]
+		local previous_loaded = package.loaded["core.timing.engine.timings"]
 		local admitted, reads = {}, 0
 		for key, value in pairs(real) do admitted[key] = value end
 		admitted.sec = function(section, key)
@@ -953,8 +953,8 @@ helpers.describe("input-source refresh: one admitted settling delay", function()
 			return real.sec(section, key)
 		end
 		local ok, failure = xpcall(function()
-			package.preload["infra.timings"] = function() return admitted end
-			package.loaded["infra.timings"] = nil
+			package.preload["core.timing.engine.timings"] = function() return admitted end
+			package.loaded["core.timing.engine.timings"] = nil
 			local f, calls = load_fixture(), 0
 			helpers.assert_eq(f.IS.confirm_source_async("Composer Check", { refresh = true }, function()
 				calls = calls + 1
@@ -968,8 +968,8 @@ helpers.describe("input-source refresh: one admitted settling delay", function()
 			f.tasks[1]:complete(0, '{"listed":true,"enabled":true,"select_capable":true,"selected":false}', "")
 			helpers.assert_eq(calls, 1)
 		end, debug.traceback)
-		package.preload["infra.timings"] = previous_loader
-		package.loaded["infra.timings"] = previous_loaded
+		package.preload["core.timing.engine.timings"] = previous_loader
+		package.loaded["core.timing.engine.timings"] = previous_loaded
 		reset_fixture_modules()
 		if not ok then error(failure, 0) end
 	end)

@@ -83,7 +83,7 @@ end
 
 helpers.describe("mt decoder: distances in millimetres through the resolution (gsd2-decoder-mm)", function()
 	helpers.it("reads the swipe minimum and the pair-scroll travel from the shared registry (gsd2-decoder-mm)", function()
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		helpers.assert_eq(Decoder.SWIPE_MINIMUM_MM, Timings.count("gestures", "decoder_swipe_minimum_mm"))
 		helpers.assert_eq(Decoder.PAIR_SCROLL_TRAVEL_MM, Timings.count("gestures", "pair_scroll_travel_mm"))
 		helpers.assert_eq(Decoder.DEFAULT_SWIPE_THRESHOLD, nil, "no swipe threshold in device units is left")

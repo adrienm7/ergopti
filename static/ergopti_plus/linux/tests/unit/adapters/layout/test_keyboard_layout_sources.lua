@@ -149,7 +149,7 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 		with_env({ DISPLAY = ":0" }, function()
 			helpers.assert_true(layout.refresh(nil), "a Wayland dump must load")
 		end)
-		local seconds = math.ceil(require("infra.timings").ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000)
+		local seconds = math.ceil(require("core.timing.engine.timings").ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000)
 		local bounded = false
 		for _, cmd in ipairs(commands) do
 			if cmd:find("dump-keymap-wayland", 1, true) then

@@ -86,7 +86,7 @@ helpers.describe("owned asynchronous AT-SPI selected-range protocol", function()
 			helpers.assert_eq(#state.argv, 7)
 			helpers.assert_eq(state.argv[7], "selection")
 			helpers.assert_eq(state.argv[5], require("core.fs.engine.paths").shared(""))
-			helpers.assert_eq(state.options.timeout_ms, require("infra.timings").ms("privacy", "atspi_probe_timeout_ms"))
+			helpers.assert_eq(state.options.timeout_ms, require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms"))
 			helpers.assert_eq(state.options.capture_output, false)
 			helpers.assert_eq(state.options.capture_tail, false)
 			local selected = { bus = ":1.7", path = "/field/A", role = 61, first = 14, last = 20, text = "ORIGIN" }

@@ -133,10 +133,10 @@ end
 --- finds nothing, and every deferred focus retry is captured to be drained.
 --- @param body function Receives the harness.
 local function with_untrusted_factory(body)
-	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "infra.deferred_work", "core.i18n.engine.i18n" }
+	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "core.timing.engine.deferred_work", "core.i18n.engine.i18n" }
 	helpers.with_stub_scope(owned, function()
 		local h = { deferred = {}, activations = 0, levels = {}, fronts = {}, shows = 0 }
-		package.loaded["infra.deferred_work"] = {
+		package.loaded["core.timing.engine.deferred_work"] = {
 			after = function(_, callback)
 				h.deferred[#h.deferred + 1] = callback
 				return true

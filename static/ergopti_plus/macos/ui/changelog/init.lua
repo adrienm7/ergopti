@@ -56,7 +56,7 @@ local M = {}
 local WebviewResult = require("adapters.webview_result")
 
 local Logger     = require("core.logger.engine.logger")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local Paths      = require("core.fs.engine.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("core.i18n.engine.i18n")
@@ -930,7 +930,7 @@ local function build_window(channel, opening_generation, focus_owner)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
+				DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
@@ -969,7 +969,7 @@ local function build_window(channel, opening_generation, focus_owner)
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	local scheduled = DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
+	local scheduled = DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 

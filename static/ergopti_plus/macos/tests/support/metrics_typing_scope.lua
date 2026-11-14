@@ -22,7 +22,7 @@ local OWNERS = {
 	"modules.keystats.log_manager", "modules.keystats.sqlite_reader",
 	-- The dashboard and the reader name the shared metric keys through this table.
 	"metrics.engine.view.manifest_keys",
-	"infra.paced_job", "infra.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
+	"core.timing.engine.paced_job", "core.timing.engine.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
 }
 
 --- Runs construction and every callback within the same native and cache scope.

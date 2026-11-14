@@ -13,7 +13,7 @@ local run_contract = function(helpers, load_host, load_builder)
   package.loaded['core.fs.engine.paths']={shared=function(p)return p end}
   package.loaded['core.i18n.engine.i18n']={get=function(k)return k end}
   package.loaded['core.ui.engine.webview.i18n_seed']={}
-  package.loaded['infra.deferred_work']={after=function()return true end}
+  package.loaded['core.timing.engine.deferred_work']={after=function()return true end}
   package.loaded['core.events.timer_scheduler']=nil -- Exercise actual timer ownership through the native-shaped port.
   package.loaded['core.fs.adapters.json_codec']=nil -- Use the actual codec over the controlled native JSON port.
   package.loaded['core.ui.engine.window_titles']={compose=function(k)return k end}

@@ -38,7 +38,7 @@ local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local SessionDemotions = require("ui.menu.session_demotions")
@@ -205,7 +205,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function()
-			return DeferredWork.after(require("infra.timings").sec("ui", "config_editor_reload_delay_ms"),
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "config_editor_reload_delay_ms"),
 				function() pcall(hs.reload) end,
 				"menu.reload_after_paths")
 		end)
@@ -1095,7 +1095,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
 		open_paths                = function()
-			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
 		end,
 		reload                    = function()
 			local accepted = do_reload("menu")
@@ -1159,7 +1159,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					return committed == true
 				end,
 				now = function() return hs.timer.absoluteTime() / 1e9 end,
-				timeout = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+				timeout = require("core.timing.engine.timings").sec("ui", "user_quit_deadline_ms"),
 				poll = 0.25,
 				on_admitted = function(decision) started = start_exit(decision) == true end,
 				on_refused = function(decision)
@@ -1172,7 +1172,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
-			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
@@ -1764,7 +1764,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
 				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
 			require("core.logger.engine.perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
-				function() return require("infra.timings").ms("budgets", "menu_rebuild_ms") end)
+				function() return require("core.timing.engine.timings").ms("budgets", "menu_rebuild_ms") end)
 			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))

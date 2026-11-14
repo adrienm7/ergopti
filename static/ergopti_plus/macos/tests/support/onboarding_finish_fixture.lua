@@ -18,7 +18,7 @@ local M = {}
 
 local MODULE_NAMES = {
 	"core.fs.adapters.file_system",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
@@ -191,7 +191,7 @@ function M.with_finish(opts, scenario)
 	package.loaded["infra.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1; return true end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, fn, label)
 			state.deferred = state.deferred + 1
 			state.pending[#state.pending + 1] = { delay = delay, fn = fn, label = label }

@@ -97,7 +97,7 @@ local function load_log_manager()
 	}
 
 	package.loaded["core.i18n.engine.i18n"]    = { t = function(key) return key end }
-	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
 	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,

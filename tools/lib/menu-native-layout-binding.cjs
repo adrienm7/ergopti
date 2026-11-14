@@ -323,7 +323,10 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 					'upgrade_active_list_async',
 					'local upgrade_active_list_async = input_sources.upgrade_active_list_async'
 				) ||
-				!localPort('DeferredWork', 'local DeferredWork = require("infra.deferred_work")') ||
+				!localPort(
+					'DeferredWork',
+					'local DeferredWork = require("core.timing.engine.deferred_work")'
+				) ||
 				positions(whole, 'local function defer_tis_call').length !== 1 ||
 				positions(whole, 'defer_tis_call =').length ||
 				positions(whole, 'local defer_tis_call').length ||

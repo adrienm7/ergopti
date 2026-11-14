@@ -16,7 +16,7 @@ local it = helpers.it
 local Fakes = helpers.load_module("tests.fakes")
 local Home = require("tests.support.keystats_home_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local TOPO_MS = Timings.ms("keystats", "topo_tick_ms")
 local SCAN_MS = Timings.ms("keystats", "av_state_slow_tick_ms")

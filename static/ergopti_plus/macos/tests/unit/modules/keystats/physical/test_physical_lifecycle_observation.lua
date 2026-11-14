@@ -9,7 +9,7 @@ local MODULE_NAMES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"modules.keystats.context_tracker",
 	"modules.keystats.log_manager",
 	"modules.keystats.watchers",
@@ -166,7 +166,7 @@ local function with_fixture(options, scenario)
 			fixture.error_lines[#fixture.error_lines + 1] = string.format(format_string, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_, key)
 			return options.timings and options.timings[key] or 1
 		end,

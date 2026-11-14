@@ -77,7 +77,7 @@ package.loaded["core.fs.engine.paths"] = { shared = function(relative)
 	return production .. "/static/ergopti_plus/_shared/" .. relative
 end }
 package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return function() end end })
-require("infra.timings")
+require("core.timing.engine.timings")
 package.loaded["adapters.managed_ollama_hint"] = { get = function(directory)
 	local raw = files[receipt_path]
 	if not raw or #raw > 1048576 then return nil end
