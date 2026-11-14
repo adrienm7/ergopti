@@ -375,6 +375,30 @@ async function exerciseLayerSelector(browser, origin) {
 		),
 		['kana', 'command']
 	);
+	// The chips read as the keycaps name their modifiers; the id stays in the tooltip.
+	const chips = await page.$$eval('#le-layerbar .le-other-layers [data-layer]', (buttons) =>
+		buttons.map((b) => [b.textContent, b.title])
+	);
+	assert.deepEqual(chips, [
+		['kana_lock', 'kana (kana_lock)'],
+		['Win / ⌘ / Super', 'command (meta)']
+	]);
+	const en = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	await tool(page, 'layers');
+	await page.fill('#le-layer-id', 'shift_caps_lock');
+	await page.check('#le-layer-required input[value="shift"]');
+	await page.check('#le-layer-required input[value="caps_lock"]');
+	await page.click('#le-layer-add');
+	assert.equal(
+		await page.textContent('[data-layer="shift_caps_lock"]'),
+		`${en['layer_editor.key.shift']} + ${en['layer_editor.key.caps_lock']}`
+	);
+	assert.match(
+		await page.getAttribute('[data-layer="shift_caps_lock"]', 'title'),
+		/^shift_caps_lock /
+	);
 	await page.click('[data-layer="option"]');
 	assert.equal(await page.getAttribute('[data-layer="option"]', 'aria-selected'), 'true');
 	// Every section reaches the page as an element: a hidden one is not printed as « null ».

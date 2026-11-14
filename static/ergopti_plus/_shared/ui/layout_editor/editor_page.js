@@ -65,6 +65,22 @@ var LayoutEditorPage = (function () {
 		MetaLeft: 'meta_left',
 		MetaRight: 'meta_right'
 	};
+	// The key that names a built-in or sided modifier of the source on the layer chips.
+	const MODIFIER_NAME_KEYS = {
+		shift: 'ShiftLeft',
+		shift_left: 'ShiftLeft',
+		shift_right: 'ShiftRight',
+		control: 'ControlLeft',
+		control_left: 'ControlLeft',
+		control_right: 'ControlRight',
+		alt: 'AltLeft',
+		alt_left: 'AltLeft',
+		alt_right: 'AltRight',
+		meta: 'MetaLeft',
+		meta_left: 'MetaLeft',
+		meta_right: 'MetaRight',
+		caps_lock: 'CapsLock'
+	};
 	const TAP_HOLD_THRESHOLD_STEP = 10;
 	// The OS whose emulation table the preview performs when neither the scope
 	// nor the host names one (the website): macOS, whose .keylayout holds the
@@ -696,6 +712,28 @@ var LayoutEditorPage = (function () {
 			return layers.find((layer) => layer.required.map(altgr).sort().join('+') === wanted) || null;
 		}
 
+		/**
+		 * A layer's readable name: its modifiers as the keycaps name them (« Maj +
+		 * Verr. Maj »), a modifier no key names keeping its id; a layer reached by
+		 * no modifier keeps its id.
+		 */
+		function layerLabel(layer) {
+			if (!layer.required.length) return layer.id;
+			return layer.required
+				.map((mod) => {
+					const code = MODIFIER_NAME_KEYS[mod];
+					if (!code) return mod;
+					const name = keyName(code);
+					if (name !== code) return name;
+					// A key each OS names its own way (Meta) when the view states no OS.
+					const names = LayoutEditorModel.PLATFORMS.map((os) =>
+						LayerModel.keyLegend(code, Object.assign({}, keyView, { os }))
+					).filter((each) => each !== code);
+					return names.length ? [...new Set(names)].join(' / ') : mod;
+				})
+				.join(' + ');
+		}
+
 		/** Selects a layer and redraws. */
 		function showLayer(id) {
 			state.layer = id;
@@ -749,8 +787,8 @@ var LayoutEditorPage = (function () {
 						class: `le-tab${layer.id === state.layer ? ' active' : ''}`,
 						'aria-selected': String(layer.id === state.layer),
 						'data-layer': layer.id,
-						title: layer.required.join('+') || tl('layer.no_modifier'),
-						text: layer.id,
+						title: `${layer.id} (${layer.required.join('+') || tl('layer.no_modifier')})`,
+						text: layerLabel(layer),
 						onclick: () => showLayer(layer.id)
 					})
 				);
