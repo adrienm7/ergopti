@@ -34,8 +34,14 @@ const TEST_NAMES = Object.freeze([
 	'metatype',
 	'metatype (5.4)'
 ]);
-function refused() {
-	throw new Error('Pinned native Lua54 provider prerequisite refused.');
+/**
+ * Refuses the provider; a detail names what was read, never a private path.
+ * @param {string} [detail] The refused fact, such as a vendor test row.
+ */
+function refused(detail) {
+	throw new Error(
+		'Pinned native Lua54 provider prerequisite refused.' + (detail ? ' ' + detail : '')
+	);
 }
 function hash(bytes) {
 	return crypto.createHash('sha256').update(bytes).digest('hex');
@@ -98,9 +104,11 @@ function vendorReceipt(rows, unionSupported) {
 		)
 			refused();
 		names.add(row.name);
+		// The vendor row is named so a CI refusal says which test changed.
+		const seen = `vendor test "${row.name}" ${row.result}/${row.returncode}, union ABI ${unionSupported}`;
 		if (row.name === 'unions by value' && !unionSupported) {
-			if (row.result !== 'SKIP' || row.returncode !== 77) refused();
-		} else if (row.result !== 'OK' || row.returncode !== 0) refused();
+			if (row.result !== 'SKIP' || row.returncode !== 77) refused(seen);
+		} else if (row.result !== 'OK' || row.returncode !== 0) refused(seen);
 	}
 	return Object.freeze({
 		passed: unionSupported ? 23 : 22,

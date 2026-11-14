@@ -580,7 +580,14 @@ providerControl('optional skip cannot be reported as pass', () => {
 	assert.throws(() => Provider.vendorReceipt(rows, false));
 });
 providerControl('supported union ABI cannot skip', () =>
-	assert.throws(() => Provider.vendorReceipt(vendorRows(), true))
+	assert.throws(
+		() => Provider.vendorReceipt(vendorRows(), true),
+		{
+			message:
+				'Pinned native Lua54 provider prerequisite refused. vendor test "unions by value" SKIP/77, union ABI true'
+		},
+		'the refusal names the vendor row it read'
+	)
 );
 providerControl('vendor nonzero pass refused', () => {
 	const rows = vendorRows();
