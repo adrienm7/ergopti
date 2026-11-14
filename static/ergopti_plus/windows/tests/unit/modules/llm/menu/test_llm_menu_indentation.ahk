@@ -279,9 +279,14 @@ _LMT_IndentRetainedOwners() {
 				if Condition == "retired owner"
 					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
 				if Condition == "paused" {
-					; A pause stops typing, not configuration (EDD-1).
-					Callback.Call()
-					AssertEqual(1, Seen["calls"], "a paused choice reaches the native writer")
+					; A pause stops typing, not configuration (EDD-1): the shared gate
+					; hands a paused choice to the native setter.
+					Expected := _LLM_Menu_IndentSnapshot()
+					Suspend(true)
+					Calls := Map("n", 0)
+					Stub := (Value, Source) => (Calls["n"] += 1, true)
+					AssertTrue(_LLM_Menu_IndentCommand(Expected, 2, Stub), "a paused choice is admitted")
+					AssertEqual(1, Calls["n"], "a paused choice reaches the native setter")
 					continue
 				}
 				Physical := FSReadUtf8Exact(Path)
