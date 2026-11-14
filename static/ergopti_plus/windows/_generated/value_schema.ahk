@@ -167,6 +167,13 @@ ValueSchemaData() {
 			"max", 1000,
 			"default_from", Map(
 				"manifest", "mod_combos.simultaneous_threshold_ms")),
+		"personal_info.info.*", Map(
+			"file", "personal_info.toml",
+			"type", "string",
+			"allow_empty", 1),
+		"personal_info.letters.*", Map(
+			"file", "personal_info.toml",
+			"type", "string"),
 		"shortcuts.caps_word.idle_timeout_seconds", Map(
 			"file", "config.toml",
 			"type", "decimal",

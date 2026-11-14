@@ -193,6 +193,22 @@ local function _parse_personal_info_toml(path)
 
 	local info    = (type(parsed.info) == "table") and parsed.info or {}
 	local letters = (type(parsed.letters) == "table") and parsed.letters or {}
+	-- A field its shared value schema declaration refuses (a number, a table)
+	-- was read as an empty value without a word; it is now reported by its
+	-- path, never its value, and still left out of the rules.
+	local ValueCheck = require("settings.engine.value_check")
+	local Outdated = require("settings.engine.migration.outdated")
+	for section, key in pairs({ info = ValueCheck.KEY.PERSONAL_INFO_INFO_ANY,
+		letters = ValueCheck.KEY.PERSONAL_INFO_LETTERS_ANY }) do
+		local declaration = ValueCheck.declaration(key)
+		for name, value in pairs(section == "info" and info or letters) do
+			local checked = ValueCheck.check_value(declaration, value)
+			if not checked.ok then
+				Outdated.report_in_file(path, { section, tostring(name) },
+					"the value is refused by its shared declaration (" .. checked.reason .. ")", Logger)
+			end
+		end
+	end
 	return info, letters
 end
 

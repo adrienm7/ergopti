@@ -280,6 +280,15 @@
 			"default_from": {
 				"manifest": "shortcuts.search.search_engine_url_query"
 			}
+		},
+		"personal_info.info.*": {
+			"file": "personal_info.toml",
+			"type": "string",
+			"allow_empty": true
+		},
+		"personal_info.letters.*": {
+			"file": "personal_info.toml",
+			"type": "string"
 		}
 	}
 }

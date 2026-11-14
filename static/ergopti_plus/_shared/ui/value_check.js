@@ -577,6 +577,15 @@ function requireValue(schema, key, value) {
 				"default_from": {
 					"manifest": "shortcuts.search.search_engine_url_query"
 				}
+			},
+			"personal_info.info.*": {
+				"file": "personal_info.toml",
+				"type": "string",
+				"allow_empty": true
+			},
+			"personal_info.letters.*": {
+				"file": "personal_info.toml",
+				"type": "string"
 			}
 		}
 	};
@@ -604,7 +613,9 @@ function requireValue(schema, key, value) {
 		"GESTURES_SENSITIVITIES_ANY": "gestures.sensitivities.*",
 		"SHORTCUTS_CHATGPT_URL": "shortcuts.chatgpt_url",
 		"SHORTCUTS_SEARCH_SEARCH_ENGINE": "shortcuts.search.search_engine",
-		"SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY": "shortcuts.search.search_engine_url_query"
+		"SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY": "shortcuts.search.search_engine_url_query",
+		"PERSONAL_INFO_INFO_ANY": "personal_info.info.*",
+		"PERSONAL_INFO_LETTERS_ANY": "personal_info.letters.*"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });
