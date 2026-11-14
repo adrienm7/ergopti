@@ -2437,10 +2437,19 @@ function scanFile(file, text, ctx) {
 			const climb = m[1].split('/').length - 1;
 			const base = `${PREFIX}${inTree}`;
 			const old = path.posix.normalize(`${base}/${'../'.repeat(climb)}${m[2]}.${m[3]}`);
-			const target = byRepoPath.get(old);
-			if (!target || target === PREFIX || target === old) continue;
-			const rel = path.posix.relative(base, target);
-			add('path-regex', m[0], rel.replace(/\./g, '\\.'), { oldRepo: old, newRepo: target });
+			// The suite's own entries (run_all.ahk, an E2E entry) climb out of
+			// windows/tests into the driver: \.\./infra/app_state\.ahk names
+			// windows/infra/app_state.ahk, and keeps its climb.
+			const fromSuite = `${base}/${m[2]}.${m[3]}`;
+			const suite = !EXISTING.has(old) && EXISTING.has(fromSuite);
+			const named = suite ? fromSuite : old;
+			const target = byRepoPath.get(named);
+			if (!target || target === PREFIX || target === named) continue;
+			if (suite && !target.startsWith(`${base}/`)) continue;
+			const rel = suite
+				? `${'../'.repeat(climb)}${target.slice(base.length + 1)}`
+				: path.posix.relative(base, target);
+			add('path-regex', m[0], rel.replace(/\./g, '\\.'), { oldRepo: named, newRepo: target });
 		}
 	// /\\modules\\llm\\x\.json"/ in a tool: an AutoHotkey path, joined onto
 	// _SharedDir (or the driver's own folder), checked with a regular expression.
