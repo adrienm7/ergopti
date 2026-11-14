@@ -420,7 +420,10 @@ about 0.3 s per corpus. French: `static/corpus/original/fr/corpus_nemolivier.txt
 (2.5 MB); English: `static/corpus/original/en/don_quixote_ormsby.txt`
 (2.2 MB; it replaced a synthetic text deleted with the corpora of unknown
 licence). A layout of the imported library has only its alphabetic block (no
-accents): its `unsupported` share shows what it cannot type.
+accents): its `unsupported` share shows what it cannot type. The keys
+outside the block keep QWERTY's characters the block did not place, and the
+QWERTY characters the block displaced (Dvorak's / and ?) take the free cells
+of those keys, then of the number row; what finds no cell stays unsupported.
 
 French corpus (best eight and the reference layouts), with the model of
 2026-11-14 (space bar on the left thumb, sections 16 and 17):
@@ -429,20 +432,20 @@ French corpus (best eight and the reference layouts), with the model of
 | ---: | ------------- | ----: | ---: | ---: | ---: | -------: | ------------: | -----------: | ----------: | -------: | ------: | ----------: |
 |    1 | Ergopti+ ANSI |  20.7 | 0.94 | 6.24 | 1.17 |     0.31 |          0.41 |        14.78 |       40.13 |    66.55 |     8.8 |        0.00 |
 |    2 | Ergopti+      |  19.0 | 0.98 | 6.21 | 1.29 |     0.24 |          0.42 |        14.70 |       40.13 |    65.51 |     8.9 |        0.00 |
-|    3 | beo           |  17.2 | 0.77 | 5.48 | 1.57 |     0.90 |          0.68 |        13.26 |       39.69 |    63.95 |     7.4 |        0.73 |
+|    3 | beo           |  18.2 | 0.77 | 5.48 | 1.57 |     0.90 |          0.68 |        13.26 |       39.69 |    63.95 |     7.4 |        0.73 |
 |    4 | Ergopti       |  17.0 | 1.33 | 6.45 | 1.15 |     0.24 |          0.38 |        14.78 |       39.92 |    65.58 |     8.3 |        0.00 |
 |    5 | Ergopti ANSI  |  16.5 | 1.33 | 6.45 | 1.15 |     0.32 |          0.38 |        14.78 |       39.92 |    66.20 |     8.4 |        0.00 |
-|    6 | Optimot       |   8.2 | 1.01 | 6.69 | 1.82 |     0.19 |          0.37 |        15.23 |       41.20 |    66.58 |     7.2 |        1.43 |
+|    6 | Optimot       |  10.2 | 1.07 | 6.80 | 1.89 |     0.18 |          0.42 |        15.19 |       40.80 |    66.39 |     7.3 |        0.85 |
 |    7 | Ergo-L        |   8.0 | 1.79 | 6.09 | 1.46 |     0.18 |          1.89 |        19.63 |       28.97 |    70.15 |     8.1 |        0.01 |
-|    8 | Hands Down    |   4.5 | 1.17 | 4.93 | 1.42 |     0.96 |          0.52 |        14.88 |       36.42 |    64.54 |     7.3 |        2.44 |
+|    8 | Hands Down    |   6.0 | 1.17 | 4.93 | 1.42 |     0.96 |          0.52 |        14.88 |       36.42 |    64.64 |     7.3 |        2.21 |
 |   11 | bépo          |  −9.7 | 2.88 | 7.72 | 0.85 |     0.08 |          0.68 |        15.65 |       38.91 |    71.18 |     8.9 |        0.00 |
-|  108 | AZERTY (FR)   | −90.5 | 7.60 | 7.97 | 4.40 |     1.47 |          1.03 |        18.07 |       28.00 |    23.77 |    15.3 |        0.04 |
+|  109 | AZERTY (FR)   | −90.5 | 7.60 | 7.97 | 4.40 |     1.47 |          1.03 |        18.07 |       28.00 |    23.77 |    15.3 |        0.04 |
 |  110 | QWERTY (US)   | −94.4 | 7.40 | 8.70 | 5.33 |     0.54 |          1.06 |        17.14 |       29.18 |    29.80 |    13.6 |        2.21 |
 
-English corpus (_Don Quixote_, Ormsby, 2.2 MB): APT (24.5), Graphite (24.2),
-APTv3, Gallium, Gallium Colstag, Maya, Noctum and Nerbs lead; Ergopti+ 11.3
-(51st), Ergo-L −1.3, Dvorak −4.4, Colemak-DH −6.2, Bépo −24.5, QWERTY −86.5,
-AZERTY −91.2. The SFB of QWERTY (5.8 %), Colemak-DH (1.6 %) and Dvorak (2.7 %)
+English corpus (_Don Quixote_, Ormsby, 2.2 MB): APTv3 and APT (24.9), Maya,
+Graphite, Nerbs, Gallium Colstag, Gallium and Noctum lead; Ergopti+ 11.3
+(53rd), Ergo-L −1.3, Dvorak −3.8, Colemak-DH −4.8, Bépo −24.5, QWERTY −86.5,
+AZERTY −91.2. The SFB of QWERTY (5.8 %), Colemak-DH (1.7 %) and Dvorak (2.7 %)
 are of the order the Keyboard Layouts Doc gives (QWERTY ~6 %, Dvorak 2.5 %,
 Colemak 1.5 %).
 

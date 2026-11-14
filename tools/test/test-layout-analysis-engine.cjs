@@ -299,6 +299,15 @@ for (const entry of registry) {
 }
 check(Object.keys(byId.get('bepo').dead).length > 0, 'library: Bépo keeps its dead keys');
 check(byId.get('qwerty').rows.KeyQ[0] === 'q', 'library: QWERTY types q on KeyQ');
+// An alphabetic block keeps or regains what QWERTY types outside it (Colemak's
+// Quote key, the / and ? Dvorak's block displaces).
+const types = (id, char) =>
+	Object.values(byId.get(id).rows).some((row) => row.slice(0, 2).includes(char));
+for (const [id, chars] of [
+	['colemak', ["'", '"', '[', '-']],
+	['dvorak', ['/', '?', ';', ':']]
+])
+	for (const char of chars) check(types(id, char), `library: ${id} cannot type ${char}`);
 // Credits: a registry layout from its meta.toml, another from layout_credits.json.
 check(
 	byId.get('bepo').authors[0] === 'bépo community (bepo.fr)',

@@ -128,6 +128,9 @@ const NUMBER_ROW = [
 	'Minus',
 	'Equal'
 ];
+// The keys an alphabetic block leaves to QWERTY, in the order the characters
+// it displaced take their free cells.
+const OUTER_KEYS = ['Quote', 'BracketLeft', 'BracketRight', 'Backslash', 'IntlBackslash'];
 const REGISTRY_ORIGIN = 'registry';
 const REFERENCE_ORIGIN = 'reference';
 const LIBRARY_ORIGIN = 'library';
@@ -236,6 +239,29 @@ function fromAlphaBlock(entry, qwerty) {
 		const shift = upper !== base ? upper : US_SHIFT[base] || null;
 		rows[code] = [base, shift, null, null];
 	}
+	// The keys outside the block keep QWERTY's characters the block did not
+	// place, then take the QWERTY characters the block displaced and placed
+	// nowhere (Dvorak's / and ?), so a 30-key layout types what QWERTY types.
+	const placed = new Set(
+		Object.values(rows)
+			.flat()
+			.filter((cell) => cell !== null)
+	);
+	const outer = OUTER_KEYS.filter((code) => !rows[code] && qwerty[code]);
+	for (const code of outer) {
+		const [base, shift] = qwerty[code];
+		rows[code] = [placed.has(base) ? null : base, placed.has(shift) ? null : shift, null, null];
+		rows[code].forEach((cell) => cell !== null && placed.add(cell));
+	}
+	const missing = Object.values(qwerty)
+		.flatMap((row) => row.slice(0, 2))
+		.filter((cell) => typeof cell === 'string' && !placed.has(cell));
+	// Free cells: the outer keys first, then the number-row cells the block
+	// emptied, then the Shift cells the block left empty (Engram's " key).
+	for (const code of outer.concat(NUMBER_ROW, Object.keys(entry.keys)))
+		for (const level of [0, 1])
+			if (rows[code][level] === null && missing.length > 0) rows[code][level] = missing.shift();
+	// What finds no free cell stays out: the unsupported metric shows it.
 	return {
 		id: entry.id,
 		name: entry.name,
