@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 02:05)
+## Where things stand (2026-11-14, 03:50)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -67,16 +67,27 @@ same commit as each step or checkpoint. Times are Paris time.
   regex, an `#Include` string in a tool naming `'windows/…'`, a bare path
   one named Lua driver holds, the source-run owner's joined pieces), fixed
   in `943d30cb`.
-- **Proof 22 (current): S03–S08, branch `…-proof-22` at `51601507`
-  (night `943d30cb` plus six steps, rebased on dev `95764817`), run
-  43538289052, dispatched 02:04.** Locally on the same steps: JS 26 reds =
-  baseline, macOS 18 and Linux 35 Lua failures = baseline by name.
-- Next: when run 43538289052 completes, compare its reds with run
-  43309556011's list. If only those: `git fetch origin dev`, rebase onto it
-  (re-run a step where dev added files its moves meet), check 0 merges and
-  0 trailers, the format and convention gates, then
-  `git push origin HEAD:refs/heads/dev` from wt-proof and one line to the
-  coordinator. Then S09–S12 the same way.
+- Proof 22 (S03–S08, `…-proof-22` at `51601507`, run 43538289052): not
+  landable. New reds, all fixed on night since (`75849616`..`ef524691`):
+  - Windows unit meta: base-name lookups of a renamed file
+    (`_DriverFileSource("network_info.ahk")`), folder scans of a folder the
+    step takes files out of (`_DriverDirConcat("infra")`, now expanded to
+    `_DriverDirsConcat(folder, homes…)`); three more meta failures fell
+    outside the 5000-line log window and the artifact host is blocked here;
+  - Windows unit core: fixture writes into a folder no DirCreate makes, and
+    an `A_LineFile` climb in a test that moved deeper;
+  - Ai and network: the trusted guardian controls stage the receiver on a
+    base the plan cannot read (listed edit). A local check red in the
+    baseline hid it: compare error tails of baseline-red checks too.
+- S09–S12 built locally on the S08 tip: 14 JS and 6 Lua reds, fixed on
+  night (tool regex and suite paths, join shape, driver-keyed blocks, gain
+  scope, listed edits, role-based UI and adapter partitions in macOS meta).
+- Later steps need listed edits once their input text exists: S14 (the two
+  AT-SPI workers in `literal_appdir_contract.py`), S30 (`wpm_surface` in
+  the focus audit's overlay detector).
+- **Next: proof 23 = S03–S12 rebuilt from the night tip**, dispatched once
+  run 43538289052 has finished (one run at a time); land if only baseline
+  reds, as for every block.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
