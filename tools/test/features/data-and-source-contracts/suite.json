@@ -889,6 +889,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-guard-needles.cjs"],
 			"repro": "npm run test:structure-guard-needles"
+		},
+		{
+			"id": "js-0538",
+			"ordinal": 660,
+			"name": "structure step keeps a moved file's optional include of a build output on its driver path",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-optional-includes.cjs"],
+			"repro": "npm run test:structure-optional-includes"
 		}
 	]
 }
