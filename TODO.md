@@ -67,9 +67,11 @@ audit), then « Sequential WPM, wrap and personal-info parity follow-up », whos
 
 From run [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (worker G's landing, dispatched
 10:15 Paris): Windows Integration Driver startup (`toml.flat_values` over its ceiling on the realistic fixture; worker
-I's fix landed on `dev` after this run's base); Linux E2E updater (the temporary native Lua 5.4 provider preparation refuses at
-`prepare-linux-lua54-native-provider.cjs:99`: a cffi-lua vendor test does not return OK on Ubuntu 26.04; worker G;
-the live step also needs a post-move dev prerelease); Linux E2E desktop-webview (AT-SPI first-focus race, worker J,
+I's fix landed on `dev` after this run's base); Linux E2E updater (its temporary native Lua 5.4 provider refusal was
+Meson 1.10+ on Ubuntu 26.04 naming each vendor test « cffi-lua:<test> », fixed by worker G, Linux run
+[43601289533](https://github.com/adrienm7/ergopti/actions/runs/43601289533); still red only at the live step, which
+updates this checkout to the newest published prerelease, v1.0.10-dev.175 from before the move: a post-move dev
+prerelease, the maintainer's, turns it green); Linux E2E desktop-webview (AT-SPI first-focus race, worker J,
 `claude/ergopti-todo-linux-flakes`); Common Packaging and boot (`test:windows-bundle-manifest`:
 `windows/_generated/value_schema.ahk` names the Lua `max_from` provenance of `llm.generation.context_length`, from
 a1b7b4ff9f; owner to be named by the coordinator). Not run because an earlier stage was red, so not yet proven green:
