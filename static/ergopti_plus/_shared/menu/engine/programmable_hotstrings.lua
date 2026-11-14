@@ -9,6 +9,10 @@
 
 local ConfigKeys = require("settings.engine.keys")
 local LabelValue = require("core.i18n.engine.label_value")
+local ValueCheck = require("settings.engine.value_check")
+
+-- The typed activation delay's shared value schema declaration.
+local DELAY_KEY = ValueCheck.KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS
 local M = {}
 local FEATURE = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE
 
@@ -46,9 +50,15 @@ local PROBLEMS = { missing = true, failed = true }
 --- missing »), opening a missing source is greyed, and creating the example
 --- loads it at once when the option is on. A refused action redraws the menu
 --- so the row shows the state the owner now reports.
---- @param ports table Manifest, translation, preference, native and problem ports.
+--- A typed activation delay its value schema declaration refuses is passed
+--- to `ports.refusal` with the localized text naming the range (decided by the
+--- agent on 2026-11-14, to review by the maintainer: the 2026-11-13 validation
+--- contract asks for that text at entry); every other refusal stays a redraw.
+--- @param ports table Manifest, translation, preference, native, problem and
+---   refusal(message) ports.
 --- @return table menu Native renderer output.
 function M.build(ports)
+	assert(type(ports.refusal) == "function", "programmable menu needs a refusal port")
 	local function refused()
 		ports.changed()
 		return false
@@ -57,7 +67,7 @@ function M.build(ports)
 	assert(problem == nil or PROBLEMS[problem], "unknown programmable source problem: " .. tostring(problem))
 	local function mutation(enabled, seconds)
 		if ports.paused() or ports.master() ~= true or type(enabled) ~= "boolean"
-			or type(seconds) ~= "number" or seconds ~= seconds or seconds < 0 or seconds >= math.huge then return refused() end
+			or not ValueCheck.check_value(ValueCheck.declaration(DELAY_KEY), seconds).ok then return refused() end
 		if ports.set(enabled, seconds) ~= true then return refused() end
 		ports.changed()
 		return true
@@ -99,10 +109,15 @@ function M.build(ports)
 						if selected == nil then return false end
 						local current_enabled, current_interval = ports.get()
 						if current_enabled ~= live or current_interval ~= interval then return refused() end
-						local milliseconds = tonumber(selected)
-						if not milliseconds or milliseconds < 0 or milliseconds ~= milliseconds
-							or milliseconds >= math.huge or milliseconds % 1 ~= 0 then return refused() end
-						return mutation(live, milliseconds / 1000)
+						-- A malformed or out-of-range delay is the one refusal
+						-- told in words: the driver shows the shared message
+						-- naming the range, as for its other delay prompts.
+						local typed = ValueCheck.parse_entry(ValueCheck.declaration(DELAY_KEY), selected)
+						if not typed.ok then
+							ports.refusal(ValueCheck.refusal_text(DELAY_KEY, typed, ports.i18n))
+							return refused()
+						end
+						return mutation(live, typed.value)
 					end },
 			} }
 	end

@@ -54,6 +54,10 @@ function M.build(ctx)
 		prompt = function(milliseconds)
 			return Prompt.ask(I18n.get("menu.hotstrings.user_code.title"), I18n.get("menu.hotstrings.delay_prompt"), tostring(milliseconds))
 		end,
+		refusal = function(message)
+			Logger.warn("programmable_hotstrings", "Typed activation delay refused.")
+			require("ui.menu.menu_dialogs").show_error(message, I18n.get("dialog.value_check.title"))
+		end,
 	})
 end
 
