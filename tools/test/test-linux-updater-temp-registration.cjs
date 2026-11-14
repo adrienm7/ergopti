@@ -554,6 +554,31 @@ providerControl('all pinned vendor names and precise optional skip', () => {
 		registered: 23
 	});
 });
+providerControl('Meson 1.10 project-prefixed vendor names', () => {
+	// Ubuntu 26.04 ships a Meson that logs « cffi-lua:simple example »; the bare-name
+	// reading refused every row there.
+	const rows = vendorRows().map((row) => ({ ...row, name: `cffi-lua:${row.name}` }));
+	assert.deepEqual(Provider.vendorReceipt(rows, false), {
+		passed: 22,
+		vendor_optional_skipped: 1,
+		registered: 23
+	});
+});
+providerControl('mixed Meson name forms refused', () => {
+	const rows = vendorRows();
+	rows[1].name = `cffi-lua:${rows[1].name}`;
+	assert.throws(() => Provider.vendorReceipt(rows, false), {
+		message:
+			'Pinned native Lua54 provider prerequisite refused. vendor test name "cffi-lua:abi example"'
+	});
+});
+providerControl('foreign Meson project refused', () => {
+	const rows = vendorRows().map((row) => ({ ...row, name: `other:${row.name}` }));
+	assert.throws(() => Provider.vendorReceipt(rows, false), {
+		message:
+			'Pinned native Lua54 provider prerequisite refused. vendor test name "other:simple example"'
+	});
+});
 providerControl('missing vendor test refused', () =>
 	assert.throws(() => Provider.vendorReceipt(vendorRows().slice(1), false))
 );
@@ -717,7 +742,7 @@ providerControl('different exact high device cannot borrow provider', () => {
 	const second = { ...providerFact(), dev: 9007199254740993n };
 	assert.throws(() => Provider.sameProvider(first, second, providerHash, providerHash));
 });
-assert.equal(providerCount, 31, 'Independent genuine provider source/model floor changed');
+assert.equal(providerCount, 34, 'Independent genuine provider source/model floor changed');
 console.log(
 	'[OK] Linux Lua54 native provider prerequisite: 31 source/model controls passed; no native credit.'
 );
