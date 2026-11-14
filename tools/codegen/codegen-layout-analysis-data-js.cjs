@@ -262,6 +262,8 @@ function credit(layouts) {
 		if (!ids.has(id))
 			throw new Error(`layout_credits.json credits ${id}, which the library does not hold`);
 	for (const layout of layouts) {
+		// A registry or reference layout comes from this repository.
+		if (!layout.source) layout.source = layout.origin;
 		if (layout.origin === REGISTRY_ORIGIN) {
 			const meta = parseToml(
 				fs.readFileSync(path.join(REGISTRY_DIR, layout.id, 'meta.toml'), 'utf8')
