@@ -111,6 +111,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The bash resolution check runs one macOS test module by its --only
+		// name, which no load site carries; S10 moves the module under core/text.
+		file: 'tools/test/test-bash-resolution.cjs',
+		moves: 'macos/tests/unit/infra/text_and_paths/paths/test_native_path.lua',
+		from: "'--only=tests.unit.infra.text_and_paths.paths.test_native_path'",
+		to: "'--only=tests.unit.core.text.text_and_paths.paths.test_native_path'"
+	},
+	{
 		// The focus audit's overlay detector names two adapters in one pattern;
 		// S12 moves graphics_renderer to core.ui.adapters, S30 moves wpm_surface.
 		file: 'tools/test/test-ui-focus-fix.cjs',
