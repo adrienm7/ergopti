@@ -230,9 +230,16 @@ NSIS installer for distribution ([layout-windows-dll.md](layout-windows-dll.md#s
   (`_generated/klc_generator.js`, from `codegen-layout-editor-klc-js.cjs`). The site host (`standalone.js`) loads the
   VM, the Lua sources, the XKB data (`static/ergopti/linux/xkb_generation/data/`) and the generator on the first
   click only. The `.klc` needs the Windows metadata (language tag, LCID, DLL name) set in « Windows options ». The
-  ErgoptiPlus hosts inline the page and cannot fetch these files, so they show a note pointing to the site instead:
-  ErgoptiPlus installs the compiled layout itself. Each report row names its status, reason and the elements the
-  target does not carry.
+  ErgoptiPlus layout editor window (`layout_editor_window/`) offers the same downloads offline on the three OS: it
+  loads the VM, the generator and `_generated/export_assets.js` (the Lua sources of `LayoutLuaRunner.MODULES` and
+  the XKB data, from `codegen-layout-editor-export-assets-js.cjs`) as static scripts, since the hosts inline the
+  page and cannot fetch, and builds the files in the page as the site does. It hands each file's bytes (base64) to
+  the host with `source_export`; the host's store (`composer/source_store.lua` on macOS and Linux,
+  `windows/ui/layout_manager/source_store.ahk`) writes them to the user's Downloads folder under the page's name,
+  or « name (2).ext » when that name is taken, never over a file, and answers `exportResult` with the path. Decided
+  by the agent on 2026-11-14, to review by the maintainer: the Downloads folder rather than a save dialog, because
+  Hammerspoon and the WebKitGTK host have no save panel and the metrics export already lands there. Each report
+  row names its status, reason and the elements the target does not carry.
 - A `layers.toml` binding using `primary` is written per OS on the way back (same effect on every OS, pinned by
   `test-layout-editor-model.cjs`); a sequence of several chords is refused.
 - KbdEdit-style editing: drag a key onto another to swap (Ctrl copies), copy and paste a mapping, ISO or ANSI board,

@@ -1245,4 +1245,19 @@ helpers.describe("layout editor files (macOS): the registry stores what the edit
 		helpers.assert_eq(refused[1], false)
 		helpers.assert_eq(refused[2], "source_invalid_file")
 	end)
+
+	helpers.it("writes a download of the editor to the Downloads folder without replacing a file", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		deps.downloads_dir = function() return "/Users/u/Downloads" end
+		state.files["/Users/u/Downloads"] = ""
+		state.files["/Users/u/Downloads/mine.klc"] = "kept"
+		local written
+		helpers.assert_true(LayoutRegistry.source_export({ filename = "mine.klc", data = "//5r" },
+			function(...) written = { ... } end, deps))
+		helpers.assert_true(written[1], tostring(written[2]) .. " " .. tostring(written[3]))
+		helpers.assert_eq(written[4], "/Users/u/Downloads/mine (2).klc")
+		helpers.assert_eq(state.files["/Users/u/Downloads/mine (2).klc"], "\255\254k")
+		helpers.assert_eq(state.files["/Users/u/Downloads/mine.klc"], "kept")
+	end)
 end)

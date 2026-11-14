@@ -1525,6 +1525,10 @@ local function source_operations(deps)
 		exists = deps.exists,
 		write = function(path, content) return write_file(deps, path, content) end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- The editor's downloads land where the metrics export does.
+		downloads_dir = deps.downloads_dir or function()
+			return require("metrics.engine.maintenance").downloads_dir(os.getenv)
+		end,
 	})
 end
 
@@ -1562,6 +1566,17 @@ end
 --- @return boolean dispatched
 function M.source_save(payload, on_done, deps)
 	return with_source(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Writes one download of the layout editor (XKB archive, KLC, DLL images,
+--- macOS bundle) to the user's Downloads folder, never over a file there.
+--- @param payload table { filename, data } with data the bytes as base64.
+--- @param on_done function on_done(ok, code, detail, path)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_export(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.export(payload, on_done) end,
 		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
 end
 

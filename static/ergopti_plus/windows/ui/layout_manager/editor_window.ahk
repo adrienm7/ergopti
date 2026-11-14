@@ -20,6 +20,9 @@
 ;    strings (sourceData), since this host does not seed window._i18n_strings.
 ; 3. An install or an emulation from the editor refreshes an open layout
 ;    manager window, which lists the composed layout.
+; 4. The editor's downloads (XKB archive, KLC, DLL images, macOS bundle) are
+;    built in the page with the export data the app ships; source_export hands
+;    their bytes to SourceStore_Export, which writes them to the Downloads folder.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,7 +41,8 @@
 ; tools/test/test-layout-manager-page.cjs pins both).
 global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"composer_open", true, "composer_save", true, "composer_emulate", true,
-	"source_open", true, "source_save", true, "source_pick", true, "nav_save", true)
+	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
+	"nav_save", true)
 
 
 
@@ -85,7 +89,8 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 		Deps["push"].Call("initData", Map("strings", LayoutEditorWindow_Strings(),
 			"state", LayoutManager_PageState(Deps["local_dir"]),
 			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
-			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true)))
+			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true),
+			"source_export", LayMgrJsonBool_Of(true)))
 		return LayoutManager_HandleEditorAction("source_open", Map("action", "source_open"), Deps)
 	}
 	if (Action == "close") {
