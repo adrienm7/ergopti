@@ -1353,8 +1353,23 @@ The questions answered on 2026-11-13 (OSM-002, the coordinator's decisions of 20
 under « Maintainer decisions of 2026-11-13, to implement » at the top.
 
 - [x] **Name the in-app layout editor window Ergopti Studio?** Answered by the maintainer on 2026-11-14: yes, under
-      « Ergopti Studio inside Ergopti+ » (window and menu row « Ergopti Studio », 21 locales). The site already
-      presents Ergopti as the project with its three products, moved the editor page to `/studio` (`/editeur`
-      redirects there) and reads « Studio » in its menu.
-- [ ] **For the maintainer: the site header still reads « Disposition clavier Ergopti ».** Left as is when the site
-      was restructured around the project (decided by the agent on 2026-11-14, to review by the maintainer).
+      « Ergopti Studio inside Ergopti+ » (window and menu row « Ergopti Studio », 21 locales).
+- [x] **Site restructured around the project (maintainer, 2026-11-14).** Short home page presenting the three
+      products; header « Ergopti » / « Optimisation de l’ergonomie clavier » with a three-entry menu (Ergopti,
+      Ergopti+, Studio), each with its icon; the layout version selector only on the `/ergopti` pages and the
+      Ergopti+ version on the `/ergopti-plus` pages. Map in `src/lib/js/siteNavigation.js`; every former address and
+      anchor redirects (`/editeur`, `/benchmarks`, `/utilisation`, `/informations`, `/#…`, `/ergopti-plus#ep-…`).
+      Ergopti+ one page → overview plus seven sub-pages, measured headless Chromium at 4× CPU slowdown, median of 3
+      (weight, DOM nodes, load event, total blocking time): before `/ergopti-plus` 1804 KiB, 9548 nodes, 1434 ms,
+      1498 ms; after `/ergopti-plus` 408 KiB, 347 nodes, 1168 ms, 520 ms; the heaviest sub-pages are `ia` (1487 KiB,
+      its lazy driver frames) and `fonctionnalites` (1079 nodes, TBT 564 ms); `installation` 976 KiB, 329 nodes once
+      its five inventory tables render only when opened (6678 nodes before).
+- [ ] **For the maintainer: placements decided by the agent on 2026-11-14, to review.** The former Utilisation page is
+      split into `/ergopti/utilisation` (« Essayer » : online typing and text replacements) and `/ergopti/installation`
+      (downloads, OS guides, printable layouts); `/utilisation` without an anchor lands on installation. No
+      `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations). Ergopti+ sub-pages:
+      présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités (tap-holds, raccourcis,
+      trackpad, métriques), configuration (réglages, vie privée), installation (démarrer, télécharger), faq; no
+      « versions » page, its changelog stays in the app. The floating reference keyboard only shows on the
+      `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark disc of the
+      logos) is new.

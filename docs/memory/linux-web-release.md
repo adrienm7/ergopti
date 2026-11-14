@@ -1076,6 +1076,21 @@ Unit or Integration rows miss an archive distribution or defer one. Unsigned sta
 releases are a standing authorisation (`stable_windows_signing_exception.json`)
 until SignPath signing is integrated.
 
+### project-site-structure-and-nested-routes
+
+Since 2026-11-14 the site is the project home plus one section per product
+(`/ergopti/*`, `/ergopti-plus/*`, `/studio`); `src/lib/js/siteNavigation.js`
+is the single map read by the header, the home cards, the section tabs and
+the redirects. Pages now nest two levels deep, so a literal relative `href` or
+`src` (`"img/…"`, `"documents/…"`, `"ergopti-plus"`) points under the current
+section and 404s: use `resolve('/route')` and `asset('file')`, also in
+`app.html` (`%sveltekit.assets%`). A former address stays as a prerendered
+`LegacyRedirect` page that forwards in an inline script (a meta refresh cannot
+carry the anchor), and is written as `name/index.html` so that `/name/` also
+resolves on GitHub Pages. Action: add a moved page to `LEGACY_PAGES` or an
+anchor map instead of deleting its route, and let
+`site-structure.playwright.cjs` cover it.
+
 ### project-site-cname-is-a-tracked-file
 
 The ergopti.fr custom domain lives in `static/CNAME` and is verified before each
