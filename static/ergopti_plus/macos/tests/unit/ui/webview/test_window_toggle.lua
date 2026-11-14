@@ -144,13 +144,18 @@ helpers.describe("window toggle (macOS)", function()
 			helpers.assert_true(handle ~= nil, page .. ": page module source is readable")
 			local src = handle:read("*a")
 			handle:close()
+			-- A hook is a function definition or a module field bound to a window
+			-- factory's own function (ui/layout_manager: the native pool probe reads
+			-- that function's upvalues, so it cannot be wrapped).
+			local function exposes(hook)
+				return src:find("function M%." .. hook .. "%(") ~= nil
+					or src:find("\nM%." .. hook .. " = [%w_]+%.[%w_]+\n") ~= nil
+			end
 			for _, hook in ipairs({ spec.window or "window", spec.close or "close" }) do
-				helpers.assert_true(src:find("function M%." .. hook .. "%(") ~= nil,
-					page .. " exposes M." .. hook .. "()")
+				helpers.assert_true(exposes(hook), page .. " exposes M." .. hook .. "()")
 			end
 			if spec.open then
-				helpers.assert_true(src:find("function M%." .. spec.open .. "%(") ~= nil,
-					page .. " exposes M." .. spec.open .. "()")
+				helpers.assert_true(exposes(spec.open), page .. " exposes M." .. spec.open .. "()")
 			end
 		end
 	end)
