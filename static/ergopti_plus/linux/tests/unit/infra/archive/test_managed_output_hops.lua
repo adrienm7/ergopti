@@ -7,9 +7,9 @@ local helpers = require("tests.helpers")
 
 --- Actual coordinator, shared transition policy, retained lease and target.
 --- Controlled native acknowledgements do not qualify real GIO/curl or files.
-local Managed = require("infra.managed_http")
+local Managed = require("core.network.engine.managed_http")
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
+local Target = require("core.network.engine.http_output_target")
 local Routing = require("core.network.engine.proxy_policy_core")
 local Redirect = require("core.network.engine.http_redirect")
 local Json = require("core.text.engine.json")

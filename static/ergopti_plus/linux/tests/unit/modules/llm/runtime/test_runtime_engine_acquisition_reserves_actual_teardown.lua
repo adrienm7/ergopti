@@ -593,7 +593,7 @@ helpers.describe("managed response reaches original transport admission", functi
 	test("(linux-managed-response) native transport constructor receives the original final admission predicate", function()
 		with_managed_responses(function(world, engine)
 			local dispatched = 0
-			package.loaded["adapters.http_client"].postStream = function(_, _, _, options)
+			package.loaded["core.network.adapters.http_client"].postStream = function(_, _, _, options)
 				assert(engine.stop_runtime())
 				if options.authorized and options.authorized() ~= true then return false end
 				dispatched = dispatched + 1; return true

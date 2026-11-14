@@ -370,6 +370,6 @@ function M.scan_owned(entries, on_done, admission)
 end
 
 M._owned_process = function(...) return require("adapters.owned_process").start(...) end
-M._owned_timer = function(...) return require("infra.managed_http_deadline").start(...) end
+M._owned_timer = function(...) return require("core.network.engine.managed_http_deadline").start(...) end
 
 return M

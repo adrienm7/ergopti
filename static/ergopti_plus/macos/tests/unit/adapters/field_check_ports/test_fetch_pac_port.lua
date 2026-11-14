@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "core.logger.engine.logger", "adapters.field_check_ports", "adapters.http_client" }
+local MODULES = { "core.logger.engine.logger", "adapters.field_check_ports", "core.network.adapters.http_client" }
 local PAC = "http://pac.private-company.invalid/company-proxy.pac"
 
 --- Runs the port over a scripted transport result.
@@ -23,7 +23,7 @@ local function run(result)
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function() return { get = function(_, _, callback) callback(result) end } end,
 		}
 		package.loaded["adapters.field_check_ports"] = nil

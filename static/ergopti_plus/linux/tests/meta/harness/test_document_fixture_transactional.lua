@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local DocumentFixture = require("tests.support.document_fixture")
 
 local SWAPPED = {
-	"lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline",
+	"lgi", "core.logger.engine.monotonic", "infra.timings", "core.network.engine.managed_http_deadline",
 	"core.events.loop", "adapters.notifier", "adapters.application_notifier",
 	"ui.webkit_host", "ui.webview_manager",
 }

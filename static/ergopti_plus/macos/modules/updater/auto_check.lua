@@ -817,8 +817,8 @@ function M.start_session(opts)
 		config = config,
 		timer = require("core.events.timer_scheduler"),
 		storage = require("core.fs.adapters.storage"),
-		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
-		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		manual_http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		now = os.time,
 	})
 	local watcher = require("core.events.wake_watcher").new(owner.on_wake)

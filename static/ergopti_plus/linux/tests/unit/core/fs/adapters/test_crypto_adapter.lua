@@ -12,12 +12,12 @@ local crypto  = helpers.load_module("core.crypto.crypto")
 
 --- Loads one adapter against the native digest provider's actual interface.
 local function fresh_crypto(provider)
-	local previous_provider = package.loaded["infra.openssl_digest"]
+	local previous_provider = package.loaded["core.network.engine.openssl_digest"]
 	local previous_crypto = package.loaded["core.crypto.crypto"]
-	package.loaded["infra.openssl_digest"] = provider
+	package.loaded["core.network.engine.openssl_digest"] = provider
 	package.loaded["core.crypto.crypto"] = nil
 	local subject = require("core.crypto.crypto")
-	package.loaded["infra.openssl_digest"] = previous_provider
+	package.loaded["core.network.engine.openssl_digest"] = previous_provider
 	package.loaded["core.crypto.crypto"] = previous_crypto
 	return subject
 end
@@ -25,7 +25,7 @@ end
 helpers.describe("crypto adapter", function()
 	helpers.it("linux-crypto-cli-invalid: refuses malformed successful digest output", function()
 		local subject = fresh_crypto({ available = false })
-		local native = require("infra.openssl_command")
+		local native = require("core.network.engine.openssl_command")
 		local previous = native.exec
 		local ok, failure = pcall(function()
 			for _, output in ipairs({ "SHA2-256(stdin)= abc\n", "SHA2-256(stdin)= " .. string.rep("a", 65) .. "\n" }) do
@@ -54,7 +54,7 @@ helpers.describe("crypto adapter", function()
 		end
 		helpers.it("linux-crypto-cli-exit-receipts: supervises " .. kind .. " input without quoting its payload twice", function()
 			local subject = fresh_crypto({ available = false })
-			local native = require("infra.openssl_command")
+			local native = require("core.network.engine.openssl_command")
 			local previous, transport = native.exec, nil
 			native.exec = function(command, input, options)
 				transport = { command = command, input = input, options = options }

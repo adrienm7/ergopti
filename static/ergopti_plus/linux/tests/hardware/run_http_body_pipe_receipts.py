@@ -15,7 +15,7 @@ import threading
 
 LUA_REQUEST = r"""
 local uv = require("luv")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 assert(uv.getuid() ~= 0, "native body-pipe checks require an ordinary user")
 local origin = assert(os.getenv("ERGOPTI_BODY_ORIGIN"))
 local method = assert(os.getenv("ERGOPTI_BODY_METHOD"))

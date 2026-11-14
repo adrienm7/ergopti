@@ -564,7 +564,7 @@ helpers.describe("AI agent: real asynchronous model download composition", funct
 			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local updates, completes, admission = 0, 0, nil
 			local controls = {}
-			require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
+			require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], controls)
 			package.loaded["ui.download_window.bridge"] = {
 				show = function() return 19 end,
 				update = function() updates = updates + 1; return true end,
@@ -646,7 +646,7 @@ helpers.describe("AI agent: existing model pull is focus without new consent cus
 				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 				local old_done, old_retired, completed, focused, admission = 0, 0, 0, 0, nil
 				local controls = {}
-				require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
+				require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], controls)
 				package.loaded["ui.download_window.bridge"] = {
 					show = function() return 29 end,
 					update = function() return true end,

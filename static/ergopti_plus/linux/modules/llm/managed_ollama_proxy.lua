@@ -129,7 +129,7 @@ end
 ---   probe, relay_address, probe_timeout_ms }
 ---   relay = { policy (core/network/engine/proxy_auth_relay_core.lua), probe(upstream, authority,
 ---   options, callback) -> operation|nil, reason, timeout_ms }: the sign-in relay.
----   probe = fn(host, port, timeout_ms, callback) -> child (adapters/tcp_probe.lua),
+---   probe = fn(host, port, timeout_ms, callback) -> child (core/network/adapters/tcp_probe.lua),
 ---   relay_address = fn(relay) -> host, port: the PAC list walk.
 --- @return function port Called as port(budget, authorized, done) -> operation.
 function M.new(deps)

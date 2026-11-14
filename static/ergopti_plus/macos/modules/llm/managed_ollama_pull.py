@@ -30,7 +30,7 @@ SESSIONS = load("ergopti_pull_sessions", SHARED / "ai/adapters/python/managed_ol
 RECEIPT = load(
     "ergopti_pull_private_receipt", SHARED / "ai/adapters/python/managed_operation_receipt.py"
 )
-PORTS = load("ergopti_pull_native_ports", DRIVER / "platform/network/native_ollama_api.py")
+PORTS = load("ergopti_pull_native_ports", DRIVER / "core/network/adapters/native_ollama_api.py")
 AUTH = load(
     "ergopti_pull_authority", SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"
 )

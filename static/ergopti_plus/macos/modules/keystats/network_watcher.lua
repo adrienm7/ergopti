@@ -37,7 +37,7 @@ local _session = nil
 --- The production ports: the network adapter and the monotonic clock.
 --- @return table ports
 local function default_ports()
-	local NetworkInfo = require("adapters.network_info")
+	local NetworkInfo = require("core.network.adapters.info")
 	local TimerScheduler = require("core.events.timer_scheduler")
 	return {
 		watch_reachability = NetworkInfo.watch_host_reachability,

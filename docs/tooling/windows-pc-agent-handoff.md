@@ -144,7 +144,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - Run 41261068581 on dev a149b129 (1 November, 01:40 UTC), new since the
   entries below: `tools/test/test-no-hardcoded-ui-strings.cjs` refuses the
-  literal "curl" passed to `Ui_MsgBox` in `windows/adapters/http_client.ahk`
+  literal "curl" passed to `Ui_MsgBox` in `windows/core/network/adapters/http_client.ahk`
   (route it through the i18n catalogue); the Windows core lane fails
   `test_network_dispatch_nonblocking.ahk:498` ("LLM_RemoteIsReady_Async must
   construct the tree-owned curl transport"); the AHK pinned-read ratchet is
@@ -507,8 +507,8 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
 
 ## Proxy override field: the Windows half (Issue #101 point 2, 31 October)
 
-Done on Windows on 1 November (`adapters/proxy_override.ahk`,
-`ui/proxy_override.ahk`, `npm run test:windows-proxy-override-e2e`); the text below
+Done on Windows on 1 November (`core/network/adapters/proxy_override.ahk`,
+`core/network/proxy_override.ahk`, `npm run test:windows-proxy-override-e2e`); the text below
 is the history. Windows stores the key in config.toml and refuses a relay WinHTTP
 cannot reach (https, socks, credentials in the address), in words.
 

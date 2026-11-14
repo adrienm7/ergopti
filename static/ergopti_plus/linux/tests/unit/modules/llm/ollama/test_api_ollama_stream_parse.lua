@@ -13,12 +13,12 @@ local helpers = require("tests.helpers")
 --- Loads api_ollama with a controllable asynchronous transport.
 --- @return table api, table transport, function restore
 local function subject()
-	local previous_client = package.loaded["adapters.http_client"]
+	local previous_client = package.loaded["core.network.adapters.http_client"]
 	local previous_api = package.loaded["modules.llm.api_ollama"]
 	local previous_probe = package.loaded["modules.llm.local_model_probe"]
 	package.loaded["modules.llm.local_model_probe"] = nil
 	local transport = { requests = {}, probes = {}, cancel_count = 0, cancel_refused = false }
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function(url, headers, options, on_done)
 			transport.probes[#transport.probes + 1] = { url = url, options = options, on_done = on_done }
 			return true
@@ -39,7 +39,7 @@ local function subject()
 	package.loaded["modules.llm.api_ollama"] = nil
 	local api = require("modules.llm.api_ollama")
 	return api, transport, function()
-		package.loaded["adapters.http_client"] = previous_client
+		package.loaded["core.network.adapters.http_client"] = previous_client
 		package.loaded["modules.llm.api_ollama"] = previous_api
 		package.loaded["modules.llm.local_model_probe"] = previous_probe
 	end

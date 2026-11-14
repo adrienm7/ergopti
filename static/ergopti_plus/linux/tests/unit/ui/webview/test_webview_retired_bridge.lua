@@ -81,7 +81,7 @@ end)
 --- Only native creation, HTML loading and JavaScript presentation are controlled.
 --- @param run function Receives the actual bridge, manager and presentation receipts.
 local function with_download_page(run)
-	local names = { "lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline",
+	local names = { "lgi", "core.logger.engine.monotonic", "infra.timings", "core.network.engine.managed_http_deadline",
 		"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
 		"ui.download_window.bridge", "infra.manifest_reader" }
 	local saved = {}

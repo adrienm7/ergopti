@@ -19,7 +19,7 @@ Contract.run_info_bar(helpers, CORPUS .. "request_plan_info_bar_vectors.json")
 Contract.run_live(helpers, CORPUS .. "request_plan_live_vectors.json")
 Contract.run_agent(helpers, CORPUS .. "request_plan_agent_vectors.json")
 Contract.run_ports(helpers, {
-	HttpClient = require("adapters.http_client"),
+	HttpClient = require("core.network.adapters.http_client"),
 	TimerScheduler = require("core.events.timer_scheduler"),
 	TooltipRenderer = require("ui.tooltip.llm"),
 })

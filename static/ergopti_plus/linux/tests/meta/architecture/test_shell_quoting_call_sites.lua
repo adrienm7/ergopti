@@ -80,12 +80,12 @@ helpers.describe("shell quoting at the call sites", function()
 	helpers.describe("core.crypto.engine.sha256()", function()
 		helpers.it("quotes the data it pipes into openssl", function()
 			-- Exercise the retained CLI branch explicitly; native hashing has no argv.
-			local previous_provider = package.loaded["infra.openssl_digest"]
+			local previous_provider = package.loaded["core.network.engine.openssl_digest"]
 			local previous_crypto = package.loaded["core.crypto.crypto"]
-			package.loaded["infra.openssl_digest"] = { available = false }
+			package.loaded["core.network.engine.openssl_digest"] = { available = false }
 			local crypto = helpers.load_module("core.crypto.crypto")
 			local ok, cmds = pcall(capture, function() crypto.sha256(PAYLOAD) end)
-			package.loaded["infra.openssl_digest"] = previous_provider
+			package.loaded["core.network.engine.openssl_digest"] = previous_provider
 			package.loaded["core.crypto.crypto"] = previous_crypto
 			if not ok then error(cmds, 0) end
 			assert_posix_quoted(find_command(cmds, "openssl"), "core.crypto.engine.sha256")

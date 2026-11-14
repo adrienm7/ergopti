@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
-	"adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
+	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
 	"core.events.timer_scheduler", "modules.llm.profiles",
 	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
@@ -64,7 +64,7 @@ local function with_api(scenario)
 		package.loaded["infra.timings"] = { sec = function() return 1 end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 		package.loaded["core.fs.adapters.storage"] = { get = function() return nil end }
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function() return { cancel = function() return true end } end,
 		}
 		package.loaded["core.fs.adapters.json_codec"] = { decode = function() return nil end }

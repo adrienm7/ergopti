@@ -11,9 +11,9 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"modules.updater.auto_check", "modules.updater", "core.fs.engine.paths", "core.logger.engine.logger", "infra.timings",
-	"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.file_system",
+	"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "adapters.update_launcher", "infra.notifications", "core.i18n.engine.i18n",
-	"infra.http_header_policy",
+	"core.network.engine.http_header_policy",
 }
 local FEED = '<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
 	.. '<id>tag:github.com,2008:Repository/1/v0.0.0-dev.150</id><updated>2026-09-02T00:00:00Z</updated>'
@@ -29,7 +29,7 @@ local function with_owner(run)
 		local Timings = require("infra.timings")
 		-- The real header policy reads shared data, so it loads before the path
 		-- and file stubs below; every request must pass its admission.
-		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
+		package.loaded["core.network.engine.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
 		local function shared(path)
 			local file = assert(io.open(helpers.shared(path), "rb"))
 			local raw = assert(file:read("*a"))
@@ -39,7 +39,7 @@ local function with_owner(run)
 		local defaults = shared("updater/data/defaults.json")
 		local registry = assert(require("updater.engine.channels").load(shared("updater/data/channels.json")))
 		local ctx = { now = 1700000000, requests = {}, schedule = {}, values = {}, writes = 0, notices = 0 }
-		local Http = helpers.load_with_stubs("adapters.http_client", {
+		local Http = helpers.load_with_stubs("core.network.adapters.http_client", {
 			timer = { new = function(_, callback)
 				local native = { callback = callback, armed = false }
 				function native:start() self.armed = true; return self end

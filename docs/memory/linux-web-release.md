@@ -633,9 +633,9 @@ answer parser keeps only the `METHOD host` entries of a PAC answer:
 `PROXY a; DIRECT` reaches GIO as `a` alone (both PROXY entries of
 `PROXY a; PROXY b` survive). So GIO can never stand for a PAC on GNOME: a
 caller that walks the list or must tell an unreachable PAC from DIRECT passes
-`pac_check_timeout_ms` to `adapters/system_proxy.lua`, and the lookup child
+`pac_check_timeout_ms` to `core/network/adapters/system_proxy.lua`, and the lookup child
 skips GIO, downloads the GSettings `autoconfig-url` itself and evaluates it in
-the system Duktape (`platform/network/pac_runtime.lua`, SONAME in
+the system Duktape (`core/network/adapters/pac_runtime.lua`, SONAME in
 `linux_native_runtime.json` `network_runtime.pac_engine`) with the shared
 `pac_helpers.js`. A PAC it could not download answers DIRECT with
 `pac_unavailable = "native_pac_download"`; one that raises or breaks a bound is
@@ -1067,7 +1067,7 @@ The Ollama daemon Ergopti starts cannot evaluate a PAC, so a pull behind a
 PAC-only network failed. `modules/llm/managed_ollama_proxy.lua` runs a stage in
 the shared runtime repair before the daemon starts: the shared proxy policy
 routes the registry URL, and only a `system` route calls the owned GIO lookup
-(`adapters/system_proxy.lua`); the first usable selection becomes `HTTPS_PROXY`
+(`core/network/adapters/system_proxy.lua`); the first usable selection becomes `HTTPS_PROXY`
 of the daemon. A proxy the user exported wins over the PAC (the proxy override
 wins over both); DIRECT and a
 machine without a desktop proxy add nothing. A GIO lookup that fails or times
@@ -1078,7 +1078,7 @@ Ergopti's own helper child still refuses the start (`runtime_proxy_unavailable`)
 Ollama has no failover, so the PAC list is walked before the start like a
 browser does: a relay followed by another entry is kept only when a TCP connect
 completes within `llm.managed_proxy_probe_timeout_ms` (1 s,
-`adapters/tcp_probe.lua`), else the next entry is tried; the last entry is kept
+`core/network/adapters/tcp_probe.lua`), else the next entry is tried; the last entry is kept
 unprobed. Action: give any new environment-driven client the same walk rather
 than its first PAC entry.
 
