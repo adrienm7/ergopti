@@ -409,3 +409,24 @@ _KLRSource_StudioOpensHttpsLinks() {
 }
 Test("Layout editor window: Ergopti Studio opens only https links (studio-open-link)",
 	_KLRSource_StudioOpensHttpsLinks)
+
+; The analysis panels mounted in the Studio read their layout_analysis.* keys
+; from the strings the Windows host sends with sourceData, like the editor's.
+_KLRSource_StudioSendsAnalysisStrings() {
+	global _I18nCache
+	_I18nEnsureLoaded()
+	AssertFalse(_I18nCache.Has("layout_analysis.studio_probe"), "the probe key is the test's own")
+	_I18nCache["layout_analysis.studio_probe"] := "Probe"
+	try {
+		Strings := LayoutManager_EditorStrings()
+		AssertTrue(Strings.Has("layout_analysis.studio_probe"), "the analysis keys reach the Studio page")
+		AssertTrue(Strings.Has("layout_editor.title"), "the editor keys still do")
+		for Key in Strings
+			Assert(SubStr(Key, 1, 14) == "layout_editor." || SubStr(Key, 1, 16) == "layout_analysis.",
+				"only the editor's and the analysis panels' keys are sent: " . Key)
+	} finally {
+		_I18nCache.Delete("layout_analysis.studio_probe")
+	}
+}
+Test("Layout editor window: the Studio page receives the analysis panels' strings (studio-analysis-strings)",
+	_KLRSource_StudioSendsAnalysisStrings)

@@ -446,7 +446,9 @@ _LayMgrWeb_ConfigDir(Deps) {
  * The layout editor's strings in the active locale. The macOS and Linux hosts
  * seed window._i18n_strings before the page runs; this host sends them with
  * sourceData, the first message the editor reads.
- * @returns {Map} Every layout_editor.* key -> its translation.
+ * The Ergopti Studio analysis panels (_shared/ui/layout_analysis) mounted in
+ * the editor read their layout_analysis.* keys from the same store.
+ * @returns {Map} Every layout_editor.* and layout_analysis.* key -> its translation.
  */
 LayoutManager_EditorStrings() {
 	global _I18nCache, _I18nCacheEn
@@ -454,7 +456,8 @@ LayoutManager_EditorStrings() {
 	Strings := Map()
 	for Cache in [_I18nCache, _I18nCacheEn]
 		for Key in Cache
-			if SubStr(Key, 1, 14) == "layout_editor." && !Strings.Has(Key)
+			if (SubStr(Key, 1, 14) == "layout_editor." || SubStr(Key, 1, 16) == "layout_analysis.")
+					&& !Strings.Has(Key)
 				Strings[Key] := I18nLookup(Key)
 	return Strings
 }
