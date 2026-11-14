@@ -366,6 +366,26 @@ for (const bad of [
 	check(threw, `profile: ${JSON.stringify(bad)} must throw`);
 }
 
+// Split, ortholinear and column-staggered boards: their own positions, fingers
+// and homes; keys they lack are reported, not dropped silently.
+for (const id of ['corne', 'planck', 'ergodox', 'moonlander', 'kinesis_advantage']) {
+	const board = E.keyboard(id);
+	check(
+		board.homeOf.every((k) => k !== undefined),
+		`board ${id}: a finger has no home key`
+	);
+	const onBoard = E.analyse(byId.get('qwerty'), E.ngramsFromText('fj'), { keyboard: id });
+	check(onBoard.metrics.distance === 0, `board ${id}: f and j are home keys`);
+}
+const corne = E.analyse(byId.get('qwerty'), E.ngramsFromText('a1'), { keyboard: 'corne' });
+check(
+	corne.coverage.missingKeys.includes('Digit1') && corne.metrics.unsupported === 50,
+	'board corne: no number row, reported and unsupported'
+);
+// Rows are counted along each staggered column: E stays one row above home.
+const dox = E.keyboard('ergodox');
+check(dox.relRow[dox.index.get('KeyE')] === -1, 'board ergodox: E one row above the home row');
+
 const ranked = E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, {});
 check(ranked[0].layout.id === 'ergopti' && ranked[0].rank === 1, 'compare: Ergopti beats QWERTY');
 const flipped = E.rescore(ranked, Object.fromEntries(Object.keys(defaults).map((m) => [m, 0])));

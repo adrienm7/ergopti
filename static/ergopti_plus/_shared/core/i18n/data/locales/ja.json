@@ -4554,5 +4554,11 @@
 	"layout_analysis.fingering.custom": "カスタム運指を使用中です。",
 	"layout_analysis.fingering.invalid": "この運指は使用できません：{reason}",
 	"layout_analysis.fingering.save_failed": "運指を保存できませんでした。",
-	"layout_analysis.fingering.load_failed": "保存された運指を読み込めませんでした。"
+	"layout_analysis.fingering.load_failed": "保存された運指を読み込めませんでした。",
+	"layout_analysis.keyboard.corne": "Corne (split 3×6+3)",
+	"layout_analysis.keyboard.planck": "Planck (4×12)",
+	"layout_analysis.keyboard.ergodox": "ErgoDox EZ",
+	"layout_analysis.keyboard.moonlander": "ZSA Moonlander",
+	"layout_analysis.keyboard.kinesis_advantage": "Kinesis Advantage",
+	"layout_analysis.details.missing_keys": "このキーボードにないキー（その文字は入力されません）：{keys}"
 }

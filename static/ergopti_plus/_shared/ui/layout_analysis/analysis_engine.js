@@ -194,12 +194,19 @@ var LAYOUT_ANALYSIS = (function () {
 		const { model, geometry } = data();
 		const spec = model.keyboards[keyboardId];
 		if (!spec) throw new Error(`layout_analysis: unknown keyboard ${keyboardId}`);
-		const fingering = Object.assign(
+		// A split, ortholinear or column-staggered board brings its own positions,
+		// fingers and home keys; a profile's base fingering applies to the
+		// row-staggered boards only.
+		const board3d = spec.board ? data().boards[spec.board] : null;
+		const baseFingering = board3d
+			? board3d.fingers
+			: model.fingerings[checked && checked.base ? checked.base : spec.fingering];
+		const fingering = Object.assign({}, baseFingering, checked ? checked.fingers : {});
+		const homeKeys = Object.assign(
 			{},
-			model.fingerings[checked && checked.base ? checked.base : spec.fingering],
-			checked ? checked.fingers : {}
+			board3d ? board3d.home_keys : model.home_keys,
+			checked ? checked.home : {}
 		);
-		const homeKeys = Object.assign({}, model.home_keys, checked ? checked.home : {});
 		const form = spec.geometry === 'ortho' ? 'iso' : spec.geometry;
 		const outer = new Set(model.outer_keys);
 		const modifierCodes = new Set(Object.values(model.modifier_keys));
@@ -223,11 +230,21 @@ var LAYOUT_ANALYSIS = (function () {
 			outer: []
 		};
 		for (const [code, fingerId] of Object.entries(fingering)) {
-			const g = geometry[code] && geometry[code][form];
+			// A board key: its centre already, no row stagger to remove.
+			const g = board3d
+				? board3d.keys[code] && {
+						col: board3d.keys[code].x - board3d.keys[code].w / 2,
+						width: board3d.keys[code].w,
+						row: board3d.keys[code].row,
+						y: board3d.keys[code].y
+					}
+				: geometry[code] && geometry[code][form];
 			if (!g) continue;
 			const finger = model.fingers.indexOf(fingerId);
 			if (finger < 0) throw new Error(`layout_analysis: unknown finger ${fingerId}`);
-			const grid = g.col + g.width / 2 + model.ortho_row_offsets[String(g.row)];
+			const grid = board3d
+				? g.col + g.width / 2
+				: g.col + g.width / 2 + model.ortho_row_offsets[String(g.row)];
 			let x = g.col + g.width / 2;
 			if (spec.geometry === 'ortho') x = grid;
 			board.index.set(code, board.codes.length);
@@ -237,12 +254,13 @@ var LAYOUT_ANALYSIS = (function () {
 			board.hand.push(finger <= LEFT_THUMB ? 0 : 1);
 			board.row.push(g.row);
 			board.x.push(x);
-			board.y.push(g.row);
+			// A column-staggered board measures its real height; the others their rows.
+			board.y.push(board3d ? g.y : g.row);
 			board.grid.push(grid);
 			board.home.push(homeCodes.has(code));
 			board.outer.push(outer.has(code));
 			// A wide modifier is pressed at its end nearest the home row.
-			if (modifierCodes.has(code)) {
+			if (modifierCodes.has(code) && !board3d) {
 				board.x[board.x.length - 1] =
 					code === model.modifier_keys.shift_for_right_hand ? g.col + g.width - 0.5 : g.col + 0.5;
 			}
@@ -828,6 +846,13 @@ var LAYOUT_ANALYSIS = (function () {
 			},
 			keys: keyReport(board, keyCount, allPresses, perKey, c, sfbPairs),
 			coverage: {
+				// Keys the layout puts characters on that this keyboard lacks (a
+				// 36-key board has no number row): their characters count as unsupported.
+				missingKeys: Object.keys(layout.rows)
+					.filter(
+						(code) => !board.index.has(code) && layout.rows[code].some((cell) => cell !== null)
+					)
+					.sort(),
 				typed: c.chars,
 				unsupported: c.unsupported,
 				unsupportedChars,

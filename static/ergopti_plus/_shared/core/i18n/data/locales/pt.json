@@ -4554,5 +4554,11 @@
 	"layout_analysis.fingering.custom": "Dedilhado personalizado em uso.",
 	"layout_analysis.fingering.invalid": "Este dedilhado não pode ser usado: {reason}",
 	"layout_analysis.fingering.save_failed": "Não foi possível guardar o dedilhado.",
-	"layout_analysis.fingering.load_failed": "Não foi possível ler o dedilhado guardado."
+	"layout_analysis.fingering.load_failed": "Não foi possível ler o dedilhado guardado.",
+	"layout_analysis.keyboard.corne": "Corne (split 3×6+3)",
+	"layout_analysis.keyboard.planck": "Planck (4×12)",
+	"layout_analysis.keyboard.ergodox": "ErgoDox EZ",
+	"layout_analysis.keyboard.moonlander": "ZSA Moonlander",
+	"layout_analysis.keyboard.kinesis_advantage": "Kinesis Advantage",
+	"layout_analysis.details.missing_keys": "Teclas que este teclado não tem, os seus caracteres não são escritos: {keys}"
 }

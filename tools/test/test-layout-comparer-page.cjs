@@ -92,6 +92,7 @@ for (const file of [
 		keys.add(m[1]);
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
+for (const id of Object.keys(DATA.model.keyboards)) keys.add(`${PREFIX}keyboard.${id}`);
 // The fingering editor's base choices and the errors it reports.
 for (const id of Object.keys(DATA.model.fingerings)) keys.add(`${PREFIX}fingering.base_${id}`);
 for (const m of fs

@@ -136,6 +136,21 @@ pressed by the left thumb and Digit6 by the right index (maintainer,
 left-hand key), AltGr by the right thumb. The **order** of a finger runs from the pinky (0) to the index (3);
 moving to a higher order is **inward**.
 
+**Boards.** Besides the row-staggered `iso`, `iso_angle`, `ansi` and
+`ortho`, the keyboards include `corne`, `planck`, `ergodox`, `moonlander` and
+`kinesis_advantage` (`board_geometries.json`).
+
+- Each board records the centre of each key in key units, its logical row,
+  its default finger and each finger's home key.
+- The row is the key's rank in its column, so a column stagger keeps its real
+  height for distances while rows and scissors count along the column.
+- They were imported from QMK's layout files and default keymaps, with
+  ShiftRight and AltGr placed on free keys where the keymap has none.
+- A key code a layout uses but the board lacks (a 36-key board's number row)
+  is listed in `result.coverage.missingKeys`, and its characters count as
+  unsupported.
+- A profile's base fingering applies to the row-staggered boards only.
+
 **Fingering profiles.** `keyboard(id, profile)` and `analyse(…, {profile})`
 take a user model of the hand: `{id, name, base: 'standard'|'angle',
 fingers: {code: finger}, home: {finger: code}}`. The base fingering and the

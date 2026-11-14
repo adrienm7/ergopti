@@ -129,12 +129,7 @@
 				i
 			</button>
 		</div>
-		<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard">
-			<option value="iso"></option>
-			<option value="iso_angle"></option>
-			<option value="ansi"></option>
-			<option value="ortho"></option>
-		</select>
+		<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard"></select>
 	</div>
 </section>
 
@@ -698,9 +693,16 @@
 						: char
 				)
 				.join(' ');
-			$('la-unsupported').textContent = missing
-				? t('layout_analysis.details.unsupported', { chars: missing })
-				: '';
+			$('la-unsupported').textContent = [
+				missing ? t('layout_analysis.details.unsupported', { chars: missing }) : '',
+				result.coverage.missingKeys.length > 0
+					? t('layout_analysis.details.missing_keys', {
+							keys: result.coverage.missingKeys.join(' ')
+						})
+					: ''
+			]
+				.filter(Boolean)
+				.join(' ');
 		}
 
 		// ===========================
@@ -914,9 +916,19 @@
 				save();
 				analyse();
 			});
+			// Every keyboard of the model: the row-staggered boards, then the split,
+			// ortholinear and column-staggered ones.
+			$('la-keyboard').replaceChildren(
+				...Object.keys(DATA.model.keyboards).map((id) => {
+					const option = el('option', '', t(`layout_analysis.keyboard.${id}`));
+					option.value = id;
+					return option;
+				})
+			);
 			$('la-keyboard').value = state.keyboard;
 			$('la-keyboard').addEventListener('change', (event) => {
 				state.keyboard = event.target.value;
+				fingeringView.draw();
 				save();
 				analyse();
 			});
@@ -1071,13 +1083,16 @@
 			setCorpus({ id: MY_TYPING_ID, tables: event.detail, default: true })
 		);
 
+		// The fingering editor, drawn on the chosen keyboard.
+		let fingeringView = null;
+
 		function start() {
 			applyStrings();
 			fillCorpora();
 			fillLayouts();
 			fillWeights();
 			fillIdealLoad();
-			FINGERING.mount($('la-fingering'));
+			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
 			FINGERING.onChange(() => analyse());
 			bind();
 			analyse();

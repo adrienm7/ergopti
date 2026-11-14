@@ -54,7 +54,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		'shortcut_left',
 		'unsupported'
 	];
-	const KEYBOARDS = ['iso', 'iso_angle', 'ansi', 'ortho'];
+	// Every keyboard of the model, in its order.
+	const KEYBOARDS = Object.keys(DATA.model.keyboards);
 	const UPDATE_DEBOUNCE_MS = 150;
 	const STORAGE_KEY = 'ergopti.layout_analysis.panel.v1';
 	const NGRAMS_EVENT = 'studio-ngrams';

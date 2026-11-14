@@ -55,6 +55,7 @@ const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
 // The repository and the host a repository document is linked on (one source each).
 const REPOSITORY_DEFAULTS_PATH = shared('updater', 'data', 'defaults.json');
 const IDENTIFIERS_PATH = shared('core', 'text', 'data', 'identifiers.json');
+const BOARDS_PATH = shared('layouts', 'data', 'analysis', 'board_geometries.json');
 // The values the « i » popovers explain besides the metrics.
 const INFO_VALUES = ['ideal_finger_load', 'shortcut_letters', 'weights', 'fingering'];
 // The ideal finger load per hand, pinky to index (maintainer 2026-11-14).
@@ -92,6 +93,7 @@ const SOURCES = [
 	'layouts/data/analysis/corpora.json',
 	'layouts/data/analysis/layout_credits.json',
 	'layouts/data/analysis/sources.json',
+	'layouts/data/analysis/board_geometries.json',
 	'static/corpus/register.json',
 	'layouts/data/analysis/analyser_models.json',
 	'layouts/data/keycodes/physical_keys.json',
@@ -637,6 +639,35 @@ function buildInfoSources(engine) {
 }
 
 /**
+ * The split, ortholinear and column-staggered boards, checked against the
+ * model: every key has a position, a row and a known finger; every finger has
+ * its home key on the board; the held modifiers exist.
+ * @param {object} model - analysis_model.json.
+ * @returns {object} board id → {name, source, keys, fingers, home_keys}.
+ * @throws {Error} On a board the engine could not measure.
+ */
+function buildBoards(model) {
+	const boards = JSON.parse(fs.readFileSync(BOARDS_PATH, 'utf8')).boards;
+	for (const [id, spec] of Object.entries(model.keyboards))
+		if (spec.board && !boards[spec.board])
+			throw new Error(`keyboard ${id}: no board ${spec.board}`);
+	for (const [id, board] of Object.entries(boards)) {
+		for (const [code, key] of Object.entries(board.keys)) {
+			if (![key.x, key.y, key.row, key.w].every(Number.isFinite))
+				throw new Error(`board ${id}: ${code} has no position`);
+			if (!model.fingers.includes(board.fingers[code]))
+				throw new Error(`board ${id}: ${code} has no finger`);
+		}
+		for (const finger of model.fingers)
+			if (!board.keys[board.home_keys[finger]])
+				throw new Error(`board ${id}: no home key for ${finger}`);
+		for (const code of Object.values(model.modifier_keys))
+			if (!board.keys[code]) throw new Error(`board ${id}: no ${code}`);
+	}
+	return boards;
+}
+
+/**
  * Rejects an ideal finger load that breaks the maintainer's rule: each hand
  * sums to half, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %.
  * @param {object} load - finger → %.
@@ -715,6 +746,7 @@ function buildData() {
 		schema_version: 1,
 		model,
 		geometry: buildGeometry(model),
+		boards: buildBoards(model),
 		scancodes: buildScancodes(model),
 		weights: weights.weights,
 		library_sources: library.sources,
@@ -751,6 +783,7 @@ function buildSource(data) {
 		`\t"schema_version": ${data.schema_version},`,
 		`\t"model": ${JSON.stringify(data.model)},`,
 		`\t"geometry": ${JSON.stringify(data.geometry)},`,
+		`\t"boards": ${JSON.stringify(data.boards)},`,
 		`\t"scancodes": ${JSON.stringify(data.scancodes)},`,
 		`\t"weights": ${JSON.stringify(data.weights)},`,
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,

@@ -147,6 +147,21 @@
 		"ortho": {
 			"geometry": "ortho",
 			"fingering": "standard"
+		},
+		"corne": {
+			"board": "corne"
+		},
+		"planck": {
+			"board": "planck"
+		},
+		"ergodox": {
+			"board": "ergodox"
+		},
+		"moonlander": {
+			"board": "moonlander"
+		},
+		"kinesis_advantage": {
+			"board": "kinesis_advantage"
 		}
 	},
 	"ortho_row_offsets": {

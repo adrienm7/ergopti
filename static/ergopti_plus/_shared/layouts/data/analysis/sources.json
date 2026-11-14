@@ -111,6 +111,11 @@
 			"title": "Visual Studio Code — Key bindings",
 			"url": "https://code.visualstudio.com/docs/getstarted/keybindings",
 			"checked": null
+		},
+		"qmk": {
+			"title": "QMK Firmware — keyboard layouts and default keymaps",
+			"url": "https://github.com/qmk/qmk_firmware/tree/master/keyboards",
+			"checked": "2026-11-14"
 		}
 	},
 	"items": {
@@ -155,6 +160,6 @@
 			"vscode_shortcuts"
 		],
 		"weights": ["study_weights"],
-		"fingering": ["engine_doc", "study", "kld"]
+		"fingering": ["engine_doc", "study", "kld", "qmk"]
 	}
 }

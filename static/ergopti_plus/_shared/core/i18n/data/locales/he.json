@@ -4554,5 +4554,11 @@
 	"layout_analysis.fingering.custom": "נעשה שימוש באצבוע מותאם.",
 	"layout_analysis.fingering.invalid": "לא ניתן להשתמש באצבוע הזה: {reason}",
 	"layout_analysis.fingering.save_failed": "לא ניתן היה לשמור את האצבוע.",
-	"layout_analysis.fingering.load_failed": "לא ניתן היה לקרוא את האצבוע השמור."
+	"layout_analysis.fingering.load_failed": "לא ניתן היה לקרוא את האצבוע השמור.",
+	"layout_analysis.keyboard.corne": "Corne (split 3×6+3)",
+	"layout_analysis.keyboard.planck": "Planck (4×12)",
+	"layout_analysis.keyboard.ergodox": "ErgoDox EZ",
+	"layout_analysis.keyboard.moonlander": "ZSA Moonlander",
+	"layout_analysis.keyboard.kinesis_advantage": "Kinesis Advantage",
+	"layout_analysis.details.missing_keys": "מקשים שחסרים במקלדת זו, התווים שלהם אינם מוקלדים: {keys}"
 }

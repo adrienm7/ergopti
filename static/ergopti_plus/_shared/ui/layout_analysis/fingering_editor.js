@@ -36,7 +36,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	const PROFILE_ID = 'custom';
 	// Size of one key unit of the key map, in pixels.
 	const KEY_UNIT_PX = 40;
-	// The board the key map is drawn on (the profile holds no board of its own).
+	// The board the key map is drawn on when the page names none.
 	const MAP_KEYBOARD = 'iso';
 	const BASES = ['standard', 'angle'];
 
@@ -130,8 +130,12 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	 * Draws the editor into a container: base fingering, key map, finger and
 	 * home-key controls for the selected key, reset, export and import.
 	 * @param {HTMLElement} root
+	 * @param {{keyboard?: function(): string}} [options] - The keyboard the map
+	 *   shows (the page's current choice).
+	 * @returns {{draw: function(): void}} Redraws, e.g. after the keyboard changed.
 	 */
-	function mount(root) {
+	function mount(root, options) {
+		const keyboardId = () => (options && options.keyboard ? options.keyboard() : MAP_KEYBOARD);
 		let selected = null;
 		const head = el('div', 'la-heading');
 		const title = el('h2');
@@ -181,10 +185,12 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 				})
 			);
 			baseSelect.value = (profile && profile.base) || 'standard';
+			// A split, ortholinear or column-staggered board has its own fingering.
+			baseLabel.hidden = Boolean(DATA.model.keyboards[keyboardId()].board);
 			reset.textContent = t('layout_analysis.fingering.reset');
 			exportButton.textContent = t('layout_analysis.fingering.export');
 			importText.textContent = t('layout_analysis.fingering.import');
-			const board = E.keyboard(MAP_KEYBOARD, profile || undefined);
+			const board = E.keyboard(keyboardId(), profile || undefined);
 			map.replaceChildren();
 			let width = 0;
 			let height = 0;
@@ -279,6 +285,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		});
 		document.addEventListener('i18n:applied', draw);
 		draw();
+		return { draw };
 	}
 
 	// The saved profile: the host's first, else this browser's.
