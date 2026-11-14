@@ -49,7 +49,8 @@ _HDCS_FuncBody(Src, FnDecl) {
 ; ===================================================
 
 _HDCS_CheckRegisterSaveRestore() {
-	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	; By its file: a folder scan meets another class's static Register( first.
+	Src := _DriverFileSource("hook_dispatcher.ahk")
 
 	RegBody := _HDCS_FuncBody(Src, "static Register(")
 	Assert(RegBody != "", "HookDispatcher.Register must be present")
@@ -61,7 +62,8 @@ _HDCS_CheckRegisterSaveRestore() {
 }
 
 _HDCS_CheckUnregisterSaveRestore() {
-	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	; By its file: a folder scan meets another class's static Register( first.
+	Src := _DriverFileSource("hook_dispatcher.ahk")
 
 	UnregBody := _HDCS_FuncBody(Src, "static Unregister(")
 	Assert(UnregBody != "", "HookDispatcher.Unregister must be present")
