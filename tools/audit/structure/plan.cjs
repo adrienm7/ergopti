@@ -496,8 +496,8 @@ function resolvePathToken(
 		});
 	// '#Include ../infra/json.ahk' in a tool that checks the Windows suite's
 	// entry: run_all.ahk includes from windows/tests, so the climb names the
-	// driver's file from there.
-	if (toolDriver === 'windows' && /^(?:\.\.\/)+[\w./-]+\.ahk$/.test(token)) {
+	// driver's file from there; 'unit/ui/x/test_y.ahk' names a suite file.
+	if (toolDriver === 'windows' && /^(?:\.\.\/)*[\w-][\w./-]*\.ahk$/.test(token)) {
 		const base = `${PREFIX}windows/tests`;
 		const abs = path.posix.normalize(`${base}/${token}`);
 		if (abs.startsWith(`${PREFIX}windows/`))
