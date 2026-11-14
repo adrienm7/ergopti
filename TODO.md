@@ -378,6 +378,15 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 - [ ] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
       keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
       defaults to a built-in corpus).
+- [ ] **Each layout's score as every major analyser computes it (maintainer, 2026-11-14).** Besides Ergopti's own
+      global score, « Comparer » and the « Éditer » side panel show each layout's score as KLAnext, Oxeylyzer, genkey,
+      cmini, the Ergo-L analyser / Kalamine statistics, KLA, a200, Keyboard Layout Optimizer (dariogoetz) and any
+      other widely used analyser would compute it: the most complete comparison available anywhere. Each analyser is
+      a scorer module on the shared engine's cached n-gram tables (no second engine), reimplemented from its
+      published source or documentation (no GPL code copied), with its formula, default weights, corpus, geometry,
+      revision read, licence and fidelity (exact, close or approximate) in `docs/design/layout-analysis.md`, and a
+      test vector reproducing a published result where one exists. A column or tab per analyser, with an « i »
+      popover giving the source and a link.
 
 - [ ] **Analysis review decisions (maintainer, 2026-11-14 evening).** Digit6 typed by the right index; the space
       bar by the LEFT thumb; the default global-score weights kept as justified in the study. Ideal finger load: the
