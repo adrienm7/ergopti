@@ -99,14 +99,13 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 			for key, value in pairs(oracle.sections) do helpers.assert_eq(f.document[key], value, key) end
 		end)
 	end)
-	helpers.it("greys the automatic-profile check and hides clone while paused", function()
+	-- A pause stops typing, not configuration (EDD-1).
+	helpers.it("keeps the automatic-profile check and clone live while paused", function()
 		with_frame({ custom = true, paused = true }, function(f)
 			local rows = f.rows()
 			local auto = assert(at(rows, f.i18n.get(oracle.labels.auto_detect)))
-			helpers.assert_eq(auto.fn ~= nil and auto.fn() or false, false, "a paused driver changes nothing")
-			helpers.assert_eq(f.fixture.direct_saves(), 0)
-			helpers.assert_nil(at(rows, f.i18n.get(oracle.labels.clone)))
-			helpers.assert_eq(#f.fixture.recommendations, 0)
+			helpers.assert_type(auto.fn, "function", "the paused check stays clickable")
+			helpers.assert_not_nil(at(rows, f.i18n.get(oracle.labels.clone)))
 		end)
 	end)
 	-- llm.profiles.auto_profile_for_model, as on Windows and Linux: a check, not a

@@ -883,10 +883,12 @@ _LLM_Menu_ApplyProfileCommitted(*) {
 }
 
 ; Reuses the native pause owner for the drawn row and retained callbacks.
+; A pause stops typing, not configuration (EDD-1): a profile is created or
+; cloned while suspended. An unreadable pause state still refuses.
 _LLM_Menu_CreateProfileReady(PausedFn) {
 	try {
 		Paused := PausedFn.Call()
-		return (Paused is Integer) && Paused == 0
+		return (Paused is Integer) && (Paused == 0 || Paused == 1)
 	} catch
 		return false
 }
@@ -971,8 +973,6 @@ _LLM_Menu_ProfilePromptInput(Prompt, Title, Options := "", Default := "") {
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
 LLM_Menu_PromptCreateProfile(Port := 0) {
-	if A_IsSuspended
-		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -985,8 +985,6 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	if !(Source is Map)
 		return ConfigReportPersistenceFailure("the custom LLM profile creation", Options.Get("notify", 0),
 			"the opening configuration source is unavailable")
-	if A_IsSuspended
-		return false
 	InputFn := Options.Get("input", Ui_InputBox)
 	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
 
@@ -1000,17 +998,11 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
 		return
 
-	if A_IsSuspended
-		return false
-
 	; Step 2: system prompt, including native pasted line breaks
 	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
-
-	if A_IsSuspended
-		return false
 
 	; Generate a unique ID from the label
 	pid := "user_" . LLM_Menu_Slugify(plabel) . "_" . A_TickCount

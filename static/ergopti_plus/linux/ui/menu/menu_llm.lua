@@ -459,10 +459,12 @@ local function _build_llm(ctx)
 			if saved then refresh() end
 			return saved
 		end
+		-- A pause stops typing, not configuration (EDD-1): a profile is created
+		-- or cloned while paused. An unreadable pause still refuses.
 		local function create_ready()
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+			if type(ctx.is_paused) ~= "function" then return false end
 			local ok, current = pcall(ctx.is_paused)
-			return ok and current == false
+			return ok and type(current) == "boolean"
 		end
 		local function open_editor(existing, activate, opts, create)
 			if type(edit_current) ~= "function" or edit_current() ~= true then
