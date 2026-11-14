@@ -1371,5 +1371,6 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
       présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités (tap-holds, raccourcis,
       trackpad, métriques), configuration (réglages, vie privée), installation (démarrer, télécharger), faq; no
       « versions » page, its changelog stays in the app. The floating reference keyboard only shows on the
-      `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark disc of the
+      `/ergopti` pages. Ergopti Studio has two tabs, « Éditer » (`/studio`) and « Comparer » (`/studio/comparer`,
+      framing the shared layout analysis page and fitting its reported height). The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark disc of the
       logos) is new.
