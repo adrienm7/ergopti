@@ -18,6 +18,10 @@
 ;    layout stays the composer's job (composer.ahk).
 ; 4. Every file operation is a port, so the tests replay the store over an
 ;    in-memory disk.
+; 5. The downloads the page builds (XKB archive, KLC, DLL images, macOS bundle)
+;    are bytes, sent as base64: SourceStore_Export writes them to the user's
+;    Downloads folder under the name the page chose, or « name (2).ext » and so
+;    on when it is taken, so nothing there is ever replaced.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -35,6 +39,10 @@
 ; A plain lowercase name ending in one of the editor's file types.
 global SOURCE_STORE_FILE_NAME := "^[a-z][a-z0-9_]*\.[a-z]+$"
 global SOURCE_STORE_EXTENSIONS := Map("toml", true, "keylayout", true)
+; A download's plain name: no folder, no leading dot.
+global SOURCE_STORE_EXPORT_NAME := "^[A-Za-z0-9][A-Za-z0-9_.-]*\.([a-z]+)$"
+; How many « name (n).ext » a download tries before it is refused.
+global SOURCE_STORE_MAX_EXPORT_SUFFIX := 99
 
 
 
@@ -50,7 +58,8 @@ global SOURCE_STORE_EXTENSIONS := Map("toml", true, "keylayout", true)
  * Validates the [source] table of the shared layout defaults.
  * @param {Map} LayoutDefaults - Decoded _shared/layouts/data/defaults.json.
  * @returns {Map} folder, last_file, max_file_bytes, max_name_length, nav_file (the navigation export,
- *   never reopened as a source) and failures (the codes of source_store.lua: invalid, write).
+ *   never reopened as a source), export_extensions (a set of the downloads' file types) and
+ *   failures (the codes of source_store.lua: invalid, write).
  * @throws {Error} When the table is missing or one of its fields is not valid.
  */
 SourceStore_Settings(LayoutDefaults) {
@@ -63,13 +72,21 @@ SourceStore_Settings(LayoutDefaults) {
 	for Field in ["max_file_bytes", "max_name_length"]
 		if !(Source.Get(Field, 0) is Integer) || Source[Field] <= 0
 			throw Error("The source " . Field . " is not a positive integer.")
+	Extensions := Map()
+	if !(Source.Get("export_extensions", 0) is Array) || Source["export_extensions"].Length == 0
+		throw Error("The source export_extensions is not a list of extensions.")
+	for Extension in Source["export_extensions"] {
+		if !(Extension is String) || !RegExMatch(Extension, "^[a-z]+$")
+			throw Error("The source export_extensions holds a value that is not a lowercase extension.")
+		Extensions[Extension] := true
+	}
 	Failures := Source.Get("failures", 0)
 	for Code in ["invalid", "write"]
 		if !(Failures is Map) || !(Failures.Get(Code, 0) is String) || !RegExMatch(Failures[Code], "^[a-z_]+$")
 			throw Error("The source failures name no " . Code . " code.")
 	return Map("folder", Source["folder"], "last_file", Source["last_file"],
 		"max_file_bytes", Source["max_file_bytes"], "max_name_length", Source["max_name_length"],
-		"nav_file", Source["nav_file"], "failures", Map("invalid", Failures["invalid"], "write", Failures["write"]))
+		"nav_file", Source["nav_file"], "export_extensions", Extensions, "failures", Map("invalid", Failures["invalid"], "write", Failures["write"]))
 }
 
 /**
@@ -174,6 +191,61 @@ SourceStore_Check(Settings, Payload) {
 }
 
 /**
+ * Checks one download the page wants written and decodes its bytes.
+ * @param {Map} Settings - From SourceStore_Settings.
+ * @param {Any} Payload - The page message: filename and data (the bytes as base64).
+ * @param {&Buffer} Bytes - The decoded bytes when the download is accepted.
+ * @returns {String} Why the download is refused, "" when it is accepted.
+ */
+SourceStore_CheckExport(Settings, Payload, &Bytes) {
+	global SOURCE_STORE_EXPORT_NAME
+	Bytes := 0
+	if !(Payload is Map)
+		return "the download request is not a table"
+	Name := Payload.Get("filename", 0), Data := Payload.Get("data", 0)
+	if !(Name is String) || StrLen(Name) > Settings["max_name_length"]
+			|| !RegExMatch(Name, SOURCE_STORE_EXPORT_NAME, &Extension) || InStr(Name, "..")
+		return "the download name is not a plain file name"
+	; RegExMatch is case-insensitive only with i); the pattern and the set are lowercase.
+	if !Settings["export_extensions"].Has(Extension[1])
+		return "the download type is not one the editor writes"
+	; Bounded before decoding: base64 carries three bytes in four characters.
+	if !(Data is String) || Data == "" || StrLen(Data) > Ceil(Settings["max_file_bytes"] / 3) * 4
+		return "the download is empty or larger than its bound"
+	; The canonical padded alphabet only, as the Lua store decodes it: Crypt32 also skips whitespace.
+	if Mod(StrLen(Data), 4) != 0 || !RegExMatch(Data, "^[A-Za-z0-9+/]+={0,2}$")
+		return "the download is not base64"
+	Decoded := CryptoBase64Decode(Data)
+	if Decoded.Size == 0
+		return "the download is not base64"
+	if Decoded.Size > Settings["max_file_bytes"]
+		return "the download is larger than its bound"
+	Bytes := Decoded
+	return ""
+}
+
+/**
+ * The first free path of a download in a folder: the name itself, then
+ * « stem (2).ext » up to SOURCE_STORE_MAX_EXPORT_SUFFIX.
+ * @param {String} Folder - With its trailing backslash.
+ * @param {String} Name - A name SourceStore_CheckExport accepted.
+ * @param {Func} Exists - Exists(Path) -> Boolean.
+ * @returns {String} The path, "" when every name is taken.
+ */
+SourceStore_FreeExportPath(Folder, Name, Exists) {
+	global SOURCE_STORE_MAX_EXPORT_SUFFIX
+	if !Exists.Call(Folder . Name)
+		return Folder . Name
+	RegExMatch(Name, "^(.*)(\.[a-z]+)$", &Parts)
+	loop SOURCE_STORE_MAX_EXPORT_SUFFIX - 1 {
+		Candidate := Folder . Parts[1] . " (" . (A_Index + 1) . ")" . Parts[2]
+		if !Exists.Call(Candidate)
+			return Candidate
+	}
+	return ""
+}
+
+/**
  * Whether a saved file is a layout source the editor reopens.
  * @param {String} Name
  * @returns {Boolean}
@@ -210,6 +282,31 @@ _SourceStore_DiskPorts() {
 		"read", (Path, MaxBytes) => FSReadUtf8ExactBounded(Path, MaxBytes),
 		"write", _SourceStore_Write
 	)
+}
+
+; The production ports of a download: the Downloads known folder, which is
+; never created, and a raw byte write.
+_SourceStore_ExportPorts(Ports) {
+	Defaults := Map(
+		"downloads_dir", () => GetKnownFolderDownloads(),
+		"dir_exists", (Path) => InStr(FileExist(Path), "D") > 0,
+		"exists", (Path) => FileExist(Path) != "",
+		"write_bytes", _SourceStore_WriteBytes
+	)
+	if Ports is Map
+		for Name, Port in Ports
+			Defaults[Name] := Port
+	return Defaults
+}
+
+_SourceStore_WriteBytes(Path, Bytes) {
+	Handle := FileOpen(Path, "w")
+	if !Handle
+		throw OSError(A_LastError, -1, "FileOpen " . Path)
+	try {
+		if Handle.RawWrite(Bytes, Bytes.Size) != Bytes.Size
+			throw Error("Short write to " . Path)
+	} finally Handle.Close()
 }
 
 _SourceStore_Write(Path, Text) {
@@ -287,4 +384,44 @@ SourceStore_Save(Settings, ConfigDir, Payload, Ports := 0) {
 	}
 	LoggerInfo("LayoutSource", "Layout editor file saved: {1}.", Path)
 	return Map("ok", true, "code", "", "detail", Path, "filename", Name)
+}
+
+/**
+ * Writes one download of the editor to the user's Downloads folder, never over
+ * a file there (the Windows twin of source_store.lua's export).
+ * @param {Map} Settings - From SourceStore_Settings.
+ * @param {Map} Payload - filename and data (the bytes as base64).
+ * @param {Map} Ports - "downloads_dir", "dir_exists", "exists" and "write_bytes"; the disk by default.
+ * @returns {Map} ok, code, detail and path, the page's exportResult.
+ */
+SourceStore_Export(Settings, Payload, Ports := 0) {
+	Ports := _SourceStore_ExportPorts(Ports)
+	Refusal := SourceStore_CheckExport(Settings, Payload, &Bytes)
+	if Refusal != "" {
+		LoggerWarn("LayoutSource", "Refused a layout editor download: {1}.", Refusal)
+		return Map("ok", false, "code", Settings["failures"]["invalid"], "detail", Refusal, "path", "")
+	}
+	try Downloads := Ports["downloads_dir"].Call()
+	catch as Err {
+		LoggerError("LayoutSource", "The layout editor download has no destination: {1}.", Err.Message)
+		return Map("ok", false, "code", Settings["failures"]["write"], "detail", Err.Message, "path", "")
+	}
+	if !Ports["dir_exists"].Call(Downloads) {
+		Detail := Downloads . " does not exist"
+		LoggerError("LayoutSource", "The layout editor download has no destination: {1}.", Detail)
+		return Map("ok", false, "code", Settings["failures"]["write"], "detail", Detail, "path", "")
+	}
+	Path := SourceStore_FreeExportPath(RTrim(Downloads, "\") . "\", Payload["filename"], Ports["exists"])
+	if Path == "" {
+		Detail := "every name for " . Payload["filename"] . " is taken in " . Downloads
+		LoggerError("LayoutSource", "The layout editor download was not written: {1}.", Detail)
+		return Map("ok", false, "code", Settings["failures"]["write"], "detail", Detail, "path", "")
+	}
+	try Ports["write_bytes"].Call(Path, Bytes)
+	catch as Err {
+		LoggerError("LayoutSource", "The layout editor download {1} could not be written: {2}.", Path, Err.Message)
+		return Map("ok", false, "code", Settings["failures"]["write"], "detail", Err.Message, "path", "")
+	}
+	LoggerInfo("LayoutSource", "Layout editor download written: {1}.", Path)
+	return Map("ok", true, "code", "", "detail", "", "path", Path)
 }

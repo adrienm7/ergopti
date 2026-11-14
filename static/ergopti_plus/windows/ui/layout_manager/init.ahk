@@ -481,12 +481,14 @@ _LayMgrWeb_ApplyNav(Text) {
 
 /**
  * Answers one action of the layout editor (its own window, editor_window.ahk):
- * source_open, source_save, source_pick, nav_save, composer_open,
- * composer_save and composer_emulate. The caller checked its allowlist.
+ * source_open, source_save, source_export, source_pick, nav_save,
+ * composer_open, composer_save and composer_emulate. The caller checked its
+ * allowlist.
  * @param {String} Action - The page's action.
  * @param {Map} Payload - Decoded message.
  * @param {Map} Deps - "push" (FunctionName, Payload), "local_dir", and the
- *   optional "config_dir", "source_ports", "apply_nav" and composer ports.
+ *   optional "config_dir", "source_ports", "export_ports", "apply_nav" and
+ *   composer ports.
  * @returns {Boolean} Whether the action was accepted.
  */
 LayoutManager_HandleEditorAction(Action, Payload, Deps) {
@@ -508,6 +510,17 @@ LayoutManager_HandleEditorAction(Action, Payload, Deps) {
 			Map("filename", Payload["filename"], "text", Payload["text"]), Deps.Get("source_ports", 0))
 		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
 		_LayMgrWeb_PushPayload(Deps, "sourceResult", Result)
+		return true
+	}
+	if (Action == "source_export") {
+		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("data", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a layout editor download without its file name and bytes.")
+			return false
+		}
+		Result := SourceStore_Export(SourceStore_SharedSettings(),
+			Map("filename", Payload["filename"], "data", Payload["data"]), Deps.Get("export_ports", 0))
+		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
+		_LayMgrWeb_PushPayload(Deps, "exportResult", Result)
 		return true
 	}
 	if (Action == "source_pick") {

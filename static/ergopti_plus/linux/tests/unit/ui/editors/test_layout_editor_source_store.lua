@@ -8,7 +8,10 @@
 --- shared bridge (_shared/layouts/engine/manager_bridge.lua). These tests pin the
 --- store's bounds (plain names, allowed types, UTF-8, size), reopening the last
 --- saved source, the bridge's routing and refusals, and the Linux bridge
---- forwarding both operations to the real registry module.
+--- forwarding both operations to the real registry module. The editor's
+--- downloads (source_export) are written to the Downloads folder, never over a
+--- file there; the Windows twin replays the same cases
+--- (windows/tests/unit/modules/keymap/test_layout_source_store.ahk).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -112,6 +115,89 @@ helpers.describe("layout editor source store", function()
 		helpers.assert_true(#logs == 8)
 	end)
 
+	helpers.it("writes a download to the Downloads folder under a free name, never over a file", function()
+		local Base64 = require("core.lifecycle.engine.compat.base64")
+		local operations, disk = store({ downloads_dir = function() return "/home/u/Downloads" end })
+		disk["/home/u/Downloads"] = "folder"
+		disk["/home/u/Downloads/mine_xkb.zip"] = "the user's file"
+		local bytes = "PK\3\4\0\255\1"
+		local results = {}
+		for _ = 1, 2 do
+			operations.export({ filename = "mine_xkb.zip", data = Base64.encode(bytes) },
+				function(...) results[#results + 1] = { ... } end)
+		end
+		helpers.assert_eq(results[1][1], true)
+		helpers.assert_eq(results[1][4], "/home/u/Downloads/mine_xkb (2).zip")
+		helpers.assert_eq(results[2][4], "/home/u/Downloads/mine_xkb (3).zip")
+		helpers.assert_eq(disk["/home/u/Downloads/mine_xkb (2).zip"], bytes, "the bytes, unchanged")
+		helpers.assert_eq(disk["/home/u/Downloads/mine_xkb.zip"], "the user's file", "never replaced")
+		helpers.assert_eq(disk["/config/layout_sources/last_source"], nil, "a download is not a source")
+		local klc
+		operations.export({ filename = "KBDERGO.klc", data = Base64.encode("\255\254k") },
+			function(...) klc = { ... } end)
+		helpers.assert_eq(klc[4], "/home/u/Downloads/KBDERGO.klc")
+	end)
+
+	helpers.it("refuses a download with a path, another type, bad base64, too many bytes or no Downloads folder", function()
+		local Base64 = require("core.lifecycle.engine.compat.base64")
+		local operations, disk, logs = store({ downloads_dir = function() return "/home/u/Downloads" end })
+		disk["/home/u/Downloads"] = "folder"
+		local codes = {}
+		local function export(filename, data)
+			operations.export({ filename = filename, data = data }, function(ok, code)
+				codes[#codes + 1] = (not ok) and code or "accepted"
+			end)
+		end
+		local good = Base64.encode("PK")
+		export("../evil.zip", good)
+		export("sub/dir.zip", good)
+		export(".hidden.zip", good)
+		export("a..zip", good)
+		export("script.sh", good)
+		export("mine.toml", good)
+		export("mine.zip", "")
+		export("mine.zip", "not base64!")
+		export("mine.zip", "QQ")
+		export("mine.zip", Base64.encode(string.rep("x", settings().max_file_bytes + 1)))
+		for index, code in ipairs(codes) do
+			helpers.assert_eq(code, settings().failures.invalid, "refusal " .. index)
+		end
+		helpers.assert_eq(#codes, 10)
+		helpers.assert_eq(#logs, 10)
+		local missing = store({ downloads_dir = function() return "/nowhere" end })
+		local result
+		missing.export({ filename = "mine.zip", data = good }, function(...) result = { ... } end)
+		helpers.assert_eq(result[2], settings().failures.write)
+		helpers.assert_contains(result[3], "/nowhere does not exist")
+		local unnamed = store({ downloads_dir = function() return nil, "HOME is not set" end })
+		unnamed.export({ filename = "mine.zip", data = good }, function(...) result = { ... } end)
+		helpers.assert_eq(result[3], "HOME is not set")
+		local full = store({ downloads_dir = function() return "/d" end,
+			exists = function(path) return path == "/d" end, write = function() return false, "disk full" end })
+		full.export({ filename = "mine.zip", data = good }, function(...) result = { ... } end)
+		helpers.assert_eq(result[1], false)
+		helpers.assert_eq(result[2], settings().failures.write)
+		helpers.assert_eq(result[3], "disk full")
+		local taken = store({ downloads_dir = function() return "/d" end, exists = function() return true end })
+		taken.export({ filename = "mine.zip", data = good }, function(...) result = { ... } end)
+		helpers.assert_contains(result[3], "every name for mine.zip is taken")
+	end)
+
+	helpers.it("refuses layout defaults whose export extensions are missing or not lowercase", function()
+		local Json = require("core.text.engine.json")
+		local Paths = require("infra.paths")
+		local handle = assert(io.open(Paths.shared(DEFAULTS_PATH), "r"))
+		local defaults = Json.decode(handle:read("*a"))
+		handle:close()
+		helpers.assert_true(settings().export_extensions.zip and settings().export_extensions.klc)
+		defaults.source.export_extensions = {}
+		local _, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "export_extensions")
+		defaults.source.export_extensions = { "ZIP" }
+		_, err = SourceStore.settings(defaults)
+		helpers.assert_contains(err, "export_extensions")
+	end)
+
 	helpers.it("reports a failed write with its detail instead of claiming success", function()
 		local operations = store({ write = function() return false, "disk full" end })
 		local result
@@ -208,6 +294,10 @@ helpers.describe("layout manager bridge routes the layout editor", function()
 			refresh = function() end,
 		}
 		if with_source then
+			registry.source_export = function(payload, on_done)
+				saved[#saved + 1] = payload
+				on_done(true, nil, nil, "/home/u/Downloads/" .. payload.filename)
+			end
 			registry.source_open = function(on_done) on_done({ text = "a = 1\n", filename = "a.toml" }) end
 			registry.source_save = function(payload, on_done)
 				saved[#saved + 1] = payload
@@ -247,6 +337,24 @@ helpers.describe("layout manager bridge routes the layout editor", function()
 		helpers.assert_eq(pushes[2].name, "sourceResult")
 		helpers.assert_eq(pushes[2].payload.ok, true)
 		helpers.assert_eq(bridge.on_message({ action = "source_save", filename = "b.toml" }), false)
+	end)
+
+	helpers.it("hands a download's name and bytes to the registry and says so on ready", function()
+		local bridge, pushes, saved = controller(true)
+		bridge.on_message({ action = "ready" })
+		helpers.assert_eq(pushes[1].payload.source_export, true)
+		helpers.assert_true(bridge.on_message({ action = "source_export", filename = "a.zip", data = "UEs=", extra = 1 }))
+		helpers.assert_eq(saved[#saved].filename, "a.zip")
+		helpers.assert_eq(saved[#saved].data, "UEs=")
+		helpers.assert_eq(saved[#saved].extra, nil, "only the file name and bytes reach the store")
+		helpers.assert_eq(pushes[#pushes].name, "exportResult")
+		helpers.assert_eq(pushes[#pushes].payload.ok, true)
+		helpers.assert_eq(pushes[#pushes].payload.path, "/home/u/Downloads/a.zip")
+		helpers.assert_eq(bridge.on_message({ action = "source_export", filename = "a.zip" }), false)
+		local plain, plain_pushes = controller(false)
+		plain.on_message({ action = "ready" })
+		helpers.assert_eq(plain_pushes[1].payload.source_export, false)
+		helpers.assert_eq(plain.on_message({ action = "source_export", filename = "a.zip", data = "UEs=" }), false)
 	end)
 
 	helpers.it("picks files through the host only when it offers a native panel", function()
@@ -292,13 +400,20 @@ helpers.describe("layout manager bridge routes the layout editor", function()
 					calls[#calls + 1] = "save " .. payload.filename
 					on_done(true, nil, "/c/" .. payload.filename, payload.filename)
 				end,
+				source_export = function(payload, on_done)
+					calls[#calls + 1] = "export " .. payload.filename
+					on_done(true, nil, nil, "/d/" .. payload.filename)
+				end,
 			},
 		}
 		helpers.assert_true(Bridge.on_message({ action = "source_open" }, daemon_state).handled)
 		helpers.assert_true(Bridge.on_message({ action = "source_save", filename = "a.toml", text = "x" },
 			daemon_state).handled)
-		helpers.assert_eq(table.concat(calls, ","), "open,save a.toml")
+		helpers.assert_true(Bridge.on_message({ action = "source_export", filename = "a.zip", data = "UEs=" },
+			daemon_state).handled)
+		helpers.assert_eq(table.concat(calls, ","), "open,save a.toml,export a.zip")
 		helpers.assert_contains(pushes[1], "window.sourceData(")
 		helpers.assert_contains(pushes[2], "window.sourceResult(")
+		helpers.assert_contains(pushes[3], "window.exportResult(")
 	end)
 end)

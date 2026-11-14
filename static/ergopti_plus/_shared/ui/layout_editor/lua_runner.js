@@ -107,5 +107,25 @@ var LayoutLuaRunner = (function () {
 		};
 	}
 
-	return { MODULES, modulePath, loadedVm, create };
+	/**
+	 * What LayoutSourceIO.xkbArchive and klcFile run, from the export data a host
+	 * holds: the module sources and the XKB converter data, fetched by the site
+	 * (standalone.js) or shipped with the app (_generated/export_assets.js).
+	 * @param {object} scope - The page's global object, once fengari has run.
+	 * @param {{sources: Object<string, string>, keysyms: object, template: string, types: string}} data
+	 * @param {object} generator - LayoutKlcGenerator (_generated/klc_generator.js).
+	 * @returns {{lua: object, keysyms: object, template: string, types: string, generator: object}}
+	 */
+	function assets(scope, data, generator) {
+		if (!generator) throw new Error('klc generator not loaded: _generated/klc_generator.js');
+		return {
+			lua: create(loadedVm(scope), data.sources),
+			keysyms: data.keysyms,
+			template: data.template,
+			types: data.types,
+			generator
+		};
+	}
+
+	return { MODULES, modulePath, loadedVm, create, assets };
 })();

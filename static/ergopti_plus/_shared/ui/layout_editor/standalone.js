@@ -8,8 +8,9 @@
  * frames it: files open through the browser's file picker and save as
  * downloads; the Linux XKB and Windows KLC downloads load the Lua VM, the
  * shared Lua export adapter and the KLC generator the first time they run.
- * ErgoptiPlus mounts the same editor in its layout manager window
- * with a host that saves through the driver instead (layout_manager/script.js).
+ * ErgoptiPlus mounts the same editor in its layout editor window with a host
+ * that saves through the driver and ships the same export assets
+ * (layout_editor_window/script.js, _generated/export_assets.js).
  * ==============================================================================
  */
 
@@ -93,13 +94,11 @@
 						fetchText(new URL(file, XKB_DATA))
 					)
 				);
-				return {
-					lua: LayoutLuaRunner.create(LayoutLuaRunner.loadedVm(window), sources),
-					keysyms: JSON.parse(keysyms),
-					template,
-					types,
-					generator: LayoutKlcGenerator
-				};
+				return LayoutLuaRunner.assets(
+					window,
+					{ sources, keysyms: JSON.parse(keysyms), template, types },
+					LayoutKlcGenerator
+				);
 			})().catch((error) => {
 				// A failed load (offline, a missing file) is retried on the next click.
 				exportAssets = null;

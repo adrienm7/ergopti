@@ -275,6 +275,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/klc_generator.js']
 	},
 	{
+		script: 'codegen/codegen-layout-editor-export-assets-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/export_assets.js']
+	},
+	{
 		script: 'codegen/codegen-layout-editor-kbd-dll-js.cjs',
 		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/kbd_dll_writer.js']
 	},

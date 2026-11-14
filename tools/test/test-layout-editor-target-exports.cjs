@@ -9,7 +9,10 @@
  * the generated KLC generator the site loads on demand, and checks that the
  * page's Linux XKB archive and Windows .klc equal, byte for byte, what the
  * repository tool writes (`export-xkb`, `export-klc`) for the corpus fixture
- * and a registry layout, refusals included.
+ * and a registry layout, refusals included. The app's layout editor window
+ * loads the same scripts with the generated export data
+ * (_generated/export_assets.js) in place of the site's fetches; its downloads
+ * are checked to be the same bytes.
  * ==============================================================================
  */
 
@@ -24,6 +27,7 @@ const { loadLayoutSource } = require('../lib/layout-source.cjs');
 const { exportXkb } = require('../lib/layout-source-xkb.cjs');
 const { exportKlc } = require('../lib/layout-source-klc.cjs');
 const klcCodegen = require('../codegen/codegen-layout-editor-klc-js.cjs');
+const assetsCodegen = require('../codegen/codegen-layout-editor-export-assets-js.cjs');
 
 const UI = shared('ui');
 const XKB_DATA = path.join(REPO_ROOT, 'static', 'ergopti', 'linux', 'xkb_generation', 'data');
@@ -166,6 +170,55 @@ sameXkb(fixture, 'fixture');
 	);
 	sameXkb(direct, 'direct levels');
 	sameKlc(direct, 'direct levels');
+}
+
+// The app's editor window: every script it needs is a static tag, and the shipped
+// export data builds what the site's fetched files build, byte for byte.
+{
+	assert.equal(fs.readFileSync(assetsCodegen.OUT_PATH, 'utf8'), assetsCodegen.buildSource());
+	const html = fs.readFileSync(path.join(UI, 'layout_editor_window', 'index.html'), 'utf8');
+	const tags = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) =>
+		path.relative(UI, path.resolve(path.join(UI, 'layout_editor_window'), m[1]))
+	);
+	for (const needed of [
+		'layout_composer/target_export.js',
+		'layout_editor/lua_runner.js',
+		...ON_DEMAND,
+		'layout_editor/_generated/export_assets.js'
+	])
+		assert(tags.includes(needed), `the editor window loads ${needed}`);
+	const context = vm.createContext({ TextEncoder });
+	context.window = context;
+	for (const file of [
+		'layout_editor/lua_runner.js',
+		...ON_DEMAND,
+		'layout_editor/_generated/export_assets.js'
+	])
+		vm.runInContext(fs.readFileSync(path.join(UI, file), 'utf8'), context, { filename: file });
+	const shipped = vm.runInContext(
+		'LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator)',
+		context
+	);
+	assert.deepEqual(clone(shipped.keysyms), clone(assets.keysyms));
+	assert.equal(shipped.template, assets.template);
+	assert.equal(shipped.types, assets.types);
+	const windows = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdergo' };
+	const structured = clone(Source.importStructured(registryXml('ergopti'), 'ergopti', 'iso'));
+	structured.exports.windows = windows;
+	const mixed = { ...shipped, generator: page.generator };
+	const viaSite = page.IO.xkbArchive(pageDoc(structured), assets);
+	const viaApp = page.IO.xkbArchive(pageDoc(structured), mixed);
+	assert(
+		Buffer.from(viaApp.bytes).equals(Buffer.from(viaSite.bytes)),
+		'the app builds the site XKB archive'
+	);
+	const klcSite = page.IO.klcFile(pageDoc(structured), assets);
+	const klcApp = page.IO.klcFile(pageDoc(structured), mixed);
+	assert(
+		Buffer.from(klcApp.bytes).equals(Buffer.from(klcSite.bytes)),
+		'the app builds the site KLC'
+	);
+	checks++;
 }
 
 // A Lua refusal reaches the page as the tool's reason.

@@ -23,17 +23,26 @@
 ---    bounded read and must be UTF-8 text, as a picked file must.
 --- 3. Saving never installs or activates anything: the editor's files are the
 ---    user's; installing a generated layout stays the layout manager's job.
+--- 5. The downloads the page builds (XKB archive, KLC, DLL images, macOS bundle)
+---    are bytes, sent as base64: export writes them to the user's Downloads
+---    folder under the name the page chose, or under « name (2).ext » and so
+---    on when that name is taken, so nothing there is ever replaced.
 --- ==============================================================================
 
 local M = {}
 
 local NativePath = require("core.fs.engine.native_path")
+local Base64     = require("core.lifecycle.engine.compat.base64")
 
 -- A plain lowercase name ending in one of the editor's file types.
 local FILE_NAME = "^[a-z][a-z0-9_]*%.[a-z]+$"
 local EXTENSIONS = { toml = true, keylayout = true }
 -- A failure code the page receives.
 local CODE = "^[a-z_]+$"
+-- A download's plain name: no folder, no leading dot.
+local EXPORT_NAME = "^[A-Za-z0-9][A-Za-z0-9_.-]*%.([a-z]+)$"
+-- How many « name (n).ext » a download tries before it is refused.
+local MAX_EXPORT_SUFFIX = 99
 
 
 
@@ -48,7 +57,8 @@ local CODE = "^[a-z_]+$"
 --- Validates the [source] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/layouts/data/defaults.json.
 --- @return table|nil settings { folder, last_file, nav_file, max_file_bytes,
----   max_name_length, failures = { invalid, write } }
+---   max_name_length, export_extensions = { [extension] = true },
+---   failures = { invalid, write } }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local source = type(layout_defaults) == "table" and layout_defaults.source or nil
@@ -64,6 +74,16 @@ function M.settings(layout_defaults)
 			return nil, "the source " .. field .. " is not a positive integer"
 		end
 	end
+	local extensions = {}
+	if type(source.export_extensions) ~= "table" or #source.export_extensions == 0 then
+		return nil, "the source export_extensions is not a list of extensions"
+	end
+	for _, extension in ipairs(source.export_extensions) do
+		if type(extension) ~= "string" or not extension:match("^[a-z]+$") then
+			return nil, "the source export_extensions holds a value that is not a lowercase extension"
+		end
+		extensions[extension] = true
+	end
 	local failures = source.failures
 	for _, code in ipairs({ "invalid", "write" }) do
 		if type(failures) ~= "table" or type(failures[code]) ~= "string" or not failures[code]:match(CODE) then
@@ -77,6 +97,7 @@ function M.settings(layout_defaults)
 		nav_file = source.nav_file,
 		max_file_bytes = source.max_file_bytes,
 		max_name_length = source.max_name_length,
+		export_extensions = extensions,
 		failures = { invalid = failures.invalid, write = failures.write },
 	}, nil
 end
@@ -161,6 +182,43 @@ function M.read_picked(settings, path, read)
 	return { filename = name, text = text }
 end
 
+--- Checks one download the page wants written and decodes its bytes.
+--- @param settings table From M.settings.
+--- @param payload any { filename, data } with data the file's bytes as base64.
+--- @return string|nil bytes
+--- @return string|nil detail Why the download is refused.
+function M.check_export(settings, payload)
+	if type(payload) ~= "table" then return nil, "the download request is not a table" end
+	local name, data = payload.filename, payload.data
+	local extension = type(name) == "string" and #name <= settings.max_name_length and name:match(EXPORT_NAME)
+	if not extension or name:find("..", 1, true) then return nil, "the download name is not a plain file name" end
+	if not settings.export_extensions[extension] then return nil, "the download type is not one the editor writes" end
+	-- Bounded before decoding: base64 carries three bytes in four characters.
+	if type(data) ~= "string" or data == "" or #data > math.ceil(settings.max_file_bytes / 3) * 4 then
+		return nil, "the download is empty or larger than its bound"
+	end
+	local bytes = Base64.decode(data)
+	if type(bytes) ~= "string" then return nil, "the download is not base64" end
+	if #bytes > settings.max_file_bytes then return nil, "the download is larger than its bound" end
+	return bytes, nil
+end
+
+--- The first free path of a download in a folder: the name itself, then
+--- « stem (2).ext » up to MAX_EXPORT_SUFFIX.
+--- @param folder string With a trailing separator.
+--- @param name string A name M.check_export accepted.
+--- @param exists function exists(path) -> boolean
+--- @return string|nil path
+function M.free_export_path(folder, name, exists)
+	if not exists(folder .. name) then return folder .. name end
+	local stem, extension = name:match("^(.-)(%.[a-z]+)$")
+	for n = 2, MAX_EXPORT_SUFFIX do
+		local candidate = folder .. stem .. " (" .. n .. ")" .. extension
+		if not exists(candidate) then return candidate end
+	end
+	return nil
+end
+
 --- Whether a saved file is a layout source the editor reopens.
 --- @param settings table From M.settings.
 --- @param name string
@@ -179,13 +237,15 @@ end
 -- ================================
 -- ================================
 
---- Creates the open and save operations over a driver's ports.
+--- Creates the open, save and export operations over a driver's ports.
 --- env: settings (M.settings), config_dir (with a trailing slash), read(path),
 ---   read_bounded(path, max_bytes) -> text|nil, status (`ok`, `absent`,
 ---   `too_large` or `error`), detail, write(path, text) -> ok, err (creating
----   the folder), exists(path), log(level, message, ...).
+---   the folder), exists(path), log(level, message, ...), and for export
+---   downloads_dir() -> folder|nil, reason (the user's Downloads folder,
+---   which export never creates).
 --- @param env table
---- @return table { open, save, folder }
+--- @return table { open, save, export, folder }
 function M.new(env)
 	local settings = env.settings
 	if type(env.read_bounded) ~= "function" then error("source_store.new: env.read_bounded is required", 2) end
@@ -244,6 +304,41 @@ function M.new(env)
 		end
 		env.log("info", "Layout editor file saved: %s.", path)
 		on_done(true, nil, path, payload.filename)
+	end
+
+	--- Writes one download of the editor to the Downloads folder.
+	--- @param payload table { filename, data }
+	--- @param on_done function on_done(ok, code, detail, path)
+	function operations.export(payload, on_done)
+		local bytes, detail = M.check_export(settings, payload)
+		if not bytes then
+			env.log("warn", "Refused a layout editor download: %s.", detail)
+			on_done(false, settings.failures.invalid, detail, nil)
+			return
+		end
+		local downloads, reason = nil, "the driver names no Downloads folder"
+		if type(env.downloads_dir) == "function" then downloads, reason = env.downloads_dir() end
+		if type(downloads) ~= "string" or not env.exists(downloads) then
+			detail = type(downloads) == "string" and (downloads .. " does not exist") or tostring(reason)
+			env.log("error", "The layout editor download has no destination: %s.", detail)
+			on_done(false, settings.failures.write, detail, nil)
+			return
+		end
+		local path = M.free_export_path(downloads:gsub("/+$", "") .. "/", payload.filename, env.exists)
+		if not path then
+			detail = "every name for " .. payload.filename .. " is taken in " .. downloads
+			env.log("error", "The layout editor download was not written: %s.", detail)
+			on_done(false, settings.failures.write, detail, nil)
+			return
+		end
+		local written, write_err = env.write(path, bytes)
+		if not written then
+			env.log("error", "The layout editor download %s could not be written: %s.", path, tostring(write_err))
+			on_done(false, settings.failures.write, tostring(write_err), nil)
+			return
+		end
+		env.log("info", "Layout editor download written: %s.", path)
+		on_done(true, nil, nil, path)
 	end
 
 	return operations

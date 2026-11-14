@@ -12,6 +12,10 @@
 //   composer_emulate, nav_save
 // Each host checks them again before acting
 // (_shared/layouts/engine/manager_bridge.lua, windows/ui/layout_manager).
+// The downloads the site offers (Linux XKB, Windows KLC and DLL images, macOS
+// bundle) are built here, offline, with the export data the app ships
+// (layout_editor/_generated/export_assets.js); source_export hands their bytes
+// to the host, which writes them to the user's Downloads folder.
 // ===========================================================================
 
 // ========================================
@@ -30,6 +34,7 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'source_open',
 	'source_save',
 	'source_pick',
+	'source_export',
 	'nav_save'
 ]);
 
@@ -77,6 +82,8 @@ let _hostAppliesNav = false;
 let _hostPicks = false;
 // Whether the host emulates a source without installing it (composer_emulate), from initData.
 let _hostEmulates = false;
+// Whether the host writes the editor's downloads to the Downloads folder (source_export), from initData.
+let _hostExports = false;
 
 /**
  * Called by the host once the page is ready: strings, capabilities and state.
@@ -92,6 +99,7 @@ window.initData = function (data) {
 	_hostPicks = data.source_pick === true;
 	_hostAppliesNav = data.nav_apply === true;
 	_hostEmulates = data.emulate === true;
+	_hostExports = data.source_export === true;
 	window.updateState(data.state);
 };
 
@@ -115,6 +123,8 @@ let _pendingInstall = null;
 let _pendingSources = null;
 let _pendingPick = null;
 let _pendingNav = null;
+let _pendingExport = null;
+let _exportAssets = null;
 
 /** Saves one editor file through the host; settles on sourceResult. */
 function hostSave(filename, text) {
@@ -244,6 +254,54 @@ window.navResult = function (result) {
 		});
 };
 
+/** The bytes as base64, the form a page message carries them in. */
+function base64Of(bytes) {
+	let binary = '';
+	// Chunks keep each String.fromCharCode call under the engines' argument limit.
+	for (let at = 0; at < bytes.length; at += 0x8000)
+		binary += String.fromCharCode.apply(null, bytes.subarray(at, at + 0x8000));
+	return btoa(binary);
+}
+
+/**
+ * Hands one download to the host (source_export), which writes it to the
+ * Downloads folder without replacing a file there; settles on exportResult
+ * with the file's path.
+ */
+function hostSaveBinary(filename, bytes) {
+	return new Promise(function (resolve, reject) {
+		if (_pendingExport) {
+			reject({ code: 'save_busy', path: filename });
+			return;
+		}
+		_pendingExport = { resolve: resolve, reject: reject };
+		send('source_export', { filename: filename, data: base64Of(bytes) });
+	});
+}
+
+/**
+ * Called by the host once a download is written: { ok, code, detail, path }.
+ * @param {Object} result
+ */
+window.exportResult = function (result) {
+	const pending = _pendingExport;
+	_pendingExport = null;
+	if (!pending) return;
+	if (result && result.ok === true) pending.resolve(result.path);
+	else
+		pending.reject({
+			code: (result && result.code) || 'host_save_failed',
+			path: (result && result.detail) || ''
+		});
+};
+
+/** What the XKB and KLC downloads run, built once from the data this page loads. */
+function hostExportAssets() {
+	_exportAssets =
+		_exportAssets || LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator);
+	return _exportAssets;
+}
+
 /** Opens a file in the host's native panel; settles on sourcePicked. */
 function hostPick() {
 	return new Promise(function (resolve, reject) {
@@ -291,6 +349,8 @@ window.sourceData = function (data) {
 		loadSources: hostSources,
 		pickFile: _hostPicks ? hostPick : null,
 		applyNav: _hostAppliesNav ? hostApplyNav : null,
+		saveBinary: _hostExports ? hostSaveBinary : null,
+		exportAssets: _hostExports ? hostExportAssets : null,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,
