@@ -128,6 +128,20 @@ function run() {
 	const rawOut = Apply.rewriteText(raw, rawRows, new Map(), RAW);
 	assert.ok(rawOut.includes('rawget(separator_modules, "core.i18n.engine.i18n")'), rawOut);
 
+	// A stub stored under a module only one driver has names that driver,
+	// though the tool's path names another: the histogram harness stubs the
+	// macOS logger as package.loaded['infra.logger'] beside a linux/ path.
+	if (fs.existsSync(path.join(__dirname, '../../static/ergopti_plus/macos/infra/logger.lua'))) {
+		const STUB = 'tools/test/zz_probe_stub.lua';
+		const stub =
+			"package.path = root .. '/static/ergopti_plus/linux/?.lua;' .. package.path\n" +
+			"package.loaded['infra.logger'] = logger\n";
+		const stubMap = new Map([['macos/infra/logger.lua', 'macos/core/logger/engine/logger.lua']]);
+		const stubRows = Plan.scanFile(STUB, stub, Plan.referenceContext(stubMap));
+		const stubOut = Apply.rewriteText(stub, stubRows, new Map(), STUB);
+		assert.ok(stubOut.includes("package.loaded['core.logger.engine.logger'] = logger"), stubOut);
+	}
+
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
 
