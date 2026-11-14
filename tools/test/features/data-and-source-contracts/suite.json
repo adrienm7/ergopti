@@ -873,6 +873,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shell-paths.cjs"],
 			"repro": "npm run test:structure-shell-paths"
+		},
+		{
+			"id": "js-0536",
+			"ordinal": 655,
+			"name": "structure step carries a payload guard's quoted needles to its reader's rewritten lines",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-guard-needles.cjs"],
+			"repro": "npm run test:structure-guard-needles"
 		}
 	]
 }
