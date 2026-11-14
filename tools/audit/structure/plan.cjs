@@ -2369,6 +2369,28 @@ function scanFile(file, text, ctx) {
 				newRepo: target
 			});
 		}
+	// "$3/platform/network/runtime_probe.lua" in a tool's shell command: a
+	// driver-relative path joined onto an unbraced variable (a positional
+	// argument included) that holds the root of the driver the tool names.
+	// S08 moved the runtime probe and left the AppImage staging running the
+	// old path.
+	if (!inTree)
+		for (const m of text.matchAll(
+			/\$([A-Za-z_]\w*|\d)\/((?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+)(?![\w/.-])/g
+		)) {
+			const driver = toolDriverOf(m[2], m.index);
+			if (!driver) continue;
+			const base = `${PREFIX}${driver}`;
+			const old = `${base}/${m[2]}`;
+			const moved = byRepoPath.get(old);
+			if (!EXISTING.has(old) || !moved || moved === old) continue;
+			if (moved === PREFIX || moved === SPLIT || !moved.startsWith(`${base}/`)) continue;
+			add('lua-module-quoted', m[0], `$${m[1]}/${moved.slice(base.length + 1)}`, {
+				oldRepo: old,
+				newRepo: moved
+			});
+		}
+
 	// SplitPath(A_LineFile, , &TestDir) then TestDir . "/../../..": a climb
 	// from the file's own folder to a folder above it. When the file moves, the
 	// climb is recounted to name the same folder (S06 moved the reload
