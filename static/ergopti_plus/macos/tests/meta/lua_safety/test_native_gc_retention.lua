@@ -51,16 +51,6 @@ local function module_source(module_name)
 	return module_name:gsub("%.", "/") .. ".lua"
 end
 
---- True for a UI source: a file under a ui/ folder of any feature. The
---- core/ui feature's own name is no such folder: its adapters and engine are
---- not UI sources, its ui/ role folder is.
---- @param relative string Driver-relative path.
---- @return boolean
-local function is_ui_source(relative)
-	local rest = relative:gsub("^core/ui/", "")
-	return ("/" .. rest):find("/ui/", 1, true) ~= nil
-end
-
 --- Lists every UI Lua source recursively, wherever its feature keeps it.
 --- @return table paths
 local function ui_sources()
@@ -74,7 +64,7 @@ local function ui_sources()
 					local attr = lfs.attributes(DRIVER_ROOT .. path)
 					if attr and attr.mode == "directory" then
 						if path ~= "tests" then walk(path .. "/") end
-					elseif entry:match("%.lua$") and is_ui_source(path) then
+					elseif entry:match("%.lua$") and helpers.is_ui_source(path) then
 						paths[#paths + 1] = path
 					end
 				end
@@ -92,7 +82,7 @@ local function ui_sources()
 		for _, line in ipairs(inventory) do
 			local normalized = line:gsub("\\", "/"):gsub("%s+$", "")
 			local relative = normalized:gsub("^.*/macos/", "")
-			if not relative:match("^tests/") and is_ui_source(relative) then
+			if not relative:match("^tests/") and helpers.is_ui_source(relative) then
 				paths[#paths + 1] = relative
 			end
 		end
