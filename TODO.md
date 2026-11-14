@@ -446,6 +446,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       the TOML or keylayout, reproducing today's Ergopti display exactly (pixel or DOM comparison test against the
       current hand-coded rendering). Not started: queued after the current Studio work.
 
+- [ ] **Studio site page uses all the space (maintainer, 2026-11-14 night).** No hero title, introduction or
+      « Contenu de la page » column on /studio and /studio/comparer: a full-width, full-height workspace under the
+      header with a slim « Éditer » / « Comparer » bar. Sticker printing, size and levels move out of the main toolbar
+      into a secondary export/print place. Key labels never overflow their key (fit, wrap or ellipsis with tooltip).
+- [ ] **Floating Ergopti layout button only on /ergopti (maintainer, 2026-11-14 night).** The fixed bottom-right
+      button that shows the Ergopti layout appears on /ergopti pages only, not on the home, Ergopti+, Studio or others.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
@@ -509,7 +516,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
       evening: a shortcut slot changed while paused is saved at once and applies on resume, the resume chord staying
       the one active when the pause started (Windows too, across a suspended reload); the magic key capture runs
       while paused on all three OS, the key inert until resume; the Windows tray stops greying the rows the pause
-      allows; macOS ends CapsWord at pause like Windows and Linux.
+      allows; macOS ends CapsWord at pause like Windows and Linux. Keep-awake / activity simulation stops at pause and is restored
+      on resume on all three OS (maintainer, 2026-11-14 night).
 - [ ] **[CODE] Parity audit continuation** (claimed by worker H, 2026-11-13)**:** on resumption, reconcile current source areas with the linked coverage register, then deepen tap-holds/chords/layers as one bounded module across Windows/macOS/Linux/shared before moving to another. Keep native receiving and implementation of existing finding IDs separate; do not restart completed focused campaigns without source drift or a new hypothesis.
       Progress (10 November 2026, [tap-hold campaign](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): census reconciled (375 areas, 12 new and 206 changed since the last pinned census, still to review outside tap-holds). Fixed on Linux/shared: LAlt's Tab tap with no hold is tap-only (THL-001), the Alt-Tab and RCtrl Tab taps keep their strict threshold (THL-002), a pair starts from the earliest held first key (THL-003), a pair's release tap respects the decided tap minimum (THL-004), chord defaults pinned across drivers (THS-001). Decisions pending: THD-1, THD-3, THD-4 (pair tap and the layer, layer-hold pair activity, macOS thumb Backspace under modifiers) and THD-2's lone window. Minimum tap (decided 2026-11-10): Linux complete; macOS needs a Karabiner mechanism qualified on a Mac (`to_if_alone` has no minimum); Windows is the maintainer's change. Left: the report's Linux and macOS remaining rows; native receiving unqualified. Next module after this one: hotstring cascade.
       Progress (12 November 2026, [tap-hold follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/report.md)): register reconciled with the 24 campaigns since the pause (381 areas). Drift since `637c017a` reviewed: fixed a single foreign chord action turning every Linux key combination off (TCL-003). Open for the shared tap-hold file series (`wt/taphold-landed`): TCL-001 (manifest rows still in `tap_hold.toml`), TCL-002 (action ids not translated between macOS and Linux), TCL-004 (Mac thumb-key ids, a decision), TCL-005 to 007; the two 2026-11-10 macOS rows are fixed in the generator, proven on the model (Left Command's one-shot Shift holds Shift and stands down under modifiers; a pair takes the first key held earliest), with field points `lalt_one_shot` and `pair_press_order`.
