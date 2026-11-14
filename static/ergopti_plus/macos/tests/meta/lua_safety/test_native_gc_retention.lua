@@ -51,7 +51,17 @@ local function module_source(module_name)
 	return module_name:gsub("%.", "/") .. ".lua"
 end
 
---- Lists every UI Lua source recursively.
+--- True for a UI source: a file under a ui/ folder of any feature. The
+--- core/ui feature's own name is no such folder: its adapters and engine are
+--- not UI sources, its ui/ role folder is.
+--- @param relative string Driver-relative path.
+--- @return boolean
+local function is_ui_source(relative)
+	local rest = relative:gsub("^core/ui/", "")
+	return ("/" .. rest):find("/ui/", 1, true) ~= nil
+end
+
+--- Lists every UI Lua source recursively, wherever its feature keeps it.
 --- @return table paths
 local function ui_sources()
 	local ok_lfs, lfs = pcall(require, "lfs")
@@ -63,26 +73,28 @@ local function ui_sources()
 					local path = relative .. entry
 					local attr = lfs.attributes(DRIVER_ROOT .. path)
 					if attr and attr.mode == "directory" then
-						walk(path .. "/")
-					elseif entry:match("%.lua$") then
+						if path ~= "tests" then walk(path .. "/") end
+					elseif entry:match("%.lua$") and is_ui_source(path) then
 						paths[#paths + 1] = path
 					end
 				end
 			end
 		end
-		walk("ui/")
+		walk("")
 	else
 		local separator = package.config:sub(1, 1)
-		local ui_root = DRIVER_ROOT .. "ui/"
 		local command = separator == "\\"
-			and ('cmd /c dir /b /s /a-d "' .. ui_root:gsub("/", "\\") .. '*.lua"')
-			or ("find '" .. ui_root .. "' -type f -name '*.lua'")
+			and ('cmd /c dir /b /s /a-d "' .. DRIVER_ROOT:gsub("/", "\\") .. '*.lua"')
+			or ("find '" .. DRIVER_ROOT .. "' -type f -name '*.lua'")
 		local source_count = #paths
 		local inventory = CommandLines.read(command)
 		assert(#inventory > 0, "source inventory must not be empty")
 		for _, line in ipairs(inventory) do
 			local normalized = line:gsub("\\", "/"):gsub("%s+$", "")
-			paths[#paths + 1] = normalized:gsub("^.*/macos/", "")
+			local relative = normalized:gsub("^.*/macos/", "")
+			if not relative:match("^tests/") and is_ui_source(relative) then
+				paths[#paths + 1] = relative
+			end
 		end
 		assert(#paths > source_count, "source inventory contains no matching files")
 	end
