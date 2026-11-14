@@ -630,7 +630,7 @@ coordinator on 2026-11-11, to review by the maintainer.
 - [ ] Keystats boot, the rest: registration, the two migration checks and the open walk are one sqlite3 process
       each (about 4 ms: a shell, then sqlite3). Merging the reads would hand the public migration functions a value
       read before the registration, which their tests drive one query at a time, so the remaining cut is a
-      persistent sqlite3 child for the synchronous writer (FFI pipes, no luv; `-bail` exit as the failure receipt).
+      persistent sqlite3 child for the synchronous writer ([design](docs/design/linux-sqlite-persistent-child.md)).
       A design for the maintainer (worker D and worker L agree, 2026-11-13). Bench note: the session bench's tray
       panel needs the Python that has GObject (`/usr/bin/python3.12` on Ubuntu 24.04 when `python3` is a newer
       build); run the Lua suite as an unprivileged user, root passes every EACCES probe.
