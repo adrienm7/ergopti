@@ -4,7 +4,7 @@
 --- MODULE: The Layout Editor Installs a Source From the Daemon's WebView
 --- DESCRIPTION:
 --- Opens the real layout manager window (ui/webview_manager, WebKit2GTK, under a
---- real X server) and drives its unified layout editor as a user would: « Editor »,
+--- real X server) and drives the layout editor as a user would: « Editor » opens it in its own window,
 --- a layout source opened in it (the Ergopti source), « Install and use », « Yes ».
 --- The page compiles the source with the shared generator and posts composer_save
 --- through WebKit's own script-message channel; the daemon's composer host stores
@@ -160,8 +160,23 @@ local function run()
 	if not check(wait_for(webview, "!document.getElementById('btn-editor').hidden"),
 		"the host offers the unified editor (source_editor)") then return 1 end
 	eval_sync(webview, "document.getElementById('btn-editor').click(); 'clicked'")
+	-- « Editor » opens the editor in its own window (layout_editor_window); the
+	-- manager's page never mounts it, so the rest drives the editor's own view.
+	local editor_view
+	local uv = require("luv")
+	for _ = 1, WAIT_ATTEMPTS do
+		pump_once()
+		uv.run("nowait")
+		editor_view = Manager.webview_for("layout_editor_window")
+		if editor_view then break end
+		os.execute("sleep " .. WAIT_SECONDS)
+	end
+	if not check(editor_view ~= nil, "« Editor » opens the layout editor in its own window") then return 1 end
+	check(eval_sync(webview, "String(Boolean(document.getElementById('le-install')))") == "false",
+		"the manager's page does not mount the editor")
+	webview = editor_view
 	if not check(wait_for(webview, "document.getElementById('le-install')"),
-		"« Editor » mounts the editor with « Install and use »") then return 1 end
+		"the editor window mounts the editor with « Install and use »") then return 1 end
 
 	-- The source as the host hands a saved one to the page (window.sourceData).
 	local Json = require("core.text.engine.json")
