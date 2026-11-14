@@ -1675,10 +1675,15 @@ checkPrivacyTriggerControls();
 	assert.equal(
 		vectors.length,
 		7,
-		'the independent corpus covers live, stale and refused native owners'
+		'the independent corpus covers live, paused and refused native owners'
 	);
-	assert(vectors.some((v) => v.enabled && v.calls === 1));
-	assert(vectors.some((v) => v.enabled && v.calls === 0));
+	// The editor is configuration: only a missing opener refuses it, whatever
+	// the pause and its receipt (EDD-1, a pause stops typing, not configuration).
+	for (const v of vectors) {
+		assert.equal(v.enabled, v.opener, v.name);
+		assert.equal(v.calls, v.opener ? 1 : 0, v.name);
+	}
+	assert(vectors.some((v) => v.initial_paused || v.delivered_paused));
 	assert(vectors.some((v) => !v.enabled && v.calls === 0));
 	// Scope21's genuine AHK owner boundary: canonical executable code lines also
 	// mask continuation-data braces, while the existing lexer retains real literals.

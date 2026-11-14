@@ -939,22 +939,12 @@ _HS_PersonalSectionsAllOn(TomlData) {
 	return _HS_ScopeAllOn(["Personal"], Paths)
 }
 
-; The editor has no input-master prerequisite. Its live pause owner admits both
-; the rendered leaf and a callback retained before suspension.
-_HS_PersonalEditorReady(PausedFn) {
-	try {
-		Paused := PausedFn.Call()
-		return (Paused is Integer) && Paused == 0
-	} catch
-		return false
-}
-
-_HS_PersonalEditorRow(OpenFn, PausedFn := 0) {
-	if !IsObject(PausedFn)
-		PausedFn := (*) => A_IsSuspended
+; The editor has no input-master prerequisite and is configuration: it opens
+; while suspended (EDD-1, a pause stops typing, not configuration).
+_HS_PersonalEditorRow(OpenFn) {
 	return MenuRenderer_CommandRow("personal_hotstring_commands", MenuCommand.PERSONAL_HOTSTRING_OPEN_EDITOR,
 		Map(MenuCommand.PERSONAL_HOTSTRING_OPEN_EDITOR, OpenFn),
-		Map("personal_hotstring_editor_ready", _HS_PersonalEditorReady.Bind(PausedFn)))
+		Map("personal_hotstring_editor_ready", (*) => true))
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
