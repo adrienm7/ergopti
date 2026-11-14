@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"core.fs.adapters.storage",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"modules.llm",
@@ -63,7 +63,7 @@ local function with_fixture(raw, callback)
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function() return "button.ok", raw end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 	}
 	package.loaded["infra.logger"] = {

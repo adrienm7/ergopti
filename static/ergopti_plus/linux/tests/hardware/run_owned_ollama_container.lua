@@ -44,7 +44,7 @@ end
 -- The refusal dialog: pick the row the user would click to start Ergopti's Ollama.
 local dialog_rows = {}
 package.loaded["ui.llm_enable_refusal"] = { show = function(_, rows)
-	local wanted = require("infra.i18n").get("ollama.runtime_start")
+	local wanted = require("core.i18n.engine.i18n").get("ollama.runtime_start")
 	local selected
 	for _, row in ipairs(rows) do
 		dialog_rows[#dialog_rows + 1] = tostring(row.label)

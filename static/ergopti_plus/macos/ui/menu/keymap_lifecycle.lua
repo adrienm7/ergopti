@@ -12,7 +12,7 @@ local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
 local Logger        = require("infra.logger")
-local I18n          = require("infra.i18n")
+local I18n          = require("core.i18n.engine.i18n")
 local Notifications = require("infra.notifications")
 local LOG = "menu.keymap_lifecycle"
 

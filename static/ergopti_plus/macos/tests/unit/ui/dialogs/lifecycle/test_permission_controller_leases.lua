@@ -15,7 +15,7 @@ local with_picker = require("tests.support.ui.usercontent_reference_fixture")
 local function with_dialog(scenario)
 	helpers.with_stub_scope({ "ui.permission_dialog" }, function()
 		with_picker(function(_, h)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			i18n.format = function(key) return key end
 			i18n.get_locale = function() return "en" end
 			local builder = require("ui.ui_builder")

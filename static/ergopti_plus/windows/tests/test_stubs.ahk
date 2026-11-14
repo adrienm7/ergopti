@@ -307,10 +307,10 @@ global _PathsFile := A_Temp . "\ergopti_test_paths_" . A_ScriptHwnd . ".toml"
 global SpaceAroundSymbols := ""
 
 ; ``_StaticDir`` is normally computed by ErgoptiPlus.ahk and read by
-; infra/i18n.ahk to build the path to the locale JSON files. Without this stub,
+; core/i18n/engine/i18n.ahk to build the path to the locale JSON files. Without this stub,
 ; the very first t() call (e.g. from modules/gestures.ahk's top-level
 ; GESTURE_SLOT_LABELS builder) raised "global variable has not been assigned a
-; value" inside infra/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
+; value" inside core/i18n/engine/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
 ; error as a MsgBox under default settings — invisible but blocking on the
 ; headless CI runner, which is the root cause of the recurring "5-minute
 ; timeout" failures of the AHK test suite.

@@ -190,7 +190,7 @@ assert(native_caption_closed and native_caption_close ~= nil and native_caption_
 local native_caption_corpus = assert(Json.decode(native_caption_bytes))
 
 local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "adapters.application_notifier",
-	"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 
 -- A caller catching an expected primary must also consume cleanup_failures.
 -- Normal positive subjects fail on any cleanup refusal after all attempts finish.
@@ -206,7 +206,7 @@ local function with_magic_notice(body, cleanup_failures)
 	-- Protection starts before the first owned cache edit, including setup imports.
 	local ok, failure = pcall(function()
 		for _, name in ipairs(magic_notice_module_names) do rawset(cache, name, nil) end
-		Locale, I18n = require("infra.locale"), require("infra.i18n")
+		Locale, I18n = require("core.i18n.engine.locale"), require("core.i18n.engine.i18n")
 		previous_locale = Locale.current_locale()
 		locale_captured = true
 		policy = require("core.ui.engine.window_titles")

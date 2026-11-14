@@ -130,7 +130,7 @@ end
 function M.choices()
 	local data = M.data()
 	if not data then error("the translation choices are unavailable: the shared files did not load") end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local current = Translate.language_name(i18n.get_locale(), data.names)
 	if not current then error("the interface locale '" .. tostring(i18n.get_locale()) .. "' has no native name") end
 	local template = i18n.get("llm.translate.ui_language")

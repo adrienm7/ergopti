@@ -19,7 +19,7 @@ local function with_fixture(redact, callback)
 		"modules.diagnostics.crash_reporter",
 		"core.fs.adapters.file_system",
 		"infra.config_paths",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.logger",
 	}
 	helpers.with_fresh_modules(module_names, function()
@@ -37,7 +37,7 @@ local function with_fixture(redact, callback)
 				return true, "created"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 		}
 		local logger_stub = helpers.make_logger_stub()

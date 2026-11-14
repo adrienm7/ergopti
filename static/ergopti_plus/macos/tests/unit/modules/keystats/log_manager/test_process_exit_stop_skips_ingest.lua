@@ -96,7 +96,7 @@ local function load_log_manager()
 		_last_complete_batch_offset = 0,
 	}
 
-	package.loaded["infra.i18n"]    = { t = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"]    = { t = function(key) return key end }
 	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
 	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 package.loaded["core.fs.adapters.file_system"] = {

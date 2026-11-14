@@ -110,7 +110,7 @@ function readLocale(name) {
 const EN = readLocale('en');
 const FR = readLocale('fr');
 
-// infra/locale.ahk t(): active locale, then en, then fr. An empty string counts as
+// core/i18n/engine/locale.ahk t(): active locale, then en, then fr. An empty string counts as
 // MISSING at every level. A total miss returns the raw key.
 function t(key) {
 	if (EN[key] !== undefined && EN[key] !== '') return EN[key];

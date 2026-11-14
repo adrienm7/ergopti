@@ -55,7 +55,7 @@ local function install_doubles(args)
 	package.loaded["modules.llm"] = { api_remote = api_remote }
 	-- The two body templates mirror the en.json shapes so the substitution
 	-- wiring is exercised; every other key echoes itself.
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if args.locale_strings then return args.locale_strings[key] or key end
 		if key == "menu.llm.api_test_ok_body" then
 			return '"{1}" answered in {2} ms: {3}'
@@ -86,7 +86,7 @@ local function install_doubles(args)
 		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = {
-			get = package.loaded["infra.i18n"].get,
+			get = package.loaded["core.i18n.engine.i18n"].get,
 			-- These command rows never request a translated section.
 			section = function() return {} end,
 		},
@@ -112,13 +112,13 @@ end
 
 
 local function with_api_add_locale(scenario)
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired
 	local ok, err = pcall(function()
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -128,7 +128,7 @@ local function with_api_add_locale(scenario)
 		helpers.assert_not_nil(receipt)
 		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
 		helpers.assert_eq(native.get_locale(), "en")
-		helpers.assert_eq(require("infra.locale").current_locale(), "en")
+		helpers.assert_eq(require("core.i18n.engine.locale").current_locale(), "en")
 		scenario(native)
 	end)
 	local restored, released, forgotten = true, true, true

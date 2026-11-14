@@ -30,7 +30,7 @@ function M.install(translator)
 		if key == "menu.hotstrings.title" then return caption end
 		return previous_get(key, ...)
 	end
-	assert(package.loaded["infra.i18n"] == translator, "caption fixture translator was not published")
+	assert(package.loaded["core.i18n.engine.i18n"] == translator, "caption fixture translator was not published")
 	package.loaded["infra.manifest_menu"] = nil
 	return require("infra.manifest_menu")
 end

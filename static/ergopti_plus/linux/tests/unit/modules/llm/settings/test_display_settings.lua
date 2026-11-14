@@ -185,7 +185,7 @@ local function with_info_menu(options, callback)
 			end
 			return root
 		end,
-		i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
+		i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = options.backend or "ollama", revision = 0 }
@@ -220,7 +220,7 @@ local function with_info_menu(options, callback)
 			is_paused = function() return observed.paused end,
 			on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 		})
-		local title = require("infra.i18n").get("menu.llm.display_menu_title")
+		local title = require("core.i18n.engine.i18n").get("menu.llm.display_menu_title")
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
 				if row.title == title and row.menu then return row end
@@ -251,7 +251,7 @@ helpers.describe("LLM shared Info Bar check", function()
 		for _, selected in ipairs(corpus.states) do
 			with_info_menu({selected = selected}, function(parent, settings, storage, observed)
 				local row = parent.menu[1]
-				helpers.assert_eq(row.title, require("infra.i18n").get(corpus.row.i18n))
+				helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(corpus.row.i18n))
 				helpers.assert_eq(row.checked or false, selected)
 				helpers.assert_eq(row.fn(), true)
 				helpers.assert_eq(settings.get("show_info_bar"), not selected)
@@ -267,7 +267,7 @@ helpers.describe("LLM shared Info Bar check", function()
 
 	helpers.it("moves the actual check after its shared remaining provider (shared-info-bar)", function()
 		with_info_menu({selected = true, info_last = true}, function(parent, _, _, observed)
-			helpers.assert_eq(parent.menu[#parent.menu].title, require("infra.i18n").get(info_bar_corpus().row.i18n))
+			helpers.assert_eq(parent.menu[#parent.menu].title, require("core.i18n.engine.i18n").get(info_bar_corpus().row.i18n))
 			helpers.assert_true(#parent.menu > 1)
 			helpers.assert_eq(observed.writes, 0)
 			helpers.assert_eq(observed.redraws, 0)
@@ -290,7 +290,7 @@ helpers.describe("LLM shared Info Bar check", function()
 		local corpus = info_bar_corpus()
 		with_info_menu({selected = true, refused = true, label = corpus.alternate_i18n}, function(parent, settings, storage, observed)
 			local row = parent.menu[1]
-			helpers.assert_eq(row.title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(corpus.alternate_i18n))
 			helpers.assert_eq(row.fn(), false)
 			helpers.assert_eq(settings.get("show_info_bar"), true)
 			helpers.assert_eq(storage.get("llm.display.show_info_bar"), true)
@@ -325,7 +325,7 @@ end
 --- @param key string
 --- @return table
 local function show_all_row(parent, key)
-	local title = require("infra.i18n").get(key)
+	local title = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(parent.menu) do if row.title == title then return row end end
 	error("the real display submenu omitted " .. key)
 end
@@ -357,9 +357,9 @@ helpers.describe("LLM shared Show-all check", function()
 	helpers.it("uses the declared Show-all label and placement (shared-show-all)", function()
 		local corpus = show_all_corpus()
 		with_info_menu({selected = true, progressive = true, count = 2, show_all_label = corpus.alternate_i18n, show_all_first = true}, function(parent)
-			helpers.assert_eq(parent.menu[1].title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(parent.menu[1].title, require("core.i18n.engine.i18n").get(corpus.alternate_i18n))
 			helpers.assert_eq(parent.menu[1].checked or false, false)
-			helpers.assert_eq(parent.menu[2].title, require("infra.i18n").get("menu.llm.show_info_bar"))
+			helpers.assert_eq(parent.menu[2].title, require("core.i18n.engine.i18n").get("menu.llm.show_info_bar"))
 		end)
 	end)
 
@@ -544,7 +544,7 @@ end
 --- @param parent table Native AI display submenu.
 --- @return table row
 local function indentation_row(parent)
-	local label = require("infra.i18n").get("menu.llm.indent_label")
+	local label = require("core.i18n.engine.i18n").get("menu.llm.indent_label")
 	for _, row in ipairs(parent.menu) do
 		if type(row.title) == "string" and row.title:sub(1, #label) == label and row.menu then return row end
 	end
@@ -557,7 +557,7 @@ helpers.describe("shared indentation choice", function()
 			local row, corpus = indentation_row(parent), indentation_corpus()
 			helpers.assert_eq(#row.menu, 15)
 			for index, choice in ipairs(corpus.choices) do
-				helpers.assert_eq(row.menu[index].title, choice.prefix .. require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, choice.prefix .. require("core.i18n.engine.i18n").get(choice.i18n))
 				helpers.assert_eq(row.menu[index].checked or false, choice.value == settings.get("pred_indent"))
 			end
 			helpers.assert_eq(row.disabled == true, false)

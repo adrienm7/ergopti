@@ -12,7 +12,7 @@ local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local Policy = require("ai.engine.ollama.local_model_policy")
 local Logger = require("core.logger.engine.shim")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local LOG = "modules.llm.local_model_offer"
 
 local _asking = false

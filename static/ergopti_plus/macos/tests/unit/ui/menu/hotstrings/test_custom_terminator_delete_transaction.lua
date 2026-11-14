@@ -54,7 +54,7 @@ end
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
+		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 	}, function()
@@ -63,7 +63,7 @@ local function with_fixture(outcome, callback)
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { removes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return "button.delete" end }
 		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",

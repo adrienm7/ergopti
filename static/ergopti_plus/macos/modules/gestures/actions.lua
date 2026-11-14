@@ -17,7 +17,7 @@ local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local Paths         = require("core.fs.engine.paths")
 local Timings       = require("infra.timings")
-local i18n          = require("infra.i18n")
+local i18n          = require("core.i18n.engine.i18n")
 local KeyNames      = require("platform.input.keycodes.key_names")
 local StickyLabel   = require("shortcuts.engine.actions.sticky_label")
 local text_utils    = require("infra.text_utils")
@@ -2372,7 +2372,7 @@ sg("script_quit",                         function()
 					send = function(text, level) return notifications.notify(text, nil, level) end,
 					info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
 					warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
-				}, require("infra.i18n").get)
+				}, require("core.i18n.engine.i18n").get)
 			end)
 			if not told then Logger.error(LOG, "The refused Quit notice failed: %s.", tostring(notice_err)) end
 		end

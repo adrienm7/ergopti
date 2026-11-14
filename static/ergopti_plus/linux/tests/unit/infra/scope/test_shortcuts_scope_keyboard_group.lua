@@ -96,7 +96,7 @@ helpers.describe("Linux keyboard group scope", function()
 					if command:find("dialog_host.lua' --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local function groups()
 					local menu = require("ui.menu.builder").build({ shortcuts = require("modules.shortcuts.manager"),
 						paused = false, is_paused = function() return controls.paused end,

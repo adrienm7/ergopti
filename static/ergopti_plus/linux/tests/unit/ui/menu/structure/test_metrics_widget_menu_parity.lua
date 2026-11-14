@@ -19,7 +19,7 @@ handle:close()
 require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 	fixture = fixture,
 	declared = declared,
-	translate = function(key) return require("infra.i18n").get(key) end,
+	translate = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	build = function(values)
 		local previous = package.loaded["ui.wpm.widget"]
 		package.loaded["ui.wpm.widget"] = {
@@ -34,7 +34,7 @@ require("tests.lua.metrics.widget_menu_contract").register(helpers, {
 					get_privacy_state = function() return {} end,
 				},
 			})
-			local label = require("infra.i18n").get("menu.metrics.title")
+			local label = require("core.i18n.engine.i18n").get("menu.metrics.title")
 			for _, row in ipairs(rows) do
 				if row.title == label then return row.menu end
 			end
@@ -59,7 +59,7 @@ helpers.describe("Metrics widget commands", function()
 				local rows = helpers.load_module("ui.menu.builder").build({ keystats = stats,
 					on_menu_changed = function() changes = changes + 1 end })
 				local metrics
-				for _, row in ipairs(rows) do if row.title == require("infra.i18n").get("menu.metrics.title") then metrics = row.menu end end
+				for _, row in ipairs(rows) do if row.title == require("core.i18n.engine.i18n").get("menu.metrics.title") then metrics = row.menu end end
 				local target = assert(metrics and metrics[1], "real metrics toggle exists")
 				os.rename = function(from, to) if to == path then attempts = attempts + 1; return false, "inert refusal" end; return rename(from, to) end
 				os.execute = function(command)
@@ -119,11 +119,11 @@ helpers.describe("Metrics widget commands", function()
 					})
 					local metrics
 					for _, row in ipairs(rows) do
-						if row.title == require("infra.i18n").get("menu.metrics.title") then metrics = row.menu end
+						if row.title == require("core.i18n.engine.i18n").get("menu.metrics.title") then metrics = row.menu end
 					end
 					local start
 					for index, row in ipairs(metrics) do
-						if row.title == require("infra.i18n").get(fixture.rows[1].i18n) then start = index end
+						if row.title == require("core.i18n.engine.i18n").get(fixture.rows[1].i18n) then start = index end
 					end
 					local offset = spec.id == "wpm_widget" and 0 or spec.id == "widget_colors" and 1 or 2
 					helpers.assert_eq(metrics[start + offset].fn(), accepted)
@@ -161,7 +161,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 		end
 		logger.cancel_migration = function() calls.cancel = calls.cancel + 1; return receipt end
 		local rows = helpers.load_module("ui.menu.builder").build({ keystats = logger })
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, row in ipairs(rows) do
 			if row.title == i18n.get("menu.metrics.title") then return row.menu[#row.menu], calls end
 		end
@@ -171,7 +171,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 	for _, status in ipairs(corpus.statuses) do
 		helpers.it("keeps actual " .. status.state .. " status inert (metrics-migration-label)", function()
 			local row, calls = actual_status(status.state)
-			helpers.assert_eq(row.title, require("infra.i18n").get(status.row.i18n))
+			helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(status.row.i18n))
 			helpers.assert_eq(row.disabled, true)
 			helpers.assert_nil(row.fn, "an inert status has no dummy callback")
 			helpers.assert_nil(row.menu, "an inert status has no child picker")
@@ -186,7 +186,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 			definition.i18n = "menu.metrics.unavailable"
 			local ok, err = pcall(function()
 				local row = actual_status(status.state)
-				helpers.assert_eq(row.title, require("infra.i18n").get("menu.metrics.unavailable"))
+				helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get("menu.metrics.unavailable"))
 				helpers.assert_eq(row.disabled, true)
 				helpers.assert_nil(row.fn)
 			end)
@@ -202,7 +202,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 			definition.platforms = { "ahk" }
 			local ok, err = pcall(function()
 				local row, calls = actual_status(status.state)
-				helpers.assert_true(row.title ~= require("infra.i18n").get(status.row.i18n), "the hidden status cannot reach the actual tray")
+				helpers.assert_true(row.title ~= require("core.i18n.engine.i18n").get(status.row.i18n), "the hidden status cannot reach the actual tray")
 				helpers.assert_eq(calls.progress, status.state == "idle" and 1 or 0, "native state selection is unchanged")
 				helpers.assert_eq(calls.cancel, 0)
 			end)
@@ -214,7 +214,7 @@ helpers.describe("declared inert Metrics migration statuses", function()
 	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" }, { name = "truthy", value = "accepted" } }) do
 		helpers.it("preserves running progress and native " .. receipt.name .. " cancellation policy (metrics-migration-label)", function()
 			local row, calls = actual_status("running", receipt.value)
-			helpers.assert_eq(row.title, string.format(require("infra.i18n").get("menu.metrics.migration_progress"),
+			helpers.assert_eq(row.title, string.format(require("core.i18n.engine.i18n").get("menu.metrics.migration_progress"),
 				corpus.running.scanned, corpus.running.total))
 			helpers.assert_true(row.disabled ~= true)
 			helpers.assert_type(row.fn, "function")
@@ -539,16 +539,16 @@ end)
 local function metrics_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
 	local completed, failure = xpcall(function()
 	-- Complete the genuine discovery/read phase before a requested test locale;
 	-- the Language child must not lazily initialize it back to the saved locale.
-	require("infra.i18n").init()
+	require("core.i18n.engine.i18n").init()
 	local native = helpers.load_module("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale();locale.set_locale("en")
 	local observed = {builds=0,parents=0,getters=0}
 	local context = { keystats={is_enabled=function()return false end,get_privacy_state=function()return{}end} }
@@ -592,7 +592,7 @@ helpers.describe("Metrics absent native module keeps genuine shared status child
 		local ok, detail = xpcall(function()
 			local rows = helpers.load_module("ui.menu.builder").build({})
 			local parent
-			for _,row in ipairs(rows)do if row.title==require("infra.i18n").get("menu.metrics.title")then parent=row end end
+			for _,row in ipairs(rows)do if row.title==require("core.i18n.engine.i18n").get("menu.metrics.title")then parent=row end end
 			helpers.assert_true(parent ~= nil);helpers.assert_nil(parent.checked)
 			helpers.assert_true(rawequal(parent.menu,finished));helpers.assert_eq(deliveries,1)
 			helpers.assert_eq(#parent.menu,1);helpers.assert_eq(parent.menu[1].disabled,true)
@@ -606,7 +606,7 @@ end)
 
 helpers.describe("Metrics absent parent final source fence", function()
 	helpers.it("refuses after the genuine final caption withdraws an absent-module parent", function()
-		local renderer, i18n = require("infra.manifest_menu"), require("infra.i18n")
+		local renderer, i18n = require("infra.manifest_menu"), require("core.i18n.engine.i18n")
 		local root = assert(renderer.get_root())
 		local top, old_group, old_get, old_render = root.top_level, renderer.group_row, i18n.get, renderer.render_rows
 		local inside, calls, deliveries, projected = false, 0, 0, nil

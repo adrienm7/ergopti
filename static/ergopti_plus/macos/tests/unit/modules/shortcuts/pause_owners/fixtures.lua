@@ -131,7 +131,7 @@ local function load_inventory_context(options)
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = function() end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,

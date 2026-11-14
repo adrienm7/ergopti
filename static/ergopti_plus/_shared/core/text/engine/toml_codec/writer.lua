@@ -37,7 +37,7 @@ local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("core.logger.engine.shim")
 end
-local _ok_i18n, i18n = pcall(require, "infra.i18n")
+local _ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 if not _ok_i18n or type(i18n) ~= "table" then
 	i18n = { get = function(k) return k end, get_locale = function() return "fr" end }
 end

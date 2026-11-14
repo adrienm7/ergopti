@@ -84,7 +84,7 @@ local run_contract = function(helpers,load_manager,load_host)
    if controls.pump_refused then error('private event loop detail')end
    controls.idle_handlers[#controls.idle_handlers+1]=fn
   end}
-  package.loaded['infra.i18n']={get=function(key)return key end,get_locale=function()return 'en'end}
+  package.loaded['core.i18n.engine.i18n']={get=function(key)return key end,get_locale=function()return 'en'end}
   package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function(...)if controls.message then return controls.message(...)end;return true end,
    on_window_closed=function(epoch)controls.closed[#controls.closed+1]=epoch end}
   local called,detail=pcall(function()

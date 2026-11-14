@@ -54,7 +54,7 @@ local function load_fixture(legacy)
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 
 	local state = {

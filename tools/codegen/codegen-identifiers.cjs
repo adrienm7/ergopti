@@ -65,7 +65,7 @@ const PROJECTED_GROUPS = GROUPS.filter(
 );
 const SWIFT_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
 // The system-language fallback reaches AutoHotkey too: Windows falls back to the
-// same catalogue as the Lua drivers (infra/i18n.ahk _I18nDetectSystemLocale, I18W-001).
+// same catalogue as the Lua drivers (core/i18n/engine/i18n.ahk _I18nDetectSystemLocale, I18W-001).
 const AHK_GROUPS = [...PROJECTED_GROUPS, 'locales'];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-

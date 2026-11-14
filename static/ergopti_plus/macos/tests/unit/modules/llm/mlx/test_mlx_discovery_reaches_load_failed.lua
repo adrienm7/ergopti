@@ -74,7 +74,7 @@ local function load_api_mlx()
 			table.insert(ctl.notifications, { title = title, body = body, kind = kind })
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 
 	local ApiMlx = helpers.load_with_stubs("modules.llm.api_mlx")
 	return ApiMlx, ctl

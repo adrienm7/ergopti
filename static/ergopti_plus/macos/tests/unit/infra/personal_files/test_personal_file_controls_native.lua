@@ -41,7 +41,7 @@ local function fixture(body, options)
 		"modules.llm.prediction_engine", "modules.llm.warmup_controller", "modules.llm.streaming_handler",
 		"modules.keymap.terminators", "modules.keymap.terminator_replay", "ui.hotstring_editor",
 		"infra.preferences", "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom", "ui.menu.keymap_lifecycle",
-		"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.hotstrings_config_window",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.hotstrings_config_window",
 	}, function()
 		local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
 		local primary, alpha, beta = root .. "/personal_hotstrings.toml", root .. "/alpha.toml", root .. "/beta.toml"
@@ -234,10 +234,10 @@ end
 --- The application configuration-window port is controlled; source and preference
 --- mutations still traverse the real controller, registry and conditional writer.
 local function personal_menu(f)
-	package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
+	package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
 	package.loaded["infra.manifest_menu"], package.loaded["ui.menu.menu_hotstrings_custom"] = nil, nil
-	local i18n = require("infra.i18n"); i18n.init()
-	local locale = require("infra.locale"); locale.set_locale("en")
+	local i18n = require("core.i18n.engine.i18n"); i18n.init()
+	local locale = require("core.i18n.engine.locale"); locale.set_locale("en")
 	local projected = f.Preferences.project_hotstring_preferences(f.saved, f.Registry.list_groups(), f.Registry.get_sections)
 	local ctx = { keymap = f.Keymap, personal_root = f.root, personal_files = f.loaded, hotfiles = { f.primary, f.alpha, f.beta },
 		state = { keymap = true, trigger_char = "★", hotstrings = projected.hotstrings }, paused = false,

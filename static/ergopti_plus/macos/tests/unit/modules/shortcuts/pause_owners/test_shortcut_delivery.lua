@@ -206,7 +206,7 @@ local function load_real_shortcut_delivery_owner()
 	-- The real i18n and a gestures owner loaded against it. A cached gestures
 	-- module may have been bound by an earlier file to a get-only i18n double,
 	-- which made the combined run fail in `i18n.format` while this file passed alone.
-	package.loaded["infra.i18n"] = nil
+	package.loaded["core.i18n.engine.i18n"] = nil
 	package.loaded["modules.gestures.actions"] = nil
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "https://example.invalid" end,

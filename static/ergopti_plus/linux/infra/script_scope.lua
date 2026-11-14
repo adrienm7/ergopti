@@ -24,7 +24,7 @@ local ALIAS_NAMES = {
 
 --- Native field owner module of each directly declared script row.
 local NATIVE_OWNERS = {
-	[ConfigKeys.KEY.SCRIPT_LOCALE] = "infra.i18n",
+	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
 	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "infra.script_settings",
 	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog.bridge",
 }

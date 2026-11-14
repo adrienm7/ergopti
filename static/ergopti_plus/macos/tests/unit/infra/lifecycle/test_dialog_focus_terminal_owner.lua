@@ -13,7 +13,7 @@ local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "infra.logger",
 	"core.events.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
 	"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
-	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "infra.i18n" }
+	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "core.i18n.engine.i18n" }
 
 
 
@@ -248,7 +248,7 @@ helpers.describe("dialog alert: a call without hs.dialog.alert's shape fails fas
 		-- confirmation calls it through xpcall(Dialog.alert, …).
 		with_dialog(function(fixture)
 			package.loaded["infra.dialog_util"] = fixture.subject
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
 			}
