@@ -396,12 +396,14 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       published source, docs and default weights (reverse-engineered from published results only where nothing else
       exists), each documented with its formula, corpus, version, licence and fidelity, and a test vector. A column
       per analyser in « Comparer » and in the « Éditer » side panel, each with an « i » popover (worker Q).
+      Decided 2026-11-14 night: every analyser shows two numbers, its official score (the tool's own fingering) and
+      the score under the user's custom finger model.
 - [ ] **Corpora: only what we can rely on (maintainer, 2026-11-14 evening).** Delete from the repository every corpus
       without a clearly compatible, recorded licence, or that could expose the project to a claim; starting from zero
       is acceptable. Deleted by decision: romans.txt, Python for Everybody, Projet GLM, Auxlang_X, the unverified
       KLAnext-style texts, and Johnix mail unless its source page and licence are confirmed. Kept: the public-domain
-      books, Autonomie (CC BY-SA), the Hello World files (MIT), Leipzig (shipped as CC BY 4.0 by the maintainer's
-      choice; its licence page could not be read from the container). Every shipped corpus is in
+      books, Autonomie (CC BY-SA), the Hello World files (MIT), Leipzig (kept by the maintainer's choice, the
+      project being non-commercial; its licence page blocks automated readers). Every shipped corpus is in
       static/corpus/register.json with source, licence and attribution, shown in the UI.
 - [ ] **More corpora from the internet (maintainer, 2026-11-14 evening).** Rebuild a rich set of built-in corpora under
       compatible licences (public domain, CC0, CC BY, CC BY-SA): French first, then English and the other languages
