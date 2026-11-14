@@ -166,6 +166,8 @@
 	</div>
 </section>
 
+<section id="la-analysers" class="la-card" hidden></section>
+
 <section id="la-details" class="la-details" hidden>
 	<h2 id="la-details-title"></h2>
 	<p class="la-muted">
@@ -1106,6 +1108,11 @@
 
 		start();
 		if (lastNgrams) setCorpus({ id: MY_TYPING_ID, tables: lastNgrams, default: true });
+		// The « Autres analyseurs » view (analyser_tab.js) on the pages that load it.
+		if (window.LAYOUT_ANALYSER_TAB)
+			window.LAYOUT_ANALYSER_TAB.attach(root.querySelector('#la-analysers'), {
+				comparer: { onResults }
+			});
 		mounted = { setCorpus, addLayouts, onResults };
 		return mounted;
 	}

@@ -326,3 +326,20 @@ trialyzer (the user's typing times), keymui / keymeow (metrics, no score),
 mw8/white_keyboard_layout, engram, kuehlmak, Oxeylyzer 2 and the newer
 analysers with a few stars (mana, keycraft, chogalyzer, stronglytyped). KLA's
 `ergodox` and `matrix` boards are not modelled.
+
+## In the Studio
+
+`_shared/ui/layout_analysis/analyser_tab.js` (global `LAYOUT_ANALYSER_TAB`)
+draws the « Autres analyseurs » view of the Comparer, on the site
+(`layout_analysis/index.html`) and in the app's Studio window
+(`layout_editor_window/index.html`), which load it after
+`analyser_scores.js`. The Comparer's mount attaches it to its
+`#la-analysers` section when the page loads it. It follows each comparison
+through `LAYOUT_ANALYSIS_COMPARER.onResults` (the compared layout objects, so
+a layout edited in « Éditer » is scored as edited), and scores only once the
+view is visible, one layout per idle slice. A change of the user's finger model
+(`LAYOUT_ANALYSIS_FINGERING.onChange`) re-scores. Each analyser has two
+columns, official and yours, and an « i » button (`analyser.<id>` of
+`sources.json`); an analyser without a score shows its headline statistics.
+The « Éditer » panel (`analysis_panel.js`) shows the same scores from
+`scoreAll`.

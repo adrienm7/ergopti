@@ -42,6 +42,8 @@ const SCRIPTS = [
 	'../host_bridge.js',
 	'_generated/analysis_data.js',
 	'analysis_engine.js',
+	'analyser_scores.js',
+	'analyser_tab.js',
 	'info_popover.js',
 	'fingering_editor.js',
 	'../layout_composer/_generated/composer_data.js',
@@ -86,7 +88,8 @@ for (const file of [
 	'comparer_page.js',
 	'info_popover.js',
 	'analysis_panel.js',
-	'fingering_editor.js'
+	'fingering_editor.js',
+	'analyser_tab.js'
 ])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
 		keys.add(m[1]);
@@ -100,6 +103,9 @@ for (const m of fs
 	.matchAll(/notifyError\('([a-z_.]+)'/g))
 	keys.add(m[1]);
 for (const id of Object.keys(DATA.sources.items)) keys.add(`${PREFIX}info.${id}`);
+// The other analysers' view shows each score-less analyser's headline parts.
+for (const entry of Object.values(DATA.analysers))
+	for (const part of entry.headline || []) keys.add(`${PREFIX}analysers.part.${part}`);
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);
 const locales = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
 check(locales.length === 21, `${locales.length} locales`);
