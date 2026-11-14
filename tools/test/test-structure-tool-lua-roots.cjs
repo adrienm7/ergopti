@@ -143,8 +143,9 @@ function run() {
 	}
 
 	// The feature requirements' content patterns name a driver's module,
-	// regex-escaped, under that driver's detection section.
-	const REQ = 'static/ergopti_plus/_shared/settings/data/features/requirements.toml';
+	// regex-escaped, under that driver's detection section. A probe path:
+	// the real file also carries listed edits (edits.cjs) the probe text lacks.
+	const REQ = 'static/ergopti_plus/_shared/zz_probe/features/requirements.toml';
 	const req =
 		"[detection.linux.uinput]\ncontent = ['/dev/uinput', '\"adapters\\.uinput_writer\"']\n" +
 		'[detection.macos.zz]\ncontent = [\'"adapters\\.uinput_writer"\']\n';
