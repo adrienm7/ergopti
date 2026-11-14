@@ -223,6 +223,27 @@ KLR_StudioContract() {
 }
 
 /**
+ * A version stamp of the keystats folder: every file's path, size and
+ * modification time, hashed. An ingest appends to a journal, so the stamp
+ * changes with every new keystroke written; Ergopti Studio keeps its
+ * projection while it does not.
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {String} The stamp, or "" for a folder without any file.
+ */
+KLR_StudioStoreStamp(MetricsDir) {
+		Entries := []
+		Loop Files, MetricsDir . "\*", "FR"
+				Entries.Push(A_LoopFileFullPath . "|" . A_LoopFileSize . "|" . A_LoopFileTimeModified)
+		if !Entries.Length
+				return ""
+		Sorted := ""
+		for Entry in Entries
+				Sorted .= Entry . "`n"
+		Sorted := Sort(Sorted)
+		return CryptoSha256(Sorted)
+}
+
+/**
  * Projects Ergopti Studio's « My typing » payload in SQLite: for each family
  * of the contract, the all-time count of each token the user typed on the
  * keyboard, every device and app summed. Synthetic sources (hotstrings, AI,

@@ -830,6 +830,21 @@ function M.read_studio_ngrams(sqlite_path)
 	return out, complete
 end
 
+--- The store's revision (meta.rev), bumped by every ingest: Ergopti Studio
+--- keeps its projection until it changes.
+--- @param sqlite_path string Absolute path to db.sqlite.
+--- @return string|nil rev The revision, or nil when it could not be read.
+function M.read_studio_stamp(sqlite_path)
+	local db = _open(sqlite_path)
+	if not db then return nil end
+	local rev = nil
+	_safe_query("meta.rev", function()
+		for r in db:nrows(Queries.render("meta.rev", "native")) do rev = r.value end
+	end)
+	db:close()
+	return rev ~= nil and tostring(rev) or nil
+end
+
 --- Adds every entry of `from` into `into`, using the same additive fields as
 --- the row handlers. Used to extend a cached historical dict by new days.
 --- An all-time history holds every distinct token, so the merge pauses at each

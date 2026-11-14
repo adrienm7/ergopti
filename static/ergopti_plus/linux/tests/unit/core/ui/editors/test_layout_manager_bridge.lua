@@ -266,6 +266,29 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		helpers.assert_true(read(true, { c = {}, bg = {}, tg = {} }, true).ok)
 	end)
 
+	helpers.it("keeps the projection while the store's revision is unchanged (studio-keystats-bridge)", function()
+		StudioNgrams.reset_cache()
+		local reads, rev = 0, "7"
+		local deps = { path = "/db.sqlite", exists = function() return true end,
+			stamp = function() return rev end,
+			read = function() reads = reads + 1; return { c = { e = { c = reads } } }, true end }
+		local first = StudioNgrams.read(deps)
+		helpers.assert_eq(first.ngrams.chars, { e = 1 })
+		helpers.assert_true(first.cached == false)
+		local second = StudioNgrams.read(deps)
+		helpers.assert_true(second.cached == true, "an unchanged revision is not read again")
+		helpers.assert_eq(reads, 1)
+		rev = "8"
+		helpers.assert_eq(StudioNgrams.read(deps).ngrams.chars, { e = 2 }, "a new ingest is read")
+		deps.stamp = function() return nil end
+		helpers.assert_eq(StudioNgrams.read(deps).ngrams.chars, { e = 3 }, "no revision, no cache")
+		helpers.assert_eq(StudioNgrams.read(deps).ngrams.chars, { e = 4 })
+		deps.stamp = function() return "8" end
+		deps.exists = function() return false end
+		helpers.assert_eq(StudioNgrams.read(deps).code, "keystats_absent", "a removed store is never answered from the cache")
+		StudioNgrams.reset_cache()
+	end)
+
 	helpers.it("the Studio window answers keystats_ngrams with the store's counts, the manager refuses it (studio-keystats-bridge)", function()
 		local Bridge, state, daemon_state = bridge()
 		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
@@ -279,6 +302,7 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 			end,
 		}
 		local saved_fs = package.loaded["core.fs.adapters.file_system"]
+		StudioNgrams.reset_cache()
 		local ok, err = pcall(function()
 			local FileSystem = require("core.fs.adapters.file_system")
 			local native_exists = FileSystem.exists
@@ -327,6 +351,7 @@ INSERT INTO ngram_chars(device_id, date, app, token, c, esrc_json) VALUES ('d2',
 INSERT INTO ngram_bigrams(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'es', 4, '{}');
 INSERT INTO ngram_trigrams(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'est', 2, '{}');
 INSERT INTO ngram_words(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'est', 2, '{}');
+INSERT OR REPLACE INTO meta(key, value) VALUES ('rev', '42');
 ]]
 		local writer = assert(io.popen("sqlite3 '" .. path .. "' >/dev/null", "w"))
 		writer:write(sql)
@@ -341,6 +366,7 @@ INSERT INTO ngram_words(device_id, date, app, token, c, esrc_json) VALUES ('d1',
 			helpers.assert_eq(dict.c.e.hs, 2)
 			helpers.assert_eq(dict.bg.es.c, 4)
 			helpers.assert_eq(dict.tg.est.c, 2)
+			helpers.assert_eq(Reader.read_studio_stamp(path), "42", "the stamp is the store's revision")
 			helpers.assert_nil(dict.w, "the other families are not read")
 			local payload = StudioNgrams.project(dict)
 			helpers.assert_eq(payload.chars, { e = 10 })

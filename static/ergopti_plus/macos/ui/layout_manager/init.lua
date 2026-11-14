@@ -257,6 +257,7 @@ local function new_window(spec)
 						path = require("modules.keystats.log_manager").get_sqlite_path(),
 						exists = function(path) return FileSystem.path_status(path) ~= "absent" end,
 						read = require("modules.keystats.sqlite_reader").read_studio_ngrams,
+						stamp = require("modules.keystats.sqlite_reader").read_studio_stamp,
 					}))
 				end, "layout_manager.read_keystats")
 			end or nil,

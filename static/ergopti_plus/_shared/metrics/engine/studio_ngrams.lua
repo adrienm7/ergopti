@@ -22,7 +22,11 @@
 ---    as the user's data.
 --- 4. One contract: the schema, the families and the refusal codes live in
 ---    _shared/metrics/data/studio_ngrams.json, read by every host.
---- 5. The driver injects its reader and its file-existence check.
+--- 5. Computed once per store version: the tables are kept with the store's
+---    revision (meta.rev, bumped by every ingest) and reused until it changes,
+---    so the Studio scores layouts at once instead of re-reading the store.
+--- 6. The driver injects its reader, its revision reader and its
+---    file-existence check.
 --- ==============================================================================
 
 local M = {}
@@ -92,22 +96,45 @@ function M.project(dict)
 	return payload
 end
 
---- Reads the store and projects it, or refuses with a code.
+-- The last complete projection: { path, stamp, ngrams }, or nil.
+local _cache = nil
+
+--- Forgets the cached projection (tests, and a store the user removed).
+function M.reset_cache()
+	_cache = nil
+end
+
+--- Reads the store and projects it, or refuses with a code. A store whose
+--- revision is the cached one answers from the cache without a read.
 --- @param deps table { path = string|nil, exists = function(path) -> boolean,
----     read = function(path) -> dict, complete }.
---- @return table result { ok = true, ngrams = payload } or { ok = false, code = string }.
+---     read = function(path) -> dict, complete,
+---     stamp = function(path) -> string|nil (optional) }.
+--- @return table result { ok = true, ngrams = payload, cached = boolean } or
+---     { ok = false, code = string }.
 function M.read(deps)
 	assert(type(deps) == "table" and type(deps.exists) == "function" and type(deps.read) == "function",
 		"studio_ngrams.read needs its exists and read ports")
 	local path = deps.path
 	if type(path) ~= "string" or path == "" or deps.exists(path) ~= true then
+		_cache = nil
 		return { ok = false, code = M.CODES.absent }
+	end
+	-- A revision that cannot be read is no revision: the store is read in full.
+	local stamp = nil
+	if type(deps.stamp) == "function" then
+		local stamped, value = pcall(deps.stamp, path)
+		if stamped and type(value) == "string" and value ~= "" then stamp = value end
+	end
+	if stamp and _cache and _cache.path == path and _cache.stamp == stamp then
+		return { ok = true, ngrams = _cache.ngrams, cached = true }
 	end
 	local called, dict, complete = pcall(deps.read, path)
 	if not called or type(dict) ~= "table" or complete ~= true then
 		return { ok = false, code = M.CODES.unreadable }
 	end
-	return { ok = true, ngrams = M.project(dict) }
+	local ngrams = M.project(dict)
+	_cache = stamp and { path = path, stamp = stamp, ngrams = ngrams } or nil
+	return { ok = true, ngrams = ngrams, cached = false }
 end
 
 return M

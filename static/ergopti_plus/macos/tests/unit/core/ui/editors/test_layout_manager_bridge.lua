@@ -342,6 +342,7 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 			ngram_chars = { { token = "e", c = 9, td = 0, e = 0, esrc_json = '{"hotstring":2}', source_rows = 1 } },
 			ngram_bigrams = { { token = "es", c = 4, td = 0, e = 0, esrc_json = "{}", source_rows = 1 } },
 			ngram_trigrams = { { token = "est", c = 2, td = 0, e = 0, esrc_json = "{}", source_rows = 1 } },
+			meta = { { value = "42" } },
 		}
 		local fake = {
 			OPEN_READONLY = 1,
@@ -352,7 +353,7 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 					close = function() end,
 					nrows = function(_, sql)
 						queries[#queries + 1] = sql
-						local table_name = sql:match("FROM (ngram_[a-z]+)")
+						local table_name = sql:match("FROM (ngram_[a-z]+)") or (sql:find("FROM meta", 1, true) and "meta")
 						local list, index = rows[table_name] or {}, 0
 						return function() index = index + 1; return list[index] end
 					end,
@@ -374,6 +375,8 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 			helpers.assert_eq(payload.chars, { e = 7 }, "hotstring expansions are not keystrokes")
 			helpers.assert_eq(payload.bigrams, { es = 4 })
 			helpers.assert_eq(payload.trigrams, { est = 2 })
+			helpers.assert_eq(Reader.read_studio_stamp("/Users/u/.ergopti/db.sqlite"), "42",
+				"the stamp is the store's revision")
 		end)
 		package.loaded["hs.sqlite3"] = saved_sqlite
 		package.loaded["modules.keystats.sqlite_reader"] = saved_reader
@@ -385,5 +388,6 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 		helpers.assert_contains(host, "read_keystats = spec.editor_window and function(on_done)")
 		helpers.assert_contains(host, 'read = require("modules.keystats.sqlite_reader").read_studio_ngrams,')
 		helpers.assert_contains(host, 'path = require("modules.keystats.log_manager").get_sqlite_path(),')
+		helpers.assert_contains(host, 'stamp = require("modules.keystats.sqlite_reader").read_studio_stamp,')
 	end)
 end)

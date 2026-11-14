@@ -229,6 +229,9 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
   (`_shared/metrics/engine/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`).
 - Fail fast: an absent store answers `keystats_absent`, a refused or partial read `keystats_unreadable`; the page
   shows the translated reason and keeps no partial data.
+- Computed once per store version: macOS and Linux keep the projection with the store's `meta.rev` (bumped by every
+  ingest), Windows with a hash of the keystats files' paths, sizes and modification times; an unchanged store answers
+  at once, without a read.
 - The page publishes the loaded counts as a `studio-ngrams` DOM event for the analysis panel.
 
 ## Limits stated to the user

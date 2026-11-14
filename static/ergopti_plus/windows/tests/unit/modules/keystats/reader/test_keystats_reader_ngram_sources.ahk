@@ -334,6 +334,8 @@ Test("Keystats reader: Ergopti Studio reads the physical keystrokes of three fam
 ; and a failed worker read are refusals, a finished read pushes the staged JSON
 ; as is, and the worker is the only reader of the store.
 _KLRSource_StudioWindowAnswers() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
 	Contract := KLR_StudioContract()
 	Pushed := []
 	Requests := []
@@ -342,8 +344,10 @@ _KLRSource_StudioWindowAnswers() {
 	try {
 		Outcome := Map("status", "ok", "stage", Dir . "\stage.json")
 		FileAppend('{"schema":1,"chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
+		Stamp := Map("value", "rev-1")
 		Deps := Map(
 			"metrics_dir", Dir . "\absent",
+			"stamp", (MetricsDir) => Stamp["value"],
 			"request_studio", (MetricsDir, OnTerminal) => (Requests.Push(MetricsDir),
 				OnTerminal.Call(Outcome["status"], Outcome["stage"]), true),
 			"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
@@ -355,13 +359,38 @@ _KLRSource_StudioWindowAnswers() {
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"e":7}}}', Pushed[2])
 		AssertEqual(Dir, Requests[1])
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(Pushed[2], Pushed[3], "an unchanged store answers from the cached projection")
+		AssertEqual(1, Requests.Length, "an unchanged store starts no second worker")
+		Stamp["value"] := "rev-2"
 		Outcome["status"] := "failed", Outcome["stage"] := ""
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
-		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[3])
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[4])
+		AssertEqual(2, Requests.Length, "a changed store is read again")
 		AssertTrue(LAYOUT_EDITOR_WINDOW_ACTIONS.Has("keystats_ngrams"), "the page's action is allowlisted")
 	} finally {
+		_LayEdWin_StudioCache := 0
 		DirDelete(Dir, true)
 	}
 }
 Test("Layout editor window: Ergopti Studio answers keystats_ngrams with the worker's read (studio-keystats-bridge)",
 	_KLRSource_StudioWindowAnswers)
+
+; The Studio stamp changes when a keystats file grows and stays put otherwise.
+_KLRSource_StudioStampFollowsTheStore() {
+	Dir := A_Temp . "\ergopti_studio_stamp_" . A_TickCount
+	DirCreate(Dir . "\device")
+	try {
+		AssertEqual("", KLR_StudioStoreStamp(Dir), "an empty folder has no stamp")
+		FileAppend("a", Dir . "\device\data.sql", "UTF-8-RAW")
+		First := KLR_StudioStoreStamp(Dir)
+		Assert(First != "", "a folder with a journal has a stamp")
+		AssertEqual(First, KLR_StudioStoreStamp(Dir), "an unchanged folder keeps its stamp")
+		FileAppend("b", Dir . "\device\data.sql", "UTF-8-RAW")
+		Assert(KLR_StudioStoreStamp(Dir) != First, "a grown journal changes the stamp")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Keystats reader: the Ergopti Studio stamp follows the keystats files (studio-keystats-bridge)",
+	_KLRSource_StudioStampFollowsTheStore)

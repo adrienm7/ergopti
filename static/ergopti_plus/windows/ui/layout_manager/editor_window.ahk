@@ -44,6 +44,9 @@
 
 ; The only actions the page may send (the page declares the same list;
 ; tools/test/test-layout-manager-page.cjs pins both).
+; The last complete Ergopti Studio projection: Map("stamp", "json"), or 0.
+global _LayEdWin_StudioCache := 0
+
 global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"composer_open", true, "composer_save", true, "composer_emulate", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
@@ -111,22 +114,31 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
  * Reads Ergopti Studio's « My typing » counts for this window. The keystats
  * folder is never written: a worker projects it read only, and its staged JSON
  * goes to this window alone.
- * @param {Map} Deps - "metrics_dir", "request_studio" (MetricsDir, OnTerminal),
- *   "push_raw" (FunctionName, Json) and "read_stage" (Path).
+ * @param {Map} Deps - "metrics_dir", "stamp" (MetricsDir), "request_studio"
+ *   (MetricsDir, OnTerminal), "push_raw" (FunctionName, Json) and "read_stage" (Path).
  * @returns {Boolean} Whether the read was accepted.
  */
 LayoutEditorWindow_ReadKeystats(Deps) {
+	global _LayEdWin_StudioCache
 	Codes := KLR_StudioContract()["codes"]
 	MetricsDir := Deps["metrics_dir"]
 	if (MetricsDir == "") || !DirExist(MetricsDir) {
+		_LayEdWin_StudioCache := 0
 		_LayEdWin_PushRefusal(Deps, Codes["absent"])
 		return true
 	}
-	return Deps["request_studio"].Call(MetricsDir, _LayEdWin_OnStudioTerminal.Bind(Deps, Codes))
+	; An unchanged keystats folder answers from the last projection, at once.
+	Stamp := Deps["stamp"].Call(MetricsDir)
+	if (Stamp != "") && (_LayEdWin_StudioCache is Map) && (_LayEdWin_StudioCache["stamp"] == Stamp) {
+		Deps["push_raw"].Call("keystatsNgrams", '{"ok":true,"ngrams":' . _LayEdWin_StudioCache["json"] . "}")
+		return true
+	}
+	return Deps["request_studio"].Call(MetricsDir, _LayEdWin_OnStudioTerminal.Bind(Deps, Codes, Stamp))
 }
 
 ; The worker's one terminal: its staged JSON, read before the stage is deleted.
-_LayEdWin_OnStudioTerminal(Deps, Codes, Status, Stage) {
+_LayEdWin_OnStudioTerminal(Deps, Codes, Stamp, Status, Stage) {
+	global _LayEdWin_StudioCache
 	if (Status != "ok") || (Stage == "") {
 		LoggerWarn("LayoutEditorWindow", "Ergopti Studio could not read the typing statistics ({1}).", Status)
 		_LayEdWin_PushRefusal(Deps, Codes["unreadable"])
@@ -138,6 +150,7 @@ _LayEdWin_OnStudioTerminal(Deps, Codes, Status, Stage) {
 		_LayEdWin_PushRefusal(Deps, Codes["unreadable"])
 		return
 	}
+	_LayEdWin_StudioCache := Stamp != "" ? Map("stamp", Stamp, "json", Json) : 0
 	Deps["push_raw"].Call("keystatsNgrams", '{"ok":true,"ngrams":' . Json . "}")
 }
 
@@ -179,6 +192,7 @@ _LayEdWin_Deps(Host) {
 		"local_dir", LayoutRegistry_LocalDir(_ConfigDir),
 		"close", () => Host.Close(),
 		"metrics_dir", KL_MetricsDirFor(_ConfigDir),
+		"stamp", KLR_StudioStoreStamp,
 		"request_studio", KLPF_RequestStudio,
 		"push_raw", _LayEdWin_PushRaw.Bind(Host),
 		"read_stage", FSRead

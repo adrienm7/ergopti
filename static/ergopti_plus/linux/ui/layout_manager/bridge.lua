@@ -226,6 +226,7 @@ local function new_handler(spec)
 					path = config_paths and config_paths.metrics_path() or nil,
 					exists = FileSystem.exists,
 					read = keystats_reader.read_studio_ngrams,
+					stamp = keystats_reader.read_studio_stamp,
 				})
 				if current() then done(result) end
 			end or nil,

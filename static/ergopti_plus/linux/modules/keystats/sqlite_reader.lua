@@ -608,6 +608,16 @@ function M.read_studio_ngrams(sqlite_path)
 	return out, complete
 end
 
+--- The store's revision (meta.rev), bumped by every ingest: Ergopti Studio
+--- keeps its projection until it changes.
+--- @param sqlite_path string Database path.
+--- @return string|nil rev The revision, or nil when it could not be read.
+function M.read_studio_stamp(sqlite_path)
+	local rows, accepted = read_rows(sqlite_path, Queries.render("meta.rev", "cli_json"))
+	if not accepted or type(rows[1]) ~= "table" or rows[1].value == nil then return nil end
+	return tostring(rows[1].value)
+end
+
 --- Resolves inclusive date bounds against one captured local calendar day.
 --- Invalid optional bounds are ignored, matching the reader's SQL filters.
 --- @param start_date string|nil Inclusive lower bound.
