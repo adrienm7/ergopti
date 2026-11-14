@@ -71,8 +71,11 @@ function refusalSite(reason) {
 	const message = String(reason.message)
 		.replace(/[\r\n]+/g, ' ')
 		.slice(0, 200);
+	// The first frame of a refusal is the shared refused() thrower; the check
+	// that called it is the next tool frame.
 	const frame = String(reason.stack || '')
 		.split('\n')
+		.filter((line) => !/^\s*at refused \(/.test(line))
 		.map((line) => line.match(/[\\/]tools[\\/]test[\\/]([\w.-]+\.cjs):(\d+):\d+\)?$/))
 		.find(Boolean);
 	return frame ? message + ' at ' + frame[1] + ':' + frame[2] : message;
