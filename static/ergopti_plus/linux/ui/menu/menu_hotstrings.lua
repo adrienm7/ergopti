@@ -1182,11 +1182,9 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_personal"] = function()
 			local default_parent, group_rows, unavailable_rows = {}, {}, {}
 			local preferences_present, close_on_add, close_action = false, false, nil
+			-- The editor is configuration: it opens while paused (EDD-1).
 			local function editor_ready()
-				if ctx.paused == true or type(ctx.is_paused) ~= "function"
-					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
-				local ok, current = pcall(ctx.is_paused)
-				return ok and current == false
+				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
 			end
 			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("settings.engine.keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },

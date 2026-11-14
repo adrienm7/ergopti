@@ -577,13 +577,9 @@ function M.build_custom(ctx, counts)
 
 	-- =====================
 	-- Assemble menu items
+	-- The editor is configuration: it opens while paused (EDD-1).
 	local function editor_ready()
-		if ctx.paused == true or type(ctx.hotstring_editor) ~= "table"
-			or type(ctx.hotstring_editor.open) ~= "function"
-			or type(ctx.script_control) ~= "table"
-			or type(ctx.script_control.is_paused) ~= "function" then return false end
-		local ok, current = pcall(ctx.script_control.is_paused)
-		return ok and current == false
+		return type(ctx.hotstring_editor) == "table" and type(ctx.hotstring_editor.open) == "function"
 	end
 	local function open_editor()
 		return DeferredWork.after(0, function()
