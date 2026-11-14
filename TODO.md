@@ -320,6 +320,12 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       worst pairs it causes; moving or swapping a key updates the colours and the score at once. Same view in the
       app's Studio and on the site.
 
+- [ ] **Two tabs in Ergopti Studio (maintainer, 2026-11-14).** One product, two tabs, in the app and on the site:
+      « Éditer » (the editor, with a right-hand side panel showing the current layout's metrics, its global score and
+      its rank against all library layouts or a chosen selection, updated live) and « Comparer » (layout battles: pick
+      layouts, see every metric, the global score and the ranking side by side, with charts). A layout being edited
+      enters the comparison in one click. Site routes: /studio and /studio/comparer.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
