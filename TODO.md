@@ -783,7 +783,9 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **Legacy Linux updater probes (remove later).** Installed Linux updaters before the structure move (v1.0.9 …
       v1.0.10-dev.175) admit a staged tarball only with `_shared/data/locales/en.json` and a `_shared/lua/` folder;
       `tools/build/add-linux-legacy-update-probes.sh` adds both to the release tarball (decided by the coordinator on
-      2026-11-13, confirmed by the maintainer on 2026-11-14; proved locally by the real v1.0.9 installer applying a
+      2026-11-13, confirmed by the maintainer on 2026-11-14: Linux has no users yet, so this protects any v1.0.9 …
+      v1.0.10-dev.175 installation that exists in the future, and stays minimal: one generated file, the empty
+      `_shared/lua/` v1.0.9 requires, one regression test; proved locally by the real v1.0.9 installer applying a
       post-move tarball, and in CI by each release's own `ownership.sh`, frozen from the v1.0.9 and v1.0.10-dev.175
       tags in `tools/test/fixtures/linux-pre-move-ownership`, recording the packed tarball). Remove that step, its
       call, `test-linux-legacy-update-probes.cjs` and those frozen helpers once the first release whose
