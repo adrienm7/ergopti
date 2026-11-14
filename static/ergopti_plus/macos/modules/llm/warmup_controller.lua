@@ -395,6 +395,18 @@ function M.resume_warmup()
 	return true
 end
 
+--- Records a warmup asked for while the script is paused: a pause stops
+--- typing, not configuration (EDD-1), so a model chosen while paused is warmed
+--- by resume_warmup, never during the pause.
+--- @param reason string Who asked for the warmup, for the log entry.
+--- @return boolean committed True once the intent is recorded.
+function M.defer_to_resume(reason)
+	if not require_state("defer_to_resume") then return false end
+	_pause_resume_pending = true
+	Logger.debug(LOG, "%s: warmup deferred to resume.", tostring(reason))
+	return true
+end
+
 --- Replays a warmup that was skipped because the backend model was not yet
 --- resolved. The model owner calls this once it publishes a new identity
 --- (for instance after restoring the persisted remote API entries).

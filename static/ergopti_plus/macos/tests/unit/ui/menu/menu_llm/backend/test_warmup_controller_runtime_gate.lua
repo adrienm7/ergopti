@@ -110,3 +110,37 @@ helpers.describe("M-12: WarmupCtrl.warmup_model gated on runtime LLM enable", fu
 			"warmup_model must be called when get_runtime_llm_enabled returns true")
 	end)
 end)
+
+
+
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= 2/ A paused script defers the warmup to resume (EDD-1) =======
+-- ======================================================================
+-- ======================================================================
+
+helpers.describe("EDD-1: WarmupCtrl defers a paused warmup to resume", function()
+	for _, entry in ipairs({ "warmup", "warmup_model" }) do
+		helpers.it(entry .. "() posts nothing while paused and records the intent (edd1-paused-writes)", function()
+			local deferred = {}
+			local saved_control = package.loaded["modules.shortcuts.script_control"]
+			local saved_engine = package.loaded["modules.llm.warmup_controller"]
+			package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return true end }
+			package.loaded["modules.llm.warmup_controller"] = {
+				defer_to_resume = function(reason) deferred[#deferred + 1] = reason return true end,
+			}
+			local ok, err = pcall(function()
+				local wc, llm_stub = load_wc(make_llm_stub(true, "test-model"))
+				local result = entry == "warmup" and wc.warmup("paused_case") or wc.warmup_model("m", "paused_case")
+				helpers.assert_eq(result, true)
+				helpers.assert_eq(#llm_stub.get_warmup_calls(), 0, "no warmup request is sent while paused")
+				helpers.assert_eq(#deferred, 1, "the warmup is handed to resume")
+			end)
+			package.loaded["modules.shortcuts.script_control"] = saved_control
+			package.loaded["modules.llm.warmup_controller"] = saved_engine
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
