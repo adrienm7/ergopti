@@ -894,12 +894,12 @@ check(
 		);
 		let busy = null;
 		host.saveBinary('other.zip', bytes).catch((error) => (busy = error.code));
-		window.exportResult({ ok: true, path: '/home/u/Downloads/mine_xkb.zip' });
+		window.exportResult({ ok: true, path: 'Downloads/mine_xkb.zip' });
 		let refused = null;
 		host.saveBinary('x.zip', bytes).catch((error) => (refused = error));
 		window.exportResult({ ok: false, code: 'write_failed', detail: 'disk full' });
 		return Promise.resolve().then(() => {
-			assert.equal(saved, '/home/u/Downloads/mine_xkb.zip', 'settles with the written path');
+			assert.equal(saved, 'Downloads/mine_xkb.zip', 'settles with the written path');
 			assert.equal(busy, 'save_busy', 'one download at a time');
 			assert.deepEqual(plain(refused), { code: 'write_failed', path: 'disk full' });
 		});
