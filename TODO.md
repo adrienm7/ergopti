@@ -696,8 +696,8 @@ Each closes on a named green hosted or native run, recorded here.
       keyboard-source fixture ».
       Worker K scan 2026-11-13 of the 11 completed ci.yml runs of that day (43347126427 to 43504755033, both attempts
       of 43430776650, every failed job's full log grepped): no failure of the Linux window switch (8 input-display jobs,
-      `test:linux:window-switch` clean), the cffi-lua clone (absent from every log), desktop-webview AI focus (`PASS
-    native GTK AI text focus: 31 cases` in all 8 jobs), `TestIdleDeadlinePhysicallyRetiresPeer`,
+      `test:linux:window-switch` clean), the cffi-lua clone (absent from every log), desktop-webview AI focus
+      (`PASS native GTK AI text focus: 31 cases` in all 8 jobs), `TestIdleDeadlinePhysicallyRetiresPeer`,
       `testBridgeHardDeath...`, the `symlink_logs_dir` Quit timeout or the App Cloner EPERM. One Windows config-group
       lookalike: `config-scope-global` in 43347126427 (job 131629578949, a structure-proof WIP source) stopped at
       `[WATCHDOG] run_llm_model_browser timed out` on test 23/29 (`model-browser-native-json`); single occurrence, not
