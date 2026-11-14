@@ -254,9 +254,10 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			.appendingPathComponent("ui/apps.manifest.json")
 		let data = try Data(contentsOf: manifestURL)
 		let manifest = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-		let policy = try XCTUnwrap(manifest["window_title"] as? [String: String])
-		let prefix = try XCTUnwrap(policy["prefix"])
-		let separator = try XCTUnwrap(policy["separator"])
+		// The policy also lists product_names, an array: read its two strings one by one.
+		let policy = try XCTUnwrap(manifest["window_title"] as? [String: Any])
+		let prefix = try XCTUnwrap(policy["prefix"] as? String)
+		let separator = try XCTUnwrap(policy["separator"] as? String)
 		return prefix.isEmpty ? label : prefix + separator + label
 	}
 
