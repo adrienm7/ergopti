@@ -452,3 +452,15 @@ _LCS_StudioRowCase() {
 	}
 	AssertFalse(IsObject(_TrayMenuStage), "the stage is released")
 }
+
+Test("layout editor host: the Studio window title is exactly « Ergopti Studio » (window-title-product-name)",
+	_LCS_StudioTitleCase)
+
+_LCS_StudioTitleCase() {
+	AssertEqual("Ergopti Studio", WindowTitle(t("layout_editor.title")), "the whole title is the product name")
+	AssertEqual("ErgoptiPlus — Paths", WindowTitle("Paths"), "every other window keeps the brand")
+	AssertEqual("ErgoptiPlus — Ergopti Studio 2", WindowTitle("Ergopti Studio 2"))
+	Body := _DriverFuncBody("LayoutEditorWindow_Open")
+	Assert(Body != "", "the editor window opener must be readable")
+	AssertContains(Body, '"Title", t("layout_editor.title")', "the window passes its caption to the composing host")
+}

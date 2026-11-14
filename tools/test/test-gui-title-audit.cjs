@@ -12,7 +12,8 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const titles = require('../codegen/codegen-window-titles.cjs');
 const audit = path.resolve(__dirname, '../lint/audit-gui-titles.cjs');
-const { isBranded, PRODUCT_CAPTIONS } = require('../lint/audit-gui-titles.cjs');
+const { isBranded, productNames } = require('../lint/audit-gui-titles.cjs');
+const PRODUCT_NAMES = productNames();
 const repository = path.resolve(__dirname, '../..');
 const sharedManifest = JSON.parse(fs.readFileSync(path.join(repository, titles.SOURCE), 'utf8'));
 const localeDirectory = path.join(repository, 'static/ergopti_plus/_shared/core/i18n/data/locales');
@@ -46,7 +47,7 @@ function brandedCaptions(manifest, locales) {
 	const found = [];
 	for (const [locale, strings] of Object.entries(locales))
 		for (const key of captionKeys(manifest, strings))
-			if (typeof strings[key] === 'string' && isBranded(strings[key]))
+			if (typeof strings[key] === 'string' && isBranded(strings[key], PRODUCT_NAMES))
 				found.push(`${locale}: ${key}`);
 	return found;
 }
@@ -64,10 +65,43 @@ assert.deepEqual(
 // (window-title-product-name) « Ergopti Studio » is the product name the
 // maintainer chose for the layout editor window: admitted exactly, never as a
 // prefix or with the composed brand in front of it.
-assert.deepEqual(PRODUCT_CAPTIONS, ['Ergopti Studio']);
-assert.equal(isBranded('Ergopti Studio'), false, 'the exact product name is a caption');
-for (const value of ['Ergopti Studio 2', 'ErgoptiPlus — Ergopti Studio', 'Ergopti', 'ErgoptiPlus'])
-	assert.equal(isBranded(value), true, `${value} still carries the brand`);
+assert.deepEqual(PRODUCT_NAMES, ['Ergopti Studio']);
+assert.equal(
+	isBranded('Ergopti Studio', PRODUCT_NAMES),
+	false,
+	'the exact product name is a caption'
+);
+for (const value of [
+	'Ergopti Studio 2',
+	'ErgoptiPlus — Ergopti Studio',
+	'Ergopti',
+	'ErgoptiPlus',
+	' Ergopti Studio'
+])
+	assert.equal(isBranded(value, PRODUCT_NAMES), true, `${value} still carries the brand`);
+assert.equal(isBranded('Ergopti Studio', []), true, 'only a declared product name is admitted');
+// The three composers show a product name as the whole title, and still brand
+// every other caption.
+{
+	const generated = titles.render(
+		{ prefix: 'ErgoptiPlus', separator: ' — ', product_names: ['Ergopti Studio'] },
+		{}
+	);
+	assert.match(generated.lua, /local PRODUCT_NAMES = \{ \["Ergopti Studio"\] = true, \}/);
+	assert.match(generated.lua, /if PRODUCT_NAMES\[label\] then return label end/);
+	assert.match(generated.ahk, /ProductNames := Map\("Ergopti Studio", true\)/);
+	assert.match(generated.ahk, /if ProductNames\.Has\(Label\)\s+return Label/);
+	assert.match(generated.swift, /let productNames: Set<String> = \["Ergopti Studio"\]/);
+	assert.match(generated.swift, /if productNames\.contains\(label\) \{ return label \}/);
+	assert.throws(
+		() => titles.render({ prefix: 'P', separator: ' — ', product_names: [''] }, {}),
+		TypeError
+	);
+	assert.throws(
+		() => titles.render({ prefix: 'P', separator: ' — ', product_names: 'x' }, {}),
+		TypeError
+	);
+}
 // The scan sees the original doubled dialog caption and a branded app title.
 for (const [key, value] of [
 	['menu.llm.api_dialog_title', 'ErgoptiPlus — API endpoint'],
@@ -87,7 +121,7 @@ for (const locale of localeNames) {
 			`${locale}: ${app} has its title translation`
 		);
 		assert.equal(
-			isBranded(strings[entry.title_key]),
+			isBranded(strings[entry.title_key], PRODUCT_NAMES),
 			false,
 			`${locale}: ${app} passes a bare title to the shared policy`
 		);
@@ -1222,6 +1256,10 @@ const cases = [
 ];
 try {
 	put('tools/lint/audit-gui-titles.cjs', fs.readFileSync(audit));
+	put(
+		'static/ergopti_plus/_shared/ui/apps.manifest.json',
+		JSON.stringify({ window_title: { prefix: 'ErgoptiPlus', separator: ' — ', product_names: [] } })
+	);
 	for (const platform of ['windows', 'macos', 'linux']) put(sourcePath(platform), '');
 	put(
 		'static/ergopti_plus/_shared/core/i18n/data/locales/en.json',

@@ -11,19 +11,33 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ROOT = path.resolve(__dirname, '../..');
 const BRAND = /^\s*Ergopti(?:Plus)?\b/;
-// Product names that are a window's own caption although they start with the
-// brand word: the maintainer named the layout editor « Ergopti Studio »
-// (2026-11-14), so its windows read « ErgoptiPlus — Ergopti Studio ». Only the
-// exact name is admitted; anything longer or prefixed is still a doubled brand.
-const PRODUCT_CAPTIONS = Object.freeze(['Ergopti Studio']);
+const MANIFEST = 'static/ergopti_plus/_shared/ui/apps.manifest.json';
+
+/**
+ * The product names of the shared title policy (apps.manifest.json
+ * window_title.product_names): a caption that is exactly one of them is the
+ * whole window title, which the composers show without the brand prefix
+ * (« Ergopti Studio », maintainer 2026-11-14).
+ * @param {string} root - Repository root.
+ * @returns {string[]} The declared product names.
+ */
+function productNames(root = ROOT) {
+	const names = JSON.parse(fs.readFileSync(path.join(root, MANIFEST), 'utf8')).window_title
+		?.product_names;
+	if (!Array.isArray(names) || !names.every((name) => typeof name === 'string' && name !== ''))
+		throw new TypeError(`${MANIFEST} window_title.product_names must list non-empty names.`);
+	return names;
+}
 
 /**
  * Whether a caption carries the brand the title composer adds.
  * @param {string} value - A translated caption.
+ * @param {string[]} names - The policy's product names, admitted exactly.
  * @returns {boolean} True for a branded caption that is not an admitted product name.
  */
-function isBranded(value) {
-	return BRAND.test(value) && !PRODUCT_CAPTIONS.includes(value.trim());
+function isBranded(value, names) {
+	if (!Array.isArray(names)) throw new TypeError('isBranded requires the policy product names.');
+	return BRAND.test(value) && !names.includes(value);
 }
 
 /** Tokenize strings and delimiters without treating quoted comment markers as comments. */
@@ -181,7 +195,7 @@ function functionRanges(ts) {
 	return ranges;
 }
 
-function auditSource(source, lua, locales, relative = '') {
+function auditSource(source, lua, locales, relative = '', names = []) {
 	const ts = tokens(source, lua),
 		findings = [],
 		debt = [],
@@ -249,7 +263,7 @@ function auditSource(source, lua, locales, relative = '') {
 			stats.dynamic++;
 			return;
 		}
-		const bad = resolved.filter((v) => isBranded(v.value));
+		const bad = resolved.filter((v) => isBranded(v.value, names));
 		if (bad.length)
 			findings.push({
 				line,
@@ -387,10 +401,10 @@ function auditSource(source, lua, locales, relative = '') {
 			continue;
 		}
 		const bad = brandedInput
-			? resolved.filter((v) => isBranded(v.value))
-			: resolved.filter((v) => !isBranded(v.value));
+			? resolved.filter((v) => isBranded(v.value, names))
+			: resolved.filter((v) => !isBranded(v.value, names));
 		// Raw expressions composed by the title helper already have their prefix.
-		if (!brandedInput && resolved.some((v) => v.composed || isBranded(v.value))) continue;
+		if (!brandedInput && resolved.some((v) => v.composed || isBranded(v.value, names))) continue;
 
 		if (bad.length)
 			findings.push({
@@ -413,6 +427,7 @@ function main(root = ROOT) {
 			.filter((n) => n.endsWith('.json'))
 			.map((n) => [n.slice(0, -5), JSON.parse(fs.readFileSync(path.join(localeDir, n), 'utf8'))])
 	);
+	const names = productNames(root);
 	let violations = 0,
 		checked = 0,
 		dynamic = 0,
@@ -431,7 +446,8 @@ function main(root = ROOT) {
 				fs.readFileSync(file, 'utf8'),
 				extension === '.lua',
 				locales,
-				relative
+				relative,
+				names
 			);
 			checked += result.checked;
 			dynamic += result.dynamic;
@@ -459,5 +475,5 @@ function main(root = ROOT) {
 	);
 	return violations ? 1 : 0;
 }
-module.exports = { auditSource, argumentsAt, isBranded, main, PRODUCT_CAPTIONS, tokens };
+module.exports = { auditSource, argumentsAt, isBranded, main, productNames, tokens };
 if (require.main === module) process.exitCode = main(process.argv[2] || ROOT);

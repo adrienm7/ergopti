@@ -5,6 +5,8 @@
 local M = {}
 local PREFIX = "ErgoptiPlus"
 local SEPARATOR = " — "
+-- Whole window titles the composer shows without the prefix.
+local PRODUCT_NAMES = { ["Ergopti Studio"] = true, }
 local TITLE_KEYS = {
 	["action_picker"] = "dialog.action_picker.label",
 	["changelog"] = "changelog_window.window_title",
@@ -55,6 +57,7 @@ local NATIVE_PRESENTATIONS = {
 --- @return string
 function M.compose(label)
 	if type(label) ~= "string" or label == "" then return PREFIX end
+	if PRODUCT_NAMES[label] then return label end
 	if PREFIX == "" then return label end
 	return PREFIX .. SEPARATOR .. label
 end

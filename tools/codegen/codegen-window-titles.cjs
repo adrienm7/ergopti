@@ -23,7 +23,25 @@ function validate(policy) {
 			throw new TypeError(
 				'Window title policy must fit on one line using valid Unicode without control characters.'
 			);
-	return policy;
+	// A product name is a whole window title, shown without the prefix
+	// (« Ergopti Studio », maintainer 2026-11-14).
+	const names = Object.hasOwn(policy, 'product_names') ? policy.product_names : [];
+	if (
+		!Array.isArray(names) ||
+		!names.every(
+			(name) =>
+				typeof name === 'string' &&
+				name !== '' &&
+				name.trim() === name &&
+				name.isWellFormed() &&
+				!/[\x00-\x1F\x7F\u2028\u2029"`;\\]/.test(name)
+		) ||
+		new Set(names).size !== names.length
+	)
+		throw new TypeError(
+			'apps.manifest.json window_title.product_names must list distinct plain one-line names.'
+		);
+	return { ...policy, product_names: names };
 }
 
 /** Quote one AHK expression without turning policy data into executable code. */
@@ -146,7 +164,7 @@ function projectPresentations(apps) {
 function render(policy, titleKeys = {}, presentations = {}, nativePresentations = {}) {
 	validateNativePresentations(nativePresentations);
 	validatePresentations(presentations);
-	validate(policy);
+	policy = validate(policy);
 	for (const [app, key] of Object.entries(titleKeys)) {
 		if (
 			!/^[a-z][a-z0-9_]*$/.test(app) ||
@@ -164,6 +182,8 @@ function render(policy, titleKeys = {}, presentations = {}, nativePresentations 
 local M = {}
 local PREFIX = ${JSON.stringify(policy.prefix)}
 local SEPARATOR = ${JSON.stringify(policy.separator)}
+-- Whole window titles the composer shows without the prefix.
+local PRODUCT_NAMES = { ${policy.product_names.map((name) => `[${JSON.stringify(name)}] = true, `).join('')}}
 local TITLE_KEYS = {
 ${Object.entries(titleKeys)
 	.sort(([a], [b]) => a.localeCompare(b))
@@ -204,6 +224,7 @@ ${Object.entries(nativePresentations)
 --- @return string
 function M.compose(label)
 \tif type(label) ~= "string" or label == "" then return PREFIX end
+\tif PRODUCT_NAMES[label] then return label end
 \tif PREFIX == "" then return label end
 \treturn PREFIX .. SEPARATOR .. label
 end
@@ -280,8 +301,12 @@ return M
 WindowTitle(Label := "") {
 \tPrefix := ${ahkString(policy.prefix)}
 \tSeparator := ${ahkString(policy.separator)}
+\t; Whole window titles shown without the prefix.
+\tProductNames := Map(${policy.product_names.map((name) => `${ahkString(name)}, true`).join(', ')})
 \tif Label == ""
 \t\treturn Prefix
+\tif ProductNames.Has(Label)
+\t\treturn Label
 \tif Prefix == ""
 \t\treturn Label
 \treturn Prefix . Separator . Label
@@ -297,7 +322,9 @@ enum WindowTitles {
 	static func compose(_ label: String? = nil) -> String {
 		let prefix = ${JSON.stringify(policy.prefix)}
 		let separator = ${JSON.stringify(policy.separator)}
+		let productNames: Set<String> = [${policy.product_names.map((name) => JSON.stringify(name)).join(', ')}]
 		guard let label, !label.isEmpty else { return prefix }
+		if productNames.contains(label) { return label }
 		guard !prefix.isEmpty else { return label }
 		return prefix + separator + label
 	}

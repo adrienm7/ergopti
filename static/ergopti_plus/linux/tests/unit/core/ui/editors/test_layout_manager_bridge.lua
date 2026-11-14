@@ -238,6 +238,23 @@ helpers.describe("layout manager bridge (Linux)", function()
 end)
 
 helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
+	helpers.it("the Studio window title is exactly « Ergopti Studio » in every locale (window-title-product-name)", function()
+		package.loaded["core.ui.engine.window_titles"] = nil
+		local WindowTitles = require("core.ui.engine.window_titles")
+		local Json = require("core.text.engine.json")
+		local Paths = require("core.fs.engine.paths")
+		local key = WindowTitles.key_for_app("layout_editor_window")
+		helpers.assert_eq(key, "layout_editor.title")
+		local order = Json.decode(assert(io.open(Paths.shared("core/i18n/data/locale_order.json"), "rb")):read("*a")).order
+		helpers.assert_eq(#order, 21)
+		for _, code in ipairs(order) do
+			local strings = Json.decode(assert(io.open(Paths.shared("core/i18n/data/locales/" .. code .. ".json"), "rb")):read("*a"))
+			helpers.assert_eq(WindowTitles.compose(strings[key]), "Ergopti Studio", code .. ": the whole title is the product name")
+		end
+		helpers.assert_eq(WindowTitles.compose("Paths"), "ErgoptiPlus — Paths", "every other window keeps the brand")
+		helpers.assert_eq(WindowTitles.compose("Ergopti Studio 2"), "ErgoptiPlus — Ergopti Studio 2")
+	end)
+
 	local StudioNgrams = require("metrics.engine.studio_ngrams")
 
 	helpers.it("projects physical keystrokes only and refuses an absent or partial store (studio-keystats-bridge)", function()
