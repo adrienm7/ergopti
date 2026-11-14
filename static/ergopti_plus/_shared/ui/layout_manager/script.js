@@ -30,9 +30,6 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'select',
 	'open_homepage',
 	'close',
-	'composer_open',
-	'composer_save',
-	'composer_remove',
 	'open_editor'
 ]);
 
@@ -414,7 +411,7 @@ function render() {
  * Posts one allowlisted action to the host.
  * @param {string} action
  * @param {string} [id] - Registry id the action applies to.
- * @param {Object} [extra] - More fields of the message (the composer's save).
+ * @param {Object} [extra] - More fields of the message.
  */
 function send(action, id, extra) {
 	if (!LAYOUT_MANAGER_ACTIONS.includes(action))
@@ -438,11 +435,8 @@ window.initData = function (data) {
 		applyDomStrings();
 	}
 	// Only a host that stores the editor's files offers it (all three drivers),
-	// in its own window (_shared/ui/layout_editor_window). There the editor
-	// replaces the composer, which fills layers from the same sources.
-	const editor = data.source_editor === true;
-	document.getElementById('btn-editor').hidden = !editor;
-	document.getElementById('btn-compose').hidden = editor;
+	// in its own window (_shared/ui/layout_editor_window).
+	document.getElementById('btn-editor').hidden = data.source_editor !== true;
 	window.updateState(data.state);
 };
 

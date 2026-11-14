@@ -57,7 +57,6 @@ M.ACTIONS = {
 	close = true,
 	composer_open = true,
 	composer_save = true,
-	composer_remove = true,
 	composer_emulate = true,
 	source_open = true,
 	source_save = true,
@@ -163,7 +162,11 @@ local function reload_extensions(deps, id)
 	end
 end
 
---- Handles the three composer messages of the page.
+--- Handles the composer messages of the layout editor window: the registry
+--- sources (composer_open), « Install and use » (composer_save with a source)
+--- and « Emulate without installing » (composer_emulate). The composer field
+--- check (composer/check_core.lua) saves a declaration and removes the
+--- composition through the registry itself, never through a page.
 --- @param deps table The controller's collaborators.
 --- @param controller table
 --- @param action string
@@ -178,8 +181,8 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		return false
 	end
 	local function report(ok, code, detail, used, installed)
-		-- A saved or removed composition changes the reserved `composed` layout.
-		if ok == true and (action == "composer_save" or action == "composer_remove") then
+		-- A saved composition changes the reserved `composed` layout.
+		if ok == true and action == "composer_save" then
 			layout_changed(deps, "composed")
 		end
 		deps.push("composerResult", { action = action, ok = ok == true, code = code, detail = detail and tostring(detail),
@@ -192,33 +195,27 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		operation(function(data) deps.push("composerData", data) end)
 		return true
 	end
-	if action == "composer_remove" then
-		operation(report)
-		return true
-	end
 	if action == "composer_emulate" then return M.handle_emulate(deps, payload, report) end
-	-- A save carries a composition (declaration) or an Ergopti layout source, with its layout.
-	local declaration = type(payload.declaration) == "string"
-	local source = type(payload.source) == "string"
-	if declaration == source or type(payload.keylayout) ~= "string" then
-		deps.log("warn", "Refused a layout composer save without exactly one of a declaration or a source, and its layout.")
+	-- A save carries an Ergopti layout source and its compiled layout; the
+	-- retired composer page's declaration is no longer a page message.
+	if type(payload.source) ~= "string" or type(payload.keylayout) ~= "string" or payload.declaration ~= nil then
+		deps.log("warn", "Refused a layout composer save without a layout source and its compiled layout.")
 		return false
 	end
 	-- A source may come with the emulation table the shared compiler built from it
 	-- and, on Linux, with the source compiled straight to XKB (its target).
-	if payload.emulation ~= nil and (not source or type(payload.emulation) ~= "string") then
+	if payload.emulation ~= nil and type(payload.emulation) ~= "string" then
 		deps.log("warn", "Refused a layout composer save whose emulation table is not text beside a source.")
 		return false
 	end
-	if payload.target ~= nil and (not source or type(payload.target) ~= "string") then
+	if payload.target ~= nil and type(payload.target) ~= "string" then
 		deps.log("warn", "Refused a layout composer save whose converter target is not text beside a source.")
 		return false
 	end
 	operation({
-		declaration = declaration and payload.declaration or nil,
-		source = source and payload.source or nil,
-		emulation = source and payload.emulation or nil,
-		target = source and payload.target or nil,
+		source = payload.source,
+		emulation = payload.emulation,
+		target = payload.target,
 		keylayout = payload.keylayout,
 		use = payload.use == true,
 	}, report)
@@ -328,9 +325,9 @@ end
 --- deps.registry: { refresh(on_done), snapshot(), install(id, on_done),
 ---   uninstall(id, on_done), select(id, on_done) }; on_done(ok, detail_or_code, detail).
 --- deps.registry also offers the composer (docs/design/layout-composer.md) as
----   composer_open(on_done), composer_save(payload, on_done) and
----   composer_remove(on_done) (_shared/layouts/engine/composer/composer.lua); a registry
----   without them refuses the three composer messages.
+---   composer_open(on_done) and composer_save(payload, on_done)
+---   (_shared/layouts/engine/composer/composer.lua); a registry without them
+---   refuses those composer messages.
 --- deps.registry may offer the layout editor's source_open(on_done) and
 ---   source_save(payload, on_done) (_shared/layouts/engine/composer/source_store.lua); a
 ---   registry without them refuses source_open and source_save; its optional
@@ -441,8 +438,7 @@ function M.new(deps)
 			end
 			return deps.open_editor_window() ~= false
 		end
-		if action == "composer_open" or action == "composer_save" or action == "composer_remove"
-			or action == "composer_emulate" then
+		if action == "composer_open" or action == "composer_save" or action == "composer_emulate" then
 			return M.handle_composer(deps, controller, action, payload, push_state)
 		end
 		if action == "source_open" or action == "source_save" then

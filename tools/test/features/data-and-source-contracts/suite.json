@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-0462",
-			"ordinal": 438,
+			"ordinal": 437,
 			"name": "translation audit scope (every driver, shared tree, unused-key baseline)",
 			"cmd": "node",
 			"args": ["tools/test/test-audit-translations-scope.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-0463",
-			"ordinal": 439,
+			"ordinal": 438,
 			"name": "visible text is localized (Windows notices, macOS field labels, Linux key names)",
 			"cmd": "node",
 			"args": ["tools/test/test-visible-text-is-localized.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-0464",
-			"ordinal": 447,
+			"ordinal": 446,
 			"name": "key-combination defaults are the same on the three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-key-combination-defaults-parity.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-0465",
-			"ordinal": 448,
+			"ordinal": 447,
 			"name": "config-key and menu-command constants are generated from the schema and the menu manifest",
 			"cmd": "node",
 			"args": ["tools/test/test-config-keys-codegen.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "js-0466",
-			"ordinal": 449,
+			"ordinal": 448,
 			"name": "raw config-key and command-id literals only go down (ratchet against the generated constants)",
 			"cmd": "node",
 			"args": ["tools/test/test-config-key-literals.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "js-0471",
-			"ordinal": 450,
+			"ordinal": 449,
 			"name": "log vocabulary scanner matches every reason, phase, tag and evidence-field shape",
 			"cmd": "node",
 			"args": ["tools/test/test-log-vocabulary-scan.cjs"],
@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "js-0472",
-			"ordinal": 451,
+			"ordinal": 450,
 			"name": "no hard-coded UI strings at display calls on any surface (baseline only shrinks)",
 			"cmd": "node",
 			"args": ["tools/test/test-no-hardcoded-ui-strings.cjs"],
@@ -492,7 +492,7 @@
 		},
 		{
 			"id": "js-0469",
-			"ordinal": 452,
+			"ordinal": 451,
 			"name": "Lua drivers copy, count, trim, shell-quote and percent-encode through the shared owners only",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-lua-helpers-single-use.cjs"],
@@ -500,7 +500,7 @@
 		},
 		{
 			"id": "js-0470",
-			"ordinal": 453,
+			"ordinal": 452,
 			"name": "every shared timing registry key is read at runtime or pinned to a driver copy",
 			"cmd": "node",
 			"args": ["tools/test/test-timings-registry-liveness.cjs"],
@@ -508,7 +508,7 @@
 		},
 		{
 			"id": "js-0475",
-			"ordinal": 458,
+			"ordinal": 457,
 			"name": "timing and size constant names declared in more than one file only go down (ratchet)",
 			"cmd": "node",
 			"args": ["tools/test/test-duplicate-constant-names.cjs"],
@@ -516,7 +516,7 @@
 		},
 		{
 			"id": "js-0500",
-			"ordinal": 472,
+			"ordinal": 471,
 			"name": "source-shape gates read a generated config-key constant as the literal it stands for",
 			"cmd": "node",
 			"args": ["tools/test/test-config-key-tokens.cjs"],
@@ -524,7 +524,7 @@
 		},
 		{
 			"id": "js-0501",
-			"ordinal": 473,
+			"ordinal": 472,
 			"name": "drift guard isolation skips directory links and keeps file links",
 			"cmd": "node",
 			"args": ["tools/test/test-drift-guard-isolation-skips-directory-links.cjs"],
@@ -532,7 +532,7 @@
 		},
 		{
 			"id": "js-0502",
-			"ordinal": 475,
+			"ordinal": 474,
 			"name": "shortcut inventory matches the manifest, handler chords and slot prefix tables",
 			"cmd": "node",
 			"args": ["tools/test/test-shortcut-inventory-matches-sources.cjs"],
@@ -540,7 +540,7 @@
 		},
 		{
 			"id": "js-0503",
-			"ordinal": 477,
+			"ordinal": 476,
 			"name": "slot roles resolve on every driver and the crosswalk equals the inventory",
 			"cmd": "node",
 			"args": ["tools/test/test-slot-roles-single-source.cjs"],
@@ -548,7 +548,7 @@
 		},
 		{
 			"id": "js-contract-vector-ledger",
-			"ordinal": 479,
+			"ordinal": 478,
 			"name": "Contract vector ledger (every case moved into a JSON vector corpus is accounted for once)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-contract-vector-ledger.cjs"],
@@ -556,7 +556,7 @@
 		},
 		{
 			"id": "js-menu-row-order-single-source",
-			"ordinal": 483,
+			"ordinal": 482,
 			"name": "Menu row order single source (no driver spells a display order of row_order.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
@@ -564,7 +564,7 @@
 		},
 		{
 			"id": "js-file-system-port-wired",
-			"ordinal": 485,
+			"ordinal": 484,
 			"name": "FileSystem port spec wiring (both Lua owners check the lease and atomic write spec at load)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-file-system-port-wired.cjs"],
@@ -572,7 +572,7 @@
 		},
 		{
 			"id": "js-linux-shell-messages",
-			"ordinal": 489,
+			"ordinal": 488,
 			"name": "Linux shell messages (catalogue reader contract and every printed key in the generated catalogue)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-shell-messages.cjs"],
@@ -580,7 +580,7 @@
 		},
 		{
 			"id": "js-ahk-local-same-as-global",
-			"ordinal": 497,
+			"ordinal": 496,
 			"name": "AHK #Warn LocalSameAsGlobal replay (no local shadows a global in the library or any #Warn All child)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-local-same-as-global.cjs"],
@@ -588,7 +588,7 @@
 		},
 		{
 			"id": "js-lua-undefined-globals",
-			"ordinal": 498,
+			"ordinal": 497,
 			"name": "Lua undefined global reads (no production Lua of macOS, Linux or _shared reads a global nothing defines)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-lua-undefined-globals.cjs"],
@@ -596,7 +596,7 @@
 		},
 		{
 			"id": "js-owned-runtimes-inventory",
-			"ordinal": 544,
+			"ordinal": 543,
 			"name": "Owned runtimes registry lists every program the macOS and Linux drivers start, each with a decision",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-inventory.cjs"],
@@ -604,7 +604,7 @@
 		},
 		{
 			"id": "js-owned-runtimes-doc",
-			"ordinal": 549,
+			"ordinal": 548,
 			"name": "Owned runtimes document tables are generated from _shared/core/network/data/owned_runtimes.json and in sync",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-owned-runtimes-doc.cjs"],
@@ -612,7 +612,7 @@
 		},
 		{
 			"id": "js-launcher-sleep-registry",
-			"ordinal": 551,
+			"ordinal": 550,
 			"name": "every Swift launcher sleep takes its duration from the [launcher] timing registry section",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-launcher-sleep-registry.cjs"],
@@ -620,7 +620,7 @@
 		},
 		{
 			"id": "key-names-single-source",
-			"ordinal": 571,
+			"ordinal": 570,
 			"name": "one shared table names every key in all locales, and every driver id and both projections resolve through it",
 			"cmd": "node",
 			"args": ["tools/test/test-key-names-single-source.cjs"],
@@ -628,7 +628,7 @@
 		},
 		{
 			"id": "js-text-escape",
-			"ordinal": 572,
+			"ordinal": 571,
 			"name": "the shared text escapes keep a spliced literal exact in a regular expression and inside one Markdown table cell",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-text-escape.cjs"],
@@ -636,7 +636,7 @@
 		},
 		{
 			"id": "js-html-scan",
-			"ordinal": 573,
+			"ordinal": 572,
 			"name": "the harness HTML scan reads tags in any case, every end-tag and comment form, and refuses an unclosed comment",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-html-scan.cjs"],
@@ -644,7 +644,7 @@
 		},
 		{
 			"id": "js-0507",
-			"ordinal": 622,
+			"ordinal": 621,
 			"name": "structure folder bounds (Rule B: 2..20 entries per folder, mismatched driver folders, ratcheted)",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-folder-bounds.cjs"],
@@ -652,7 +652,7 @@
 		},
 		{
 			"id": "js-0508",
-			"ordinal": 623,
+			"ordinal": 622,
 			"name": "shared literal inventory (Rule A: hand-typed driver values that belong in _shared, ratcheted)",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-literal-inventory.cjs"],
@@ -660,7 +660,7 @@
 		},
 		{
 			"id": "js-0509",
-			"ordinal": 625,
+			"ordinal": 624,
 			"name": "secure applications single source (macOS, Linux and Windows read _shared/data/secure_apps.json, ADD-1)",
 			"cmd": "node",
 			"args": ["tools/test/test-secure-apps-single-source.cjs"],
@@ -668,7 +668,7 @@
 		},
 		{
 			"id": "js-0510",
-			"ordinal": 627,
+			"ordinal": 626,
 			"name": "structure plan runtime edits wait for the step that moves their last module, and a refused step writes nothing",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-runtime-edit-steps.cjs"],
@@ -676,7 +676,7 @@
 		},
 		{
 			"id": "js-0511",
-			"ordinal": 628,
+			"ordinal": 627,
 			"name": "structure plan moves a one-word Lua module name only where it is loaded, never a same-spelled word",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-module-load-sites.cjs"],
@@ -684,7 +684,7 @@
 		},
 		{
 			"id": "js-0512",
-			"ordinal": 631,
+			"ordinal": 630,
 			"name": "structure plan switches every spelling of the shared Lua root in the step that empties _shared",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shared-root-switch.cjs"],
@@ -692,7 +692,7 @@
 		},
 		{
 			"id": "js-0513",
-			"ordinal": 632,
+			"ordinal": 631,
 			"name": "structure plan follows every spelling of a moved Lua module name, and same-spelled words and keys stay",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-lua-name-forms.cjs"],
@@ -700,7 +700,7 @@
 		},
 		{
 			"id": "js-0514",
-			"ordinal": 633,
+			"ordinal": 632,
 			"name": "structure plan rewrites every form a moved path takes (joins, constants, Paths.shared, self-location, AHK and regex spellings)",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-path-forms.cjs"],
@@ -708,7 +708,7 @@
 		},
 		{
 			"id": "js-0515",
-			"ordinal": 634,
+			"ordinal": 633,
 			"name": "structure plan phase 2 runner refuses without its go and owns the follow-ups of each step",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-run-phase2.cjs"],
@@ -716,7 +716,7 @@
 		},
 		{
 			"id": "js-0516",
-			"ordinal": 635,
+			"ordinal": 634,
 			"name": "the pinned-read fixer leaves a test helper that reads shared data alone instead of blocking its commit",
 			"cmd": "node",
 			"args": ["tools/test/test-pinned-reads-shared-helpers.cjs"],
@@ -724,7 +724,7 @@
 		},
 		{
 			"id": "js-0517",
-			"ordinal": 636,
+			"ordinal": 635,
 			"name": "a structure step re-pins every hash of a file it changed, follows chains, refuses ambiguity and keeps history",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-repin.cjs"],
@@ -732,7 +732,7 @@
 		},
 		{
 			"id": "js-0518",
-			"ordinal": 637,
+			"ordinal": 636,
 			"name": "user value schema: one declaration per setting, shared check vectors, locales and generated Windows data agree",
 			"cmd": "node",
 			"args": ["tools/test/test-value-schema.cjs"],
@@ -740,7 +740,7 @@
 		},
 		{
 			"id": "js-linux-layout-bom-gate",
-			"ordinal": 641,
+			"ordinal": 640,
 			"name": "Linux layout workflow refuses a stray UTF-8 BOM and admits the Windows-written tap-hold corpus",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-layout-bom-gate.cjs"],
@@ -749,7 +749,7 @@
 		},
 		{
 			"id": "js-linux-layout-python-floor",
-			"ordinal": 642,
+			"ordinal": 641,
 			"name": "Linux layout workflow runs its Python 3.8 floor on a runner setup-python serves 3.8 for",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-layout-python-floor.cjs"],

@@ -467,16 +467,8 @@
 			"repro": "npm run test:ahk-not-executed"
 		},
 		{
-			"id": "js-0459",
-			"ordinal": 435,
-			"name": "layout composer page: per-layer model rendering and bridge actions",
-			"cmd": "node",
-			"args": ["tools/test/test-layout-composer-page.cjs"],
-			"repro": "node tools/test/test-layout-composer-page.cjs"
-		},
-		{
 			"id": "js-0460",
-			"ordinal": 436,
+			"ordinal": 435,
 			"name": "Windows native owner hook stays first after the AutoHotkey SendInput rehook",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-native-hook-front.cjs"],
@@ -484,7 +476,7 @@
 		},
 		{
 			"id": "js-0461",
-			"ordinal": 437,
+			"ordinal": 436,
 			"name": "Windows replayed edge: what AutoHotkey consumers make of it",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-replay-consumers.cjs"],
@@ -492,7 +484,7 @@
 		},
 		{
 			"id": "js-0477",
-			"ordinal": 460,
+			"ordinal": 459,
 			"name": "local runners refuse a host whose toolchain differs from CI (pinned Node, Lua 5.4, non-root, pwsh)",
 			"cmd": "node",
 			"args": ["tools/test/test-host-toolchain.cjs"],
@@ -500,7 +492,7 @@
 		},
 		{
 			"id": "js-0499",
-			"ordinal": 481,
+			"ordinal": 480,
 			"name": "Wine runner preserves process exclusion without forking per unrelated PID",
 			"cmd": "node",
 			"args": ["tools/test/test-wine-runner-process-guard.cjs"],
@@ -509,7 +501,7 @@
 		},
 		{
 			"id": "js-linux-private-runner-output",
-			"ordinal": 503,
+			"ordinal": 502,
 			"name": "Linux private helper failures stay private while canonical failures remain reportable",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-runner-private-output.cjs"],
@@ -518,7 +510,7 @@
 		},
 		{
 			"id": "js-windows-sendinput-consumers",
-			"ordinal": 506,
+			"ordinal": 505,
 			"name": "Windows SendInput: every direct call is decided in the input hooks design note",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-sendinput-consumers.cjs"],
@@ -526,7 +518,7 @@
 		},
 		{
 			"id": "js-no-pinned-source-reads-linux",
-			"ordinal": 545,
+			"ordinal": 544,
 			"name": "no new location-pinned source reads in Linux tests (ratchet)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
@@ -534,7 +526,7 @@
 		},
 		{
 			"id": "js-ahk-parallel-runner",
-			"ordinal": 557,
+			"ordinal": 556,
 			"name": "parallel AHK runner reads results by exact test name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-parallel.cjs"],
@@ -542,7 +534,7 @@
 		},
 		{
 			"id": "js-git-paths",
-			"ordinal": 591,
+			"ordinal": 590,
 			"name": "Git path inventories retain every record beyond the default capture ceiling",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],

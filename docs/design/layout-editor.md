@@ -88,9 +88,9 @@ Decided by the coordinator on 2026-11-11, to review by the maintainer.
   editor refreshes an open layout manager; `source_store.ahk` keeps the files; `composer.ahk` takes the source form of
   `composer_save` and `composer_emulate`; `kbd_register.ahk` is the elevated helper (`kbd_register_core.ahk` holds
   its steps behind ports; the compiled driver runs them with `--kbd-register`); `keylayout_emulation.ahk` reads the
-  composer copy and performs the emulation table through `source_emulation.ahk`. Left: retire the composer section
-  (`layout_composer/composer_page.js` and its markup) now that no host shows it, and the maintainer's checks on a PC
-  (install, type, uninstall).
+  composer copy and performs the emulation table through `source_emulation.ahk`. The composer section of the layout manager
+  page was retired on 2026-11-14 (its view, its three page messages and its 66 strings). Left: the maintainer's
+  checks on a PC (install, type, uninstall).
 
 ## Windows host
 

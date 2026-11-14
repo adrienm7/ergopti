@@ -333,6 +333,10 @@ _LCS_OwnWindowCase() {
 		for Action in ["source_open", "source_save", "source_pick", "source_export", "nav_save", "composer_emulate"]
 			AssertFalse(LayoutManager_HandleMessage(Map("action", Action), Deps),
 				"the manager page no longer carries the editor: " . Action)
+		; The composer view of the manager page is retired (2026-11-14): its three messages are refused.
+		for Action in ["composer_open", "composer_save", "composer_remove"]
+			AssertFalse(LayoutManager_HandleMessage(Map("action", Action), Deps),
+				"the manager page no longer carries the composer: " . Action)
 		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "install", "id", "ergol"), Deps),
 			"the editor window installs no catalogue layout")
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "close"), Deps))

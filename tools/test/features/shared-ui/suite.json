@@ -255,7 +255,7 @@
 		},
 		{
 			"id": "shared-ui-no-platform-branches",
-			"ordinal": 444,
+			"ordinal": 443,
 			"name": "shared pages read host capabilities and never compare a platform or driver name",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-no-platform-branches.cjs"],
@@ -263,7 +263,7 @@
 		},
 		{
 			"id": "js-0473",
-			"ordinal": 445,
+			"ordinal": 444,
 			"name": "tooltip duration decrement and floor have one declaration that every engine and vector uses",
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
@@ -271,7 +271,7 @@
 		},
 		{
 			"id": "js-0474",
-			"ordinal": 446,
+			"ordinal": 445,
 			"name": "hex colour census counts literals, not comments, issue numbers or entities",
 			"cmd": "node",
 			"args": ["tools/test/test-hex-colours.cjs"],
@@ -279,7 +279,7 @@
 		},
 		{
 			"id": "shared-ui-theme",
-			"ordinal": 457,
+			"ordinal": 456,
 			"name": "shared pages take their recurring colours from theme.css and link it",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-theme.cjs"],
@@ -287,7 +287,7 @@
 		},
 		{
 			"id": "encryptor-startup-receipt",
-			"ordinal": 480,
+			"ordinal": 479,
 			"name": "Encryptor startup preserves icon helper and process replacement without a fixed temporary log",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-launch.cjs"],
@@ -295,7 +295,7 @@
 		},
 		{
 			"id": "paths-editor-initialization",
-			"ordinal": 586,
+			"ordinal": 585,
 			"name": "paths editor keeps typed and browsed folders across delayed initialization",
 			"cmd": "node",
 			"args": ["tools/test/test-paths-editor-initialization.cjs"],
@@ -303,7 +303,7 @@
 		},
 		{
 			"id": "encryptor-conversion-receipts",
-			"ordinal": 593,
+			"ordinal": 592,
 			"name": "Encryptor conversion reads the password from a private file and never from a command argument",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-convert.cjs"],
@@ -312,7 +312,7 @@
 		},
 		{
 			"id": "encryptor-shared-vectors",
-			"ordinal": 596,
+			"ordinal": 595,
 			"name": "Encryptor containers are the shared OpenSSL envelope every driver reads and writes",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-shared-vectors.cjs"],
@@ -320,7 +320,7 @@
 		},
 		{
 			"id": "app-cloner-shared-families",
-			"ordinal": 598,
+			"ordinal": 597,
 			"name": "App Cloner families are one catalogue the macOS detection agrees with",
 			"cmd": "node",
 			"args": ["tools/test/test-app-cloner-families.cjs"],
@@ -328,7 +328,7 @@
 		},
 		{
 			"id": "personal-info-editor-multiline",
-			"ordinal": 599,
+			"ordinal": 598,
 			"name": "personal-info editor preserves multiline values through its save bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-info-editor-multiline.cjs"],
@@ -336,7 +336,7 @@
 		},
 		{
 			"id": "prompt-editor-raw-whitespace",
-			"ordinal": 600,
+			"ordinal": 599,
 			"name": "prompt editor preserves raw prompt whitespace",
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-raw-whitespace.cjs"],
@@ -344,7 +344,7 @@
 		},
 		{
 			"id": "layout-source",
-			"ordinal": 604,
+			"ordinal": 603,
 			"name": "versioned layout source preserves imported keylayout and refuses unimplemented exports",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source.cjs"],
@@ -352,7 +352,7 @@
 		},
 		{
 			"id": "layout-source-compiler",
-			"ordinal": 609,
+			"ordinal": 608,
 			"name": "layout source compiler round-trips the registry and generates bundle, XKB and KLC",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-compiler.cjs"],
@@ -360,7 +360,7 @@
 		},
 		{
 			"id": "layout-editor-model",
-			"ordinal": 610,
+			"ordinal": 609,
 			"name": "unified layout editor reads, edits and writes the layout source through one module",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-model.cjs"],
@@ -368,7 +368,7 @@
 		},
 		{
 			"id": "layout-source-emulation",
-			"ordinal": 611,
+			"ordinal": 610,
 			"name": "layout source emulation table matches its golden file and types the shared vectors",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-source-emulation.cjs"],
@@ -376,7 +376,7 @@
 		},
 		{
 			"id": "macos-layout-bundle-plan",
-			"ordinal": 615,
+			"ordinal": 614,
 			"name": "macOS bundle native check types source vectors that match the compiled cells",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-layout-bundle-plan.cjs"],
@@ -384,7 +384,7 @@
 		},
 		{
 			"id": "layout-editor-unicode-names",
-			"ordinal": 616,
+			"ordinal": 615,
 			"name": "layout editor Unicode names table decodes every name and answers wildcard searches",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-unicode-names.cjs"],
@@ -392,7 +392,7 @@
 		},
 		{
 			"id": "layout-sources",
-			"ordinal": 618,
+			"ordinal": 617,
 			"name": "kept layout sources reproduce the layouts they were made from, Kana level included",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-sources.cjs"],
@@ -400,7 +400,7 @@
 		},
 		{
 			"id": "layout-editor-target-exports",
-			"ordinal": 619,
+			"ordinal": 618,
 			"name": "layout editor page writes the tool's XKB and KLC bytes through fengari and the shared adapters",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-target-exports.cjs"],
@@ -408,7 +408,7 @@
 		},
 		{
 			"id": "kbd-dll",
-			"ordinal": 620,
+			"ordinal": 619,
 			"name": "Windows layout DLLs build from a KLC and read back as their model on every architecture",
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-dll.cjs"],
@@ -416,7 +416,7 @@
 		},
 		{
 			"id": "kbd-installer",
-			"ordinal": 621,
+			"ordinal": 620,
 			"name": "keyboard layout installer holds the verified DLLs and registers and unregisters the layout",
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-installer.cjs"],
@@ -424,7 +424,7 @@
 		},
 		{
 			"id": "linux-pages-post-ready",
-			"ordinal": 629,
+			"ordinal": 628,
 			"name": "every shared page a Linux bridge waits for posts ready, so none opens empty on Linux",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-pages-post-ready.cjs"],
@@ -432,7 +432,7 @@
 		},
 		{
 			"id": "host-context-menu",
-			"ordinal": 630,
+			"ordinal": 629,
 			"name": "host pages keep the native context menu closed outside text fields",
 			"cmd": "node",
 			"args": ["tools/test/test-host-context-menu.cjs"],

@@ -345,9 +345,6 @@ jobs:
       - name: Test shared Versions installation rendering
         run: npm run test:browser:changelog-install
 
-      - name: Test shared layout composer rendering
-        run: npm run test:browser:layout-composer
-
       - name: Test shared layout editor page
         run: npm run test:browser:layout-editor
 
