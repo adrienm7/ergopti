@@ -1714,9 +1714,15 @@ function scanFile(file, text, ctx) {
 		!file.startsWith('tools/audit/structure/') &&
 		treeGains.length > 0
 	) {
+		// A file inside a driver lists that driver's folders: a Windows suite
+		// folder's siblings say nothing about a macOS config list.
 		const gainsFor = (names) =>
 			treeGains.filter(
 				(g) =>
+					(!inTree ||
+						inTree === '_shared' ||
+						g.parent === inTree ||
+						g.parent.startsWith(`${inTree}/`)) &&
 					names.includes(g.from) &&
 					!names.includes(g.to) &&
 					names.filter((n) => g.siblings.has(n)).length >= 2
