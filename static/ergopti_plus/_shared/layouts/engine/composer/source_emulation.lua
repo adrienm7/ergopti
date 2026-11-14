@@ -186,8 +186,14 @@ function M.compile(table_)
 	for index, entry in ipairs(table_.tap_holds or {}) do
 		local where = "tap_holds[" .. index .. "]"
 		local threshold = entry.threshold_ms
-		if type(entry.key) ~= "string" or type(threshold) ~= "number" or threshold <= 0 or threshold % 1 ~= 0 then
-			error("The emulation table holds a malformed tap-hold at " .. where .. ".")
+		-- The delay's declaration in the shared value schema (whole milliseconds
+		-- up to the shared tap-hold maximum) guards the emulation's timers.
+		local ValueCheck = require("settings.engine.value_check")
+		local checked = ValueCheck.check_value(
+			ValueCheck.declaration(ValueCheck.KEY.LAYOUT_SOURCE_TAP_HOLDS_THRESHOLD_MS), threshold)
+		if type(entry.key) ~= "string" or not checked.ok then
+			error("The emulation table holds a malformed tap-hold at " .. where .. " ("
+				.. tostring(checked.reason or "no key") .. ").")
 		end
 		if (entry.hold_layer == nil) == (entry.hold_modifier == nil) then
 			error("A tap-hold of the emulation table needs one hold at " .. where .. ".")

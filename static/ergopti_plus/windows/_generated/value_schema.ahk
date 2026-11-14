@@ -101,6 +101,20 @@ ValueSchemaData() {
 			"max_from", Map(
 				"file", "layouts/data/layer_actions.toml",
 				"pattern", "\[parameters\.repeat_count\]\n(?:[^\n]*\n)*?max = (\d+)")),
+		"layout_source.keys.virtual_key", Map(
+			"file", "layout_source.toml",
+			"type", "integer",
+			"min", 0,
+			"max", 255),
+		"layout_source.tap_holds.threshold_ms", Map(
+			"file", "layout_source.toml",
+			"type", "integer",
+			"unit", "ms",
+			"min", 1,
+			"max", 10000,
+			"max_from", Map(
+				"timing", "tap_hold.max_activation_ms",
+				"scale", 1)),
 		"llm.generation.context_length", Map(
 			"file", "config.toml",
 			"type", "integer",

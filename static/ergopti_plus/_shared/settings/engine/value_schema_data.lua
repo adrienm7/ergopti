@@ -18,6 +18,8 @@ return {
 		["HOTSTRINGS_EXPANSION_DELAY"] = "hotstrings.expansion_delay",
 		["HOTSTRINGS_IDLE_RESET_SECONDS"] = "hotstrings.idle_reset_seconds",
 		["LAYERS_REPEAT_COUNT"] = "layers.repeat_count",
+		["LAYOUT_SOURCE_KEYS_VIRTUAL_KEY"] = "layout_source.keys.virtual_key",
+		["LAYOUT_SOURCE_TAP_HOLDS_THRESHOLD_MS"] = "layout_source.tap_holds.threshold_ms",
 		["LLM_GENERATION_CONTEXT_LENGTH"] = "llm.generation.context_length",
 		["LLM_GENERATION_MAX_WORDS"] = "llm.generation.max_words",
 		["LLM_GENERATION_MIN_WORDS"] = "llm.generation.min_words",
@@ -137,6 +139,23 @@ return {
 			},
 			["min"] = 1,
 			["type"] = "integer",
+		},
+		["layout_source.keys.virtual_key"] = {
+			["file"] = "layout_source.toml",
+			["max"] = 255,
+			["min"] = 0,
+			["type"] = "integer",
+		},
+		["layout_source.tap_holds.threshold_ms"] = {
+			["file"] = "layout_source.toml",
+			["max"] = 10000,
+			["max_from"] = {
+				["scale"] = 1,
+				["timing"] = "tap_hold.max_activation_ms",
+			},
+			["min"] = 1,
+			["type"] = "integer",
+			["unit"] = "ms",
 		},
 		["llm.generation.context_length"] = {
 			["default_from"] = {

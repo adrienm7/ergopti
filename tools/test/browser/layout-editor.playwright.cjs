@@ -295,6 +295,35 @@ async function exerciseManager(browser, origin) {
 		await page.click('#le-apply');
 		assert.equal(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), 'æ');
 
+		// A tap-hold delay or a virtual key outside its shared value schema
+		// declaration is refused with the text naming the range, and nothing is
+		// applied (value-validation).
+		const strings = JSON.parse(
+			fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+		);
+		const thresholdRange = strings['dialog.value_check.range_integer_unit']
+			.replace('{1}', '1')
+			.replace('{2}', '10000')
+			.replace('{3}', strings['value_check.unit.ms']);
+		for (const typed of ['0', '10001', '2.5', '']) {
+			await page.fill('#le-threshold', typed);
+			await page.click('#le-tap-hold-apply');
+			assert.equal(await page.textContent('#le-message'), thresholdRange, `threshold ${typed}`);
+			assert.equal(
+				await page.locator('#le-tap-hold-remove').count(),
+				0,
+				`no tap-hold for ${typed}`
+			);
+		}
+		const virtualKeyRange = strings['dialog.value_check.range_integer']
+			.replace('{1}', '0')
+			.replace('{2}', '255');
+		for (const typed of ['256', '-1']) {
+			await page.fill('#le-virtual-key', typed);
+			await page.click('#le-key-apply');
+			assert.equal(await page.textContent('#le-message'), virtualKeyRange, `virtual key ${typed}`);
+		}
+
 		// The name search loads the names table lazily, then maps a result to the key.
 		assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'undefined');
 		await page.click('#le-board [data-code="KeyW"]');
