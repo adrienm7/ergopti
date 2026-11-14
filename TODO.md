@@ -262,6 +262,20 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
       read by the site's benchmarks and by the Studio.
 
+- [ ] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
+      comparison in the browser (corpus upload, layout library, the layout being edited), with the same shared engine
+      as the app, so ergopti.fr is a full alternative to the online layout analysers. No upload of the user's text to
+      a server: the analysis runs in the page.
+- [ ] **Study of the existing layout analysers, then match and exceed them.** First write a detailed report
+      (`docs/audits/layout-analysers/`): Keyboard Layout Analyzer (KLA), KLAnext, the Ergo-L site's analyser and the
+      other public analysers and generators found (online sites and open-source tools), each with its metrics, its
+      definitions, its corpora, its UI, its strengths and its weaknesses, with links. Then implement in the shared
+      engine every metric that matters, each with a written definition and tests on a small reference corpus: finger
+      load per finger and per hand, row usage (home row versus top, bottom and number rows), finger travel distance,
+      SFBs and same-finger skipgrams, rolls (inward and outward, two- and three-key), alternation, redirects (one-hand
+      direction changes), lateral stretches and scissors, trigram classes, and any other one the study shows to be
+      useful. Every metric is shown per layout and compared across layouts, in the app's Studio and on the site.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
