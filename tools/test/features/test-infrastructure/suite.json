@@ -546,7 +546,7 @@
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
-			"repro": "node tools/test/test-commit-identity.cjs"
+			"repro": "npm run test:commit-identity"
 		}
 	]
 }
