@@ -240,6 +240,17 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
 - **Hardware checks** are in [TODO-tests-macos.md](TODO-tests-macos.md),
   [TODO-tests-windows.md](TODO-tests-windows.md) and [TODO-tests-linux.md](TODO-tests-linux.md).
 
+## Commit identity (maintainer request, 2026-11-14)
+
+- [x] **Commits in the maintainer's name.** From 2026-11-14 23:00 Paris every agent commits as the maintainer
+      (skill `commit-and-push`); `tools/lint/check-commit-identity.cjs` refuses an AI assistant author or committer
+      and AI attribution trailers in the `commit-msg` hook and over each pushed range in CI.
+- [ ] **Rewrite the « Claude » commits on dev, later (maintainer, 2026-11-14).** 1297 dev commits since 2026-11-10
+      (none on main) have author and committer « Claude ». Once every worker container has finished, pause pushes,
+      keep a backup ref of the old dev, rewrite author and committer to the maintainer with git filter-repo, update
+      the commit ids cited in TODO.md, docs and pins, force-push dev once with --force-with-lease (authorized for
+      this rewrite only), then rebase any open branch.
+
 ## Ergopti Studio inside Ergopti+ (maintainer request, 2026-11-14)
 
 Naming (maintainer, 2026-11-14): « Ergopti » is the project; « Disposition Ergopti » the layout; « Ergopti+ » the
