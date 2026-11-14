@@ -52,7 +52,11 @@ _CTWP_NativeReadCustodyTick(State) {
 ; the gap between two interrupt checks on some attempt, and every byte of it costs
 ; far more in the commit and the rollback than in that read, so a small source with
 ; many attempts is both faster and tighter than a large one with few.
-global _CTWP_TEMPORAL_READ_ATTEMPTS := 512
+; A hit is a geometric draw: 57 hosted modes (7 runs, 2026-11-14) needed 71.5
+; attempts on average, up to 432, so 512 missed one mode in about 150 runs
+; (run 43611195865). 2048 leaves about 3e-12 per run; a run only pays them on
+; a miss. tools/test/test-windows-config-timer-custody-bound.cjs recomputes it.
+global _CTWP_TEMPORAL_READ_ATTEMPTS := 2048
 
 _CTWP_TemporalPaddedSource(Marker) {
 	static PaddingDoublings := 18

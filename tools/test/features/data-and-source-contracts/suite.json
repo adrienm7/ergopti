@@ -914,6 +914,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-optional-includes.cjs"],
 			"repro": "npm run test:structure-optional-includes"
+		},
+		{
+			"id": "js-windows-config-timer-custody-bound",
+			"ordinal": 662,
+			"name": "Windows acquired-read timer custody retries leave a negligible per-run miss chance for the measured hit rate",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-config-timer-custody-bound.cjs"],
+			"repro": "npm run test:windows-config-timer-custody-bound"
 		}
 	]
 }

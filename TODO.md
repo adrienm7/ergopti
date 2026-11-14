@@ -1142,6 +1142,11 @@ Each closes on a named green hosted or native run, recorded here.
       4 other failures). A new intermittent, `NativeAppClonerBundleOwnershipTests.testActualNativeCliLogLimits...`
       (runs 42438031643, 42480689370, `[Errno 1] Operation not permitted`), is fixed at its cause in bce01f27: XNU
       answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
+      Worker G, 2026-11-14 (Paris): Windows config-transition « guarded native adapter: genuine acquired-read timer
+      custody » (dev run 43611195865, control mode, 0 hits in 512 attempts) is a geometric draw, not a hang: 57 hosted
+      modes over 7 runs needed 71.5 attempts on average, up to 432, so 512 missed one mode in about 150 runs. The bound is
+      2048 (about 3e-12 per run; a run pays it only on a miss), and `test-windows-config-timer-custody-bound.cjs`
+      recomputes the chance from that sample and fails at 512. Keep it listed until the config-transition shard stays green.
       Worker G, 2026-11-13 (Paris): the baseline flake `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (macOS
       Intel Managed Ollama) is fixed at its cause in 9496d32980: a 120 ms deadline and a 200 ms idle clock could end
       the request before a slow runner had started the peer, so the retirement check found no receipt. Each case now
