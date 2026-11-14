@@ -453,16 +453,26 @@ Discord user ids were not imported). The codegen adds the six registry layouts
 and the reference QWERTY and AZERTY with all their layers and dead keys: 115
 layouts. Each entry names its `source` and `source_path`.
 
-**Basis for re-encoding** (maintainer, 2026-11-14, TODO « Read every common
-layout format »): a key arrangement itself is not protected by copyright, only
-its implementation; the Court of Justice of the European Union held in _SAS
-Institute v World Programming_ (C-406/10, 2 May 2012) that the functionality
-of a program, its programming language and its data file formats are not
-protected, only the expression of the code. This study found no analyser or
-collection that claims rights in an arrangement as such. Limits (not legal
-advice): the judgment concerns software, not keyboard layouts; a collection
-can carry database rights in the European Union when its making was a
-substantial investment; a layout's name may be a trademark. Hence the library:
+**Basis for re-encoding** (TODO « Read every common layout format »): the
+maintainer recalls a public discussion holding that a key arrangement is not
+protected by copyright, only its implementation, and points to _SAS Institute
+v World Programming_. The sources below were found by a web search on
+2026-11-14; the session could not open the pages themselves, so each is graded
+and must be re-read before it is quoted elsewhere. **Not legal advice.**
+
+| Source                                                                                                                                                                                                    | What it says                                                                                                                                                                                                                                                                                                                                        | Weight for a layout                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| debian-legal thread « The copyright of a keyboard mapping and its implementation » (Josselin Mouette, March 2009), https://lists.debian.org/debian-legal/2009/03/msg00053.html and replies msg00054–00069 | About Francis Leboutte's French Dvorak: Mouette argues that under European law copyright on a mapping does not reach an independent implementation; one reply finds a mapping « doesn't appear to be covered by copyright »; another advises caution. The likeliest match for the discussion the maintainer recalls (seen through search snippets). | Opinions, not authority; shows the doubt is old and real.                                                                            |
+| freedesktop bug 15407 (2008), https://bugs.freedesktop.org/show_bug.cgi?id=15407                                                                                                                          | The same dispute in xkeyboard-config: the author claims an original work, the packager answers that layouts are not subject to copyright.                                                                                                                                                                                                           | A real case of an author asserting rights.                                                                                           |
+| CJEU, C-406/10, _SAS Institute v World Programming_, Grand Chamber, 2 May 2012, ECLI:EU:C:2012:259                                                                                                        | The functionality of a program, its programming language and its data file formats are not a form of expression protected by the Software Directive; protecting them would monopolise ideas. It leaves open protection of other material as a work if it is its author's own intellectual creation.                                                 | Limits protection of the implementation side; does not settle whether a layout is itself a « work ».                                 |
+| Database Directive 96/9/EC, art. 7; CJEU C-203/02 _British Horseracing Board v William Hill_ (9 November 2004)                                                                                            | The sui generis right needs a substantial investment in obtaining, verifying or presenting contents, not in creating them.                                                                                                                                                                                                                          | A single layout is no database; copying a whole collection wholesale is the residual risk, hence one arrangement at a time.          |
+| 17 U.S.C. §102(b); _Lotus v. Borland_, 49 F.3d 807 (1st Cir. 1995)                                                                                                                                        | No protection for a « system » or « method of operation »; a menu command hierarchy is an uncopyrightable method of operation.                                                                                                                                                                                                                      | Strong analogy in the United States, binding in one circuit.                                                                         |
+| US Copyright Office Review Board, « AEIOU Keyboard » (30 November 2017), https://www.copyright.gov/rulings-filings/review-board/docs/aeiou.pdf                                                            | Registration of a key arrangement refused for lack of « the authorship necessary to support copyright claims ».                                                                                                                                                                                                                                     | The most direct statement found; an agency decision, not a court ruling.                                                             |
+| Project statements                                                                                                                                                                                        | Bépo is distributed under CC-BY-SA and GFDL (Ergodis leaflet, 2014); the Dvorak patent US 2,040,248 (1936) has long expired; Colemak is described as public domain by secondary sources only; Workman states no licence for the layout; Kalamine's MIT licence covers the tool, not the layouts.                                                    | The projects license their files; none shows a right over the arrangement. Crediting authors and naming their licence costs nothing. |
+
+Limits: no court has ruled on a keyboard layout as such; an author could argue
+in the European Union that an arrangement is an original creation; the layout's
+name can be a trademark. The library therefore:
 
 - re-encodes each arrangement in Ergopti's own format (what each key types, by
   KeyboardEvent.code), never copies a file of another tool;
@@ -470,7 +480,8 @@ substantial investment; a layout's name may be a trademark. Hence the library:
   from cmini);
 - names the source file of every layout (`source`, `source_path`) and the
   layout's name; the authors are not yet recorded, because neither collection
-  gives them in a structured field (a next step for the Studio's layout cards).
+  gives them in a structured field (a next step for the Studio's layout cards);
+- removes a layout on a credible request from its author.
 
 A further step can complete the French library layouts (Optimot, Béopy, the
 Ergo-L variants…) with their real layers and dead keys by adding them to the
