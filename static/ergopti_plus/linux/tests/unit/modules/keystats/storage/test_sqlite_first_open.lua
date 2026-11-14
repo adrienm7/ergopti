@@ -271,6 +271,24 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 			"the real Calendar origin must preserve exact COMMIT, privacy and system aggregate assertions")
 	end)
 
+	-- The fixture's sample gaps last minutes: started at 23:59:26 (a CI run at that
+	-- time), a gap crossed midnight and the day read back held 86000 of its
+	-- 120000 ms of sleep (system-capture-before-midnight).
+	helpers.it("system-capture-before-midnight: the capture fixture keeps its gaps inside one local day", function()
+		local quote = require("core.text.engine.utils_core").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_system_event_capture.lua"
+		local receipt = os.tmpname()
+		local today = os.date("*t")
+		local before_midnight = os.time({ year = today.year, month = today.month, day = today.day, hour = 23, min = 59, sec = 26 })
+		local status = os.execute("ERGOPTI_FIXTURE_WALL_S=" .. before_midnight .. " "
+			.. native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil)
+			.. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		os.remove(receipt)
+		helpers.assert_true(status == true or status == 0,
+			"a run started just before midnight must keep every committed sleep interval on one day")
+	end)
+
 	helpers.it("retains the actual physical family at input capture (layout-capture-context)", function()
 		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
