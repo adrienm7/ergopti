@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Independent behavior checks use each driver's actual manifest renderer.
 --- Rendering is inert; explicit commands, live gates and typing intervals own
---- admission. A refusal never opens a dialog: it redraws the menu, whose
---- feature row names the source problem the native owner reports.
+--- admission. A refusal redraws the menu, whose feature row names the source
+--- problem the native owner reports; only a typed delay the shared value
+--- schema refuses is also told, through the refusal port.
 --- ==============================================================================
 
 local M = {}
@@ -20,7 +21,7 @@ function M.run(helpers, manifest, Logger)
 	--- @param problem string|nil The source problem the native owner reports.
 	local function fixture(problem)
 		local f = { enabled = false, seconds = 0.5, master = true, paused = false, problem = problem,
-			calls = { open = 0, reload = 0, create = 0, set = 0, changed = 0 } }
+			calls = { open = 0, reload = 0, create = 0, set = 0, changed = 0 }, refusals = {} }
 		local ports = { manifest = manifest, i18n = function(key) return key end,
 			get = function() return f.enabled, f.seconds end,
 			master = function() return f.master end, paused = function() return f.paused end,
@@ -35,7 +36,8 @@ function M.run(helpers, manifest, Logger)
 				if f.on_prompt then f.on_prompt() end
 				return f.selected
 			end,
-			problem = function() return f.problem end }
+			problem = function() return f.problem end,
+			refusal = function(message) f.refusals[#f.refusals + 1] = message end }
 		for _, kind in ipairs({ "open", "reload", "create" }) do
 			ports[kind] = function() f.calls[kind] = f.calls[kind] + 1; return not f.refuse end
 		end
@@ -138,12 +140,17 @@ function M.run(helpers, manifest, Logger)
 			f.paused, f.master = false, false
 			helpers.assert_eq(f.rows[1].menu[1].fn(), false)
 			f.master = true
-			for _, invalid in ipairs({ "bad", "-1", "1.5", "1e999" }) do
+			for _, invalid in ipairs({ "bad", "-1", "1.5", "1e999", "3600001" }) do
 				f.selected = invalid
 				helpers.assert_eq(f.rows[1].menu[2].fn(), false)
 			end
 			helpers.assert_eq(f.calls.set, 0)
-			helpers.assert_eq(f.calls.changed, 6, "every refusal redraws the menu, and opens nothing")
+			-- The typed delays are told with the range; the gates are not.
+			helpers.assert_eq(#f.refusals, 5, "each refused typed delay is told once")
+			for _, message in ipairs(f.refusals) do
+				helpers.assert_eq(message, "dialog.value_check.range_integer_unit")
+			end
+			helpers.assert_eq(f.calls.changed, 7, "every refusal redraws the menu, and opens nothing")
 			helpers.assert_eq(f.calls.open, 0, "a refusal never offers or opens the source")
 		end)
 		for _, changed in ipairs({ "enabled", "seconds" }) do

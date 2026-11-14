@@ -66,6 +66,10 @@ function M.build(ctx)
 				I18n.get("menu.hotstrings.delay_prompt"), tostring(milliseconds), I18n.get("common.ok"), I18n.get("common.cancel"))
 			if button == I18n.get("common.ok") then return value end
 		end,
+		refusal = function(message)
+			Logger.warn("programmable_hotstrings", "Typed activation delay refused.")
+			pcall(Dialog.block_alert, I18n.get("dialog.value_check.title"), message, I18n.get("common.ok"))
+		end,
 	})
 end
 
