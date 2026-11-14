@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 08:30)
+## Where things stand (2026-11-14, 11:35)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -104,7 +104,26 @@ same commit as each step or checkpoint. Times are Paris time.
     `$3/platform/network/` (`e94990ce`).
     The four Linux E2E jobs share their tests differently from run to run:
     compare the union of their failing names with the baseline union.
-- **Proof 24 (current): S03–S12 rebuilt from night `e94990ce`.**
+- Proof 24 (S03–S12 on dev `37de779c`, run 43581641357, cancelled at its
+  last job): Windows core, hotstrings and Driver startup green. New names:
+  the Windows OS-purity ratchet (modules+lib 247 to 249: S06's singleton
+  pass folds windows/adapters/driver_control.ahk into core/lifecycle, fixed
+  by naming it in the listed exemption, `6b2836cc`); the live updater
+  `installed` check, which fails the same way on dev (worker G owns it; the
+  coordinator counts it as baseline). Also fixed while rebasing: a file dev
+  added after the move map is numbered by its step (`c3cde8ed`); a payload
+  guard's quoted needles follow their reader (`96d8c756`).
+- **Proof 25 (current): S03–S12 rebuilt on the latest dev with `6b2836cc`.**
+- S14–S17 move Windows adapters into platform/<domain>/, which has no
+  adapters/ folder: the OS-purity ratchet treats files under the driver's
+  platform/<domain>/ as the OS isolation layer, by a rule with a regression
+  test, not per-file exemptions (decided by the coordinator on 2026-11-14,
+  to review by the maintainer).
+- Rebasing night onto dev: dev and night both append JS suite checks, so
+  each replayed commit's new checks are renumbered by name
+  (scratchpad `fix-suite-ids.py`, `resolve-suite.py`), and a cohort pin
+  conflict takes the merged file's sha256 (`resolve-pins.py`); then the
+  steps are re-run on the rebased chain.
 - Proof rule: for every red job, compare its failing names with the same job
   of baseline run 43309556011 (scratchpad `basefail/`, `fail-names.py`), not
   only the conclusion.
