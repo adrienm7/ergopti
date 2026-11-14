@@ -215,6 +215,15 @@ ValueSchemaData() {
 			"special", [Map(
 				"value", 0,
 				"label_key", "value_check.special.off")]),
+		"tap_holds.sticky_timeout_ms", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "ms",
+			"min", 0,
+			"max", 2147483647,
+			"special", [Map(
+				"value", 0,
+				"label_key", "value_check.special.no_time_limit")]),
 		"updater.check_interval_seconds", Map(
 			"file", "config.toml",
 			"type", "integer",

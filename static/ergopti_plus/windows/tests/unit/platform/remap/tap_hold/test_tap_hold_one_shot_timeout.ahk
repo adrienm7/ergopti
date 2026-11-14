@@ -85,7 +85,7 @@ _THOS_CommitWritesTheLeaf() {
 	Reloads := 0
 	Reload := () => (Reloads += 1, "reloaded")
 	try {
-		for _, Bad in [-1, 2.5, "3000"]
+		for _, Bad in [-1, 2.5, "3000", 2147483648]
 			AssertEqual(false, _TH_CommitOneShotTimeoutMs(Bad, Path, Reload), "refused: " . String(Bad))
 		AssertEqual(0, Reloads, "a refused timeout never reloads")
 		AssertEqual("", FileRead(Path, "UTF-8"), "a refused timeout writes nothing")
@@ -97,7 +97,7 @@ _THOS_CommitWritesTheLeaf() {
 		AssertEqual("reloaded", _TH_PromptOneShotDelay((*) => Answer, Path, Reload), "the prompt commits its answer")
 		Parsed := TOML_ParseFreshFile(Path)
 		AssertEqual(4000, Parsed[ConfigLeaf.TAP_HOLDS][ConfigLeaf.STICKY_TIMEOUT_MS], "the prompted timeout reaches the file")
-		for _, BadAnswer in ["-5", "1.5", "soon"] {
+		for _, BadAnswer in ["-5", "1.5", "soon", "2147483648"] {
 			Answer := { Result: "OK", Value: BadAnswer }
 			AssertEqual(false, _TH_PromptOneShotDelay((*) => Answer, Path, Reload), "refused answer: " . BadAnswer)
 		}

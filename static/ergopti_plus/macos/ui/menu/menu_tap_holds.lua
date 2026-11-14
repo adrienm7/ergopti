@@ -830,11 +830,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
 			-- 0 is no time limit; a negative or fractional answer is refused.
-			local ms = require("tap_hold.engine.one_shot_timeout").parse(result["text returned"])
-			if ms == nil then
-				Logger.warn(LOG, "Invalid sticky delay '%s' — ignored.", tostring(result["text returned"]))
-				return
-			end
+			local ms = read_typed(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, result["text returned"])
+			if ms == nil then return end
 			commit_menu_setting(karabiner, "Sticky timeout", function()
 				return karabiner.set_sticky_timeout(ms)
 			end, update_menu)

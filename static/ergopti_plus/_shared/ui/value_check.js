@@ -556,6 +556,19 @@ function requireValue(schema, key, value) {
 				"type": "integer",
 				"min": 0,
 				"max": 255
+			},
+			"tap_holds.sticky_timeout_ms": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "ms",
+				"min": 0,
+				"max": 2147483647,
+				"special": [
+					{
+						"value": 0,
+						"label_key": "value_check.special.no_time_limit"
+					}
+				]
 			}
 		}
 	};
@@ -590,7 +603,8 @@ function requireValue(schema, key, value) {
 		"METRICS_APPS_ANY_SCORE": "metrics_apps.*.score",
 		"LAYERS_REPEAT_COUNT": "layers.repeat_count",
 		"LAYOUT_SOURCE_TAP_HOLDS_THRESHOLD_MS": "layout_source.tap_holds.threshold_ms",
-		"LAYOUT_SOURCE_KEYS_VIRTUAL_KEY": "layout_source.keys.virtual_key"
+		"LAYOUT_SOURCE_KEYS_VIRTUAL_KEY": "layout_source.keys.virtual_key",
+		"TAP_HOLDS_STICKY_TIMEOUT_MS": "tap_holds.sticky_timeout_ms"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

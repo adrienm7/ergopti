@@ -105,9 +105,13 @@ _TH_PromptOneShotDelay(PromptFn := 0, Path := "", ReloadFn := 0) {
 			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
-		Raw := Trim(Answer.Value, " `t")
-		if !IsInteger(Raw) || !NumberTryParseInputInteger(Raw, &Ms)
+		; The shared value check names the accepted range in its refusal.
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS), Answer.Value)
+		if !Typed["ok"] {
+			ValueCheckShowRefusal(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS, Typed, Answer.Value)
 			return false
+		}
+		Ms := Typed["value"]
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "The one-shot Shift timeout prompt was refused: {1}.", Err.Message)
 		return false

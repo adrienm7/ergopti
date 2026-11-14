@@ -81,7 +81,8 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 
 	helpers.it("refuses negative, fractional and non-numeric timeouts in the writer (one-shot-timeout-setting)", function()
 		local writer, path, state, config_path = fresh_writer()
-		for _, bad in ipairs({ -1, 12.5, "1000", math.huge, 0 / 0, true }) do
+		-- 2147483648 passes the declared maximum (the Windows timer ceiling).
+		for _, bad in ipairs({ -1, 12.5, "1000", math.huge, 0 / 0, true, 2147483648 }) do
 			helpers.assert_eq(writer.set_one_shot_timeout_ms(bad), false, "refused: " .. tostring(bad))
 		end
 		for _, file in ipairs({ path, config_path }) do

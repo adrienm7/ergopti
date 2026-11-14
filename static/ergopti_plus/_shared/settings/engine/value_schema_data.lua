@@ -36,6 +36,7 @@ return {
 		["SHORTCUTS_SEARCH_SEARCH_ENGINE"] = "shortcuts.search.search_engine",
 		["SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY"] = "shortcuts.search.search_engine_url_query",
 		["TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS"] = "tap_holds.lone_modifier_tap_max_ms",
+		["TAP_HOLDS_STICKY_TIMEOUT_MS"] = "tap_holds.sticky_timeout_ms",
 		["TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS"] = "tap_hold.keys.*.time_activation_seconds",
 		["TAP_HOLD_TIME_ACTIVATION_SECONDS"] = "tap_hold.time_activation_seconds",
 		["UPDATER_CHECK_INTERVAL_SECONDS"] = "updater.check_interval_seconds",
@@ -269,6 +270,17 @@ return {
 			["min"] = 0,
 			["special"] = { {
 				["label_key"] = "value_check.special.off",
+				["value"] = 0,
+			} },
+			["type"] = "integer",
+			["unit"] = "ms",
+		},
+		["tap_holds.sticky_timeout_ms"] = {
+			["file"] = "config.toml",
+			["max"] = 2147483647,
+			["min"] = 0,
+			["special"] = { {
+				["label_key"] = "value_check.special.no_time_limit",
 				["value"] = 0,
 			} },
 			["type"] = "integer",

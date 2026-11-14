@@ -63,9 +63,12 @@ Test("navigation actions: the emitted rows are offered on Windows (sticky-action
 _SNA_NativeChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	Owner := _DriverProductionFileForSymbol("SIHO_StartOwned")
-	AssertTrue(Owner != "", "The actual SIHO registry must have a canonical owner.")
-	Code .= "#Include " . Owner . "`n"
+	for Symbol in ["SIHO_StartOwned", "ValueCheckValue"] {
+		; The one-shot timeout rule reads the shared value schema through the value check.
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The actual dependency must have a canonical owner: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
 	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "The complete actual sticky owner must exist: " . Name)
@@ -139,7 +142,7 @@ _SSM_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
-	for Symbol in ["SIHO_StartOwned", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar"] {
+	for Symbol in ["SIHO_StartOwned", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar", "ValueCheckValue"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The real transaction dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
