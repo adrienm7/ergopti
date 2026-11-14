@@ -158,6 +158,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\t\t\tpath.join(driver, 'core/network/adapters', name)\n"
 	},
 	{
+		// The Windows runner's CI lots are path patterns over the suite; the
+		// TOML tests belong to config-updater. S10 moves all thirty of them to
+		// unit/core/text/toml, which the core lot's pattern would take.
+		file: 'static/ergopti_plus/windows/tests/test_framework.ahk',
+		moves: 'windows/tests/unit/infra/toml/test_toml_writer_admission.ahk',
+		from: '["config-updater", "^unit/infra/(config|toml)/|',
+		to: '["config-updater", "^unit/infra/config/|^unit/core/text/toml/|'
+	},
+	{
 		// The literal AppDir contract runs workers from the driver root as its
 		// working directory (./adapters/x.lua); the plan reads ./ from the
 		// fixture's own folder. S09 moves the SQLite worker under core/process.
