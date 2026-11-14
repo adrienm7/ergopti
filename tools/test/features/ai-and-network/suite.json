@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0467",
-			"ordinal": 442,
+			"ordinal": 441,
 			"name": "Go route plan gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-route-plan-gate.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "js-0468",
-			"ordinal": 443,
+			"ordinal": 442,
 			"name": "proxy policy single source (every hand-typed precedence pinned to proxy_policy.json, no new copy)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-proxy-policy-single-source.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0476",
-			"ordinal": 459,
+			"ordinal": 458,
 			"name": "network field check parity (one step list, every label localised, no URL in the evidence)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-network-field-check-parity.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-0493",
-			"ordinal": 469,
+			"ordinal": 468,
 			"name": "proxy precedence shell projection (the shell expansions are generated from proxy_policy.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-codegen-proxy-precedence.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-ollama-termination-owned",
-			"ordinal": 492,
+			"ordinal": 491,
 			"name": "Ollama termination ownership (no driver stops Ollama by process name or by its port)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ollama-termination-owned.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-model-selector-page",
-			"ordinal": 495,
+			"ordinal": 494,
 			"name": "model selector page greys unavailable backends, downloads missing models and keeps keyboard access",
 			"cmd": "node",
 			"args": ["tools/test/test-model-selector-page.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-llm-backend-brands-single-source",
-			"ordinal": 496,
+			"ordinal": 495,
 			"name": "AI backend brand and emoji single source (backends.json, emoji-first model button)",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-backend-brands-single-source.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-test-prediction-single-source",
-			"ordinal": 505,
+			"ordinal": 504,
 			"name": "the AI menu's test prediction: one excerpt length and blank-answer reason, on the three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-test-prediction-single-source.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-windows-route-plan",
-			"ordinal": 541,
+			"ordinal": 540,
 			"name": "Windows route plan replays the shared route-plan vectors in PowerShell",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-route-plan.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "go-proxy-relay-gate",
-			"ordinal": 548,
+			"ordinal": 547,
 			"name": "Go proxy sign-in relay gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-proxy-relay-gate.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "macos-proxy-relay-shell",
-			"ordinal": 552,
+			"ordinal": 551,
 			"name": "macOS Ollama daemon starts under the proxy sign-in relay when the proxy demands NTLM or Negotiate",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-proxy-relay-shell.cjs"],
@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "fake-network-controls",
-			"ordinal": 553,
+			"ordinal": 552,
 			"name": "The fake corporate network refuses a wrong NTLM password and ends each proxy mode as it claims",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-fake-network.cjs"],
@@ -492,7 +492,7 @@
 		},
 		{
 			"id": "windows-proxy-relay-bundle",
-			"ordinal": 554,
+			"ordinal": 553,
 			"name": "The bundled Windows proxy relay is the one its sources and manifest name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-relay-bundle.cjs"],
@@ -500,7 +500,7 @@
 		},
 		{
 			"id": "windows-proxy-relay-e2e",
-			"ordinal": 555,
+			"ordinal": 554,
 			"name": "Windows proxy relay end to end: real relay, launcher and SSPI through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-relay-e2e.cjs"],
@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "windows-proxy-override-e2e",
-			"ordinal": 560,
+			"ordinal": 559,
 			"name": "Windows proxy override end to end: the real adapter and workers through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-override-e2e.cjs"],
@@ -518,7 +518,7 @@
 		},
 		{
 			"id": "perplexity-agent-e2e",
-			"ordinal": 562,
+			"ordinal": 561,
 			"name": "Perplexity Agent API end to end: the real transport and the shared Lua through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-perplexity-agent-e2e.cjs"],
@@ -527,7 +527,7 @@
 		},
 		{
 			"id": "js-model-browser-host-actions",
-			"ordinal": 566,
+			"ordinal": 565,
 			"name": "every model selector page action has a handler on macOS, Linux and Windows",
 			"cmd": "node",
 			"args": ["tools/test/test-model-browser-host-actions.cjs"],
@@ -535,7 +535,7 @@
 		},
 		{
 			"id": "js-prompt-editor-literal-token",
-			"ordinal": 590,
+			"ordinal": 589,
 			"name": "prompt editor preserves literal brace text through its save bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-literal-token.cjs"],
@@ -543,7 +543,7 @@
 		},
 		{
 			"id": "js-llm-provider-retirements",
-			"ordinal": 607,
+			"ordinal": 606,
 			"name": "remote providers keep no retired endpoint or model as a default",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-provider-retirements.cjs"],

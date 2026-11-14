@@ -104,9 +104,6 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/browser/hotstring-editor-whitespace.playwright.cjs',
 	// Real rendering checks model drafts during download progress updates.
 	'tools/test/browser/model-browser-draft.playwright.cjs',
-	// Real Chromium and WebKit layout of the composer runs separately in Core / js;
-	// test-desktop-ci-evidence.cjs rejects a missing or skipped browser step.
-	'tools/test/browser/layout-composer.playwright.cjs',
 	// Real Chromium drives the unified layout editor page separately in Core / js;
 	// test-ci-pipeline-wiring.cjs rejects a missing or redirected browser step.
 	'tools/test/browser/layout-editor.playwright.cjs',

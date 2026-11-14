@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "metrics-collection-controls",
-			"ordinal": 440,
+			"ordinal": 439,
 			"name": "metrics pause and session reset: one declaration, one meaning and one set of sequences on all three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-collection-controls.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "keystats-sql-census",
-			"ordinal": 454,
+			"ordinal": 453,
 			"name": "keystats SQL census extractor counts concatenated statements once and groups CLI and in-process spellings by shape",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-census.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "keystats-query-catalogue",
-			"ordinal": 455,
+			"ordinal": 454,
 			"name": "keystats named-query catalogue returns the legacy rows on a realistic fixture in both dialects and its compiled outputs are current",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-query-catalogue.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "keystats-sql-shared-spelling",
-			"ordinal": 474,
+			"ordinal": 473,
 			"name": "no keystats statement is spelled by hand in both Lua drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-shared-spelling.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "keystats-write-catalogue",
-			"ordinal": 476,
+			"ordinal": 475,
 			"name": "keystats write statements of the catalogue leave the rows the legacy driver SQL left and render to the shared vectors",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-write-catalogue.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "legacy-folder-names",
-			"ordinal": 574,
+			"ordinal": 573,
 			"name": "legacy folder names (only the one-time migration spells a data folder of the builds before the single folder name)",
 			"cmd": "node",
 			"args": ["tools/test/test-legacy-folder-names.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-metrics-app-unicode-search",
-			"ordinal": 577,
+			"ordinal": 576,
 			"name": "application filter matches canonically equivalent Unicode names",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-app-unicode-search.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-metrics-app-fallback-icon-unicode",
-			"ordinal": 584,
+			"ordinal": 583,
 			"name": "typing metrics fallback badges preserve Unicode initials",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-app-fallback-icon-unicode.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "typing-metrics-partial-live",
-			"ordinal": 589,
+			"ordinal": 588,
 			"name": "typing metrics partial live slots preserve calendar and selected-range ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-typing-metrics-partial-live.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-crash-worker-partial-write",
-			"ordinal": 592,
+			"ordinal": 591,
 			"name": "Windows crash workers publish only complete reports after a refused write",
 			"cmd": "node",
 			"args": ["tools/test/test-crash-worker-partial-write.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-metrics-key-names",
-			"ordinal": 594,
+			"ordinal": 593,
 			"name": "metrics heatmap names its special keys from the key name table in every locale",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-key-names.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-metrics-maintenance",
-			"ordinal": 601,
+			"ordinal": 600,
 			"name": "dashboard export and purge: a tombstone purges every device in any replay order and the page answers only its own request",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-maintenance.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "keystats-roi-case-profile",
-			"ordinal": 605,
+			"ordinal": 604,
 			"name": "trigger ROI lowercase projection replays its qualified native Windows profile and rejects changed receipts",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-roi-case.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "js-windows-diagnostic-progress-reader",
-			"ordinal": 624,
+			"ordinal": 623,
 			"name": "Windows diagnostic worker commits its archive while the host reads its progress",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-diagnostic-progress-reader.cjs"],

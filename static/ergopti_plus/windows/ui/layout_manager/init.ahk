@@ -67,8 +67,7 @@ global LAYMGR_HOST_ACCESS_ALLOW := 1
 ; same list; tools/test/test-layout-manager-page.cjs pins the three). The
 ; layout editor's own window has its list in editor_window.ahk.
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
-	"uninstall", true, "select", true, "open_homepage", true, "close", true,
-	"composer_open", true, "composer_save", true, "composer_remove", true, "open_editor", true)
+	"uninstall", true, "select", true, "open_homepage", true, "close", true, "open_editor", true)
 
 ; The actions that change the installed or selected layout, refused while a
 ; runtime refresh is pending.
@@ -288,8 +287,6 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps["close"].Call()
 		return true
 	}
-	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
-		return LayoutComposer_Handle(Action, Payload, Deps)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)

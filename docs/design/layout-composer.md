@@ -151,13 +151,17 @@ and the bounds are declared once in the `composer` table of
 sent and installs the compiled file as an installed layout of that id, with a
 record entry built from the file (size, SHA-256, keycode convention, name), so
 the picker, the verified local copy, the uninstall and the selection work on it
-like on a registry layout. The page lives in the layout manager window, opened
-by "Compose a layout…", and speaks three more host messages: `composer_open`
-(answered by `composerData`: every verified registry layout as a source, the
-stored declaration, whether the composition is in use, and `shortcuts`
-"full" or "single"), `composer_save` (declaration, keylayout, use) and
-`composer_remove`; the answer is `composerResult`. The hosts re-check what the
-page sends (bounds, schema, name, map set) and never trust it.
+like on a registry layout. The composer's own page (« Compose a layout… » in the
+layout manager window, `layout_composer/composer_page.js`) was retired on
+2026-11-14: the unified layout editor (`docs/design/layout-editor.md`) builds a
+source from any layer of any layout and installs it through the same host,
+with `composer_open` (answered by `composerData`) and `composer_save` carrying
+`source`, its compiled `.keylayout` and, on Linux, the source compiled straight
+to XKB (`target`). A declaration (`composition.json`) is no longer a page
+message: only the composer field check (`composer/check_core.lua` and the
+Windows `composer_check.ahk`) still saves the shipped declaration and removes
+the composition, through the registry itself. The hosts re-check what the page
+sends (bounds, schema, name, map set) and never trust it.
 
 - **Windows.** `[layout] emulated_layout = "composed"` (an existing key, so no
   new switch: the default `""` keeps the composer dormant). The emulation
@@ -182,26 +186,14 @@ page sends (bounds, schema, name, map set) and never trust it.
   there: the host sends `shortcuts: "single"` and the page locks those rows and
   says why.
 
-### One page, three hosts
+### Hosts
 
-The three drivers load the same `_shared/ui/layout_manager/index.html` with the
-same composer script, model and stylesheet; no driver has a copy or a fork of
-them. Windows serves the shared folder from a WebView2 virtual host, macOS and
-Linux inline the same files into their WebKit view. What differs per OS comes
-from the host as data, never from a test of the platform in the page:
-`shortcuts` ("single" on Linux, above), `platform` (which registry layouts
-apply) and `shortcut_menu_path`.
-
-The window is resizable on the three OS at the `layout_manager` size of
-`_shared/ui/apps.manifest.json`. The page scales to it: the board's keys are
-placed in fractions of a board that takes the width of the view, and only the
-composer body scrolls, so the action buttons stay in a footer below it. On
-Windows the controller is parented to a placeholder control, which every Size
-handler grows to the window through `WebView_FitToWindow` before filling it
-(`infra/webview_utils.ahk`); filling alone left the page at its opening size.
-`tools/test/browser/layout-composer.playwright.cjs` measures the page in
-Chromium and WebKit at four window sizes and the AHK test
-`test_webview_fit_to_window.ahk` covers the Windows host.
+The editor window (`_shared/ui/layout_editor_window`) is the composer's only
+page on the three drivers; what differs per OS comes from the host as data,
+never from a test of the platform in the page. On Windows the WebView2
+controller is parented to a placeholder control, which every Size handler
+grows to the window through `WebView_FitToWindow` before filling it
+(`infra/webview_utils.ahk`, covered by `test_webview_fit_to_window.ahk`).
 
 ## What exists already, and how it relates
 

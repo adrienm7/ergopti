@@ -387,7 +387,7 @@ return function(helpers, Json, ports)
 			end
 		end)
 
-		helpers.it("routes the three composer messages and pushes their results (layout-composer)", function()
+		helpers.it("routes the editor window's composer messages and pushes their results (layout-composer)", function()
 			local ManagerBridge = require("layouts.engine.manager_bridge")
 			local registry, deps = fresh()
 			local pushed = {}
@@ -408,26 +408,23 @@ return function(helpers, Json, ports)
 			})
 			helpers.assert_true(controller.on_message({ action = "composer_open" }))
 			helpers.assert_eq(pushed[#pushed].name, "composerData")
-			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = 5 }), "a save needs text")
+			helpers.assert_true(not controller.on_message({ action = "composer_save", source = 5 }), "a save needs text")
 			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = DECLARATION,
-				source = SOURCE, keylayout = KEYLAYOUT }), "a save carries one form")
-			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE,
-				keylayout = SOURCE_KEYLAYOUT }), "a source save is routed")
+				keylayout = KEYLAYOUT, use = false }), "the retired composer page's declaration is no page message")
+			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = DECLARATION,
+				source = SOURCE, keylayout = KEYLAYOUT }), "a save carries no declaration beside its source")
+			helpers.assert_true(not controller.on_message({ action = "composer_remove" }),
+				"the removal is the composer check's, through the registry, never a page message")
 			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE,
 				emulation = EMULATION, keylayout = SOURCE_KEYLAYOUT }), "a source save with its table is routed")
-			helpers.assert_true(not controller.on_message({ action = "composer_save", declaration = DECLARATION,
-				emulation = EMULATION, keylayout = KEYLAYOUT }), "a table comes only with a source")
 			helpers.assert_true(not controller.on_message({ action = "composer_save", source = SOURCE,
 				emulation = 5, keylayout = SOURCE_KEYLAYOUT }), "a table is text")
-			helpers.assert_true(controller.on_message({ action = "composer_save", declaration = DECLARATION,
-				keylayout = KEYLAYOUT, use = false }))
+			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE,
+				keylayout = SOURCE_KEYLAYOUT, use = false }), "a source save is routed")
 			local result
 			for _, item in ipairs(pushed) do if item.name == "composerResult" then result = item.payload end end
 			helpers.assert_true(result and result.ok, "the save result reaches the page")
 			helpers.assert_eq(result.action, "composer_save")
-			helpers.assert_true(controller.on_message({ action = "composer_remove" }))
-			helpers.assert_eq(pushed[#pushed - 1].name, "composerResult")
-			helpers.assert_eq(pushed[#pushed - 1].payload.action, "composer_remove")
 			local plain = { snapshot = wrapper.snapshot, refresh = wrapper.refresh }
 			local limited = ManagerBridge.new({ registry = plain, push = function() end, strings = function() return {} end,
 				open_url = function() end, close = function() end, log = function() end })

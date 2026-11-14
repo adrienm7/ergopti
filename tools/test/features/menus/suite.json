@@ -252,7 +252,7 @@
 		},
 		{
 			"id": "platform-reason-wording",
-			"ordinal": 441,
+			"ordinal": 440,
 			"name": "platform reasons describe the platform and never schedule work",
 			"cmd": "node",
 			"args": ["tools/test/test-platform-reason-wording.cjs"],
@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "llm-prompt-keys-single-source",
-			"ordinal": 456,
+			"ordinal": 455,
 			"name": "AI numeric prompts and local-server port dialogs use one key set on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-prompt-keys-single-source.cjs"],
@@ -268,7 +268,7 @@
 		},
 		{
 			"id": "linux-menu-parts",
-			"ordinal": 540,
+			"ordinal": 539,
 			"name": "the Linux tray root is read with its split section modules, and every other wiring is refused",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-menu-parts.cjs"],
@@ -276,7 +276,7 @@
 		},
 		{
 			"id": "menu-shown-rows-have-own-label",
-			"ordinal": 568,
+			"ordinal": 567,
 			"name": "every manifest row a driver shows has its own key in all 21 locales, and every key the menus name exists",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-shown-rows-have-own-label.cjs"],
@@ -284,7 +284,7 @@
 		},
 		{
 			"id": "french-punctuation",
-			"ordinal": 569,
+			"ordinal": 568,
 			"name": "no French string glues high punctuation to a word, and every label joins its value through common.label_value",
 			"cmd": "node",
 			"args": ["tools/test/test-french-punctuation.cjs"],
@@ -292,7 +292,7 @@
 		},
 		{
 			"id": "menu-category-off-rule",
-			"ordinal": 570,
+			"ordinal": 569,
 			"name": "a category off greys its submenu but the enable row and the rows declared readable_when_off",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-category-off-rule.cjs"],

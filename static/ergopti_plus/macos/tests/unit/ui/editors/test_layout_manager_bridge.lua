@@ -185,7 +185,6 @@ local function host_bridge(paused)
 			uninstall = function(_, on_done) on_done(true, {}) end,
 			select = function(_, on_done) on_done(true, {}) end,
 			composer_save = function(_, on_done) on_done(true) end,
-			composer_remove = function(on_done) on_done(true) end,
 		},
 		push = function() return true end,
 		strings = function() return {} end,
@@ -205,9 +204,8 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 		helpers.assert_true(instance.on_message({ action = "update", id = "ergol" }))
 		helpers.assert_true(instance.on_message({ action = "uninstall", id = "ergol" }))
 		helpers.assert_true(instance.on_message({ action = "select", id = "ergol" }))
-		helpers.assert_true(instance.on_message({ action = "composer_remove" }))
 		helpers.assert_true(instance.on_message({ action = "composer_save", source = "src", keylayout = "kl" }))
-		helpers.assert_eq(changed, { "ergol", "ergol", "ergol", "composed", "composed" },
+		helpers.assert_eq(changed, { "ergol", "ergol", "ergol", "composed" },
 			"a select changes no layout; every other success reaches the emulation")
 	end)
 
