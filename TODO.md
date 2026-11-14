@@ -286,6 +286,15 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       change every weight (and restore the defaults), the ranking updating live. Score and weights tested on the
       reference corpus.
 
+- [ ] **Shortcut placement metric (maintainer, 2026-11-14), worth about 5-10 % of the global score.** Rewards a
+      layout whose useful Ctrl/Cmd shortcut letters sit on the left hand (the right hand stays on the mouse). One
+      shared, documented table of letters with a usefulness weight: highest for Z (undo), X, C, V (cut, copy, paste),
+      A (select all), S (save); then F (find), W (close), T (new tab), N, O, R, P, Y, Q (quit on macOS, lower);
+      zero for letters whose shortcut is useless (e.g. E). Score = weighted share of those letters on the left hand,
+      better on easy keys (home and lower row, near the index) than on hard ones. The table and the metric weight are
+      editable in the Studio like the other weights. Goal of the whole analyser (maintainer): do better than every
+      existing tool, Kalamine included.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
