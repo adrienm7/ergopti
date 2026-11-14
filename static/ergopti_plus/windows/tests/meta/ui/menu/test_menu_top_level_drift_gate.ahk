@@ -188,7 +188,7 @@ _DG_ReorderedManifestReordersTheRoot() {
 ; a new builder has to say which row it stages.
 global _DG_BUILDER_TITLES := Map(
 	"keyboard_layout", 'MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
-	"ergopti_studio",  'MenuRenderer_CommandRow("top_level", MenuCommand.ERGOPTI_STUDIO',
+	"ergopti_studio",  'MenuRenderer_CommandRow("top_level", "ergopti_studio"',
 	"hotstrings",      'MenuRenderer_GroupReceiver("top_level", "hotstrings")',
 	"llm",             'LLM_Menu_TrayTitle()',
 	"agent",           't("menu.agent.title")',

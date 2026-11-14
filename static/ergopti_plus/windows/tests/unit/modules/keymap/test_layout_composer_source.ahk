@@ -436,7 +436,8 @@ _LCS_StudioRowCase() {
 	Builders := _MI_TopLevelBuilders()
 	AssertTrue(Builders.Has("ergopti_studio"), "the tray root has a builder for the row")
 	Body := _DriverFuncBody(Builders["ergopti_studio"].Name)
-	AssertContains(Body, "Map(MenuCommand.ERGOPTI_STUDIO, LayoutManager_OpenEditor)")
+	; The test source view reads generated constants as their values (test_framework.ahk).
+	AssertContains(Body, 'Map("ergopti_studio", LayoutManager_OpenEditor)')
 	Stage := TrayMenuStage_Begin()
 	try {
 		Builders["ergopti_studio"].Call()

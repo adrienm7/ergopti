@@ -423,6 +423,7 @@ _MI_StageAbout() => 0
 _MI_StageSuspend() => 0
 _MI_StageReload() => 0
 _MI_StageQuit() => 0
+_MI_StageErgoptiStudio() => 0
 _MI_StageDebug() => 0
 _MI_StageMetrics() {
  global _LMPC_State

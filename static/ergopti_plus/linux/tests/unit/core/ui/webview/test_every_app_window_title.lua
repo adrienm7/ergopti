@@ -30,6 +30,14 @@ local LOCALES = read_shared("core/i18n/data/locale_order.json").order
 --- @param context string Locale and app identity for the failure message.
 local function assert_caption(caption, label, context)
 	local prefix, separator = MANIFEST.window_title.prefix, MANIFEST.window_title.separator
+	-- A product name of the title policy is the whole title, without the brand
+	-- prefix (« Ergopti Studio », window-title-product-name).
+	for _, name in ipairs(MANIFEST.window_title.product_names or {}) do
+		if label == name then
+			helpers.assert_eq(caption, label, context .. " shows its product name as the whole title")
+			return
+		end
+	end
 	local count, from = 0, 1
 	while true do
 		local at = caption:find(prefix, from, true)

@@ -800,7 +800,7 @@ function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps, pacer)
 end
 
 --- Reads the all-time character, bigram and trigram families Ergopti Studio
---- analyses (_shared/metrics/engine/studio_ngrams.lua), every device and app
+--- analyses (_shared/metrics/engine/view/studio_ngrams.lua), every device and app
 --- summed. The open is read only; the other families are skipped so a large
 --- store answers quickly.
 --- @param sqlite_path string Absolute path to db.sqlite.
@@ -811,7 +811,7 @@ function M.read_studio_ngrams(sqlite_path)
 	local db = _open(sqlite_path)
 	if not db then return out, false end
 	local complete = true
-	for _, family in ipairs(require("metrics.engine.studio_ngrams").FAMILIES) do
+	for _, family in ipairs(require("metrics.engine.view.studio_ngrams").FAMILIES) do
 		local tbl = NGRAM_TYPE_TABLE[family.code]
 		local ok = _safe_query(tbl, function()
 			for r in _rows(db, Queries.render("ngram.tokens", "native",
@@ -828,21 +828,6 @@ function M.read_studio_ngrams(sqlite_path)
 	end
 	db:close()
 	return out, complete
-end
-
---- The store's revision (meta.rev), bumped by every ingest: Ergopti Studio
---- keeps its projection until it changes.
---- @param sqlite_path string Absolute path to db.sqlite.
---- @return string|nil rev The revision, or nil when it could not be read.
-function M.read_studio_stamp(sqlite_path)
-	local db = _open(sqlite_path)
-	if not db then return nil end
-	local rev = nil
-	_safe_query("meta.rev", function()
-		for r in db:nrows(Queries.render("meta.rev", "native")) do rev = r.value end
-	end)
-	db:close()
-	return rev ~= nil and tostring(rev) or nil
 end
 
 --- Adds every entry of `from` into `into`, using the same additive fields as

@@ -14,7 +14,7 @@
 // (_shared/layouts/engine/manager_bridge.lua, windows/ui/layout_manager).
 // Ergopti Studio reads the user's own typing with keystats_ngrams: the host
 // answers keystatsNgrams with the counts of the local keystats store
-// (_shared/metrics/engine/studio_ngrams.lua), read only and never sent
+// (_shared/metrics/engine/view/studio_ngrams.lua), read only and never sent
 // anywhere; the page asks only when the user clicks « Analyse my typing ».
 // The downloads the site offers (Linux XKB, Windows KLC and DLL images, macOS
 // bundle) are built here, offline, with the export data the app ships
@@ -394,7 +394,7 @@ window.sourceResult = function (result) {
 let _keystatsNgrams = null;
 let _keystatsPending = false;
 
-// The message of each refusal code the hosts send (metrics/engine/studio_ngrams.lua
+// The message of each refusal code the hosts send (metrics/engine/view/studio_ngrams.lua
 // CODES); an unknown code reads as unreadable, never as an empty success.
 const KEYSTATS_REFUSALS = Object.freeze({
 	keystats_absent: 'layout_editor.studio.keystats.keystats_absent',

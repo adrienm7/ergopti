@@ -255,7 +255,7 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		helpers.assert_eq(WindowTitles.compose("Ergopti Studio 2"), "ErgoptiPlus — Ergopti Studio 2")
 	end)
 
-	local StudioNgrams = require("metrics.engine.studio_ngrams")
+	local StudioNgrams = require("metrics.engine.view.studio_ngrams")
 
 	helpers.it("projects physical keystrokes only and refuses an absent or partial store (studio-keystats-bridge)", function()
 		local payload = StudioNgrams.project({
@@ -312,6 +312,8 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		daemon_state.layout_registry.source_save = function() end
 		local read_paths = {}
 		daemon_state.config_paths = { metrics_path = function() return "/home/u/.config/ergopti/metrics.sqlite" end }
+		local revision = 7
+		daemon_state.keystats_writer = { get_revision = function() return revision end }
 		daemon_state.keystats_reader = {
 			read_studio_ngrams = function(path)
 				read_paths[#read_paths + 1] = path
@@ -336,10 +338,16 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 				helpers.assert_contains(last.js, '"ok":true')
 				helpers.assert_contains(last.js, '"chars":{"e":7}')
 				helpers.assert_eq(read_paths, { "/home/u/.config/ergopti/metrics.sqlite" })
+				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
+				helpers.assert_contains(state.pushes[#state.pushes].js, '"chars":{"e":7}')
+				helpers.assert_eq(#read_paths, 1, "an unchanged revision answers from the cache")
+				revision = 8
+				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
+				helpers.assert_eq(#read_paths, 2, "a new ingest is read again")
 				FileSystem.exists = function() return false end
 				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
 				helpers.assert_contains(state.pushes[#state.pushes].js, '"code":"keystats_absent"')
-				helpers.assert_eq(#read_paths, 1, "an absent store is not opened")
+				helpers.assert_eq(#read_paths, 2, "an absent store is not opened")
 			end)
 			FileSystem.exists = native_exists
 			Editor._reset()
@@ -383,7 +391,6 @@ INSERT OR REPLACE INTO meta(key, value) VALUES ('rev', '42');
 			helpers.assert_eq(dict.c.e.hs, 2)
 			helpers.assert_eq(dict.bg.es.c, 4)
 			helpers.assert_eq(dict.tg.est.c, 2)
-			helpers.assert_eq(Reader.read_studio_stamp(path), "42", "the stamp is the store's revision")
 			helpers.assert_nil(dict.w, "the other families are not read")
 			local payload = StudioNgrams.project(dict)
 			helpers.assert_eq(payload.chars, { e = 10 })

@@ -249,15 +249,19 @@ local function new_window(spec)
 				on_done(applier(text))
 			end or nil,
 			-- Ergopti Studio reads the user's own typing from the local keystats
-			-- store, read only, for this window alone (metrics/engine/studio_ngrams.lua).
+			-- store, read only, for this window alone (metrics/engine/view/studio_ngrams.lua).
 			-- Deferred, so the page's message returns before the read.
 			read_keystats = spec.editor_window and function(on_done)
 				DeferredWork.after(0, function()
-					on_done(require("metrics.engine.studio_ngrams").read({
+					on_done(require("metrics.engine.view.studio_ngrams").read({
 						path = require("modules.keystats.log_manager").get_sqlite_path(),
 						exists = function(path) return FileSystem.path_status(path) ~= "absent" end,
 						read = require("modules.keystats.sqlite_reader").read_studio_ngrams,
-						stamp = require("modules.keystats.sqlite_reader").read_studio_stamp,
+						-- The store's meta.rev, bumped by every ingest; 0 while no store is open.
+						stamp = function()
+							local rev = require("modules.keystats.export").get_db_rev()
+							return rev > 0 and tostring(rev) or nil
+						end,
 					}))
 				end, "layout_manager.read_keystats")
 			end or nil,

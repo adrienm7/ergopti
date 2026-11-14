@@ -590,7 +590,7 @@ function M.read_ngrams(sqlite_path, start_date, end_date, apps, exclude_date)
 end
 
 --- Reads the all-time character, bigram and trigram families Ergopti Studio
---- analyses (_shared/metrics/engine/studio_ngrams.lua), every device and app
+--- analyses (_shared/metrics/engine/view/studio_ngrams.lua), every device and app
 --- summed. Read only, like every reader query; the other families are skipped
 --- so a large store answers quickly.
 --- @param sqlite_path string Database path.
@@ -598,7 +598,7 @@ end
 --- @return boolean complete Whether every query was accepted.
 function M.read_studio_ngrams(sqlite_path)
 	local out, complete = { c = {}, bg = {}, tg = {} }, true
-	for _, family in ipairs(require("metrics.engine.studio_ngrams").FAMILIES) do
+	for _, family in ipairs(require("metrics.engine.view.studio_ngrams").FAMILIES) do
 		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[family.code], "", false))
 		if not accepted then complete = false end
 		for _, row in ipairs(rows) do
@@ -606,16 +606,6 @@ function M.read_studio_ngrams(sqlite_path)
 		end
 	end
 	return out, complete
-end
-
---- The store's revision (meta.rev), bumped by every ingest: Ergopti Studio
---- keeps its projection until it changes.
---- @param sqlite_path string Database path.
---- @return string|nil rev The revision, or nil when it could not be read.
-function M.read_studio_stamp(sqlite_path)
-	local rows, accepted = read_rows(sqlite_path, Queries.render("meta.rev", "cli_json"))
-	if not accepted or type(rows[1]) ~= "table" or rows[1].value == nil then return nil end
-	return tostring(rows[1].value)
 end
 
 --- Resolves inclusive date bounds against one captured local calendar day.

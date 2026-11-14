@@ -179,6 +179,7 @@ _MI_StageAbout() => 0
 _MI_StageSuspend() => 0
 _MI_StageReload() => 0
 _MI_StageQuit() => 0
+_MI_StageErgoptiStudio() => 0
 _MI_StageDebug() => 0
 _MI_StageMetrics() => TrayMenuStage_AddFeature("metrics", Menu())
 ; A root build publishes the IA child deferred, built at its first open; this

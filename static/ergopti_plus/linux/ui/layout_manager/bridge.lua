@@ -149,6 +149,8 @@ local function new_handler(spec)
 		local keystats_reader = dependency(state, "keystats_reader", "modules.keystats.sqlite_reader")
 		if keystats_reader and type(keystats_reader.read_studio_ngrams) ~= "function" then keystats_reader = nil end
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local keystats_writer = dependency(state, "keystats_writer", "modules.keystats.sqlite_writer")
+		if keystats_writer and type(keystats_writer.get_revision) ~= "function" then keystats_writer = nil end
 		local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")
 		local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
 		if not (preferences and type(preferences.choose) == "function" and emulation
@@ -219,14 +221,18 @@ local function new_handler(spec)
 				if current() then done(result) end
 			end or nil,
 			-- Ergopti Studio reads the user's own typing from the local keystats
-			-- store, read only, for this window alone (metrics/engine/studio_ngrams.lua).
+			-- store, read only, for this window alone (metrics/engine/view/studio_ngrams.lua).
 			read_keystats = spec.editor_window and keystats_reader and function(done)
 				if not current() then return false end
-				local result = require("metrics.engine.studio_ngrams").read({
+				local result = require("metrics.engine.view.studio_ngrams").read({
 					path = config_paths and config_paths.metrics_path() or nil,
 					exists = FileSystem.exists,
 					read = keystats_reader.read_studio_ngrams,
-					stamp = keystats_reader.read_studio_stamp,
+					-- The writer's meta.rev, bumped by every ingest; nil while metrics are off.
+					stamp = keystats_writer and function()
+						local rev = keystats_writer.get_revision()
+						return rev ~= nil and tostring(rev) or nil
+					end or nil,
 				})
 				if current() then done(result) end
 			end or nil,

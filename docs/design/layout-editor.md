@@ -226,7 +226,7 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
   written to the store and nothing leaves the machine; the counts go to the Studio window alone, and only after the
   user clicks.
 - Physical keystrokes: hotstring expansions, AI completions and other synthetic sources are subtracted
-  (`_shared/metrics/engine/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`).
+  (`_shared/metrics/engine/view/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`).
 - Fail fast: an absent store answers `keystats_absent`, a refused or partial read `keystats_unreadable`; the page
   shows the translated reason and keeps no partial data.
 - Computed once per store version: macOS and Linux keep the projection with the store's `meta.rev` (bumped by every

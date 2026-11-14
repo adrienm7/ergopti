@@ -248,7 +248,7 @@ KLR_StudioStoreStamp(MetricsDir) {
  * of the contract, the all-time count of each token the user typed on the
  * keyboard, every device and app summed. Synthetic sources (hotstrings, AI,
  * other synthetic labels; KLR_NgramSourceProjection) are subtracted, as
- * _shared/metrics/engine/studio_ngrams.lua does on macOS and Linux. No LIMIT:
+ * _shared/metrics/engine/view/studio_ngrams.lua does on macOS and Linux. No LIMIT:
  * a truncated table would be shown as the user's data.
  * @param db Open SQLite handle.
  * @param Contract {Map} KLR_StudioContract().

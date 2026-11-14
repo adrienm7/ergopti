@@ -41,7 +41,7 @@
 ---    (composer/source_store.lua) and answers exportResult {ok, code, detail, path}.
 --- 8. Ergopti Studio reads the user's own typing (keystats_ngrams): the host's
 ---    deps.read_keystats answers with the character, bigram and trigram counts
----    of the local keystats store (_shared/metrics/engine/studio_ngrams.lua),
+---    of the local keystats store (_shared/metrics/engine/view/studio_ngrams.lua),
 ---    read only and pushed to this page alone (keystatsNgrams {ok, ngrams} or
 ---    {ok = false, code}). Only the editor window offers it, and only when the
 ---    user asks: the page posts it from its « Analyse my typing » button.
@@ -469,7 +469,7 @@ function M.new(deps)
 					deps.push("keystatsNgrams", { ok = true, ngrams = result.ngrams })
 				else
 					deps.push("keystatsNgrams", { ok = false,
-						code = type(result.code) == "string" and result.code or require("metrics.engine.studio_ngrams").CODES.unreadable })
+						code = type(result.code) == "string" and result.code or require("metrics.engine.view.studio_ngrams").CODES.unreadable })
 				end
 			end)
 			return true

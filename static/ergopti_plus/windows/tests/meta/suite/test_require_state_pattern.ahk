@@ -88,7 +88,12 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; _ProxyOverrideDeclaration is a lazy cache of a shipped file and _ProxyOverrideStored
 	; is written with the published value; a reader before boot sees "automatic", the
 	; declared empty value, by design. There is no injected state for a guard to wait on.
-	"core/network/adapters/proxy_override.ahk", true
+	"core/network/adapters/proxy_override.ahk", true,
+	; _LayEdWin_StudioCache — a lazy cache of the last Ergopti Studio keystats
+	; projection, keyed by the keystats folder stamp. It starts empty at its
+	; declaration and the editor window fills it after a complete worker read;
+	; an empty cache only means the next read starts a worker.
+	"ui/layout_manager/editor_window.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state

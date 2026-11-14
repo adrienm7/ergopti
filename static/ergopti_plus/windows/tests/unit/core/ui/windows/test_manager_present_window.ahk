@@ -468,8 +468,18 @@ _WVT_WithCapturedCaptions(Body) {
 
 ; The caption names the product once, then the window's translated name.
 _WVT_AssertCaption(Caption, TitleKey, Context) {
+	global _SharedDir
 	Label := t(TitleKey)
 	Assert(Label != TitleKey && Label != "", Context . " has a translated name")
+	; A product name of the title policy is the whole title, without the brand
+	; prefix (« Ergopti Studio », window-title-product-name).
+	Policy := JsonParse(FSRead(_SharedDir . "\ui\apps.manifest.json"))["window_title"]
+	for Name in Policy.Get("product_names", []) {
+		if (Label == Name) {
+			AssertEqual(Label, Caption, Context . " shows its product name as the whole title")
+			return
+		}
+	}
 	Brand := WindowTitle()
 	Separator := SubStr(WindowTitle("|"), StrLen(Brand) + 1, -1)
 	StrReplace(Caption, Brand, , , &Count)

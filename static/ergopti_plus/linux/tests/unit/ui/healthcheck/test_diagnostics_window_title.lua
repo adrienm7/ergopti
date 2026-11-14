@@ -120,7 +120,11 @@ helpers.describe("shared application native window titles", function()
 				return Json.decode(text)
 			end
 			local locales = read_json("core/i18n/data/locale_order.json").order
-			local apps = read_json("ui/apps.manifest.json").apps
+			local manifest = read_json("ui/apps.manifest.json")
+			local apps = manifest.apps
+			-- A product name of the title policy is the whole title (window-title-product-name).
+			local whole = {}
+			for _, name in ipairs(manifest.window_title.product_names or {}) do whole[name] = true end
 			helpers.assert_eq(#locales, 21)
 			for _, locale in ipairs(locales) do
 				current_locale = locale
@@ -132,7 +136,8 @@ helpers.describe("shared application native window titles", function()
 					local bridge = require("core.ui.ui.webkit_host").bridge_for_app(app)
 					if bridge then
 						helpers.assert_true(manager._create_gtk_window(app, "<html></html>", { bridge_name = bridge }))
-						helpers.assert_eq(captured, "ErgoptiPlus — " .. label, locale .. " native " .. app .. " title")
+						helpers.assert_eq(captured, whole[label] and label or "ErgoptiPlus — " .. label,
+							locale .. " native " .. app .. " title")
 						helpers.assert_true(manager._destroy_gtk_window(app), "exact controlled child/signal/window retirement")
 					else
 						helpers.assert_eq(app, "permission_dialog", "only the macOS permission-repair dialog lacks a GTK owner")

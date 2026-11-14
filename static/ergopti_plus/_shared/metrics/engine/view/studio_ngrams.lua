@@ -1,4 +1,4 @@
---- _shared/metrics/engine/studio_ngrams.lua
+--- _shared/metrics/engine/view/studio_ngrams.lua
 
 --- ==============================================================================
 --- MODULE: Ergopti Studio N-gram Projection
