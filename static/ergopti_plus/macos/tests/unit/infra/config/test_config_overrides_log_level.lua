@@ -112,7 +112,7 @@ helpers.describe("Expert known-value admission", function()
 				local file = assert(io.open(path, "rb")); local content = assert(file:read("*a")); assert(file:close()); return content
 			end
 			write(source)
-			local codec = require("infra.toml.codec")
+			local codec = require("core.text.engine.toml.codec")
 			local ok, detail = xpcall(function()
 				body({ owner = owner, path = path, read = read, write = write, codec = codec,
 					observed = observed, warnings = warnings, errors = errors, writes = writes,

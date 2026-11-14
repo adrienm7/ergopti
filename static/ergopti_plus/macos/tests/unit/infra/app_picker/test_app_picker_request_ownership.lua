@@ -15,7 +15,7 @@ local MODULES = {
 	"core.fs.adapters.file_system",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"infra.deferred_work",
 }
 
@@ -48,7 +48,7 @@ local function with_picker(run, options)
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.text_utils"] = {
+		package.loaded["core.text.engine.utils"] = {
 			escape_gsub_replacement = function(value) return value end,
 		}
 		local AppPicker = helpers.load_with_stubs("infra.app_picker", {

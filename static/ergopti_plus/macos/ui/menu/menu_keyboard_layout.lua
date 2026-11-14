@@ -1047,7 +1047,7 @@ function M.capture_scope(state, source)
 		if type(source) ~= "table" or (source.status ~= "ok" and source.status ~= "absent") then return nil end
 		if source.status == "ok" then
 			if type(source.content) ~= "string" then return nil end
-			local decoded, document = pcall(require("infra.toml.codec").decode, source.content)
+			local decoded, document = pcall(require("core.text.engine.toml.codec").decode, source.content)
 			if not decoded or type(document) ~= "table" then return nil end
 			local layout = document.layout
 			if layout ~= nil and type(layout) ~= "table" then return nil end

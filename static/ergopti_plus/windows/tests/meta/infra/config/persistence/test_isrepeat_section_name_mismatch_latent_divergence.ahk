@@ -78,7 +78,7 @@ _ISRMM_CacheDropsBrokenPredicate() {
 Test("hotstrings cache: build drops the broken IsRepeat predicate (isrepeat-section-name-mismatch-latent-divergence)", _ISRMM_CacheDropsBrokenPredicate)
 
 _ISRMM_TomlFallbackOmitsIsRepeat() {
-	Src := _ISRMM_ReadWindowsSource("toml_loader.ahk")
+	Src := _ISRMM_ReadWindowsSource("loader.ahk")
 	Body := _DriverFuncBody("LoadHotstringsSection")
 	Assert(Body != "", "LoadHotstringsSection must exist in toml_loader.ahk")
 	; The fallback must NOT set an IsRepeat option - that is the canonical behaviour

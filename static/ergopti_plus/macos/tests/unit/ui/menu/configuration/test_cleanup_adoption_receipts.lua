@@ -27,7 +27,7 @@ local function with_cleanup(callback)
 		"adapters.hotkey_registrar", "core.fs.adapters.json_codec", "adapters.keyboard_geometry",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "settings.engine.migration.migrate", "infra.config_paths",
 		"infra.deferred_work", "infra.hotstring_choice_catalogue", "infra.manifest_reader",
-		"infra.notifications", "infra.personal_file_adoption", "infra.toml.writer",
+		"infra.notifications", "infra.personal_file_adoption", "core.text.engine.toml.writer",
 		"modules.shortcuts.ai_actions", "core.text.engine.toml_codec.reader",
 		"core.text.engine.toml_codec.writer", "hotstrings.engine.catalogue.personal_adoption",
 	}, function()

@@ -126,7 +126,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 		}
 
 		; In case email is "^a" we want to send raw string and not Ctrl + A.
-		; The transform itself is SendEscapeLiteral (infra/text_utils.ahk): the
+		; The transform itself is SendEscapeLiteral (core/text/engine/utils.ahk): the
 		; fire-time @-combo resolver needs the same escaping on the same values, and
 		; a nested copy here would be a second implementation to keep in step.
 		EscapeSpecialChars(text) {

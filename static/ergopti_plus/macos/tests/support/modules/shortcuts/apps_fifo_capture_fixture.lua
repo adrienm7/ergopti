@@ -8,7 +8,7 @@ local OWNED = {
 	"modules.shortcuts.actions.apps", "adapters.synthetic_input", "adapters.event_provenance",
 	"core.events.timer_scheduler", "core.fs.adapters.storage", "adapters.clipboard", "core.logger.engine.logger", "core.logger.engine.shim", "tests.stubs.hs", "hs",
 	"adapters.window_info", "adapters.window_manager", "adapters.app_launcher", "core.process.adapters.shell_runner",
-	"infra.notifications", "core.i18n.engine.i18n", "infra.text_utils",
+	"infra.notifications", "core.i18n.engine.i18n", "core.text.engine.utils",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
 function M.with_world(options, callback)

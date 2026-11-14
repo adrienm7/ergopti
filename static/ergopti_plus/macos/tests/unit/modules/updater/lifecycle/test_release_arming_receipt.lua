@@ -136,7 +136,7 @@ helpers.describe("physical detached arming handshake", function()
 	local cases
 	local function observed()
 		if cases then return cases end
-		local quote = require("infra.text_utils").shell_quote
+		local quote = require("core.text.engine.utils").shell_quote
 		local output = require("tests.support.command_lines").read("python3 -B "
 			.. quote(helpers.driver_root() .. "tests/support/modules/updater/release_arming_fixture.py")
 			.. " " .. quote(helpers.driver_root()) .. " " .. quote(helpers.temp_dir())

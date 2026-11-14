@@ -10,11 +10,11 @@ local helpers = require("tests.helpers")
 
 local function with_classification(callback)
 	return helpers.with_fresh_modules({ "infra.preferences", "ui.menu.hotstring_counter",
-		"core.logger.engine.logger", "infra.toml.codec", "core.fs.adapters.file_system", "core.fs.engine.dir", "menu.engine.labels" }, function()
+		"core.logger.engine.logger", "core.text.engine.toml.codec", "core.fs.adapters.file_system", "core.fs.engine.dir", "menu.engine.labels" }, function()
 		-- This contract is pure name resolution and counting, with no persistence or directory access
 		local function unexpected_io() error("Classification must not access files", 0) end
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.toml.codec"] = { encode = unexpected_io, decode = unexpected_io }
+		package.loaded["core.text.engine.toml.codec"] = { encode = unexpected_io, decode = unexpected_io }
 		package.loaded["core.fs.adapters.file_system"] = { read_with_status = unexpected_io }
 		package.loaded["core.fs.engine.dir"] = { try_entries = unexpected_io }
 		local preferences = require("infra.preferences")

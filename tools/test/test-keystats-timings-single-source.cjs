@@ -185,7 +185,7 @@ const SOURCE_PINS = [
 	{
 		section: 'adapters',
 		key: 'stale_temp_age_ms',
-		file: 'windows/infra/toml/toml_helpers.ahk',
+		file: 'windows/core/text/engine/toml/helpers.ahk',
 		pattern: /^StaleTempAgeMs\(\) \{\n\treturn (\d+)\n\}$/gm
 	},
 	{

@@ -670,7 +670,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	return run_transaction("load_toml:" .. name, function()
 		Logger.start(LOG, "Loading TOML mapping file '%s'…", PrivateLabel.mask(name))
 
-		local toml_reader       = require("infra.toml.reader")
+		local toml_reader       = require("core.text.engine.toml.reader")
 		local ok, data, committed
 		if source_content ~= nil then
 			ok, data, committed = pcall(require("core.text.engine.toml_codec.reader").parse_text, source_content)

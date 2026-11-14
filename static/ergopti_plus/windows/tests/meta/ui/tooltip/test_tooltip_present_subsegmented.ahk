@@ -107,7 +107,7 @@ _TPS_BreakdownCapRetainsEveryMark() {
 		MarkCount += 1
 		Pos += 1
 	}
-	Infra := _DriverDirsConcat("infra", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Infra := _DriverDirsConcat("infra", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(RegExMatch(Infra,
 		"global\s+_HOTPATH_BREAKDOWN_CAP\s*:=\s*(\d+)", &CapMatch) > 0,
 		"hot-path breakdown cap must remain a literal, auditable bound")

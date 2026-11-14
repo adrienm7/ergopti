@@ -40,7 +40,7 @@
 
 #Requires Autohotkey v2.0+
 
-#Include ../../infra/number.ahk
+#Include ../../core/text/engine/number.ahk
 
 ; Bump whenever the cache's tables or the provenance required for reuse change.
 ; An older image is discarded rather than migrated: it can always

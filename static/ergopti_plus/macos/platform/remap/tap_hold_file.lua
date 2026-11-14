@@ -26,7 +26,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.logger")
 local Paths = require("core.fs.engine.paths")
-local TomlCodec = require("infra.toml.codec")
+local TomlCodec = require("core.text.engine.toml.codec")
 local JsonCodec = require("core.fs.adapters.json_codec")
 local SharedFile = require("tap_hold.engine.shared_file")
 local Migrate = require("tap_hold.engine.migrate")

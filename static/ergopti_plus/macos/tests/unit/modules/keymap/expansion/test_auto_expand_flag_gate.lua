@@ -68,7 +68,7 @@ local function fresh_engine()
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.expander"]    = nil
 	package.loaded["modules.keymap.utils"]       = nil
-	package.loaded["infra.text_utils"]           = nil
+	package.loaded["core.text.engine.utils"]           = nil
 	package.loaded["core.text.engine.utils_core"]                 = nil
 
 	local R = require("modules.keymap.registry")

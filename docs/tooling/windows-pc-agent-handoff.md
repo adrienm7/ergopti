@@ -239,7 +239,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
   (`dialog.action_picker.count_default`, `ui/action_picker_webview.ahk`) reads
   the new text.
 
-- Item 139 on Windows: `infra/toml/toml_loader.ahk` prints user-chosen pack and
+- Item 139 on Windows: `core/text/engine/toml/loader.ahk` prints user-chosen pack and
   category names in clear (`LoggerDone` at lines 496 and 584) and the extension
   TOML path (`LoggerStart` at 638, `LoggerSuccess` at 755). macOS and Linux mask
   them through `_shared/diagnostics/engine/private_label.lua` (placeholder pinned
@@ -417,7 +417,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `windows/tests/fixtures/keylogger_fire_publication_owner_body.ahk`, the
   `#Include` in `test_keystats_journal_flush_retry.ahk` and
   `test_buffer_snapshot_publication_owner.ahk`, and the `[keylogger]` section
-  of `windows/tests/unit/infra/toml/test_toml_reader_publication.ahk`. Rename
+  of `windows/tests/unit/core/text/toml/test_reader_publication.ahk`. Rename
   to `keystats` unless `[keylogger]` there pins a real retired section a
   migration still reads; then say so in a comment. The macOS-only leftover is
   the compiled comment of `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt`

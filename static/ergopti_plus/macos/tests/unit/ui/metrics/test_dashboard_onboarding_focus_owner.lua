@@ -414,7 +414,7 @@ helpers.describe("onboarding retained same-source acknowledgment", function()
 	helpers.it("(onboarding-retained-same-source) acknowledges exact source without new native or write authority", function()
 		with_onboarding_reuse(function(onboarding, state, owners)
 			local native_new = hs.webview.usercontent.new
-			local writer = require("infra.toml.writer")
+			local writer = require("core.text.engine.toml.writer")
 			local batch_write = writer.batch_write
 			local bridges, writes = 0, 0
 			local called, primary = xpcall(function()

@@ -11,7 +11,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local JsonCodec = require("core.fs.adapters.json_codec")
 local i18n   = require("core.i18n.engine.i18n")
 local LOG    = "vscode_bridge"

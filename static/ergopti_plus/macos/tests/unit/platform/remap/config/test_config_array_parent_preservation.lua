@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param original string Independent TOML fixture.
 --- @param body function Assertions receiving actual owners and recorded ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -101,7 +101,7 @@ helpers.describe("Array remap dictionaries", function()
 					helpers.assert_eq(f.read(), f.original, "read-only admission retains exact bytes")
 					state.enabled = false
 					helpers.assert_true(f.config.save_user_config(state, f.path))
-					local codec = require("infra.toml.codec")
+					local codec = require("core.text.engine.toml.codec")
 					local stored, shapes = codec.decode_with_shapes(f.read())
 					local model, is_array = require("tests.support.tap_hold_file_text").decode_pair(f.path)
 					local preserved = obsolete(model, vector)

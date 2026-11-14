@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
-local TextUtils = require("infra.text_utils")
+local TextUtils = require("core.text.engine.utils")
 
 --- Owns real source files, registry state and the conditional publication port.
 --- @param collision boolean Whether two sources share one legacy group.

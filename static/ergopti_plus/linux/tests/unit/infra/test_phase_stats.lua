@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
+	"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
 	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
@@ -165,8 +165,8 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 
 	helpers.it("times each TOML parse as toml.parse and leaves the shared reader's other functions alone", function()
 		local stats = fixture(20)
-		package.loaded["infra.toml.reader"] = nil
-		local Reader = require("infra.toml.reader")
+		package.loaded["core.text.engine.toml.reader"] = nil
+		local Reader = require("core.text.engine.toml.reader")
 		local shared = require("core.text.engine.toml_codec.reader")
 		helpers.assert_eq(Reader.parse_text, shared.parse_text)
 		local path = os.tmpname()

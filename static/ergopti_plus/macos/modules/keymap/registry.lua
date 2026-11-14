@@ -19,7 +19,7 @@
 local M = {}
 
 local JsonCodec   = require("core.fs.adapters.json_codec")
-local text_utils  = require("infra.text_utils")
+local text_utils  = require("core.text.engine.utils")
 -- The collision cascade is shared with the Linux driver rather than defined here:
 -- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
 -- none, so the same pair of colliding entries elected different winners per OS.

@@ -29,7 +29,7 @@
 
 local M = {}
 
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local FileSystem = require("core.fs.adapters.file_system")
 local Json = require("core.text.engine.json")
 local Admission = require("modules.llm.opaque_network_admission")

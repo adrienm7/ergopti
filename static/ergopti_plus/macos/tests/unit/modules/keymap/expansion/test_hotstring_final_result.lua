@@ -43,7 +43,7 @@ local function fresh_engine(rules, max_arrows)
 			package.loaded[name] = nil
 		end
 	end
-	package.loaded["infra.text_utils"] = nil
+	package.loaded["core.text.engine.utils"] = nil
 	package.loaded["core.text.engine.utils_core"]       = nil
 
 	local Registry = require("modules.keymap.registry")
@@ -75,7 +75,7 @@ local function fresh_engine(rules, max_arrows)
 	local typed
 	require("modules.keymap.utils").emit_text = function(text)
 		typed = text
-		return require("infra.text_utils").utf8_len(text), text, text
+		return require("core.text.engine.utils").utf8_len(text), text, text
 	end
 	Expander.perform_text_replacement = function(deletes, emit_action, buffer_action, is_final,
 		_ignored, _source, _variant, _is_private, terminator_spec)

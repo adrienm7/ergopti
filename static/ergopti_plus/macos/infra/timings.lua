@@ -25,7 +25,7 @@
 
 local Logger = require("core.logger.engine.logger")
 local Paths = require("core.fs.engine.paths")
-local TomlReader = require("infra.toml.reader")
+local TomlReader = require("core.text.engine.toml.reader")
 
 return require("core.timing.engine.timings_core").new({
 	logger = Logger,

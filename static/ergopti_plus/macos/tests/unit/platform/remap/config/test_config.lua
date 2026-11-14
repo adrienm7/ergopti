@@ -18,7 +18,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 -- monkey-patched per test where TOML parsing matters.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
 package.loaded["core.text.engine.toml_codec"]     = _toml_stub
-package.loaded["infra.toml.codec"] = _toml_stub
+package.loaded["core.text.engine.toml.codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("platform.remap.config")
 
@@ -230,7 +230,7 @@ end
 local function encoded_document(state, merge_existing)
 	-- The codec table config.lua captured at load time; stubs installed later
 	-- replace the package entry, not that table.
-	local codec = package.loaded["infra.toml.codec"]
+	local codec = package.loaded["core.text.engine.toml.codec"]
 	local encoded = nil
 	local original_encode = codec.encode
 	local original_decode_shapes, original_encode_shapes = codec.decode_with_shapes, codec.encode_with_shapes
@@ -312,7 +312,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 
 	helpers.it("preserves the retired enabled key and the rest of the file until explicit cleanup", function()
 		local file_system = package.loaded["core.fs.adapters.file_system"]
-		local codec = package.loaded["infra.toml.codec"]
+		local codec = package.loaded["core.text.engine.toml.codec"]
 		local original_read, original_decode = file_system.read_with_status, codec.decode
 		file_system.read_with_status = function() return "[karabiner]\nenabled = false\n", "ok" end
 		codec.decode = function()

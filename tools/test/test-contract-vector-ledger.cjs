@@ -179,7 +179,7 @@ function replayerCounts(contract, held, label) {
 	const found = [];
 	for (const relative of [
 		'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
-		'static/ergopti_plus/macos/tests/unit/infra/toml/test_toml_writer_transaction.lua'
+		'static/ergopti_plus/macos/tests/unit/core/text/toml/test_writer_transaction.lua'
 	]) {
 		const match = fs
 			.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -196,7 +196,7 @@ const LUA_COUNTS = {
 		const found = [];
 		for (const relative of [
 			'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
-			'static/ergopti_plus/macos/tests/unit/infra/toml/test_toml_writer_transaction.lua'
+			'static/ergopti_plus/macos/tests/unit/core/text/toml/test_writer_transaction.lua'
 		]) {
 			const match = fs
 				.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -224,7 +224,7 @@ const LUA_COUNTS = {
 		const found = [];
 		for (const relative of [
 			'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
-			'static/ergopti_plus/macos/tests/unit/infra/toml/test_toml_writer_transaction.lua'
+			'static/ergopti_plus/macos/tests/unit/core/text/toml/test_writer_transaction.lua'
 		]) {
 			const match = fs
 				.readFileSync(path.join(ROOT, relative), 'utf8')

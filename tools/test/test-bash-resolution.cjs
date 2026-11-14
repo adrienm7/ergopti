@@ -507,7 +507,7 @@ assert(load(source:sub(1, boundary - 1) .. "\n" .. checks, "@" .. entry, "t"))(e
 						args: [
 							...prefixArguments,
 							'tests/run.lua',
-							'--only=tests.unit.infra.text_and_paths.paths.test_native_path'
+							'--only=tests.unit.core.text.text_and_paths.paths.test_native_path'
 						],
 						cwd: path.join(checkout, 'static/ergopti_plus/macos'),
 						count: 5,

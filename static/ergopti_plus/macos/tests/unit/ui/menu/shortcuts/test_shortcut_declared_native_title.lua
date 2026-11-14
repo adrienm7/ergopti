@@ -29,7 +29,7 @@ local function fixture(body, secondary)
 			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "core.i18n.engine.i18n",
 			"core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.logger.engine.logger", "core.fs.adapters.json_codec",
 			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.process.adapters.shell_runner", "infra.dialog_util",
-			"ui.menu.shortcut_utils", "infra.text_utils", "platform.input.send_input", "hs", "tests.stubs.hs",
+			"ui.menu.shortcut_utils", "core.text.engine.utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()
 			local policy, lookup, dialog, prompt, scheduler
 			local state = { calls = {}, applies = {}, raw = "ctrl+k", focus_calls = 0 }

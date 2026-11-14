@@ -28,7 +28,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.notifications",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
 	"infra.keycodes",
@@ -629,7 +629,7 @@ return function(run, dependencies)
 				"core.logger.engine.logger",
 				"core.i18n.engine.i18n",
 				"infra.notifications",
-				"infra.text_utils",
+				"core.text.engine.utils",
 				"platform.remap.ke_paths",
 				"core.events.timer_scheduler",
 				"core.process.adapters.task_lifecycle",
@@ -686,7 +686,7 @@ return function(run, dependencies)
 			package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, has = function() return false end }
 			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.text_utils"] = {
+			package.loaded["core.text.engine.utils"] = {
 				applescript_format = function(format, value) return string.format(format, value) end,
 				escape_gsub_replacement = function(value) return value end,
 				shell_quote = function(value) return value end,

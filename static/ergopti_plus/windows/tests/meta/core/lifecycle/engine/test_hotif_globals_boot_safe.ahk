@@ -106,7 +106,7 @@ _HGBS_FeaturesPublishAfterDependencies(Entry, Driver) {
 			return false
 	}
 	Pump := RegExMatch(Entry, "m)^Bundle_Init\(\)\s*$")
-	Json := RegExMatch(Entry, "im)^#Include\s+infra/json\.ahk\s*$")
+	Json := RegExMatch(Entry, "im)^#Include\s+core/text/engine/json\.ahk\s*$")
 	Policy := RegExMatch(Entry, "im)^#Include\s+\.\./_shared/settings/data/features/layout_rows_policy\.ahk\s*$")
 	return Pump > 0 && Json > Pump && Policy > Json && PublishPos > Policy
 }
@@ -390,7 +390,7 @@ _HGBS_ColdFeaturesGuardControls() {
 	Publication := "global Features := ManifestBuildFeaturesMap()"
 	for Mutant in [StrReplace(Entry, Publication, ""),
 		Publication . "`n" . StrReplace(Entry, Publication, ""), Entry . "`n" . Publication,
-		StrReplace(Entry, "#Include infra/json.ahk", ""),
+		StrReplace(Entry, "#Include core/text/engine/json.ahk", ""),
 		StrReplace(Entry, "#Include ../_shared/settings/data/features/layout_rows_policy.ahk", "")] {
 		Assert(StrCompare(Entry, Mutant, true) != 0, "each owner mutant must alter the actual entry")
 		AssertFalse(_HGBS_FeaturesPublishAfterDependencies(Mutant, Mutant),

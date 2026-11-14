@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local quote = require("infra.text_utils").shell_quote
+local quote = require("core.text.engine.utils").shell_quote
 
 
 --- Delivers real decoded PNG output through the public two-phase action.

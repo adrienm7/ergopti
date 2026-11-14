@@ -32,7 +32,7 @@ for _, edge in ipairs(edges) do
 		"personal metadata must delegate complete-record edits through its actual native owner")
 end
 
-local Editor = require("infra.toml.record_editor")
+local Editor = require("core.text.engine.toml.record_editor")
 local duplicated = table.concat({
 	"[_meta]",
 	"delay = 100",

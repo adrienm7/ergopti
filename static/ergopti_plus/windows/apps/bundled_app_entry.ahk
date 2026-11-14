@@ -20,7 +20,7 @@ LoggerError(Args*) => ""
 
 #Include %A_ScriptDir%\..\_generated\window_titles.ahk
 #Include %A_ScriptDir%\..\infra\native_dialogs.ahk
-#Include %A_ScriptDir%\..\infra\json.ahk
+#Include %A_ScriptDir%\..\core\text\engine\json.ahk
 #Include %A_ScriptDir%\..\adapters\crypto.ahk
 #Include %A_ScriptDir%\..\adapters\bundled_apps_native.ahk
 #Include %A_ScriptDir%\app_strings.ahk

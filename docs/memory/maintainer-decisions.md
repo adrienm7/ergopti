@@ -13,7 +13,7 @@ hotstring with an end character, case-conform and final) load on every OS.
 The shared `toml_codec/reader.lua` accepts them only in a section the
 document's `[_meta] sections_order` lists, so `constants.toml`, the tap-hold
 defaults and the tooltip configuration parse as before. Windows'
-`HS_EntryPattern` (`infra/toml/toml_loader.ahk`) also takes an inline-table
+`HS_EntryPattern` (`core/text/engine/toml/loader.ahk`) also takes an inline-table
 entry in any key order or with only `output`, each missing flag false.
 Regression `hse-002-short-entry-forms`.
 

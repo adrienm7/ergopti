@@ -259,7 +259,7 @@ _BPF_PathsTomlEarlyOwner(Mode) {
 			AssertContains(Evidence, "fatal-startup=starting")
 			AssertContains(Evidence, "Unterminated TOML document record")
 			AssertContains(Evidence, "ReadPathsToml")
-			AssertContains(Evidence, "toml_document.ahk")
+			AssertContains(Evidence, "document.ahk")
 			AssertFalse(InStr(Evidence, "after_read") > 0, "fatal handling must prevent a partial startup continuation")
 		}
 		AssertContains(Evidence, "exit=Exit/" . ExitCode, "the genuine process exit must be independently observed")

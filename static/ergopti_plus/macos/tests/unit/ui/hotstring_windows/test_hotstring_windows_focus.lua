@@ -38,8 +38,8 @@ local function with_window(module_name, scenario)
 			return true
 		end }
 		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
-		package.loaded["infra.toml.reader"] = { parse = function() return {}, true end }
-		package.loaded["infra.toml.writer"] = {}
+		package.loaded["core.text.engine.toml.reader"] = { parse = function() return {}, true end }
+		package.loaded["core.text.engine.toml.writer"] = {}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {}
 		package.loaded["hs.spaces"] = {}
 		_G.hs = {

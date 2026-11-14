@@ -401,7 +401,7 @@ helpers.describe("hotstrings config: override inputs stay data", function()
 		helpers.assert_nil(serialize_err)
 		helpers.assert_type(content, "string")
 
-		local codec = require("infra.toml.codec")
+		local codec = require("core.text.engine.toml.codec")
 		local decoded = codec.decode(content)
 		helpers.assert_type(decoded, "table", "the serialized candidate must remain valid TOML")
 		helpers.assert_eq(decoded.rolls.color, hostile,

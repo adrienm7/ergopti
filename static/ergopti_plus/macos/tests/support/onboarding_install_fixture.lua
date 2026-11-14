@@ -25,7 +25,7 @@ local MODULE_NAMES = {
 	"core.lifecycle.engine.launcher_environment",
 	"core.logger.engine.logger",
 	"infra.notifications",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	-- The remap onboarding resolves its own folder, joins a label to its value
 	-- and the scheduler admits delays through these pure owners.
 	"core.i18n.engine.label_value",
@@ -307,7 +307,7 @@ local function run_fixture(options, scenario)
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		applescript_format = function(format, value) return string.format(format, value) end,
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,

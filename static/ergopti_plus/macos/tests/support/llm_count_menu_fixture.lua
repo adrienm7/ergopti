@@ -17,7 +17,7 @@ return function(callback, options)
 			if name:match("^ui%.menu%.menu_llm") or name:match("^modules%.llm")
 				or name == "menu.engine.renderer" then package.loaded[name] = nil end
 		end
-		helpers.load_with_stubs("infra.toml.codec")
+		helpers.load_with_stubs("core.text.engine.toml.codec")
 		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "r"))
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)

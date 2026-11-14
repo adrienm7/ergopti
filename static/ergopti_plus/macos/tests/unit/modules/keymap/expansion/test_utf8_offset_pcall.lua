@@ -412,7 +412,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.llm.prediction_engine",
 			"modules.keystats",
 			"modules.hotstrings.hotstrings_config",
-			"infra.text_utils",
+			"core.text.engine.utils",
 			"infra.keycodes",
 			"core.logger.engine.perf",
 			"infra.hotpath_profiler",
@@ -428,7 +428,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name           = function(_) return "f16" end,
 		}
-		package.loaded["infra.text_utils"] = {
+		package.loaded["core.text.engine.utils"] = {
 			is_letter_char       = function(_) return false end,
 			trig_lower           = function(s) return s:lower() end,
 			conform_replacement  = function(repl, _, _) return repl end,

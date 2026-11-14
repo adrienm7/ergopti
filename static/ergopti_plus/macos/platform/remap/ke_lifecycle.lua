@@ -26,7 +26,7 @@ local Logger        = require("core.logger.engine.logger")
 local Storage       = require("core.fs.adapters.storage")
 local Notifications = require("infra.notifications")
 local i18n          = require("core.i18n.engine.i18n")
-local text_utils    = require("infra.text_utils")
+local text_utils    = require("core.text.engine.utils")
 local KePaths       = require("platform.remap.ke_paths")
 local Timings       = require("infra.timings")
 

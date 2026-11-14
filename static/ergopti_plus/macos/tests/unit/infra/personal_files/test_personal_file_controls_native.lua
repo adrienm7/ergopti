@@ -33,7 +33,7 @@ end
 local function fixture(body, options)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths", "core.fs.engine.dir", "infra.toml.reader",
+		"core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths", "core.fs.engine.dir", "core.text.engine.toml.reader",
 		"infra.personal_hotstrings", "infra.personal_file_adoption", "infra.personal_file_controls",
 		"modules.hotstrings.hotstrings_config", "modules.keymap", "modules.keymap.state",
 		"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",

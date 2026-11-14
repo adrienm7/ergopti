@@ -36,7 +36,7 @@ local MODULE_NAMES = {
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.notifications",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"platform.remap.onboarding",
 	"tests.stubs.hs",
@@ -96,7 +96,7 @@ local function with_fixture(scenario)
 			notices[#notices + 1] = { message = message, kind = kind }
 		end,
 	}
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 	package.loaded["platform.remap.ke_paths"] = {
 		CLI = "/test/karabiner_cli",
 		CORE_SERVICE = "/test/Karabiner-Core-Service",

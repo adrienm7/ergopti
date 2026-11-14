@@ -56,9 +56,9 @@ local function load_editor(writer, reader, file_system)
 	end
 	_G.hs = hs_stub
 	package.loaded["core.fs.adapters.file_system"] = file_system
-	package.loaded["infra.toml.writer"] = writer
+	package.loaded["core.text.engine.toml.writer"] = writer
 	package.loaded["core.text.engine.toml_codec.writer"] = nil
-	package.loaded["infra.toml.reader"] = reader
+	package.loaded["core.text.engine.toml.reader"] = reader
 	package.loaded["infra.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1 end,
 	}

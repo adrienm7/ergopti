@@ -30,8 +30,8 @@ local COMMON_STUBS = {
 	},
 	["core.i18n.engine.i18n"] = { get = function(key) return key end },
 	["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end },
-	["infra.toml.reader"] = {},
-	["infra.toml.writer"] = {},
+	["core.text.engine.toml.reader"] = {},
+	["core.text.engine.toml.writer"] = {},
 	["infra.notifications"] = {},
 	["keyboard.engine.chord"] = {},
 	["adapters.hotkey_registrar"] = {},
@@ -39,7 +39,7 @@ local COMMON_STUBS = {
 	["infra.deferred_work"] = {},
 	["modules.hotstrings.hotstrings_config"] = {},
 	["modules.hotstrings.hotstrings_config_schema"] = {},
-	["infra.toml.record_editor"] = {},
+	["core.text.engine.toml.record_editor"] = {},
 }
 
 local SUBJECTS = {

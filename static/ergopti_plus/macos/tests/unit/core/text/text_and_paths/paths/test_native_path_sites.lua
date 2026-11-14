@@ -1,0 +1,4 @@
+--- tests/unit/core/text/text_and_paths/paths/test_native_path_sites.lua
+
+--- Replays the shared native path sites contract on the macOS suite.
+require("tests.lua.core.native_path_sites_contract").register(require("tests.helpers"))

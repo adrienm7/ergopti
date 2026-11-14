@@ -7,7 +7,7 @@
 --- admission; copied factories and missing native cwd refuse before invocation.
 --- ==============================================================================
 local helpers = require("tests.helpers")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local lfs = require("lfs")
 local driver = helpers.driver_root():gsub("/$", "")
 

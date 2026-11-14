@@ -127,12 +127,12 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		local key = "ergopti.hotstrings_section_broken_one"
 		hs.settings.set(key, false)
 
-		local previous_reader = package.loaded["infra.toml.reader"]
-		package.loaded["infra.toml.reader"] = {
+		local previous_reader = package.loaded["core.text.engine.toml.reader"]
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() error("injected TOML parse failure") end,
 		}
 		local ok, committed = pcall(registry.enable_section, "broken", "one")
-		package.loaded["infra.toml.reader"] = previous_reader
+		package.loaded["core.text.engine.toml.reader"] = previous_reader
 
 		helpers.assert_true(ok, "parse failure must be contained by the public mutator")
 		helpers.assert_eq(committed, false)
@@ -152,8 +152,8 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		state.groups.personal.kind = "toml"
 		add_group_mapping(registry, "personal", "stable")
 		local mapping_before = state.mappings[1]
-		local previous_reader = package.loaded["infra.toml.reader"]
-		package.loaded["infra.toml.reader"] = {
+		local previous_reader = package.loaded["core.text.engine.toml.reader"]
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() error("injected editor reload failure", 0) end,
 		}
 
@@ -170,7 +170,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		)
 		Logger.set_sink(nil)
 		Logger.set_level(previous_level)
-		package.loaded["infra.toml.reader"] = previous_reader
+		package.loaded["core.text.engine.toml.reader"] = previous_reader
 		-- Field log 2026-10-30 11:37: the editor reported a rolled-back reload
 		-- with no registry line naming the step that refused it.
 		helpers.assert_contains(table.concat(lines, "\n"), "did not load its saved file",
@@ -192,13 +192,13 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		registry.register_lua_group("personal", "Personal", {})
 		add_group_mapping(registry, "personal", "stable")
 		helpers.assert_eq(registry.disable_group("personal"), true)
-		local previous_reader = package.loaded["infra.toml.reader"]
-		package.loaded["infra.toml.reader"] = {
+		local previous_reader = package.loaded["core.text.engine.toml.reader"]
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() error("disabled groups must not be loaded by Save", 0) end,
 		}
 
 		local committed = registry.reload_toml("personal", "/virtual/new-personal.toml")
-		package.loaded["infra.toml.reader"] = previous_reader
+		package.loaded["core.text.engine.toml.reader"] = previous_reader
 
 		helpers.assert_eq(committed, true)
 		helpers.assert_eq(registry.is_group_enabled("personal"), false)

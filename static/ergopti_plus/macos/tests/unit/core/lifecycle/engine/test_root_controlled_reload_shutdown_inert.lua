@@ -46,7 +46,7 @@ local MODULE_NAMES = {
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
 	"core.fs.adapters.toml_cache",
-	"infra.toml.reader",
+	"core.text.engine.toml.reader",
 	"infra.timings",
 	"core.lifecycle.engine.launcher_guard",
 	"core.fs.adapters.file_system",
@@ -351,7 +351,7 @@ local function run_isolated(options, assertions)
 			["modules.shortcuts"] = { stop = function() return true end },
 			["modules.dynamic_hotstrings"] = {},
 			["core.fs.adapters.toml_cache"] = { init = function() return true end },
-			["infra.toml.reader"] = {
+			["core.text.engine.toml.reader"] = {
 				set_cache_provider = function() end,
 				-- The real cold hotstring controller grants terminal admission before
 				-- its init phase. Its mandatory shipped defaults still need a real,

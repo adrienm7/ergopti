@@ -20,7 +20,7 @@ local function with_native_editor(name, scenario)
 		"ui.hotstring_editor", "ui.hotstring_editor.save_validation", "ui.hotstrings_config_window",
 		"ui.personal_info_editor", "ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler",
 		"adapters.webview_result", "infra.deferred_work", "core.fs.engine.paths", "core.fs.engine.dir", "infra.notifications",
-		"infra.toml.reader", "infra.toml.writer", "modules.hotstrings.hotstrings_config",
+		"core.text.engine.toml.reader", "core.text.engine.toml.writer", "modules.hotstrings.hotstrings_config",
 		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "keyboard.engine.chord",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
@@ -30,7 +30,7 @@ local function with_native_editor(name, scenario)
 		"settings.engine.migration.migrate", "core.text.engine.toml_codec.leaf_rows", "core.fs.engine.module_source_directory", "core.text.engine.toml_codec.reader",
 		"core.text.engine.toml_codec.basic_string", "diagnostics.engine.operation_reporter", "core.fs.adapters.file_system",
 		"hotstrings.engine.publication_recovery", "hotstrings.engine.delay_resolver", "hotstrings.engine.catalogue.personal_files",
-		"hotstrings.engine.priority", "infra.toml.record_editor", "hotstrings.engine.extensions",
+		"hotstrings.engine.priority", "core.text.engine.toml.record_editor", "hotstrings.engine.extensions",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, callbacks = {} }
 		local construct = require("tests.support.native_webview_close_fixture")(h)

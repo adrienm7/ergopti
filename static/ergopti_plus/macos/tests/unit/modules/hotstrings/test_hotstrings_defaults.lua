@@ -43,7 +43,7 @@ end
 
 --- Parse the canonical shared file directly (same reader both drivers use).
 local function read_defaults()
-	local reader = require("infra.toml.reader")
+	local reader = require("core.text.engine.toml.reader")
 	local parsed = reader.parse(defaults_path)
 	return parsed and parsed.sections or nil
 end

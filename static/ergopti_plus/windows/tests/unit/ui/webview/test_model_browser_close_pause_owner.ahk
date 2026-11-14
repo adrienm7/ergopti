@@ -93,7 +93,7 @@ _MBPT_WriterDiagnosticOwner(Directory) {
 			if Expanded == 0
 				Target := OwnerDir . "\" . Target
 			CanonicalInclude := _MBPT_AbsoluteFile(Target)
-			if InStr(Include[1], "toml_refusals.ahk")
+			if InStr(Include[1], "refusals.ahk")
 				SawRefusalOwner := true
 			Line := "#Include " . CanonicalInclude
 			Rewrites.Push({ Original: OriginalLine, Private: Line })

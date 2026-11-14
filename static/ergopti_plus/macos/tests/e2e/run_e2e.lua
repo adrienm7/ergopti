@@ -180,7 +180,7 @@ local function make_vkb(trigger, replacement, opts, others)
 	-- The emission adapters capture Quartz constructors at module-load time, so
 	-- they MUST be in the same load wave as Expander.
 	package.loaded["core.logger.engine.logger"]                 = nil
-	package.loaded["infra.text_utils"]             = nil
+	package.loaded["core.text.engine.utils"]             = nil
 	package.loaded["core.i18n.engine.i18n"]                   = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.utils"]       = nil
@@ -224,7 +224,7 @@ local function make_vkb(trigger, replacement, opts, others)
 		eventtap = event_hs.eventtap,
 	})
 	local Registry = require("modules.keymap.registry")
-	local text_utils = require("infra.text_utils")
+	local text_utils = require("core.text.engine.utils")
 	-- Required from the SAME load wave as Expander so the harness drives the very
 	-- instance the expander armed — a second instance would hold an empty slot.
 	local TerminatorReplay = require("modules.keymap.terminator_replay")

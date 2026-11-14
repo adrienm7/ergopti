@@ -481,7 +481,7 @@ helpers.describe("SystemMouse mirror owner: positive and synchronous controls", 
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
 		local handle = fixture.shells[1]
-		local quote = require("infra.text_utils").shell_quote
+		local quote = require("core.text.engine.utils").shell_quote
 		local command = "python3 -B " .. quote(helpers.driver_root()
 			.. "tests/support/modules/shortcuts/mirror_configuration_fixture.py")
 			.. " " .. quote(handle.args[2]) .. " 2>&1"

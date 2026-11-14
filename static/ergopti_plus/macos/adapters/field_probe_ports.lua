@@ -173,7 +173,7 @@ end
 --- @param path string Absolute path.
 --- @return boolean parsed
 local function parse_toml(path)
-	local ok, document = pcall(require("infra.toml.reader").parse, path)
+	local ok, document = pcall(require("core.text.engine.toml.reader").parse, path)
 	if not ok then
 		require("core.logger.engine.logger").warn("adapters.field_probe_ports", "A configuration file did not parse: %s.",
 			tostring(document))

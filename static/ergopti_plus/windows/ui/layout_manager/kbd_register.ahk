@@ -21,7 +21,7 @@
 ; result.json, and the crypto adapter's diagnostics are no-ops here.
 LoggerError(Args*) => ""
 
-#Include %A_ScriptDir%\..\..\infra\json.ahk
+#Include %A_ScriptDir%\..\..\core\text\engine\json.ahk
 #Include %A_ScriptDir%\..\..\adapters\crypto.ahk
 #Include %A_ScriptDir%\kbd_register_core.ahk
 

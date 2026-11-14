@@ -139,7 +139,7 @@ end)
 
 helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
-		helpers.with_fresh_modules({ "infra.toml.writer", "core.fs.adapters.file_system", "ui.menu.menu_paths",
+		helpers.with_fresh_modules({ "core.text.engine.toml.writer", "core.fs.adapters.file_system", "ui.menu.menu_paths",
 			"infra.notifications" }, function()
 			return require("tests.support.onboarding_finish_fixture").with_migration_reader(function()
 			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
@@ -158,7 +158,7 @@ helpers.describe("onboarding commit() honours the retarget", function()
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 			}
-			package.loaded["infra.toml.writer"] = {
+			package.loaded["core.text.engine.toml.writer"] = {
 				batch_write = function(path, updates)
 					helpers.assert_eq(persisted, 1, "the destination must be persisted before writing answers")
 					writes[#writes + 1] = { path = path, updates = updates }

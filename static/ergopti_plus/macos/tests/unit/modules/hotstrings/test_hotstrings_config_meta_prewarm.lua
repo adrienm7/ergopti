@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 --- @param body function body(cfg, world)
 local function with_config(body)
 	helpers.with_stub_scope({
-		"core.logger.engine.logger", "infra.toml.reader", "infra.deferred_work", "core.fs.adapters.file_system",
+		"core.logger.engine.logger", "core.text.engine.toml.reader", "infra.deferred_work", "core.fs.adapters.file_system",
 		"modules.hotstrings.hotstrings_config",
 	}, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
@@ -29,15 +29,15 @@ local function with_config(body)
 		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		-- The module reads its shared defaults through the real reader at load
 		-- time; only the category files under /bundle/ are counted and faked
-		package.loaded["infra.toml.reader"] = nil
-		local real = require("infra.toml.reader")
+		package.loaded["core.text.engine.toml.reader"] = nil
+		local real = require("core.text.engine.toml.reader")
 		local counting = setmetatable({}, { __index = real })
 		counting.parse = function(path, ...)
 			if type(path) ~= "string" or path:sub(1, #"/bundle/") ~= "/bundle/" then return real.parse(path, ...) end
 			world.parses[#world.parses + 1] = path
 			return { sections = {}, meta = { delay = 0.3, color = "#336699", sections = {} } }, true
 		end
-		package.loaded["infra.toml.reader"] = counting
+		package.loaded["core.text.engine.toml.reader"] = counting
 		package.loaded["infra.deferred_work"] = {
 			after = function(delay, callback, label)
 				world.scheduled[#world.scheduled + 1] = { delay = delay, callback = callback, label = label }

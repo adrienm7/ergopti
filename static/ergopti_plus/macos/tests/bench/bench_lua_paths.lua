@@ -243,7 +243,7 @@ end)
 workload("hotstring_load_warm", function()
 	local Cache = helpers.load_with_stubs("core.fs.adapters.toml_cache")
 	Cache.init(scratch .. "/toml_cache")
-	require("infra.toml.reader").set_cache_provider(Cache)
+	require("core.text.engine.toml.reader").set_cache_provider(Cache)
 	load_packs(fresh_registry())
 	return fresh_registry, load_packs
 end)

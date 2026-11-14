@@ -74,7 +74,7 @@ helpers.with_fresh_modules({
 	"infra.config_paths",
 	"infra.keycodes",
 	"core.logger.engine.logger",
-	"infra.toml.codec",
+	"core.text.engine.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
@@ -98,7 +98,7 @@ helpers.with_fresh_modules({
 	-- read here are JSON and the shared defaults use the pure-Lua reader.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 	package.loaded["core.text.engine.toml_codec"] = toml_stub
-	package.loaded["infra.toml.codec"] = toml_stub
+	package.loaded["core.text.engine.toml.codec"] = toml_stub
 	-- Every build re-reads the three static rule files, and the adapter's safe
 	-- read cost more than the rest of a build: serve each file's real content,
 	-- read once.

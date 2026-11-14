@@ -28,7 +28,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.notifications",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
 	"infra.keycodes",

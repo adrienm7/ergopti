@@ -67,7 +67,7 @@ helpers.describe("layout_install: user installation is POSIX-quoted", function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				execute = function(command) dispatched = command; return "", false end,
 			})
-			local text_utils = require("infra.text_utils")
+			local text_utils = require("core.text.engine.utils")
 			local source_dir, bundle_name = "/tmp/O'Brien/$cache/`layout`/", "Ergopti_v2.0.0.bundle"
 			install.install_user(source_dir, bundle_name)
 			helpers.assert_type(dispatched, "string")

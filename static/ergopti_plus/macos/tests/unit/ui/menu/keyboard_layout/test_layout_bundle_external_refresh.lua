@@ -32,7 +32,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				"modules.keymap.input_sources",
 				"ui.menu.menu_keyboard_layout",
 				"core.logger.engine.logger",
-				"infra.text_utils",
+				"core.text.engine.utils",
 				"core.i18n.engine.i18n",
 				"infra.notifications",
 				"core.fs.adapters.storage",
@@ -50,7 +50,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				package.loaded["hs"] = hs_stub
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
-				package.loaded["infra.text_utils"] = {
+				package.loaded["core.text.engine.utils"] = {
 					shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 					applescript_format = function(template) return template end,
 				}

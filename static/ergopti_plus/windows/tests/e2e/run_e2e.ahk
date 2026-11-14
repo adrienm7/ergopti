@@ -81,7 +81,7 @@ global _SharedDir := _StaticDir . "\ergopti_plus\_shared"
 global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 ; Production engine dependencies (same order as run_all.ahk).
-#Include ../../infra/json.ahk
+#Include ../../core/text/engine/json.ahk
 #Include ../../core/lifecycle/engine/app_state.ahk
 #Include ../../_generated/window_titles.ahk
 #Include ../../infra/native_dialogs.ahk
@@ -94,7 +94,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 #Include ../../infra/hotpath_profiler.ahk
 
 #Include ../../infra/window_utils.ahk
-#Include ../../infra/text_utils.ahk
+#Include ../../core/text/engine/utils.ahk
 #Include ../../infra/hotstrings/hotstring_engine.ahk
 #Include ../../infra/hotstrings/hotstring_engine_main.ahk
 ; Project the same shipped terminator catalogue that production boot loads.
