@@ -6,13 +6,17 @@
  * DESCRIPTION:
  * Turns a file the user picks into plain text, in the page: text formats as
  * they are, HTML without its markup, Word (.docx) and OpenDocument (.odt)
- * through their XML part. Nothing is uploaded.
+ * through their XML part. Nothing is uploaded. Also loads the n-gram tables
+ * of a built-in corpus, for every page that analyses (the Comparer, the
+ * editor's analysis panel).
  *
  * FEATURES & RATIONALE:
  * 1. No library: .docx and .odt are ZIP archives, read with a central
  *    directory walk and the browser's DecompressionStream for deflate.
  * 2. Fail fast: a format the page cannot read rejects with a stable code the
  *    page turns into a localized message (PDF: copy its text and paste it).
+ * 3. A built-in corpus's script path is relative to this folder; it resolves
+ *    against this script's own URL, so a page in another folder loads it too.
  * ==============================================================================
  */
 
@@ -33,6 +37,15 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	const LOCAL_SIGNATURE = 0x04034b50;
 	const STORED = 0;
 	const DEFLATED = 8;
+	// This folder's URL, read while the script runs (a Node context has none).
+	const BASE =
+		typeof document !== 'undefined' && document.currentScript
+			? new URL('.', document.currentScript.src).href
+			: null;
+	const loadedScripts = new Map();
+	// The Comparer's saved settings (weights, ideal finger load…), which the
+	// editor's analysis panel reads so both score alike.
+	const SETTINGS_KEY = 'ergopti.layout_analysis.v1';
 
 	/** A rejection the page localizes. */
 	const failure = (code) => Object.assign(new Error(code), { code });
@@ -118,5 +131,39 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		return officeText(new TextDecoder().decode(bytes), office.paragraphs);
 	}
 
-	return { readText };
+	/** Loads a script of this folder once. */
+	function loadScript(path) {
+		if (!BASE) throw new Error('layout_analysis: corpus_files.js was not loaded by a page');
+		const src = new URL(path, BASE).href;
+		if (!loadedScripts.has(src))
+			loadedScripts.set(
+				src,
+				new Promise((resolve, reject) => {
+					const script = document.createElement('script');
+					script.src = src;
+					script.onload = resolve;
+					script.onerror = () => {
+						loadedScripts.delete(src);
+						reject(new Error(src));
+					};
+					document.head.append(script);
+				})
+			);
+		return loadedScripts.get(src);
+	}
+
+	/**
+	 * The n-gram tables of a built-in corpus, loaded once.
+	 * @param {{id: string, script: string}} corpus - An entry of LAYOUT_ANALYSIS_DATA.corpora.
+	 * @returns {Promise<object>} Its {chars, bigrams, trigrams} tables.
+	 * @throws {Error} When the script fails to load or defines no tables.
+	 */
+	async function builtinTables(corpus) {
+		await loadScript(corpus.script);
+		const tables = window.LAYOUT_ANALYSIS_CORPORA && window.LAYOUT_ANALYSIS_CORPORA[corpus.id];
+		if (!tables) throw new Error(`layout_analysis: ${corpus.script} defines no ${corpus.id}`);
+		return tables;
+	}
+
+	return { SETTINGS_KEY, readText, builtinTables };
 })();

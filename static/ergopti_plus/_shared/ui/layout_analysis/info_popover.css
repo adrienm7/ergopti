@@ -1,0 +1,74 @@
+/* _shared/ui/layout_analysis/info_popover.css */
+
+/* =========================================================================== */
+/* « i » buttons and their source popover (info_popover.js), shared by the     */
+/* Comparer and the editor's analysis panel. Light and dark through theme.css. */
+/* =========================================================================== */
+
+/* ============================== */
+/* ============================== */
+/* ======= 1/ Info popovers ===== */
+/* ============================== */
+/* ============================== */
+
+.la-heading {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+}
+
+/* As specific as a page's own button rule, and loaded after it. */
+button.la-info {
+	border-radius: 50%;
+	cursor: pointer;
+	font-size: 0.8em;
+	font-style: italic;
+	font-weight: 600;
+	height: 1.6em;
+	line-height: 1;
+	padding: 0;
+	vertical-align: middle;
+	width: 1.6em;
+}
+
+.la-popover {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+	color: var(--theme-text);
+	font:
+		14px/1.45 system-ui,
+		sans-serif;
+	padding: 10px 12px;
+	position: absolute;
+	z-index: 10;
+}
+
+.la-popover p {
+	margin: 0 0 6px;
+}
+
+.la-popover ul {
+	margin: 0 0 8px;
+	padding-left: 18px;
+}
+
+.la-popover-title {
+	font-weight: 600;
+}
+
+.la-popover a {
+	color: var(--theme-accent);
+	overflow-wrap: anywhere;
+}
+
+.la-popover-close {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 5px 8px;
+}

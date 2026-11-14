@@ -119,16 +119,6 @@ const LIBRARY_ORIGIN = 'library';
 // ======================
 
 /**
- * The codes the engine measures: every finger-assigned key but the modifiers.
- * @param {object} model - analysis_model.json.
- * @returns {string[]} The codes, in the model's order.
- */
-function typingCodes(model) {
-	const modifiers = new Set(Object.values(model.modifier_keys));
-	return Object.keys(model.fingerings.standard).filter((code) => !modifiers.has(code));
-}
-
-/**
  * The centre of each finger-assigned key on the ISO and ANSI boards.
  * @param {object} model - analysis_model.json.
  * @returns {object} code → {iso: {x, y, col, width}, ansi: {...}}.
@@ -248,9 +238,9 @@ function fromAlphaBlock(entry, qwerty) {
  * @throws {Error} On a duplicate id.
  */
 function buildLibrary(model) {
-	const codes = typingCodes(model);
-	const composer = loadComposer();
 	const engine = loadEngine();
+	const codes = engine.typingCodes(model);
+	const composer = loadComposer();
 	const out = [];
 	for (const entry of composer.INDEX.layouts)
 		out.push(fromComposer(engine, composer.SOURCES[entry.id], REGISTRY_ORIGIN, codes, entry.name));

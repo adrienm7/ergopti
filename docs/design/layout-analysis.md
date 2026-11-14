@@ -287,6 +287,37 @@ The codegen refuses a default that breaks the maintainer's rule (each hand at
 Weights, ideal finger load, selection, corpus and keyboard are remembered in `localStorage` when
 the browser allows it; nothing is sent anywhere.
 
+## Editor analysis panel
+
+`_shared/ui/layout_analysis/analysis_panel.js` (global `LAYOUT_ANALYSIS_PANEL`)
+is the live analysis beside the « Éditer » board. `create()` returns
+`{node, update(doc), addSection(draw)}`. The editor page appends `node` to its
+board row on every render and calls `update(doc())` afterwards. A page that
+does not load the panel's scripts gets no panel.
+
+- The edited source becomes the engine's layout through the same path as the
+  registry layouts: `LayoutSourceIO.keylayoutFile(doc, 'iso')`, then
+  `LayoutComposer.parseSource`, then `layoutFromComposerSource`
+  (`layoutFromEditorDoc`). A document the compiler refuses shows the refusal's
+  code instead of a score.
+- Each edit is analysed 150 ms after the last change. In Chromium the
+  conversion takes about 0.3 ms and the analysis about 5 ms.
+- The library is ranked once per corpus, keyboard, weights and ideal finger
+  load. The rank is « N of library + 1 ».
+- The panel reads the weights and ideal finger load the Comparer saved (key
+  `LAYOUT_ANALYSIS_FILES.SETTINGS_KEY`), so both pages score alike.
+- Corpus and keyboard are its own choices. « Ma frappe » arrives through the
+  app's `studio-ngrams` event and becomes the default corpus.
+- It lists the main metrics with « i » buttons and the change the last edit
+  made (green better, red worse), then the finger load.
+- `addSection(draw)` adds a view drawn after each analysis with
+  `(container, {layout, tables, keyboard, result})`. Other analysers' scores
+  use it.
+
+The built-in corpus scripts load through `LAYOUT_ANALYSIS_FILES.builtinTables`,
+relative to `corpus_files.js`, from any page folder. The « i » popovers
+(`info_popover.js`, `info_popover.css`) are shared by both pages.
+
 ## Performance
 
 The library (115 layouts) on a 2.5 MB French corpus takes about 0.3 s from

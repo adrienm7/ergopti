@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "Defaults per hand: pinky {pinky}, ring {ring}, middle {middle}, index {index} %. The mean of dariogoetz's intended loads and genkey's finger speeds, rounded, with index ≥ middle ≥ ring ≥ pinky and pinkies under 8 %.",
 	"layout_analysis.info.shortcut_letters": "Each letter A–Z has a usefulness from 1 to 10: 10 for copy, paste, cut and undo, 8 for select all and save, 5 for bold, italic and underline, 1 for rare ones. An estimate ordered by the vendors' shortcut lists.",
 	"layout_analysis.info.weights": "Points per unit of each measure, set so that each weighs as the studied analysers weigh it. Every weight is editable.",
-	"layout_analysis.info.fingering": "Which finger types each key: Digit6 by the right index, the space bar by the left thumb, AltGr by the right thumb; or the angle mod. Ortholinear boards drop the stagger."
+	"layout_analysis.info.fingering": "Which finger types each key: Digit6 by the right index, the space bar by the left thumb, AltGr by the right thumb; or the angle mod. Ortholinear boards drop the stagger.",
+	"layout_analysis.panel.title": "Layout analysis",
+	"layout_analysis.panel.score": "Score {score} · rank {rank} of {count}",
+	"layout_analysis.panel.ranking": "Ranking against the library…",
+	"layout_analysis.panel.unavailable": "This layout cannot be analysed here ({reason}).",
+	"layout_analysis.panel.weights_note": "Scored with the weights and ideal finger load set in « Compare »."
 }

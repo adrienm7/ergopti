@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "القيم الافتراضية لكل يد: الخنصر {pinky}، البنصر {ring}، الوسطى {middle}، السبابة {index} %. متوسط الأحمال المقصودة لدى dariogoetz وسرعات الأصابع لدى genkey، مقرّبًا، مع السبابة ≥ الوسطى ≥ البنصر ≥ الخنصر والخنصران دون 8 %.",
 	"layout_analysis.info.shortcut_letters": "لكل حرف من A إلى Z فائدة من 1 إلى 10: 10 للنسخ واللصق والقص والتراجع، 8 لتحديد الكل والحفظ، 5 للغامق والمائل والتسطير، 1 للنادرة. تقدير مرتب وفق قوائم اختصارات الشركات.",
 	"layout_analysis.info.weights": "نقاط لكل وحدة من كل مقياس، مضبوطة ليزن كل مقياس كما في المحللات المدروسة. كل وزن قابل للتعديل.",
-	"layout_analysis.info.fingering": "أي إصبع يضغط كل مفتاح: 6 بالسبابة اليمنى، المسافة بالإبهام الأيسر، AltGr بالإبهام الأيمن؛ أو angle mod. لوحات المفاتيح المتعامدة بلا إزاحة."
+	"layout_analysis.info.fingering": "أي إصبع يضغط كل مفتاح: 6 بالسبابة اليمنى، المسافة بالإبهام الأيسر، AltGr بالإبهام الأيمن؛ أو angle mod. لوحات المفاتيح المتعامدة بلا إزاحة.",
+	"layout_analysis.panel.title": "تحليل التخطيط",
+	"layout_analysis.panel.score": "النتيجة {score} · المرتبة {rank} من {count}",
+	"layout_analysis.panel.ranking": "جارٍ الترتيب مقارنة بالمكتبة…",
+	"layout_analysis.panel.unavailable": "لا يمكن تحليل هذا التخطيط هنا ({reason}).",
+	"layout_analysis.panel.weights_note": "احتُسبت النتيجة بالأوزان والحِمل المثالي للأصابع المضبوطة في « مقارنة »."
 }

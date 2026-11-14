@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "Wartości domyślne na rękę: mały {pinky}, serdeczny {ring}, środkowy {middle}, wskazujący {index} %. Średnia zamierzonych obciążeń dariogoetz i szybkości palców genkey, zaokrąglona, z wskazującym ≥ środkowy ≥ serdeczny ≥ mały i małymi palcami poniżej 8 %.",
 	"layout_analysis.info.shortcut_letters": "Każda litera A–Z ma użyteczność od 1 do 10: 10 dla kopiuj, wklej, wytnij i cofnij, 8 dla zaznacz wszystko i zapisz, 5 dla pogrubienia, kursywy i podkreślenia, 1 dla rzadkich. Szacunek uporządkowany według list skrótów producentów.",
 	"layout_analysis.info.weights": "Punkty na jednostkę każdej miary, dobrane tak, by każda ważyła jak w badanych analizatorach. Każdą wagę można zmienić.",
-	"layout_analysis.info.fingering": "Który palec naciska każdy klawisz: 6 prawym wskazującym, spację lewym kciukiem, AltGr prawym kciukiem; albo angle mod. Klawiatury ortolinearne nie mają przesunięcia."
+	"layout_analysis.info.fingering": "Który palec naciska każdy klawisz: 6 prawym wskazującym, spację lewym kciukiem, AltGr prawym kciukiem; albo angle mod. Klawiatury ortolinearne nie mają przesunięcia.",
+	"layout_analysis.panel.title": "Analiza układu",
+	"layout_analysis.panel.score": "Wynik {score} · miejsce {rank} z {count}",
+	"layout_analysis.panel.ranking": "Porównywanie z biblioteką…",
+	"layout_analysis.panel.unavailable": "Tego układu nie można tu przeanalizować ({reason}).",
+	"layout_analysis.panel.weights_note": "Oceniono z wagami i idealnym obciążeniem palców ustawionymi w « Porównaj »."
 }

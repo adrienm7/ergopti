@@ -30,11 +30,10 @@
  *    LAYOUT_ANALYSIS_COMPARER.setCorpus) adds « My typing » and selects it;
  *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts; a host
  *    `store` ({list, save, remove}, promises) keeps imported layouts instead
- *    of localStorage.
- * 8. Every metric and sourced value has an « i » button: its popover says
- *    where the value comes from and links the sources (DATA.sources, from
- *    sources.json). A host may define LAYOUT_ANALYSIS_HOST.openLink(url) to
- *    open links itself (the app's browser); otherwise they open a new tab.
+ *    of localStorage. LAYOUT_ANALYSIS_COMPARER.onResults(listener) lets an
+ *    extra view (other analysers' scores) follow every comparison.
+ * 8. Every metric and sourced value has an « i » button (info_popover.js):
+ *    its popover says where the value comes from and links the sources.
  * 9. The ideal finger load of finger_imbalance is editable (eight targets
  *    summing to 100 %), kept with the other conveniences.
  * ==============================================================================
@@ -46,7 +45,9 @@
 	const E = window.LAYOUT_ANALYSIS;
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const HOST = window.LAYOUT_ANALYSIS_HOST || {};
-	const STORAGE_KEY = 'ergopti.layout_analysis.v1';
+	const INFO = window.LAYOUT_ANALYSIS_INFO;
+	const infoButton = INFO.button;
+	const STORAGE_KEY = window.LAYOUT_ANALYSIS_FILES.SETTINGS_KEY;
 	const CUSTOM_ID = 'custom';
 	// The metrics shown as table columns; every metric is in the details.
 	const TABLE_METRICS = [
@@ -69,9 +70,6 @@
 	// Size of one key unit of the heatmap, in pixels.
 	const HEAT_UNIT_PX = 44;
 	const TEXT_DEBOUNCE_MS = 400;
-	// The « i » popover: its widest size and its gap to the window's edges.
-	const POPOVER_WIDTH_PX = 360;
-	const POPOVER_GUTTER_PX = 12;
 	// The message the framing page listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
 	// The app's keystats n-grams: the event its Studio window dispatches and the
@@ -212,31 +210,12 @@
 	// ======= 3/ Corpora =======
 	// ==========================
 
-	const loadedScripts = new Map();
-
-	/** Loads a built-in corpus's generated tables once. */
-	function loadScript(src) {
-		if (!loadedScripts.has(src))
-			loadedScripts.set(
-				src,
-				new Promise((resolve, reject) => {
-					const script = document.createElement('script');
-					script.src = src;
-					script.onload = resolve;
-					script.onerror = () => reject(new Error(src));
-					document.head.append(script);
-				})
-			);
-		return loadedScripts.get(src);
-	}
-
 	/** The prepared tables of the chosen corpus, or null when it has none yet. */
 	async function corpusTables() {
 		const corpus = corpora.find((c) => c.id === state.corpus);
 		if (corpus.host) return E.prepareNgrams(corpus.host.tables);
 		if (corpus.builtin) {
-			await loadScript(corpus.builtin.script);
-			return E.prepareNgrams(window.LAYOUT_ANALYSIS_CORPORA[corpus.id]);
+			return E.prepareNgrams(await window.LAYOUT_ANALYSIS_FILES.builtinTables(corpus.builtin));
 		}
 		return state.custom ? E.prepareNgrams(state.custom.tables) : null;
 	}
@@ -260,6 +239,8 @@
 	// ==========================
 
 	let generation = 0;
+	// Extra views (other analysers' scores) told about each comparison.
+	const resultListeners = [];
 
 	/** Analyses the selected layouts on the chosen corpus and redraws. */
 	async function analyse() {
@@ -287,6 +268,8 @@
 			idealLoad: state.idealLoad
 		});
 		const ms = Math.round(performance.now() - start);
+		for (const listener of resultListeners)
+			listener(state.results, tables, { keyboard: state.keyboard });
 		showStatus(
 			t('layout_analysis.status.ready', {
 				count: chosen.length,
@@ -493,7 +476,7 @@
 		link.hidden = !layout.url;
 		link.href = layout.url || '#';
 		link.textContent = layout.url;
-		routeLink(link);
+		INFO.routeLink(link);
 		renderHeatmap(result);
 		const contributions = Object.entries(result.score.contributions)
 			.filter(([, v]) => v !== 0)
@@ -668,125 +651,6 @@
 		});
 	}
 
-	// ==========================
-	// ======= Info popovers ====
-	// ==========================
-
-	let popoverOwner = null;
-
-	/** An « i » button that opens the sources of one metric or value. */
-	function infoButton(item) {
-		const button = el('button', 'la-info', 'i');
-		button.type = 'button';
-		button.dataset.info = item;
-		labelInfoButton(button);
-		return button;
-	}
-
-	function labelInfoButton(button) {
-		const label = t('layout_analysis.info.button');
-		button.setAttribute('aria-label', label);
-		button.title = label;
-		button.setAttribute('aria-expanded', String(button === popoverOwner));
-		button.setAttribute('aria-controls', 'la-popover');
-	}
-
-	/** Opens links through the host when it has a browser of its own. */
-	function routeLink(link) {
-		link.target = '_blank';
-		link.rel = 'noopener';
-		if (typeof HOST.openLink !== 'function') return;
-		link.onclick = (event) => {
-			event.preventDefault();
-			HOST.openLink(link.href);
-		};
-	}
-
-	/** The default values an explanation quotes, from the data (one source of truth). */
-	function infoValues(item) {
-		if (item !== 'ideal_finger_load') return {};
-		const load = E.defaultIdealLoad();
-		return {
-			pinky: format(load.lp, 1),
-			ring: format(load.lr, 1),
-			middle: format(load.lm, 1),
-			index: format(load.li, 1)
-		};
-	}
-
-	function openInfo(button) {
-		const item = button.dataset.info;
-		const refs = DATA.sources.items[item];
-		if (!refs) throw new Error(`layout_analysis: no sources for ${item}`);
-		const popover = $('la-popover');
-		$('la-popover-text').textContent = t(`layout_analysis.info.${item}`, infoValues(item));
-		const list = $('la-popover-links');
-		list.replaceChildren();
-		for (const id of refs) {
-			const ref = DATA.sources.references[id];
-			const li = el('li');
-			const a = el('a', '', ref.title);
-			a.href = ref.url;
-			routeLink(a);
-			li.append(a);
-			if (!ref.checked) li.append(` (${t('layout_analysis.info.unchecked')})`);
-			list.append(li);
-		}
-		closeInfo();
-		popoverOwner = button;
-		button.setAttribute('aria-expanded', 'true');
-		popover.hidden = false;
-		const box = button.getBoundingClientRect();
-		const width = Math.min(
-			POPOVER_WIDTH_PX,
-			document.documentElement.clientWidth - 2 * POPOVER_GUTTER_PX
-		);
-		popover.style.width = `${width}px`;
-		const left = Math.min(
-			Math.max(POPOVER_GUTTER_PX, box.left),
-			document.documentElement.clientWidth - width - POPOVER_GUTTER_PX
-		);
-		popover.style.left = `${left + window.scrollX}px`;
-		popover.style.top = `${box.bottom + window.scrollY + POPOVER_GUTTER_PX / 2}px`;
-		$('la-popover-close').focus();
-	}
-
-	function closeInfo() {
-		const popover = $('la-popover');
-		if (popover.hidden) return;
-		popover.hidden = true;
-		const owner = popoverOwner;
-		popoverOwner = null;
-		if (owner && owner.isConnected) {
-			owner.setAttribute('aria-expanded', 'false');
-			owner.focus();
-		}
-	}
-
-	function bindInfo() {
-		// One listener for every « i » button, static or redrawn.
-		document.addEventListener(
-			'click',
-			(event) => {
-				const button = event.target.closest('.la-info');
-				if (button) {
-					// Inside a sortable header or a weight label: open only.
-					event.preventDefault();
-					event.stopPropagation();
-					if (button === popoverOwner) closeInfo();
-					else openInfo(button);
-					return;
-				}
-				if (!event.target.closest('#la-popover')) closeInfo();
-			},
-			true
-		);
-		document.addEventListener('keydown', (event) => {
-			if (event.key === 'Escape') closeInfo();
-		});
-		$('la-popover-close').addEventListener('click', closeInfo);
-	}
-
 	/** Decodes a picked layout file: UTF-16 with its byte-order mark (KLC) or UTF-8. */
 	async function fileText(file) {
 		const bytes = new Uint8Array(await file.arrayBuffer());
@@ -923,7 +787,6 @@
 			fillCorpora();
 			fillWeights();
 			fillIdealLoad();
-			document.querySelectorAll('.la-info').forEach(labelInfoButton);
 			render();
 			analyse();
 		});
@@ -980,7 +843,19 @@
 		analyse();
 	}
 
-	window.LAYOUT_ANALYSIS_COMPARER = { setCorpus, addLayouts };
+	/**
+	 * Calls a listener after each comparison with (results, tables, {keyboard}),
+	 * and at once with the current ones: the hook of extra views.
+	 * @param {function(object[], object, object): void} listener
+	 */
+	function onResults(listener) {
+		if (typeof listener !== 'function')
+			throw new Error('layout_analysis: onResults needs a function');
+		resultListeners.push(listener);
+		if (state.tables) listener(state.results, state.tables, { keyboard: state.keyboard });
+	}
+
+	window.LAYOUT_ANALYSIS_COMPARER = { setCorpus, addLayouts, onResults };
 	document.addEventListener(NGRAMS_EVENT, (event) =>
 		setCorpus({ id: MY_TYPING_ID, tables: event.detail, default: true })
 	);
@@ -990,9 +865,7 @@
 		fillLayouts();
 		fillWeights();
 		fillIdealLoad();
-		document.querySelectorAll('.la-info').forEach(labelInfoButton);
 		bind();
-		bindInfo();
 		analyse();
 		reportHeight();
 		// The host's personal layouts (app data folder, site IndexedDB).

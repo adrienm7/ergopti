@@ -1,0 +1,140 @@
+/* _shared/ui/layout_analysis/analysis_panel.css */
+
+/* =========================================================================== */
+/* The live analysis panel beside the layout editor's board (analysis_panel.js) */
+/* — a column on wide screens, below the board on narrow ones. Light and dark  */
+/* through theme.css.                                                          */
+/* =========================================================================== */
+
+/* ============================== */
+/* ============================== */
+/* ======= 1/ Panel ============= */
+/* ============================== */
+/* ============================== */
+
+.la-panel {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	flex: 1 1 300px;
+	max-width: 420px;
+	padding: 10px 12px;
+}
+
+.la-panel-title {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.la-panel-controls {
+	align-items: center;
+	display: grid;
+	gap: 6px 8px;
+	grid-template-columns: auto 1fr;
+	margin: 10px 0;
+}
+
+.la-panel-controls select {
+	min-width: 0;
+	width: 100%;
+}
+
+.la-panel-score {
+	font-size: 1.1em;
+	font-weight: 600;
+	margin: 6px 0 2px;
+}
+
+.la-panel-error {
+	color: var(--theme-danger);
+	font-size: 1em;
+	font-weight: normal;
+}
+
+.la-panel-note {
+	color: var(--theme-sub);
+	font-size: 0.85em;
+	margin: 0 0 8px;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 2/ Metrics & fingers = */
+/* ============================== */
+/* ============================== */
+
+.la-panel-metrics {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.la-panel-metrics th,
+.la-panel-metrics td {
+	border-bottom: 1px solid var(--theme-separator);
+	padding: 3px 4px;
+}
+
+.la-panel-metrics th {
+	font-weight: normal;
+	text-align: left;
+}
+
+.la-panel-metrics td {
+	text-align: right;
+	white-space: nowrap;
+}
+
+.la-panel-delta {
+	color: var(--theme-sub);
+	font-size: 0.85em;
+	min-width: 4em;
+}
+
+.la-panel-good {
+	color: var(--theme-green);
+}
+
+.la-panel-bad {
+	color: var(--theme-danger);
+}
+
+.la-panel h3 {
+	font-size: 1em;
+	margin: 12px 0 6px;
+}
+
+.la-panel-finger {
+	align-items: center;
+	display: grid;
+	font-size: 0.9em;
+	gap: 6px;
+	grid-template-columns: 9em 1fr 4em;
+	margin: 2px 0;
+}
+
+.la-panel-track {
+	background: var(--theme-surface-2);
+	border-radius: 3px;
+	height: 8px;
+	overflow: hidden;
+}
+
+.la-panel-bar {
+	background: var(--theme-accent);
+	display: block;
+	height: 100%;
+}
+
+.la-panel-finger-value {
+	text-align: right;
+}
+
+.la-panel-section {
+	margin-top: 10px;
+}
+
+@media (max-width: 700px) {
+	.la-panel {
+		max-width: none;
+	}
+}

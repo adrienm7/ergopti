@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "ברירות מחדל לכל יד: זרת {pinky}, קמיצה {ring}, אמה {middle}, מורה {index} %. הממוצע של העומסים המכוונים של dariogoetz ושל מהירויות האצבעות של genkey, מעוגל, עם מורה ≥ אמה ≥ קמיצה ≥ זרת וזרתות מתחת ל-8 %.",
 	"layout_analysis.info.shortcut_letters": "לכל אות A–Z יש תועלת מ-1 עד 10: 10 להעתקה, הדבקה, גזירה וביטול, 8 לבחירת הכול ולשמירה, 5 למודגש, נטוי וקו תחתון, 1 לנדירות. הערכה שמסודרת לפי רשימות הקיצורים של היצרנים.",
 	"layout_analysis.info.weights": "נקודות ליחידה של כל מדד, שנקבעו כך שכל מדד ישקול כמו במנתחים שנחקרו. כל משקל ניתן לעריכה.",
-	"layout_analysis.info.fingering": "איזו אצבע מקלידה כל מקש: 6 באצבע המורה הימנית, מקש הרווח באגודל השמאלי, AltGr באגודל הימני; או angle mod. במקלדות אורתוליניאריות אין היסט."
+	"layout_analysis.info.fingering": "איזו אצבע מקלידה כל מקש: 6 באצבע המורה הימנית, מקש הרווח באגודל השמאלי, AltGr באגודל הימני; או angle mod. במקלדות אורתוליניאריות אין היסט.",
+	"layout_analysis.panel.title": "ניתוח הפריסה",
+	"layout_analysis.panel.score": "ציון {score} · מקום {rank} מתוך {count}",
+	"layout_analysis.panel.ranking": "מדרג מול הספרייה…",
+	"layout_analysis.panel.unavailable": "לא ניתן לנתח כאן את הפריסה הזו ({reason}).",
+	"layout_analysis.panel.weights_note": "הציון חושב עם המשקלים ועומס האצבעות האידיאלי שהוגדרו ב« השוואה »."
 }

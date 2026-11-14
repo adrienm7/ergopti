@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "Standardværdier pr. hånd: lillefinger {pinky}, ringfinger {ring}, langfinger {middle}, pegefinger {index} %. Gennemsnittet af dariogoetz' tilsigtede belastninger og genkeys fingerhastigheder, afrundet, med pege- ≥ lang- ≥ ringfinger ≥ lillefinger og lillefingre under 8 %.",
 	"layout_analysis.info.shortcut_letters": "Hvert bogstav A–Z har en nytte fra 1 til 10: 10 for kopier, indsæt, klip og fortryd, 8 for marker alt og gem, 5 for fed, kursiv og understreget, 1 for sjældne. Et skøn ordnet efter leverandørernes genvejslister.",
 	"layout_analysis.info.weights": "Point pr. enhed af hvert mål, sat så hvert mål vejer som i de undersøgte analyseværktøjer. Hver vægt kan ændres.",
-	"layout_analysis.info.fingering": "Hvilken finger der skriver hver tast: 6 med højre pegefinger, mellemrum med venstre tommelfinger, AltGr med højre tommelfinger; eller angle mod. Ortolineære tastaturer har ingen forskydning."
+	"layout_analysis.info.fingering": "Hvilken finger der skriver hver tast: 6 med højre pegefinger, mellemrum med venstre tommelfinger, AltGr med højre tommelfinger; eller angle mod. Ortolineære tastaturer har ingen forskydning.",
+	"layout_analysis.panel.title": "Layoutanalyse",
+	"layout_analysis.panel.score": "Score {score} · plads {rank} af {count}",
+	"layout_analysis.panel.ranking": "Rangerer i forhold til biblioteket…",
+	"layout_analysis.panel.unavailable": "Dette layout kan ikke analyseres her ({reason}).",
+	"layout_analysis.panel.weights_note": "Scoret med vægtene og den ideelle fingerbelastning fra « Sammenlign »."
 }

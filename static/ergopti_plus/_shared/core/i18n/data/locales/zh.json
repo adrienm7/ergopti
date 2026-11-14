@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "每只手的默认值：小指 {pinky}、无名指 {ring}、中指 {middle}、食指 {index} %。取 dariogoetz 的目标负荷与 genkey 的手指速度的平均并取整，满足食指 ≥ 中指 ≥ 无名指 ≥ 小指，小指低于 8 %。",
 	"layout_analysis.info.shortcut_letters": "A–Z 每个字母有 1 到 10 的有用度：复制、粘贴、剪切、撤销为 10，全选和保存为 8，粗体、斜体、下划线为 5，罕用的为 1。按各厂商快捷键列表排序的估计值。",
 	"layout_analysis.info.weights": "每个指标每单位的分数，设定为与所研究分析器中的权重相当。每个权重都可编辑。",
-	"layout_analysis.info.fingering": "每个键由哪个手指按：6 由右手食指，空格键由左手拇指，AltGr 由右手拇指；或 angle mod。直列键盘没有错位。"
+	"layout_analysis.info.fingering": "每个键由哪个手指按：6 由右手食指，空格键由左手拇指，AltGr 由右手拇指；或 angle mod。直列键盘没有错位。",
+	"layout_analysis.panel.title": "布局分析",
+	"layout_analysis.panel.score": "得分 {score} · 第 {rank} 名，共 {count} 个",
+	"layout_analysis.panel.ranking": "正在与布局库排名…",
+	"layout_analysis.panel.unavailable": "无法在此分析该布局（{reason}）。",
+	"layout_analysis.panel.weights_note": "使用「比较」中设定的权重和理想手指负荷计分。"
 }

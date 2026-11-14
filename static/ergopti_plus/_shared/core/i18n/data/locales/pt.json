@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "Valores predefinidos por mão: mindinho {pinky}, anelar {ring}, médio {middle}, indicador {index} %. A média das cargas previstas de dariogoetz e das velocidades dos dedos de genkey, arredondada, com indicador ≥ médio ≥ anelar ≥ mindinho e mindinhos abaixo de 8 %.",
 	"layout_analysis.info.shortcut_letters": "Cada letra de A a Z tem uma utilidade de 1 a 10: 10 para copiar, colar, cortar e anular, 8 para selecionar tudo e guardar, 5 para negrito, itálico e sublinhado, 1 para as raras. Uma estimativa ordenada pelas listas de atalhos dos fabricantes.",
 	"layout_analysis.info.weights": "Pontos por unidade de cada medida, definidos para que cada uma pese como nos analisadores estudados. Cada peso é editável.",
-	"layout_analysis.info.fingering": "Que dedo prime cada tecla: o 6 com o indicador direito, a barra de espaços com o polegar esquerdo, AltGr com o polegar direito; ou o angle mod. Os teclados ortolineares não têm desfasamento."
+	"layout_analysis.info.fingering": "Que dedo prime cada tecla: o 6 com o indicador direito, a barra de espaços com o polegar esquerdo, AltGr com o polegar direito; ou o angle mod. Os teclados ortolineares não têm desfasamento.",
+	"layout_analysis.panel.title": "Análise da disposição",
+	"layout_analysis.panel.score": "Pontuação {score} · posição {rank} de {count}",
+	"layout_analysis.panel.ranking": "A classificar face à biblioteca…",
+	"layout_analysis.panel.unavailable": "Esta disposição não pode ser analisada aqui ({reason}).",
+	"layout_analysis.panel.weights_note": "Pontuada com os pesos e a carga ideal dos dedos definidos em « Comparar »."
 }

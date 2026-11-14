@@ -19,6 +19,9 @@
  *    the user converts it, and the conversion lists what it drops; exports
  *    show the format owner's per-target report, refusals included.
  * 3. Every visible string is a locale key (21 locales, _shared/core/i18n/data/locales).
+ * 4. Live analysis: a page that loads the layout analysis scripts
+ *    (layout_analysis/analysis_panel.js and its dependencies) gets the
+ *    analysis panel beside the board, updated after every render.
  * ==============================================================================
  */
 
@@ -290,6 +293,11 @@ var LayoutEditorPage = (function () {
 			dirty: false
 		};
 		const doc = () => state.history.current();
+		// The live analysis beside the board, on the pages that load its scripts.
+		const analysisPanel =
+			typeof window.LAYOUT_ANALYSIS_PANEL === 'object'
+				? window.LAYOUT_ANALYSIS_PANEL.create()
+				: null;
 
 		function apply(edit) {
 			try {
@@ -2568,7 +2576,12 @@ var LayoutEditorPage = (function () {
 				messageBar(),
 				metadata(),
 				layerTabs(),
-				el('div', { class: 'le-main' }, [board(), inspector(), magnifier()]),
+				el('div', { class: 'le-main' }, [
+					board(),
+					inspector(),
+					magnifier(),
+					analysisPanel ? analysisPanel.node : null
+				]),
 				el('div', { class: 'le-panels' }, [
 					LayoutSourceIO.isPreserved(doc()) ? null : modifiersPanel(),
 					LayoutSourceIO.isPreserved(doc()) ? null : windowsPanel(),
@@ -2579,6 +2592,7 @@ var LayoutEditorPage = (function () {
 				exportPanel(),
 				stickers()
 			);
+			if (analysisPanel) analysisPanel.update(doc());
 		}
 
 		if (typeof host.initial === 'string') {

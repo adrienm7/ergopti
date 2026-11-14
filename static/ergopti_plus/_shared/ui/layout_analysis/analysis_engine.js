@@ -287,6 +287,19 @@ var LAYOUT_ANALYSIS = (function () {
 		return layoutFromRows({ id: source.id, name: source.name, rows, command, dead });
 	}
 
+	/**
+	 * The keys a layout types characters on: every finger-assigned key but the
+	 * held modifiers. The codes layoutFromComposerSource keeps.
+	 * @param {object} [model] - analysis_model.json; the loaded data's when absent
+	 *   (the codegen passes it before the data exists).
+	 * @returns {string[]} KeyboardEvent codes.
+	 */
+	function typingCodes(model) {
+		const m = model || data().model;
+		const modifiers = new Set(Object.values(m.modifier_keys));
+		return Object.keys(m.fingerings.standard).filter((code) => !modifiers.has(code));
+	}
+
 	/** The layouts of the shared library, in the library shape. */
 	function libraryLayouts() {
 		return data().layouts.map(layoutFromRows);
@@ -949,6 +962,7 @@ var LAYOUT_ANALYSIS = (function () {
 		keyboard,
 		layoutFromRows,
 		layoutFromComposerSource,
+		typingCodes,
 		libraryLayouts,
 		compileLayout,
 		ngramsFromText,

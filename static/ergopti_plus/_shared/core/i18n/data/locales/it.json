@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "Valori predefiniti per mano: mignolo {pinky}, anulare {ring}, medio {middle}, indice {index} %. La media dei carichi previsti da dariogoetz e delle velocità delle dita di genkey, arrotondata, con indice ≥ medio ≥ anulare ≥ mignolo e mignoli sotto l'8 %.",
 	"layout_analysis.info.shortcut_letters": "Ogni lettera dalla A alla Z ha un'utilità da 1 a 10: 10 per copia, incolla, taglia e annulla, 8 per seleziona tutto e salva, 5 per grassetto, corsivo e sottolineato, 1 per le rare. Una stima ordinata secondo gli elenchi di scorciatoie dei produttori.",
 	"layout_analysis.info.weights": "Punti per unità di ogni misura, fissati perché ognuna pesi come negli analizzatori studiati. Ogni peso è modificabile.",
-	"layout_analysis.info.fingering": "Quale dito preme ogni tasto: il 6 con l'indice destro, la barra spaziatrice con il pollice sinistro, AltGr con il pollice destro; oppure l'angle mod. Le tastiere ortolineari non hanno sfalsamento."
+	"layout_analysis.info.fingering": "Quale dito preme ogni tasto: il 6 con l'indice destro, la barra spaziatrice con il pollice sinistro, AltGr con il pollice destro; oppure l'angle mod. Le tastiere ortolineari non hanno sfalsamento.",
+	"layout_analysis.panel.title": "Analisi del layout",
+	"layout_analysis.panel.score": "Punteggio {score} · posizione {rank} su {count}",
+	"layout_analysis.panel.ranking": "Classificazione rispetto alla libreria…",
+	"layout_analysis.panel.unavailable": "Questo layout non può essere analizzato qui ({reason}).",
+	"layout_analysis.panel.weights_note": "Valutato con i pesi e il carico ideale delle dita impostati in « Confronta »."
 }

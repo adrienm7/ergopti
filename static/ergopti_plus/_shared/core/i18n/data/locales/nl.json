@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "Standaardwaarden per hand: pink {pinky}, ringvinger {ring}, middelvinger {middle}, wijsvinger {index} %. Het gemiddelde van de beoogde belastingen van dariogoetz en de vingersnelheden van genkey, afgerond, met wijs- ≥ middel- ≥ ringvinger ≥ pink en pinken onder 8 %.",
 	"layout_analysis.info.shortcut_letters": "Elke letter A–Z heeft een nut van 1 tot 10: 10 voor kopiëren, plakken, knippen en ongedaan maken, 8 voor alles selecteren en opslaan, 5 voor vet, cursief en onderstrepen, 1 voor zeldzame. Een schatting, geordend naar de sneltoetslijsten van de leveranciers.",
 	"layout_analysis.info.weights": "Punten per eenheid van elke maat, zo gekozen dat elke maat weegt zoals in de onderzochte analysatoren. Elk gewicht is aanpasbaar.",
-	"layout_analysis.info.fingering": "Welke vinger elke toets typt: 6 met de rechterwijsvinger, de spatiebalk met de linkerduim, AltGr met de rechterduim; of de angle mod. Ortholineaire toetsenborden hebben geen verspringing."
+	"layout_analysis.info.fingering": "Welke vinger elke toets typt: 6 met de rechterwijsvinger, de spatiebalk met de linkerduim, AltGr met de rechterduim; of de angle mod. Ortholineaire toetsenborden hebben geen verspringing.",
+	"layout_analysis.panel.title": "Analyse van de indeling",
+	"layout_analysis.panel.score": "Score {score} · plaats {rank} van {count}",
+	"layout_analysis.panel.ranking": "Rangschikken tegen de bibliotheek…",
+	"layout_analysis.panel.unavailable": "Deze indeling kan hier niet worden geanalyseerd ({reason}).",
+	"layout_analysis.panel.weights_note": "Gescoord met de gewichten en de ideale vingerbelasting uit « Vergelijken »."
 }

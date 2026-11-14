@@ -4503,5 +4503,10 @@
 	"layout_analysis.info.ideal_finger_load": "片手あたりの既定値：小指 {pinky}、薬指 {ring}、中指 {middle}、人差し指 {index} %。dariogoetz の目標負荷と genkey の指の速さの平均を丸めた値で、人差し指 ≥ 中指 ≥ 薬指 ≥ 小指、小指は 8 % 未満です。",
 	"layout_analysis.info.shortcut_letters": "A〜Z の各文字に 1〜10 の有用度があります：コピー、貼り付け、切り取り、元に戻すが 10、すべて選択と保存が 8、太字、斜体、下線が 5、まれなものが 1。各ベンダーのショートカット一覧に基づく推定です。",
 	"layout_analysis.info.weights": "各指標の 1 単位あたりの点数。調査した分析ツールでの重みと釣り合うように設定。すべての重みを編集できます。",
-	"layout_analysis.info.fingering": "各キーを打つ指：6 は右人差し指、スペースは左親指、AltGr は右親指。または angle mod。格子配列キーボードにはずれがありません。"
+	"layout_analysis.info.fingering": "各キーを打つ指：6 は右人差し指、スペースは左親指、AltGr は右親指。または angle mod。格子配列キーボードにはずれがありません。",
+	"layout_analysis.panel.title": "配列の分析",
+	"layout_analysis.panel.score": "スコア {score}・{count} 中 {rank} 位",
+	"layout_analysis.panel.ranking": "ライブラリと比較して順位付け中…",
+	"layout_analysis.panel.unavailable": "この配列はここでは分析できません（{reason}）。",
+	"layout_analysis.panel.weights_note": "「比較」で設定した重みと理想的な指の負荷で採点しています。"
 }

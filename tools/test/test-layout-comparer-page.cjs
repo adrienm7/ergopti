@@ -39,6 +39,7 @@ const SCRIPTS = [
 	'../host_bridge.js',
 	'_generated/analysis_data.js',
 	'analysis_engine.js',
+	'info_popover.js',
 	'../layout_composer/_generated/composer_data.js',
 	'../layout_composer/composer_model.js',
 	'../layout_editor/toml_prelude.js',
@@ -73,7 +74,10 @@ const keys = new Set();
 for (const m of html.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) keys.add(m[1]);
 for (const m of html.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
 	for (const option of m[2].matchAll(/value="([^"]+)"/g)) keys.add(`${m[1]}.${option[1]}`);
-for (const m of page.matchAll(/\bt\('([a-z_.]+)'/g)) keys.add(m[1]);
+// The page, its popovers and the editor's analysis panel share these strings.
+for (const file of ['comparer_page.js', 'info_popover.js', 'analysis_panel.js'])
+	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
+		keys.add(m[1]);
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
 for (const id of Object.keys(DATA.sources.items)) keys.add(`${PREFIX}info.${id}`);
@@ -140,7 +144,7 @@ for (const src of SCRIPTS)
 		.matchAll(/^(?:const|let|class)\s+([A-Za-z_$][\w$]*)/gm))
 		lexical.add(m[1]);
 check(lexical.has('LAYOUT_COMPOSER_DATA'), 'globals: composer_data.js no longer seen');
-for (const file of ['comparer_page.js', 'corpus_files.js'])
+for (const file of ['comparer_page.js', 'analysis_panel.js', 'info_popover.js', 'corpus_files.js'])
 	for (const m of fs
 		.readFileSync(path.join(PAGE_DIR, file), 'utf8')
 		.matchAll(/window\.([A-Za-z_$][\w$]*)/g))
