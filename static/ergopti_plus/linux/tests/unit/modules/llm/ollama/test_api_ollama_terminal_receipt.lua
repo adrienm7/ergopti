@@ -12,10 +12,10 @@ local helpers = require("tests.helpers")
 --- Loads the actual backend with only its asynchronous transport controlled.
 --- @param body function Receives API, request callbacks and cancellation control.
 local function isolated(body)
-	local names = { "modules.llm.api_ollama", "adapters.http_client", "modules.llm.prediction_engine" }
+	local names = { "modules.llm.api_ollama", "core.network.adapters.http_client", "modules.llm.prediction_engine" }
 	local previous, transport = {}, { refused = false }
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		postStream = function(_, _, _, _, chunk, done)
 			transport.chunk, transport.done = chunk, done
 			return true
@@ -204,8 +204,8 @@ helpers.describe("Ollama terminal inference ownership", function()
 	helpers.it("a successor admitted by a cancellation terminal callback is not overwritten (ll-001)", function()
 		isolated(function(api, transport)
 			local successor, posts = nil, 0
-			local post = package.loaded["adapters.http_client"].postStream
-			package.loaded["adapters.http_client"].postStream = function(...)
+			local post = package.loaded["core.network.adapters.http_client"].postStream
+			package.loaded["core.network.adapters.http_client"].postStream = function(...)
 				posts = posts + 1
 				return post(...)
 			end
@@ -239,12 +239,12 @@ helpers.describe("Ollama terminal inference ownership", function()
 					successor = begin(api, true)
 				end))
 			local stale_done = transport.done
-			package.loaded["adapters.http_client"].cancel = function()
+			package.loaded["core.network.adapters.http_client"].cancel = function()
 				stale_done({ ok = false, error = "transfer aborted" })
 				return true
 			end
 			helpers.assert_true(api.cancel())
-			package.loaded["adapters.http_client"].cancel = function() return true end
+			package.loaded["core.network.adapters.http_client"].cancel = function() return true end
 			helpers.assert_eq(#first.terminals, 1)
 			helpers.assert_true(api.is_active(), "the successor still owns the request slot")
 			transport.chunk('{"message":{"content":"successor"},"done":true}\n')

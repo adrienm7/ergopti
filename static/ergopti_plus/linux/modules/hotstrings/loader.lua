@@ -527,7 +527,7 @@ local function same_file_exact(left, right)
 	_same_file_exact_acquiring = true
 	local called, result = pcall(function()
 		local available, native = pcall(require, "luv")
-		local admitted, Identity = pcall(require, "infra.curl_identity")
+		local admitted, Identity = pcall(require, "core.network.engine.curl_identity")
 		if not available or type(native) ~= "table" or not admitted or type(Identity) ~= "table"
 			or type(Identity.new) ~= "function" or type(Identity.copy) ~= "function"
 			or type(Identity.equal) ~= "function" then return false end

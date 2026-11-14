@@ -11,7 +11,7 @@
 local uv = require("luv")
 local Json = require("core.text.engine.json")
 local Remote = require("modules.llm.api_remote")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local vectors = assert(Json.decode(assert(os.getenv("AUDIT_VECTORS"))))
 assert(#vectors == 8)
 local native_post, receipt = Http.post

@@ -64,7 +64,7 @@ local Profiles = require("modules.llm.profiles")
 local Engine = require("modules.llm.prediction_engine")
 local Download = require("modules.llm.model_download")
 local Window = require("ui.download_window.bridge")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local EventLoop = require("core.events.loop")
 
 Engine.init({ is_paused = function() return false end })

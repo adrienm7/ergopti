@@ -968,7 +968,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		{
 			name = "vscode-bridge",
 			run = function()
-				local module = package.loaded["infra.vscode_bridge"]
+				local module = package.loaded["core.network.engine.vscode_bridge"]
 				if module == nil then return true end
 				if type(module) ~= "table" or type(module.stop_server) ~= "function" then
 					error("infra.vscode_bridge.stop_server is unavailable")

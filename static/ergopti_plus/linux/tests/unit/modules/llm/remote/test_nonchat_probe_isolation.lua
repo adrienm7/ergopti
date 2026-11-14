@@ -18,10 +18,10 @@ local PROBE = { provider = "typesafe", model = "jev-latest", token = "owned-fixt
 	base_url = "http://127.0.0.1:1234/decision" }
 
 local function isolated(body)
-	local names = { "modules.llm.api_remote", "adapters.http_client", "core.logger.engine.shim" }
+	local names = { "modules.llm.api_remote", "core.network.adapters.http_client", "core.logger.engine.shim" }
 	local saved, world = {}, { calls = {}, cancels = {}, refuse = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, _, payload, callback, options)
 			world.calls[#world.calls + 1] = { url = url, payload = Json.decode(payload), callback = callback, options = options }
 			return true

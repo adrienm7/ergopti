@@ -247,7 +247,7 @@ end
 --- it is the only clue a field report carries (issue #104).
 --- @param callback function fn(status|nil, body|nil).
 local function fetch_pac(url, callback)
-	local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+	local client = require("core.network.adapters.http_client").new({ timeout_ms = 6000 })
 	client.get(url, {}, function(result)
 		if (tonumber(result.status) or 0) == 0 then
 			-- The transport's error text ends with the request URL: the company PAC

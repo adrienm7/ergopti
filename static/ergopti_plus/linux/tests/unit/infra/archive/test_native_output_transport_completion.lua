@@ -174,7 +174,7 @@ local function fake_luv(config)
 end
 
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
+local Target = require("core.network.engine.http_output_target")
 local helpers = require("tests.helpers")
 local registered = 0
 local function check(name, fn)
@@ -186,10 +186,10 @@ end
 local function setup(options)
 	options = options or {}
 	local uv, state = fake_luv(options)
-	local saved_luv, saved_core = package.loaded.luv, package.loaded["adapters.curl_http_client"]
-	package.loaded.luv, package.loaded["adapters.curl_http_client"] = uv, nil
-	local loaded, core = pcall(require, "adapters.curl_http_client")
-	package.loaded.luv, package.loaded["adapters.curl_http_client"] = saved_luv, saved_core
+	local saved_luv, saved_core = package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"]
+	package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"] = uv, nil
+	local loaded, core = pcall(require, "core.network.adapters.curl_http_client")
+	package.loaded.luv, package.loaded["core.network.adapters.curl_http_client"] = saved_luv, saved_core
 	assert(loaded, core)
 	local h = { core = core, state = state, uv = uv, owner = {}, current = true, native_source_current = true, source_checks = 0, now = 0,
 		writes = {}, closes = 0, timer_closed = false, timer_listeners = {}, results = {}, notices = {}, events = {} }

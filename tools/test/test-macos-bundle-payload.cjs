@@ -125,30 +125,30 @@ const CURATED_READS = [
 			'SHARED_ROOT / "core/network/data/http/redirect_policy.json"',
 			'SHARED_ROOT / "core/network/adapters/python_network_proxy_policy.py"',
 			'SHARED_ROOT / "ai/data/managed_python_release.json"',
-			'DRIVER_ROOT / "platform/network/native_http.py"'
+			'DRIVER_ROOT / "core/network/adapters/native_http.py"'
 		],
 		targets: [
 			'ergopti_plus/_shared/core/network/data/http/redirect_policy.json',
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 			'ergopti_plus/_shared/ai/data/managed_python_release.json',
-			'ergopti_plus/macos/platform/network/native_http.py'
+			'ergopti_plus/macos/core/network/adapters/native_http.py'
 		],
 		why: 'offline inputs retain the canonical routing policy, pinned Python and native request owner'
 	},
 	{
 		reader: 'ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_download.lua',
 		needles: ['from managed_http import install_huggingface_transport'],
-		targets: ['ergopti_plus/macos/platform/network/managed_http.py'],
+		targets: ['ergopti_plus/macos/core/network/adapters/managed_http.py'],
 		why: 'the emitted Hugging Face downloader activates the bundled native HTTPX transport'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/network/managed_http.py',
+		reader: 'ergopti_plus/macos/core/network/adapters/managed_http.py',
 		needles: [
 			'with_name("native_http.py")',
 			'_ROOT.parent / "_shared/core/network/adapters/python_network_proxy_policy.py"'
 		],
 		targets: [
-			'ergopti_plus/macos/platform/network/native_http.py',
+			'ergopti_plus/macos/core/network/adapters/native_http.py',
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py'
 		],
 		why: 'the HTTPX transport loads the exact native protocol owner and shared policy'
@@ -176,7 +176,7 @@ const CURATED_READS = [
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_pull.py',
 		needles: [
-			'DRIVER / "platform/network/native_ollama_api.py"',
+			'DRIVER / "core/network/adapters/native_ollama_api.py"',
 			'with_name("managed_ollama_runtime.py")',
 			'SHARED / "ai/adapters/python/managed_ollama_pull.py"',
 			'SHARED / "ai/adapters/python/managed_ollama_sessions.py"',
@@ -189,7 +189,7 @@ const CURATED_READS = [
 			'SHARED / "ai/data/managed_ollama_bootstrap.json"'
 		],
 		targets: [
-			'ergopti_plus/macos/platform/network/native_ollama_api.py',
+			'ergopti_plus/macos/core/network/adapters/native_ollama_api.py',
 			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_pull.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_sessions.py',
@@ -206,13 +206,13 @@ const CURATED_READS = [
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py',
 		needles: [
-			'DRIVER / "platform/network/native_ollama_api.py"',
+			'DRIVER / "core/network/adapters/native_ollama_api.py"',
 			'SHARED / "ai/adapters/python/managed_ollama_operation_authority.py"',
 			'with_name("managed_ollama_runtime.py")',
 			'SHARED / "ai/adapters/python/managed_operation_receipt.py"'
 		],
 		targets: [
-			'ergopti_plus/macos/platform/network/native_ollama_api.py',
+			'ergopti_plus/macos/core/network/adapters/native_ollama_api.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_ollama_operation_authority.py',
 			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_operation_receipt.py'
@@ -279,7 +279,7 @@ const CURATED_READS = [
 			'DRIVER / "platform/ollama_bootstrap_owner.py"',
 			'DRIVER / "platform/ollama_daemon_authority.py"',
 			'SHARED / "core/network/adapters/python_network_proxy_policy.py"',
-			'DRIVER / "platform/network/native_http.py"',
+			'DRIVER / "core/network/adapters/native_http.py"',
 			'SHARED / "ai/data/managed_ollama_bootstrap.json"',
 			'SHARED / "core/network/data/proxy_policy.json"'
 		],
@@ -290,7 +290,7 @@ const CURATED_READS = [
 			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
 			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
 			'ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
-			'ergopti_plus/macos/platform/network/native_http.py',
+			'ergopti_plus/macos/core/network/adapters/native_http.py',
 			'ergopti_plus/_shared/ai/data/managed_ollama_bootstrap.json',
 			'ergopti_plus/_shared/core/network/data/proxy_policy.json'
 		],
@@ -305,7 +305,7 @@ const CURATED_READS = [
 	{
 		reader: 'ergopti_plus/macos/platform/trusted_native_guardian.py',
 		needles: ['Path(__file__).parent / "network/native_http.py"'],
-		targets: ['ergopti_plus/macos/platform/network/native_http.py'],
+		targets: ['ergopti_plus/macos/core/network/adapters/native_http.py'],
 		why: 'guardian admission retains the existing native helper trust boundary'
 	},
 	{
@@ -353,13 +353,13 @@ const CURATED_READS = [
 		why: 'the native alias owner retains the canonical private namespace admission'
 	},
 	{
-		reader: 'ergopti_plus/macos/platform/network/native_ollama_api.py',
+		reader: 'ergopti_plus/macos/core/network/adapters/native_ollama_api.py',
 		needles: [
 			'Path(__file__).with_name("native_http.py")',
 			'Path(__file__).resolve().parents[3] / "_shared/ai/adapters/python/managed_source_alias.py"'
 		],
 		targets: [
-			'ergopti_plus/macos/platform/network/native_http.py',
+			'ergopti_plus/macos/core/network/adapters/native_http.py',
 			'ergopti_plus/_shared/ai/adapters/python/managed_source_alias.py'
 		],
 		why: 'authenticated loopback calls keep the actual native wire and alias contract'

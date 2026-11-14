@@ -164,7 +164,7 @@ const PINS = [
 	pin(
 		'limits',
 		'process_output_bytes',
-		'windows/adapters/http_client.ahk',
+		'windows/core/network/adapters/http_client.ahk',
 		'SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES'
 	)
 ];
@@ -191,7 +191,7 @@ const SOURCE_PINS = [
 	{
 		section: 'adapters',
 		key: 'default_timeout_ms',
-		file: 'macos/adapters/http_client.lua',
+		file: 'macos/core/network/adapters/http_client.lua',
 		pattern: /^local HTTP_CLIENT_DEFAULT_TIMEOUT_MS\s*=\s*(\d+)\s*$/gm
 	},
 	...[

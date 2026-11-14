@@ -38,7 +38,7 @@ local function bridge_fixture(replace)
 		diagnostics_available = false, evaluated = {} }
 	-- Restore exact known native fixture ports even if construction throws
 	-- before the fixture can return its owned close callback.
-	for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline",
+	for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "infra.timings", "core.network.engine.managed_http_deadline",
 		"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
 		"infra.manifest_reader" }) do
 		replace(name, package.loaded[name])
@@ -96,7 +96,7 @@ local function model_fixture(replace)
 		end,
 	}
 	world.owned_http = {}
-	replace("adapters.http_client", require("tests.support.owned_http_fixture").attach(http, world.owned_http))
+	replace("core.network.adapters.http_client", require("tests.support.owned_http_fixture").attach(http, world.owned_http))
 	replace("ui.download_window.bridge", {
 		show = function(opts) world.options = opts; return 47 end,
 		session_id = function() return 47 end,
@@ -394,7 +394,7 @@ helpers.describe("actual model cancellation preserves caller UI ownership", func
 	local function actual_bridge_fixture(replace)
 		local _, world = model_fixture(replace)
 		world.evaluated = {}
-		for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline",
+		for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "infra.timings", "core.network.engine.managed_http_deadline",
 			"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
 			"infra.manifest_reader" }) do
 			replace(name, package.loaded[name])

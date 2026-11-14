@@ -15,7 +15,7 @@ local ResponseCapture, ResponseCurrent = ResponseEngine.capture_runtime_response
 assert(type(ResponseCapture) == "function" and type(ResponseCurrent) == "function",
 	"original runtime response owner unavailable")
 local Policy = require("ai.engine.ollama.local_model_policy")
-local HttpClient = require("adapters.http_client")
+local HttpClient = require("core.network.adapters.http_client")
 local Timings = require("infra.timings")
 local Bridge = require("infra.llm_bridge")
 

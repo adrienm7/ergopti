@@ -33,7 +33,7 @@
 ; ==============================================
 
 _PFSW_OnlyOneWriter() {
-	Src := _DriverDirConcat("ui")
+	Src := _DriverDirsConcat("ui", "core/network")
 	Assert(Src != "", "the ui/ source must be readable")
 
 	; No UI site may publish locator bytes directly. The crash-recoverable
@@ -87,7 +87,7 @@ _PFSW_WriterFailsLoudly() {
 ; Both callers must honour that contract: reloading after a failed write is what
 ; puts the user back in the old directory with no explanation.
 _PFSW_CallersSkipReloadOnFailure() {
-	Src := _DriverDirConcat("ui")
+	Src := _DriverDirsConcat("ui", "core/network")
 	Pos := 1
 	Checked := 0
 	while (Pos := InStr(Src, "_PathsFile_Write(", , Pos)) {

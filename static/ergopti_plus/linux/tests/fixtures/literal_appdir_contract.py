@@ -255,7 +255,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         proxy = run(
             [
                 usr / "bin/luajit",
-                driver / "platform/network/system_proxy_probe.lua",
+                driver / "core/network/adapters/system_proxy_probe.lua",
                 app / "_shared",
             ],
             env=env,
@@ -263,7 +263,11 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         )
         assert "proxy-request-invalid" in proxy
         runtime_probe = subprocess.run(
-            [usr / "bin/luajit", driver / "platform/network/runtime_probe.lua", app / "_shared"],
+            [
+                usr / "bin/luajit",
+                driver / "core/network/adapters/runtime_probe.lua",
+                app / "_shared",
+            ],
             env=env,
             text=True,
             capture_output=True,

@@ -650,10 +650,10 @@ helpers.describe("prediction dispatch admission is explicit", function()
 
 	helpers.it("retires loading when the real remote backend cannot settle prior ownership (dispatch-refusal)", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
-		local previous_http = package.loaded["adapters.http_client"]
+		local previous_http = package.loaded["core.network.adapters.http_client"]
 		local posts, cancels, refuse_cancel = {}, 0, true
 		local ok, err = pcall(function()
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				post = function(_, _, body, callback)
 					posts[#posts + 1] = { body = body, callback = callback }
 					return true
@@ -685,7 +685,7 @@ helpers.describe("prediction dispatch admission is explicit", function()
 			helpers.assert_eq(engine.is_predicting(), false)
 			helpers.assert_eq(#engine.get_suggestions(), 1)
 		end)
-		package.loaded["adapters.http_client"] = previous_http
+		package.loaded["core.network.adapters.http_client"] = previous_http
 		restore()
 		if not ok then error(err, 0) end
 	end)

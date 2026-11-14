@@ -10,7 +10,7 @@
 
 local uv = require('luv')
 local Remote = require('modules.llm.api_remote')
-local Http = require('adapters.http_client')
+local Http = require('core.network.adapters.http_client')
 local Logger = require('core.logger.engine.shim')
 local origin = assert(os.getenv('LLM_WRAPPER_ORIGIN'))
 

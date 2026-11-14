@@ -32,14 +32,14 @@ _CLWT_NoInfiniteResolveTimeout() {
 	; Move-resilient: scan the ui module tree via the framework helper instead of
 	; a pinned changelog path. Both timeout tokens are unique to changelog_window
 	; within ui/, so the scope stays meaningful.
-	Src := _DriverDirConcat("ui")
+	Src := _DriverDirsConcat("ui", "core/network")
 	Assert(InStr(Src, "SetTimeouts(0,") = 0,
 		"changelog_window.ahk must NOT use SetTimeouts(0,...) — zero resolve timeout hangs the timer thread on captive networks")
 }
 Test("changelog_window: no infinite WinHTTP resolve timeout (SetTimeouts(0,...))", _CLWT_NoInfiniteResolveTimeout)
 
 _CLWT_UsesSharedResolveConstant() {
-	Src := _DriverDirConcat("ui")
+	Src := _DriverDirsConcat("ui", "core/network")
 	Assert(InStr(Src, "UPDATER_HTTP_RESOLVE_TIMEOUT_MS") > 0,
 		"changelog_window.ahk must reference UPDATER_HTTP_RESOLVE_TIMEOUT_MS so all WinHTTP calls share the same finite DNS budget")
 }

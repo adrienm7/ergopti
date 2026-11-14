@@ -9,7 +9,7 @@ local helpers = require("tests.helpers")
 --- Native transport acknowledgements are explicit controlled ports, not proof
 --- of physical curl/PAC/kernel behavior. Expected final bytes are handwritten.
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
+local Target = require("core.network.engine.http_output_target")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local function fixture(body, received)

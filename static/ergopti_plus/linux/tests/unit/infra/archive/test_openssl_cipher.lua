@@ -58,11 +58,11 @@ local function with_native(options, body)
 		return options.decode_status or #input / 4 * 3
 	end
 	if options.missing_symbol then library[options.missing_symbol] = nil end
-	local old_library, old_cipher = package.loaded["infra.openssl_library"], package.loaded["infra.openssl_cipher"]
-	package.loaded["infra.openssl_library"] = options.no_ffi and {} or { ffi = ffi, library = library }
-	package.loaded["infra.openssl_cipher"] = nil
-	local ok, err = xpcall(function() body(require("infra.openssl_cipher"), calls) end, debug.traceback)
-	package.loaded["infra.openssl_library"], package.loaded["infra.openssl_cipher"] = old_library, old_cipher
+	local old_library, old_cipher = package.loaded["core.network.engine.openssl_library"], package.loaded["core.network.engine.openssl_cipher"]
+	package.loaded["core.network.engine.openssl_library"] = options.no_ffi and {} or { ffi = ffi, library = library }
+	package.loaded["core.network.engine.openssl_cipher"] = nil
+	local ok, err = xpcall(function() body(require("core.network.engine.openssl_cipher"), calls) end, debug.traceback)
+	package.loaded["core.network.engine.openssl_library"], package.loaded["core.network.engine.openssl_cipher"] = old_library, old_cipher
 	if not ok then error(err, 0) end
 end
 

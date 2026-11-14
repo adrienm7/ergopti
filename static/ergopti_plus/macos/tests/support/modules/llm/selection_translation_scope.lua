@@ -99,7 +99,7 @@ local OWNED = {
 	"core.fs.adapters.file_system",
 	"adapters.metadata_command_stats",
 	"core.fs.adapters.write_lock_path",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"core.fs.adapters.json_codec",
 	"adapters.key_state",
 	"core.logger.adapters.log_transport",

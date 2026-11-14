@@ -416,14 +416,14 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
-#Include adapters/http_client.ahk
+#Include core/network/adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
 #Include core/fs/adapters/storage.ahk
 #Include adapters/process_lifecycle.ahk
 #Include adapters/key_state.ahk
 #Include adapters/keyboard_layout_switch.ahk
 #Include adapters/app_launcher.ahk
-#Include adapters/network_info.ahk
+#Include core/network/adapters/info.ahk
 #Include adapters/keyboard_hook.ahk
 #Include adapters/llm_nav_event_owner.ahk
 #Include adapters/terminal_output_preview.ahk
@@ -463,7 +463,7 @@ if UIASW_IsWorkerInvocation()
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include infra/window_utils.ahk
-#Include infra/external_url_policy.ahk
+#Include core/network/engine/external_url_policy.ahk
 #Include infra/text_utils.ahk
 #Include infra/text_case.ahk
 #Include infra/wrap_pair.ahk
@@ -596,7 +596,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include vendor/WebView2.ahk
 BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include infra/webview_utils.ahk
-#Include adapters/network_failure_host.ahk
+#Include core/network/adapters/failure_host.ahk
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
 #Include ui/console_window.ahk
@@ -1424,7 +1424,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/composer_check.ahk
 #Include ui/layout_manager/source_store.ahk
 #Include ui/field_check/network_check.ahk
-#Include ui/proxy_override.ahk
+#Include core/network/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 #Include ui/physical_shortcuts/init.ahk

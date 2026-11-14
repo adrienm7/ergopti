@@ -65,7 +65,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 LUA = r"""
 local uv=require('luv')
-local H=require('adapters.http_client')
+local H=require('core.network.adapters.http_client')
 assert(uv.getuid()~=0)
 local method=assert(os.getenv('CASE_METHOD'))
 local code=assert(tonumber(os.getenv('CASE_STATUS')))

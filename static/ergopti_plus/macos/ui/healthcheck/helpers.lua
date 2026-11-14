@@ -361,7 +361,7 @@ end
 --- names (no-network-identity); GitHub's reachability is a probe.
 --- @return table
 function H.collect_network()
-	local signal = require("adapters.network_info").getSignalStrength()
+	local signal = require("core.network.adapters.info").getSignalStrength()
 	return { wifi_signal = type(signal) == "number" and string.format("%d%%", signal) or nil }
 end
 

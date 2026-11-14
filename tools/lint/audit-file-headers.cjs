@@ -45,6 +45,7 @@ const TREES = [
 	'windows/modules',
 	'windows/platform',
 	'windows/ui',
+	'windows/core/network',
 	'windows/adapters',
 	'windows/core/lifecycle',
 	'windows/core/fs/adapters',
@@ -58,6 +59,7 @@ const TREES = [
 	'macos/modules',
 	'macos/platform',
 	'macos/ui',
+	'macos/core/network',
 	'macos/adapters',
 	'macos/core/logger/adapters',
 	'macos/core/fs/adapters',
@@ -75,6 +77,7 @@ const TREES = [
 	'linux/core/fs/engine',
 	'linux/bin',
 	'linux/ui',
+	'linux/core/network',
 	// _shared (the port specs) and _shared were outside the audit,
 	// and had drifted to a repo-relative header (`static/ergopti_plus/_shared/…`)
 	// where every other tree under _shared/ uses the BASE-relative form.

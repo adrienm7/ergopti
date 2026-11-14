@@ -25,7 +25,7 @@ local uv = require("luv")
 local Shell = require("adapters.shell_runner")
 local Codec = require("metrics.engine.privacy.text_crypto")
 local Base64 = require("core.lifecycle.engine.compat.base64")
-local OpenSSL = require("infra.openssl_command")
+local OpenSSL = require("core.network.engine.openssl_command")
 assert(uv.getuid() ~= 0, "native at-rest tests require an ordinary user")
 local real = assert(Shell.exec_line("command -v openssl"))
 local previous_path = assert(os.getenv("PATH"))
@@ -124,7 +124,7 @@ end
 
 -- The proxy runs the REAL primitive before refusing its acknowledgement. Unlike
 -- a fake cipher, this proves useful actual output cannot survive a failed ACK.
-local Native = require("infra.openssl_library")
+local Native = require("core.network.engine.openssl_library")
 local fault, observed, freed = nil, false, 0
 local proxy = setmetatable({}, { __index = Native.library })
 for _, stage in ipairs({ "Init", "Update", "Final" }) do
@@ -137,10 +137,10 @@ for _, stage in ipairs({ "Init", "Update", "Final" }) do
 	end
 end
 proxy.EVP_CIPHER_CTX_free = function(context) freed = freed + 1; Native.library.EVP_CIPHER_CTX_free(context) end
-package.loaded["infra.openssl_library"] = { ffi = Native.ffi, library = proxy }
-package.loaded["infra.openssl_cipher"] = nil
-local AES = require("infra.openssl_cipher")
-package.loaded["infra.openssl_library"] = Native
+package.loaded["core.network.engine.openssl_library"] = { ffi = Native.ffi, library = proxy }
+package.loaded["core.network.engine.openssl_cipher"] = nil
+local AES = require("core.network.engine.openssl_cipher")
+package.loaded["core.network.engine.openssl_library"] = Native
 assert(AES.available, "real native AES capability required")
 mode(0); cipher = fresh(); assert(cipher.is_available()); assert(cipher.set_enabled(true))
 

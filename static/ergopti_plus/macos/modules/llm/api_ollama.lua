@@ -19,13 +19,13 @@ local Ports = require("ai.engine.request_plan.ports")
 local TokenBudget = require("ai.engine.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
-local _infer_client  = require("adapters.http_client").new()
-local _check_client  = require("adapters.http_client").new()
-local _warmup_client = require("adapters.http_client").new()
+local _infer_client  = require("core.network.adapters.http_client").new()
+local _check_client  = require("core.network.adapters.http_client").new()
+local _warmup_client = require("core.network.adapters.http_client").new()
 -- Screen reading (modules/llm/screen_answer.lua) never shares the prediction owner
-local _vision_client = require("adapters.http_client").new()
+local _vision_client = require("core.network.adapters.http_client").new()
 -- The AI agent menu's model listing never supersedes a request in flight
-local _listing_client = require("adapters.http_client").new()
+local _listing_client = require("core.network.adapters.http_client").new()
 local JsonCodec      = require("core.fs.adapters.json_codec")
 local FileSystem     = require("core.fs.adapters.file_system")
 local TimerScheduler = require("core.events.timer_scheduler")

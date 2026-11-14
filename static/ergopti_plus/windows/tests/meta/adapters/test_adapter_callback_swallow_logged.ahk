@@ -4,7 +4,7 @@
 ; MODULE: Adapter Callback-Swallow Logging Guard
 ; DESCRIPTION:
 ; Regression guard for the 6 bare `try Callback(...)` sites across
-; adapters/text_sender.ahk and adapters/http_client.ahk that swallowed a
+; adapters/text_sender.ahk and core/network/adapters/http_client.ahk that swallowed a
 ; throwing completion callback with zero log trace, unlike sibling adapters
 ; (adapters/shell_runner.ahk's on_done wrapper, core/events/timer_scheduler.ahk's
 ; _OneShot/_Repeating wrappers), which both log via LoggerError.
@@ -75,7 +75,7 @@ Test("text_sender: no bare 'try Callback()' sites remain in _TextSendClipboard/T
 
 _MetaHttpPostCallbackLogged() {
 	Body := _DriverFuncBody("HTTPPost")
-	Assert(Body != "", "HTTPPost must exist in adapters/http_client.ahk")
+	Assert(Body != "", "HTTPPost must exist in core/network/adapters/http_client.ahk")
 	Assert(!InStr(Body, "try Callback(Result)"),
 		"HTTPPost must not use a bare 'try Callback(Result)' with no catch")
 	Assert(InStr(Body, "Callback(Result)") > 0, "HTTPPost must still invoke Callback(Result)")

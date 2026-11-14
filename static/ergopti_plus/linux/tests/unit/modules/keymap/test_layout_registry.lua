@@ -439,7 +439,7 @@ helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("settles a refused Python download even if the cleanup runner has stopped", function()
 		local Registry = require("modules.keymap.layout_registry")
 		local Managed = require("modules.keymap.managed_python")
-		local Http, Process = require("adapters.http_client"), require("adapters.process_runner")
+		local Http, Process = require("core.network.adapters.http_client"), require("adapters.process_runner")
 		local Shell, Files = require("adapters.shell_runner"), require("core.fs.adapters.file_system")
 		local Paths = require("infra.config_paths")
 		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
@@ -896,7 +896,7 @@ require("tests.lua.layouts.installed_extension_manager_contract")(helpers, Json,
 --- @param options table Existing registry filesystem/transport fixture options.
 --- @param body function Receives the real registry and controlled physical helper ACK.
 local function with_shutdown_owner(options, body)
-	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "adapters.http_client", "core.fs.adapters.file_digest" }
+	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "core.network.adapters.http_client", "core.fs.adapters.file_digest" }
 	local previous = {}
 	for _, name in ipairs(modules) do previous[name] = package.loaded[name] end
 	local physical = { settled = true, stops = 0, http_cancels = 0, digest_cancels = 0 }
@@ -904,7 +904,7 @@ local function with_shutdown_owner(options, body)
 		shutdown = function() physical.stops = physical.stops + 1; return physical.settled end,
 		is_settled = function() return physical.settled end,
 	}
-	package.loaded["adapters.http_client"] = { cancel = function(owner)
+	package.loaded["core.network.adapters.http_client"] = { cancel = function(owner)
 		helpers.assert_eq(owner, "layout_registry")
 		physical.http_cancels = physical.http_cancels + 1
 		if physical.on_cancel then physical.on_cancel() end

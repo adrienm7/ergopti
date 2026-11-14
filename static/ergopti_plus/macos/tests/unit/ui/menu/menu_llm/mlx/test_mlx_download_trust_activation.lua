@@ -187,7 +187,7 @@ helpers.describe("MLX helper directory quotation ownership", function()
 					end
 					helpers.assert_type(source, "string")
 					scalar_packets[#scalar_packets + 1] = {
-						expected = directory .. "/platform/network", source = source,
+						expected = directory .. "/core/network/adapters", source = source,
 					}
 				end)
 			end)

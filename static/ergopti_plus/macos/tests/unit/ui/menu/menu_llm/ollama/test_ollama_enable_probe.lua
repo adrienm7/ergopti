@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "core.logger.engine.logger", "adapters.http_client", "core.events.timer_scheduler",
+local OWNED = { "core.logger.engine.logger", "core.network.adapters.http_client", "core.events.timer_scheduler",
 	"ui.menu.menu_llm.ollama_enable_probe", "ai.engine.settings.enable_admission_core" }
 
 -- ===================================
