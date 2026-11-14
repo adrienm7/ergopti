@@ -12,7 +12,8 @@
  * source-run owner check all read files that no longer existed. An .ahk path
  * in a tool that names the Windows driver now follows its file, even when
  * the tool names the Lua drivers too; so does a windows\\infra\\x\.ahk
- * regular expression, and a bare path only one named Lua driver holds.
+ * regular expression, a bare path only one named Lua driver holds, and a
+ * path in a block keyed by a driver (linux: { 'adapters/x.lua': … }).
  * ==============================================================================
  */
 
@@ -36,6 +37,7 @@ const MAP = new Map([
 	],
 	['windows/adapters/program_providers.ahk', 'windows/core/process/adapters/program_providers.ahk'],
 	['linux/infra/installation.lua', 'linux/core/lifecycle/engine/installation.lua'],
+	['linux/adapters/graphics_renderer.lua', 'linux/core/ui/adapters/graphics_renderer.lua'],
 	['macos/infra/paths.lua', 'macos/infra/paths.lua']
 ]);
 
@@ -112,6 +114,13 @@ function run() {
 				"fail('infra/installation.lua');\n"
 		);
 		assert.ok(out.includes("fail('core/lifecycle/engine/installation.lua')"), out);
+	}
+	// A block keyed by a driver holds that driver's paths.
+	{
+		const out = rewrite(
+			"const ALLOWED = {\n\tlinux: { 'adapters/graphics_renderer.lua': 'tooltip' }\n};\n"
+		);
+		assert.ok(out.includes("'core/ui/adapters/graphics_renderer.lua': 'tooltip'"), out);
 	}
 	// A tool that never names the Windows driver keeps a bare .ahk path.
 	{
