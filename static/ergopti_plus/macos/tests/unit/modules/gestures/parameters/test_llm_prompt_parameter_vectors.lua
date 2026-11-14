@@ -39,6 +39,15 @@ local PromptAction = require("ai.engine.prediction.prompt_action")
 helpers.describe("llm_prompt_prediction parameter replays the shared llm_prompt corpus", function()
 	local corpus = read_corpus()
 
+	-- The count's bounds are the AI menu setting's, read from the shared value
+	-- schema, never a copy (value-validation).
+	helpers.it("the prediction count bounds are the declared llm.profiles.num_predictions bounds", function()
+		local declared = require("settings.engine.value_check").declaration("llm.profiles.num_predictions")
+		helpers.assert_eq(PromptAction.MIN_PREDICTIONS, declared.min)
+		helpers.assert_eq(PromptAction.MAX_PREDICTIONS, declared.max)
+		helpers.assert_nil(PromptAction.parse("p|" .. tostring(declared.max + 1)), "past the declared maximum")
+	end)
+
 	helpers.it("the parameter is declared and the corpus is loaded", function()
 		helpers.assert_eq(Actions.get_action_parameter_spec("llm_prompt_prediction"), "llm_prompt")
 		helpers.assert_true(#corpus.vectors >= 10, "the corpus must hold its vectors")
