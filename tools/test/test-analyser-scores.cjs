@@ -43,9 +43,11 @@ const SCRIPTS = [
 const MIN_VECTORS = 20;
 const MIN_ANALYSERS = 11;
 // Budget per library layout for every analyser, inside a vm context (slower
-// than a page: global lookups go through the context). Measured about 85 ms.
-const BUDGET_MS_PER_LAYOUT = 400;
+// than a page: global lookups go through the context), both fingerings.
+// Measured about 160 ms.
+const BUDGET_MS_PER_LAYOUT = 600;
 const LIBRARY_SAMPLE = 30;
+const STANDARD_TEXT = 'The quick brown fox jumps over the lazy dog, then sleeps.';
 
 const errors = [];
 const check = (condition, message) => {
@@ -174,6 +176,31 @@ for (const self of ['dead:1dk', '**']) {
 		`ergol: ë not typed through « ${self} » (${parts.unsupported} % unsupported)`
 	);
 }
+// Two fingerings side by side: where an analyser's own fingering is the
+// standard one (carpalx, keygen, genkey, Oxeylyzer on QWERTY), the user's
+// default model gives the same number; Keyboard Layout Optimizer types Space
+// with the left thumb, our model with the right, so its two numbers differ.
+{
+	const both = S.scoreAll(library.get('qwerty'), E.ngramsFromText(STANDARD_TEXT), {
+		keyboard: 'iso'
+	});
+	for (const id of ['carpalx', 'keygen', 'genkey', 'oxeylyzer'])
+		check(
+			both[id].official.value === both[id].custom.value,
+			`${id}: official and custom differ on QWERTY`
+		);
+	check(
+		both.dariogoetz.official.value !== both.dariogoetz.custom.value,
+		'dariogoetz: the custom finger model is not used'
+	);
+	let refused = false;
+	try {
+		S.score('kla', library.get('qwerty'), E.ngramsFromText('the'), { fingering: 'other' });
+	} catch {
+		refused = true;
+	}
+	check(refused, 'an unknown fingering does not throw');
+}
 let threw = false;
 try {
 	S.score('no_such_analyser', library.get('qwerty'), E.ngramsFromText('the'), {});
@@ -192,7 +219,8 @@ const corpus = E.prepareNgrams(
 const sample = Array.from(library.values()).slice(0, LIBRARY_SAMPLE);
 const started = Date.now();
 for (const layout of sample) {
-	const all = S.scoreAll(layout, corpus, { keyboard: 'iso' });
+	const both = S.scoreAll(layout, corpus, { keyboard: 'iso' });
+	const all = Object.fromEntries(Object.entries(both).map(([id, r]) => [id, r.official]));
 	for (const a of analysers) {
 		const r = all[a.id];
 		if (a.better === 'none') {

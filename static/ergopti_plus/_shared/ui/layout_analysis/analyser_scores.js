@@ -147,6 +147,34 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return { board, finger };
 	}
 
+	/**
+	 * In « custom » mode, the user's finger model (the engine's board for the
+	 * fingering profile): each key's finger and each finger's home key. Null in
+	 * « official » mode, where every analyser keeps its own fingering.
+	 * @returns {{finger: Map<string, number>, home: string[]}|null} The model.
+	 */
+	function customModel(ctx) {
+		if (!ctx.custom) return null;
+		if (ctx.cache.has('custom')) return ctx.cache.get('custom');
+		const { board, finger } = ourFingers(ctx.layout, ctx.keyboard, ctx.profile);
+		const model = { finger, home: FINGERS.map((id, f) => board.codes[board.homeOf[f]]) };
+		ctx.cache.set('custom', model);
+		return model;
+	}
+
+	/**
+	 * A key's finger: the user's in « custom » mode when the model has the key,
+	 * else the analyser's own.
+	 * @param {object} ctx - The scoring context.
+	 * @param {string} code - The physical key.
+	 * @param {number} official - The analyser's finger index for it.
+	 * @returns {number} The finger index (LP 0 … RP 9).
+	 */
+	function fingerFor(ctx, code, official) {
+		const model = customModel(ctx);
+		return model && model.finger.has(code) ? model.finger.get(code) : official;
+	}
+
 	// ==============================================
 	// ======= 3/ KLA, its fork and KLAnext =========
 	// ==============================================
@@ -155,16 +183,26 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * KLA's keyboard: its own key centres in pixels and its fingering (the
 	 * layout's angle mod applied), for ANSI (`standard`) or ISO (`european`).
 	 */
-	function klaBoard(model, layout, keyboardId) {
+	function klaBoard(model, ctx) {
+		const { layout, keyboard: keyboardId } = ctx;
 		const form = keyboardId === 'ansi' ? 'standard' : 'european';
 		const angle = layout.fingering === 'angle' || keyboardId === 'iso_angle';
 		const geometry = model.geometry[form];
 		const codes = Object.keys(geometry);
 		const index = new Map(codes.map((code, k) => [code, k]));
 		const finger = codes.map((code) =>
-			fingerIndex((angle && model.angle_fingering[code]) || model.fingering[code])
+			fingerFor(
+				ctx,
+				code,
+				fingerIndex((angle && model.angle_fingering[code]) || model.fingering[code])
+			)
 		);
-		const home = FINGERS.map((id) => index.get(model.home_keys[id]));
+		const custom = customModel(ctx);
+		const home = FINGERS.map((id, f) =>
+			custom && index.has(custom.home[f])
+				? index.get(custom.home[f])
+				: index.get(model.home_keys[id])
+		);
 		return {
 			form,
 			codes,
@@ -339,7 +377,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const key = `kla:${id}`;
 		if (ctx.cache.has(key)) return ctx.cache.get(key);
 		const model = entry(id).model;
-		const board = klaBoard(model, ctx.layout, ctx.keyboard);
+		const board = klaBoard(model, ctx);
 		const strokes = klaStrokes(model, ctx.layout, board);
 		const bigrams = klaBigrams(ctx.table, strokes);
 		const counters = klaSimulate(board, strokes, bigrams, move(model, board));
@@ -517,7 +555,11 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	function charFingers(ctx, layers) {
 		const key = `fingers:${layers.join('')}`;
 		if (ctx.cache.has(key)) return ctx.cache.get(key);
-		const { board, finger } = ourFingers(ctx.layout, ctx.keyboard, ctx.profile);
+		const { board, finger } = ourFingers(
+			ctx.layout,
+			ctx.keyboard,
+			ctx.custom ? ctx.profile : undefined
+		);
 		const map = keyOfChar(ctx.layout, board.codes, layers);
 		const out = new Map();
 		const row = new Map();
@@ -862,10 +904,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			let key;
 			if (where.has(hit.code)) {
 				const { r, col } = where.get(hit.code);
-				key = { r, finger: model.finger[r][col], base: model.base_effort[r][col] };
+				key = {
+					r,
+					finger: fingerFor(ctx, hit.code, model.finger[r][col]),
+					base: model.base_effort[r][col]
+				};
 			} else if (model.extension[hit.code]) {
 				const ext = model.extension[hit.code];
-				key = { r: ext.row, finger: ext.finger, base: ext.base };
+				key = { r: ext.row, finger: fingerFor(ctx, hit.code, ext.finger), base: ext.base };
 			} else continue;
 			const w = model.weights;
 			key.hand = key.finger > 5 ? 1 : 0;
@@ -923,6 +969,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	// ======= 6/ keygen ======
 	// ========================
 
+	// keygen's finger names, by order from the pinky (0) to the thumb (4).
+	const KEYGEN_FINGERS = ['pinky', 'ring', 'middle', 'index', 'thumb'];
+
 	/**
 	 * keygen's penalty per character: a base cost per key plus penalties on
 	 * the last key given up to three previous keys (same finger, long jumps,
@@ -940,10 +989,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		for (const [char, { code }] of keyOf) {
 			if (!init.has(char)) continue;
 			const p = posOf.get(code);
+			const custom = customModel(ctx);
+			const f = custom ? custom.finger.get(code) : undefined;
+			const own = f === undefined;
 			keys.set(char, {
 				pos: p,
-				finger: model.finger[p],
-				hand: model.hand[p],
+				finger: own ? model.finger[p] : KEYGEN_FINGERS[orderOf(f)],
+				hand: own ? model.hand[p] : handOf(f) === 0 ? 'L' : 'R',
 				row: p >= 32 ? 'thumb' : p >= 22 ? 'bottom' : p >= 11 ? 'home' : 'top',
 				center: centre.has(p),
 				base: model.base_penalty[p]
@@ -1108,6 +1160,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				let finger = model.column_fingers[Math.min(col, model.column_fingers.length - 1)];
 				if (angle && r === 2 && model.angle_fingers[col] !== undefined)
 					finger = model.angle_fingers[col];
+				const custom = customModel(ctx);
+				if (custom && custom.finger.has(code)) {
+					// genkey numbers the eight fingers without the thumbs.
+					const f = custom.finger.get(code);
+					if (isThumb(f)) return;
+					finger = f < LEFT_THUMB ? f : f - 2;
+				}
 				keys.set(char, { r, col, finger });
 			})
 		);
@@ -1307,7 +1366,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				const k = board.index.get(code);
 				pos.push({
 					char,
-					finger: fingerIndex(fingers[col]),
+					finger: fingerFor(ctx, code, fingerIndex(fingers[col])),
 					x: ortho ? col : board.x[k],
 					y: r
 				});
@@ -1471,6 +1530,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const finger = new Map();
 		for (const [id, codes] of Object.entries(model.fingering))
 			for (const code of codes) finger.set(code, id);
+		// In « custom » mode the user's fingers; Ergo-L leaves thumb keys unassigned.
+		const custom = customModel(ctx);
+		if (custom)
+			for (const [code, f] of custom.finger) {
+				if (isThumb(f)) finger.delete(code);
+				else finger.set(code, FINGERS[f]);
+			}
 		const ignored = new Set(Array.from(model.ignored));
 		const fold = perCorpus(ctx.table, 'ergol:tables', (table) => {
 			const merge = (rows, size) => {
@@ -1603,14 +1669,15 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * hand; AltGr on AltRight, our adaptation: the tool models Neo layers, not
 	 * AltGr). A modifier press is a key of its own, flagged.
 	 */
-	function dgStrokes(model, layout) {
+	function dgStrokes(model, ctx) {
+		const layout = ctx.layout;
 		const keys = new Map();
 		let size = 0;
 		const keyOf = (code, mod) => {
 			const id = mod ? `${code}:mod` : code;
 			if (keys.has(id)) return keys.get(id);
 			const k = model.keys[code];
-			const f = fingerIndex(k.finger);
+			const f = fingerFor(ctx, code, fingerIndex(k.finger));
 			const row = layout.rows[code];
 			const key = {
 				id,
@@ -1636,7 +1703,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		for (const code of Object.keys(model.keys)) {
 			const row = layout.rows[code];
 			if (!row) continue;
-			const hand = handOf(fingerIndex(model.keys[code].finger));
+			const hand = handOf(fingerFor(ctx, code, fingerIndex(model.keys[code].finger)));
 			const shift = hand === 0 ? model.shift_keys.right : model.shift_keys.left;
 			const mods = [[], [shift], [model.altgr_key], [shift, model.altgr_key]];
 			row.forEach((cell, layer) => {
@@ -1677,7 +1744,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	function scoreDariogoetz(ctx) {
 		const model = entry('dariogoetz').model;
 		const W = model.weights;
-		const { strokes, size } = dgStrokes(model, ctx.layout);
+		const { strokes, size } = dgStrokes(model, ctx);
 		const fr = model.finger_repeats;
 		const mp = model.movement_pattern;
 		const nh = model.no_handswitch_in_trigram;
@@ -1926,12 +1993,17 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		dariogoetz: scoreDariogoetz
 	};
 
+	const FINGERINGS = ['official', 'custom'];
+
 	/** The context one layout is scored in, shared by the scorers. */
 	function context(layout, ngrams, options) {
 		const E = engine();
 		const keyboardId = (options && options.keyboard) || 'iso';
-		// The user's fingering profile (the engine's keyboard(id, profile)); the
-		// scorers that read the fingering from the layout follow it.
+		// « official »: every analyser's own fingering; « custom »: the user's
+		// finger model, the engine's keyboard(id, profile).
+		const fingering = (options && options.fingering) || 'official';
+		if (!FINGERINGS.includes(fingering))
+			throw new Error(`analyser_scores: unknown fingering ${fingering}`);
 		const profile = options ? options.profile : undefined;
 		E.keyboard(keyboardId, profile);
 		return {
@@ -1939,6 +2011,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			table: E.prepareNgrams(ngrams),
 			keyboard: keyboardId,
 			profile,
+			custom: fingering === 'custom',
 			cache: new Map()
 		};
 	}
@@ -1974,8 +2047,10 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * @param {string} id - An analyser id (see analysers()).
 	 * @param {object} layout - Library shape.
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, profile?: object}} [options] - Board (iso, iso_angle,
-	 *   ansi, ortho) and the engine's fingering profile.
+	 * @param {{keyboard?: string, profile?: object, fingering?: string}} [options] -
+	 *   Board (iso, iso_angle, ansi, ortho), the engine's fingering profile, and
+	 *   « official » (the analyser's own fingering, the default) or « custom »
+	 *   (the user's finger model from the profile).
 	 * @returns {{id, value: number|null, better, fidelity, unit, parts: object}}
 	 *   value is null for an analyser without a score (its parts are its statistics).
 	 * @throws {Error} On an unknown analyser, keyboard or malformed input.
@@ -1986,13 +2061,22 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	}
 
 	/**
-	 * One layout's score as every analyser computes it.
-	 * @returns {object} analyser id → score() result.
+	 * One layout's score as every analyser computes it, with its own fingering
+	 * and with the user's finger model side by side.
+	 * @param {object} layout - Library shape.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object}} [options] - As score().
+	 * @returns {object} analyser id → {official, custom}, each a score() result.
 	 */
 	function scoreAll(layout, ngrams, options) {
-		const ctx = context(layout, ngrams, options);
 		const out = {};
-		for (const id of ORDER) out[id] = finish(id, SCORERS[id](ctx));
+		for (const fingering of FINGERINGS) {
+			const ctx = context(layout, ngrams, Object.assign({}, options, { fingering }));
+			for (const id of ORDER) {
+				if (!out[id]) out[id] = {};
+				out[id][fingering] = finish(id, SCORERS[id](ctx));
+			}
+		}
 		return out;
 	}
 

@@ -54,15 +54,33 @@ fidelity, better, unit, digits, headline}]`; `better` is `higher`, `lower` or
   instead).
 - `score(id, layout, ngrams, {keyboard})` → `{id, value, better, fidelity,
 unit, parts}`; `value` is `null` for an analyser without a score.
-- `scoreAll(layout, ngrams, {keyboard})` → `{id: score result}`, sharing the
-  per-layout work between scorers.
+- `score(…, {keyboard, profile, fingering})`: `fingering` is `official` (the
+  default) or `custom` (see « Two fingerings »).
+- `scoreAll(layout, ngrams, {keyboard, profile})` → `{id: {official, custom}}`,
+  sharing the per-layout work between scorers.
 
 `layout` is the engine's library shape; `keyboard` is the engine's (`iso`,
 `iso_angle`, `ansi`, `ortho`), mapped to each analyser's own boards below. In
-Node, `scoreAll` takes about 35 ms per layout on the French _Don Quichotte_
+Node, one fingering of `scoreAll` takes about 35 ms per layout on the French _Don Quichotte_
 (Keyboard Layout Optimizer is the slowest, about 10 ms); inside a `vm`
-context, where global lookups are slower, about 100 ms. The gate holds it
-under 400 ms per layout in a `vm` context.
+context, where global lookups are slower, about 100 ms. The gate holds both
+fingerings under 600 ms per layout in a `vm` context.
+
+## Two fingerings
+
+Every analyser is shown twice, side by side (maintainer, 2026-11-14): its
+**official** score, with the analyser's own fingering, and its score under the
+user's **custom** finger model (the engine's `keyboard(id, profile)`: each
+key's finger and each finger's home key). In custom mode each key the model
+knows takes its finger from it, and KLA's fingers start from the model's home
+keys; keys the model does not know (Enter, Tab, the modifiers of Keyboard
+Layout Optimizer's board) keep the analyser's own finger. genkey has no thumb
+finger and Ergo-L assigns no thumb key: a key the model gives a thumb leaves
+their statistics. Where the user's model is the analyser's own, the two
+numbers are equal (QWERTY: carpalx, keygen, genkey, Oxeylyzer); they differ
+where the analyser's fingering is not the standard one (Keyboard Layout
+Optimizer types Space with the left thumb and shifts the number row by one key;
+KLAnext weighs the left hand 10 % more and KLA's Space is the left thumb's).
 
 ## How each analyser types a character
 
