@@ -757,7 +757,7 @@
 		},
 		{
 			"id": "js-0520",
-			"ordinal": 643,
+			"ordinal": 642,
 			"name": "structure plan follows a Lua module-prefix sweep only when its modules move together, and refuses a scattering step",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-lua-prefix-sweeps.cjs"],
@@ -765,7 +765,7 @@
 		},
 		{
 			"id": "js-0521",
-			"ordinal": 644,
+			"ordinal": 643,
 			"name": "structure plan never widens a live scope to the folder above a scattered one",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-scope-ancestor.cjs"],
@@ -773,7 +773,7 @@
 		},
 		{
 			"id": "js-0522",
-			"ordinal": 645,
+			"ordinal": 644,
 			"name": "structure plan follows a shared file's path under a driver root when every driver moves the file alike",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shared-driver-paths.cjs"],
@@ -781,7 +781,7 @@
 		},
 		{
 			"id": "js-0523",
-			"ordinal": 646,
+			"ordinal": 645,
 			"name": "structure plan adds the gained folder to a per-line list of a driver's sibling folders",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-folder-gain-lists.cjs"],
@@ -789,7 +789,7 @@
 		},
 		{
 			"id": "js-0524",
-			"ordinal": 647,
+			"ordinal": 646,
 			"name": "structure plan reads a Lua tool's requires against the driver whose modules only it has",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-tool-lua-roots.cjs"],
@@ -797,7 +797,7 @@
 		},
 		{
 			"id": "js-0525",
-			"ordinal": 648,
+			"ordinal": 647,
 			"name": "structure plan gives a fixture's mkdir ladder the folders of a path the step respelled under it",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-mkdir-ladder.cjs"],
@@ -805,7 +805,7 @@
 		},
 		{
 			"id": "js-0526",
-			"ordinal": 649,
+			"ordinal": 648,
 			"name": "structure plan follows an included AutoHotkey test's A_ScriptDir climb from windows/tests",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-scriptdir.cjs"],
@@ -813,7 +813,7 @@
 		},
 		{
 			"id": "js-0527",
-			"ordinal": 650,
+			"ordinal": 649,
 			"name": "structure plan follows the AutoHotkey paths of a tool naming the Windows driver",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-windows-tool-paths.cjs"],
@@ -821,7 +821,7 @@
 		},
 		{
 			"id": "js-0528",
-			"ordinal": 651,
+			"ordinal": 650,
 			"name": "structure plan recounts a bare Python climb in a moving file",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-python-anchor.cjs"],
@@ -829,7 +829,7 @@
 		},
 		{
 			"id": "js-0529",
-			"ordinal": 652,
+			"ordinal": 651,
 			"name": "structure plan follows a regex-escaped tool path by its unique tail",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-regex-tail-paths.cjs"],
@@ -837,7 +837,7 @@
 		},
 		{
 			"id": "js-0530",
-			"ordinal": 653,
+			"ordinal": 652,
 			"name": "structure plan adds each new scope home once, never under another",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-scope-overlap.cjs"],
@@ -845,7 +845,7 @@
 		},
 		{
 			"id": "js-0531",
-			"ordinal": 654,
+			"ordinal": 653,
 			"name": "structure plan keeps a join onto a scattered folder from widening to the driver root",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-widened-join.cjs"],
@@ -853,7 +853,7 @@
 		},
 		{
 			"id": "js-0532",
-			"ordinal": 655,
+			"ordinal": 654,
 			"name": "structure plan folder gains stay in the driver of the file that lists them",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-gain-scope.cjs"],
@@ -861,7 +861,7 @@
 		},
 		{
 			"id": "js-0533",
-			"ordinal": 656,
+			"ordinal": 655,
 			"name": "structure plan follows a Windows test's base-name lookup of a renamed production file",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-basename.cjs"],
@@ -869,7 +869,7 @@
 		},
 		{
 			"id": "js-0534",
-			"ordinal": 657,
+			"ordinal": 656,
 			"name": "structure plan keeps a Windows folder scan reading every file it read before the step",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-dir-scans.cjs"],
@@ -877,7 +877,7 @@
 		},
 		{
 			"id": "js-0535",
-			"ordinal": 658,
+			"ordinal": 657,
 			"name": "structure plan keeps AutoHotkey fixtures' created folders and climbs",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-fixture-paths.cjs"],
@@ -885,7 +885,7 @@
 		},
 		{
 			"id": "js-0536",
-			"ordinal": 659,
+			"ordinal": 658,
 			"name": "structure plan never rewrites a record of a published artifact or a past run",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-published-records.cjs"],
@@ -893,7 +893,7 @@
 		},
 		{
 			"id": "js-0537",
-			"ordinal": 660,
+			"ordinal": 659,
 			"name": "structure plan follows a shell path joined onto an unbraced variable",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-shell-paths.cjs"],
@@ -901,7 +901,7 @@
 		},
 		{
 			"id": "js-0538",
-			"ordinal": 661,
+			"ordinal": 660,
 			"name": "structure step carries a payload guard's quoted needles to its reader's rewritten lines",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-guard-needles.cjs"],
@@ -909,7 +909,7 @@
 		},
 		{
 			"id": "js-0539",
-			"ordinal": 662,
+			"ordinal": 661,
 			"name": "structure step keeps a moved file's optional include of a build output on its driver path",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-optional-includes.cjs"],
