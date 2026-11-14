@@ -428,6 +428,10 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       Add a visible layer selector to show and edit the Base, Shift, AltGr and Shift+AltGr layers (and other layers
       the layout defines); the maintainer could not find how to display them.
 
+- [ ] **Studio and editor i18n: English and French first (maintainer, 2026-11-14 night).** Every user-facing string
+      of Studio, the layout editor and the analyser goes through the i18n system, written in English and French only
+      for now; improve the labels first, translate into the other locales afterwards.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
