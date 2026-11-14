@@ -700,6 +700,22 @@ _DriverDirConcat(RelDir) {
 	return Combined
 }
 
+; Reads several windows/-relative directories with _DriverDirConcat, in order.
+; The structure plan writes it when a step scatters a directory a test scans:
+; the directory (while it keeps files) and the new homes of the files that left
+; it, so the scan still reads every file it read before the move. Each one must
+; hold a readable .ahk file, as for _DriverDirConcat.
+; @param RelDirs {String*} One or more directories, forward slashes.
+; @returns {String} Their sources, concatenated.
+_DriverDirsConcat(RelDirs*) {
+	if RelDirs.Length == 0
+		throw ValueError("_DriverDirsConcat needs at least one directory.")
+	Combined := ""
+	for RelDir in RelDirs
+		Combined .= _DriverDirConcat(RelDir)
+	return Combined
+}
+
 ; Reads ONE production file by its name, wherever the tree holds it, for a test
 ; whose claim is about that whole file (a single-file absence assertion that a
 ; directory-wide scan would weaken). A move between directories cannot break it;
