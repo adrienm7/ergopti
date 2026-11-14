@@ -74,7 +74,7 @@ M.COUNT_SIGNALS = {
 	{ step = "log_window_toggle_raises", name = "toggle_raise" },
 	-- modules/keymap/expander.lua: an auto or terminator expansion (DEBUG).
 	{ step = "log_hotstring_expansions", name = "expansion" },
-	-- infra/boot_profiler.lua: one completed boot.
+	-- core/logger/engine/boot_profiler.lua: one completed boot.
 	{ step = "log_boot_completions", name = "boot" },
 	-- modules/llm: an API entry restored without its Keychain key, then given one.
 	{ step = "log_api_key_absent", name = "api_key_absent" },

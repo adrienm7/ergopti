@@ -16,13 +16,13 @@ local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 --- @param schedule table Selected native failure boundary.
 --- @param check function Assertions against the export and observed state.
 local function observe(schedule, check)
-	helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 		local digest = ContentDigest.create()
 		local runloop = RunloopTimers.create()
 		local state = { reads = 0, closes = 0, applied = {}, watermark = #BATCH, position = 0, logs = {} }
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, format, ...) state.logs[#state.logs + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "foreign" }, true end }
 		local db = {
 			prepare = function() return { bind_values = function() return 0 end,

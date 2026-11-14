@@ -28,7 +28,7 @@ local helpers = require("tests.helpers")
 
 local MODULE_NAMES = {
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"modules.llm.warmup_controller",
 }
@@ -98,7 +98,7 @@ local function with_fixture(options, scenario)
 
 	local function noop() end
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.timings"] = {
 		sec = function() return 1 end,
 	}
@@ -141,7 +141,7 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 	local owned_modules = {
 		"core.events.timer_scheduler",
 		"hs",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.timings",
 		"modules.llm.warmup_controller",
 		"tests.stubs.hs",
@@ -163,7 +163,7 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 			end
 		end,
 	}, { __index = function() return function() end end })
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local timer_stub = { timers = {} }
 	function timer_stub.new(_, callback)
@@ -204,7 +204,7 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 		return registered
 	end
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.timings"] = { sec = function() return 1 end }
 	package.loaded["modules.llm.warmup_controller"] = nil
 

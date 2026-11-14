@@ -36,7 +36,7 @@ local MODULES = {
 	"modules.llm.api_mlx",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"infra.dialog_util",
@@ -308,7 +308,7 @@ local function with_fixture(options, callback)
 		is_backend_load_failed = function() return false end,
 		load_api_entries = function() end,
 	}
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["infra.notifications"] = {notify = function() end}
 	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))

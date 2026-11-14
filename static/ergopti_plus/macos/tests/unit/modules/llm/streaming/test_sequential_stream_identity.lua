@@ -131,7 +131,7 @@ end
 local function build_handler()
 	local renders, warnings = {}, {}
 	local partial
-	helpers.with_stub_scope({ "modules.llm.parser", "modules.llm.streaming_handler", "infra.logger" }, function()
+	helpers.with_stub_scope({ "modules.llm.parser", "modules.llm.streaming_handler", "core.logger.engine.logger" }, function()
 		package.loaded["modules.llm.parser"] = {
 			new_thinking_filter = SharedParser.new_thinking_filter,
 			process_prediction = function(_, _, raw) return { to_type = raw, deletes = 0, chunks = {}, nw = raw } end,
@@ -141,7 +141,7 @@ local function build_handler()
 				return { title = function() return "Fixture" end }
 			end },
 		})
-		package.loaded["infra.logger"].warn = function(_, fmt, ...)
+		package.loaded["core.logger.engine.logger"].warn = function(_, fmt, ...)
 			warnings[#warnings + 1] = string.format(fmt, ...)
 		end
 		local tooltip = {

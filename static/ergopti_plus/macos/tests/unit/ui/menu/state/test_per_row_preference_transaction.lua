@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_inverse)
 	helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.deferred_work",
 		"core.fs.engine.dir",
 		"infra.dialog_util",
@@ -61,7 +61,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 			resume_bindings = function() return true end,
 			pause_bindings = function() return true end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.dialog_util"] = {}
@@ -183,7 +183,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		"core.text.engine.json",
 		"ui.action_picker",
 		"ui.menu.shortcut_utils",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.deferred_work",
 	}, function()
 		local sensitivity = 3.5
@@ -244,7 +244,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		}
 		package.loaded["ui.action_picker"] = { open = function() return true end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
 
 		local Menu = require("ui.menu.menu_gestures")

@@ -80,7 +80,7 @@ helpers.describe("preferences transaction read-only contract", function()
 	--- @return table state
 	--- @return table calls
 	local function bind(reason)
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.preferences_transaction"] = nil
 		local Transaction = require("ui.menu.preferences_transaction")
 		local calls = { save = 0, restore = 0 }

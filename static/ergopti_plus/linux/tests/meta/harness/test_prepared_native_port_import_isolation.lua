@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local Ports = require("tests.support.prepared_native_ports")
 local target = "adapters.curl_http_client"
-local names = { "luv", target, "adapters.shell_runner", "infra.monotonic" }
+local names = { "luv", target, "adapters.shell_runner", "core.logger.engine.monotonic" }
 
 local function fixture(values, callback)
 	local saved, original_require = {}, require
@@ -42,7 +42,7 @@ helpers.describe("prepared native fixture import isolation", function()
 					if name ~= target then return original_require(name) end
 					helpers.assert_true(type(package.loaded.luv.new_pipe) == "function")
 					package.loaded["adapters.shell_runner"] = { captured_fixture_luv = package.loaded.luv }
-					package.loaded["infra.monotonic"] = { captured_fixture_luv = package.loaded.luv }
+					package.loaded["core.logger.engine.monotonic"] = { captured_fixture_luv = package.loaded.luv }
 					package.loaded[target] = returned
 					return returned
 				end
@@ -60,7 +60,7 @@ helpers.describe("prepared native fixture import isolation", function()
 				_G.require = function(name)
 					if name ~= target then return original_require(name) end
 					package.loaded["adapters.shell_runner"] = { captured_fixture_luv = package.loaded.luv }
-					package.loaded["infra.monotonic"] = { captured_fixture_luv = package.loaded.luv }
+					package.loaded["core.logger.engine.monotonic"] = { captured_fixture_luv = package.loaded.luv }
 					package.loaded[target] = { incomplete = true }
 					error(failure, 0)
 				end
@@ -85,10 +85,10 @@ helpers.describe("prepared native fixture import isolation", function()
 			local client = Ports.fresh_client()
 			helpers.assert_true(type(client.dispatch_owned) == "function")
 			helpers.assert_nil(package.loaded["adapters.shell_runner"])
-			helpers.assert_nil(package.loaded["infra.monotonic"])
+			helpers.assert_nil(package.loaded["core.logger.engine.monotonic"])
 			helpers.assert_nil(package.loaded[target])
 			helpers.assert_nil(package.loaded.luv)
-			local clock = original_require("infra.monotonic")
+			local clock = original_require("core.logger.engine.monotonic")
 			helpers.assert_eq(clock.backend(), "luv.hrtime")
 			helpers.assert_eq(clock.now_ms(), 123)
 			helpers.assert_eq(calls, 1)

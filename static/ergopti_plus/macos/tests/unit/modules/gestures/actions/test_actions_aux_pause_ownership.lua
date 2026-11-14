@@ -17,7 +17,7 @@ local function fresh_owner()
 		"modules.gestures.actions_aux_owner",
 		"core.events.timer_scheduler",
 		"adapters.shell_runner",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -147,7 +147,7 @@ local function fresh_owner()
 	logger.error = function(_, format, ...)
 		fixture.errors[#fixture.errors + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.events.timer_scheduler"] = nil

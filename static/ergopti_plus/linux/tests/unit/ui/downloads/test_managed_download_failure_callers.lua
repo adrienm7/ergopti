@@ -38,7 +38,7 @@ local function bridge_fixture(replace)
 		diagnostics_available = false, evaluated = {} }
 	-- Restore exact known native fixture ports even if construction throws
 	-- before the fixture can return its owned close callback.
-	for _, name in ipairs({ "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
+	for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline",
 		"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
 		"infra.manifest_reader" }) do
 		replace(name, package.loaded[name])
@@ -394,7 +394,7 @@ helpers.describe("actual model cancellation preserves caller UI ownership", func
 	local function actual_bridge_fixture(replace)
 		local _, world = model_fixture(replace)
 		world.evaluated = {}
-		for _, name in ipairs({ "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
+		for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline",
 			"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
 			"infra.manifest_reader" }) do
 			replace(name, package.loaded[name])

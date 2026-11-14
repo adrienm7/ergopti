@@ -17,7 +17,7 @@ local function with_editor(test)
 		errors = {}, notifications = 0,
 	}
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			error = function(_, message, ...)
 				state.errors[#state.errors + 1] = string.format(message, ...)

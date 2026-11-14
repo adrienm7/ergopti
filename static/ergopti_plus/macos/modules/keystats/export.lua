@@ -28,7 +28,7 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Queries = require("metrics.engine.queries")
 -- One owner of SQL text values: db:exec ends a statement at a NUL, so doubling
 -- apostrophes alone let one cut a literal (sql-literal-nul-2026-10-21).

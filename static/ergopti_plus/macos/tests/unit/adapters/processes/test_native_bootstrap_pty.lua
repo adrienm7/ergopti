@@ -54,7 +54,7 @@ local function receiving(body, options)
 	local native = { bytes = "", exists = true, inode = 9, removals = 0, releases = 0 }
 	local ok, error_message = xpcall(function()
 		_G.hs = { host = { uuid = function() return NONCE end } }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["platform.remap.lease_helper"] = { resolve = function()
 			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 		end }

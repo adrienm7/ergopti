@@ -188,16 +188,16 @@ helpers.describe("TimerScheduler adapter — every()", function()
 
 	helpers.it("isolates callback exceptions and routes them to the file logger", function()
 		local timer_stub = make_timer_stub()
-		local previous_logger = package.loaded["infra.logger"]
+		local previous_logger = package.loaded["core.logger.engine.logger"]
 		local logged_error = nil
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			error = function(_, message, ...)
 				logged_error = string.format(message, ...)
 			end,
 		}
 		local TS = helpers.load_with_stubs("core.events.timer_scheduler",
 			{ timer = timer_stub })
-		package.loaded["infra.logger"] = previous_logger
+		package.loaded["core.logger.engine.logger"] = previous_logger
 		TS.every(1, function() error("boom") end)
 		-- Must not raise even though the callback throws
 		-- The swallowing IS the subject, so the pcall stays. What it was missing:

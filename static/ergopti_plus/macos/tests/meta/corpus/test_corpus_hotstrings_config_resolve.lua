@@ -18,8 +18,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 local corpus_path = helpers.shared("tests/corpus/hotstrings/config_resolve_vectors.json")
 

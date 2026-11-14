@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local Report = require("diagnostics.engine.field_check.report")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local M = {}
 

@@ -18,7 +18,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Vhid = require("platform.remap.runtime_vhid")
 
 local LOG = "remap.runtime_approval_watch"

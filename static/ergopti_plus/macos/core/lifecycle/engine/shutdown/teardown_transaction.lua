@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "core.lifecycle.engine.shutdown.teardown_transaction"

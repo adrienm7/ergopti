@@ -24,7 +24,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local TableUtil = require("core.text.engine.table_util")
 

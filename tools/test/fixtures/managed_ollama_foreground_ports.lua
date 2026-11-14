@@ -22,7 +22,7 @@ function M.new(root, production, options)
 	local logger = { today_log_path = function() return LOG end,
 		error = function(_, _, ...) state.errors[#state.errors + 1] = table.pack(...) end }
 	for _, name in ipairs({ "debug", "warn", "info", "success" }) do logger[name] = function() end end
-	modules["infra.logger"] = logger
+	modules["core.logger.engine.logger"] = logger
 	modules["infra.text_utils"] = text_utils
 	modules["infra.notifications"] = { notify = function() return true end }
 	modules["core.i18n.engine.i18n"] = { get = function(key) return key end }

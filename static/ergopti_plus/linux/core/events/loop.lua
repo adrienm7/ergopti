@@ -109,8 +109,8 @@ local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context p
 local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
 local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield_idle().
 
-local Monotonic = require("infra.monotonic")
-local Perf = require("infra.perf_counters")
+local Monotonic = require("core.logger.engine.monotonic")
+local Perf = require("core.logger.engine.perf_counters")
 local PhaseStats = require("infra.phase_stats")
 
 

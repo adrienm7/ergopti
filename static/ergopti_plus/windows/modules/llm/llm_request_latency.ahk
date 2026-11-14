@@ -24,7 +24,7 @@
 
 #Requires AutoHotkey v2.0
 
-; TickElapsed (infra/tick_count.ahk), PerfBudget_Report (infra/perf_budget.ahk),
+; TickElapsed (core/logger/engine/tick_count.ahk), PerfBudget_Report (core/logger/engine/perf_budget.ahk),
 ; TimingsGet and the logger come from ErgoptiPlus.ahk: the test harnesses that
 ; load the prediction engine stub some of them, and a second definition would
 ; stop their load.

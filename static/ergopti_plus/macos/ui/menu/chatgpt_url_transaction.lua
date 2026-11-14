@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu.chatgpt_url_transaction"
 
 local function valid_url(value)

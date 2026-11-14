@@ -19,7 +19,7 @@
 
 local M = {}
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.engine.labels")
 local Extensions = require("hotstrings.engine.extensions")

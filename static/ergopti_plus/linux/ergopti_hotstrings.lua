@@ -169,7 +169,7 @@ end
 -- from holding it after this daemon stops or crashes.
 -- The fatal outcomes that precede the logger sink leave one closed-vocabulary
 -- record in bootstrap.log (the Windows file of the same name), besides stderr.
-local BootstrapLog = require("infra.bootstrap_log")
+local BootstrapLog = require("core.logger.engine.bootstrap_log")
 local lock_protected, lock_error = require("core.lifecycle.engine.shutdown.session_lock").protect()
 if not lock_protected then
 	io.stderr:write("[session_lock] " .. lock_error .. "\n")
@@ -215,7 +215,7 @@ local RuntimeGuard = require("core.lifecycle.engine.runtime_guard")
 -- The shared logger core only writes to an injected sink, so install ours before
 -- the first Logger.* call. Without this every log line on Linux — including the
 -- two fatal errors below — went to a ring buffer and nowhere else.
-local LoggerSink = require("infra.logger_sink")
+local LoggerSink = require("core.logger.engine.sink")
 -- A privacy admission failure must not let Lua print the unredacted exception.
 -- A false durability result remains a successfully admitted stdout-only sink.
 local privacy_admitted, privacy_failure, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
@@ -275,7 +275,7 @@ local dev_finder        = require("modules.hotstrings.device_finder")
 local keystats         = require("modules.keystats.keystats")
 local keyboard_hook     = require("adapters.keyboard_hook")
 local InputEvent        = require("infra.input_event")
-local Monotonic         = require("infra.monotonic")
+local Monotonic         = require("core.logger.engine.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
@@ -283,7 +283,7 @@ local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
-local BootProfiler      = require("infra.boot_profiler")
+local BootProfiler      = require("core.logger.engine.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
@@ -1925,7 +1925,7 @@ local function main()
 	-- than to the whole input.dispatch span that also contains the tap-hold path.
 	do
 		-- Required here, not at file level: main() sits at LuaJIT's 60-upvalue limit.
-		local Perf = require("infra.perf_counters")
+		local Perf = require("core.logger.engine.perf_counters")
 		local guarded_char = on_char
 		on_char = function(ch, scancode)
 			local started = Perf.clock()
@@ -2845,7 +2845,7 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
-					local switch_started = require("infra.perf_counters").trace("layout.switch")
+					local switch_started = require("core.logger.engine.perf_counters").trace("layout.switch")
 					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
 					local function selected_map_current()
 						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
@@ -2857,7 +2857,7 @@ local function main()
 						return selected_map_current() and set_layout(new_layout) == true
 							and selected_map_current() and refresh(selected_keymap) == true
 					end, selected_map_current) then
-						require("infra.perf_counters").done("layout.switch", switch_started, "refused")
+						require("core.logger.engine.perf_counters").done("layout.switch", switch_started, "refused")
 						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
 						return
 					end
@@ -2874,7 +2874,7 @@ local function main()
 					-- menu still marks the old layout and the change reads as ignored.
 					if rebuild_tray_menu then rebuild_tray_menu() end
 					Logger.success(LOG, "Layout '%s' applied in %.0f ms.", tostring(new_layout),
-						require("infra.perf_counters").done("layout.switch", switch_started))
+						require("core.logger.engine.perf_counters").done("layout.switch", switch_started))
 				end,
 		keystats     = keystats,
 		llm           = prediction_engine,
@@ -3774,7 +3774,7 @@ local function main()
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	-- The interval since the last summary, which a short session never reached.
-	require("infra.perf_counters").flush_now()
+	require("core.logger.engine.perf_counters").flush_now()
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end

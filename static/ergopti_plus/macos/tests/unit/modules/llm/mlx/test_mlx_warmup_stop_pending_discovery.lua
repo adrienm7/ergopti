@@ -33,7 +33,7 @@ local function stop_with(stop)
 		package.loaded["modules.llm.api_mlx"] = nil
 		local ApiMlx = helpers.load_with_stubs("modules.llm.api_mlx")
 		local lines = {}
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)

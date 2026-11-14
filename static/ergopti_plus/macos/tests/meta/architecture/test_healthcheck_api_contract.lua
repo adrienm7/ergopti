@@ -28,7 +28,7 @@ local helpers = require("tests.helpers")
 -- The exact external surface the diagnostics window relies on.
 -- mod = require path; fns = functions that must exist; constants = fields read.
 local CONTRACT = {
-	{ mod = "infra.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
+	{ mod = "core.logger.engine.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
 		"logs_dir", "today_log_path", "today_errors_path", "crash_reports_dir" } },
 	{ mod = "infra.config_paths",               fns = { "is_initialized", "get_config_dir" } },
 	{ mod = "infra.diagnostic_snapshot",        fns = { "resolve_commit" } },
@@ -97,7 +97,7 @@ helpers.describe("meta: healthcheck diagnostic API contract", function()
 			-- Build the hs/lib stub environment, then force a REAL require of the
 			-- target module. Clear the exact canonical key so no partial subject
 			-- stub left by an earlier test can satisfy this API contract.
-			helpers.load_with_stubs("infra.logger")
+			helpers.load_with_stubs("core.logger.engine.logger")
 			package.loaded[entry.mod] = nil
 			local ok, mod = pcall(require, entry.mod)
 			helpers.assert_true(ok and type(mod) == "table",
@@ -135,11 +135,11 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	local failures = {}
 	local ok_run, snap
 	local scope = {
-		"infra.logger", "core.logger.engine", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "core.logger.engine", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}
 	for _, name in ipairs(HS_READERS) do scope[#scope + 1] = name end
 	helpers.with_stub_scope(scope, function()
-		local Logger = helpers.load_with_stubs("infra.logger")
+		local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 		answer_as_a_mac(hs)
 		for _, name in ipairs(HS_READERS) do package.loaded[name] = nil end
 		-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).

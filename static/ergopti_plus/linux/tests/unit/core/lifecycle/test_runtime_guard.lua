@@ -12,7 +12,7 @@ local Guard = helpers.load_module("core.lifecycle.engine.runtime_guard")
 
 helpers.describe("runtime guard: optional capabilities", function()
 	helpers.it("returns a real module table", function()
-		helpers.assert_not_nil(Guard.optional_require("infra.monotonic"))
+		helpers.assert_not_nil(Guard.optional_require("core.logger.engine.monotonic"))
 	end)
 
 	helpers.it("returns nil for a missing or malformed module", function()

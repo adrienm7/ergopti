@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.field_check_ports", "adapters.shell_runner", "core.events.timer_scheduler",
+	"core.logger.engine.logger", "adapters.field_check_ports", "adapters.shell_runner", "core.events.timer_scheduler",
 	"platform.remap.lease_helper", "modules.llm.network_env",
 }
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
@@ -20,7 +20,7 @@ local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
 helpers.describe("field check command deadlines", function()
 	helpers.it("retains a partially started child when launch refuses (field-command-start-owner)", function()
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local observer, done, terminations = nil, nil, 0
 			package.loaded["core.events.timer_scheduler"] = { after = function() error("no timer after refused start") end,
 				cancel = function() return true end }
@@ -40,7 +40,7 @@ helpers.describe("field check command deadlines", function()
 	end)
 	helpers.it("waits for process retirement after a timeout signal (field-command-timeout-owner)", function()
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local observer, deadline, done = nil, nil, nil
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function(_, callback) deadline = callback; return {}, true end, cancel = function() return true end,
@@ -61,7 +61,7 @@ helpers.describe("field check command deadlines", function()
 	end)
 	helpers.it("cancels a deadline if the child completes while it is being armed (field-command-timer-race)", function()
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local completion, cancelled, result = nil, 0, nil
 			local handle = {}
 			package.loaded["core.events.timer_scheduler"] = {
@@ -80,7 +80,7 @@ helpers.describe("field check command deadlines", function()
 	end)
 	helpers.it("retires the exact child after deadline allocation refusal (field-command-timer-refusal)", function()
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local observer, done, terminations = nil, nil, 0
 			package.loaded["core.events.timer_scheduler"] = { after = function() return {}, false end, cancel = function() return true end }
 			package.loaded["adapters.shell_runner"] = { spawn = function()
@@ -108,7 +108,7 @@ end)
 local function run(script, launcher)
 	local calls, answer, timers = {}, nil, {}
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function() local handle = { stopped = false }; timers[#timers + 1] = handle; return handle end,
 			cancel = function() return true end,
@@ -177,9 +177,9 @@ end)
 helpers.describe("network check relay probe port", function()
 	local function probe(script, launcher, present)
 		local calls, answers = {}, {}
-		helpers.with_stub_scope({ "infra.logger", "adapters.field_check_ports", "adapters.shell_runner",
+		helpers.with_stub_scope({ "core.logger.engine.logger", "adapters.field_check_ports", "adapters.shell_runner",
 			"core.events.timer_scheduler", "platform.remap.lease_helper", "core.fs.adapters.file_system" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { stopped = false } end, cancel = function() return true end,
 			}

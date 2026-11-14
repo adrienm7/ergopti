@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 
 local STUBBED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
@@ -39,7 +39,7 @@ local function load_fixture(options, lifetime)
 	local engine_resets = 0
 	local hides = 0
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,

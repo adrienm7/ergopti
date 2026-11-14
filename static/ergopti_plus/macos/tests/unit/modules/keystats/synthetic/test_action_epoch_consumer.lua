@@ -22,7 +22,7 @@ local RESET_MODULES = {
 	"modules.keystats.watchers", "adapters.process_lifecycle",
 	"adapters.keyboard_hook", "adapters.event_provenance",
 	"adapters.synthetic_input", "adapters.input_source_broker",
-	"infra.logger", "infra.timings",
+	"core.logger.engine.logger", "infra.timings",
 	"infra.manifest_reader", "core.i18n.engine.i18n", "infra.dialog_util",
 	"metrics.engine.metrics", "modules.keymap",
 }
@@ -94,7 +94,7 @@ local function load_timer_allocation_failure_fixture()
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 
 	local appended = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats.rotation"] = {
 		init = noop,
 		is_initialized = function() return true end,
@@ -421,7 +421,7 @@ local function load_fixture()
 		unsubscribe = function() return true end,
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
-	package.loaded["infra.logger"] = api({
+	package.loaded["core.logger.engine.logger"] = api({
 		pcall = function(_module_name, fn, ...)
 			return pcall(fn, ...)
 		end,

@@ -17,7 +17,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"modules.llm",
 	"modules.llm.network_env",
@@ -477,7 +477,7 @@ local function with_fixture(plan, callback)
 				local ok, rendered = pcall(string.format, tostring(message), ...)
 				records.errors[#records.errors + 1] = ok and rendered or tostring(message)
 			end
-			package.loaded["infra.logger"] = logger_stub
+			package.loaded["core.logger.engine.logger"] = logger_stub
 			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,

@@ -24,7 +24,7 @@
 
 local M = {}
 
-local Logger    = require("infra.logger")
+local Logger    = require("core.logger.engine.logger")
 local llm_mod   = require("modules.llm")
 local Chord     = require("keyboard.engine.chord")
 local Hotkeys   = require("adapters.hotkey_registrar")

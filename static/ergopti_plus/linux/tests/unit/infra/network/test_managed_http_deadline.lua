@@ -47,12 +47,12 @@ local function fresh(config)
 			if not receipt.acknowledged then receipt.acknowledged = true; receipt.callback() end
 		end
 	end
-	local names = { "luv", "infra.monotonic", "core.logger.engine.shim" }
+	local names = { "luv", "core.logger.engine.monotonic", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, module = pcall(function()
 	package.loaded.luv = uv
-	package.loaded["infra.monotonic"] = { now_ms = function() return state.time end }
+	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return state.time end }
 	package.loaded["core.logger.engine.shim"] = { error = function(_, message) state.logs[#state.logs + 1] = message end }
 	return helpers.fresh_module("infra.managed_http_deadline")
 	end)

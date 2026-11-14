@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"hs", "infra.logger", "core.fs.engine.paths", "infra.manifest_reader",
+	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "infra.manifest_reader",
 	"core.fs.adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
 	"adapters.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
 	"adapters.keyboard_geometry", "shortcuts.engine.magic_editor_core",
@@ -23,7 +23,7 @@ local function with_fixture(callback)
 		native.keycodes.map = { a = 0, c = 8, b = 11, j = 38 }
 		_G.hs, package.loaded.hs = native, native
 		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(native.eventtap.event.properties)
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "physical-registry.json" end }
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return "open_hotstrings_editor" end,

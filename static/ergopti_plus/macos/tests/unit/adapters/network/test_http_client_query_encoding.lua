@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.events.timer_scheduler",
 	"adapters.http_client",
 }
@@ -29,7 +29,7 @@ local function with_encoder(native_encoder, callback)
 				local ok, formatted = pcall(string.format, format_string, ...)
 				errors[#errors + 1] = ok and formatted or tostring(format_string)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 
 			local http_stub = {}
 			if native_encoder then http_stub.encodeForQuery = native_encoder end

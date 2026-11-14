@@ -20,7 +20,7 @@ local function with_fixture(listing, callback)
 		"core.fs.adapters.file_system",
 		"infra.config_paths",
 		"core.i18n.engine.i18n",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"core.fs.engine.dir",
 	}
 	helpers.with_fresh_modules(module_names, function()
@@ -42,7 +42,7 @@ local function with_fixture(listing, callback)
 		local logger_stub = helpers.make_logger_stub()
 		logger_stub.crash_reports_dir = function() return "/virtual/logs/crash_reports/" end
 		logger_stub.warn = function(_, fmt, ...) state.warnings[#state.warnings + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"] = logger_stub
+		package.loaded["core.logger.engine.logger"] = logger_stub
 		hs.fs.attributes = function() return { mode = "directory" } end
 		hs.fs.mkdir = function() return true end
 		hs.fs.dir = function()

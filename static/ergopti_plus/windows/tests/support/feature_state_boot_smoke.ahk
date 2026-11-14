@@ -38,9 +38,9 @@ global HSE_RepeatEnabled := true
 #Include ..\..\_generated\app_dirs.ahk
 #Include ..\..\infra\app_folders.ahk
 #Include ..\..\infra\legacy_folder_migration.ahk
-#Include ..\..\infra\tick_count.ahk
-#Include ..\..\infra\wall_clock.ahk
-#Include ..\..\infra\logger.ahk
+#Include ..\..\core\logger\engine\tick_count.ahk
+#Include ..\..\core\logger\engine\wall_clock.ahk
+#Include ..\..\core\logger\engine\logger.ahk
 #Include ..\..\infra\hotpath_profiler.ahk
 #Include ..\..\infra\redact.ahk
 #Include ..\..\core\crypto\crypto.ahk

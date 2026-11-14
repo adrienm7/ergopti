@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local with_remap = require("tests.support.guardian_recovery_fixture").with_remap
 local OWNERS = {
-	"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger",
+	"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger",
 	"platform.remap", "hs", "tests.stubs.hs",
 }
 

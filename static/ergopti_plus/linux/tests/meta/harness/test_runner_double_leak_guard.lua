@@ -26,14 +26,14 @@ helpers.describe("runner: test doubles never outlive their module", function()
 		local previous_events = package.loaded["metrics.engine.system.session_events"]
 		package.loaded["metrics.engine.system.session_events"] = nil
 		local before = snapshot()
-		local real_monotonic = package.loaded["infra.monotonic"]
-		package.loaded["infra.monotonic"] = { now_ms = function() return 0 end }
+		local real_monotonic = package.loaded["core.logger.engine.monotonic"]
+		package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return 0 end }
 		package.loaded["metrics.engine.system.session_events"] = { new = function() return {} end }
 		local leaked = helpers.restore_leaked_doubles(before)
 		local new_double = package.loaded["metrics.engine.system.session_events"]
 		package.loaded["metrics.engine.system.session_events"] = previous_events
-		helpers.assert_eq(table.concat(leaked, ","), "infra.monotonic,metrics.engine.system.session_events")
-		helpers.assert_true(rawequal(package.loaded["infra.monotonic"], real_monotonic),
+		helpers.assert_eq(table.concat(leaked, ","), "core.logger.engine.monotonic,metrics.engine.system.session_events")
+		helpers.assert_true(rawequal(package.loaded["core.logger.engine.monotonic"], real_monotonic),
 			"the replaced product module is the original object again")
 		helpers.assert_eq(new_double, nil, "a new double is removed")
 	end)

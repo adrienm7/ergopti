@@ -753,13 +753,13 @@ end)
 --- @return table loop, table clock { now }
 local function pump_on_clock(resolution)
 	local clock = { now = 0 }
-	local previous = package.loaded["infra.monotonic"]
-	package.loaded["infra.monotonic"] = {
+	local previous = package.loaded["core.logger.engine.monotonic"]
+	package.loaded["core.logger.engine.monotonic"] = {
 		now_ms = function() return clock.now end,
 		resolution_ms = function() return resolution end,
 	}
 	local ok, loop = pcall(load_pump_loop)
-	package.loaded["infra.monotonic"] = previous
+	package.loaded["core.logger.engine.monotonic"] = previous
 	if not ok then error(loop, 0) end
 	return loop, clock
 end

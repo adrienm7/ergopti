@@ -43,7 +43,7 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 	helpers.it("logs a keystats system-load sink exception", isolated(function()
 		local errors = {}
 		local completion
-		package.loaded["infra.logger"] = capturing_logger(errors)
+		package.loaded["core.logger.engine.logger"] = capturing_logger(errors)
 		package.loaded["infra.timings"] = { ms = function() return 1 end }
 		package.loaded["modules.keystats.log_manager"] = {
 			log_system_event = function() error("system event sink exploded") end,
@@ -74,7 +74,7 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 	helpers.it("logs an active-layout on_done exception", isolated(function()
 		local errors = {}
 		local completion
-		package.loaded["infra.logger"] = capturing_logger(errors)
+		package.loaded["core.logger.engine.logger"] = capturing_logger(errors)
 		package.loaded["adapters.task_lifecycle"] = nil
 		local InputSources = helpers.load_with_stubs("modules.keymap.input_sources", {
 			task = { new = function(_, cb)

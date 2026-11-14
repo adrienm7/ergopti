@@ -241,7 +241,7 @@ for (const source of [
 	'static/ergopti_plus/linux/infra/archive_tar_feeder.lua',
 	'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
 	'static/ergopti_plus/linux/infra/native_timer.lua',
-	'static/ergopti_plus/linux/infra/monotonic.lua',
+	'static/ergopti_plus/linux/core/logger/engine/monotonic.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
 	'.github/workflows/ci-linux.yml',
 	'.github/linux-ci-coverage.json'

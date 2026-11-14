@@ -67,12 +67,12 @@
 	},
 	"NS_PER_MS": {
 		"files": [
-			"linux/infra/monotonic.lua",
+			"linux/core/logger/engine/monotonic.lua",
 			"macos/core/events/clock.lua",
-			"macos/infra/boot_profiler.lua",
+			"macos/core/logger/engine/boot_profiler.lua",
 			"macos/infra/hotpath_profiler.lua",
-			"macos/infra/key_event_health.lua",
-			"macos/infra/keystroke_integrity.lua"
+			"macos/core/logger/engine/key_event_health.lua",
+			"macos/core/logger/engine/keystroke_integrity.lua"
 		],
 		"divergent": false
 	},

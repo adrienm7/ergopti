@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("ShellRunner preserves native undecodable stdout", function()
  helpers.it("forwards nil chunk and terminal output without converting either to empty text", function()
-  helpers.with_stub_scope({ "adapters.shell_runner", "adapters.task_environment", "infra.logger" }, function()
+  helpers.with_stub_scope({ "adapters.shell_runner", "adapters.task_environment", "core.logger.engine.logger" }, function()
    local chunk_callback, done_callback, native
    local runner = helpers.load_with_stubs("adapters.shell_runner", {
     task = { new = function(_, done, chunk)

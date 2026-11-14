@@ -19,7 +19,7 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 
 local LOG = "menu_llm.warmup"
 

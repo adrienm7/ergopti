@@ -14,7 +14,7 @@
 ; The fix: !(BaseDir ~= "[/\\]$") — NOT applied to the full match expression.
 ;
 ; The crash reporter no longer builds its folder: LoggerCrashReportsDir() in
-; infra/logger.ahk resolves it inside the logs folder. The invariant moved with
+; core/logger/engine/logger.ahk resolves it inside the logs folder. The invariant moved with
 ; it and is now checked behaviourally: whatever separator the logs folder was
 ; stored with, the crash-reports folder ends in exactly one backslash.
 ;

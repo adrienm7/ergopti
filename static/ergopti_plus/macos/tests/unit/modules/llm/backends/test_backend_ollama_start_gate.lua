@@ -33,7 +33,7 @@ local function fixture(installed, source_kind)
 	local core = helpers.load_with_stubs("modules.llm")
 	local api = package.loaded["modules.llm.api_ollama"]
 	local binary = package.loaded["modules.llm.ollama_binary"]
-	local logger = package.loaded["infra.logger"]
+	local logger = package.loaded["core.logger.engine.logger"]
 	local originals = { ensure = api.ensure_running, resolve = binary.resolve, error = logger.error }
 	local spy = { starts = 0, errors = {}, resolves = 0 }
 	api.ensure_running = function()

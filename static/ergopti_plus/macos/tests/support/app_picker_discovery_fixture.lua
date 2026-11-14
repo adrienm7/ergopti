@@ -24,7 +24,7 @@ return function(run)
 			return original_getenv(key)
 		end
 		helpers.with_fresh_modules({ "infra.app_picker", "adapters.shell_runner",
-			"core.fs.adapters.file_system", "infra.logger", "core.i18n.engine.i18n", "infra.text_utils", "infra.deferred_work" }, function()
+			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.text_utils", "infra.deferred_work" }, function()
 			package.loaded["infra.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
 				if state.defer_synchronous then callback() end
@@ -58,7 +58,7 @@ return function(run)
 					if state.on_log then state.on_log(level, message) end
 				end
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.text_utils"] = { escape_gsub_replacement = function(value) return value end }
 			_G.hs = {

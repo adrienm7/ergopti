@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local WindowManager = require("adapters.window_manager")
 local MouseControl  = require("adapters.mouse_control")
 

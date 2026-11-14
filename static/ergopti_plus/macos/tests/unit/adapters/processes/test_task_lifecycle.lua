@@ -29,7 +29,7 @@ local function load_adapter()
 		local ok, rendered = pcall(string.format, fmt, ...)
 		errors[#errors + 1] = ok and rendered or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["adapters.task_lifecycle"] = nil
 	return require("adapters.task_lifecycle"), errors
 end
@@ -105,7 +105,7 @@ helpers.describe("task_lifecycle: only a real native start commits", function()
 			local ok, rendered = pcall(string.format, fmt, ...)
 			errors[#errors + 1] = ok and rendered or tostring(fmt)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.task_lifecycle"] = nil
 		local lifecycle = require("adapters.task_lifecycle")
 

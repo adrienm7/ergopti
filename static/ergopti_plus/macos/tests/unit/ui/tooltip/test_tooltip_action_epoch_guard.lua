@@ -18,7 +18,7 @@ local restore_context = function() end
 
 local function load_fixture()
 	restore_context()
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	restore_context = TooltipContext.install()
 
 	local watchers = {}
@@ -32,7 +32,7 @@ local function load_fixture()
 		partial_render = 0,
 	}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.hotpath_profiler"] = {
 		now = function() return 0 end,
 		log_if_slow = function() end,
@@ -317,7 +317,7 @@ end)
 
 helpers.describe("tooltip facade: quarantine is LLM-only", function()
 	helpers.it("keeps stacked hotstring output available while every LLM paint is closed", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local calls = { stacked = 0, loading = 0, predictions = 0, navigate = 0 }
 		local llm_guard
 		package.loaded["ui.tooltip.config"] = {

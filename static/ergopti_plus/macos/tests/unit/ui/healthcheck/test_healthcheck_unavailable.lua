@@ -18,9 +18,9 @@ local helpers = require("tests.helpers")
 local function collect(explained, silent)
 	local result
 	local ok, err = pcall(function()
-		helpers.with_stub_scope({ "infra.logger", "infra.manifest_reader", "ui.healthcheck.helpers" }, function()
-			helpers.load_with_stubs("infra.logger")
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "infra.manifest_reader", "ui.healthcheck.helpers" }, function()
+			helpers.load_with_stubs("core.logger.engine.logger")
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_reader"] = { coverage_gaps = function() return explained, silent end }
 			package.loaded["ui.healthcheck.helpers"] = nil
 			result = require("ui.healthcheck.helpers").collect_unavailable()

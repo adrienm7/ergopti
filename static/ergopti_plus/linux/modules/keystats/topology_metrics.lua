@@ -155,7 +155,7 @@ function M.start(record)
 		processes = function()
 			return M.process_names("/proc", function(path) return NativeDirectory.entries(path) end, read)
 		end,
-		now_ms = function() return require("infra.monotonic").now_ms() end,
+		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 	})
 	if _source.read then
 		Logger.info(LOG, "Window topology and capture-program presence are recorded.")

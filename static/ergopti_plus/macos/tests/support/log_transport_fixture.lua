@@ -27,7 +27,7 @@ local LOOPBACK = { host = "127.0.0.1", port = 49321 }
 --- @return table context Transport plus observable test-double state.
 local function new_context(config)
 	config = config or {}
-	package.loaded["adapters.log_transport"] = nil
+	package.loaded["core.logger.adapters.log_transport"] = nil
 	package.loaded["tests.stubs.hs"] = nil
 	package.loaded["hs"] = nil
 
@@ -167,7 +167,7 @@ local function new_context(config)
 		return state.clock * 1000000000
 	end
 
-	local transport = require("adapters.log_transport")
+	local transport = require("core.logger.adapters.log_transport")
 	local bootstrap = {}
 	function bootstrap:settimeout(timeout_sec)
 		state.preflight_timeouts[#state.preflight_timeouts + 1] = timeout_sec
@@ -331,8 +331,8 @@ end
 --- @param callback function Test assertions.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"adapters.log_transport", "tests.stubs.hs", "hs",
-		"core.events.timer_scheduler", "infra.logger",
+		"core.logger.adapters.log_transport", "tests.stubs.hs", "hs",
+		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}, callback)
 end
 

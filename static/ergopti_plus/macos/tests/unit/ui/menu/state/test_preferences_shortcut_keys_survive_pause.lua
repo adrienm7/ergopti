@@ -30,11 +30,11 @@ local DISABLED_ID = "cmd_star"
 --- @return ... Callback results.
 local function with_preferences(callback)
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "infra.logger",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
 	}, function()
 		local disk = {}
 		local control = { refuse_write = false }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				if disk[path] == nil then return nil, "absent" end

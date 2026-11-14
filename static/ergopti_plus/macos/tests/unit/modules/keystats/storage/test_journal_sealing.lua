@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
-local SLOTS = { "modules.keystats.rotation", "modules.keystats.text_cipher", "infra.logger", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer" }
+local SLOTS = { "modules.keystats.rotation", "modules.keystats.text_cipher", "core.logger.engine.logger", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer" }
 
 --- A reversible stand-in cipher with the shared envelope format.
 --- @return table cipher With controllable `enabled` and `broken` flags.
@@ -48,7 +48,7 @@ local function load_fixture()
 	local cipher = fake_cipher()
 	package.loaded["modules.keystats.rotation"] = nil
 	package.loaded["modules.keystats.text_cipher"] = cipher
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local hs_stub = _G.hs or require("tests.stubs.hs")
 	for _, name in ipairs({ "fs", "json", "sqlite3", "timer" }) do
 		package.loaded["hs." .. name] = hs_stub[name]

@@ -17,7 +17,7 @@ local function child()
   local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
- package.loaded['infra.logger'] = logger
+ package.loaded['core.logger.engine.logger'] = logger
  package.loaded['modules.keystats.text_cipher'] = { encrypt = function(_, _, value) return value end }
  local field = assert(os.getenv('ERGOPTI_LLM_FIELD'))
  local entry = { type='llm_generation', timestamp='2026-10-17 12:00:00', app='Editor' }

@@ -88,7 +88,7 @@ local function load_fixture(behavior)
 	--- Loads one genuinely fresh bridge instance with the same observable ports.
 	--- @return table bridge Fresh production module.
 	local function load_bridge_module()
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.notifications"] = notification_module
 		return helpers.load_with_stubs("infra.vscode_bridge")
 	end

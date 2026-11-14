@@ -45,7 +45,7 @@ helpers.describe("typing reset completion", function()
 				context.poll(); evaluations[#evaluations].done("request", nil)
 				evaluations[#evaluations].done(true, nil)
 			end
-			package.loaded["infra.logger"].info = function(_, template)
+			package.loaded["core.logger.engine.logger"].info = function(_, template)
 				if template == "Caches cleared by user reset." and id == 1 then id = 2; dispatch() end
 			end
 			local original = os.remove

@@ -38,7 +38,7 @@ function M.run(config, done)
 	assert(config.readiness_query == "typeof window.publishMetricsAppsData")
 	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
 		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
-	local Logger, UI = require("infra.logger"), require("ui.ui_builder")
+	local Logger, UI = require("core.logger.engine.logger"), require("ui.ui_builder")
 	local Scheduler, Result = require("core.events.timer_scheduler"), require("adapters.webview_result")
 	local json = require("hs.json")
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))

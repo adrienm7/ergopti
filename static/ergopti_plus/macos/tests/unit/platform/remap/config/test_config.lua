@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- toml_codec is a native C library not available in the headless test runner;
 -- stub it out so the module loads without crashing. _load_toml_file is then

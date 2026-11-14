@@ -14,7 +14,7 @@
 
 local M = {}
 
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Storage = require("core.fs.adapters.storage")
 
 local LOG = "llm.ollama_endpoint"

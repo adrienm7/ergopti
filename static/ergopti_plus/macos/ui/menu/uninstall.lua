@@ -17,7 +17,7 @@ local owner = nil
 function M.run(deps)
 	if owner then return false end
 	deps = deps or {}
-	local logger = deps.logger or require("infra.logger")
+	local logger = deps.logger or require("core.logger.engine.logger")
 	-- On a source run the About row is greyed and names why, so a click that
 	-- still arrives does nothing: logged, with no failure dialog for a removal
 	-- that was never possible.

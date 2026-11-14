@@ -29,7 +29,7 @@ local helpers = require("tests.helpers")
 
 local MODULE_NAMES = {
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"modules.llm.warmup_controller",
 }
@@ -68,7 +68,7 @@ local function with_fixture(scenario)
 
 	local function noop() end
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.timings"] = { sec = function() return 1 end }
 
 	local controller = require("modules.llm.warmup_controller")

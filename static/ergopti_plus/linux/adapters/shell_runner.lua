@@ -43,9 +43,9 @@ local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
 local Heredoc = require("core.process.shell_heredoc")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local RuntimeLog = require("diagnostics.engine.runtime_log")
-local Perf = require("infra.perf_counters")
+local Perf = require("core.logger.engine.perf_counters")
 local PhaseStats = require("infra.phase_stats")
 local NumberPolicy = require("core.text.engine.number_policy")
 local OwnedProcess = nil

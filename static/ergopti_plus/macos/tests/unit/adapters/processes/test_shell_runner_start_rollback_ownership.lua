@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 local SOURCE = { source_path = "/fixture/config.toml", source_sha256 = string.rep("a", 64) }
 
 local OWNED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"adapters.shell_runner",
 	"adapters.owned_program_runner",
 	"platform.remap.lease_helper",
@@ -14,7 +14,7 @@ local function with_runner(callback)
 	local saved_hs = _G.hs
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/fixture/bundled/ErgoptiPlus" end }
 			local native = {
 				tasks = {},
@@ -510,7 +510,7 @@ helpers.describe("private user program native boundary", function()
 			with_runner(function(runner, native)
 				local marker = "PRIVATE106_PATH_ARG_STDERR"
 				local logs, crashes = {}, 0
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				for _, name in ipairs({ "trace", "done", "error", "warn" }) do
 					logger[name] = function(_, message, ...)
 						logs[#logs + 1] = string.format(message, ...)

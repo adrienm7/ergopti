@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Policy = require("diagnostics.engine.control_driver_control")
 local Json = require("core.text.engine.json")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")

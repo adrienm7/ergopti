@@ -114,7 +114,7 @@ helpers.describe("api_remote entry identity generation", function()
 		local original_get = warmup_client.get
 		local requests = 0
 		warmup_client.get = function() requests = requests + 1 end
-		local Logger = get_upvalue(ApiRemote.warmup, "Logger") or require("infra.logger")
+		local Logger = get_upvalue(ApiRemote.warmup, "Logger") or require("core.logger.engine.logger")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		local ok, err = pcall(function()
@@ -152,13 +152,13 @@ local PUBLICATION_LOCAL = [[{"server_order":["independent_local"],"servers":{"in
 --- @param close_refused boolean|nil Inject a refused cloud close receipt.
 local function with_publication_sources(cloud, local_source, callback, close_refused)
 	helpers.with_stub_scope({ "modules.llm.api_remote", "modules.llm.local_servers", "core.fs.engine.paths",
-		"infra.logger", "ai.engine.policy.provider_config_policy" }, function()
+		"core.logger.engine.logger", "ai.engine.policy.provider_config_policy" }, function()
 		-- Establish the native ports once. A second load_with_stubs would replace
 		-- the path owner and hide the source under examination.
 		helpers.load_with_stubs("modules.llm.api_remote")
 		local paths = require("core.fs.engine.paths")
 		local original_path = paths.shared_llm_path
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(logger)
 		local original_warn, original_error = logger.warn, logger.error
 		local original_open = io.open
@@ -324,7 +324,7 @@ end)
 helpers.describe("remote inference error privacy", function()
 	helpers.it("does not log a provider error body that echoes private text", function()
 		local client = assert(get_upvalue(ApiRemote.cancel_streaming, "_infer_client"))
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		local old_post, old_error = client.post, logger.error
 		local callback, messages, failed = nil, {}, 0
 		client.post = function(_, _, _, done) callback = done end

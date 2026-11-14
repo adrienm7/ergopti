@@ -421,7 +421,7 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			if name == "tray.protocol" then return { resolve_tray_icon = function() return "input-keyboard" end } end
 			if name == "core.fs.engine.paths" then return { shared_root = function() return "/synthetic" end } end
 			-- Counters only: the tray counts and times each menu replacement.
-			if name == "infra.perf_counters" then return require(name) end
+			if name == "core.logger.engine.perf_counters" then return require(name) end
 			error("unexpected tray dependency: " .. name)
 		end }, { __index = _G })
 		-- adapters/tray_menu, selected by a declaration unique to it.

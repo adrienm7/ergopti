@@ -260,7 +260,7 @@ helpers.describe("one-shot native boundary", function()
 	helpers.it("types a fresh press whose earlier release was missed (one-shot-stale-claim)", function()
 		-- A tap outage lets a release pass unseen. The claim used to outlive it
 		-- and swallow the next press of the same key without any output.
-		local Integrity = require("infra.keystroke_integrity")
+		local Integrity = require("core.logger.engine.keystroke_integrity")
 		Integrity.reset()
 		local adapter, event, calls = fixture()
 		adapter.arm(2)

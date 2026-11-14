@@ -204,7 +204,7 @@ end
 -- ======================================
 
 -- Timer probes the run-loop step takes, how long each asks, and the lateness
--- above which key events arrive late at the taps (infra/logger.lua's hold count).
+-- above which key events arrive late at the taps (core/logger/engine/logger.lua's hold count).
 M.RUNLOOP_PROBES = 5
 M.RUNLOOP_PROBE_SECONDS = 0.1
 M.RUNLOOP_LATE_MS = 250
