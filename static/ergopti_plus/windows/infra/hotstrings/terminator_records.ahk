@@ -467,8 +467,9 @@ HotstringsTerminatorRecordsEdit(Operation, Options := unset) {
 		}
 		if !HasMethod(ReloadFn, "Call")
 			throw TypeError("Terminator editing requires a callable reload owner.")
-		if Operation.Has("admission") && (A_IsSuspended
-				|| !HotstringsTerminatorRecordCurrent(Operation["admission"]))
+		; A pause stops typing, not configuration (EDD-1): the edit runs while
+		; suspended, and the reload keeps the suspension.
+		if Operation.Has("admission") && !HotstringsTerminatorRecordCurrent(Operation["admission"])
 			return Receipt
 		Acquired := ConfigTransitionAcquireLifecycleBundle(Locator, [Path], Port,
 			Options.Get("acquire", 0), Options.Get("settle", 0))
@@ -513,8 +514,6 @@ HotstringsTerminatorRecordsEdit(Operation, Options := unset) {
 			OriginalRecordSource := Present ? FSReadUtf8Exact(Path) : ""
 			if !(OriginalRecordSource is String)
 				throw Error("The terminator source could not be read exactly.")
-			if Operation.Has("admission") && A_IsSuspended
-				throw ValueError("The displayed terminator operation was paused before publication.")
 			Candidate := HotstringsTerminatorRecordPlan(OriginalRecordSource, Operation)
 			Expected := ConfigTransitionExpectedOld(Present, OriginalRecordSource, Port)
 			if !(Expected is Map)

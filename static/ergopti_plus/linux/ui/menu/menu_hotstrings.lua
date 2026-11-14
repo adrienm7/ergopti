@@ -647,9 +647,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
-			local function word_expanders_ready()
-				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
-			end
+			-- The delimiters are configuration: they run while paused (EDD-1).
+			local function word_expanders_ready() return true end
 
 			--- Captures enough catalogue state to undo a persistence failure.
 			--- @return table

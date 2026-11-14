@@ -228,8 +228,6 @@ HotstringsExtensionScopeApply(ExtensionId, Enabled, Options := unset) {
 	RootsFn := Options.Get("roots", _HotstringExtensions_CurrentRoots)
 	Operations() {
 		global _LegacyTopCategoryMap
-		if A_IsSuspended
-			throw Error("An extension selection cannot change while paused.")
 		Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
 		NativeIds := Map(), ExtensionGroups := Map(), Targets := [], Bound := []
 		for Id in Inventory

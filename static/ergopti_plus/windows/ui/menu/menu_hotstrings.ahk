@@ -459,13 +459,13 @@ _HS_WordExpanderRows(Commands := unset) {
 						Admission, Record.Enabled, Record.Label)),
 					MenuRenderer_CommandRow("word_expander_custom_menu", MenuCommand.WORD_EXPANDER_DELETE,
 					Map(MenuCommand.WORD_EXPANDER_DELETE, ((Captured) => (*) => _HS_DelimRemoveRecord(Captured))(Admission)),
-					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
+					Map("word_expanders_ready", (*) => true))]))
 		}
 	}
 
 	Rows.Push(MenuRenderer_CommandRow("word_expander_custom_menu", MenuCommand.WORD_EXPANDER_ADD,
 		Map(MenuCommand.WORD_EXPANDER_ADD, (*) => _HS_DelimAddCustom()),
-		Map("word_expanders_ready", (*) => !A_IsSuspended)))
+		Map("word_expanders_ready", (*) => true)))
 
 	Entries := MenuRenderer_TemplateRows("hotstrings_word_expander_frame", Map(), Map(),
 		Map("parameter_catalogue_entries", (*) => CatalogueRows, "parameter_consume_children", ConsumeRows,
@@ -479,7 +479,8 @@ _HS_WordExpanderRows(Commands := unset) {
 			MenuCommand.WORD_EXPANDERS_DISABLE_ALL, (*) => _HS_DelimSetAll(false),
 			MenuCommand.WORD_EXPANDERS_RESTORE, (*) => _HS_DelimReset())
 	}
-	Ready := (*) => !A_IsSuspended
+	; The delimiters are configuration: they run while suspended (EDD-1).
+	Ready := (*) => true
 	GuardedCommands := Map()
 	for Id, Command in Commands
 		GuardedCommands[Id] := _HS_WordExpanderCommand.Bind(Command, Ready)
@@ -613,8 +614,6 @@ global _HS_DelimAddGui := ""
 ; app covered it the dialog this thread waits on could not be reached again.
 _HS_DelimAddCustom() {
 	global _HS_DelimAddGui
-	if A_IsSuspended
-		return false
 	if IsObject(_HS_DelimAddGui) {
 		; Requested again: bring the open dialog back instead of stacking a
 		; second one over it.
@@ -645,9 +644,6 @@ _HS_DelimAddCustom() {
 	try WinWaitClose("ahk_id " . DialogHwnd)
 	finally _HS_DelimAddGui := ""
 
-	; A held native dialog cannot borrow its pre-pause menu admission.
-	if A_IsSuspended
-		return false
 	if (!Result.OK or Result.Char == "") {
 		return false
 	}
@@ -1568,7 +1564,6 @@ _HS_ExtensionScopeCommandRows(ExtensionId, Options) {
 	for Id in [MenuCommand.HOTSTRING_CATEGORY_ENABLE_ALL, MenuCommand.HOTSTRING_CATEGORY_DISABLE_ALL] {
 		Row := MenuRenderer_CommandRow("hotstring_category_menu", Id, Commands)
 		if Row is Map {
-			Row["disabled"] := A_IsSuspended
 			Rows.Push(Row)
 		}
 	}
@@ -1613,7 +1608,7 @@ _HS_ExtensionToggle(Path, Options, *) {
 ; New records join the conditional config.toml/reload owner.
 _HS_DelimAddRecordCommit(Char, Consume, Options := unset) {
 	if !HotstringsTerminatorRecordCharacter(Char) || !(Consume is Integer)
-			|| (Consume != 0 && Consume != 1) || A_IsSuspended
+			|| (Consume != 0 && Consume != 1)
 		return false
 	Record := Map("key", "custom_" . Format("{:X}", Ord(Char)), "char", Char,
 		"label", LabelValue(Char, t("menu.hotstrings.custom_label")), "consume", TOML_Bool(Consume))
@@ -1621,7 +1616,7 @@ _HS_DelimAddRecordCommit(Char, Consume, Options := unset) {
 }
 
 _HS_DelimRemoveRecord(Admission, Options := unset) {
-	if A_IsSuspended || !HotstringsTerminatorRecordCurrent(Admission)
+	if !HotstringsTerminatorRecordCurrent(Admission)
 		return false
 	if IsSet(Options) && !(Options is Map)
 		throw TypeError("Removing a terminator requires explicit owner options.")
@@ -1631,7 +1626,7 @@ _HS_DelimRemoveRecord(Admission, Options := unset) {
 	if Confirm.Call(t("dialog.hotstrings.delete_delimiter_body"),
 			t("dialog.hotstrings.delete_delimiter_title"), "YesNo") != "Yes"
 		return false
-	if A_IsSuspended || !HotstringsTerminatorRecordCurrent(Admission)
+	if !HotstringsTerminatorRecordCurrent(Admission)
 		return false
 	return HotstringsTerminatorRecordsEdit(
 		Map("mode", "remove", "key", Admission.Key, "admission", Admission), Options?)
@@ -1648,7 +1643,7 @@ _HS_DelimRecordRowClick(Admission, Enabled, Label, Options := unset, NotifyFn :=
 }
 
 _HS_DelimRecordState(Admission, Enabled, Options := unset) {
-	if A_IsSuspended || !HotstringsTerminatorRecordCurrent(Admission)
+	if !HotstringsTerminatorRecordCurrent(Admission)
 		return false
 	return HotstringsTerminatorRecordsEdit(
 		Map("mode", "state", "key", Admission.Key, "enabled", Enabled, "admission", Admission), Options?)

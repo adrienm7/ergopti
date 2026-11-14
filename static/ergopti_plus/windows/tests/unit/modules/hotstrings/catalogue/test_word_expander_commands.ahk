@@ -118,31 +118,19 @@ _HSDT_SharedControlOrderAndRefusal() {
 Test("word expanders: shared ordering retains the actual native owner refusal", _HSDT_SharedControlOrderAndRefusal)
 
 
-_HSDT_SharedControlRefusesDelayedPause() {
-	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	global _HSDT_WriteCalls, _HSDT_NotifyCalls
+; A pause stops typing, not configuration (EDD-1): a control rendered before a
+; pause still commits once the driver is suspended (edd1-paused-writes).
+_HSDT_SharedControlCommitsWhileSuspended() {
 	Saved := _HSDT_SaveState()
 	WasSuspended := A_IsSuspended
 	Built := 0
 	try {
 		Suspend(false)
 		_HSDT_ControlSeed("shared-control-delayed-pause")
-		SeededWord := HSE_WORD_TERMINATORS, SeededConsumed := HSE_CONSUMED_DELIMITERS
 		Built := _HSDT_NativeControlMenu(_HSDT_AcceptWriter)
-		Callbacks := []
-		loop 3
-			Callbacks.Push(_HSDT_NativeControlCallback(Built, A_Index - 1))
+		Callback := _HSDT_NativeControlCallback(Built, 0)
 		Suspend(true)
-		Receipts := []
-		for Callback in Callbacks
-			Receipts.Push(Callback.Call())
-		AssertEqual(3, Receipts.Length, "every captured control must refuse actual suspended delivery")
-		AssertEqual(0, _HSDT_WriteCalls)
-		AssertEqual(0, _HSDT_NotifyCalls)
-		AssertEqual(SeededWord, HSE_WORD_TERMINATORS)
-		AssertEqual(SeededConsumed, HSE_CONSUMED_DELIMITERS)
-		for Receipt in Receipts
-			AssertFalse(Receipt, "the current readiness owner refuses before the durable owner")
+		AssertTrue(Callback.Call(), "a suspended driver still commits the delimiter control")
 	} finally {
 		Suspend(WasSuspended)
 		if Built is Menu
@@ -150,7 +138,7 @@ _HSDT_SharedControlRefusesDelayedPause() {
 		_HSDT_Restore(Saved)
 	}
 }
-Test("word expanders: shared native controls refuse delayed delivery after pause", _HSDT_SharedControlRefusesDelayedPause)
+Test("word expanders: shared native controls commit while suspended (edd1-paused-writes)", _HSDT_SharedControlCommitsWhileSuspended)
 
 
 _HSDT_CustomDeleteCorpus() {
@@ -222,37 +210,17 @@ _HSDT_DeclaredCustomAddReceipts() {
 Test("custom word expanders: declared Add retains native ACK, refusal and held pause",
 	_HSDT_DeclaredCustomAddReceipts)
 
-_HSDT_PausedNativeAddOpensNoDialog() {
-	global _HS_DelimAddGui, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+; The Add dialog is configuration: it opens while suspended (EDD-1). The unit
+; runner cannot wait on a real dialog, so the entry's own body is checked.
+_HSDT_AddEntryIgnoresSuspension() {
 	Entry := _DriverFuncBody("_HS_DelimAddCustom")
 	Assert(Entry != "", "the actual modal owner must exist before native delivery")
-	PauseGatePosition := RegExMatch(Entry, "m)^\s*if A_IsSuspended\s*$")
-	FirstGui := InStr(Entry, "if IsObject(_HS_DelimAddGui)")
-	Assert(PauseGatePosition > 0 && FirstGui > PauseGatePosition,
-		"the exact early native admission must precede any existing-dialog access")
-	Assert(InStr(Entry, "Gui_Create") > PauseGatePosition,
-		"the native owner must refuse before constructing a dialog")
-	Saved := _HSDT_SaveState()
-	WasSuspended := A_IsSuspended
-	PreviousGui := _HS_DelimAddGui
-	try {
-		_HSDT_Seed("paused-native-add")
-		Suspend(true)
-		Result := _HS_DelimAddCustom()
-		Observed := Map("result", Result, "gui", _HS_DelimAddGui,
-			"word", HSE_WORD_TERMINATORS, "consumed", HSE_CONSUMED_DELIMITERS)
-	} finally {
-		Suspend(WasSuspended)
-		_HSDT_Restore(Saved)
-	}
-	AssertFalse(Observed["result"])
-	AssertEqual(PreviousGui, Observed["gui"], "the paused native owner must not create, present or retire a dialog")
-	AssertEqual(_HSDT_DefaultWord(), Observed["word"])
-	AssertEqual("★", Observed["consumed"])
-	AssertEqual(WasSuspended, A_IsSuspended, "the actual native suspension owner is restored exactly")
+	AssertFalse(InStr(_DriverMaskNonCode(&Entry), "A_IsSuspended"), "the Add dialog must not read the suspension")
+	Commit := _DriverFuncBody("_HS_DelimAddRecordCommit")
+	AssertFalse(InStr(_DriverMaskNonCode(&Commit), "A_IsSuspended"), "the typed commit must not read the suspension")
 }
-Test("custom word expanders: actual suspended Add entry keeps its native dialog owner inert",
-	_HSDT_PausedNativeAddOpensNoDialog)
+Test("custom word expanders: the Add entry ignores the suspension (edd1-paused-writes)",
+	_HSDT_AddEntryIgnoresSuspension)
 
 _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 	Provider := _DriverFuncBody("_HS_WordExpanderRows")
@@ -266,19 +234,12 @@ _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 	_HSDT_AssertPostModalRecordAdmission(Owner)
 	RecordCode := _DriverMaskNonCode(&RecordCommit)
 	Assert(InStr(RecordCode, "HotstringsTerminatorRecordCharacter(Char)")
-		&& InStr(RecordCode, "Consume is Integer") && InStr(RecordCode, "A_IsSuspended"),
-		"the typed commit must retain scalar, consume-type and suspension admission")
+		&& InStr(RecordCode, "Consume is Integer"),
+		"the typed commit must retain scalar and consume-type admission")
 	AssertEqual(1, _HSDT_PostModalCodeCount(RecordCode, "\bHotstringsTerminatorRecordsEdit\("),
 		"the typed commit must acquire exactly one actual record transaction")
 	ClosePosition := InStr(Owner, 'finally _HS_DelimAddGui := ""')
 	Assert(ClosePosition > 0, "the real close receipt must exist before deriving mutations")
-	ModalPrefix := SubStr(Owner, 1, ClosePosition - 1)
-	ModalTail := SubStr(Owner, ClosePosition)
-	LatePause := "`tif A_IsSuspended`n`t`treturn false`n"
-	NoLatePause := ModalPrefix . StrReplace(ModalTail, LatePause, "", true, &PauseReplacements, 1)
-	AssertEqual(1, PauseReplacements, "the mutant removes only the actual post-close pause gate")
-	_HSDT_ExpectPostModalRefusal(NoLatePause,
-		"a completed native dialog must recheck its actual pause owner before acquiring the transaction")
 	Cancel := '`tif (!Result.OK or Result.Char == "") {`n`t`treturn false`n`t}`n'
 	NoCancel := StrReplace(Owner, Cancel, "", true, &CancelReplacements, 1)
 	AssertEqual(1, CancelReplacements, "the mutant removes only the actual cancelled-result gate")
@@ -306,13 +267,9 @@ _HSDT_AssertPostModalRecordAdmission(ModalSource) {
 		"the modal result must acquire exactly one typed record owner")
 	ClosePosition := RegExMatch(ModalCode, ClosePattern)
 	CommitPosition := RegExMatch(ModalCode, CommitPattern)
-	PausePosition := RegExMatch(ModalCode,
-		"m)^[ `t]*if A_IsSuspended[ `t]*`n[ `t]*return false[ `t]*$",, ClosePosition)
-	Assert(ClosePosition > 0 && PausePosition > ClosePosition && CommitPosition > PausePosition,
-		"a completed native dialog must recheck its actual pause owner before acquiring the transaction")
 	CancelPosition := RegExMatch(ModalCode,
 		"m)^[ `t]*if \(!Result\.OK or Result\.Char ==[ `t]*\) \{[ `t]*`n[ `t]*return false[ `t]*`n[ `t]*\}")
-	Assert(CancelPosition > PausePosition && CommitPosition > CancelPosition,
+	Assert(ClosePosition > 0 && CancelPosition > ClosePosition && CommitPosition > CancelPosition,
 		"cancelled and empty native results must remain unpublished")
 	AssertFalse(InStr(ModalCode, "_HS_DelimAddCustomCommit("),
 		"the native record dialog must not publish an anonymous delimiter string")
@@ -333,7 +290,7 @@ _HSDT_ExpectPostModalRefusal(ModalSource, ExpectedMessage) {
 	}
 	Assert(false, "the weakened native modal source must be refused")
 }
-Test("custom word expanders: actual Add dialog rechecks admission after its native close receipt",
+Test("custom word expanders: actual Add dialog checks its result after its native close receipt",
 	_HSDT_CustomAddProviderKeepsPostModalAdmission)
 
 

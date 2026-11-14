@@ -71,7 +71,6 @@ end
 
 function M.build_management(ctx)
 	local state  = ctx.state
-	local paused = ctx.paused
 	local bubble_item = nil
 	local exp_item = nil
 	local delays_item = nil
@@ -189,7 +188,8 @@ function M.build_management(ctx)
 		return true
 	end
 
-	local function word_expanders_ready() return ctx.paused ~= true end
+	-- The delimiters are configuration: they run while paused (EDD-1).
+	local function word_expanders_ready() return true end
 
 	local function bulk_set_terminators(enabled)
 		if not word_expanders_ready() then return false end
@@ -239,8 +239,7 @@ function M.build_management(ctx)
 				exp_sub[#exp_sub + 1] = {
 					label    = ctx.applyTriggerChar(lbl),
 					checked  = enabled_t or nil,
-					disabled = paused or nil,
-					action       = not paused and (function(k, l) return function()
+					action       = (function(k, l) return function()
 						local nv = true
 						if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
 							nv = not ctx.keymap.is_terminator_enabled(k)
@@ -258,7 +257,7 @@ function M.build_management(ctx)
 						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
 						return true
-					end end)(def.key, lbl) or nil,
+					end end)(def.key, lbl),
 				}
 			end
 		end
@@ -275,8 +274,7 @@ function M.build_management(ctx)
 			consume_rows[#consume_rows + 1] = {
 				label    = label,
 				checked  = consumed or nil,
-				disabled = paused or nil,
-				action   = not paused and function()
+				action   = function()
 					local next_consume = not consumed
 					local committed = KeymapLifecycle.commit_mutation(ctx, "toggle delimiter consumption", function()
 						if not ctx.keymap or type(ctx.keymap.set_terminators_consume) ~= "function" then return false end
@@ -295,7 +293,7 @@ function M.build_management(ctx)
 						label .. " " .. i18n.get("menu.hotstrings.consumed_suffix")), next_consume)
 					ctx.updateMenu()
 					return true
-				end or nil,
+				end,
 			}
 		end
 	end
@@ -344,7 +342,6 @@ function M.build_management(ctx)
 			label    = ct_lbl,
 			checked  = enabled_t or nil,
 			items     = ct_sub,
-			disabled = paused or nil,
 		}
 		::continue_ct::
 	end
@@ -442,7 +439,7 @@ function M.build_management(ctx)
 	local expander_submenu_rows = ManifestMenu.native_child_rows(rendered_expanders)
 	if not expander_submenu_rows then return nil end
 	local expander_parent = ManifestMenu.template_rows("hotstrings_word_expander_parent", {},
-		{ ["parameter_parent_ready"] = function() return not paused end },
+		{ ["parameter_parent_ready"] = function() return true end },
 		{ ["parameter_word_expander_children"] = expander_submenu_rows })
 	if not expander_parent then return nil end
 	exp_item = expander_parent[1]
