@@ -263,6 +263,22 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "[owner + '/core/network/adapters/native_http.py']"
 	},
 	{
+		// The Linux evdev and uinput plumbing names the adapters/ folder that
+		// held the reader, hook and writer; S15 moves all three into
+		// platform/input, and adapters/ then reaches neither requirement.
+		file: 'static/ergopti_plus/_shared/settings/data/features/requirements.toml',
+		moves: 'linux/adapters/uinput_writer.lua',
+		from: '[detection.linux.evdev.plumbing]\n"adapters/" = "the evdev and uinput adapters the owners call"',
+		to: '[detection.linux.evdev.plumbing]\n"platform/input/" = "the evdev and uinput adapters the owners call"'
+	},
+	{
+		file: 'static/ergopti_plus/_shared/settings/data/features/requirements.toml',
+		moves: 'linux/adapters/uinput_writer.lua',
+		from: '[detection.linux.uinput.plumbing]\n"adapters/" = "the evdev and uinput adapters the owners call"',
+		// adapters/ still holds the XKB source probe, which reaches uinput too.
+		to: '[detection.linux.uinput.plumbing]\n"adapters/" = "the evdev and uinput adapters the owners call"\n"platform/input/" = "the evdev and uinput adapters the owners call"'
+	},
+	{
 		// The literal AppDir contract runs the AT-SPI workers from the driver
 		// root (cwd), so "./adapters/x.lua" is relative to the process, not to
 		// the fixture; S14 moves both workers into platform/focus.
