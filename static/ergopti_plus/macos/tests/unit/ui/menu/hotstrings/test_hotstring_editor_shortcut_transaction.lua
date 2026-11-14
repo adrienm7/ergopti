@@ -55,7 +55,7 @@ local function run_menu_action(raw, outcome)
 	local saved_notifications = package.loaded["infra.notifications"]
 	local saved_lifecycle = package.loaded["ui.menu.keymap_lifecycle"]
 	local saved_custom = package.loaded["ui.menu.menu_hotstrings_custom"]
-	local calls = { sets = 0, clears = 0, saves = 0, updates = 0, notices = 0 }
+	local calls = { sets = 0, clears = 0, saves = 0, updates = 0, notices = 0, alerts = {} }
 	local state = {
 		keymap = true,
 		hotstrings = { personal = true, custom = true },
@@ -67,6 +67,7 @@ local function run_menu_action(raw, outcome)
 
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function() return "OK", raw end,
+		block_alert = function(title, body) calls.alerts[#calls.alerts + 1] = { title, body } end,
 	}
 	package.loaded["infra.notifications"] = {
 		notify = function(_title, _body, kind)
@@ -188,7 +189,12 @@ helpers.describe("personal hotstring editor shortcut is transactional", function
 		helpers.assert_eq(fixture.calls.sets, 0)
 		helpers.assert_eq(fixture.calls.saves, 0)
 		helpers.assert_eq(fixture.calls.updates, 0)
-		helpers.assert_eq(fixture.calls.notices, 1)
+		-- The refusal names the accepted form instead of a generic failure (value-validation).
+		local i18n = require("infra.i18n")
+		helpers.assert_eq(fixture.calls.alerts, {
+			{ i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint") },
+		})
+		helpers.assert_eq(fixture.calls.notices, 0, "no generic failure notice")
 		helpers.assert_eq(fixture.state.custom_editor_shortcut,
 			{ mods = { "ctrl" }, key = "A" })
 	end)
