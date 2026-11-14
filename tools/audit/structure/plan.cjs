@@ -2289,6 +2289,35 @@ function scanFile(file, text, ctx) {
 				}
 			);
 		}
+	// SplitPath(A_LineFile, , &TestDir) then TestDir . "/../../..": a climb
+	// from the file's own folder to a folder above it. When the file moves, the
+	// climb is recounted to name the same folder (S06 moved the reload
+	// quiescence test two folders deeper and its TestsRoot named unit/).
+	if (file.endsWith('.ahk') && selfTarget) {
+		const vars = [...text.matchAll(/SplitPath\(\s*A_LineFile\s*,\s*,\s*&(\w+)\s*\)/g)].map(
+			(v) => v[1]
+		);
+		for (const v of new Set(vars))
+			for (const m of text.matchAll(
+				new RegExp(`\\b${v} \\. "((?:[\\\\/]\\.\\.)+)([\\\\/][^"]*)?"`, 'g')
+			)) {
+				const sep = m[1][0];
+				const climbs = m[1].split('..').length - 1;
+				const oldDir = path.posix.dirname(file).split('/');
+				if (climbs >= oldDir.length) continue;
+				const base = oldDir.slice(0, oldDir.length - climbs).join('/');
+				const newDir = path.posix.dirname(`${PREFIX}${selfTarget}`);
+				if (!newDir.startsWith(`${base}/`) && newDir !== base) continue;
+				const k = newDir.split('/').length - base.split('/').length;
+				const climb = `${sep}..`.repeat(k);
+				const respelled = `${v} . "${climb}${m[2] || ''}"`;
+				if (k > 0 && respelled !== m[0])
+					add('lua-module-quoted', m[0], respelled, {
+						oldRepo: file,
+						newRepo: `${PREFIX}${selfTarget}`
+					});
+			}
+	}
 	// _DriverFileSource("network_info.ahk") in a Windows test, directly or
 	// through a test's own reader: a production file found by its base name.
 	// A step that renames the file renames the lookup; a new name another
