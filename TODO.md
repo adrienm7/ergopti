@@ -80,14 +80,19 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       NaN, out of range) fails fast with a log line instead of crashing. Start with an inventory of every prompt and
       key per OS, then regression tests per OS that feed a wrong type, a boundary and an out-of-range value at each
       of the three places.
-      Claimed by worker B (2026-11-13). Block 1 landed: the inventory
-      ([docs/design/value-validation-inventory.md](docs/design/value-validation-inventory.md)), the shared schema
-      `_shared/settings/data/value_schema/value_schema.json` and its check in JS, Lua (macOS, Linux) and AHK, pinned
-      by shared vectors, with the localized refusal text in 21 locales. Next blocks wire one family each: tap-hold
-      timings, then hotstrings delays, LLM settings, the rest; the one-shot timeout after worker A lands 0 = no
-      limit. Confirmed by the maintainer on 2026-11-13: `lone_modifier_tap_max_ms` gets a 10000 ms maximum and
-      `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms on the three OS. Block 2
-      (tap-hold timings wired at entry, load and boundary on the three OS) is on the branch.
+      Claimed by worker B (2026-11-13). Landed on 2026-11-14 after CI run 43532578410: the inventory
+      ([docs/design/value-validation-inventory.md](docs/design/value-validation-inventory.md), its « Migration
+      status » table is the state per family), the shared schema `_shared/settings/data/value_schema/value_schema.json`
+      and its check in JS, Lua (macOS, Linux) and AHK, pinned by shared vectors, with the localized refusals in 21
+      locales; then the families wired at entry, load and boundary: tap-hold timings, hotstring delays and
+      priorities, LLM settings, the CapsWord idle timeout, gesture steps and web addresses (a new `url` type).
+      Confirmed by the maintainer on 2026-11-13: `lone_modifier_tap_max_ms` gets a 10000 ms maximum and
+      `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms on the three OS. Decided by the
+      agent, to review by the maintainer: LLM temperature 0 to 1.3 and context length 80 to 4000 (their engines'
+      limits), CapsWord idle timeout at most 3600 s, URLs at most 2048 characters, the updater interval kept on its
+      snap-to-preset rule. On the branch for the next landing: personal info (Linux reports a field that is not text)
+      and the user-code delay prompt (macOS, Linux). Left: the one-shot timeout, once worker A lands « 0 = no time
+      limit ».
 - [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
@@ -219,7 +224,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### Policy, documentation and verification debt
 
-- [ ] **[CI] Native keyboard-source fixture:** investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
+- [ ] **[CI] Native keyboard-source fixture:** Claimed by worker B (2026-11-14). Investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
       2026-11-11: the refusal of run 42014901978 (Intel macOS 15) follows one line no passing log shows,
       `CFMessagePortSendRequest FAILED(-1) to send to port com.apple.tsm.uiserver`: the service that applies the
       selection did not answer for about 11 s. 6736a355 brackets the cohort with a read-only snapshot of the text-input
@@ -259,7 +264,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### Qualification and policy follow-up
 
-- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain.
+- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Worker B 2026-11-14: the Windows and macOS boundaries need a real PC and a real Mac, so they stay for the maintainer; the Linux runtime, editor and diagnostics flows can run in the hosted desktop-webview CI shard and are still to be written there. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain.
 
 ## Migration and update parity follow-up
 
