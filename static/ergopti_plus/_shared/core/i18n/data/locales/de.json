@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "macOS-Layout",
 	"layout_editor.target.web": "Emulation auf der Website",
 	"layout_editor.target.windows": "KLC für Windows",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "Mein Tippen analysieren",
 	"layout_editor.studio.keystats.privacy": "Ihre Tippstatistiken werden nur auf diesem Computer aus den lokalen Metriken von Ergopti+ gelesen und nirgendwohin gesendet.",
 	"layout_editor.studio.keystats.loading": "Ihre Tippstatistiken werden gelesen…",

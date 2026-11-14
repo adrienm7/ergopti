@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "macOS 配列",
 	"layout_editor.target.web": "ウェブサイトでのエミュレーション",
 	"layout_editor.target.windows": "Windows の KLC",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "自分のタイピングを分析",
 	"layout_editor.studio.keystats.privacy": "タイピング統計はこのコンピューター上でのみ、Ergopti+ のローカル計測から読み取られ、どこにも送信されません。",
 	"layout_editor.studio.keystats.loading": "タイピング統計を読み込んでいます…",

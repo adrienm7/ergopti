@@ -89,7 +89,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       the editor in its own WebKitGTK window; a second request brings it to the front with its unsaved work; « Close »
       closes it.
       Ergopti Studio (2026-11-14, `claude/ergopti-todo-studio-app`): the top-level « 🎨 Ergopti Studio… » row,
-      right after « Keyboard layout », opens the same window, titled « ErgoptiPlus — Studio ».
+      right after « Keyboard layout », opens the same window, titled « ErgoptiPlus — Ergopti Studio ».
       Downloads (2026-11-14, `layout_editor_downloads`): the window's XKB, KLC, DLL and macOS bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext », and the XKB archive installs with the user layout installer.
 - [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler (2026-11-13, `claude/ergopti-todo-compilers`): the XKB export of
       `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,

@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "Disposition macOS",
 	"layout_editor.target.web": "Émulation sur le site web",
 	"layout_editor.target.windows": "KLC pour Windows",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "Analyser ma frappe",
 	"layout_editor.studio.keystats.privacy": "Vos statistiques de frappe sont lues sur cet ordinateur uniquement, depuis les métriques locales d’Ergopti+, et ne sont jamais envoyées nulle part.",
 	"layout_editor.studio.keystats.loading": "Lecture de vos statistiques de frappe…",

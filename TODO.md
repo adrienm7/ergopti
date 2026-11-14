@@ -266,10 +266,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       exactly « Ergopti Studio », without the « ErgoptiPlus — » prefix (maintainer, 2026-11-14).
       Done 2026-11-14: the top-level « 🎨 Ergopti Studio… » command right after « Keyboard layout » (place decided by
       the agent, to review by the maintainer), greyed with the feature rows while the Windows driver is paused. The
-      window reads « ErgoptiPlus — Studio »: captions stay brandless and the title composer adds the brand once
-      (`window-title-brand-once`), so « Ergopti Studio » would read « ErgoptiPlus — Ergopti Studio » (decided by the
-      agent, to review by the maintainer). Real-machine checks: the `layout_editor_window` lines of the three
-      TODO-tests files.
+      window caption is « Ergopti Studio » (maintainer, 2026-11-14), so the windows read « ErgoptiPlus — Ergopti
+      Studio »; the title gate admits exactly this product name (`window-title-product-name`). Real-machine checks:
+      the `layout_editor_window` lines of the three TODO-tests files.
 - [ ] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
       sent anywhere) and shows, for the layout being edited, the metrics computed on what this user really types:
       SFBs (same-finger bigrams), hand alternation, rolls, redirects, finger and row load. The numbers update as keys

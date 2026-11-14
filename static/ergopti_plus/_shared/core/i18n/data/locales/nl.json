@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "macOS-lay-out",
 	"layout_editor.target.web": "Emulatie op de website",
 	"layout_editor.target.windows": "KLC voor Windows",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "Mijn typen analyseren",
 	"layout_editor.studio.keystats.privacy": "Je typstatistieken worden alleen op deze computer gelezen, uit de lokale metingen van Ergopti+, en nooit ergens heen gestuurd.",
 	"layout_editor.studio.keystats.loading": "Je typstatistieken worden gelezen…",

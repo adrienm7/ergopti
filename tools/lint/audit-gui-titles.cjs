@@ -11,6 +11,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ROOT = path.resolve(__dirname, '../..');
 const BRAND = /^\s*Ergopti(?:Plus)?\b/;
+// Product names that are a window's own caption although they start with the
+// brand word: the maintainer named the layout editor « Ergopti Studio »
+// (2026-11-14), so its windows read « ErgoptiPlus — Ergopti Studio ». Only the
+// exact name is admitted; anything longer or prefixed is still a doubled brand.
+const PRODUCT_CAPTIONS = Object.freeze(['Ergopti Studio']);
+
+/**
+ * Whether a caption carries the brand the title composer adds.
+ * @param {string} value - A translated caption.
+ * @returns {boolean} True for a branded caption that is not an admitted product name.
+ */
+function isBranded(value) {
+	return BRAND.test(value) && !PRODUCT_CAPTIONS.includes(value.trim());
+}
 
 /** Tokenize strings and delimiters without treating quoted comment markers as comments. */
 function tokens(source, lua) {
@@ -235,7 +249,7 @@ function auditSource(source, lua, locales, relative = '') {
 			stats.dynamic++;
 			return;
 		}
-		const bad = resolved.filter((v) => BRAND.test(v.value));
+		const bad = resolved.filter((v) => isBranded(v.value));
 		if (bad.length)
 			findings.push({
 				line,
@@ -373,10 +387,10 @@ function auditSource(source, lua, locales, relative = '') {
 			continue;
 		}
 		const bad = brandedInput
-			? resolved.filter((v) => BRAND.test(v.value))
-			: resolved.filter((v) => !BRAND.test(v.value));
+			? resolved.filter((v) => isBranded(v.value))
+			: resolved.filter((v) => !isBranded(v.value));
 		// Raw expressions composed by the title helper already have their prefix.
-		if (!brandedInput && resolved.some((v) => v.composed || BRAND.test(v.value))) continue;
+		if (!brandedInput && resolved.some((v) => v.composed || isBranded(v.value))) continue;
 
 		if (bad.length)
 			findings.push({
@@ -445,5 +459,5 @@ function main(root = ROOT) {
 	);
 	return violations ? 1 : 0;
 }
-module.exports = { auditSource, argumentsAt, main, tokens };
+module.exports = { auditSource, argumentsAt, isBranded, main, PRODUCT_CAPTIONS, tokens };
 if (require.main === module) process.exitCode = main(process.argv[2] || ROOT);

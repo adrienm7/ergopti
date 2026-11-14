@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "macOS-oppsett",
 	"layout_editor.target.web": "Emulering på nettstedet",
 	"layout_editor.target.windows": "KLC for Windows",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "Analyser skrivingen min",
 	"layout_editor.studio.keystats.privacy": "Skrivestatistikken din leses bare på denne datamaskinen, fra Ergopti+ sine lokale målinger, og sendes aldri noe sted.",
 	"layout_editor.studio.keystats.loading": "Leser skrivestatistikken din…",

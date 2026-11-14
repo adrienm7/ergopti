@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "macOS 布局",
 	"layout_editor.target.web": "网站模拟",
 	"layout_editor.target.windows": "Windows 的 KLC",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "分析我的打字",
 	"layout_editor.studio.keystats.privacy": "你的打字统计只在这台电脑上从 Ergopti+ 的本地指标读取，绝不会发送到任何地方。",
 	"layout_editor.studio.keystats.loading": "正在读取你的打字统计…",

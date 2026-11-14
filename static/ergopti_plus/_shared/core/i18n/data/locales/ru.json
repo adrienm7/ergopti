@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "Раскладка macOS",
 	"layout_editor.target.web": "Эмуляция на сайте",
 	"layout_editor.target.windows": "Windows KLC",
-	"layout_editor.title": "Studio",
+	"layout_editor.title": "Ergopti Studio",
 	"layout_editor.studio.keystats.load": "Проанализировать мой набор",
 	"layout_editor.studio.keystats.privacy": "Ваша статистика набора читается только на этом компьютере, из локальных метрик Ergopti+, и никуда не отправляется.",
 	"layout_editor.studio.keystats.loading": "Чтение статистики набора…",

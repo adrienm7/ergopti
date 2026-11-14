@@ -12,6 +12,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const titles = require('../codegen/codegen-window-titles.cjs');
 const audit = path.resolve(__dirname, '../lint/audit-gui-titles.cjs');
+const { isBranded, PRODUCT_CAPTIONS } = require('../lint/audit-gui-titles.cjs');
 const repository = path.resolve(__dirname, '../..');
 const sharedManifest = JSON.parse(fs.readFileSync(path.join(repository, titles.SOURCE), 'utf8'));
 const localeDirectory = path.join(repository, 'static/ergopti_plus/_shared/core/i18n/data/locales');
@@ -45,7 +46,7 @@ function brandedCaptions(manifest, locales) {
 	const found = [];
 	for (const [locale, strings] of Object.entries(locales))
 		for (const key of captionKeys(manifest, strings))
-			if (typeof strings[key] === 'string' && /^\s*Ergopti(?:Plus)?\b/.test(strings[key]))
+			if (typeof strings[key] === 'string' && isBranded(strings[key]))
 				found.push(`${locale}: ${key}`);
 	return found;
 }
@@ -60,11 +61,19 @@ assert.deepEqual(
 	[],
 	'(window-title-brand-once) caption translations stay brandless: the composer adds the brand'
 );
+// (window-title-product-name) « Ergopti Studio » is the product name the
+// maintainer chose for the layout editor window: admitted exactly, never as a
+// prefix or with the composed brand in front of it.
+assert.deepEqual(PRODUCT_CAPTIONS, ['Ergopti Studio']);
+assert.equal(isBranded('Ergopti Studio'), false, 'the exact product name is a caption');
+for (const value of ['Ergopti Studio 2', 'ErgoptiPlus — Ergopti Studio', 'Ergopti', 'ErgoptiPlus'])
+	assert.equal(isBranded(value), true, `${value} still carries the brand`);
 // The scan sees the original doubled dialog caption and a branded app title.
 for (const [key, value] of [
 	['menu.llm.api_dialog_title', 'ErgoptiPlus — API endpoint'],
 	['dialog.unused_keys.title', 'ErgoptiPlus — Réglages inutilisés'],
-	['menu.paths.window_title', 'Ergopti — Paths']
+	['menu.paths.window_title', 'Ergopti — Paths'],
+	['layout_editor.title', 'Ergopti Studio — Comparer']
 ]) {
 	const mutant = { 'fr.json': { ...shippedLocales['fr.json'], [key]: value } };
 	assert.deepEqual(brandedCaptions(sharedManifest, mutant), [`fr.json: ${key}`]);
@@ -78,7 +87,7 @@ for (const locale of localeNames) {
 			`${locale}: ${app} has its title translation`
 		);
 		assert.equal(
-			/^\s*Ergopti(?:Plus)?\b/.test(strings[entry.title_key]),
+			isBranded(strings[entry.title_key]),
 			false,
 			`${locale}: ${app} passes a bare title to the shared policy`
 		);
