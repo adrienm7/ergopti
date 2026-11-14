@@ -351,6 +351,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       licence), each with its source and licence recorded; others are linked, not shipped. The user's own layouts
       made in « Éditer » (several personal layouts, saved locally) appear in the comparison list beside the library.
 
+- [ ] **Several personal layouts, never lost (maintainer, 2026-11-14).** « Éditer » holds several layouts in its own
+      tabs; a « + » button opens a new one (blank, from a library layout, or from a file). Everything is saved
+      locally on the user's machine as they type: on the site in the browser's persistent storage (IndexedDB, with
+      navigator.storage.persist() requested), in the app in the user's data folder; a reload, a crash or F5 restores
+      every tab and its unsaved edits; export/import of all personal layouts as files for backup. Nothing is sent to a
+      server.
+- [ ] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
+      keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
+      defaults to a built-in corpus).
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
