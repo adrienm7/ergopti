@@ -46,6 +46,19 @@ const VERSION_SELECTOR = Object.freeze({
 	present: ['/ergopti', '/ergopti/benchmarks'],
 	absent: ['/', '/ergopti-plus', '/ergopti-plus/hotstrings', '/studio']
 });
+// The floating button that shows the Ergopti layout belongs to the layout
+// pages only (maintainer, 2026-11-14).
+const REFERENCE_KEYBOARD = Object.freeze({
+	present: ['/ergopti', '/ergopti/presentation', '/ergopti/benchmarks', '/ergopti/informations'],
+	absent: [
+		'/',
+		'/ergopti-plus',
+		'/ergopti-plus/installation',
+		'/ergopti-plus-old',
+		'/studio',
+		'/studio/comparer'
+	]
+});
 // Each Ergopti+ page renders exactly these sections, so a page never pays
 // for another one's demos, frames and images.
 const ERGOPTI_PLUS_SECTIONS = Object.freeze({
@@ -186,6 +199,18 @@ async function exerciseSections(page, origin, basePath) {
 		await visit(page, origin, basePath, route);
 		await page.locator('#version-selection').waitFor({ state: 'visible' });
 		await expectMenu(page, 'disposition');
+	}
+	for (const route of REFERENCE_KEYBOARD.present) {
+		await visit(page, origin, basePath, route);
+		await page.locator('#afficher-clavier-reference').waitFor({ state: 'visible' });
+	}
+	for (const route of REFERENCE_KEYBOARD.absent) {
+		await visit(page, origin, basePath, route);
+		assert.equal(
+			await page.locator('#afficher-clavier-reference, #clavier-ref').count(),
+			0,
+			'No reference keyboard on ' + route
+		);
 	}
 	for (const route of VERSION_SELECTOR.absent) {
 		await visit(page, origin, basePath, route);
@@ -435,6 +460,7 @@ module.exports = {
 	MENU,
 	HOME_CARDS,
 	VERSION_SELECTOR,
+	REFERENCE_KEYBOARD,
 	ERGOPTI_PLUS_SECTIONS,
 	REDIRECTS,
 	STUDIO_TABS,
