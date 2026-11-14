@@ -81,7 +81,7 @@ end
 --- ones to the receipt), read from the policy file beside this helper's shared root.
 --- @return table|nil limits { max_selections, max_proxy_bytes }
 local function policy_limits()
-	local loaded, reader = pcall(require, "infra.regular_file_reader")
+	local loaded, reader = pcall(require, "core.fs.engine.regular_file_reader")
 	if not loaded or type(reader) ~= "table" or type(reader.open_source) ~= "function" then return nil end
 	local file = reader.open_source(shared_root .. "/core/network/data/proxy_policy.json")
 	if not file then return nil end
@@ -102,7 +102,7 @@ end
 --- @param limit number Largest admitted size in bytes.
 --- @return string|nil bytes
 local function shared_file(relative, limit)
-	local loaded, reader = pcall(require, "infra.regular_file_reader")
+	local loaded, reader = pcall(require, "core.fs.engine.regular_file_reader")
 	if not loaded or type(reader) ~= "table" or type(reader.open_source) ~= "function" then return nil end
 	local file = reader.open_source(shared_root .. "/" .. relative)
 	if not file then return nil end

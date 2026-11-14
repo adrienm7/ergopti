@@ -28,7 +28,7 @@ end
 --- @param assignments table Initial canonical slot map, updated after successful writes.
 --- @param before_write function|nil Explicit conditional-publication failure hook.
 function M.install(assignments, before_write)
-	local files = assert(package.loaded["adapters.file_system"])
+	local files = assert(package.loaded["core.fs.adapters.file_system"])
 	M.attach_catalogue(files)
 	local content = Codec.encode({ shortcuts = { keyboard = assignments } })
 	files.read_with_status = function() return content, "ok" end

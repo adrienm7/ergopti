@@ -480,7 +480,7 @@ helpers.describe("meta: lua module OS-API purity baseline", function()
 	local macos_root = DRIVER_ROOT
 
 	local all_lua_files = {}
-	for _, dir in ipairs({ "modules", "infra", "platform" }) do
+	for _, dir in ipairs({ "modules", "infra", "platform", "core" }) do
 		for _, f in ipairs(list_files(macos_root .. dir, "lua")) do
 			-- A UI source counts in the ui pair below, wherever it lives.
 			if not helpers.is_ui_source(f:sub(#DRIVER_ROOT + 1)) then

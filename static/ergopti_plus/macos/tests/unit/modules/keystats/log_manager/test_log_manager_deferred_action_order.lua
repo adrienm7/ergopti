@@ -153,8 +153,8 @@ local function load_fixture(options)
 		end,
 	}
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		write = function() return true end,
 		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
@@ -167,7 +167,7 @@ local function load_fixture(options)
 		},
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	local state = {
 		LOG_DIR = "/tmp/ergopti_action_epoch_order",
 		CACHE_DIR = "/tmp/ergopti_action_epoch_order/cache",
@@ -396,7 +396,7 @@ helpers.describe("log_manager deferred action boundaries", function()
 end)
 
 for _, name in ipairs({
-	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
 	"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
 	"core.events.timer_scheduler",

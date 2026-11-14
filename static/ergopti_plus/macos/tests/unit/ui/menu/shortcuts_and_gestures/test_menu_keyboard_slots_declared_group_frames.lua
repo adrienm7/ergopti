@@ -46,7 +46,7 @@ local function keyboard_frame_json(relative)
 	local file = assert(io.open(helpers.shared(relative), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("adapters.json_codec").decode(text))
+	return assert(require("core.fs.adapters.json_codec").decode(text))
 end
 
 helpers.describe("menu_keyboard_slots: complete declared group frame", function()

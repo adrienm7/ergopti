@@ -42,9 +42,9 @@ local M = {}
 local hs          = hs
 local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
-local Paths       = require("infra.paths")
+local Paths       = require("core.fs.engine.paths")
 local ConfigPaths = require("infra.config_paths")
-local FileSystem  = require("adapters.file_system")
+local FileSystem  = require("core.fs.adapters.file_system")
 local ui_builder  = require("ui.ui_builder")
 local Json        = require("core.text.engine.json")
 local TomlCodec   = require("core.text.engine.toml_codec")
@@ -256,7 +256,7 @@ local function opening_current(session, opening)
 	local function identities_current()
 		return _session == session and not session.retired and session.opening == opening
 			and rawequal(package.loaded["infra.config_paths"], ConfigPaths)
-			and rawequal(package.loaded["adapters.file_system"], FileSystem)
+			and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem)
 			and FileSystem.read_with_status == opening.read_with_status
 			and FileSystem.write_if_unchanged_admitted == opening.publish
 			and ConfigPaths.get_config_dir == opening.get_config_dir

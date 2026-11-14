@@ -103,8 +103,8 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 		local response = rpc({ op = "link", source = source, destination = destination })
 		return response.ok and true or nil, response.error
 	end
-	package.loaded["adapters.file_system"] = native.make_adapter(nil, nil, nil, link)
-	package.loaded["adapters.ledger_append"] = nil
+	package.loaded["core.fs.adapters.file_system"] = native.make_adapter(nil, nil, nil, link)
+	package.loaded["core.fs.adapters.ledger_append"] = nil
 	package.loaded["infra.logger"] = logger
 	package.loaded["hs.sqlite3"], package.loaded["hs.json"], package.loaded["hs.timer"] = sqlite_port, json_port, loop.api
 	local Writer = require("modules.keystats.sqlite_writer")

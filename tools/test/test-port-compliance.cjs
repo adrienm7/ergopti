@@ -39,6 +39,7 @@ const ROOT = path.join(__dirname, '../..');
 const CONTRACTS_PATH = shared('core/ports/contracts.json');
 const AHK_ADAPTERS_DIRS = [
 	path.join(ROOT, 'static/ergopti_plus/windows/adapters'),
+	path.join(ROOT, 'static/ergopti_plus/windows/core/fs/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/core/events'),
 	path.join(ROOT, 'static/ergopti_plus/windows/core/crypto')
 ];

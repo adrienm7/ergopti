@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"infra.i18n",
 	"infra.logger",
-	"infra.fs_dir",
+	"core.fs.engine.dir",
 	"infra.notifications",
 	"infra.text_utils",
 	"modules.llm.ollama_binary",
@@ -26,7 +26,7 @@ local MODULES = {
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.ui_builder",
-	"infra.paths", "infra.timings",
+	"core.fs.engine.paths", "infra.timings",
 	"infra.deferred_work",
 	"ui.download_window.javascript",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -38,7 +38,7 @@ local function with_fixture(options, callback)
 	local saved_hs = _G.hs
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
-	package.loaded["infra.fs_dir"] = nil
+	package.loaded["core.fs.engine.dir"] = nil
 
 	local pulls = {}
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
@@ -211,7 +211,7 @@ local function with_fixture(options, callback)
 	local real_window, native_window
 	if options.real_window then
 		helpers.provide_timings()
-		package.loaded["infra.paths"] = { shared = function()
+		package.loaded["core.fs.engine.paths"] = { shared = function()
 			return helpers.driver_root() .. "../_shared"
 		end }
 		package.loaded["infra.deferred_work"] = { after = function() return true end }

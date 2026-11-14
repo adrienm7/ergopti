@@ -26,7 +26,7 @@ local Logger        = require("infra.logger")
 local ConfigPaths   = require("infra.config_paths")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
-local FileSystem    = require("adapters.file_system")
+local FileSystem    = require("core.fs.adapters.file_system")
 
 local LOG = "log_openers"
 

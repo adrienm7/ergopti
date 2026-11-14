@@ -13,7 +13,7 @@ local function test(name, body) helpers.it(name .. " (ollama-install)", body) en
 local Policy = helpers.load_module("ai.engine.ollama.install_policy")
 local Resolver = helpers.load_module_with_dependency("modules.llm.ollama_install_resolver", "luv", false)
 local Json, AppDirs = require("core.text.engine.json"), require("core.fs.engine.app_dirs")
-local source = assert(io.open(assert(require("infra.paths").shared("ai/data/ollama_release.json")), "rb"))
+local source = assert(io.open(assert(require("core.fs.engine.paths").shared("ai/data/ollama_release.json")), "rb"))
 local release_text = assert(source:read("*a")); assert(source:close())
 local function release() return assert(Json.decode_lossless(release_text)) end
 local catalogue = release()
@@ -47,7 +47,7 @@ local function fixture()
 end
 
 test("Ollama release catalogue refuses a FIFO without blocking", function()
-	local uv, Paths = require("luv"), require("infra.paths")
+	local uv, Paths = require("luv"), require("core.fs.engine.paths")
 	local original_shared = Paths.shared
 	local source_path = assert(original_shared("ai/data/ollama_release.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-release-XXXXXX"))

@@ -70,7 +70,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- Karabiner deploy failure, a menu build error, an unreadable watch root.
 		-- Anything that throws here used to leave the session with no teardown.
 		local later_phases = {
-			'require("infra.file_watchers").start',
+			'require("core.fs.engine.file_watchers").start',
 			"menu.start",
 			"Boot.mark(\"Boot complete",
 		}

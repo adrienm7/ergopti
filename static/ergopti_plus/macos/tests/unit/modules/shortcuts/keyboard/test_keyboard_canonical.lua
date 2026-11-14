@@ -4,20 +4,20 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local function with_subject(source, body)
-	local names = { "adapters.storage", "adapters.file_system", "adapters.hotkey_registrar", "infra.preferences",
-		"infra.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
+	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "adapters.hotkey_registrar", "infra.preferences",
+		"core.fs.engine.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0, handles = {}, fired = {} }
 	local subject
 	local ok, err = pcall(function()
 		helpers.load_with_stubs("infra.preferences")
-		package.loaded["adapters.storage"] = setmetatable({}, { __index = function()
+		package.loaded["core.fs.adapters.storage"] = setmetatable({}, { __index = function()
 			return function() error("canonical owner must not read legacy storage") end
 		end })
-		package.loaded["infra.paths"] = { shared = function(rel) return helpers.shared(rel) end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
 		package.loaded["infra.config_paths"] = { get = function() return "keyboard-config" end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local f = assert(io.open(path, "rb")); local raw = f:read("*a"); f:close(); return raw
 			end,

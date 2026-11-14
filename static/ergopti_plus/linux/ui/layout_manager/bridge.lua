@@ -14,8 +14,8 @@
 
 local Json          = require("core.text.engine.json")
 local Logger        = require("core.logger.engine.shim")
-local Paths         = require("infra.paths")
-local FileSystem    = require("adapters.file_system")
+local Paths         = require("core.fs.engine.paths")
+local FileSystem    = require("core.fs.adapters.file_system")
 local ManagerBridge = require("layouts.engine.manager_bridge")
 
 local LOG = "bridge.layout_manager"

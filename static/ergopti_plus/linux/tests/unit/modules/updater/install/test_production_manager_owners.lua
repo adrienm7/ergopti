@@ -7,7 +7,7 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(options, body)
  options = options or {}
  local names = { "modules.updater.manager", "modules.updater.archive_transfer", "infra.archive_output",
-  "infra.monotonic", "infra.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "adapters.storage" }
+  "infra.monotonic", "infra.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "core.fs.adapters.storage" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
@@ -39,7 +39,7 @@ local function scenario(options, body)
   -- Runtime check state belongs to this model. A warmed real Storage would
   -- otherwise retain this scenario's fake Writer after the cache is restored.
   local stored = {}
-  package.loaded["adapters.storage"] = {
+  package.loaded["core.fs.adapters.storage"] = {
    get = function(key, default) local value = stored[key]; if value == nil then return default end; return value end,
    set = function(key, value) stored[key] = value; return true end,
   }

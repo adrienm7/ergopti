@@ -42,7 +42,7 @@ local SCAN_PREDICATES = {
 local function probe(source, claim)
 	local target = "modules.dynamic_hotstrings.personal_info"
 	return helpers.with_stub_scope({ target, "infra.logger", "modules.keystats", "ui.personal_info_editor",
-		"adapters.synthetic_input", "adapters.file_system", "infra.personal_info_fields" }, function()
+		"adapters.synthetic_input", "core.fs.adapters.file_system", "infra.personal_info_fields" }, function()
 		local record = { errors = {}, queries = {}, attempts = 0, scans = 0 }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) record.errors[#record.errors + 1] = string.format(format, ...) end

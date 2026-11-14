@@ -32,8 +32,8 @@ local M = {}
 
 local Logger         = require("infra.logger")
 local Timings        = require("infra.timings")
-local FileSystem     = require("adapters.file_system")
-local JsonCodec      = require("adapters.json_codec")
+local FileSystem     = require("core.fs.adapters.file_system")
+local JsonCodec      = require("core.fs.adapters.json_codec")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Policy         = require("ai.engine.local_servers.ports_core")

@@ -151,7 +151,7 @@ helpers.describe("hotstrings_config", function()
           cfg.load_all()
 
           local Loader = require("modules.hotstrings.loader")
-          local Paths = require("infra.paths")
+          local Paths = require("core.fs.engine.paths")
           local bundled = Loader.find_toml_files(Paths.shared("hotstrings/data/catalogue"))
           helpers.assert_true(#bundled > 0, "fixture requires the actual bundled TOML inventory")
           helpers.assert_true(cfg.mapping_count() > 0,

@@ -43,7 +43,7 @@ return function(callback)
 		end
 		package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
 		package.loaded["modules.keystats.sqlite_reader"] = {}
-		local filesystem = package.loaded["adapters.file_system"]
+		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.read_with_status = function() return nil, "absent" end
 		local logger = package.loaded["infra.logger"]
 		logger.error = function(_, template, ...) errors[#errors + 1] = string.format(template, ...) end

@@ -105,7 +105,7 @@ function M.register(helpers, driver)
 	end
 	local function shared_file(relative)
 		if driver == "macos" then return helpers.shared(relative) end
-		return require("infra.paths").shared(relative)
+		return require("core.fs.engine.paths").shared(relative)
 	end
 	local vectors = assert(require("core.text.engine.json").decode(bytes(shared_file("tests/corpus/config_binding_identity/keyboard_vectors.json"))))
 	helpers.describe("keyboard-binding: shared complete identity contract", function()

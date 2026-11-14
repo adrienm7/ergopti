@@ -5,7 +5,7 @@
 ---         cache writes
 --- DESCRIPTION:
 --- Two independent RECURSIVE pathwatchers cover the same tree, and only one
---- carries exclusions. `infra/file_watchers.lua` filters out runtime artefacts and is
+--- carries exclusions. `core/fs/engine/file_watchers.lua` filters out runtime artefacts and is
 --- fed `ignored_dirs = { TOML_CACHE_DIR }`. `ui/menu/menu_watchers.lua` arms a
 --- second recursive watcher on the same `base_dir` whose entire filter is
 --- ".lua or .toml, not under logs/, not paths.toml" — no ignored directories at

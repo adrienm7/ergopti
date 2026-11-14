@@ -289,13 +289,13 @@ function M.register_pure(helpers)
 end
 
 local function with_native(helpers, content, body)
-	helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-		package.loaded["adapters.file_system"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
 		require("settings.engine.migration.outdated").reset_for_tests()
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local path = os.tmpname()
@@ -475,7 +475,7 @@ function M.register_native(helpers)
 					local meta = { __eq = function() effects = effects + 1; return true end }
 					setmetatable(original, meta)
 					if kind == "substituted token" then operation.record_list = setmetatable({}, meta) end
-					local writer, adapter = require("core.text.engine.toml_codec.writer"), require("adapters.file_system")
+					local writer, adapter = require("core.text.engine.toml_codec.writer"), require("core.fs.adapters.file_system")
 					local reader, publisher = adapter.read_with_status, adapter.write_if_unchanged
 					local reads, writes = 0, 0
 					adapter.read_with_status = function(...) reads = reads + 1; return reader(...) end
@@ -510,7 +510,7 @@ function M.register_native(helpers)
 					if kind == "path metatable" then setmetatable(entry.path, meta)
 					else setmetatable(original, meta); if kind == "substituted token" then entry.source_record = setmetatable({}, meta) end end
 					local backup_calls, publish_calls = 0, 0
-					local writer, adapter = require("core.text.engine.toml_codec.writer"), require("adapters.file_system")
+					local writer, adapter = require("core.text.engine.toml_codec.writer"), require("core.fs.adapters.file_system")
 					local called, refused = pcall(Unused.remove, { path = path, keys = scan.keys, file_adapter = adapter,
 						create_backup = function(target, content)
 							backup_calls = backup_calls + 1; backups[#backups + 1] = target
@@ -568,7 +568,7 @@ function M.register_native(helpers)
 			with_native(helpers, source, function(preferences, path, read)
 				local state = preferences.load(path)
 				local previous = LeafRows.clone_value(state.llm_user_models)
-				local adapter = require("adapters.file_system")
+				local adapter = require("core.fs.adapters.file_system")
 				local write = adapter.write_if_unchanged
 				local publications = 0
 				adapter.write_if_unchanged = function() publications = publications + 1; return false, "native refusal" end

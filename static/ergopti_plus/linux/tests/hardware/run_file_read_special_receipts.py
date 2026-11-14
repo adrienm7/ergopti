@@ -17,7 +17,7 @@ local path = assert(os.getenv("ERGOPTI_FILE_SOURCE"))
 local value
 if os.getenv("ERGOPTI_FILE_PORT") == "updater" then
 	value = require("modules.updater.installer").DEFAULT_OPS.read(path)
-else value = require("adapters.file_system").read(path) end
+else value = require("core.fs.adapters.file_system").read(path) end
 if os.getenv("ERGOPTI_FILE_REGULAR") == "yes" then
 	local expected = assert(io.open(assert(os.getenv("ERGOPTI_FILE_EXPECTED")), "rb"))
 	local bytes = assert(expected:read("*a")); assert(expected:close())

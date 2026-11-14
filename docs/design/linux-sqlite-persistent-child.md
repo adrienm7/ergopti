@@ -30,7 +30,7 @@ synchronous read (the dashboard's `query_rows`, `get_meta`) pays the same 4 ms.
 
 - **No luv in the store** (`tests/hardware/run_sqlite_private_no_luv.lua`): the
   child is started with LuaJIT FFI (`pipe2`, `posix_spawn` with file actions,
-  `read`, `write`, `waitpid`), as `infra/private_sqlite_file.lua` already uses
+  `read`, `write`, `waitpid`), as `core/fs/engine/private_sqlite_file.lua` already uses
   FFI for its descriptors. Stock Lua keeps today's per-call path.
 - **A refused statement rolls its batch back.** Today `-bail` makes the CLI exit
   on the first error, which closes the connection and rolls back an open

@@ -45,7 +45,7 @@ local OUTDATED_KEYS = table.concat({
 local MENU_STATE_MODULES = {
 	"ui.menu.menu_state",
 	"ui.menu.keymap_lifecycle",
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"infra.deferred_work",
 	"modules.keystats.text_cipher",
 }

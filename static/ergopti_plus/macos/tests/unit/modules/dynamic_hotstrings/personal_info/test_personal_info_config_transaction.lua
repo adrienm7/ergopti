@@ -9,7 +9,7 @@
 
 local helpers = require('tests.helpers')
 local modules = {
-	'modules.dynamic_hotstrings.personal_info', 'adapters.file_system',
+	'modules.dynamic_hotstrings.personal_info', 'core.fs.adapters.file_system',
 	'infra.logger', 'adapters.synthetic_input', 'ui.personal_info_editor',
 	'modules.keystats',
 	'infra.manifest_reader', 'infra.personal_info_fields',
@@ -17,7 +17,7 @@ local modules = {
 local function with_subject(content, run)
 	helpers.with_fresh_modules(modules, function()
 		local state = { content = content, writes = 0, registrations = 0, logs = {}, refreshes = 0 }
-		package.loaded['adapters.file_system'] = {
+		package.loaded['core.fs.adapters.file_system'] = {
 			read_with_status = function() return state.content, 'ok' end,
 			write_if_unchanged = function(_, value, expected)
 				if expected.content ~= state.content then return false end

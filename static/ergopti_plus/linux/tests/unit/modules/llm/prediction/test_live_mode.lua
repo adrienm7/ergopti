@@ -259,7 +259,7 @@ end
 
 helpers.it("live mode refuses a FIFO configuration without blocking", function()
 	scenario({}, function(world)
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original = Paths.shared
 		local source = assert(original("ai/data/live.json"))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-live-config-XXXXXX"))

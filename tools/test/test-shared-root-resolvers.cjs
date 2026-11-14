@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Shared-Root Resolver Execution Guard
  * DESCRIPTION:
- * Runs the real `infra/paths.lua` resolver of every driver, asks it for every
+ * Runs the real `core/fs/engine/paths.lua` resolver of every driver, asks it for every
  * `_shared` path the codebase actually requests, and stats the answer. A target
  * that does not exist on disk fails, and so does a resolver that returns nil.
  *
@@ -240,7 +240,7 @@ if use_hs_stub == "1" then
 	hs = stub
 end
 
-local ok, Paths = pcall(require, "infra.paths")
+local ok, Paths = pcall(require, "core.fs.engine.paths")
 if not ok then
 	print("${MARK}FATAL\\tcannot load lib.paths: " .. tostring(Paths))
 	os.exit(0)
@@ -302,7 +302,7 @@ if (!LUA) {
 } else {
 	for (const drv of RESOLVER_DRIVERS) {
 		const driverRoot = path.join(DRIVERS, drv.name).split(path.sep).join('/');
-		const resolver = path.join(DRIVERS, drv.name, 'infra', 'paths.lua');
+		const resolver = path.join(DRIVERS, drv.name, 'core', 'fs', 'engine', 'paths.lua');
 		if (!fs.existsSync(resolver)) {
 			errors.push(
 				`${drv.name}/infra/paths.lua is missing — the driver has no shared-tree resolver`

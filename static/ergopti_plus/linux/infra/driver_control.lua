@@ -50,7 +50,7 @@ Session.__index = Session
 --- @return table|nil stage Creation-time current/discard callbacks.
 --- @return string|nil detail
 local function native_stage(path, text)
-	local opened, stream, detail, _, discard, current = pcall(require("infra.regular_file_writer").open, path, "wx")
+	local opened, stream, detail, _, discard, current = pcall(require("core.fs.engine.regular_file_writer").open, path, "wx")
 	if not opened or not stream then return nil, tostring(opened and detail or stream) end
 	local wrote_ok, wrote, write_err = pcall(stream.write, stream, text)
 	local close_ok, closed, close_err = pcall(stream.close, stream)
@@ -67,7 +67,7 @@ end
 --- @return table ports
 local function native_ports()
 	local uv = require("luv")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	return {
 		read = FileSystem.read,
 		read_status = FileSystem.read_with_status,
@@ -297,8 +297,8 @@ M.Session = Session
 function M.start(opts)
 	Logger.start(LOG, "Starting the local reload control…")
 	local ok, session_or_err = pcall(function()
-		local file = assert(require("infra.regular_file_reader").open(
-			opts.declaration or require("infra.paths").shared("diagnostics/data/control/driver_control.json")))
+		local file = assert(require("core.fs.engine.regular_file_reader").open(
+			opts.declaration or require("core.fs.engine.paths").shared("diagnostics/data/control/driver_control.json")))
 		local read, text = pcall(file.read, file, "*a")
 		local closed, acknowledged = pcall(file.close, file)
 		assert(read and type(text) == "string", "the control declaration could not be read")

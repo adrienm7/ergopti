@@ -22,7 +22,7 @@ local hs         = hs
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
-local Paths      = require("infra.paths")
+local Paths      = require("core.fs.engine.paths")
 
 local LOG = "prompt_editor"
 

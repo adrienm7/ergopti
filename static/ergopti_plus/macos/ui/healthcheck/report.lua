@@ -176,7 +176,7 @@ local DEFAULT_EFFECTS = {
 		if not make_dir(dir) then return nil, "cannot create " .. dir end
 		local stem, extension = name:match("^(.*)(%.[^.]+)$")
 		stem, extension = stem or name, extension or ""
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		for index = 0, 999 do
 			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
 			-- This probe only skips a visibly occupied name; creation still belongs

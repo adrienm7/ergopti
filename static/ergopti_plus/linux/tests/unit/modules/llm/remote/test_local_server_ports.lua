@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Reads one shared JSON file.
 --- @param relative string
@@ -258,7 +258,7 @@ end)
 for _, kind in ipairs({ "settings", "proc" }) do
 	for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
 		helpers.it("local server " .. kind .. " refuses incomplete read " .. fault, function()
-			local Scanner, Reader = require("modules.llm.local_server_ports"), require("infra.regular_file_reader")
+			local Scanner, Reader = require("modules.llm.local_server_ports"), require("core.fs.engine.regular_file_reader")
 			local original_open, original_reader = io.open, Reader.open_source
 			local closed, maximum = 0, nil
 			local stream = { read = function(_, limit)

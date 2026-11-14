@@ -15,8 +15,8 @@ local function with_program(callback, program_admission)
 	local tasks, actions, auxiliary = {}, nil, nil
 	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
 		"adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
-		"adapters.task_environment", "adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
-		"infra.config_paths", "infra.paths", "infra.i18n", "infra.logger", "infra.timings",
+		"adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
+		"infra.config_paths", "core.fs.engine.paths", "infra.i18n", "infra.logger", "infra.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
 	local ok, failure = xpcall(function()
@@ -191,7 +191,7 @@ helpers.describe("private program parameter transaction admission", function()
 	helpers.it("rechecks transaction admission after a physical source callback", function()
 		local pending = false
 		with_program(function(actions, _, _, _, tasks)
-			local filesystem = require("adapters.file_system")
+			local filesystem = require("core.fs.adapters.file_system")
 			local read = filesystem.read_with_status
 			filesystem.read_with_status = function(...)
 				local content, status = read(...)

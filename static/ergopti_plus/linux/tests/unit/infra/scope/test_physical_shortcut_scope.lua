@@ -47,7 +47,7 @@ local function with_scope(body, source, chord_j_identity)
 			local prediction = require("modules.llm.prediction_engine")
 			prediction.init({ scheduler = require("tests.fakes").timer_scheduler() })
 			assert(prediction.shutdown_runtime() == true, "the idle original AI owner must actually close")
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,
 			}
@@ -109,7 +109,7 @@ local function with_scope(body, source, chord_j_identity)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			package.loaded["adapters.file_system"] = files
+			package.loaded["core.fs.adapters.file_system"] = files
 			-- Keep this fixture's genuine pre-Magic-init phase while binding the
 			-- new observer to the same actual route, file ports and preference owner.
 			local magic_preferences = require("infra.hotstring_preferences")
@@ -145,7 +145,7 @@ local function with_scope(body, source, chord_j_identity)
 				execute_action = function() error("no output during edit admission") end,
 				action_names = gestures.get_executable_action_names,
 				on_text_injected = function() error("no text during edit admission") end,
-				defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			local Pair = require("modules.shortcuts.key_combinations")
 			local pair_owner = tap_manager.configuration_snapshot().combinations
 			assert(Pair.set_instance(pair_owner))

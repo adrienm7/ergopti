@@ -335,7 +335,7 @@ for _, operation in ipairs({ "install", "repoint" }) do
 				write(errors, expected)
 				assert(uv.fs_chmod(errors, 256))
 			end
-			local refused, _, code = require("infra.regular_file_writer").open(errors, "a")
+			local refused, _, code = require("core.fs.engine.regular_file_writer").open(errors, "a")
 			assert(refused == nil and code == (refusal == "directory" and "EISDIR" or "EACCES"),
 				"fixture did not establish the actual native open refusal")
 			local diagnostics = capture_diagnostics(function()

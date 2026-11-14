@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Active File Manager Folder Receipt
 --- DESCRIPTION:
---- Runs the real adapters/file_manager_folder.lua and the real
+--- Runs the real core/fs/adapters/file_manager_folder.lua and the real
 --- open_terminal_here / new_text_file_here handlers against the display, the
 --- window manager and the file managers of the calling fixture
 --- (tests/hardware/run_file_manager_folder.sh). One line per call:
@@ -18,7 +18,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 local DisplayServer = require("infra.display_server")
 assert(DisplayServer.is_x11(), "the file manager folder receipt needs an X11 display")
 
-local Folder = require("adapters.file_manager_folder")
+local Folder = require("core.fs.adapters.file_manager_folder")
 local SystemActions = require("modules.gestures.system_actions")
 
 local mode = arg[1]

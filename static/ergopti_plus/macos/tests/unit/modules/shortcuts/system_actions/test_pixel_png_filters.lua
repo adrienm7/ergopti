@@ -21,7 +21,7 @@ local function copy_capture(mode)
 	local notices = {}
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.system_pixel", "adapters.task_lifecycle",
-		"adapters.file_system", "infra.notifications", "infra.i18n", "infra.logger",
+		"core.fs.adapters.file_system", "infra.notifications", "infra.i18n", "infra.logger",
 		"modules.shortcuts.actions.screen_capture_flow",
 	}, function()
 		local tasks = {}
@@ -37,7 +37,7 @@ local function copy_capture(mode)
 			end,
 			start = function(task) return task:start() == task end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function() return "/private/tmp/pixel-png-capture" end,
 			remove_exact = function() return true end,
 			classify_no_follow = function() return nil, "absent" end,

@@ -78,7 +78,7 @@ M.RESTORE_STEP = "register-core-agents"
 function M.new(dependencies)
 	dependencies = dependencies or {}
 	local exec = dependencies.exec or require("adapters.field_check_ports").exec
-	local exists = dependencies.exists or require("adapters.file_system").exists
+	local exists = dependencies.exists or require("core.fs.adapters.file_system").exists
 	local timer = dependencies.timer or require("core.events.timer_scheduler")
 	local port = {}
 

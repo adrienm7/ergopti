@@ -15,7 +15,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 local uv = require("luv")
 local ffi = require("ffi")
 ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
-local Digest = require("adapters.file_digest")
+local Digest = require("core.fs.adapters.file_digest")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-digest-replacement-XXXXXX"))
 local ABC_SHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 local checks, failures, paths, processes = 0, 0, {}, {}

@@ -15,7 +15,7 @@ local M = {}
 
 local Json = require("core.text.engine.json")
 local ExactIdentity = require("infra.curl_identity")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local ProcessGroup = require("infra.libuv_process_group")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")

@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local WPMModel = require("metrics.engine.wpm_widget_model")
 local TomlCodec = require("core.text.engine.toml_codec")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 -- The real canon, read before any stub replaces the paths it lives at.
 local CANON = assert(WPMModel.load(Paths.shared("metrics/data/wpm_widget/constants.toml"), TomlCodec.decode))

@@ -26,9 +26,9 @@ local MODULES = {
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	-- FileSystem captures hs when it loads; bind it to this fixture's probe.
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	-- Storage captures hs too: the prelude reads the proxy override through it.
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",

@@ -27,7 +27,7 @@ assert(Paths.shared_root() == shared, "real shared-tree lookup lost literal dire
 local locale_path = assert(Paths.shared("core/i18n/data/locales/en.json"))
 local file = assert(io.open(locale_path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
 assert(#bytes > 100 and require("core.text.engine.json").decode(bytes), "actual shared locale file was not read")
-package.loaded["infra.paths"] = Paths
+package.loaded["core.fs.engine.paths"] = Paths
 local Installer = require("modules.updater.installer")
 local context = Installer.resolve(assert(os.getenv("ERGOPTI_NATIVE_MANAGER_SOURCE")))
 assert(context.kind == "standalone", "literal directory bytes prevented native installation classification")
@@ -85,7 +85,7 @@ def main():
                     "XDG_CONFIG_HOME": str(prefix / "config"),
                     "ERGOPTI_NATIVE_PATH_SOURCE": str(source)
                     if loading == "absolute"
-                    else "linux/infra/paths.lua",
+                    else "linux/core/fs/engine/paths.lua",
                     "ERGOPTI_NATIVE_DRIVER_ROOT": str(root),
                     "ERGOPTI_NATIVE_SHARED_ROOT": expected_shared,
                     "ERGOPTI_NATIVE_MANAGER_SOURCE": str(manager)

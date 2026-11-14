@@ -20,7 +20,7 @@ local CATEGORY_OWNERS = {
 	"ui.ui_builder",
 	"infra.logger",
 	"infra.dialog_util",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
@@ -57,12 +57,12 @@ local function with_category_store_owned(spec, callback)
 
 	io.open = function(path, mode)
 		if path == TARGET_PATH then
-			error("category persistence bypassed adapters.file_system in mode " .. tostring(mode))
+			error("category persistence bypassed core.fs.adapters.file_system in mode " .. tostring(mode))
 		end
 		return original_open(path, mode)
 	end
 
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			helpers.assert_eq(path, TARGET_PATH)
 			state.read_calls = state.read_calls + 1
@@ -179,7 +179,7 @@ local function with_category_store_owned(spec, callback)
 	package.loaded["ui.ui_builder"] = nil
 	package.loaded["infra.dialog_util"] = nil
 	package.loaded["infra.logger"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	for name, prior in pairs(previous_modules) do package.loaded[name] = prior.value end
 	if not ok then error(result, 0) end
 	return result

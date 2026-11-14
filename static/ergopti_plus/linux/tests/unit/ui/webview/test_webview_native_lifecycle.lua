@@ -589,7 +589,7 @@ local run_contract = function(helpers,load_manager,load_host)
      fixture(function(m,c)
       local received,retired=0,0
       package.loaded['shortcuts.engine.physical_slots']={new=function()return{candidates=function()return{}end}end}
-      package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
+      package.loaded['core.fs.engine.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
       package.loaded['modules.gestures.manager']={}
       package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)
        local closed=false
@@ -615,7 +615,7 @@ local run_contract = function(helpers,load_manager,load_host)
     fixture(function(m,c)
      local received=0
      package.loaded['shortcuts.engine.physical_slots']={new=function()return{candidates=function()return{}end}end}
-     package.loaded['infra.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
+     package.loaded['core.fs.engine.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
      package.loaded['modules.gestures.manager']={}
      package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)return{retire=function()return true end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host

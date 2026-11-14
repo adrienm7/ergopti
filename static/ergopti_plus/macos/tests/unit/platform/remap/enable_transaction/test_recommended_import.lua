@@ -49,7 +49,7 @@ local function importing_remap(fixture)
 		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return RUNNING
 	end
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	files.read_with_status = function(path)
 		local content = disk.files[path]
 		return content, content and "ok" or "absent"

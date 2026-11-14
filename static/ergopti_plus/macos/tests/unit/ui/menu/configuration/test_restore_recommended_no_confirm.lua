@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 
 local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_4 = "open_url"\n'
 	.. 'action_parameters = { tap_4__open_url = "https://apple.com" }\n[future]\nkeep = 42\n'
@@ -25,7 +25,7 @@ local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_4 = "open_url"\n'
 --- double records each question and answers No.
 --- @return table fixture owner, gestures, files, state, asked, writes().
 local function gesture_fixture()
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["modules.gestures.conflicts"] = nil
 	helpers.load_with_stubs("modules.gestures.actions")
@@ -48,7 +48,7 @@ local function gesture_fixture()
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local modules = { gestures = gestures }
@@ -137,7 +137,7 @@ helpers.describe("restore-recommended-no-confirm: Gestures (macOS)", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FileSystem
+package.loaded["core.fs.adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
 --- A remap facade double recording each scope request; its terminal is true.

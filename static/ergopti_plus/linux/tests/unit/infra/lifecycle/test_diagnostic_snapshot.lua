@@ -19,7 +19,7 @@ local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
 local json     = require("core.text.engine.json")
-local Paths    = require("infra.paths")
+local Paths    = require("core.fs.engine.paths")
 local Snapshot = require("diagnostics.engine.snapshot")
 
 
@@ -129,7 +129,7 @@ end)
 
 describe("linux-diagnostic-read-admission", function()
 	local Collector = require("infra.diagnostic_snapshot")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local sha = "123456789" .. string.rep("0", 31)
 	local root = "/native-diagnostic-fixture"
 	for _, case in ipairs({ "stamp", "git", "pid", "facts" }) do

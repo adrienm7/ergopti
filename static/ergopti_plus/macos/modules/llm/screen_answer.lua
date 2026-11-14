@@ -38,9 +38,9 @@ local M = {}
 local Vision       = require("ai.engine.prediction.vision")
 local Logger       = require("infra.logger")
 local i18n         = require("infra.i18n")
-local Paths        = require("infra.paths")
-local FileSystem   = require("adapters.file_system")
-local JsonCodec    = require("adapters.json_codec")
+local Paths        = require("core.fs.engine.paths")
+local FileSystem   = require("core.fs.adapters.file_system")
+local JsonCodec    = require("core.fs.adapters.json_codec")
 local MouseControl = require("adapters.mouse_control")
 
 local LOG = "llm.screen_answer"

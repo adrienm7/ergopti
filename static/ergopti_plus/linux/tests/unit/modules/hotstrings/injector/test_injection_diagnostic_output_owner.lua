@@ -19,7 +19,7 @@ local function scenario(mode, change)
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector, successor, writer
 	local called, failure = pcall(function()
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("debug")
 		package.loaded["core.logger.engine.shim"] = logger
 		Fixture.with_session(nil, function(session)

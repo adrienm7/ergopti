@@ -223,7 +223,7 @@ end)
 local function load_healthcheck(view)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder",
+		"infra.logger", "core.fs.engine.paths", "infra.i18n", "ui.ui_builder",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -253,7 +253,7 @@ local function load_healthcheck(view)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
-	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	local real = require("ui.ui_builder")
 	package.loaded["ui.ui_builder"] = setmetatable({
@@ -310,7 +310,7 @@ end)
 local function load_error_dialog(view, app)
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "core.events.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+		"infra.locale", "ui.ui_builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -343,7 +343,7 @@ local function load_error_dialog(view, app)
 		now_ns = function() return 0 end,
 		cancel = function() return true end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(_, default) return default end,
 		set = function() return true end,
 	}

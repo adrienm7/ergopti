@@ -24,7 +24,7 @@ return function(run)
 			return original_getenv(key)
 		end
 		helpers.with_fresh_modules({ "infra.app_picker", "adapters.shell_runner",
-			"adapters.file_system", "infra.logger", "infra.i18n", "infra.text_utils", "infra.deferred_work" }, function()
+			"core.fs.adapters.file_system", "infra.logger", "infra.i18n", "infra.text_utils", "infra.deferred_work" }, function()
 			package.loaded["infra.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
 				if state.defer_synchronous then callback() end
@@ -43,7 +43,7 @@ return function(run)
 				if path == "/System/Applications" then return state.bundled_status, state.bundled_detail end
 				return state.status, state.detail
 			end
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				path_status = classify,
 				directory_status = function(path)
 					local status, detail = classify(path)

@@ -268,7 +268,7 @@ helpers.describe("private program group retirement (program106-group)", function
 	end)
 
 	helpers.it("qualifies real descendant retirement in an owned subreaper (program106-group)", function()
-		local path = require("infra.paths").driver_root() .. "/tests/hardware/run_program_group_receipts.lua"
+		local path = require("core.fs.engine.paths").driver_root() .. "/tests/hardware/run_program_group_receipts.lua"
 		local code = "package.path = " .. string.format("%q", package.path) .. "; dofile("
 			.. string.format("%q", path) .. ")"
 		local stdout, stderr = Native.new_pipe(false), Native.new_pipe(false)
@@ -606,7 +606,7 @@ end)
 helpers.describe("private program lossless shared parameter corpus", function()
 	helpers.it("checks every executable syntax against independently declared literal vectors", function()
 		local Json, Program = require("core.text.engine.json"), require("settings.engine.program_parameter")
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/action_parameters/program_vectors.json"), "rb"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/action_parameters/program_vectors.json"), "rb"))
 		local corpus = assert(Json.decode_lossless(file:read("*a"))); file:close()
 		local count = 0
 		for _, vector in ipairs(corpus.cases) do

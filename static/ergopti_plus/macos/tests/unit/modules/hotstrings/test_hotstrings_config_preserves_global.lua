@@ -34,7 +34,7 @@ helpers.describe("hotstrings_config: a save preserves the [__global__] block", f
 	helpers.it("an old delimiter table survives a category-only save", function()
 		local path = os.tmpname()
 		local config_module = "modules.hotstrings.hotstrings_config"
-		local file_system_module = "adapters.file_system"
+		local file_system_module = "core.fs.adapters.file_system"
 		local saved_config = package.loaded[config_module]
 		local saved_file_system = package.loaded[file_system_module]
 		local ok, err = xpcall(function()

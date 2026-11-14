@@ -27,7 +27,7 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = ['macos', 'linux'].map((driver) =>
-	path.join(ROOT, 'static', 'ergopti_plus', driver, 'adapters', 'file_system.lua')
+	path.join(ROOT, 'static', 'ergopti_plus', driver, 'core', 'fs', 'adapters', 'file_system.lua')
 );
 const CALL = 'require("core.fs.engine.ports").check_owner(M)';
 
@@ -61,6 +61,8 @@ const WINDOWS_OWNER = path.join(
 	'static',
 	'ergopti_plus',
 	'windows',
+	'core',
+	'fs',
 	'adapters',
 	'file_system.ahk'
 );

@@ -63,12 +63,12 @@ local function load_subject()
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function()
 			return '{"keys":[{"id":"a","label":"A"},{"id":"b","label":"B"}]}'
 		end,
 	}
-	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
+	package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	-- The start transaction is independent of which ids exist; the load-time
 	-- catalogue check has its own test (test_keyboard_shortcuts_unknown_action.lua).
@@ -76,7 +76,7 @@ local function load_subject()
 		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function() end,
 	}
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	require("tests.support.keyboard_config_fixture").install({ primary_a = "script_pause_toggle", primary_b = "script_pause_toggle" })

@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- @param source string TOML source.
 --- @param body function Receives { config, path, load, read, errors }.
 local function with_file(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "core.logger.engine.shim",
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim",
 		"core.text.engine.toml_codec", "infra.toml.codec" }, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
@@ -33,7 +33,7 @@ local function with_file(source, body)
 			return text
 		end
 		-- The portable writer: publication atomicity is the filesystem adapter's own tested concern.
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local function publish(destination, content)
 			local handle = assert(io.open(destination, "wb")); assert(handle:write(content)); assert(handle:close())
 			return true

@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 local Model = require("metrics.engine.wpm_widget_model")
 local Codec = require("core.text.engine.toml_codec")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local LiveWpm = require("metrics.engine.wpm.live_wpm")
 
 local CANON_PATH = Paths.shared("metrics/data/wpm_widget/constants.toml")
@@ -410,7 +410,7 @@ end
 local _displaced = {}
 
 local function with_storage(initial, body)
-	_displaced.storage = package.loaded["adapters.storage"]
+	_displaced.storage = package.loaded["core.fs.adapters.storage"]
 	-- The previews other suites leave up would keep the readouts shown.
 	_displaced.preview = package.loaded["ui.tooltip.preview"]
 	_displaced.llm = package.loaded["ui.tooltip.llm"]
@@ -423,7 +423,7 @@ local function with_storage(initial, body)
 		for _, key in ipairs(deletions or {}) do store.values[key] = nil end
 		return true
 	end
-	package.loaded["adapters.storage"] = store
+	package.loaded["core.fs.adapters.storage"] = store
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
 	local ok, err = pcall(function()
@@ -431,7 +431,7 @@ local function with_storage(initial, body)
 			body(store, preferences)
 		end, { initial = initial })
 	end)
-	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["core.fs.adapters.storage"] = _displaced.storage
 	package.loaded["ui.tooltip.preview"] = _displaced.preview
 	package.loaded["ui.tooltip.llm"] = _displaced.llm
 	package.loaded["ui.wpm.widget"] = nil

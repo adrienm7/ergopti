@@ -70,7 +70,7 @@ local function with_subject(stage, body, options)
 				local logs, logger = {}, helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do logger[level] = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end end
 				package.loaded["infra.logger"] = logger
-				package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
+				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 				package.loaded["infra.config_paths"] = { get = function() return path end }
 				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }
 				local preferences = require("infra.preferences"); preferences.load(path)

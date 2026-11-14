@@ -18,9 +18,9 @@ local function with_window(domain, scenario)
 	return helpers.with_stub_scope({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot", "diagnostics.engine.healthcheck.cleanup", "diagnostics.engine.healthcheck.actions",
 		"ui.error_dialog", "diagnostics.engine.reports.error_policy", "diagnostics.engine.reports.error_report", "diagnostics.engine.reports.issue_report", "diagnostics.engine.reports.redact",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-		"core.events.timer_scheduler", "adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
-		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "adapters.json_codec",
+		"infra.logger", "core.fs.engine.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"core.events.timer_scheduler", "core.fs.adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
+		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "core.fs.adapters.json_codec",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
 			timers = {}, script_refs = {}, controllers = {}, serial = 0 }
@@ -33,9 +33,9 @@ local function with_window(domain, scenario)
 			if h.on_debug then h.on_debug(format) end
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = helpers.shared }
+		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["adapters.storage"] = { get = function() return true end, set = function() return true end }
+		package.loaded["core.fs.adapters.storage"] = { get = function() return true end, set = function() return true end }
 		package.loaded["ui.ui_builder"] = {
 			window_title = function(value) return "ErgoptiPlus — " .. tostring(value) end,
 			get_app_geometry = function() return { width = 700, height = 600 } end,

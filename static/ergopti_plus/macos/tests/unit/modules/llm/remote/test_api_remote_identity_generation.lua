@@ -151,12 +151,12 @@ local PUBLICATION_LOCAL = [[{"server_order":["independent_local"],"servers":{"in
 --- @param callback function Actual native owner and recorded diagnostics.
 --- @param close_refused boolean|nil Inject a refused cloud close receipt.
 local function with_publication_sources(cloud, local_source, callback, close_refused)
-	helpers.with_stub_scope({ "modules.llm.api_remote", "modules.llm.local_servers", "infra.paths",
+	helpers.with_stub_scope({ "modules.llm.api_remote", "modules.llm.local_servers", "core.fs.engine.paths",
 		"infra.logger", "ai.engine.policy.provider_config_policy" }, function()
 		-- Establish the native ports once. A second load_with_stubs would replace
 		-- the path owner and hide the source under examination.
 		helpers.load_with_stubs("modules.llm.api_remote")
-		local paths = require("infra.paths")
+		local paths = require("core.fs.engine.paths")
 		local original_path = paths.shared_llm_path
 		local logger = require("infra.logger")
 		helpers.admit_logger_privacy(logger)
@@ -310,7 +310,7 @@ helpers.describe("Actual provider catalogue publication", function()
 				client.post = function(_, _, raw) body = raw end
 				owner.request_raw(entry.model, "Independent", "Independent", "", 0, 1, function() end, function() end)
 				helpers.assert_type(body, "string")
-				local decoded = assert(require("adapters.json_codec").decode(body))
+				local decoded = assert(require("core.fs.adapters.json_codec").decode(body))
 				helpers.assert_eq(decoded.model, entry.model)
 				helpers.assert_true(rawequal(owner.get_entries()[1], entry))
 				for _, message in ipairs(observed.warnings) do

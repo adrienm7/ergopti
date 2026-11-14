@@ -17,9 +17,9 @@
 
 local M = {}
 
-local JsonCodec = require("adapters.json_codec")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local Logger  = require("infra.logger")
-local Paths   = require("infra.paths")
+local Paths   = require("core.fs.engine.paths")
 
 -- Always start from a clean locale.core — tests may have left mock state
 -- in the module cache (Core.init is idempotent and won't overwrite it).

@@ -25,7 +25,7 @@ local function with_subject(source, body)
 		Sandbox.with_config(source, function(path)
 			local controls = { commands = {}, legacy_writes = 0, legacy_url = "https://legacy.example" }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return controls.legacy_url or default end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
 			}

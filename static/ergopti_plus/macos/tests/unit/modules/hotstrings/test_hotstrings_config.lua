@@ -31,7 +31,7 @@ end
 --- @return table The freshly-initialised module.
 --- @param toml_resolver function|nil Category to TOML path; none by default.
 local function fresh_module(path, toml_resolver)
-	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+	package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = toml_resolver or function() return nil end })
@@ -99,7 +99,7 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 			helpers.assert_eq(mod.common_autocorrection_admitted(), false)
 			helpers.with_stub_scope({
 				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-				"modules.keymap.state", "modules.keymap.terminators", "adapters.storage", "infra.toml.reader",
+				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage", "infra.toml.reader",
 			}, function()
 				local State = helpers.load_with_stubs("modules.keymap.state")
 				local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -109,7 +109,7 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 				Registry.add("foreign", "Preserved foreign", { is_word = true, is_case_sensitive = true, priority = 50 })
 				Registry.set_group_context(nil)
 				local before, sequence = { state.mappings[1] }, state.seq_counter
-				helpers.assert_true(require("adapters.storage").set("hotstrings_section_autocorrection_names", true))
+				helpers.assert_true(require("core.fs.adapters.storage").set("hotstrings_section_autocorrection_names", true))
 				helpers.assert_eq(Registry.load_toml("autocorrection", helpers.shared("hotstrings/data/catalogue/autocorrection.toml")), false)
 				helpers.assert_eq(state.mappings, before, "the actual native transaction keeps every previous mapping")
 				helpers.assert_eq(state.seq_counter, sequence)
@@ -121,7 +121,7 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 				helpers.assert_eq(hotfiles, {}, "cold startup never advertises a refused common group")
 				helpers.assert_nil(hotfile_paths.autocorrection)
 				helpers.assert_eq(state.mappings, before, "cold refusal also leaves prior unrelated native rows intact")
-				helpers.assert_true(require("adapters.storage").set(require("modules.keymap.section_keys").current("french_autocorrection", "names"), true))
+				helpers.assert_true(require("core.fs.adapters.storage").set(require("modules.keymap.section_keys").current("french_autocorrection", "names"), true))
 				local french_path = helpers.shared("hotstrings/data/catalogue/french/autocorrection.toml")
 				local admitted = Boot.load(Registry, "french_autocorrection", french_path, nil, hotfiles, hotfile_paths)
 				helpers.assert_eq(admitted, { committed = true, complete = true, unavailable = {} })

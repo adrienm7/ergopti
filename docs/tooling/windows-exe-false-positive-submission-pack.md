@@ -63,7 +63,7 @@ Left, as proposals with trade-offs. None of these hides behaviour, and none is i
    process to own and log, and a larger bundle. Recommendation: keep, and describe it in the
    submission text (below); revisit only if a vendor names that string.
 2. **Dynamic API names.** The repository has no obfuscated or computed API name: `DllCall`
-   targets are literals, `GetProcAddress` runs over fixed export tables (`infra/sqlite3.ahk`, the
+   targets are literals, `GetProcAddress` runs over fixed export tables (`core/fs/engine/sqlite3.ahk`, the
    nav-owner DLL, UIA), and `"bcrypt\" . fn` in `adapters/crypto.ahk` selects between the literals
    `BCryptEncrypt` and `BCryptDecrypt`. Splitting that last call into two literal calls would make
    a scanner see both names at the call site, but both names are already present as literals a few

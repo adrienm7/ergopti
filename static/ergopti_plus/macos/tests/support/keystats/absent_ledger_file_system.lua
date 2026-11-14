@@ -133,8 +133,8 @@ end
 --- @param overrides table|nil Existing scenario's native overrides.
 --- @return table manager Actual production manager, with no method wrapped.
 function M.load(overrides)
-	local files = package.loaded["adapters.file_system"]
-	if type(files) ~= "table" then files = {}; package.loaded["adapters.file_system"] = files end
+	local files = package.loaded["core.fs.adapters.file_system"]
+	if type(files) ~= "table" then files = {}; package.loaded["core.fs.adapters.file_system"] = files end
 	local manager, ingest_once
 	local function get_current_paths()
 		assert(type(ingest_once) == "function", "fixture manager is not loaded")
@@ -151,7 +151,7 @@ function M.load(overrides)
 		end
 	end
 	M.extend(files, get_current_paths)
-	package.loaded["adapters.ledger_append"] = nil
+	package.loaded["core.fs.adapters.ledger_append"] = nil
 	manager = helpers.load_with_stubs("modules.keystats.log_manager", overrides)
 	-- Scenarios may wrap the public method; retain its actual path owner.
 	ingest_once = manager.ingest_once
