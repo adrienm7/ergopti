@@ -223,6 +223,14 @@ async function exerciseSections(page, origin, basePath) {
 			'Studio tabs on ' + route
 		);
 	}
+	// The comparison page reports its height; the frame follows it.
+	const frame = page.locator('iframe.layout-analysis-frame');
+	await page.waitForFunction(() => {
+		const element = document.querySelector('iframe.layout-analysis-frame');
+		const inner = element?.contentDocument?.documentElement;
+		return inner && Math.abs(element.clientHeight - inner.scrollHeight) <= 2;
+	});
+	assert.equal(await frame.count(), 1);
 }
 
 /** Every former address lands on its new page, anchors included. */
