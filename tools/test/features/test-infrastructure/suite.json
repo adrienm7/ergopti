@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-0540",
-			"ordinal": 667,
+			"ordinal": 668,
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
