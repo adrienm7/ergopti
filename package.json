@@ -165,6 +165,7 @@
 		"test:structure-regex-tail-paths": "node ./tools/test/test-structure-regex-tail-paths.cjs",
 		"test:structure-scope-overlap": "node ./tools/test/test-structure-scope-overlap.cjs",
 		"test:structure-widened-join": "node ./tools/test/test-structure-widened-join.cjs",
+		"test:structure-gain-scope": "node ./tools/test/test-structure-gain-scope.cjs",
 		"test:shared-literal-inventory": "node ./tools/test/test-shared-literal-inventory.cjs",
 		"test:stub-interception": "node ./tools/test/test-stubs-intercept-something.cjs",
 		"test:action-emit-per-os": "node ./tools/test/test-action-emit-is-per-os.cjs",

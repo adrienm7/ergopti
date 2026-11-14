@@ -825,6 +825,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-widened-join.cjs"],
 			"repro": "npm run test:structure-widened-join"
+		},
+		{
+			"id": "js-0530",
+			"ordinal": 649,
+			"name": "structure plan folder gains stay in the driver of the file that lists them",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-gain-scope.cjs"],
+			"repro": "npm run test:structure-gain-scope"
 		}
 	]
 }
