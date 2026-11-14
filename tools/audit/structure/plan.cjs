@@ -1912,6 +1912,23 @@ function scanFile(file, text, ctx) {
 				newRepo: target
 			});
 		}
+	// "im)^#Include\s+infra/bundle\.ahk\s*$" in a Windows source: a regular
+	// expression over the entry's #Include, its dots escaped and its slashes
+	// not. The startup source identity read core\lifecycle\engine\bundle.ahk
+	// after S06 but still matched infra/bundle.ahk, and identified nothing. A
+	// tail exactly one driver file ends with follows that file from the
+	// driver root, escaped the same way.
+	if (file.endsWith('.ahk') && inTree === 'windows')
+		for (const m of text.matchAll(/(?<![\w\\/.])((?:[\w-]+\/)+[\w-]+)\\\.(ahk)(?![\w])/g)) {
+			const tail = `${m[1]}.${m[2]}`;
+			const owners = filesEndingWith(tail).filter((o) => o.startsWith(`${PREFIX}windows/`));
+			if (owners.length !== 1 || owners[0] !== `${PREFIX}windows/${tail}`) continue;
+			const target = byRepoPath.get(owners[0]);
+			if (!target || target === PREFIX || target === SPLIT || target === owners[0]) continue;
+			if (!target.startsWith(`${PREFIX}windows/`)) continue;
+			const rel = target.slice(`${PREFIX}windows/`.length);
+			add('path-regex', m[0], rel.replace(/\./g, '\\.'), { oldRepo: owners[0], newRepo: target });
+		}
 	// SPEC_ONLY = { 'modules/tooltip/tint.js': … } in a tool: a bare path that
 	// names a file under _shared and nothing else follows that file.
 	// A captured source (a .txt snapshot of a predecessor) keeps what it held.

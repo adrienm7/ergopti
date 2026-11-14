@@ -67,6 +67,22 @@ function run() {
 			JSON.stringify(shadowed)
 		);
 	}
+	// A regular expression over the entry's #Include in a Windows source, dots
+	// escaped and slashes not: the startup source identity matched
+	// infra/bundle.ahk after S06 had moved it, and identified nothing.
+	const BUNDLE = 'windows/infra/bundle.ahk';
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus', BUNDLE))) {
+		const bundleStep = Plan.steps(map).find((s) => s.moves.some(([o]) => o === BUNDLE));
+		const bundleMap = new Map(
+			[...map].map(([o, t]) => [o, bundleStep.moves.some(([so]) => so === o) ? t : o])
+		);
+		const source = 'static/ergopti_plus/windows/infra/zz_probe_identity.ahk';
+		const regex = '\t\t|| !RegExMatch(Entry, "im)^#Include\\s+infra/bundle\\.ahk\\s*$")\n';
+		const regexRows = Plan.scanFile(source, regex, Plan.referenceContext(bundleMap));
+		const regexOut = Apply.rewriteText(regex, regexRows, new Map(), source);
+		const moved = map.get(BUNDLE).slice('windows/'.length).replace(/\./g, '\\.');
+		assert.ok(regexOut.includes(`#Include\\s+${moved}\\s*$`), regexOut);
+	}
 	console.log(`[OK] a Windows base-name lookup follows the file ${step.id} renames.`);
 }
 
