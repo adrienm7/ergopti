@@ -119,6 +119,23 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '"core/ui/engine/webview/" = "the WebView2 host helpers the windows share"'
 	},
 	{
+		// The literal AppDir contract runs workers from the driver root as its
+		// working directory (./adapters/x.lua); the plan reads ./ from the
+		// fixture's own folder. S09 moves the SQLite worker under core/process.
+		file: 'static/ergopti_plus/linux/tests/fixtures/literal_appdir_contract.py',
+		moves: 'linux/adapters/sqlite_process_worker.lua',
+		from: '"./adapters/sqlite_process_worker.lua",',
+		to: '"./core/process/adapters/sqlite_process_worker.lua",'
+	},
+	{
+		// The owned dialog host test pins the installed command line, under
+		// /usr/lib/ergopti, the Linux driver root; S12 moves the host.
+		file: 'static/ergopti_plus/linux/tests/unit/ui/webview/test_dialog_host.lua',
+		moves: 'linux/ui/dialog_host.lua',
+		from: '"</opt/ergopti/runtime/bin/luajit> </usr/lib/ergopti/ui/dialog_host.lua>"',
+		to: '"</opt/ergopti/runtime/bin/luajit> </usr/lib/ergopti/core/ui/ui/dialog_host.lua>"'
+	},
+	{
 		// The bash resolution check runs one macOS test module by its --only
 		// name, which no load site carries; S10 moves the module under core/text.
 		file: 'tools/test/test-bash-resolution.cjs',
