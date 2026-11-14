@@ -484,6 +484,14 @@ var LAYOUT_ANALYSIS = (function () {
 			same_finger_trigram: 0
 		};
 		const unsupportedChars = {};
+		// Per key: how often it takes part in each bad event, for the heatmap.
+		const KEY_EVENTS = ['sfb', 'sfs', 'lsb', 'scissors', 'redirect'];
+		const perKey = {};
+		for (const event of KEY_EVENTS) perKey[event] = new Float64Array(board.codes.length);
+		const sfbPairs = new Map();
+		const blame = (event, n, keys) => {
+			for (const k of keys) perKey[event][k] += n;
+		};
 
 		const bigram = (k1, k2, n) => {
 			if (thumb[k1] || thumb[k2]) return;
@@ -496,6 +504,9 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			if (f1 === f2) {
 				c.sfb += n;
+				blame('sfb', n, [k1, k2]);
+				const pair = k1 < k2 ? k1 * 1000 + k2 : k2 * 1000 + k1;
+				sfbPairs.set(pair, (sfbPairs.get(pair) || 0) + n);
 				return;
 			}
 			if (board.hand[k1] !== board.hand[k2]) {
@@ -512,7 +523,11 @@ var LAYOUT_ANALYSIS = (function () {
 				const down = board.row[longer] - board.row[shorter];
 				if (down >= 2) c.scissors += n;
 				else if (down === 1) c.half_scissors += n;
-				if (board.lateral[k1] || board.lateral[k2]) c.lsb += n;
+				if (down >= 1) blame('scissors', n, [k1, k2]);
+				if (board.lateral[k1] || board.lateral[k2]) {
+					c.lsb += n;
+					blame('lsb', n, [k1, k2]);
+				}
 			}
 			if (o2 > o1) c.roll_in += n;
 			else c.roll_out += n;
@@ -524,7 +539,10 @@ var LAYOUT_ANALYSIS = (function () {
 			const f1 = board.finger[k1];
 			const f2 = board.finger[k2];
 			const f3 = board.finger[k3];
-			if (f1 === f3 && k1 !== k3) c.sfs += n;
+			if (f1 === f3 && k1 !== k3) {
+				c.sfs += n;
+				blame('sfs', n, [k1, k3]);
+			}
 			if (f1 === f2 || f2 === f3) {
 				c.same_finger_trigram += n;
 				return;
@@ -539,6 +557,7 @@ var LAYOUT_ANALYSIS = (function () {
 					else c.roll3_out += n;
 				} else {
 					c.redirect += n;
+					blame('redirect', n, [k1, k2, k3]);
 					const index = [k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER);
 					if (!index) c.redirect_bad += n;
 				}
@@ -693,6 +712,7 @@ var LAYOUT_ANALYSIS = (function () {
 				roll_mixed: pct(c.roll_mixed, c.trigrams),
 				same_finger: pct(c.same_finger_trigram, c.trigrams)
 			},
+			keys: keyReport(board, keyCount, allPresses, perKey, c, sfbPairs),
 			coverage: {
 				typed: c.chars,
 				unsupported: c.unsupported,
@@ -703,6 +723,42 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		result.score = score(result, opts.weights);
 		return result;
+	}
+
+	/**
+	 * The per-key data of the heatmap: each key's share of the presses and of
+	 * each bad event (the share of the bigrams or trigrams it takes part in),
+	 * and its three worst same-finger partners.
+	 * @returns {object} code → {presses, sfb, sfs, lsb, scissors, redirect,
+	 *   sfbWith: [[code, %], ...]}.
+	 */
+	function keyReport(board, keyCount, allPresses, perKey, c, sfbPairs) {
+		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const keys = {};
+		board.codes.forEach((code, k) => {
+			keys[code] = {
+				presses: pct(keyCount[k], allPresses),
+				sfb: pct(perKey.sfb[k], c.bigrams),
+				sfs: pct(perKey.sfs[k], c.trigrams),
+				lsb: pct(perKey.lsb[k], c.bigrams),
+				scissors: pct(perKey.scissors[k], c.bigrams),
+				redirect: pct(perKey.redirect[k], c.trigrams),
+				sfbWith: []
+			};
+		});
+		const pairs = Array.from(sfbPairs.entries()).sort((a, b) => b[1] - a[1]);
+		for (const [pair, n] of pairs) {
+			const a = Math.floor(pair / 1000);
+			const b = pair % 1000;
+			for (const [self, other] of [
+				[a, b],
+				[b, a]
+			]) {
+				const list = keys[board.codes[self]].sfbWith;
+				if (list.length < 3) list.push([board.codes[other], pct(n, c.bigrams)]);
+			}
+		}
+		return keys;
 	}
 
 	/**

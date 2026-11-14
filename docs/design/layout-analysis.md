@@ -66,10 +66,15 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
     hands: {left, right},            // % of the presses, thumbs apart
     rows: {number, top, home, bottom},
     trigramClasses: {roll3_in, roll3_out, alternation, redirect, roll_mixed, same_finger},
+    keys: {KeyE: {presses, sfb, sfs, lsb, scissors, redirect, sfbWith: [[code, %], ...]}, ...},
     coverage: {typed, unsupported, unsupportedChars: {char: count}, bigrams, trigrams},
     score: {total, contributions: {metric: points}, weights}
   }
   ```
+
+  `keys` feeds the Studio's live heatmap: each key's share of the presses and
+  the share of the bigrams (`sfb`, `lsb`, `scissors`) or trigrams (`sfs`,
+  `redirect`) it takes part in, with its three worst same-finger partners.
 
 - `score(result, weights?)` → `{total, contributions, weights}`; the given
   weights override the defaults metric by metric.

@@ -11,7 +11,8 @@
  * WHAT IS CHECKED:
  * 1. Metrics: every reference vector of
  *    _shared/tests/corpus/layout_analysis/metric_vectors.json gives the value
- *    computed by hand from its definition.
+ *    computed by hand from its definition, and the per-key heatmap data blames
+ *    the keys of each event.
  * 2. Exact keystrokes: the key n-grams rebuilt from character n-gram tables
  *    equal those counted on the expanded key stream of the text itself.
  * 3. Score: each contribution is sign × weight × value, the total their sum,
@@ -85,6 +86,12 @@ for (const vector of vectors) {
 		compared++;
 	}
 }
+
+// The heatmap's per-key data: both keys of an SFB carry it, each names the other.
+const heat = E.analyse(byId.get('qwerty'), E.ngramsFromText('ed'), { keyboard: 'iso' }).keys;
+check(heat.KeyE.sfb === 100 && heat.KeyD.sfb === 100, 'keys: both keys of "ed" carry the SFB');
+check(heat.KeyE.sfbWith[0][0] === 'KeyD', 'keys: KeyE names KeyD as its SFB partner');
+check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry nothing');
 
 // =====================================
 // ======= 2/ Exact key n-grams ========
