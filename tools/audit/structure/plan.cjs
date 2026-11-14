@@ -1396,8 +1396,29 @@ function renderJoin(j, rel) {
 	const single =
 		j.parts.length === 1 &&
 		(j.parts[0].includes('/') || /^(?:true|false|nil|null|undefined|\d+)$/.test(j.after || ''));
-	const pieces = single ? [rel] : rel.split('/');
+	const pieces = single ? [rel] : splitLike(j.parts, rel);
 	return pieces.map((p) => `${j.quote}${p}${j.quote}`).join(j.separator || ', ');
+}
+
+/**
+ * The new path in as many pieces as the call wrote: code('windows',
+ * 'adapters/x.ahk', strip) takes one path argument after the driver, and
+ * one piece per segment shifted strip into the path. Pieces kept as written
+ * stay; the rest is one piece when the original wrote a separator in one.
+ */
+function splitLike(parts, rel) {
+	const segs = rel.split('/');
+	if (!parts.some((p) => p.includes('/'))) return segs;
+	const out = [];
+	let i = 0;
+	for (const p of parts.slice(0, -1)) {
+		const n = p.split('/').length;
+		if (segs.slice(i, i + n).join('/') !== p) break;
+		out.push(p);
+		i += n;
+	}
+	out.push(segs.slice(i).join('/'));
+	return out;
 }
 
 /**
@@ -3004,7 +3025,7 @@ function resolveOnBase(j, base, joined, byRepoPath, byRepoDir, successors) {
 	// Relative to the base's new place, climbing out of it when the original
 	// climbed too (path.join(WIN, '..', '_shared', …)).
 	const rel = path.posix.relative(newBase || '.', newFull) || '.';
-	const pieces = j.parts.length === 1 ? [rel] : rel.split('/');
+	const pieces = j.parts.length === 1 ? [rel] : splitLike(j.parts, rel);
 	const rendered = pieces.map((p) => `${j.quote}${p}${j.quote}`).join(j.separator || ', ');
 	if (rendered === j.text) return null;
 	return { kind: 'join', rendered, oldRepo: full, newRepo: newFull };
