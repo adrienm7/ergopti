@@ -60,8 +60,7 @@ reloads an engine the paused hook does not install (`_apply`), and resume
 installs it; a pause or resume transition still retires an editor captured
 before it, through the manager's generation. The programmable source loads at
 once when switched on while paused; its hotstrings stay inert because the
-paused driver types nothing (decided by the agent on 2026-11-13, to review by
-the maintainer).
+paused driver types nothing (confirmed by the maintainer on 2026-11-14).
 
 The macOS Shortcuts switch records its intent under ScriptControl's claim
 (`shortcuts.set_feature_intent_under_pause`): OFF publishes the feature claim,
