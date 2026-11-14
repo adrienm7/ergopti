@@ -17,8 +17,8 @@ local M = {}
 local WebviewResult = require("adapters.webview_result")
 
 local hs            = hs
-local toml_reader   = require("infra.toml.reader")
-local toml_writer   = require("infra.toml.writer")
+local toml_reader   = require("core.text.engine.toml.reader")
+local toml_writer   = require("core.text.engine.toml.writer")
 local ui_builder    = require("ui.ui_builder")
 local Logger        = require("core.logger.engine.logger")
 local notifications = require("infra.notifications")

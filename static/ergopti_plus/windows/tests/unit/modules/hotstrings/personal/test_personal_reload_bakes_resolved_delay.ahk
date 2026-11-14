@@ -104,7 +104,7 @@ Test("personal TOML: the live reload bakes the resolved expansion delay (persona
 ; reintroduce the literal.
 ;
 ; Deliberately scoped to ReloadPersonalSection. LoadExtTomlFile
-; (infra/toml/toml_loader.ahk) still pins the same literal zero for extension
+; (core/text/engine/toml/loader.ahk) still pins the same literal zero for extension
 ; packs — the same class, a different owner, and outside this change.
 _PRBD_ReloadResolvesRatherThanPins() {
 	Body := _DriverFuncBody("ReloadPersonalSection")

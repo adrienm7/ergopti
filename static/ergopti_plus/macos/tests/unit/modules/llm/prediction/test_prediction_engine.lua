@@ -217,7 +217,7 @@ local function load_real_setting_bridge()
 		["modules.keymap.utils"] = {},
 		["adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
 		["adapters.synthetic_input"] = {current_action_epoch = function() return 0 end},
-		["infra.text_utils"] = {},
+		["core.text.engine.utils"] = {},
 		["infra.keycodes"] = {
 			ESCAPE = 53,
 			RETURN = 36,

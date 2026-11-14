@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger",
-	"core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }
+	"core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }
 local LEAF = "tap_holds.lone_modifier_tap_max_ms" -- config-key-literal-ok: the persisted leaf under test
 
 --- Runs body against one real source file; publication is captured in place.

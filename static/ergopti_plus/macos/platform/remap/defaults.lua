@@ -20,7 +20,7 @@
 --- there is no driver-side fallback table (would mask a broken install).
 --- ==============================================================================
 
-local TomlReader = require("infra.toml.reader")
+local TomlReader = require("core.text.engine.toml.reader")
 local NativePath = require("core.fs.engine.native_path")
 
 local D = {}

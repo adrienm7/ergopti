@@ -22,7 +22,7 @@ local function with_window(module_name, scenario)
 			"ui.layer_editor", "ui.action_picker", "ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
 			"infra.config_paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
 			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "infra.keycodes", "core.fs.adapters.file_system",
-			"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
+			"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
 			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",
 			"diagnostics.engine.runtime_log", "platform.remap.lease_helper", "settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",

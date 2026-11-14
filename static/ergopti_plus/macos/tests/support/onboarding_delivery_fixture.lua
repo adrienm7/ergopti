@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
-	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
+	helpers.with_fresh_modules({ "ui.menu.menu_paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
 		"core.fs.adapters.file_system", "infra.config_paths", "platform.remap", "core.text.engine.json",
 		"modules.keymap.number_row_live" }, function()
 		-- No layout of ours types in the fixture: the number-row order is greyed.
@@ -40,7 +40,7 @@ local function with_delivery(callback, native_timers)
 				return "/virtual/chosen/"
 			end,
 		}
-		package.loaded["infra.toml.codec"] = { decode = function() return {} end }
+		package.loaded["core.text.engine.toml.codec"] = { decode = function() return {} end }
 		with_window("ui.onboarding", function(onboarding, state)
 			require("tests.support.onboarding_shared_data").install()
 			local pending, errors, evaluations = {}, {}, {}

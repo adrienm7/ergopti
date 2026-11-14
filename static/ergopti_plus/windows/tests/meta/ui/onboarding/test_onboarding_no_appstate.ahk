@@ -196,7 +196,7 @@ Test("onboarding: all commit errors use the selected locale "
 
 _ONA_BatchWriterDoesNotReenterFullSave() {
 	Seg := _DriverFuncBody("TOML_BatchWrite")
-	Assert(Seg != "", "TOML_BatchWrite declaration must exist in infra/toml/toml_helpers.ahk")
+	Assert(Seg != "", "TOML_BatchWrite declaration must exist in core/text/engine/toml/helpers.ahk")
 	Assert(InStr(Seg, "SaveFullConfig") = 0
 		and InStr(Seg, "TOML_RunStrictCanonicalization") = 0,
 		"the low-level batch writer must not re-enter a full save from stale caller globals")

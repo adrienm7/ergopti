@@ -31,7 +31,7 @@ local helpers = require("tests.helpers")
 -- load_with_stubs() call below gets a truly fresh module graph.
 local STUB_MODULES = {
 	"modules.keymap.utils",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.llm",
 	"infra.keycodes",
 	"modules.keystats",
@@ -66,7 +66,7 @@ package.loaded["modules.keymap.utils"] = {
 }
 
 -- Minimal stub for lib.text_utils.
-package.loaded["infra.text_utils"] = {
+package.loaded["core.text.engine.utils"] = {
 	is_letter_char  = function(_) return false end,
 	trig_lower      = function(s) return s end,
 	conform_replacement = function(r, _, _) return r end,

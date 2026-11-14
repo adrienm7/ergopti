@@ -22,7 +22,7 @@
 local M = {}
 local hs = hs
 local fs = require("hs.fs")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local MetricsState = require("infra.metrics_state_keys")
 
 local AppPickerLib  = require("infra.app_picker")

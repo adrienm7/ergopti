@@ -39,7 +39,7 @@ local function load_lifecycle()
 		end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 	package.loaded["platform.remap.ke_paths"] = {
 		CORE_SERVICE = "/stock/Karabiner-Core-Service",
 		GRABBER = "/stock/karabiner_grabber",

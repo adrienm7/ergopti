@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 --- Runs the real entry point against one controlled discovery outcome.
 --- @param mode string Discovery failure injected by the probe.

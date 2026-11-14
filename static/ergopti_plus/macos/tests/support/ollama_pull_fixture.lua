@@ -15,7 +15,7 @@ local MODULES = {
 	"core.logger.engine.logger",
 	"core.fs.engine.dir",
 	"infra.notifications",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
@@ -74,7 +74,7 @@ local function with_fixture(options, callback)
 			return true
 		end,
 	}
-	package.loaded["infra.text_utils"] = nil
+	package.loaded["core.text.engine.utils"] = nil
 	package.loaded["modules.llm.ollama_binary"] = {
 		resolve = function() return options.binary_path or "/fixture/ollama", nil, options.binary_source end,
 	}

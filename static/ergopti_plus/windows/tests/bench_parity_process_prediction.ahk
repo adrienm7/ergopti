@@ -19,7 +19,7 @@
 SetWorkingDir(A_ScriptDir)
 #Warn VarUnset, Off
 
-#Include ../infra/json.ahk
+#Include ../core/text/engine/json.ahk
 #Include ../modules/llm/rewrite.ahk
 #Include ../modules/llm/parser.ahk
 

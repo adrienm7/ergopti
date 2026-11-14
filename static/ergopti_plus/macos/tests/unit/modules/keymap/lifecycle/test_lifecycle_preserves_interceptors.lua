@@ -62,7 +62,7 @@ local function load_keymap_capturing_taps()
 	-- diagnose. Running this file alone would pass; the suite would not.
 	local to_wipe = {
 		"ui.tooltip",
-		"infra.text_utils",
+		"core.text.engine.utils",
 		"core.logger.engine.logger",
 		"modules.keystats",
 		"modules.hotstrings.hotstrings_config",
