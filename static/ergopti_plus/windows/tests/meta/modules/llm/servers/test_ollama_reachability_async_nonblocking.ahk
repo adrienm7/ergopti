@@ -52,6 +52,10 @@ _MetaCheckReachabilityNonBlocking() {
 		"LLM_OllamaIsRunning_Async must run a curl child process for the reachability ping")
 	Assert(InStr(Body, "_LLM_Ollama_PingPoll("),
 		"LLM_OllamaIsRunning_Async must hand off to _LLM_Ollama_PingPoll (poll the child, don't block)")
+	; The curl ceiling and the poll backstop come from the timing registry, so a
+	; caller (the enable admission test's held answer) can bound them.
+	Assert(InStr(Body, 'TimingsGet("llm", "local_server_probe_timeout_ms")') > 0 && !InStr(Body, " -m 2 "),
+		"LLM_OllamaIsRunning_Async must take curl's --max-time from [llm] local_server_probe_timeout_ms")
 
 	; The poll must check the durable receipt — never a blocking wait or recyclable PID.
 	PollBody := _DriverFuncBody("_LLM_Ollama_PingPoll")
