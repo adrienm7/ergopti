@@ -74,6 +74,11 @@ function run() {
 		assert.ok(out.includes("'#Include core/lifecycle/engine/lifecycle.ahk'"), out);
 		assert.ok(out.includes('/windows\\\\core\\\\lifecycle\\\\engine\\\\bundle\\.ahk/'), out);
 	}
+	// After a %A_LineFile% climb the path is the includer's: it stays.
+	{
+		const text = `${head}assert.match(src, /^#Include %A_LineFile%\\\\\\.\\.\\\\infra\\\\bundle\\.ahk$/m);\n`;
+		assert.equal(rewrite(text), text);
+	}
 	// An #Include of the Windows suite's entry climbs from windows/tests.
 	{
 		const out = rewrite(`${head}principal.indexOf('#Include ../infra/json.ahk');\n`);
