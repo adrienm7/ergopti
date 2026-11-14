@@ -36,9 +36,12 @@ local Translate = require("ai.engine.prediction.translate")
 -- Separator between the profile id and the prediction count
 M.SEPARATOR = "|"
 
--- Bounds of a binding's own prediction count, those of the AI menu's setting
-M.MIN_PREDICTIONS = 1
-M.MAX_PREDICTIONS = 10
+-- Bounds of a binding's own prediction count, those of the AI menu's setting,
+-- declared once in the shared value schema (llm.profiles.num_predictions)
+local ValueCheck = require("settings.engine.value_check")
+local PREDICTIONS = ValueCheck.declaration(ValueCheck.KEY.LLM_PROFILES_NUM_PREDICTIONS)
+M.MIN_PREDICTIONS = PREDICTIONS.min
+M.MAX_PREDICTIONS = PREDICTIONS.max
 
 -- Longest accepted profile id; generated custom ids stay well below it
 M.MAX_ID_LENGTH = 128

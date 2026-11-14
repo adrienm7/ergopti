@@ -83,6 +83,16 @@ _LPA_TrailingLineBreakRefused() {
 }
 Test("llm_prompt: anchors and counts cannot be fooled", _LPA_TrailingLineBreakRefused)
 
+; The count's bounds are the AI menu setting's, read from the shared value schema,
+; never a copy (value-validation).
+_LPA_BoundsFromTheSchema() {
+	global LLM_PROMPT_ACTION_MIN_PREDICTIONS, LLM_PROMPT_ACTION_MAX_PREDICTIONS
+	Declared := ValueCheckEntryFor("llm.profiles.num_predictions")
+	AssertEqual(Declared["min"], LLM_PROMPT_ACTION_MIN_PREDICTIONS, "the declared minimum")
+	AssertEqual(Declared["max"], LLM_PROMPT_ACTION_MAX_PREDICTIONS, "the declared maximum")
+}
+Test("llm_prompt: the prediction count bounds are the declared ones (value-validation)", _LPA_BoundsFromTheSchema)
+
 
 
 

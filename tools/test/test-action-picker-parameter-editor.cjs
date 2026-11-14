@@ -216,6 +216,12 @@ function loadPage(host, current, skipInit) {
 		console
 	};
 	vm.createContext(context);
+	// The page loads the shared value check (window.ErgoptiValueCheck) first.
+	vm.runInContext('var window = this;', context);
+	vm.runInContext(
+		fs.readFileSync(path.join(SP, '_shared', 'ui', 'value_check.js'), 'utf8'),
+		context
+	);
 	vm.runInContext(
 		fs.readFileSync(path.join(SP, '_shared', 'ui', 'program_parameter.js'), 'utf8'),
 		context
@@ -285,6 +291,29 @@ function loadPage(host, current, skipInit) {
 		return e;
 	};
 	return { byId, posted, context, keydown };
+}
+
+// 0. The prediction count of a prompt binding takes the AI menu setting's bounds,
+// read from the shared value schema, never a copy (value-validation).
+{
+	const page = loadPage('ahk');
+	const declared = vm.runInContext(
+		'window.ErgoptiValueCheck.entryFor(window.ErgoptiValueCheck.SCHEMA, "llm.profiles.num_predictions")',
+		page.context
+	);
+	const bounds = vm.runInContext(
+		'[LLM_PROMPT_MIN_PREDICTIONS, LLM_PROMPT_MAX_PREDICTIONS]',
+		page.context
+	);
+	check(
+		bounds[0] === declared.min && bounds[1] === declared.max,
+		'the prompt count bounds are the declared llm.profiles.num_predictions bounds'
+	);
+	page.context.__value = `p|${declared.max + 1}`;
+	check(
+		vm.runInContext("parseParameter('llm_prompt', __value)", page.context) === null,
+		'a count past the declared maximum is refused'
+	);
 }
 
 // 1. The page's rules are the drivers' rules: the shared corpus replayed.

@@ -154,6 +154,15 @@ function loadPage() {
 		console
 	};
 	vm.createContext(page);
+	// The page loads the shared value check (window.ErgoptiValueCheck) first.
+	vm.runInContext('var window = this;', page);
+	vm.runInContext(
+		fs.readFileSync(
+			path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'value_check.js'),
+			'utf8'
+		),
+		page
+	);
 	vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), page, { filename: SCRIPT });
 	for (const fn of docListeners.DOMContentLoaded || []) fn();
 	return page;
