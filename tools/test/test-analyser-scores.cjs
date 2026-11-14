@@ -47,7 +47,8 @@ const MIN_ANALYSERS = 11;
 // Measured about 160 ms.
 const BUDGET_MS_PER_LAYOUT = 600;
 const LIBRARY_SAMPLE = 30;
-const STANDARD_TEXT = 'The quick brown fox jumps over the lazy dog, then sleeps.';
+const LETTERS_TEXT = 'Thequickbrownfoxjumpsoverthelazydog';
+const DIGITS_TEXT = '2024 or 1999, 35 and 46';
 
 const errors = [];
 const check = (condition, message) => {
@@ -176,21 +177,21 @@ for (const self of ['dead:1dk', '**']) {
 		`ergol: ë not typed through « ${self} » (${parts.unsupported} % unsupported)`
 	);
 }
-// Two fingerings side by side: where an analyser's own fingering is the
-// standard one (carpalx, keygen, genkey, Oxeylyzer on QWERTY), the user's
-// default model gives the same number; Keyboard Layout Optimizer types Space
-// with the left thumb, our model with the right, so its two numbers differ.
+// Two fingerings side by side: on a text without spaces or digits, where
+// carpalx, keygen, genkey and Oxeylyzer finger QWERTY as the default model
+// does, the two numbers are equal; Keyboard Layout Optimizer fingers the
+// number row one key over, so on digits its two numbers differ.
 {
-	const both = S.scoreAll(library.get('qwerty'), E.ngramsFromText(STANDARD_TEXT), {
-		keyboard: 'iso'
-	});
+	const qwerty = library.get('qwerty');
+	const letters = S.scoreAll(qwerty, E.ngramsFromText(LETTERS_TEXT), { keyboard: 'iso' });
 	for (const id of ['carpalx', 'keygen', 'genkey', 'oxeylyzer'])
 		check(
-			both[id].official.value === both[id].custom.value,
-			`${id}: official and custom differ on QWERTY`
+			letters[id].official.value === letters[id].custom.value,
+			`${id}: official and custom differ on QWERTY letters`
 		);
+	const digits = S.scoreAll(qwerty, E.ngramsFromText(DIGITS_TEXT), { keyboard: 'iso' });
 	check(
-		both.dariogoetz.official.value !== both.dariogoetz.custom.value,
+		digits.dariogoetz.official.value !== digits.dariogoetz.custom.value,
 		'dariogoetz: the custom finger model is not used'
 	);
 	let refused = false;

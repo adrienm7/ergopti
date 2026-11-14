@@ -77,10 +77,10 @@ keys; keys the model does not know (Enter, Tab, the modifiers of Keyboard
 Layout Optimizer's board) keep the analyser's own finger. genkey has no thumb
 finger and Ergo-L assigns no thumb key: a key the model gives a thumb leaves
 their statistics. Where the user's model is the analyser's own, the two
-numbers are equal (QWERTY: carpalx, keygen, genkey, Oxeylyzer); they differ
-where the analyser's fingering is not the standard one (Keyboard Layout
-Optimizer types Space with the left thumb and shifts the number row by one key;
-KLAnext weighs the left hand 10 % more and KLA's Space is the left thumb's).
+numbers are equal (QWERTY letters: carpalx, keygen, genkey, Oxeylyzer); they differ
+where the analyser's fingering is not the user's (keygen types Space with
+the right thumb, the default model with the left; Keyboard Layout Optimizer
+fingers the number row one key over; KLAnext weighs the left hand 10 % more).
 
 ## How each analyser types a character
 
