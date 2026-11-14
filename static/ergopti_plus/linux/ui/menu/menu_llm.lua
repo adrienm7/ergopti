@@ -1114,8 +1114,14 @@ local function _build_llm(ctx)
 	llm_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
 	local Preferences = require("infra.llm_preferences")
+	-- A pause stops typing, not configuration (EDD-1): the switch turns the AI
+	-- off while paused, which only stops work. Turning it on waits for resume:
+	-- it starts model warmups and may offer an install (decided by the agent on
+	-- 2026-11-14, to review by the maintainer).
 	local function toggle_ready()
-		return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true
+		local paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+		return type(llm.toggle) == "function" and Preferences.admit() == true
+			and (not paused or (type(llm.is_enabled) == "function" and llm.is_enabled() == true))
 	end
 	-- The AI rows that write config.toml: greyed, and their retained clicks
 	-- refused, while paused or while the configuration refuses writes.

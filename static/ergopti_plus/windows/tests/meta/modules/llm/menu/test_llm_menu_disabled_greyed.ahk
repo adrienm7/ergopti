@@ -140,9 +140,9 @@ _LMDG_ToggleRoute(Build, Render, Getters) {
 		'm)^[ \t]*(StateGetters) := _LLM_Menu_StateGetters\(\)[ \t]*$', 2)
 	Publish := _LMDG_Statement(Build,
 		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", Map\(\), _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
-	; The factored getter must retain both pause and genuine full-state admission.
+	; The factored getter must retain the pause (an off AI waits for resume) and genuine full-state admission.
 	Ready := _LMDG_Statement(Getters,
-		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended && ConfigFullStateCanPersist\(\),[ \t]*$', 1)
+		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => \(!A_IsSuspended \|\| _LLM_Menu\["enabled"\]\) && ConfigFullStateCanPersist\(\),[ \t]*$', 1)
 	if !(Command && Reader && Ready && Publish && Command < Reader && Reader < Publish)
 		return false
 	Stage := _LMDG_Statement(Build, 'm)^[ \t]*(try) \{[ \t]*$', 1)
@@ -184,7 +184,7 @@ _LMDG_ToggleRouteRefusesDecoy(Kind) {
 		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'Commands["other_toggle"] := LLM_Menu_OnToggle')
 	else if Kind == "wrong-reader"
 		Getters := StrReplace(Getters,
-			'"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist()',
+			'"llm_toggle_ready", () => (!A_IsSuspended || _LLM_Menu["enabled"]) && ConfigFullStateCanPersist()',
 			'"llm_toggle_ready", () => _LLM_Menu["enabled"]')
 	else if Kind == "conditional-command"
 		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'if _LLM_Menu["enabled"] {`nCommands["llm_toggle"] := LLM_Menu_OnToggle`n}')

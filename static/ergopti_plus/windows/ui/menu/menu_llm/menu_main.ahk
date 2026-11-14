@@ -254,8 +254,12 @@ LLM_Menu_BuildSubmenu(Target := 0) {
 /** Captures readers; backend availability never grants configuration write readiness. */
 _LLM_Menu_StateGetters() {
 	global _LLM_Menu
+	; A pause stops typing, not configuration (EDD-1): the switch turns the AI
+	; off while paused, which only stops work. Turning it on waits for resume:
+	; it starts model warmups and may offer an install (decided by the agent on
+	; 2026-11-14, to review by the maintainer).
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
-		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"llm_toggle_ready", () => (!A_IsSuspended || _LLM_Menu["enabled"]) && ConfigFullStateCanPersist(),
 		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
 		"config_newer_schema", () => ConfigNewerSchemaReadOnly(),
 		"config_older_schema", () => ConfigOlderSchemaReadOnly())

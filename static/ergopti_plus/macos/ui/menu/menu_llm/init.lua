@@ -1451,7 +1451,11 @@ local function create_menu(deps)
 					return type(path) == "string" and path ~= ""
 						and require("settings.engine.migration.migrate").read_only_reason(path) == nil
 				end
-				local toggle_ready = not paused
+				-- A pause stops typing, not configuration (EDD-1): the switch turns the AI
+				-- off while paused, which only stops work. Turning it on waits for resume:
+				-- it starts model warmups and may offer an install (decided by the agent
+				-- on 2026-11-14, to review by the maintainer).
+				local toggle_ready = (not paused or state.llm_enabled == true)
 					and configuration_writable()
 					and activation_requirement_owner ~= nil
 					and type(models_mgr.pause_requirements) == "function"

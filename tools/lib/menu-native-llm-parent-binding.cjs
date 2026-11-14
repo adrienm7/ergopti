@@ -1815,7 +1815,8 @@ function closedLlmReadOnlyToggle(caller) {
 	const { positions, rootPositions, body, lex } = luaPublicationParser();
 	const fragments = [
 		'local Preferences = require("infra.llm_preferences")',
-		'local function toggle_ready() return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true end',
+		// A pause stops typing, not configuration (EDD-1): an enabled AI turns off while paused.
+		'local function toggle_ready() local paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true) return type(llm.toggle) == "function" and Preferences.admit() == true and (not paused or (type(llm.is_enabled) == "function" and llm.is_enabled() == true)) end',
 		'local function scope_ready() return Preferences.admit() == true end',
 		'llm_ctx.commands["llm_toggle"] = function() if not toggle_ready() then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end',
 		'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready'
@@ -1840,7 +1841,7 @@ function closedLlmReadOnlyToggle(caller) {
 		return false;
 	const predicate = body(caller, 'local function toggle_ready()');
 	const expected = lex(
-		'return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true'
+		'local paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true) return type(llm.toggle) == "function" and Preferences.admit() == true and (not paused or (type(llm.is_enabled) == "function" and llm.is_enabled() == true))'
 	);
 	if (
 		!predicate ||

@@ -3666,8 +3666,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'withdrawn restore admission'
 			],
 			[
-				'ctx.paused ~= true and Preferences.admit()',
-				'true and Preferences.admit()',
+				'(not paused or (type(llm.is_enabled)',
+				'(true or (type(llm.is_enabled)',
 				'withdrawn pause fence'
 			],
 			[
