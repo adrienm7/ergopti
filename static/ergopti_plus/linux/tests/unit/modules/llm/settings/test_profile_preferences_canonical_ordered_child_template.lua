@@ -544,13 +544,19 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 			end)
 		end)
 	end
-	helpers.it("retained controls keep original live pause refusal while builtin selection keeps its native nil receipt", function()
+	-- A pause stops typing, not configuration (EDD-1): the retained controls run while paused.
+	helpers.it("retained controls run while paused (edd1-paused-writes)", function()
+		for _, label in ipairs({ oracle.labels.auto_detect, oracle.labels.create, oracle.labels.clone }) do
+			with_frame({}, function(f)
+				local row = assert(at(assert(f.rows()), label))
+				f.ctx.paused = true; f.ctx.is_paused = function() return true end
+				helpers.assert_true(row.fn(), label)
+			end)
+		end
+	end)
+	helpers.it("builtin selection keeps its native nil receipt", function()
 		with_frame({}, function(f)
 			local rows = assert(f.rows())
-			local auto, create, clone = at(rows, oracle.labels.auto_detect), at(rows, oracle.labels.create), at(rows, oracle.labels.clone)
-			f.ctx.paused = true; f.ctx.is_paused = function() return true end
-			helpers.assert_eq(auto.fn(), false); helpers.assert_eq(create.fn(), false); helpers.assert_eq(clone.fn(), false)
-			helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial); helpers.assert_eq(f.counts(), { 0, 0 })
 			local catalogue = f.settings.list_built_in()
 			local last = catalogue[#catalogue]
 			helpers.assert_nil(assert(at(rows, f.settings.menu_label(last, f.settings.get("num_predictions") or 1))).fn())
