@@ -641,7 +641,7 @@ end
 --- @return table port
 function M.native_port()
 	local DisplayServer = require("infra.display_server")
-	local OwnedProcess = require("adapters.owned_process")
+	local OwnedProcess = require("core.process.adapters.owned_process")
 	local Timings = require("infra.timings")
 	local timeout_ms = Timings.ms("ui", "input_source_operation_timeout_ms")
 	local sequence = 0

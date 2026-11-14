@@ -20,7 +20,7 @@ local function with_binding(body, options)
 			package.loaded["infra.config_paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end,
 				set = function() error("canonical bindings must not write legacy storage") end }
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 				run = function(command) seen.commands[#seen.commands + 1] = command; return true end,

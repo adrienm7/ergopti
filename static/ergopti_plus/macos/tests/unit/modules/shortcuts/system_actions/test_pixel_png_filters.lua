@@ -20,12 +20,12 @@ local function copy_capture(mode)
 	local copied, decoder_status
 	local notices = {}
 	helpers.with_stub_scope({
-		"modules.shortcuts.actions.system_pixel", "adapters.task_lifecycle",
+		"modules.shortcuts.actions.system_pixel", "core.process.adapters.task_lifecycle",
 		"core.fs.adapters.file_system", "infra.notifications", "core.i18n.engine.i18n", "core.logger.engine.logger",
 		"modules.shortcuts.actions.screen_capture_flow",
 	}, function()
 		local tasks = {}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, callback, arguments)
 				local task = { label = label, executable = executable, arguments = arguments,
 					callback = callback, running = false }

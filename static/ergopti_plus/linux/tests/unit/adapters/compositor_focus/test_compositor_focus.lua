@@ -219,7 +219,7 @@ local function wayland_window_info(desktop)
 	local display = helpers.load_module("infra.display_server")
 	display._set_for_test(display.WAYLAND, desktop)
 	package.loaded["infra.display_server"] = display
-	local shell = helpers.load_module("adapters.shell_runner")
+	local shell = helpers.load_module("core.process.adapters.shell_runner")
 	local commands = {}
 	shell._set_runner(function(command)
 		commands[#commands + 1] = command

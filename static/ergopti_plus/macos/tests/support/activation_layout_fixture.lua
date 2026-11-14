@@ -12,7 +12,7 @@ local LeaseContract = require("platform.remap.lease_contract")
 local M = {}
 local REAL_MODULES = {
 	"core.fs.adapters.file_system", "core.fs.engine.dir", "platform.remap.ke_variables",
-	"core.fs.adapters.json_codec", "adapters.shell_runner", "infra.deferred_work",
+	"core.fs.adapters.json_codec", "core.process.adapters.shell_runner", "infra.deferred_work",
 }
 
 local TOKENS = {

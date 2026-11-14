@@ -134,10 +134,10 @@ end)
 
 it("a refused start retains pending native cleanup until its completion", function()
 	local Binding = helpers.load_module("core.network.engine.proxy_auth_relay")
-	local original_executable, original_process = Binding.executable, package.loaded["adapters.owned_process"]
+	local original_executable, original_process = Binding.executable, package.loaded["core.process.adapters.owned_process"]
 	local complete, settled = nil, false
 	Binding.executable = function() return "/bin/true" end
-	package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+	package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback)
 		complete = callback
 		return { started = false, is_settled = function() return settled end,
 			on_settled = function() return true end, cancel = function() return false end }
@@ -154,6 +154,6 @@ it("a refused start retains pending native cleanup until its completion", functi
 		eq(answers, 1)
 		eq(operation.is_settled(), true)
 	end)
-	Binding.executable, package.loaded["adapters.owned_process"] = original_executable, original_process
+	Binding.executable, package.loaded["core.process.adapters.owned_process"] = original_executable, original_process
 	assert(ok, err)
 end)

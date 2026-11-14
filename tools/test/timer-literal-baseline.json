@@ -12,7 +12,7 @@
 	"windows/ErgoptiPlus.ahk": 3,
 	"windows/adapters/llm_nav_event_owner.ahk": 1,
 	"windows/core/events/timer_scheduler.ahk": 1,
-	"windows/adapters/uia_worker.ahk": 1,
+	"windows/core/process/adapters/uia_worker.ahk": 1,
 	"windows/infra/hotpath_profiler.ahk": 1,
 	"windows/core/lifecycle/engine/lifecycle.ahk": 1,
 	"windows/modules/dynamic_hotstrings/user_code.ahk": 1,

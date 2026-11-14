@@ -62,7 +62,7 @@ and dispatches the correct reactor once.
      calls `_UpdaterDownloadWorker.terminate()` and ends the transaction.
    - `_SR_HandleTerminate` kills the `cmd.exe` child tree before falling back to the
      direct process, otherwise the PowerShell staging process survives its parent.
-   - `_SR_Poll` (`adapters/shell_runner.ahk`) refuses to fire any `OnDone` callback
+   - `_SR_Poll` (`core/process/adapters/shell_runner.ahk`) refuses to fire any `OnDone` callback
      while suspended; tasks stay queued for the first tick after resume.
    - `Ergopti_OnSuspendEnter` calls `_Updater_CancelAsyncChecks()`, which fires each
      pending `on_json("")` so consumers reset instead of latching a disabled menu item.

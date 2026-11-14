@@ -224,7 +224,7 @@ end)
 
 helpers.it("send-input vocabulary refuses a FIFO without blocking", function()
 	local uv = require("luv")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local path = os.tmpname()
 	os.remove(path)
 	assert(Shell.run("mkfifo -- " .. Shell.quote(path)))

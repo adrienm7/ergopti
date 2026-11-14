@@ -11,7 +11,7 @@
 
 local M = {}
 local Native = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Helpers = require("tests.helpers")
 local PREFIX = "ergopti-install-publication-"
 

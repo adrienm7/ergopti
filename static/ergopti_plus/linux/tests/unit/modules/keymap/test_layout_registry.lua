@@ -439,8 +439,8 @@ helpers.describe("layout manager (Linux): installing", function()
 	helpers.it("settles a refused Python download even if the cleanup runner has stopped", function()
 		local Registry = require("modules.keymap.layout_registry")
 		local Managed = require("modules.keymap.managed_python")
-		local Http, Process = require("core.network.adapters.http_client"), require("adapters.process_runner")
-		local Shell, Files = require("adapters.shell_runner"), require("core.fs.adapters.file_system")
+		local Http, Process = require("core.network.adapters.http_client"), require("core.process.adapters.runner")
+		local Shell, Files = require("core.process.adapters.shell_runner"), require("core.fs.adapters.file_system")
 		local Paths = require("infra.config_paths")
 		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
 			shell = Shell.run, exists = Files.exists, data = Paths.data }
@@ -473,10 +473,10 @@ helpers.describe("layout manager (Linux): installing", function()
 	end)
 
 	helpers.it("does not accept cleanup success delivered before a refused process start", function()
-		local names = { "modules.keymap.layout_registry", "modules.keymap.managed_python", "adapters.process_runner" }
+		local names = { "modules.keymap.layout_registry", "modules.keymap.managed_python", "core.process.adapters.runner" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-		package.loaded["adapters.process_runner"] = {
+		package.loaded["core.process.adapters.runner"] = {
 			run = function(_, _, _, callback) callback({ exit_code = 0 }); return false end,
 			is_settled = function() return true end,
 		}
@@ -494,11 +494,11 @@ helpers.describe("layout manager (Linux): installing", function()
 	end)
 
 	helpers.it("reports a resource-free refusal of Python staging cleanup", function()
-		local names = { "modules.keymap.layout_registry", "modules.keymap.managed_python", "adapters.process_runner" }
+		local names = { "modules.keymap.layout_registry", "modules.keymap.managed_python", "core.process.adapters.runner" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local native_settled = true
-		package.loaded["adapters.process_runner"] = { run = function() return false end, is_settled = function() return native_settled end }
+		package.loaded["core.process.adapters.runner"] = { run = function() return false end, is_settled = function() return native_settled end }
 		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
 			deps.remove_tree("/tmp/owned-python-stage", done)
 		end }
@@ -896,11 +896,11 @@ require("tests.lua.layouts.installed_extension_manager_contract")(helpers, Json,
 --- @param options table Existing registry filesystem/transport fixture options.
 --- @param body function Receives the real registry and controlled physical helper ACK.
 local function with_shutdown_owner(options, body)
-	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "core.network.adapters.http_client", "core.fs.adapters.file_digest" }
+	local modules = { "modules.keymap.layout_registry", "core.process.adapters.runner", "core.network.adapters.http_client", "core.fs.adapters.file_digest" }
 	local previous = {}
 	for _, name in ipairs(modules) do previous[name] = package.loaded[name] end
 	local physical = { settled = true, stops = 0, http_cancels = 0, digest_cancels = 0 }
-	package.loaded["adapters.process_runner"] = {
+	package.loaded["core.process.adapters.runner"] = {
 		shutdown = function() physical.stops = physical.stops + 1; return physical.settled end,
 		is_settled = function() return physical.settled end,
 	}
@@ -1103,7 +1103,7 @@ helpers.describe("native installed-layout record publication", function()
 	end
 	for _, kind in ipairs(cases) do
 		helpers.it("(layout-record-publication) preserves the production registry on " .. kind, function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
 			local okay, detail = xpcall(function()

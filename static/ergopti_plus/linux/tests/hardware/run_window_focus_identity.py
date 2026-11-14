@@ -99,7 +99,7 @@ def main():
         lua = """
 package.path = './?.lua;../_shared/?.lua;../_shared/?/init.lua;' .. package.path
 local adapter = require('adapters.window_info')
-local lifecycle = require('adapters.process_lifecycle')
+local lifecycle = require('core.process.adapters.lifecycle')
 local transitions = 0
 lifecycle.onFocusChange(function() transitions = transitions + 1 end)
 lifecycle.start()

@@ -254,7 +254,7 @@ end
 --- @param on_output function
 --- @param on_failure function
 local function run_task(executable, args, on_cancel, on_output, on_failure)
-	local handle = require("adapters.shell_runner").spawn(executable, args, function(code, stdout)
+	local handle = require("core.process.adapters.shell_runner").spawn(executable, args, function(code, stdout)
 		if code == 0 then on_output(stdout or "") else on_failure(executable .. " exited with " .. tostring(code)) end
 	end)
 	on_cancel(function() handle.terminate() end)

@@ -54,11 +54,11 @@ local function fresh(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		start = function(handle) return handle.start() end,
 		terminate = function(handle) return handle.terminate() end,
 	}
-	package.loaded["adapters.shell_runner"] = { spawn = function(executable, arguments, done, chunk, env, private)
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, arguments, done, chunk, env, private)
 		created = created + 1
 		if configuration.construct_delay then now = now + configuration.construct_delay end
 		check(executable, "/actual/native/python"); check(arguments[1], "-IB")
@@ -263,8 +263,8 @@ case(function()
 	end
 	check(adapter.get(directory, driver), nil); check(created, 0); check(next(adapter._active_tasks), nil)
 	fresh()
-	local spawn = package.loaded["adapters.shell_runner"].spawn
-	package.loaded["adapters.shell_runner"].spawn = function(...)
+	local spawn = package.loaded["core.process.adapters.shell_runner"].spawn
+	package.loaded["core.process.adapters.shell_runner"].spawn = function(...)
 		local handle = spawn(...)
 		configuration.clock_throw = true
 		return handle

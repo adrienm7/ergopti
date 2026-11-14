@@ -66,8 +66,8 @@ local MODULES = {
 	"core.fs.adapters.storage",
 	-- FileSystem captures hs when it loads; each fixture binds its own copy.
 	"core.fs.adapters.file_system",
-	"adapters.task_lifecycle",
-	"adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"ui.download_window",
@@ -219,7 +219,7 @@ local function with_fixture(spec, body)
 			complete = function() return true end,
 		}
 
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local index = #spawns + 1
 				local record = {
@@ -352,7 +352,7 @@ local function with_fixture(spec, body)
 		}
 
 		local manager
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, on_done, on_chunk_or_args, args)
 				local index = #native_tasks + 1
 				if native_task_results[index] == false then return nil end

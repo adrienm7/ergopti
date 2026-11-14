@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local describe, it = helpers.describe, helpers.it
 
 local MODULE_NAMES = {
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
 	"infra.timings",
@@ -171,7 +171,7 @@ local function with_fixture(options, scenario)
 			return options.timings and options.timings[key] or 1
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function() return nil end,
 		start = function() return false end,
 	}
@@ -541,7 +541,7 @@ end)
 
 local root_fixture = require("tests.unit.modules.keystats.lifecycle.test_activation_callback_fail_closed")
 local function with_root(options, scenario)
-	local names={"adapters.event_provenance","adapters.input_source_broker","adapters.keyboard_hook","adapters.physical_observation_clock","adapters.process_lifecycle","adapters.synthetic_input","infra.config_paths","infra.dialog_util","core.logger.engine.logger","infra.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
+	local names={"adapters.event_provenance","adapters.input_source_broker","adapters.keyboard_hook","adapters.physical_observation_clock","core.process.adapters.lifecycle","adapters.synthetic_input","infra.config_paths","infra.dialog_util","core.logger.engine.logger","infra.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
 	helpers.with_stub_scope(names,function()
 		local original=helpers.load_with_stubs
 		local records,owner,token,clock= {},{},nil,0

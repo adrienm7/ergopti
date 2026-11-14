@@ -381,7 +381,7 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 				helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
 				helpers.assert_eq(releases, #notices)
 				if #notices > 0 then
-					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+					helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
 						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 				end
 			end)
@@ -495,7 +495,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 				helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
 				helpers.assert_eq(releases, #notices)
 				if #notices > 0 then
-					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+					helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
 						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 				end
 			end)

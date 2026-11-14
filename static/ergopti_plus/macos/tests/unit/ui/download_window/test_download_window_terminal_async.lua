@@ -13,7 +13,7 @@ local MODULES = {
 	"ui.download_window",
 	"ui.ui_builder", "ui.webview_close_owner",
 	"core.logger.engine.logger",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 }
 
 local function make_webview_overrides(state)
@@ -93,7 +93,7 @@ local function with_terminal_bridge(callback)
 			return true, table.unpack(results, 2, results.n)
 		end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			applescript = function(script, on_done)
 				state.applescript_calls = state.applescript_calls + 1
 				state.script = script
@@ -107,7 +107,7 @@ local function with_terminal_bridge(callback)
 		local callback_ok, callback_err = xpcall(function()
 			callback(DownloadWindow, state)
 		end, debug.traceback)
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not callback_ok then error(callback_err, 0) end
 	end)
 end

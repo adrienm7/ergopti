@@ -104,7 +104,7 @@ local function with_owned(options, run)
 		check(input.version, 2)
 		check(input.anchor.device, "1")
 		check(input.anchor.inode, "2")
-		local lifecycle = package.loaded["adapters.task_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.task_lifecycle"]
 		local native = lifecycle.native
 		lifecycle.native = function(label, ...)
 			if label == "Ollama pending pull cleanup" and options.construct_cleanup == false then return nil end

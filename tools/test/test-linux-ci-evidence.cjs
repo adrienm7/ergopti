@@ -262,7 +262,7 @@ package.preload['core.logger.engine.shim'] = function() return {
   if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end
  end,
 } end
-package.preload['adapters.shell_runner'] = function() return { validate_spawn_args = function() return '' end } end
+package.preload['core.process.adapters.shell_runner'] = function() return { validate_spawn_args = function() return '' end } end
 -- The simulated luv above owns no descriptors. The client reads the checked-in
 -- timings registry, locale sentinel and finite network policy declarations. Admit
 -- only these declared sources through stdio; every other path is refused.

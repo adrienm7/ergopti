@@ -565,7 +565,7 @@ local function _build_shortcuts(ctx)
 				end
 				if spec == "program" then return nil end
 				if spec == "app" then
-					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+					return require("ui.app_chooser").pick(require("core.process.adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
 				end
 				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
 				if require("ui.user_action_editor").KINDS[spec] then

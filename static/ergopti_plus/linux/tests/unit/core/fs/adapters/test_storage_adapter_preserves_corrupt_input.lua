@@ -40,7 +40,7 @@ helpers.describe("storage adapter preserves corrupt input for recovery", functio
 	helpers.it("storage recovery does not block when a candidate becomes a FIFO", function()
 		if not pcall(require, "luv") or package.config:sub(1, 1) ~= "/" then return end
 		local root = make_temp_config_root()
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local fixture = helpers.driver_root() .. "/tests/fixtures/native_storage_recovery_fifo_race.lua"
 		local command = "timeout 4 " .. Shell.quote(assert(arg and arg[-1])) .. " " .. Shell.quote(fixture)
 			.. " " .. Shell.quote(root)
@@ -253,7 +253,7 @@ helpers.describe("native script storage cohorts", function()
 	helpers.it("script-storage-cohort native FIFO and symlink source kinds refuse without mutation", function()
 		for _, kind in ipairs({ "fifo", "symlink" }) do
 			storage_cohort_fixture(nil, function(storage, _, path, backup, write, read)
-				local Shell = require("adapters.shell_runner")
+				local Shell = require("core.process.adapters.shell_runner")
 				if kind == "fifo" then helpers.assert_true(Shell.run("mkfifo -- " .. Shell.quote(path)))
 				else write(backup, '{"a":1}'); helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(backup) .. " " .. Shell.quote(path))) end
 				local owner = {}; helpers.assert_true(storage.acquire_owned(owner, { "a" })); helpers.assert_eq(storage.capture_owned(owner), nil)

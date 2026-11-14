@@ -144,7 +144,7 @@ local default_owner
 function M.default()
 	if default_owner then return default_owner end
 	local FileSystem = require("core.fs.adapters.file_system")
-	local TaskLifecycle = require("adapters.task_lifecycle")
+	local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 	local origin = debug.getinfo(1, "S").source
 	local driver = type(origin) == "string" and origin:match("^@(.*)/modules/llm/managed_pyobjc%.lua$")
 	assert(type(driver) == "string" and driver:sub(1, 1) == "/", "the driver folder of managed_pyobjc.lua is unknown")

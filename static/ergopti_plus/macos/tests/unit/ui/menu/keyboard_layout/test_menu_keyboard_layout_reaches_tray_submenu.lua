@@ -259,7 +259,7 @@ end)
 --- Native effect ports are controlled and expose their launch receipt.
 local function with_empty_source_preferences(callback, labels)
 	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
-		"modules.keymap.input_sources", "modules.keymap.layout_install", "adapters.shell_runner"}, function()
+		"modules.keymap.input_sources", "modules.keymap.layout_install", "core.process.adapters.shell_runner"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local state = {records = {}, commands = {}, result = true, effects = 0}
@@ -273,7 +273,7 @@ local function with_empty_source_preferences(callback, labels)
 		installer.install_user = forbid_effect
 		installer.install_system = forbid_effect
 		sources.set_input_source_async = forbid_effect
-		package.loaded["adapters.shell_runner"] = { open = function(url)
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(url)
 			state.commands[#state.commands + 1] = url
 			if state.result == "throw" then error("Native launch refused") end
 			return state.result

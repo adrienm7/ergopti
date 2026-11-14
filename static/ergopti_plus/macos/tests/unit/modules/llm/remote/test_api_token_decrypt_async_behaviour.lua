@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local function with_crypto_fixture(options, body)
 	options = options or {}
 	local names = {
-		"modules.llm.api_token_crypto", "adapters.shell_runner",
+		"modules.llm.api_token_crypto", "core.process.adapters.shell_runner",
 		"core.events.timer_scheduler", "infra.timings", "core.logger.engine.logger",
 		"platform.remap.lease_helper",
 	}
@@ -88,7 +88,7 @@ local function with_crypto_fixture(options, body)
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done, on_chunk)
 			if options.spawn_throws then error("spawn exploded") end
 			fixture.executable = executable
@@ -126,7 +126,7 @@ local function with_crypto_fixture(options, body)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	-- Keep the shared-slot restore explicit so the cross-file hygiene scanner can
 	-- prove this fixture cannot leak an exec-less shell runner into its successor.
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err) end
 end
 
@@ -433,7 +433,7 @@ end
 local function with_real_remote_crypto_settlement(stop_mode, body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"adapters.shell_runner", "core.events.timer_scheduler",
+		"core.process.adapters.shell_runner", "core.events.timer_scheduler",
 		"core.network.adapters.http_client", "modules.shortcuts.script_control",
 		"platform.remap.lease_helper",
 	}
@@ -473,7 +473,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		package.loaded["platform.remap.lease_helper"] = {
 			resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_executable, _args, on_done)
 				fixture.done = on_done
 				return {
@@ -507,7 +507,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		body(require("modules.llm.api_remote"), fixture)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err) end
 end
 

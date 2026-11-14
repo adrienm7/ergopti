@@ -86,7 +86,7 @@ local function with_connectors(opts, body)
 end
 
 helpers.it("agent calendar preserves the complete private directory receipt", function()
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local previous_line, previous_checked = Shell.exec_line, Shell.exec_checked
 	local prior = package.loaded["modules.llm.agent_connectors"]
 	local dir = "/tmp/base\nwith-newline/ergopti-agent.abcdefgh"

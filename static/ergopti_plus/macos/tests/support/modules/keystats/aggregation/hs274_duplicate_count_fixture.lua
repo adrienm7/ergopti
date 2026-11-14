@@ -34,7 +34,7 @@ end
 local function with_system_policy_callback(vector, body)
 	Accounting.run(function(scenario)
 		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
-		local lifecycle = package.loaded["adapters.process_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		local manager = package.loaded["modules.keystats.log_manager"]
 		local previous_activation, previous_append = lifecycle.onAppActivate, manager.append_log
 		local ports = { "init", "app_watcher_cb", "update_private_status", "update_ax_observer",
@@ -324,7 +324,7 @@ local private_modifier_vectors = {
 local function with_private_window_callback(vector, body)
 	Accounting.run(function(scenario)
 		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
-		local lifecycle = package.loaded["adapters.process_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		local manager = package.loaded["modules.keystats.log_manager"]
 		local original_activation = lifecycle.onAppActivate
 		local original_append = manager.append_log

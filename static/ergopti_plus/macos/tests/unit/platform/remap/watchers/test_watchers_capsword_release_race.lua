@@ -41,10 +41,10 @@ local function fresh_harness(options)
 	package.loaded["adapters.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	-- TaskLifecycle captures `hs` at require time; reload it so any task the
 	-- watcher could construct reaches the spy below instead of a stale stub.
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 
 	local h = {
 		clock = 1000,

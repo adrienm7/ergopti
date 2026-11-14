@@ -723,7 +723,7 @@ helpers.describe("native JSON fallback completion", function()
 	end
 	for _, kind in ipairs(cases) do
 		helpers.it("(keystats-json-fallback) retains saved data and pending events on " .. kind, function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
 			local okay, detail = xpcall(function()

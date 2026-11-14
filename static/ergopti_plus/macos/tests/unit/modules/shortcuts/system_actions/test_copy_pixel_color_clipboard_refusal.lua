@@ -39,7 +39,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 			end,
 			start = function(task) return task:start() and true or false end,
 		}
-		package.loaded["adapters.task_lifecycle"] = task_lifecycle
+		package.loaded["core.process.adapters.task_lifecycle"] = task_lifecycle
 		package.loaded["infra.notifications"] = {
 			notify = function(message, _, level)
 				notifications[#notifications + 1] = { message = message, level = level }
@@ -78,7 +78,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 		local clipboard = "original"
 		local nested_pause = nil
 		local actions
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(_label, _path, callback, _args)
 				callbacks[#callbacks + 1] = callback
 				return {

@@ -7,9 +7,9 @@ local SOURCE = { source_path = "/private/config.toml", source_sha256 = string.re
 local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 
 local OWNED_MODULES = {
-	"modules.gestures.actions_aux_owner", "adapters.shell_runner", "adapters.task_environment",
+	"modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "tests.stubs.hs", "hs",
-	"adapters.owned_program_runner", "platform.remap.lease_helper",
+	"core.process.adapters.owned_program_runner", "platform.remap.lease_helper",
 }
 
 local function with_program_owner(callback)
@@ -72,7 +72,7 @@ local function with_program_owner(callback)
 				return task
 			end
 			fixture.owner = require("modules.gestures.actions_aux_owner")
-			fixture.runner = require("adapters.shell_runner")
+			fixture.runner = require("core.process.adapters.shell_runner")
 			function fixture.start()
 				return fixture.owner.run_program("/private/secret-executable", { "private-argument" },
 					function() return fixture.admitted end, "gestures", SOURCE)

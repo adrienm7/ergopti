@@ -46,7 +46,7 @@ end
 --- @return table Commands handed to io.popen.
 local function with_zenity(read_body, close_status, fn)
 	local real_popen = io.popen
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	local real_checked = shell.exec_checked
 	local commands = {}
 	shell.exec_checked = function(command)

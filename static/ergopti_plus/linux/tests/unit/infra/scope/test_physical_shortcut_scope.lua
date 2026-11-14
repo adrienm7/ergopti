@@ -56,7 +56,7 @@ local function with_scope(body, source, chord_j_identity)
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,

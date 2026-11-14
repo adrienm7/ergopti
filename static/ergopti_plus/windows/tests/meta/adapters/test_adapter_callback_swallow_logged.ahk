@@ -6,7 +6,7 @@
 ; Regression guard for the 6 bare `try Callback(...)` sites across
 ; adapters/text_sender.ahk and core/network/adapters/http_client.ahk that swallowed a
 ; throwing completion callback with zero log trace, unlike sibling adapters
-; (adapters/shell_runner.ahk's on_done wrapper, core/events/timer_scheduler.ahk's
+; (core/process/adapters/shell_runner.ahk's on_done wrapper, core/events/timer_scheduler.ahk's
 ; _OneShot/_Repeating wrappers), which both log via LoggerError.
 ;
 ; Fix: text_sender.ahk's 5 sites now route through a shared

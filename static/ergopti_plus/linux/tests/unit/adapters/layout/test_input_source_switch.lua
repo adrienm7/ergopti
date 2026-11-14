@@ -153,10 +153,10 @@ end)
 
 helpers.describe("input source switch: switcher", function()
 	helpers.it("linux-x11-active-group: waits for owned group acknowledgement and retirement", function()
-		local names = { "adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
+		local names = { "core.process.adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
 		local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
 		local calls = {}
-		package.loaded["adapters.owned_process"] = { start = function(program, args, options, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(program, args, options, callback)
 			calls[#calls + 1] = { program = program, args = args, options = options, done = callback }
 			return { started = false, error = "dispatch refused until retired" }
 		end }
@@ -184,13 +184,13 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-x11-active-group: query and rejected layout never start the group worker", function()
-		local previous = package.loaded["adapters.owned_process"]
+		local previous = package.loaded["core.process.adapters.owned_process"]
 		local calls = {}
-		package.loaded["adapters.owned_process"] = { start = function(program, args, _, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(program, args, _, callback)
 			calls[#calls + 1] = { program = program, args = args, done = callback }; return {}
 		end }
 		local port = Switch.native_port()
-		package.loaded["adapters.owned_process"] = previous
+		package.loaded["core.process.adapters.owned_process"] = previous
 		local query, rejected
 		port.run("setxkbmap", { "-query" }, function(result) query = result end)
 		calls[1].done({ ok = true, stdout = "layout: us" })
@@ -202,9 +202,9 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-x11-active-group: worker setup errors complete as refusals", function()
-		local old_process, old_luv, old_paths = package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"]
+		local old_process, old_luv, old_paths = package.loaded["core.process.adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"]
 		local done
-		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback) done = callback; return {} end }
+		package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback) done = callback; return {} end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
 		package.loaded["core.fs.engine.paths"] = { driver_root = function() error("unavailable") end }
 		local port = Switch.native_port()
@@ -213,14 +213,14 @@ helpers.describe("input source switch: switcher", function()
 		done({ ok = true })
 		helpers.assert_eq(result.ok, false)
 		helpers.assert_eq(result.error, "X11 group worker could not start")
-		package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"] = old_process, old_luv, old_paths
+		package.loaded["core.process.adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"] = old_process, old_luv, old_paths
 	end)
 
 	helpers.it("linux-x11-active-group: invalid declared soname never reaches a worker", function()
-		local names = { "adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
+		local names = { "core.process.adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
 		local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
 		local calls, done = 0, nil
-		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback)
 			calls = calls + 1; done = callback; return {}
 		end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
@@ -235,14 +235,14 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-layout-start-debt: native refused start waits for settlement callback", function()
-		local previous = package.loaded["adapters.owned_process"]
+		local previous = package.loaded["core.process.adapters.owned_process"]
 		local pending
-		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback)
 			pending = callback
 			return { started = false, error = "native allocation refused" }
 		end }
 		local port = Switch.native_port()
-		package.loaded["adapters.owned_process"] = previous
+		package.loaded["core.process.adapters.owned_process"] = previous
 		local delivered = false
 		local accepted = port.run("setxkbmap", { "-query" }, function() delivered = true end)
 		helpers.assert_eq(accepted, true, "the returned owner still has physical retirement to acknowledge")

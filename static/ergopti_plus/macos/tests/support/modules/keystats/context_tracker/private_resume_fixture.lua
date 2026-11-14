@@ -28,7 +28,7 @@ local OWNERS = {
 	"modules.keystats.physical_accounting_mode",
 	"adapters.synthetic_input",
 	"adapters.event_provenance",
-	"adapters.process_lifecycle",
+	"core.process.adapters.lifecycle",
 	"adapters.keyboard_hook",
 	"adapters.input_source_broker",
 	"core.fs.adapters.storage",
@@ -76,8 +76,8 @@ local OWNERS = {
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec",
 	"adapters.keyboard_geometry",
-	"adapters.shell_runner",
-	"adapters.task_environment",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_environment",
 	"adapters.text_sender",
 	"adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8",
@@ -287,7 +287,7 @@ function M.with_runtime(callback)
 				return table.unpack(receipt, 2, receipt.n)
 			end
 			local activation_callback
-			package.loaded["adapters.process_lifecycle"].onAppActivate = function(callback)
+			package.loaded["core.process.adapters.lifecycle"].onAppActivate = function(callback)
 				activation_callback = callback
 				return true
 			end

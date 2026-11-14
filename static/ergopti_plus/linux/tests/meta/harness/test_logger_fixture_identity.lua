@@ -24,7 +24,7 @@ helpers.describe("instrumentation fixture logger ownership", function()
 	for _, scenario in ipairs({
 		{ module = "tests.unit.core.logger.test_perf_counters", owned = { "core.logger.engine.perf_counters", "core.fs.engine.paths", "core.text.engine.toml_codec.reader" } },
 		{ module = "tests.unit.infra.test_phase_stats", owned = {
-			"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
+			"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
 			"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 		} },
 		{ module = "tests.unit.core.lifecycle.test_boot_profiler_summary", owned = { "core.logger.engine.boot_profiler", "infra.phase_stats" } },
