@@ -34,14 +34,18 @@ eval "$(dbus-launch --sh-syntax)"
 PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
 "${BUS_LAUNCHER}" --launch-immediately >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
-sleep 1
+# A GTK application asks for the accessibility bus once, at start: one started
+# before the launcher serves it never joins and reads inconclusive. A fixed
+# one-second sleep lost that race on a slow runner.
+READY_TIMEOUT_SECONDS=20
+python3 tests/hardware/wait_a11y_bus.py "${READY_TIMEOUT_SECONDS}" || { kill ${PIDS} 2>/dev/null; exit 2; }
 openbox >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
-sleep 1
+WORK="$(mktemp -d)"
 
 FAILURES=0
 probe() {
-	luajit -e "local m=require('adapters.atspi_focus'); local s,ok=m._get_native_snapshot(); print(ok and ('role='..s.role) or 'inconclusive')" 2>/dev/null | tail -1
+	luajit -e "local m=require('adapters.atspi_focus'); local s,ok=m._get_native_snapshot(); print(ok and ('role='..s.role) or 'inconclusive')" 2>"${WORK}/probe.err" | tail -1
 }
 check() {
 	local what="$1" expected="$2" got
@@ -50,27 +54,37 @@ check() {
 		echo "  ok   ${what} (${got})"
 	else
 		echo "  FAIL ${what}: expected ${expected}, got ${got}"
+		sed 's/^/       probe: /' "${WORK}/probe.err"
 		FAILURES=$((FAILURES + 1))
 	fi
 }
+# Opens one fixture window and waits until the window manager made it active
+# with its field focused, the state a probe reads; a fixed sleep raced it.
+open_fixture() {
+	local name="$1"
+	shift
+	python3 "${FIXTURE}" "${name}" "$@" --ready-file "${WORK}/${name}.ready" >/dev/null 2>&1 &
+	PIDS="${PIDS} $!"
+	local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
+	until [ -e "${WORK}/${name}.ready" ]; do
+		if [ "${SECONDS}" -ge "${deadline}" ]; then
+			echo "  FAIL the ${name} window was not active and focused within ${READY_TIMEOUT_SECONDS} s"
+			FAILURES=$((FAILURES + 1))
+			return 1
+		fi
+		sleep 0.05
+	done
+}
 
 echo "=== secure-field probe on a real accessibility bus ==="
-python3 "${FIXTURE}" editor >/dev/null 2>&1 &
-PIDS="${PIDS} $!"
-sleep 3
-check "one application with a focused text field" "role=61"
+open_fixture editor && check "one application with a focused text field" "role=61"
 
-python3 "${FIXTURE}" second >/dev/null 2>&1 &
-PIDS="${PIDS} $!"
-sleep 3
-check "a second application opened on top — still one answer, the active window's" "role=61"
+open_fixture second && check "a second application opened on top — still one answer, the active window's" "role=61"
 
-python3 "${FIXTURE}" login password >/dev/null 2>&1 &
-PIDS="${PIDS} $!"
-sleep 3
-check "a password field in the active window is recognised as one" "role=40"
+open_fixture login password && check "a password field in the active window is recognised as one" "role=40"
 
 # shellcheck disable=SC2086
 kill ${PIDS} 2>/dev/null
+rm -rf "${WORK}"
 echo "=== ${FAILURES} failure(s) ==="
 [ "${FAILURES}" -eq 0 ]
