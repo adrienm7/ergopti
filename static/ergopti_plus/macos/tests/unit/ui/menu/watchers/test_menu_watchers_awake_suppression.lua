@@ -44,7 +44,7 @@ local OWNED_MODULES = {
 	"core.logger.engine.boot_profiler",
 	"infra.capsword_auto_off",
 	"infra.config_paths",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"infra.diagnostic_snapshot",
 	"infra.dialog_util",
 	"infra.factory_reset_journal",

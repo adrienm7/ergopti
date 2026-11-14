@@ -447,7 +447,7 @@ end
 local function configuration(schema, overrides)
 	return function(done, on_cancel)
 		local Timers = require("core.events.timer_scheduler")
-		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
+		local handle = Timers.after(require("core.timing.engine.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("diagnostics.engine.healthcheck.configuration").probe, context)
 			if not ok then
@@ -472,7 +472,7 @@ end
 local function local_state(slice_ms, snapshot)
 	return function(done, on_cancel)
 		local Timers = require("core.events.timer_scheduler")
-		local yield = require("infra.timings").sec("ui", "healthcheck_probe_yield_ms")
+		local yield = require("core.timing.engine.timings").sec("ui", "healthcheck_probe_yield_ms")
 		local steps, sections = require("ui.healthcheck.core").local_state_steps(snapshot)
 		local next_step, failures, handle = 1, {}, nil
 		local function slice()

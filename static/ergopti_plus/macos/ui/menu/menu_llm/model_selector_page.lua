@@ -31,8 +31,8 @@ local M = {}
 
 local i18n           = require("core.i18n.engine.i18n")
 local Logger         = require("core.logger.engine.logger")
-local DeferredWork   = require("infra.deferred_work")
-local Timings        = require("infra.timings")
+local DeferredWork   = require("core.timing.engine.deferred_work")
+local Timings        = require("core.timing.engine.timings")
 local dialog         = require("infra.dialog_util")
 local BackendLabels  = require("ui.menu.menu_llm.backend_labels")
 local CustomModels   = require("ui.menu.menu_llm.custom_models")

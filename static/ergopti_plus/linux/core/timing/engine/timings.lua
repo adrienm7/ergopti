@@ -1,4 +1,4 @@
---- infra/timings.lua
+--- core/timing/engine/timings.lua
 
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Linux)
@@ -18,7 +18,7 @@
 ---    daemon died on its first read.
 ---
 --- USAGE:
----   local Timings = require("infra.timings")
+---   local Timings = require("core.timing.engine.timings")
 ---   local SESSION_TIMEOUT_MS = Timings.ms("keystats", "session_timeout_ms")
 --- ==============================================================================
 

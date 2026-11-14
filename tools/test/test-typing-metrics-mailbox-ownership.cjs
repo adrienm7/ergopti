@@ -80,7 +80,7 @@ local poll
 local slices={}
 local dashboard,context=require('tests.support.metrics_typing_fixture')({
  after=function(delay,fn)
-  if delay==require('infra.paced_job').DEFAULT_GAP_SEC then slices[#slices+1]=fn end
+  if delay==require('core.timing.engine.paced_job').DEFAULT_GAP_SEC then slices[#slices+1]=fn end
   return {timer={}},true
  end,
  every=function(_,fn) poll=fn;return {timer={}},true end,

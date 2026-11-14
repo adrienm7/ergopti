@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 	"core.fs.engine.file_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
-	"core.fs.adapters.storage", "infra.timings", "core.fs.adapters.file_system",
+	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",
 	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "ui.hotstring_editor",
 }
 
@@ -73,7 +73,7 @@ local function with_watchers(callback)
 				return true
 			end }
 			package.loaded["core.fs.engine.dir"] = {}
-			package.loaded["infra.timings"] = { sec = function(group, key)
+			package.loaded["core.timing.engine.timings"] = { sec = function(group, key)
 				assert(group == "ui" and key == "ui_restore_poll_ms", "unexpected UI timing")
 				return 1
 			end }

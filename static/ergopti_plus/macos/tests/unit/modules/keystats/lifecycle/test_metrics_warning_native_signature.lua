@@ -11,7 +11,7 @@ local WarningContract = require("tests.support.dialog_warning_contract")
 local Fixture = require("tests.support.keystats_provenance_fixture")
 local OWNERS = {
 	"core.events.clock",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"core.text.engine.toml.reader",
 	"metrics.engine.metrics",
 	"modules.keystats.privacy_context",

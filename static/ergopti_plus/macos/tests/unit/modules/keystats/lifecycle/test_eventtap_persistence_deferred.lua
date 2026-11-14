@@ -39,7 +39,7 @@ local RESET_MODULES = {
 	"core.process.adapters.lifecycle", "adapters.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "infra.config_paths", "infra.dialog_util", "core.i18n.engine.i18n",
-	"core.logger.engine.logger", "infra.manifest_reader", "infra.timings",
+	"core.logger.engine.logger", "infra.manifest_reader", "core.timing.engine.timings",
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
 	"modules.keystats.init", "modules.keystats.kc_bridge",
@@ -247,7 +247,7 @@ local function load_fixture(options)
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { alert = function() end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
 				micro_idle_timeout_ms = 30000,

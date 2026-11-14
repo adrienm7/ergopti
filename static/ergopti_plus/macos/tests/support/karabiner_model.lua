@@ -685,7 +685,7 @@ end
 --- How long a quick tap holds its key: the shared tap minimum
 --- (tap_hold.tap_min_duration_ms), the shortest press every driver types as a
 --- tap; a shorter one is a bounce the generated rules drop.
-M.TAP_MS = require("infra.timings").ms("tap_hold", "tap_min_duration_ms")
+M.TAP_MS = require("core.timing.engine.timings").ms("tap_hold", "tap_min_duration_ms")
 
 --- Presses and quickly releases one key alone: a tap held for M.TAP_MS.
 --- @param key_code string Physical key.

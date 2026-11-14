@@ -89,7 +89,7 @@ local function with_provider(kind, options, body)
 		package.loaded["infra.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["adapters.apple_shortcuts_native"] = nil
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			if options.reject_schedule then return false end
 			callback(); return true
 		end }
@@ -258,7 +258,7 @@ for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 		if kind ~= "script" then
 			helpers.it("keeps the picker open when its parameter handoff is refused", function()
 				with_provider(kind, {}, function(fixture, pick)
-					local deferred = require("infra.deferred_work")
+					local deferred = require("core.timing.engine.deferred_work")
 					local previous = deferred.after
 					deferred.after = function() return false end
 					local ok, result = pcall(pick)

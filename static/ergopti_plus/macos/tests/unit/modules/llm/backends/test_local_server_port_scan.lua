@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Policy = require("ai.engine.local_servers.ports_core")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 --- Builds the scan entries of the actual catalogue.
 --- @return table entries

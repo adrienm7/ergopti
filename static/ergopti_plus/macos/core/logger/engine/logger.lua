@@ -1711,7 +1711,7 @@ function M.enable_repeat_collapsing(scheduler)
 		return false, "repeat collapsing needs a scheduler with every() and cancel()"
 	end
 	-- Required here, not at load: infra.timings itself requires this module.
-	local interval_sec = require("infra.timings").sec("logger", "flush_interval_ms")
+	local interval_sec = require("core.timing.engine.timings").sec("logger", "flush_interval_ms")
 	Core.enable_repeat_collapsing()
 	local ok, handle_or_err, committed = pcall(scheduler.every, interval_sec, function()
 		Core.flush_repeats(false)

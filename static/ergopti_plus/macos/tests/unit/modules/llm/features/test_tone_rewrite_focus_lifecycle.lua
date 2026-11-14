@@ -14,7 +14,7 @@ local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
 local Response = require("tests.support.modules.llm.selection_translation_fixture")
 local Tone = require("ai.engine.prediction.tone")
 local RESULT = "A formal rewrite"
-local function seconds(key) return require("infra.timings").sec("debounce", key) end
+local function seconds(key) return require("core.timing.engine.timings").sec("debounce", key) end
 
 --- Owns the tone module in addition to the common real-pipeline fixture scope.
 --- @param scenario function Complete callback and timer scenario.

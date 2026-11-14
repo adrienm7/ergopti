@@ -123,14 +123,14 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 	local BUSYBOX = { exit_code = 1, stdout = "", error = "pgrep: unrecognized option: a" }
 
 	helpers.it("truncated process arguments do not invent a port", function()
-		local limit = require("infra.timings").count("limits", "proc_cmdline_bytes")
+		local limit = require("core.timing.engine.timings").count("limits", "proc_cmdline_bytes")
 		local prefix = "/usr/bin/llama-server\0" .. string.rep("x", limit - #"/usr/bin/llama-server\0" - #"\0--port=8") .. "\0--port=8"
 		local results = scan_with({ [700] = prefix .. "181\0" })
 		helpers.assert_true(results.llamacpp.port ~= 8, "a truncated 8181 port must not become port 8")
 	end)
 
 	helpers.it("a final process slice that exceeds the deadline is not accepted", function()
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		local budget = Timings.ms("llm", "local_server_process_lookup_timeout_ms")
 		local calls = 0
 		local _, runs = scan_with({ [700] = "/usr/bin/llama-server\0--port\0008181\0" }, nil, function()
@@ -187,7 +187,7 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 
 	helpers.it("a walk past its budget falls back to the listening pids, described from /proc (omlx-ps-timeout-listening)",
 		function()
-			local Timings = require("infra.timings")
+			local Timings = require("core.timing.engine.timings")
 			local budget = Timings.ms("llm", "local_server_process_lookup_timeout_ms")
 			local processes = { [4242] = "omlx-server\0" }
 			for pid = 1, 300 do processes[pid] = "sleep\0001\0" end

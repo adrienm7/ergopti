@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"platform.remap.lease_controller",
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
 	"infra.config_paths",
 	"modules.keystats.kc_bridge",
@@ -47,7 +47,7 @@ local OWNED_MODULES = {
 	"platform.remap.ke_variables",
 	"core.fs.adapters.json_codec",
 	"core.process.adapters.shell_runner",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"platform.remap.lease_contract",
 	"modules.keymap.layout",
 	"core.fs.adapters.file_system",
@@ -450,7 +450,7 @@ return function(run, dependencies)
 					return options.unbind_succeeds ~= false
 				end,
 			}
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			local timer_scheduler = {}
 			function timer_scheduler.after(delay, callback)
 				calls.timer_after_attempts = calls.timer_after_attempts + 1

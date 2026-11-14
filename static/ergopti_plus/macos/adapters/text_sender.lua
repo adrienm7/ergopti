@@ -27,7 +27,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("core.logger.engine.logger")
-local Timings  = require("infra.timings")
+local Timings  = require("core.timing.engine.timings")
 local Clipboard = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local SyntheticInput = require("adapters.synthetic_input")

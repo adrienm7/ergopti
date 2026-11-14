@@ -46,7 +46,7 @@ local MENU_STATE_MODULES = {
 	"ui.menu.menu_state",
 	"ui.menu.keymap_lifecycle",
 	"core.fs.adapters.storage",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"modules.keystats.text_cipher",
 }
 
@@ -59,7 +59,7 @@ local function sync(bindings, shortcuts_on, keys)
 	return helpers.with_fresh_modules(MENU_STATE_MODULES, function()
 		-- Deferred warm-up work is irrelevant to the replay and must not outlive
 		-- the fixture that owns the Bindings registry.
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		local menu_state = helpers.load_with_stubs("ui.menu.menu_state")
 		local facade = {
 			pause_bindings = bindings.pause,

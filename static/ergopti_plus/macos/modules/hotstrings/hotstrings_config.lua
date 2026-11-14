@@ -989,8 +989,8 @@ function M.prewarm_meta(categories)
 		if type(category) == "string" and category ~= "" then queue[#queue + 1] = category end
 	end
 	local state, index, read = _state, 0, 0
-	local DeferredWork = require("infra.deferred_work")
-	local delay = require("infra.timings").sec("ui", "hotstring_meta_prewarm_step_ms")
+	local DeferredWork = require("core.timing.engine.deferred_work")
+	local delay = require("core.timing.engine.timings").sec("ui", "hotstring_meta_prewarm_step_ms")
 	local step
 	step = function()
 		-- A re-init owns a new memo: this queue warms nothing of it

@@ -675,7 +675,7 @@ helpers.describe("system metrics: network changes", function()
 				"the first sample has no CPU interval yet")
 			-- 1000 more ticks: 300 user, 100 system, 600 idle.
 			write("stat", "cpu  400 0 150 1400 50 0 0 0 0 0\n")
-			local poll = require("infra.timings").ms("keystats", "system_load_poll_ms")
+			local poll = require("core.timing.engine.timings").ms("keystats", "system_load_poll_ms")
 			sample(metrics._sample_interval_ms(), "2026-08-06")
 			helpers.assert_eq(metrics.take_events(), {}, "load waits for its own poll interval")
 			for at = 2 * metrics._sample_interval_ms(), poll, metrics._sample_interval_ms() do sample(at, "2026-08-06") end

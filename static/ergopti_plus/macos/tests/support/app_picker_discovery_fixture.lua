@@ -24,8 +24,8 @@ return function(run)
 			return original_getenv(key)
 		end
 		helpers.with_fresh_modules({ "infra.app_picker", "core.process.adapters.shell_runner",
-			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.text.engine.utils", "infra.deferred_work" }, function()
-			package.loaded["infra.deferred_work"] = { after = function(_, callback)
+			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.text.engine.utils", "core.timing.engine.deferred_work" }, function()
+			package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
 				if state.defer_synchronous then callback() end
 				return state.defer_started

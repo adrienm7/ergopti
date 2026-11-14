@@ -15,7 +15,7 @@ local ShellRunner = require("core.process.adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")
 local JsonCodec = require("core.fs.adapters.json_codec")
 local LauncherHelper = require("platform.remap.lease_helper")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "adapters.keyboard_source_probe"
 local PROBE_FLAG = "--keyboard-source-probe"

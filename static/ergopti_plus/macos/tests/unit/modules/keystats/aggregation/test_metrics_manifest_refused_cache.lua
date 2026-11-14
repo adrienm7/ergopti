@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
 	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 local PAST, TODAY, TOMORROW = "2026-10-17", "2026-10-18", "2026-10-19"
@@ -139,10 +139,10 @@ helpers.describe("metrics-manifest-refused-cache", function()
 end)
 
 local APP_OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
 	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
 	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "ui.ui_builder",
-	"core.fs.engine.paths", "core.i18n.engine.i18n", "infra.dialog_util", "infra.deferred_work", "infra.config_paths",
+	"core.fs.engine.paths", "core.i18n.engine.i18n", "infra.dialog_util", "core.timing.engine.deferred_work", "infra.config_paths",
 	"core.fs.adapters.file_system", "core.events.timer_scheduler", "adapters.webview_result",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 }

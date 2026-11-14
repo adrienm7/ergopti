@@ -76,7 +76,7 @@ end
 					native.close(timer, function() timer_closed = true end)
 					native.close(child, function() child_closed = true end)
 				end))
-				assert(require("infra.native_timer").start(native, timer, 2000, 0, function()
+				assert(require("core.timing.engine.native_timer").start(native, timer, 2000, 0, function()
 					expired = true; child:kill("sigkill")
 				end))
 				while not exited or not timer_closed or not child_closed do native.run("once") end

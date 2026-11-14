@@ -4,7 +4,7 @@
 local Json = require("core.text.engine.json")
 local Unicode = require("core.lifecycle.engine.compat.utf8")
 local Parameter = require("settings.engine.program_parameter")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local M = { MAX_SCAN = 256, MAX_CHOICES = 64, MAX_NAME_BYTES = 4096, MAX_ARGUMENT_BYTES = 1048576,
 	MAX_CATALOGUE_BYTES = Timings.count("limits", "program_catalogue_bytes"), MAX_PATH_BYTES = 16384, MAX_PATH_DIRECTORIES = 128, MAX_SAFE_INTEGER = 9007199254740991 }
 

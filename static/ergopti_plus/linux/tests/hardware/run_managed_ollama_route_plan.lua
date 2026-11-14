@@ -50,7 +50,7 @@ local port = Proxy.new({
 	relay = { policy = relay_policy, probe = Relay.probe, executable = Relay.executable,
 		timings = Relay.timings, timeout_ms = Relay.timings().probe_ms },
 	probe = TcpProbe.probe, relay_address = TcpProbe.relay_address,
-	probe_timeout_ms = require("infra.timings").ms("llm", "managed_proxy_probe_timeout_ms"),
+	probe_timeout_ms = require("core.timing.engine.timings").ms("llm", "managed_proxy_probe_timeout_ms"),
 })
 local deadline = uv.now() + 8000
 local budget = { remaining_ms = function() uv.update_time(); return deadline - uv.now() end }

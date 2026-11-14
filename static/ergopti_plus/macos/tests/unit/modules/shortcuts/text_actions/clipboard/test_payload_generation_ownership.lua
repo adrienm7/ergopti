@@ -53,7 +53,7 @@ local function with_text(kind, callback)
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
 			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			f.text = require("modules.shortcuts.actions.text")
 			f.payload = kind == "wrap" and "(hello)" or "HELLO"
 			function f.stage()

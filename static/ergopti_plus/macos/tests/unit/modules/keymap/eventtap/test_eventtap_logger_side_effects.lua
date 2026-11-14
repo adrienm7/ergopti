@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local RESET_MODULES = {
 	"core.logger.engine.logger", "core.logger.adapters.log_transport", "adapters.event_provenance",
 	"adapters.synthetic_input",
-	"core.fs.engine.paths", "infra.timings",
+	"core.fs.engine.paths", "core.timing.engine.timings",
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
 	"ui.tooltip", "modules.hotstrings.hotstrings_config", "adapters.tooltip_renderer",
 	"core.fs.adapters.file_system",
@@ -110,7 +110,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		package.loaded["hs.json"] = hs_stub.json
 		package.loaded["hs.sqlite3"] = hs_stub.sqlite3
 		package.loaded["hs.timer"] = hs_stub.timer
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			ms = function() return 100 end,
 			sec = function() return 0.1 end,
 		}

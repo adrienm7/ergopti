@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.updater.auto_check", "modules.updater", "core.fs.engine.paths", "core.logger.engine.logger", "infra.timings",
+	"modules.updater.auto_check", "modules.updater", "core.fs.engine.paths", "core.logger.engine.logger", "core.timing.engine.timings",
 	"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "adapters.update_launcher", "infra.notifications", "core.i18n.engine.i18n",
 	"core.network.engine.http_header_policy",
@@ -26,7 +26,7 @@ local function with_owner(run)
 		local Json = require("core.text.engine.json")
 		-- The real registry reader, loaded before infra.paths is stubbed below:
 		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		-- The real header policy reads shared data, so it loads before the path
 		-- and file stubs below; every request must pass its admission.
 		package.loaded["core.network.engine.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
@@ -54,7 +54,7 @@ local function with_owner(run)
 		})
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = {}
-		package.loaded["infra.timings"] = Timings
+		package.loaded["core.timing.engine.timings"] = Timings
 		package.loaded["core.fs.adapters.file_system"] = {}
 		package.loaded["core.fs.adapters.json_codec"] = { encode = Json.encode, decode = Json.decode }
 		package.loaded["modules.updater"] = { channels = function() return registry end, GH_OWNER = "adrienm7", GH_REPO = "ergopti" }

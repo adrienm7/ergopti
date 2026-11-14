@@ -52,7 +52,7 @@ local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 local LOG = "adapters.keyboard_layout"

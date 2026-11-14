@@ -100,7 +100,7 @@ helpers.describe("native metrics fixture construction deadlines", function()
 				local native = require("tests.support.keystats_native_fixture")
 				local batch = require("core.fs.engine.sqlite_batch_process")
 				local original_start = assert(batch.start)
-				local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+				local operation_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 				local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-deadline-XXXXXX"))
 				local database = directory .. "/metrics.sqlite"
 				local armed, delayed, starts, collector = false, 0, 0, nil
@@ -164,7 +164,7 @@ helpers.describe("native metrics fixture retirement observation", function()
 		local uv = require("luv")
 		local native = require("tests.support.keystats_native_fixture")
 		local batch = require("core.fs.engine.sqlite_batch_process")
-		local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		local operation_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 		local original_spawn, original_timer_start, original_start = uv.spawn, uv.timer_start, batch.start
 		for _, name in ipairs({ "spawn", "timer_start", "run", "sleep", "new_check", "check_start", "walk" }) do
 			helpers.assert_eq(debug.getinfo(uv[name], "S").what, "C", "the regression requires the actual native " .. name)
@@ -256,7 +256,7 @@ helpers.describe("native metrics fixture retirement observation", function()
 	for _, phase in ipairs({ "reservation", "commit", "resolve", "cleanup", "idle", "reservation_retry", "compose_retry",
 		"commit_retry", "resolve_retry", "cleanup_retry", "uncertain" }) do
 		it("native-fixture-retirement-model: frozen " .. phase .. " has a finite observation limit", function()
-			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local budget = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
 			local now, calls = 0, 0
 			local modeled = {
 				reset_session = function() calls = calls + 1; return false end,
@@ -307,7 +307,7 @@ helpers.describe("native metrics fixture finite observation contract", function(
 			for _, name in ipairs({ "hrtime", "run", "sleep" }) do
 				helpers.assert_eq(type(uv[name]), "function", "the model must mirror the real native methods")
 			end
-			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local budget = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
 			local now, calls = 0, 0
 			local modeled = {
 				reset_session = function() calls = calls + 1; return not scenario.frozen and calls > #scenario.phases end,
@@ -1038,7 +1038,7 @@ helpers.describe("session reset refusal keeps exact session ownership", function
 						if reentrant then
 							now = now + 100
 							k.on_keydown("b", now, "owned")
-							now = now + require("infra.timings").ms("keystats", "micro_idle_timeout_ms") + 1
+							now = now + require("core.timing.engine.timings").ms("keystats", "micro_idle_timeout_ms") + 1
 							assert_false(k.flush())
 						end
 						assert_false(k.reset_session(), "nested construction cannot replace the original reset owner")
@@ -1545,7 +1545,7 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
 		Native.flush(collector)
 		Native.flush(collector)
-		local until_ms = now + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		local until_ms = now + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 		while not collector.stop() and require("core.logger.engine.monotonic").now_ms() < until_ms do
 			require("luv").run("nowait")
 			require("luv").sleep(1)
@@ -1577,7 +1577,7 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} },
 				upserts = { { kind = "ngrams", args = { "2026-11-07", "Editor", group, "ngram_chars" } } },
 			}))
-			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+			local until_ms = now() + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 			while not operation:is_settled() and now() < until_ms do
 				operation:pump()
 				if operation:is_retryable() then operation:cancel() end

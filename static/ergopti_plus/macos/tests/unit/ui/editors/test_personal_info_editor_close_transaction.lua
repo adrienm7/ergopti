@@ -48,7 +48,7 @@ local function load_fixture()
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
-	package.loaded["infra.deferred_work"] = { after = function() return true end }
+	package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 	package.loaded["ui.ui_builder"] = {
 		force_focus = function(owner)
 			helpers.assert_eq(owner, webview)

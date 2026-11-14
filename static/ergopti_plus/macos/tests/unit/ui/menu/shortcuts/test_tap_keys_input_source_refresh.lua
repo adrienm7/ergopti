@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local names = {
 	"ui.menu.menu_tap_keys", "modules.shortcuts.tap_keys", "core.logger.engine.logger",
 	"adapters.input_source_broker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
-	"ui.action_picker", "modules.shortcuts.bindings", "infra.deferred_work",
+	"ui.action_picker", "modules.shortcuts.bindings", "core.timing.engine.deferred_work",
 }
 
 helpers.describe("tap-key rows follow the input source", function()

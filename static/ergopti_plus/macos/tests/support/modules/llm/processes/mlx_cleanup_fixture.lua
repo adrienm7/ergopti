@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
 	"core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
-	"core.text.engine.utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
+	"core.text.engine.utils", "core.timing.engine.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner",
 	"core.events.timer_scheduler", "core.process.adapters.task_lifecycle", "modules.llm.profiles",
 	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
@@ -52,7 +52,7 @@ function M.with_commands(callback)
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
 			package.loaded["core.text.engine.utils"] = { shell_quote = M.quote }
-			package.loaded["infra.timings"] = { sec = function() return 1 end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 			package.loaded["core.fs.adapters.storage"] = { get = function() return nil end }
 			package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }

@@ -12,9 +12,9 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
-	"core.logger.engine.logger", "infra.timings", "adapters.python_interpreter",
+	"core.logger.engine.logger", "core.timing.engine.timings", "adapters.python_interpreter",
 	"adapters.input_source_selector", "core.fs.engine.native_path", "core.process.adapters.shell_runner",
-	"infra.deferred_work", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"core.timing.engine.deferred_work", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy", "core.fs.engine.openstep_plist",
 }

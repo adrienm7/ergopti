@@ -10,9 +10,9 @@ local helpers = require("tests.helpers")
 local load_fixture = require("tests.support.paths_editor_fixture")
 
 local function with_editor(callback)
-	helpers.with_fresh_modules({ "infra.deferred_work" }, function()
+	helpers.with_fresh_modules({ "core.timing.engine.deferred_work" }, function()
 		local pending, evaluations = {}, {}
-		package.loaded["infra.deferred_work"] = { after = function(_, fn)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn)
 			pending[#pending + 1] = fn
 			return true
 		end }
@@ -49,7 +49,7 @@ helpers.describe("paths JavaScript delivery", function()
 		helpers.it("(paths-js-delivery) construction scheduling refusal " .. mode .. " is visible", function()
 			with_editor(function(editor, calls, _, evaluations)
 				calls.bridge_callback({ body = { action = "cancel" } })
-				package.loaded["infra.deferred_work"].after = function()
+				package.loaded["core.timing.engine.deferred_work"].after = function()
 					if mode == "throw" then error("PRIVATE_PATH") end
 					return false
 				end
@@ -71,7 +71,7 @@ helpers.describe("paths JavaScript delivery", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		helpers.it("(paths-js-delivery) scheduling refusal " .. mode .. " is visible", function()
 			with_editor(function(_, calls, _, evaluations)
-				package.loaded["infra.deferred_work"].after = function()
+				package.loaded["core.timing.engine.deferred_work"].after = function()
 					if mode == "throw" then error("PRIVATE_PATH") end
 					if mode == "false" then return false end
 				end

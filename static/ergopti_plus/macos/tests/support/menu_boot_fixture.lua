@@ -120,7 +120,7 @@ function M.boot(opts)
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return true

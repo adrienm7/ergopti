@@ -29,7 +29,7 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler",
+		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
 		"adapters.clipboard", "adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil

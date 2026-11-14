@@ -55,7 +55,7 @@ local load_sources
 local APP_NAME = "changelog"
 local HTTP_OWNER = "changelog"
 -- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
-local MAX_CHANGELOG_BYTES = require("infra.timings").count("limits", "changelog_source_bytes")
+local MAX_CHANGELOG_BYTES = require("core.timing.engine.timings").count("limits", "changelog_source_bytes")
 
 local _fetch_generation = 0
 local _sources = nil

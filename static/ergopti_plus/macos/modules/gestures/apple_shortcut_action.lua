@@ -27,7 +27,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.logger")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local AuxOwner = require("modules.gestures.actions_aux_owner")
 local UserActions = require("modules.gestures.user_actions")
 local FileSystem = require("core.fs.adapters.file_system")

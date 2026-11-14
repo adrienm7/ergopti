@@ -129,7 +129,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		stats.use_clock(function() return clock end)
 		package.loaded["infra.phase_stats"] = stats
 		package.loaded["ui.menu.timed_build"] = nil
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		local held_ms = Timings.ms
 		Timings.ms = function(section, key)
 			if section == "budgets" and key == "menu_rebuild_ms" then return 250 end
@@ -158,7 +158,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		local source = file:read("*a")
 		file:close()
 		local completed = source:find("local boot_ms = BootProfiler.complete()", 1, true)
-		local reported = source:find('require("infra.reload_timing").complete()', 1, true)
+		local reported = source:find('require("core.timing.engine.reload_timing").complete()', 1, true)
 		helpers.assert_true(completed ~= nil and reported ~= nil and reported > completed,
 			"the reload is reported once the boot it ends is complete")
 	end)

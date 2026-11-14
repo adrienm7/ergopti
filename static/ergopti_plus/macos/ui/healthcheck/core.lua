@@ -33,7 +33,7 @@ local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
 local Actions  = require("diagnostics.engine.healthcheck.actions")
 local TimerScheduler = require("core.events.timer_scheduler")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local TableUtil = require("core.text.engine.table_util")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 

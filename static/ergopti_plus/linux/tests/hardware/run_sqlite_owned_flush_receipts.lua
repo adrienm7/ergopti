@@ -81,7 +81,7 @@ end
 
 local uv = require("luv")
 if arg[1] == "--stale-clock" then
-	local timeout = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+	local timeout = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local cached = uv.now()
 	uv.sleep(timeout + 50) -- Deliberately leave libuv's cached loop time stale.
 	assert(uv.now() == cached, "fixture must not refresh the loop before dispatch")
@@ -103,7 +103,7 @@ if arg[1] == "--parent-death" then
 	end
 	local request = assert(require("core.fs.engine.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
 		"WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<100000000) SELECT sum(x) FROM n;",
-		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
+		{ owner = "native-sqlite-parent-death", timeout_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	assert(child_pid)
 	io.stdout:write(string.format("READY %d %d\n", uv.os_getpid(), child_pid)); io.stdout:flush()
 	uv.run()

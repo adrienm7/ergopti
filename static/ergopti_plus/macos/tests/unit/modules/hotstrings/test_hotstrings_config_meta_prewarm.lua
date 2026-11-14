@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 --- @param body function body(cfg, world)
 local function with_config(body)
 	helpers.with_stub_scope({
-		"core.logger.engine.logger", "core.text.engine.toml.reader", "infra.deferred_work", "core.fs.adapters.file_system",
+		"core.logger.engine.logger", "core.text.engine.toml.reader", "core.timing.engine.deferred_work", "core.fs.adapters.file_system",
 		"modules.hotstrings.hotstrings_config",
 	}, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
@@ -38,7 +38,7 @@ local function with_config(body)
 			return { sections = {}, meta = { delay = 0.3, color = "#336699", sections = {} } }, true
 		end
 		package.loaded["core.text.engine.toml.reader"] = counting
-		package.loaded["infra.deferred_work"] = {
+		package.loaded["core.timing.engine.deferred_work"] = {
 			after = function(delay, callback, label)
 				world.scheduled[#world.scheduled + 1] = { delay = delay, callback = callback, label = label }
 				return true
@@ -93,7 +93,7 @@ helpers.describe("hotstrings_config: category metadata prewarm (hotstrings-meta-
 
 	helpers.it("a refused timer is reported, never a silent success (hotstrings-meta-prewarm)", function()
 		with_config(function(cfg)
-			package.loaded["infra.deferred_work"].after = function() return false end
+			package.loaded["core.timing.engine.deferred_work"].after = function() return false end
 			helpers.assert_eq(cfg.prewarm_meta({ "rolls" }), false)
 		end)
 	end)

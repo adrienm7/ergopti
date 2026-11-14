@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local DISPLACED = {
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"infra.dialog_util",
 	"modules.shortcuts.input_source_conflict",
 	"ui.menu.menu_keyboard_slots",
@@ -30,7 +30,7 @@ local function with_menu(ids, answer, body)
 	for _, name in ipairs(DISPLACED) do prior[name] = package.loaded[name] end
 	local prior_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local seen = { dialogs = {}, opened = {} }
-	package.loaded["infra.deferred_work"] = { after = function(_, fn) fn() return true end }
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn() return true end }
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function(title, message, first)
 			seen.dialogs[#seen.dialogs + 1] = { title = title, message = message }

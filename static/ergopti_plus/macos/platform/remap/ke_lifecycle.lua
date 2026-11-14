@@ -28,7 +28,7 @@ local Notifications = require("infra.notifications")
 local i18n          = require("core.i18n.engine.i18n")
 local text_utils    = require("core.text.engine.utils")
 local KePaths       = require("platform.remap.ke_paths")
-local Timings       = require("infra.timings")
+local Timings       = require("core.timing.engine.timings")
 
 local LOG = "karabiner"
 

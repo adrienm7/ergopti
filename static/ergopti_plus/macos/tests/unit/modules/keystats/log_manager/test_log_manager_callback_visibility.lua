@@ -40,7 +40,7 @@ local function fresh_manager()
 	}
 
 	package.loaded["core.logger.engine.logger"] = Logger
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function() return 1000 end,
 		sec = function() return 1 end,
 	}

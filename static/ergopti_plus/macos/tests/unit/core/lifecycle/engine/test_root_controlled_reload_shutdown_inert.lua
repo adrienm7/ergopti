@@ -47,7 +47,7 @@ local MODULE_NAMES = {
 	"modules.dynamic_hotstrings",
 	"core.fs.adapters.toml_cache",
 	"core.text.engine.toml.reader",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"core.lifecycle.engine.launcher_guard",
 	"core.fs.adapters.file_system",
 	"platform.remap",
@@ -360,7 +360,7 @@ local function run_isolated(options, assertions)
 			},
 			-- Keep these deadlines independent of the native timing loader; the root
 			-- coordinator reads no other timing in this early-boot fixture.
-			["infra.timings"] = {
+			["core.timing.engine.timings"] = {
 				sec = function(section, key)
 					local name = section .. "." .. key
 					helpers.assert_true(name == "ui.user_quit_deadline_ms" or name == "ui.reload_deadline_ms", name)

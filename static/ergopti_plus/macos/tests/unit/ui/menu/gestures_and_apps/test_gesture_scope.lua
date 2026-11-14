@@ -143,12 +143,12 @@ helpers.describe("macOS complete gesture scope", function()
 		end
 		local dialogs, opened, deferred = {}, 0, {}
 		local saved = {}
-		for _, name in ipairs({ "infra.dialog_util", "infra.deferred_work" }) do saved[name] = package.loaded[name] end
+		for _, name in ipairs({ "infra.dialog_util", "core.timing.engine.deferred_work" }) do saved[name] = package.loaded[name] end
 		package.loaded["infra.dialog_util"] = { block_alert = function(_, message, first)
 			dialogs[#dialogs + 1] = message
 			return first
 		end }
-		package.loaded["infra.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
 		local ok, err = pcall(function()
 			gestures.system_slot_state = function(slot) return slot == claimed_slot and "taken" or "free" end
 			gestures.open_system_gestures = function() opened = opened + 1; return true end

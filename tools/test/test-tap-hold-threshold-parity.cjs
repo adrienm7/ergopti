@@ -130,7 +130,7 @@ if (
 
 // Linux and macOS read the registry value, never a literal of their own.
 if (
-	!/GLOBAL_DEFAULT_SECONDS\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
+	!/GLOBAL_DEFAULT_SECONDS\s*=\s*require\("core\.timing\.engine\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
 		read('linux', 'platform', 'remap', 'tap_hold_loader.lua')
 	)
 ) {
@@ -140,7 +140,7 @@ if (
 }
 const MACOS_DEFAULTS_SRC = read('macos', 'platform', 'remap', 'defaults.lua');
 if (
-	!/D\.tap_hold_timeout_ms\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
+	!/D\.tap_hold_timeout_ms\s*=\s*require\("core\.timing\.engine\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
 		MACOS_DEFAULTS_SRC
 	)
 ) {
@@ -251,7 +251,7 @@ const MACOS_DEFAULTS = path.join(
 	'defaults.lua'
 );
 if (
-	!/D\.sticky_timeout_ms\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "one_shot_shift_timeout_ms"\)/.test(
+	!/D\.sticky_timeout_ms\s*=\s*require\("core\.timing\.engine\.timings"\)\.ms\("tap_hold", "one_shot_shift_timeout_ms"\)/.test(
 		fs.readFileSync(MACOS_DEFAULTS, 'utf8')
 	)
 ) {

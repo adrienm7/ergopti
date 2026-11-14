@@ -42,7 +42,7 @@ if not Indicator.is_available() then abort("the tray library cannot bind.") end
 local Model = require("metrics.engine.wpm_widget_model")
 local Activity = require("metrics.engine.wpm.activity")
 local Constants = require("infra.wpm_constants")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Widget = require("ui.wpm.widget")
 local Readout = require("ui.wpm.tray_readout")
 local canon = assert(Constants.load(), "the shared canon must load")

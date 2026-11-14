@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_picker(scenario)
 	return helpers.with_stub_scope({
 		"ui.action_picker", "ui.webview_controller_pool", "ui.ui_builder", "core.logger.engine.logger",
-		"core.i18n.engine.i18n", "core.fs.engine.paths", "infra.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
+		"core.i18n.engine.i18n", "core.fs.engine.paths", "core.timing.engine.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
 		"core.process.adapters.program_providers", "adapters.apple_shortcuts_native",
 	}, function()
 		local h = { controllers = {}, userdata_refs = {}, callback_refs = {}, views = {}, errors = {}, nil_calls = 0 }

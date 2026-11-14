@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local MODULES = {
 	"adapters.keyboard_source_probe", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
-	"core.fs.adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "core.logger.engine.logger",
+	"core.fs.adapters.json_codec", "platform.remap.lease_helper", "core.timing.engine.timings", "core.logger.engine.logger",
 }
 local SOURCE = "com.apple.keylayout.US"
 
@@ -73,7 +73,7 @@ local function fixture(options)
 		}
 	end
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = { sec = function() return 10 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 10 end }
 	package.loaded["platform.remap.lease_helper"] = {
 		resolve = function()
 			if options.helper_refusal then return nil, "exact helper unavailable" end

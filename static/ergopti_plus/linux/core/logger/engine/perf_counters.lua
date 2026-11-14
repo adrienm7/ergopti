@@ -103,7 +103,7 @@ local _slow_ms = nil
 --- @return table name -> milliseconds
 local function slow_limits()
 	if _slow_ms then return _slow_ms end
-	local default_ms = require("infra.timings").ms("logger", "hotpath_slow_ms")
+	local default_ms = require("core.timing.engine.timings").ms("logger", "hotpath_slow_ms")
 	local limits = {}
 	for name in pairs(Segments.for_driver("linux")) do limits[name] = Segments.threshold_ms(name, default_ms) end
 	_slow_ms = limits

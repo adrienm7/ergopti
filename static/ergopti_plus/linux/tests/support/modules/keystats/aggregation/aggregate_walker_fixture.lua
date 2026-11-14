@@ -16,7 +16,7 @@ local Fakes = helpers.load_module("tests.fakes")
 
 local Walker = helpers.load_module("modules.keystats.aggregate_walker")
 
-local Timings = helpers.load_module("infra.timings")
+local Timings = helpers.load_module("core.timing.engine.timings")
 
 local PAUSE_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 

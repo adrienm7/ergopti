@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["core.i18n.engine.i18n"] = { t = function(key) return key end }
-package.loaded["infra.timings"] = {
+package.loaded["core.timing.engine.timings"] = {
 	ms = function() return 1000 end,
 	sec = function() return 1 end,
 }

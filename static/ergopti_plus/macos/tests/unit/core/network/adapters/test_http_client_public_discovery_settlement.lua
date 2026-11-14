@@ -14,7 +14,7 @@ local OWNED_MODULES = {
 	"core.events.timer_scheduler", "core.logger.engine.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
 	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
-	"infra.timings", "core.text.engine.utils", "modules.llm.profiles", "modules.llm.parser",
+	"core.timing.engine.timings", "core.text.engine.utils", "modules.llm.profiles", "modules.llm.parser",
 	"modules.llm.api_common", "ai.engine.prediction.prompt_builder_core", "modules.llm.api_token_crypto",
 	"modules.llm.progressive_reveal", "modules.llm.remote_response_classifier",
 	"ai.engine.api.remote_formats", "modules.keystats", "core.fs.adapters.file_system", "core.network.engine.http_header_policy",
@@ -69,7 +69,7 @@ local function isolated(scenario)
 			"modules.llm.remote_response_classifier", "ai.engine.api.remote_formats", "modules.keystats" }) do
 			package.loaded[name] = {}
 		end
-		package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1 end }
+		package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1 end }
 		package.loaded["modules.llm.api_common"] = { get_retry_policy = function() return 1, 0, 0 end }
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path) return SourceFile.read(path), "ok" end,

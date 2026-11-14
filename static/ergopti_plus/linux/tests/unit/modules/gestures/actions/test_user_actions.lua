@@ -117,8 +117,8 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 			helpers.assert_eq(run.executable, "/bin/sh")
 			helpers.assert_eq(run.args, { "-l", "-c", SECRET })
 			helpers.assert_eq(run.options, {
-				timeout_ms = require("infra.timings").ms("gestures", "run_command_timeout_ms"),
-				max_output_bytes = require("infra.timings").count("limits", "user_action_output_bytes"),
+				timeout_ms = require("core.timing.engine.timings").ms("gestures", "run_command_timeout_ms"),
+				max_output_bytes = require("core.timing.engine.timings").count("limits", "user_action_output_bytes"),
 			})
 			run.callback({ ok = true, code = 0, stdout = "token\n", stderr = "" })
 			helpers.assert_eq(world.clipboard, { "token" })

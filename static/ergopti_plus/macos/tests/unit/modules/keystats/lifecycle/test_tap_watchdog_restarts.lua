@@ -40,7 +40,7 @@ helpers.describe("keystats: tap-watchdog behavioral contract (C2)", function()
 		-- at module scope, and the registry value must be positive.
 		local key = src:match('local TAP_WATCHDOG_INTERVAL_SEC%s*=%s*Timings%.sec%("keystats",%s*"([%w_]+)"%)')
 		helpers.assert_true(key ~= nil, "TAP_WATCHDOG_INTERVAL_SEC must be read from the timing registry")
-		local seconds = require("infra.timings").sec("keystats", key)
+		local seconds = require("core.timing.engine.timings").sec("keystats", key)
 		helpers.assert_true(seconds > 0, "TAP_WATCHDOG_INTERVAL_SEC must be positive, got: " .. tostring(seconds))
 	end)
 

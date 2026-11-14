@@ -241,7 +241,7 @@ local function load_remap(options)
 		is_paused = function() return shortcuts_paused end,
 		rebind_for_layout = function() return true end,
 	}
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 	package.loaded["infra.config_paths"] = {
 		get = function() return "tests/unit/platform/remap/activation.toml" end,

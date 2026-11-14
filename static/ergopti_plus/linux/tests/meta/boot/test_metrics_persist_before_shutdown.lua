@@ -105,7 +105,7 @@ helpers.describe("metrics persistence: the interval", function()
 	end)
 
 	helpers.it("flushes at least once a minute at the shipped values", function()
-		local Timings = helpers.load_module("infra.timings")
+		local Timings = helpers.load_module("core.timing.engine.timings")
 		local ingest_ms = Timings.ms("keystats", "ingest_tick_ms")
 		helpers.assert_true(type(ingest_ms) == "number" and ingest_ms > 0,
 			"the canon must actually carry the value")

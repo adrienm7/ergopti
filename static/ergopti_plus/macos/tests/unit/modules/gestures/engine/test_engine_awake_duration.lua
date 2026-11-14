@@ -15,7 +15,7 @@ local OWNED_MODULES = {
 	"modules.gestures.geometry",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"adapters.accessibility_permission",
 	"adapters.mouse_control",
 	"diagnostics.engine.reports.error_description",
@@ -73,7 +73,7 @@ local function with_engine_scope(callback)
 			pair_join_confirm_ms = 0.02,
 			scroll_momentum_guard_ms = 0.2,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			count = require("tests.support.registry_count"),
 			sec = function(group, key)
 				assert(group == "gestures" and seconds[key] ~= nil, "unexpected engine timing")

@@ -4,7 +4,7 @@
 		"static/ergopti_plus/macos/core/fs/adapters/file_system.lua": 2,
 		"static/ergopti_plus/macos/adapters/python_interpreter.lua": 3,
 		"static/ergopti_plus/macos/core/logger/engine/logger.lua": 1,
-		"static/ergopti_plus/macos/infra/paced_job.lua": 1,
+		"static/ergopti_plus/macos/core/timing/engine/paced_job.lua": 1,
 		"static/ergopti_plus/macos/init.lua": 1,
 		"static/ergopti_plus/macos/modules/llm/api_remote.lua": 1,
 		"static/ergopti_plus/macos/modules/shortcuts/script_control.lua": 2,

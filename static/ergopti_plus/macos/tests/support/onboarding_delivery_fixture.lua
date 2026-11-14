@@ -102,8 +102,8 @@ local function with_delivery(callback, native_timers)
 				end
 				package.loaded["core.events.timer_scheduler"] = nil
 				scheduler = require("core.events.timer_scheduler")
-				package.loaded["infra.deferred_work"] = nil
-				require("infra.deferred_work")
+				package.loaded["core.timing.engine.deferred_work"] = nil
+				require("core.timing.engine.deferred_work")
 				package.loaded["ui.onboarding"] = nil
 				onboarding = require("ui.onboarding")
 				state.focus_attempts = 0
@@ -114,7 +114,7 @@ local function with_delivery(callback, native_timers)
 				state.native_timers, state.scheduler = owned_timers, scheduler
 				state.fire_timer = function(index) owned_timers[index].callback() end
 			else
-				package.loaded["infra.deferred_work"].after = function(_, fn)
+				package.loaded["core.timing.engine.deferred_work"].after = function(_, fn)
 					pending[#pending + 1] = fn
 					return true
 				end

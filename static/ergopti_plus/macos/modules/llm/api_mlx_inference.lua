@@ -34,7 +34,7 @@ local LosslessJson   = require("core.text.engine.json")
 local FileSystem     = require("core.fs.adapters.file_system")
 local TimerScheduler = require("core.events.timer_scheduler")
 local ShellRunner    = require("core.process.adapters.shell_runner")
-local Timings        = require("infra.timings")
+local Timings        = require("core.timing.engine.timings")
 local StreamRetirement = require("modules.llm.mlx_stream_retirement")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"

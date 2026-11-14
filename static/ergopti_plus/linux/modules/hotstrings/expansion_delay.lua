@@ -21,7 +21,7 @@
 local M = {}
 
 local Engine = require("modules.hotstrings.engine")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 --- Whether the match is still inside its expansion delay.
 --- @param result table Match returned by engine:on_char() (carries expander_gap_ms).

@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local OWNERS = {
-	"core.events.timer_scheduler", "infra.deferred_work", "core.logger.engine.logger",
+	"core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
 	"ui.menu.menu_keyboard_layout", "infra.manifest_menu",
 	"infra.notifications", "core.i18n.engine.i18n",
@@ -31,7 +31,7 @@ local function exercise_failure(site)
 		-- Input-source construction loaded deferred work and its scheduler. Both
 		-- continuation owners must capture this fixture's current logger and port.
 		package.loaded["core.events.timer_scheduler"] = nil
-		package.loaded["infra.deferred_work"] = nil
+		package.loaded["core.timing.engine.deferred_work"] = nil
 		local scheduler = require("core.events.timer_scheduler")
 		local marker = "controlled " .. site .. " callback failure"
 		local dispatched, refreshed, business_done = 0, 0, nil

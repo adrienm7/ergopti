@@ -20,7 +20,7 @@ local MODULES = {
 	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
-	"adapters.mouse_control", "core.logger.engine.logger", "infra.timings", "infra.keycodes",
+	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "infra.keycodes",
 	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
@@ -104,7 +104,7 @@ local function with_capture(callback)
 			show = function(text) f.notices[#f.notices + 1] = text; return true end,
 		})
 		local flow = helpers.load_with_stubs("modules.llm.screen_answer")
-		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
 		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		local engine = require("modules.llm.prediction_engine")
 		helpers.assert_true(engine.init({ buffer = "", llm_buffer = "", mappings = {}, DELAYS = {} }))

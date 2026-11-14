@@ -4,7 +4,7 @@
 --- MODULE: Shared Timings Reader Tests (macOS)
 --- DESCRIPTION:
 --- Pins the shared timings reader (_shared/core/timing/engine/timings_core.lua) that
---- infra/timings.lua binds: an unreachable shared tree, an unreadable or empty
+--- core/timing/engine/timings.lua binds: an unreachable shared tree, an unreadable or empty
 --- registry, a missing section and a non-numeric key all raise naming the
 --- cause, and the seconds and count helpers read the same value as the
 --- millisecond accessor. The driver binding reads the real registry.
@@ -66,7 +66,7 @@ helpers.describe("shared timings reader (macOS)", function()
 	end)
 
 	helpers.it("binds the driver to the real registry", function()
-		local driver = require("infra.timings")
+		local driver = require("core.timing.engine.timings")
 		helpers.assert_true(type(driver.ms("gestures", "tap_max_ms")) == "number")
 		helpers.assert_eq(driver.sec("gestures", "tap_max_ms"), driver.ms("gestures", "tap_max_ms") / 1000)
 	end)

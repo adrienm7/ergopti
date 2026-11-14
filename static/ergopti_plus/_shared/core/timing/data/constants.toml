@@ -3,9 +3,9 @@
 # Canonical registry of all timing constants used across Ergopti drivers.
 #
 # Every driver consumes this file:
-#   - Hammerspoon (macOS): infra/timings.lua, at startup.
-#   - Linux: infra/timings.lua, at startup.
-#   - AutoHotkey (Windows): infra/timings/timings_config.ahk, at boot.
+#   - Hammerspoon (macOS): core/timing/engine/timings.lua, at startup.
+#   - Linux: core/timing/engine/timings.lua, at startup.
+#   - AutoHotkey (Windows): core/timing/engine/config.ahk, at boot.
 #
 # All values are in milliseconds unless the key name says otherwise.
 # Keys ending in _sec are in seconds (kept for readability where the

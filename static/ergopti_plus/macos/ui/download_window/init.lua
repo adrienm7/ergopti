@@ -28,7 +28,7 @@
 local M = {}
 
 local Logger     = require("core.logger.engine.logger")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Paths      = require("core.fs.engine.paths")
 local ShellRunner = require("core.process.adapters.shell_runner")
@@ -153,7 +153,7 @@ local PRESETS = {
 -- from the shared registry when an error is shown, so loading this window
 -- (which every download path does) does not depend on the registry.
 local function error_auto_dismiss_sec()
-	return require("infra.timings").sec("tooltip", "error_dialog_autodismiss_ms")
+	return require("core.timing.engine.timings").sec("tooltip", "error_dialog_autodismiss_ms")
 end
 
 --- Invokes one external window controller through the central visible boundary.
@@ -436,7 +436,7 @@ local function ensure_webview(title)
 		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		DeferredWork.after(require("infra.timings").sec("ui", "download_window_flush_safety_ms"), function()
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "download_window_flush_safety_ms"), function()
 				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
@@ -837,7 +837,7 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        DeferredWork.after(require("infra.timings").sec("ui", "download_window_hide_delay_ms"), function()
+        DeferredWork.after(require("core.timing.engine.timings").sec("ui", "download_window_hide_delay_ms"), function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return

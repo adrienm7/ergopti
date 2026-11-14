@@ -31,7 +31,7 @@ local M = {}
 
 local Helpers = require("metrics.engine.aggregator.helpers")
 local SharedWalker = require("metrics.engine.walker.walker")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 -- Which finger types which character, from the shared keycode catalogue — the
 -- same file the typing heatmap is generated from. Keyed by CHARACTER rather

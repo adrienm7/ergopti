@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function load_fixture()
 	for _, name in ipairs({
 		"modules.keymap.utils", "adapters.clipboard", "core.events.timer_scheduler", "adapters.synthetic_input",
-		"core.logger.engine.logger", "infra.timings", "core.text.engine.utils",
+		"core.logger.engine.logger", "core.timing.engine.timings", "core.text.engine.utils",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -129,7 +129,7 @@ local function load_fixture()
 		emit_key_strokes = function() return true end,
 	}
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_section, key)
 			if key == "clipboard_paste_settle_ms" then return 0.05 end
 			return 0.15

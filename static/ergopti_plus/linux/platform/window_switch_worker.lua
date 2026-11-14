@@ -13,7 +13,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 local Shell = require("core.process.adapters.shell_runner")
 local Policy = require("core.ui.engine.cursor_window_policy")
 local LIMIT = 65536
-local SLEEP_MS = require("infra.timings").ms("adapters", "window_switch_worker_sleep_ms")
+local SLEEP_MS = require("core.timing.engine.timings").ms("adapters", "window_switch_worker_sleep_ms")
 local Native = require("luv")
 local Constants = Native.constants
 local files, directory = {}, nil

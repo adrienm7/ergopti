@@ -103,7 +103,7 @@ package.loaded["modules.keystats.export"] = {
 local _TIMINGS_MS = {
 	keystats = { max_keystroke_delay_ms = 5000 },
 }
-package.loaded["infra.timings"] = {
+package.loaded["core.timing.engine.timings"] = {
 	ms  = function(section, key)
 		return (_TIMINGS_MS[section] or {})[key] or 1000
 	end,

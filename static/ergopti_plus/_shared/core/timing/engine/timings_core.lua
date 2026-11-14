@@ -6,7 +6,7 @@
 --- Reads `_shared/core/timing/data/constants.toml`, the single authoritative
 --- source of every tunable timing in the project (debounces, timeouts, poll
 --- intervals, ...), for the macOS and Linux drivers. Each driver binds this
---- factory in infra/timings.lua with its logger, its shared-path resolver and
+--- factory in core/timing/engine/timings.lua with its logger, its shared-path resolver and
 --- its TOML parser; the lookup rules live here once.
 ---
 --- FEATURES & RATIONALE:

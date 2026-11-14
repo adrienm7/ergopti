@@ -156,7 +156,7 @@ local function walk_system(batch, date, action, meta, timestamp)
 	elseif action == "unlock" then day.locked_ms = day.locked_ms + duration
 	elseif action == "wake" then
 		day.sleep_ms = day.sleep_ms + duration
-		if Helpers.is_night_wake(timestamp, require("infra.timings").ms("keystats", "night_wake_end_ms")) then day.night_wake_count = day.night_wake_count + 1 end
+		if Helpers.is_night_wake(timestamp, require("core.timing.engine.timings").ms("keystats", "night_wake_end_ms")) then day.night_wake_count = day.night_wake_count + 1 end
 	end
 end
 
@@ -196,7 +196,7 @@ function M.walk_device(opts)
 	for _, context in pairs(contexts) do AggregateWalker.settle(context, nil, batch, true) end
 
 	-- The switch walks read no timing and no finger; the walker still requires both.
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local timings = {}
 	for _, name in ipairs({ "max_keystroke_delay_ms", "think_pause_ms", "burst_gap_ms", "session_gap_ms",
 		"auto_repeat_max_delay_ms" }) do timings[name] = Timings.ms("keystats", name) end

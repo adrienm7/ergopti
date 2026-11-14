@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.updater.auto_check", "modules.updater", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
+	"modules.updater.auto_check", "modules.updater", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "adapters.update_launcher",
 	"infra.notifications", "core.i18n.engine.i18n", "core.text.engine.json", "updater.engine.channels", "updater.engine.schedule",
 	"updater.engine.release_parser", "updater.engine.check_result", "updater.engine.rate_limit", "updater.engine.version_core",
@@ -23,7 +23,7 @@ local function with_owner(run)
 		local Json = require("core.text.engine.json")
 		-- The real registry reader, loaded before infra.paths is stubbed below:
 		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		local function shared(relative)
 			local file = assert(io.open(helpers.shared(relative), "rb"))
 			local raw = assert(file:read("*a"))
@@ -34,7 +34,7 @@ local function with_owner(run)
 		local registry = assert(require("updater.engine.channels").load(shared("updater/data/channels.json")))
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = {}
-		package.loaded["infra.timings"] = Timings
+		package.loaded["core.timing.engine.timings"] = Timings
 		package.loaded["core.fs.adapters.file_system"] = {}
 		package.loaded["core.fs.adapters.json_codec"] = { encode = Json.encode, decode = Json.decode }
 		package.loaded["modules.updater"] = { channels = function() return registry end }

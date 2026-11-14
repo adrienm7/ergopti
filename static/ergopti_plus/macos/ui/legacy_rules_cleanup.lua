@@ -66,7 +66,7 @@ end
 --- @param message string Localized result.
 --- @return boolean scheduled
 local function show_report(message)
-	local committed = require("infra.deferred_work").after(0, function()
+	local committed = require("core.timing.engine.deferred_work").after(0, function()
 		require("infra.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
 			i18n.get("common.ok"))
 	end, "legacy_rules_cleanup.report")

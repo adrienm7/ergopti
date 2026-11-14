@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 require("tests.lua.byte_limits_contract").register(helpers, { driver = "linux", timings = Timings })
 

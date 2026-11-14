@@ -474,7 +474,7 @@ helpers.describe("linux-injector-wait-eintr", function()
 	end)
 
 	helpers.it("linux-injector-wait-eintr: the event loop and the injector share one binding", function()
-		local NativeSleep = require("infra.native_sleep")
+		local NativeSleep = require("core.timing.engine.native_sleep")
 		helpers.assert_nil(NativeSleep.bind(nil))
 		helpers.assert_nil(NativeSleep.bind({ cdef = function() error("controlled cdef refusal") end }))
 		local ffi, requests = interrupted_ffi({ 4 })

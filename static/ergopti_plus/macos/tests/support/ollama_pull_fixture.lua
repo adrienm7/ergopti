@@ -26,8 +26,8 @@ local MODULES = {
 	"core.network.adapters.http_client",
 	"ui.download_window",
 	"ui.ui_builder",
-	"core.fs.engine.paths", "infra.timings",
-	"infra.deferred_work",
+	"core.fs.engine.paths", "core.timing.engine.timings",
+	"core.timing.engine.deferred_work",
 	"ui.download_window.javascript",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -214,7 +214,7 @@ local function with_fixture(options, callback)
 		package.loaded["core.fs.engine.paths"] = { shared = function()
 			return helpers.driver_root() .. "../_shared"
 		end }
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.download_window.javascript"] = nil
 		package.loaded["ui.ui_builder"] = {
 			get_app_geometry = function() return { width = 460, height = 380 } end,

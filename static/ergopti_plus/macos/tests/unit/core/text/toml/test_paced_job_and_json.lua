@@ -25,8 +25,8 @@ local function load_runner()
 		end,
 		cancel = function(handle) handle.timer = nil; handle.cancelled = true; return true end,
 	}
-	package.loaded["infra.paced_job"] = nil
-	local runner = helpers.load_with_stubs("infra.paced_job", {
+	package.loaded["core.timing.engine.paced_job"] = nil
+	local runner = helpers.load_with_stubs("core.timing.engine.paced_job", {
 		timer = { absoluteTime = function() return clock.now_ns end },
 	})
 	local function run_next()
@@ -37,8 +37,8 @@ local function load_runner()
 	return runner, clock, queue, run_next
 end
 
-helpers.describe("infra.paced_job", function()
-	local owners = { "infra.paced_job", "core.logger.engine.logger", "core.events.timer_scheduler" }
+helpers.describe("core.timing.engine.paced_job", function()
+	local owners = { "core.timing.engine.paced_job", "core.logger.engine.logger", "core.events.timer_scheduler" }
 
 	helpers.it("rejects non-finite budgets and gaps before arming a timer", function()
 		helpers.with_fresh_modules(owners, function()
@@ -142,7 +142,7 @@ helpers.describe("infra.paced_job", function()
 			package.loaded["core.events.timer_scheduler"] = nil
 			local natives, completions, steps = {}, 0, 0
 			local clock, allow_stop = 0, false
-			local runner = helpers.load_with_stubs("infra.paced_job", {
+			local runner = helpers.load_with_stubs("core.timing.engine.paced_job", {
 				timer = {
 					absoluteTime = function() return clock end,
 					new = function(_, callback)
@@ -224,10 +224,10 @@ helpers.describe("infra.paced_job", function()
 	end)
 end)
 
-helpers.describe("infra.paced_json", function()
+helpers.describe("core.timing.engine.paced_json", function()
 	helpers.it("encodes LuaSkin shapes and round-trips through a JSON decoder", function()
-		helpers.with_fresh_modules({ "infra.paced_json", "core.text.engine.json" }, function()
-			local PacedJson = require("infra.paced_json")
+		helpers.with_fresh_modules({ "core.timing.engine.paced_json", "core.text.engine.json" }, function()
+			local PacedJson = require("core.timing.engine.paced_json")
 			local json = require("core.text.engine.json")
 			local value = {
 				historical = { c = { a = { c = 1, t = 2.5, e = 0 }, ["\"q\\\n"] = { c = 3 } }, bg = {} },
@@ -245,8 +245,8 @@ helpers.describe("infra.paced_json", function()
 	end)
 
 	helpers.it("refuses values the page could not parse", function()
-		helpers.with_fresh_modules({ "infra.paced_json" }, function()
-			local PacedJson = require("infra.paced_json")
+		helpers.with_fresh_modules({ "core.timing.engine.paced_json" }, function()
+			local PacedJson = require("core.timing.engine.paced_json")
 			helpers.assert_eq((pcall(PacedJson.encode, { x = 0 / 0 })), false)
 			helpers.assert_eq((pcall(PacedJson.encode, { x = math.huge })), false)
 			helpers.assert_eq((pcall(PacedJson.encode, { x = "\255\254" })), false)
@@ -255,8 +255,8 @@ helpers.describe("infra.paced_json", function()
 	end)
 
 	helpers.it("pauses while encoding a large value", function()
-		helpers.with_fresh_modules({ "infra.paced_json" }, function()
-			local PacedJson = require("infra.paced_json")
+		helpers.with_fresh_modules({ "core.timing.engine.paced_json" }, function()
+			local PacedJson = require("core.timing.engine.paced_json")
 			local big = {}
 			for index = 1, 3000 do big["token" .. index] = { c = index, t = 0, e = 0 } end
 			local pauses = 0

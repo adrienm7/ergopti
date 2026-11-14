@@ -81,7 +81,7 @@ local helpers = require("tests.helpers")
 -- up when it opens a file. Load the timings registry while the genuine backend
 -- is installed: fixtures swap package.loaded.luv for a double while requiring
 -- the HTTP engine, and a first registry read inside that window read nothing.
-require("infra.timings")
+require("core.timing.engine.timings")
 local shell_quote = require("core.text.engine.utils_core").shell_quote
 helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")

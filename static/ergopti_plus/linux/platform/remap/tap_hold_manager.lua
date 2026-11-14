@@ -41,7 +41,7 @@ local PairModule = require("platform.remap.key_combination_engine")
 -- A private original constructor port; later module export replacements are refused.
 local CombinationEngine = { new = PairModule.new }
 local original_pair_constructor = CombinationEngine.new
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local HoldOptions = require("tap_hold.engine.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
 local ScriptActions = require("modules.shortcuts.script_actions")

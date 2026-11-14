@@ -23,7 +23,7 @@ end
 function M.register(helpers)
 	local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
 	local Paths = require("core.fs.engine.paths")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local paste_window_ms = Timings.ms("keystats", "paste_burst_window_ms")
 
 	helpers.describe("clipboard copy/paste bursts (clipboard-events)", function()

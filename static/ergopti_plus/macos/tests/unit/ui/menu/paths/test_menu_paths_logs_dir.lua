@@ -20,9 +20,9 @@ local load_fixture = require("tests.support.paths_editor_fixture")
 --- Opens the editor over the fixture and runs `callback` with its observations.
 --- @param callback function Receives (calls, evaluations, pending).
 local function with_editor(callback)
-	helpers.with_fresh_modules({ "infra.deferred_work" }, function()
+	helpers.with_fresh_modules({ "core.timing.engine.deferred_work" }, function()
 		local pending, evaluations = {}, {}
-		package.loaded["infra.deferred_work"] = { after = function(_, fn)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn)
 			pending[#pending + 1] = fn
 			return true
 		end }

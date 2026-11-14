@@ -22,7 +22,7 @@ local M = {}
 --- @return string|nil reason Classified native construction refusal.
 function M.new(engine, profiles)
 	local native = require("luv")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local resolver, reason = require("modules.llm.ollama_install_resolver").new()
 	if not resolver then return nil, reason end
 	local serve_environment, environment_reason = require("modules.llm.managed_ollama_environment").load()
@@ -44,7 +44,7 @@ function M.new(engine, profiles)
 	})
 	local process = require("ai.engine.policy.process_port").new(require("core.lifecycle.engine.native_worker_owner"),
 		require("core.process.adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))
-	local timer = require("modules.llm.owned_timer").new(native, require("infra.native_timer"))
+	local timer = require("modules.llm.owned_timer").new(native, require("core.timing.engine.native_timer"))
 	local installed = require("modules.llm.ollama_installed_runtime")
 	local controller = require("modules.llm.runtime_composition").new({
 		source = source, resolver = resolver, installed = installed,

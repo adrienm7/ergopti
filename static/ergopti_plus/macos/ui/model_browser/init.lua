@@ -25,7 +25,7 @@ local M = {}
 local WebviewResult = require("adapters.webview_result")
 
 local Logger     = require("core.logger.engine.logger")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local Paths      = require("core.fs.engine.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("core.i18n.engine.i18n")
@@ -377,7 +377,7 @@ function M.open(ctx)
 			html_string       = final_html,
 			on_navigation     = function(action)
 				if action == "didFinishNavigation" then
-					DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
+					DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 						if not candidate_is_active() then return end
 						local navigation_session = _session
 						if not _ready then flush_queue() end
@@ -421,7 +421,7 @@ function M.open(ctx)
 	_wv_committed = true
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
-	DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
+	DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if not candidate_is_active() or _ready then return end
 		local fallback_session = _session
 		flush_queue()

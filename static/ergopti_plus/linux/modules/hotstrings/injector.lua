@@ -156,7 +156,7 @@ local _nanosleep = nil
 local function nanosleep()
 	if _nanosleep ~= nil then return _nanosleep or nil end
 	local ok_ffi, ffi = pcall(require, "ffi")
-	_nanosleep = require("infra.native_sleep").bind(ok_ffi and ffi or nil) or false
+	_nanosleep = require("core.timing.engine.native_sleep").bind(ok_ffi and ffi or nil) or false
 	return _nanosleep or nil
 end
 
@@ -211,7 +211,7 @@ local function send_backspaces(tx, count, paced)
 	-- A terminal or TUI prompt may judge every Backspace against one stale
 	-- render: Windows (IsTerminalApp) and macOS (prepare_collected_paced) wait
 	-- [debounce] terminal_hotstring_key_delay_ms after each one (HSE-001).
-	local delay_ms = paced == true and require("infra.timings").ms("debounce", "terminal_hotstring_key_delay_ms") or nil
+	local delay_ms = paced == true and require("core.timing.engine.timings").ms("debounce", "terminal_hotstring_key_delay_ms") or nil
 	for _ = 1, count do
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN, "backspace down")
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP, "backspace up")

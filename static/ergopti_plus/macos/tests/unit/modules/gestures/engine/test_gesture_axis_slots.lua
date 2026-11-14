@@ -28,12 +28,12 @@ local function play(ga, fingers, dx, dy)
 	local hs = _G.hs
 	local saved_clock, saved_absolute = hs.timer.secondsSinceEpoch, hs.timer.absoluteTime
 	local saved_scheduler = package.loaded["core.events.timer_scheduler"]
-	local saved_timings = package.loaded["infra.timings"]
+	local saved_timings = package.loaded["core.timing.engine.timings"]
 	local clock = 3000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["infra.timings"] = nil
+	package.loaded["core.timing.engine.timings"] = nil
 	package.loaded["modules.gestures.engine"] = nil
 	hs.eventtap.__reset()
 
@@ -72,7 +72,7 @@ local function play(ga, fingers, dx, dy)
 	Engine.stop()
 	hs.timer.secondsSinceEpoch, hs.timer.absoluteTime = saved_clock, saved_absolute
 	package.loaded["core.events.timer_scheduler"] = saved_scheduler
-	package.loaded["infra.timings"] = saved_timings
+	package.loaded["core.timing.engine.timings"] = saved_timings
 	package.loaded["modules.gestures.engine"] = nil
 	return fired
 end

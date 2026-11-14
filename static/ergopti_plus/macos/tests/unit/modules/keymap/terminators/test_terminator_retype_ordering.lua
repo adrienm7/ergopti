@@ -15,9 +15,9 @@ local OWNED = {
 	"adapters.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
 	"adapters.text_sender", "core.events.timer_scheduler", "adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
-	"hs", "infra.capsword_output", "infra.deferred_work",
+	"hs", "infra.capsword_output", "core.timing.engine.deferred_work",
 	"infra.hotstring_engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
-	"core.text.engine.utils", "infra.timings", "core.text.engine.json",
+	"core.text.engine.utils", "core.timing.engine.timings", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
 	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
@@ -119,7 +119,7 @@ local function load_fixture(options)
 		return event
 	end
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,

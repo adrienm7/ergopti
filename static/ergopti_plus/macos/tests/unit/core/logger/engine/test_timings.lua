@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 package.loaded["core.logger.engine.logger"] = nil
 local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 -- The exact (section, key) -> value pairs each wired module is now sourced from.
 -- Mirror these against constants.toml; a change there must be deliberate.
@@ -140,7 +140,7 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- @return boolean,string The pcall status and the raised message.
 	local function reload_timings_without_shared_tree()
 		local saved_paths   = package.loaded["core.fs.engine.paths"]
-		local saved_timings = package.loaded["infra.timings"]
+		local saved_timings = package.loaded["core.timing.engine.timings"]
 
 		package.loaded["core.fs.engine.paths"] = {
 			shared          = function() return nil end,
@@ -148,12 +148,12 @@ helpers.describe("timings: registry load fail-fast", function()
 			shared_llm_path = function() return nil end,
 			find_from_configdir = function() return nil end,
 		}
-		package.loaded["infra.timings"] = nil
+		package.loaded["core.timing.engine.timings"] = nil
 
-		local ok, err = pcall(require, "infra.timings")
+		local ok, err = pcall(require, "core.timing.engine.timings")
 
 		-- Restore the real modules so later suites are unaffected by this probe.
-		package.loaded["infra.timings"] = saved_timings
+		package.loaded["core.timing.engine.timings"] = saved_timings
 		package.loaded["core.fs.engine.paths"]   = saved_paths
 
 		return ok, tostring(err)
@@ -183,13 +183,13 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- lib.paths real. The three cases above all trip the FIRST guard (the shared
 	--- tree is unreachable), so the second guard — a tree that resolves but whose
 	--- constants.toml is missing, unreadable or empty — was never exercised. That
-	--- is the guard the comment in infra/timings.lua says was added because
+	--- is the guard the comment in core/timing/engine/timings.lua says was added because
 	--- TomlReader.parse returns a well-formed result with empty `sections` on BOTH
 	--- of its failure exits, so the earlier type-only test could never fire.
 	--- @return boolean ok, string err
 	local function reload_timings_with_empty_registry()
 		local saved_reader  = package.loaded["core.text.engine.toml.reader"]
-		local saved_timings = package.loaded["infra.timings"]
+		local saved_timings = package.loaded["core.timing.engine.timings"]
 
 		-- Exactly what the real reader returns when the file is absent or malformed:
 		-- a well-formed table whose sections map is empty. Returning nil instead
@@ -197,11 +197,11 @@ helpers.describe("timings: registry load fail-fast", function()
 		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(_path) return { sections = {} } end,
 		}
-		package.loaded["infra.timings"] = nil
+		package.loaded["core.timing.engine.timings"] = nil
 
-		local ok, err = pcall(require, "infra.timings")
+		local ok, err = pcall(require, "core.timing.engine.timings")
 
-		package.loaded["infra.timings"]     = saved_timings
+		package.loaded["core.timing.engine.timings"]     = saved_timings
 		package.loaded["core.text.engine.toml.reader"] = saved_reader
 
 		return ok, tostring(err)

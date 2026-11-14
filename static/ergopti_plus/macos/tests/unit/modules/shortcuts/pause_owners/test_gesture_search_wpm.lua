@@ -82,7 +82,7 @@ local function load_real_wpm_surface(module_name)
 	-- A healthy idle surface still needs its canonical display configuration.
 	-- Keep only the scheduler timings controlled by this ownership fixture.
 	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.2 end,
 		ms = function() return 200 end,
 	}
@@ -151,7 +151,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 	end
 	hs_stub.pasteboard.writeAllData = function() return true end
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
 	package.loaded["adapters.synthetic_input"] = setmetatable({
 		emit_key_stroke = function() return true end,
 		defer_after_callback = function() return false end,

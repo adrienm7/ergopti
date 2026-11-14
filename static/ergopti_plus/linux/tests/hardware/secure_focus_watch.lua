@@ -12,7 +12,7 @@ package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" ..
 require("core.lifecycle.engine.compat.utf8").install()
 local Json = require("core.text.engine.json")
 local Clock = require("core.logger.engine.monotonic")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Window = require("adapters.window_info")
 local Lifecycle = require("core.process.adapters.lifecycle")
 local Detector = require("adapters.secure_field_detector")

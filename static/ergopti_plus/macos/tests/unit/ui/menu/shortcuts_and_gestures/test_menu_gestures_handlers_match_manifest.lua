@@ -119,7 +119,7 @@ end)
 local mode_fixture_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
+	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
 }
 local function mode_json(path)
 	local file = assert(io.open(path, "rb"))
@@ -172,7 +172,7 @@ local function with_mode_fixture(options, callback)
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
 		for _, name in ipairs({ "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
-			"ui.menu.shortcut_utils", "infra.deferred_work" }) do package.loaded[name] = {} end
+			"ui.menu.shortcut_utils", "core.timing.engine.deferred_work" }) do package.loaded[name] = {} end
 		if options.dialog then package.loaded["infra.dialog_util"] = options.dialog end
 		local owner = require("ui.menu.menu_gestures")
 		function fixture.build()
@@ -444,7 +444,7 @@ local function with_gesture_controls(options, callback)
 			return true
 		end
 		f.gestures.on_action_changed = function() f.conflicts = f.conflicts + 1 end
-		package.loaded["infra.deferred_work"].after = function(delay, work, tag)
+		package.loaded["core.timing.engine.deferred_work"].after = function(delay, work, tag)
 			f.queue[#f.queue + 1] = { delay = delay, work = work, tag = tag }
 			return true
 		end

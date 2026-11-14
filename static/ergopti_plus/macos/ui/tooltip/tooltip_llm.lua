@@ -1253,7 +1253,7 @@ local function refresh_chain_timing()
 		_chain_ttft_ms         = (now - _chain_start_time) * 1000
 		Logger.debug(LOG, "TTFT captured: %.0f ms.", _chain_ttft_ms)
 		require("core.logger.engine.perf_budget").judge(Logger, LOG, "prediction.display", _chain_ttft_ms,
-			function() return require("infra.timings").ms("budgets", "prediction_display_ms") end)
+			function() return require("core.timing.engine.timings").ms("budgets", "prediction_display_ms") end)
 	end
 end
 

@@ -23,7 +23,7 @@ local MODULES = {
 	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
-	"adapters.mouse_control", "core.logger.engine.logger", "infra.timings", "infra.keycodes",
+	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "infra.keycodes",
 	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "modules.llm.api_token_crypto", "core.network.adapters.http_client",
 	"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",

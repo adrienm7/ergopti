@@ -20,8 +20,8 @@ local OWNED = {
 	"core.logger.engine.logger", "core.events.timer_scheduler", "core.network.adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
-	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.timings",
-	"infra.deferred_work", "core.process.adapters.task_environment", "diagnostics.engine.runtime_log",
+	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "core.timing.engine.timings",
+	"core.timing.engine.deferred_work", "core.process.adapters.task_environment", "diagnostics.engine.runtime_log",
 	"diagnostics.engine.operation_reporter", "diagnostics.engine.reports.redact", "core.logger.engine.shim",
 	"infra.manifest_reader", "core.text.engine.toml.reader", "core.fs.adapters.storage",
 	"core.fs.engine.dir", "hotstrings.engine.catalogue.personal_files", "settings.engine.publication.defaults", "lfs",
@@ -85,7 +85,7 @@ local function with_stream(scenario)
 			local ok, detail = xpcall(function() scenario(f) end, debug.traceback)
 			for _, native in ipairs(f.native) do native:complete() end
 			for _, timer in ipairs(f.timers) do
-				if timer.delay > require("infra.timings").sec("llm", "stream_hard_timeout_ms") then timer.callback() end
+				if timer.delay > require("core.timing.engine.timings").sec("llm", "stream_hard_timeout_ms") then timer.callback() end
 			end
 			if not ok then error(detail, 0) end
 		end)

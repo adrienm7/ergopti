@@ -80,11 +80,11 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		-- The one-shot default comes from the shared timing registry, which this
 		-- probe path does not hold: the reader is a stub for the same reason the
 		-- TOML reader is.
-		package.loaded["infra.timings"] = { ms = function() return 2000 end }
+		package.loaded["core.timing.engine.timings"] = { ms = function() return 2000 end }
 		package.loaded["platform.remap.defaults"] = nil
 		local ok, err = pcall(require, "platform.remap.defaults")
 
-		package.loaded["infra.timings"] = nil
+		package.loaded["core.timing.engine.timings"] = nil
 		package.loaded["tap_hold.engine.key_catalog"] = saved_catalog
 		package.loaded["core.fs.engine.paths"] = nil
 		package.loaded["core.text.engine.toml.reader"] = nil

@@ -116,10 +116,10 @@ helpers.describe("owned runtime service repair (MRT-004)", function()
 		end }
 		local Dialog = helpers.load_with_stubs("ui.owned_runtime_install", {
 			["infra.dialog_util"] = dialog_util,
-			["infra.deferred_work"] = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end },
+			["core.timing.engine.deferred_work"] = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end },
 		})
 		package.loaded["infra.dialog_util"] = dialog_util
-		package.loaded["infra.deferred_work"] = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end }
 		local repaired, reloaded = 0, 0
 		local started = Dialog.open_repair({
 			repair_owned_runtime = function(on_done) repaired = repaired + 1; on_done(true); return true end,
@@ -135,7 +135,7 @@ helpers.describe("owned runtime service repair (MRT-004)", function()
 		local ok = pcall(Dialog.open_repair, { install_owned_runtime = function() return true end })
 		helpers.assert_eq(ok, false, "a facade without the repair is refused before any dialog")
 		package.loaded["infra.dialog_util"] = nil
-		package.loaded["infra.deferred_work"] = nil
+		package.loaded["core.timing.engine.deferred_work"] = nil
 		package.loaded["ui.owned_runtime_install"] = nil
 	end)
 end)

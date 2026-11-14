@@ -23,7 +23,7 @@ local function load(answer)
 			return answer
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback) callback(); return true end,
 	}
 	package.loaded["core.process.adapters.shell_runner"] = {
@@ -47,7 +47,7 @@ end
 
 -- Modules the doubles replace; every test restores them (suite order).
 local OWNED = {
-	"ui.python_runtime_offer", "infra.dialog_util", "infra.deferred_work", "core.process.adapters.shell_runner", "core.i18n.engine.i18n",
+	"ui.python_runtime_offer", "infra.dialog_util", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner", "core.i18n.engine.i18n",
 }
 
 --- Runs one case with the doubled modules restored afterwards.

@@ -75,7 +75,7 @@ local retained_openers = {}
 --- @param current function Exact action owner predicate.
 --- @return table request Cancellable native opener.
 local function open_with(args, done, current)
-	local timeout = require("infra.timings").sec("ui", "desktop_open_timeout_ms")
+	local timeout = require("core.timing.engine.timings").sec("ui", "desktop_open_timeout_ms")
 	local cleanup = {}
 	for request, retired in pairs(retained_openers) do
 		if retired() then cleanup[#cleanup + 1] = request end

@@ -12,7 +12,7 @@ local LeaseContract = require("platform.remap.lease_contract")
 local M = {}
 local REAL_MODULES = {
 	"core.fs.adapters.file_system", "core.fs.engine.dir", "platform.remap.ke_variables",
-	"core.fs.adapters.json_codec", "core.process.adapters.shell_runner", "infra.deferred_work",
+	"core.fs.adapters.json_codec", "core.process.adapters.shell_runner", "core.timing.engine.deferred_work",
 }
 
 local TOKENS = {
@@ -24,7 +24,7 @@ local TOKENS = {
 local STUB_MODULES = {
 	"core.logger.engine.logger",
 	"infra.config_paths",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"platform.remap.defaults",
 	"platform.remap.config",
 	"platform.remap.generator",
@@ -142,7 +142,7 @@ local function with_remap(options, body)
 			["debounce.layout_tis_settle_ms"] = 0.5,
 			["ui.onboarding_startup_delay_ms"] = 2,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function(category, key)
 				local value = timings_sec[category .. "." .. key]
 				helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)

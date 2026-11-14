@@ -30,7 +30,7 @@ local function with_manager(body)
 		Process.start = function(executable, args, options)
 			if state.start_throws then error("PRIVATE_CONSTRUCTOR_BODY") end
 			helpers.assert_eq(executable, "xdotool")
-			helpers.assert_eq(options.timeout_ms, require("infra.timings").ms("gestures", "aux_shell_timeout_ms"))
+			helpers.assert_eq(options.timeout_ms, require("core.timing.engine.timings").ms("gestures", "aux_shell_timeout_ms"))
 			helpers.assert_eq(options.capture_output, false)
 			local op = { started = true, settled = false, options = options, action = args[1], button = args[2] }
 			function op:is_settled() return self.settled end
@@ -58,7 +58,7 @@ local function with_manager(body)
 		end })
 		function state.harvest() manager.pump(); manager.pump() end
 		function state.advance()
-			state.time = state.time + require("infra.timings").ms("gestures", "aux_shell_cleanup_retry_ms")
+			state.time = state.time + require("core.timing.engine.timings").ms("gestures", "aux_shell_cleanup_retry_ms")
 			state.harvest()
 		end
 		body(manager, state)

@@ -152,7 +152,7 @@ function M.default()
 		expand = FileSystem.expand_path,
 		exists = FileSystem.exists,
 		driver_root = function() return driver end,
-		timeout_ms = function() return require("infra.timings").ms("llm", "dependency_bootstrap_timeout_ms") end,
+		timeout_ms = function() return require("core.timing.engine.timings").ms("llm", "dependency_bootstrap_timeout_ms") end,
 		prepare = function(source, environment, timeout_ms)
 			return require("adapters.native_bootstrap_pty").prepare(source, environment, timeout_ms)
 		end,

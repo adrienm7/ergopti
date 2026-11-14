@@ -251,7 +251,7 @@ helpers.describe("keystats", function()
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
       local now = require("core.logger.engine.monotonic").now_ms()
-      local window = require("infra.timings").ms("keystats", "wpm_window_ms")
+      local window = require("core.timing.engine.timings").ms("keystats", "wpm_window_ms")
       local first = now - window - 2000
       keystats.on_keydown("a", first, "test-app")
       keystats.on_keydown("b", first + 200, "test-app")

@@ -37,7 +37,7 @@ local Logger = require("core.logger.engine.logger")
 local Timer  = require("core.events.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
 local Segments = require("metrics.engine.perf.hotpath_segments")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local LOG    = "HotPath"
 -- Tag of the paired trace()/done() lines, the same on Linux.
 local SPAN_LOG = "Span"

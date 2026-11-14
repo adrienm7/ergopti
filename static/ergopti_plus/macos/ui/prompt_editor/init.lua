@@ -195,7 +195,7 @@ end
 --- open with the prompt. The alert runs as deferred work, never inside the
 --- page's message callback.
 local function report_save_failure()
-	local scheduled = require("infra.deferred_work").after(0, function()
+	local scheduled = require("core.timing.engine.deferred_work").after(0, function()
 		local shown, err = pcall(function()
 			require("infra.dialog_util").block_alert(i18n.get("common.error_title"),
 				i18n.get("prompt_editor.save_failed"), i18n.get("button.ok"), nil, "critical")

@@ -28,7 +28,7 @@ return function(callback)
 		})
 		context.poll = function() return poll() end
 		-- Runs every pending paced-projection slice until the queue is idle
-		local job_gap = require("infra.paced_job").DEFAULT_GAP_SEC
+		local job_gap = require("core.timing.engine.paced_job").DEFAULT_GAP_SEC
 		context.settle_jobs = function()
 			local progressed = true
 			while progressed do

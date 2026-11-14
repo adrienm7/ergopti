@@ -52,12 +52,12 @@ helpers.describe("tap-key dispatcher ownership", function()
 
 	helpers.it("the real picker reconciles an assignment and its removal after persistence", function()
 		Fixture.with_bindings(function(bindings, ctx)
-			helpers.with_stub_scope({ "ui.menu.menu_tap_keys", "ui.action_picker", "infra.deferred_work",
+			helpers.with_stub_scope({ "ui.menu.menu_tap_keys", "ui.action_picker", "core.timing.engine.deferred_work",
 				"adapters.input_source_broker", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots" }, function()
 				local picked, updates
 				updates = 0
 				package.loaded["ui.action_picker"] = { open = function(_, callback) picked = callback end }
-				package.loaded["infra.deferred_work"] = { after = function(_, fn) fn() end }
+				package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn() end }
 				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["ui.menu.shortcut_utils"] = { picker_parameter_fields = function() return {} end }
 				package.loaded["ui.menu.menu_keyboard_slots"] = { build_action_items = function() return {} end }

@@ -70,7 +70,7 @@ local function fresh_engine()
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			if key == "tap_max_ms" then return 0.5 end
 			if key == "finger_confirm_ms" then return 0.05 end

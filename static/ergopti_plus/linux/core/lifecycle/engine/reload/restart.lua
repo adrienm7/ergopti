@@ -17,7 +17,7 @@
 --- 3. No silent fallback. When no restart can be requested the request fails
 ---    and the daemon keeps running; it never reloads half of itself in process.
 --- 4. Measured end to end. The request time is stamped before the restart
----    (infra/reload_timing.lua) and the successor reports the whole reload at
+---    (core/timing/engine/reload_timing.lua) and the successor reports the whole reload at
 ---    its boot completion; a refused or abandoned restart retires the stamp.
 --- ==============================================================================
 
@@ -36,7 +36,7 @@ local LOG = "core.lifecycle.engine.reload.restart"
 --- @return function abandon `abandon()` -> cancelled, detail: a Quit that wins over the reload
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.restart) == "function", "the reload owner needs its restart")
-	local timing = opts.timing or require("infra.reload_timing")
+	local timing = opts.timing or require("core.timing.engine.reload_timing")
 	local in_flight, starting = false, false
 	local function perform_inner(trigger)
 		if in_flight then

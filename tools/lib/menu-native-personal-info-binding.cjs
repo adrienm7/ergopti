@@ -119,7 +119,7 @@ const MAC_BODY = `
 	local editor = template("personal_info_editor_frame", {
 		personal_info_editor_open = function()
 			if not current() then return false end
-			return DeferredWork.after(require("infra.timings").sec("ui", "editor_open_after_click_ms"),
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "editor_open_after_click_ms"),
 				function()
 					if not current() then return false end
 					pcall(ctx.personal_info.open_editor)
@@ -746,7 +746,11 @@ function personalInfoEvidence(source) {
 	}
 	// The Mac scheduling owner is the actual imported DeferredWork, with no replacement.
 	if (platform === 'hs') {
-		const deferred = positions(whole, 'local DeferredWork = require("infra.deferred_work")', true);
+		const deferred = positions(
+			whole,
+			'local DeferredWork = require("core.timing.engine.deferred_work")',
+			true
+		);
 		if (deferred.length !== 1 || whole.tokens[deferred[0]].start >= consumer.base) return null;
 		allowed.add(deferred[0] + 1);
 	}
