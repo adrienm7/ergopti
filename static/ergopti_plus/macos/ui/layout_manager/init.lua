@@ -449,16 +449,18 @@ function M.set_extension_reloader(reloader)
 	_extension_reloader = reloader
 end
 
---- Opens the layout manager, or focuses it when it is already open.
+--- Opens the layout manager, or focuses it when it is already open. The factory's
+--- own function, not a wrapper: the native pool probe reads the window's owners
+--- as its upvalues (tools/diagnostics/macos_layout_manager_pool_observer.lua).
 --- @return boolean opened
-function M.open() return Manager.open() end
+M.open = Manager.open
 
 --- Opens the layout editor in its own window (the menu's « Create or edit a
 --- layout… », the manager's « Layout editor »), or focuses it when it is
 --- already open: an open editor keeps its unsaved work. A new window shows the
 --- last saved source once its page is ready.
 --- @return boolean opened
-function M.open_editor() return Editor.open() end
+M.open_editor = Editor.open
 
 --- The open layout manager window, for ui/window_toggle (nil when closed).
 --- @return userdata|nil view
