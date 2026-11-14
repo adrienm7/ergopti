@@ -89,7 +89,9 @@ Test("app_state: prune thresholds have a single source in ErgoptiPlus.ahk (appst
 ; AppState["remapped_list"], which caused an UnsetError crash on boot (AppState is unset).
 _AOPS_NoRemappedListViaAppState() {
 	LayoutSrc   := _AOPS_ReadSource("layout.ahk")
-	ShortcutSrc := _AOPS_ReadSource("utils.ahk")
+	; utils.ahk is a base name the structure plan gives other files too: the
+	; shortcuts helpers are read by a function only they define.
+	ShortcutSrc := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("AddShortcut"), "UTF-8"))
 	; Search for the string key used in the removed AppState Map
 	Assert(InStr(LayoutSrc, "remapped_list") == 0,
 		"modules/keymap/layout.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
