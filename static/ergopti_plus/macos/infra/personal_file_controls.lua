@@ -10,7 +10,7 @@ local M = {}
 local Files = require("hotstrings.engine.catalogue.personal_files")
 local Loader = require("infra.personal_hotstrings")
 local Config = require("modules.hotstrings.hotstrings_config")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Paths = require("infra.config_paths")
 local pending
 

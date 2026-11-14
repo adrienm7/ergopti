@@ -40,7 +40,7 @@ function M.new(options)
 	assert(type(options) == "table", "keyboard layout scope requires its options")
 	local transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"), manifest = Manifest,
+		files = options.files or require("core.fs.adapters.file_system"), manifest = Manifest,
 		-- The live layout is acknowledged by the participant, after the rows are
 		-- published: the receipt is empty but present, so the transaction records
 		-- that the capture happened.

@@ -78,7 +78,7 @@ local _action_revision = 0
 --- @return table
 function M.config()
 	if not _config then
-		_config = Snapshot.load_config(function(rel) return require("infra.paths").shared(rel) end)
+		_config = Snapshot.load_config(function(rel) return require("core.fs.engine.paths").shared(rel) end)
 	end
 	return _config
 end
@@ -110,7 +110,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	return require("infra.regular_file_reader").read_source(path)
+	return require("core.fs.engine.regular_file_reader").read_source(path)
 end
 
 --- The folder part of a path.
@@ -134,7 +134,7 @@ local function collect_paths(schema)
 		errors_today    = LoggerSink.errors_log_path(),
 		crash_dir       = require("modules.diagnostics.crash_reporter").get_crash_dir(),
 		diagnostics_dir = logs_dir and (logs_dir .. "/" .. schema.report.subdir) or nil,
-		app_dir         = require("infra.paths").driver_root(),
+		app_dir         = require("core.fs.engine.paths").driver_root(),
 	}
 end
 
@@ -497,7 +497,7 @@ local function collect_issues()
 	local recent, source = {}, "unavailable"
 	local ok, err = pcall(function()
 		local limits = Snapshot.load_recent_issue_limits(
-			require("infra.paths").shared("diagnostics/data/recent_issues.json"))
+			require("core.fs.engine.paths").shared("diagnostics/data/recent_issues.json"))
 		recent, source = Snapshot.collect_recent_issues(LoggerSink.errors_log_path(), lines, limits)
 	end)
 	if not ok then Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(err)) end

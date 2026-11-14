@@ -560,7 +560,7 @@ end
 
 --- Exercises the actual manager and menu around durable writer and timer ports.
 local function with_frequency_owner(refusal, body)
-	local names = {"core.events.timer_scheduler", "adapters.storage", "modules.updater.manager"}
+	local names = {"core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager"}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local writer = require("core.text.engine.toml_codec.writer")
@@ -582,7 +582,7 @@ local function with_frequency_owner(refusal, body)
 		end,
 		cancel = function(handle) obs.cancels = obs.cancels + 1; handle.armed = false; return true end,
 	}
-	package.loaded["adapters.storage"] = require("tests.fakes").storage({initial = {}})
+	package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({initial = {}})
 	package.loaded["modules.updater.manager"] = nil
 	local up = require("modules.updater.manager")
 	up._now = function() return 1700000000 end
@@ -753,7 +753,7 @@ end)
 --- Exercises the real About provider with unrelated tray surfaces isolated.
 --- @param alternative boolean True to independently replace the declaration's label and reason.
 local function with_source_command(alternative, callback)
-	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
@@ -778,7 +778,7 @@ local function with_source_command(alternative, callback)
 		local header_brand = assert(header_labels["menu.builder.active_brand"])
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
 		labels["menu.builder.active_brand"] = header_brand
-		package.loaded["infra.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
 		package.loaded["infra.version"] = { identity = function()
 			return {kind = "local", version = "", commit = "known"}
 		end }

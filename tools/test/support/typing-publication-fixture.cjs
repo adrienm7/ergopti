@@ -39,7 +39,7 @@ package.loaded['hs.json'].encode=function(value)
 end
 package.loaded['hs.json'].decode=json.decode
 package.loaded['hs.fs'].attributes=function()return {}end
-package.loaded['adapters.file_system'].read_with_status=function()return nil,'absent'end
+package.loaded['core.fs.adapters.file_system'].read_with_status=function()return nil,'absent'end
 local manager=package.loaded['modules.keystats.log_manager']
 manager.get_sqlite_path=function()return '/virtual/db'end
 -- The paced projection is private; the publications around it are under test
@@ -114,7 +114,7 @@ local dashboard,context=require('tests.support.metrics_typing_fixture')({
  cancel=function(h)h.timer=nil;return true end})
 local codec=package.loaded['hs.json'];codec.encode=json.encode;codec.decode=json.decode
 local payload='{"manifest":{"2026-09-01":{"Cache":{"chars":1}}},"app_icons":{},"initial_data":null,"kc_layout":{}}'
-package.loaded['adapters.file_system'].read_with_status=function()
+package.loaded['core.fs.adapters.file_system'].read_with_status=function()
  return 'ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1790000000 '..#payload..'\\n'..payload,'ok'
 end
 package.loaded['hs.fs'].attributes=function()return {}end

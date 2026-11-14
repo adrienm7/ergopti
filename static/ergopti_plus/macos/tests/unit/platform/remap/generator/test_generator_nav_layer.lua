@@ -35,7 +35,7 @@ local LEGACY_LAYER = {
 }
 local files = {}
 
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read = function(path) return files[path] end,
 	read_with_status = function(path)
 		if files[path] then return files[path], "ok" end

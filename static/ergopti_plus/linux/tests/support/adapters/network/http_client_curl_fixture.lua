@@ -199,12 +199,12 @@ end
 local function fresh_digest(config)
 	local fake, state = fake_luv(config)
 	local previous_luv = package.loaded["luv"]
-	local previous_digest = package.loaded["adapters.file_digest"]
+	local previous_digest = package.loaded["core.fs.adapters.file_digest"]
 	package.loaded["luv"] = fake
-	package.loaded["adapters.file_digest"] = nil
-	local digest = require("adapters.file_digest")
+	package.loaded["core.fs.adapters.file_digest"] = nil
+	local digest = require("core.fs.adapters.file_digest")
 	package.loaded["luv"] = previous_luv
-	package.loaded["adapters.file_digest"] = previous_digest
+	package.loaded["core.fs.adapters.file_digest"] = previous_digest
 	return digest, state
 end
 

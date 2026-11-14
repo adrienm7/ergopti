@@ -14,7 +14,7 @@ local Codec = require("core.text.engine.toml_codec")
 local Outdated = require("settings.engine.migration.outdated")
 local Logger = require("core.logger.engine.shim")
 local LayerPreset = require("layouts.engine.layers.preset")
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local FUTURE = '\n[future]\nnote = "kept"\n'
 local CASES = {
 	{ name = "scalar root", text = 'tap_hold = "opaque"\n', path = "tap_hold" },
@@ -65,7 +65,7 @@ local function with_writer(text, body)
 		canonical_hold = function(kind, id)
 			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
-		layers = { shared_root = require("infra.paths").shared_root(), config_dir = dir },
+		layers = { shared_root = require("core.fs.engine.paths").shared_root(), config_dir = dir },
 	})
 	local ok, detail = pcall(body, writer, path, state, dir)
 	-- Backups are private fixture state and never include a user's path.
@@ -245,7 +245,7 @@ helpers.describe("tap-hold exact-source publication", function()
 			local original = '[tap_hold.keys.caps_lock]\nfuture = "old"\n'
 			with_writer(original, function(writer, path, state)
 				local real_open, real_rename = io.open, os.rename
-				local FileWriter = require("infra.regular_file_writer")
+				local FileWriter = require("core.fs.engine.regular_file_writer")
 				local real_writer_open = FileWriter.open
 				local staged, publications = 0, 0
 				local external = '# newer editor bytes\n[tap_hold.keys.caps_lock]\nfuture = "new"\n'

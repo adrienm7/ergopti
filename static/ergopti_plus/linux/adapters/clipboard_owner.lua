@@ -63,7 +63,7 @@ local function owner_command(mode, path)
 	if not loaded or type(uv.exepath) ~= "function" then return nil end
 	local executable = uv.exepath()
 	if type(executable) ~= "string" or executable:sub(1, 1) ~= "/" then return nil end
-	local worker = require("infra.paths").driver_root() .. "/adapters/clipboard_owner_worker.lua"
+	local worker = require("core.fs.engine.paths").driver_root() .. "/adapters/clipboard_owner_worker.lua"
 	local parts = { "timeout", tostring(OWNER_TIMEOUT_S), Shell.quote(executable), Shell.quote(worker), mode, kind,
 		Shell.quote(soname) }
 	if path then parts[#parts + 1] = Shell.quote(path) end

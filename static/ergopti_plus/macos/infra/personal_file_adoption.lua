@@ -8,7 +8,7 @@
 
 local M = {}
 local Core = require("hotstrings.engine.catalogue.personal_adoption")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 
 --- Reads the exact regular-file identity; links never gain mutation authority.
 --- @param path string

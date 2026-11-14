@@ -10,15 +10,15 @@ local run_contract = function(helpers, load_host, load_builder)
   local noop=function()end
   local logger={info=noop,debug=noop,warn=noop,error=function(_,fmt,...)c.diagnostics[#c.diagnostics+1]=fmt end}
   package.loaded['infra.logger']=logger
-  package.loaded['infra.paths']={shared=function(p)return p end}
+  package.loaded['core.fs.engine.paths']={shared=function(p)return p end}
   package.loaded['infra.i18n']={get=function(k)return k end}
   package.loaded['core.ui.engine.webview.i18n_seed']={}
   package.loaded['infra.deferred_work']={after=function()return true end}
   package.loaded['core.events.timer_scheduler']=nil -- Exercise actual timer ownership through the native-shaped port.
-  package.loaded['adapters.json_codec']=nil -- Use the actual codec over the controlled native JSON port.
+  package.loaded['core.fs.adapters.json_codec']=nil -- Use the actual codec over the controlled native JSON port.
   package.loaded['core.ui.engine.window_titles']={compose=function(k)return k end}
   package.loaded['core.text.engine.json']={encode=function()return '{}'end}
-  package.loaded['adapters.file_system']={read=function()return c.catalogue or '{}'end}
+  package.loaded['core.fs.adapters.file_system']={read=function()return c.catalogue or '{}'end}
   package.loaded['shortcuts.engine.physical_slots']={new=function(model)c.decoded_model=model;return{candidates=function()return{}end}end}
   package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)
    local retired=false

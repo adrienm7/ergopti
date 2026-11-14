@@ -288,7 +288,7 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
 	; the custom-combination prefix layer is disarmed. The fix drains the prefix
 	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (infra/lifecycle.ahk).
-	Src := _DriverDirConcat("infra")
+	Src := _DriverDirsConcat("infra", "core/fs/engine")
 	Assert(Src != "", "lib must be readable")
 	Body := _DriverFuncBody("ToggleSuspend")
 	Assert(Body != "", "ToggleSuspend must exist in infra/lifecycle.ahk")

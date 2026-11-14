@@ -15,7 +15,7 @@ local Codec = require("core.text.engine.toml_codec")
 --- Reads the independent custom-command identity used by each native provider.
 --- @return table expected Canonical command expectation.
 local function custom_command_expected()
-	local path = require("infra.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
 	local file = assert(io.open(path, "rb"))
 	local text = file:read("*a")
 	file:close()
@@ -126,7 +126,7 @@ local DUPLICATE_RECORDS = {
 --- @param reordered boolean Whether the shared section is reversed.
 --- @return table controls, table context, table observations
 local function menu_controls(Settings, paused, reordered)
-	local paths = require("infra.paths")
+	local paths = require("core.fs.engine.paths")
 	local i18n = require("infra.i18n")
 	local original = package.loaded["infra.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
@@ -202,7 +202,7 @@ end
 --- Reads the independent fixed-command and delimiter-state expectations.
 --- @return table corpus
 local function controls_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -222,7 +222,7 @@ end
 --- Reads independent Add identity and custom-record expectations.
 --- @return table corpus
 local function add_command_expected()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_add_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_add_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -300,7 +300,7 @@ end
 --- Reads the independent command and existing native window identity.
 --- @return table corpus Historical command expectation.
 local function delay_settings_command_expected()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
 	local bytes = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(bytes))

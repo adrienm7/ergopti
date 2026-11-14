@@ -44,7 +44,7 @@ local function settle_after_edit(root, edited, native)
 	local counts = { reload = 0, source = 0 }
 	local backend = false
 	if native then backend = assert(Fixture.native_luv, "inotify source watching requires luv") end
-	local watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", backend)
+	local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", backend)
 	watcher.start({
 		now_ms = function() return now end,
 		hotstrings_dir = root,
@@ -117,7 +117,7 @@ helpers.describe("file_watchers developer source trees", function()
 				end
 				return shell.exec_checked(command, ...)
 			end }, { __index = shell })
-			local watcher = helpers.load_module_with_dependency("infra.file_watchers", "adapters.shell_runner", controlled)
+			local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "adapters.shell_runner", controlled)
 			local ok, err = pcall(watcher.start, { hotstrings_dir = root, source_dirs = { root },
 				on_source_change = function() error("a refused census cannot reload") end })
 			watcher.stop()
@@ -150,7 +150,7 @@ helpers.describe("file_watchers developer source trees", function()
 	helpers.it("(linux-dev-mode-autoreload) arms no source restart outside a developer run", function()
 		local root = source_tree()
 		local now, reloads = 1000, 0
-		local watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+		local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 		watcher.start({ now_ms = function() return now end, base_dir = root,
 			on_reload = function() reloads = reloads + 1 end })
 		watcher.pump()
@@ -164,7 +164,7 @@ helpers.describe("file_watchers developer source trees", function()
 	end)
 
 	helpers.it("refuses source trees without their restart callback", function()
-		local watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+		local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 		local ok, err = pcall(watcher.start, { base_dir = "/nonexistent", source_dirs = { "/nonexistent" } })
 		watcher.stop()
 		helpers.assert_eq(ok, false)

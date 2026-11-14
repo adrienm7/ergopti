@@ -198,7 +198,7 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		-- The candidates used to hang off "<driver root>/../_shared/tray/data", a
 		-- directory that did not exist: every Linux user got the themed
 		-- "input-keyboard" glyph instead of the logo macOS and Windows show.
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local expected = Paths.shared("tray/data/ergopti_tray.png")
 		local tray, log = with_indicator(true)
 		tray.setMenu({})
@@ -229,7 +229,7 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		-- /usr/lib/ergopti nests _shared INSIDE the driver root; the old
 		-- "<driver>/../_shared" candidate addressed /usr/lib/_shared there.
 		local Protocol = helpers.load_module("tray.protocol")
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local root = Paths.shared_root()
 		helpers.assert_contains(Protocol.resolve_tray_icon(root, false), "/tray/data/ergopti_tray.png")
 		helpers.assert_eq(Protocol.resolve_tray_icon(nil, false), "",
@@ -242,7 +242,7 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		-- and on Linux the rewritten path names no file. Declaring that separator
 		-- here reproduces it on every host.
 		local Protocol = helpers.load_module("tray.protocol")
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local real_config = package.config
 		package.config = "\\" .. real_config:sub(2)
 		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), false)

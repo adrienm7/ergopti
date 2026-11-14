@@ -386,8 +386,8 @@ local function with_common_section_frame(body)
 		"ui.menu.menu_hotstrings_custom", "ui.menu.menu_hotstrings_management" }, function()
 		local translator = require("infra.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		local hotstrings = require("ui.menu.menu_hotstrings")

@@ -32,7 +32,7 @@ function M.run(kind, options, callback)
 			local state = { kind = kind, fixture = f, writes = 0, clears = 0, copies = 0,
 				count_reads = 0, initial = f.clipboard(), initial_count = f.change_count,
 				faults_open = true }
-			package.loaded["infra.paths"] = { shared = function() return nil end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents

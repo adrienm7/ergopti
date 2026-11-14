@@ -151,7 +151,7 @@ function readersIn(dir, spec) {
 function verifyReaderDetection() {
 	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-manifest-readers-'));
 	const binding = [
-		'local JsonCodec = require("adapters.json_codec")',
+		'local JsonCodec = require("core.fs.adapters.json_codec")',
 		'return {',
 		'  manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,',
 		'  json_decode = JsonCodec.decode,',

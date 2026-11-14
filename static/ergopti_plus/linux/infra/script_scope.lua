@@ -52,7 +52,7 @@ end
 function M.adopt_configured()
 	return require("settings.engine.scope.script_config_authority").adopt({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, platform = "linux",
-		aliases = M.alias_names(), storage = require("adapters.storage"), logger = Logger, log = "infra.script_scope" })
+		aliases = M.alias_names(), storage = require("core.fs.adapters.storage"), logger = Logger, log = "infra.script_scope" })
 end
 
 --- Rewrites the config.toml row a menu or wizard change replaces, when the
@@ -92,7 +92,7 @@ function M.new(options)
 	local transaction
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end, edit_key = options.edit_key }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "linux", aliases = options.aliases or aliases(),
-		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
+		storage = options.storage or require("core.fs.adapters.storage"), token = token, files = options.files,
 		only = options.only, allow_invalid_source = options.allow_invalid_source, storage_backup_path = function() return options.storage_backup_path end })
 	transaction = Transaction.new({ path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = runtime.manifest,
@@ -151,7 +151,7 @@ function M.edit_setting(key, value)
 	end
 	local owner = M.new({ path = path, backup_path = backup,
 		storage_backup_path = storage_backup,
-		files = require("adapters.file_system"), allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
+		files = require("core.fs.adapters.file_system"), allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
 		aliases = { [key] = { alias = alias, native = require(native_name) } }, only = { [key] = true },
 		prepare_batch = prepare, preserve_unchanged = true,
 		validate_update = function(scope, row)
@@ -186,7 +186,7 @@ function M.apply(mode)
 	local path = require("infra.config_paths").config("config.toml")
 	local backup = path .. ".script-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak"
 	_owner = M.new({ path = path, backup_path = backup, storage_backup_path = backup .. ".settings",
-		files = require("adapters.file_system") })
+		files = require("core.fs.adapters.file_system") })
 	local committed, detail = _owner.apply(mode)
 	if committed ~= true then Logger.warn("infra.script_scope", "Script scope refused: %s.", tostring(detail)) end
 	return committed, detail

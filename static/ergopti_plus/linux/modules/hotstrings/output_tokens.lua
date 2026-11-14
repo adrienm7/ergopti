@@ -16,7 +16,7 @@
 
 local M = {}
 
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local SendInput = require("platform.input.send_input")
 
 local SEND_KEYS_REL_PATH = "shortcuts/data/actions/send_keys.json"

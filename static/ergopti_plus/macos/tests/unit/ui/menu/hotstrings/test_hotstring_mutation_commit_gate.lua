@@ -267,7 +267,7 @@ helpers.describe("Personal menu native caption fixture isolation", function()
 		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
 		local owner = captured_i18n(Custom)
 		local original_get = owner.get
-		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.paths" }
+		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "core.fs.engine.paths" }
 		for _, prior in ipairs({ false, {}, "nil" }) do
 			local expected = prior
 			if prior == "nil" then expected = nil end

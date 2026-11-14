@@ -24,7 +24,7 @@ local test_settings = {
 	get = function(key) return stored[key] end,
 }
 
-package.loaded["adapters.storage"] = nil
+package.loaded["core.fs.adapters.storage"] = nil
 local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 
 local function write_tmp(contents)
@@ -77,14 +77,14 @@ helpers.describe("init re-applies the log level after config overrides", functio
 	end)
 end)
 
-package.loaded["adapters.storage"] = nil
+package.loaded["core.fs.adapters.storage"] = nil
 package.loaded["infra.config_overrides"] = nil
 if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end
 
 
 helpers.describe("Expert known-value admission", function()
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local observed, warnings, errors, writes = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.LEVELS = require("core.logger.engine").LEVELS
@@ -237,7 +237,7 @@ end)
 helpers.describe("Expert classified source admission", function()
 	local SOURCE = '[script]\nlog_level = "INFO"\n[future]\nkeep = "independent"\n'
 	local function with_file(body)
-		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "adapters.file_system", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local observed, warnings, errors, debug_messages = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.LEVELS = require("core.logger.engine").LEVELS
@@ -251,7 +251,7 @@ helpers.describe("Expert classified source admission", function()
 			}
 			local owner = helpers.load_with_stubs("infra.config_overrides", { settings = native })
 			_G.hs.settings = native
-			local files = require("adapters.file_system")
+			local files = require("core.fs.adapters.file_system")
 			local native_read, native_open = files.read_with_status, io.open
 			local path = os.tmpname()
 			local function write(content)
@@ -357,7 +357,7 @@ end)
 
 helpers.describe("Persisted native consent admission", function()
 	local function with_native(value, body)
-		helpers.with_stub_scope({ "infra.config_overrides", "adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local stored = { ["ergopti.llm.enabled"] = value, ["ergopti.log_level"] = "ERROR",
 				["foreign.future"] = { keep = false, values = { 1, "future" } } }
 			local function detached(value)
@@ -380,7 +380,7 @@ helpers.describe("Persisted native consent admission", function()
 			}
 			local owner = helpers.load_with_stubs("infra.config_overrides", { settings = native })
 			_G.hs.settings = native
-			local storage = require("adapters.storage")
+			local storage = require("core.fs.adapters.storage")
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local manifest = require("infra.manifest_reader")
 			local entry = assert(manifest.find_declared_entry_by_path("llm.enabled"))

@@ -382,7 +382,7 @@ end
 --- @return table deps
 function M.default_deps(overrides)
 	overrides = overrides or {}
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local Json = require("core.text.engine.json")
 	local InputSources = require("modules.keymap.input_sources")
 	local LayoutFiles = require("adapters.keyboard_layout_files")
@@ -408,7 +408,7 @@ function M.default_deps(overrides)
 	}
 	-- Read once: the menu asks for these collaborators at every rebuild.
 	if _keycodes_table == nil then
-		local table_path = require("infra.paths").shared("layouts/data/mac_keycodes.json")
+		local table_path = require("core.fs.engine.paths").shared("layouts/data/mac_keycodes.json")
 		local table_text = type(table_path) == "string" and FileSystem.read(table_path) or nil
 		_keycodes_table = type(table_text) == "string" and Json.decode(table_text) or nil
 	end

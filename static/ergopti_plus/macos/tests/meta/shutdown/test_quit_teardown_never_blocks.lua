@@ -38,7 +38,7 @@ local RECEIVER_MODULES = {
 	keymap = "modules.keymap",
 	gestures = "modules.gestures",
 	shortcuts = "modules.shortcuts",
-	Storage = "adapters.storage",
+	Storage = "core.fs.adapters.storage",
 	TerminationCoordinator = "infra.termination_coordinator",
 }
 

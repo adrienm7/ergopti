@@ -188,7 +188,7 @@ local function main()
 				timer = {new = new_timer, absoluteTime = function() return 1000000000 end,
 					secondsSinceEpoch = function() return 1792497600 end},
 			})
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 			logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end

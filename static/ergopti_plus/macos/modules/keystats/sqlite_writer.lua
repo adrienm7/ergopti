@@ -31,7 +31,7 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local Queries = require("metrics.engine.queries")
 local LocalTime = require("metrics.engine.local_time")
 local WindowTopology = require("metrics.engine.system.window_topology")

@@ -40,7 +40,7 @@ function M.run(parent_pid, database)
 	else
 		package.path = root .. "/?.lua;" .. package.path
 	end
-	local private = require("infra.private_sqlite_file")
+	local private = require("core.fs.engine.private_sqlite_file")
 	assert(private.admit(database), "SQLite private file admission refused")
 	-- SQLite creates rollback journals and WAL/SHM after replacing this process.
 	ffi.C.umask(private.creation_mask)

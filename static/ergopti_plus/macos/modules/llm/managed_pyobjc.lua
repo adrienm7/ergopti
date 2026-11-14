@@ -143,7 +143,7 @@ local default_owner
 --- @return table owner
 function M.default()
 	if default_owner then return default_owner end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local TaskLifecycle = require("adapters.task_lifecycle")
 	local origin = debug.getinfo(1, "S").source
 	local driver = type(origin) == "string" and origin:match("^@(.*)/modules/llm/managed_pyobjc%.lua$")

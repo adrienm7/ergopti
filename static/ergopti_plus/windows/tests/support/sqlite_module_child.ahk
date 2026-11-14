@@ -12,7 +12,7 @@
 #Warn VarUnset, Off
 #Warn LocalSameAsGlobal, Off
 global _VendorDir := A_ScriptDir . "\..\..\vendor"
-#Include ../../infra/sqlite3.ahk
+#Include ../../core/fs/engine/sqlite3.ahk
 
 try {
 	if DllCall("GetModuleHandleW", "Str", SQLiteConst.DLL, "Ptr")

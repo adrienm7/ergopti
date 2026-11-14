@@ -1,7 +1,7 @@
 --- tests/unit/infra/config/test_file_watchers_native_backend.lua
 
 ---
---- Unit tests for infra/file_watchers.lua. Exercises the public API —
+--- Unit tests for core/fs/engine/file_watchers.lua. Exercises the public API —
 --- has_inotify(), start/stop lifecycle, debounce deadline logic, and
 --- pump-mode mtime polling — by creating a real temporary directory
 --- with .toml files and driving changes through M.pump().
@@ -37,7 +37,7 @@ helpers.describe("file watchers native backend", function()
 			fs_event_stop = function() stopped = stopped + 1 end,
 			close = function() closed = closed + 1 end,
 		}
-		local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", uv)
+		local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", uv)
 		local now, fired = 0, 0
 		local ok, err = pcall(function()
 			fw.start({ hotstrings_dir = dir, now_ms = function() return now end,
@@ -77,7 +77,7 @@ helpers.describe("file watchers native backend", function()
 				fs_event_stop = function() return 0 end,
 				close = function(_, callback) if callback then callback() end end,
 			}
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", uv)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", uv)
 			local now, fired = 0, 0
 			local ok, detail = pcall(function()
 				fw.start({ hotstrings_dir = dir, now_ms = function() return now end,
@@ -95,7 +95,7 @@ helpers.describe("file watchers native backend", function()
 	if native_ok then
 		helpers.it("installed luv observes a real TOML creation through inotify", function()
 			local dir = make_temp_dir()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", native_luv)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", native_luv)
 			local now, fired = 0, 0
 			local ok, err = pcall(function()
 				fw.start({ hotstrings_dir = dir, now_ms = function() return now end,
@@ -150,7 +150,7 @@ helpers.describe("file_watchers subsecond polling", function()
 			local path = dir .. "/" .. basename
 			local quoted_path = "'" .. path:gsub("'", "'\\''") .. "'"
 			local held_popen = io.popen
-			local previous_watcher = package.loaded["infra.file_watchers"]
+			local previous_watcher = package.loaded["core.fs.engine.file_watchers"]
 			local previous_posix, previous_preload = package.loaded["posix"], package.preload["posix"]
 			local watcher, now_ms, fired, nanoseconds, precision_reads = nil, 0, 0, 100000000, 0
 			local function set_timestamp(fraction)
@@ -186,7 +186,7 @@ helpers.describe("file_watchers subsecond polling", function()
 					end
 					return held_popen(command, ...)
 				end
-				watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				watcher.start({ hotstrings_dir = dir, now_ms = function() return now_ms end,
 					on_reload = function() fired = fired + 1 end })
 				helpers.assert_true(not watcher.has_inotify(), "exercise the real polling producer")
@@ -211,7 +211,7 @@ helpers.describe("file_watchers subsecond polling", function()
 			local stopped, stop_error = true, nil
 			if watcher then stopped, stop_error = pcall(watcher.stop) end
 			io.popen = held_popen
-			package.loaded["infra.file_watchers"] = previous_watcher
+			package.loaded["core.fs.engine.file_watchers"] = previous_watcher
 			package.loaded["posix"], package.preload["posix"] = previous_posix, previous_preload
 			local removed = os.execute("rm -rf '" .. dir:gsub("'", "'\\''") .. "'")
 			helpers.assert_true(ok, tostring(err))
@@ -275,12 +275,12 @@ helpers.describe("file_watchers", function()
 	helpers.describe("has_inotify", function()
 
 		helpers.it("returns a boolean", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			helpers.assert_type(fw.has_inotify(), "boolean")
 		end)
 
 		helpers.it("is stable across calls", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local a = fw.has_inotify()
 			local b = fw.has_inotify()
 			helpers.assert_eq(a, b, "has_inotify must return the same value every call")
@@ -295,12 +295,12 @@ helpers.describe("file_watchers", function()
 	helpers.describe("lifecycle", function()
 
 		helpers.it("stop() before start() is safe (no-op)", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			fw.stop()
 		end)
 
 		helpers.it("stop() is idempotent (second call no-op)", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			fw.stop()
 			fw.stop()
 		end)
@@ -308,7 +308,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("start() then stop() then restart() works", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/test.toml")
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.stop()
@@ -320,21 +320,21 @@ helpers.describe("file_watchers", function()
 		end)
 
 		helpers.it("start() with empty opts is a no-op", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			fw.start({})
 			fw.pump()
 			fw.stop()
 		end)
 
 		helpers.it("start() with nil opts is a no-op", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			fw.start(nil)
 			fw.pump()
 			fw.stop()
 		end)
 
 		helpers.it("start() with no readable directories still finishes gracefully", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({
 				hotstrings_dir = "/nonexistent/path/xyz",
@@ -355,7 +355,7 @@ helpers.describe("file_watchers", function()
 	helpers.describe("start (pump mode)", function()
 
 		helpers.it("pump() with no entries is a no-op (no crash)", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -369,7 +369,7 @@ helpers.describe("file_watchers", function()
 			write_file(dir .. "/a.toml")
 			write_file(dir .. "/b.toml")
 			write_file(dir .. "/not_a_toml.txt", "ignored")
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -381,7 +381,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("skips directories with no .toml files", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/readme.txt", "hello")
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -412,7 +412,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("fires on_reload after .toml mtime changes and deadline passes", function()
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired_count = 0
 				-- Drive the debounce deadline through an injected wall clock so the
 				-- test is deterministic and independent of os.clock semantics.
@@ -442,7 +442,7 @@ helpers.describe("file_watchers", function()
 			helpers.it("debounces — multiple rapid changes fire only once", function()
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired_count = 0
 				local now_ms = 1000
 				fw.start({
@@ -478,7 +478,7 @@ helpers.describe("file_watchers", function()
 				local dir = make_temp_dir()
 				local N = reload_gate.BULK_THRESHOLD + 5
 				for i = 1, N do write_file(dir .. "/g" .. i .. ".toml") end
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired_count = 0
 				local now_ms = 1000
 				fw.start({
@@ -513,7 +513,7 @@ helpers.describe("file_watchers", function()
 				local now_ms = 1000
 				local dir = make_non_tmp_dir()
 				write_file(dir .. "/init.lua", "return {}")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired_count = 0
 				fw.start({ now_ms = function() return now_ms end, base_dir = dir, on_reload = function() fired_count = fired_count + 1 end })
 
@@ -536,7 +536,7 @@ helpers.describe("file_watchers", function()
 				local sub = dir .. "/sub"
 				os.execute("mkdir -p '" .. sub:gsub("'", "'\\''") .. "' 2>/dev/null")
 				write_file(sub .. "/personal.toml")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired = 0
 				fw.start({ now_ms = function() return now_ms end, personal_dir = dir, on_reload = function() fired = fired + 1 end })
 
@@ -557,7 +557,7 @@ helpers.describe("file_watchers", function()
 				local sub = dir .. "/sub"
 				os.execute("mkdir -p '" .. sub:gsub("'", "'\\''") .. "' 2>/dev/null")
 				write_file(sub .. "/readme.txt", "hello")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired = 0
 				fw.start({ personal_dir = dir, on_reload = function() fired = fired + 1 end })
 				fw.pump()
@@ -591,7 +591,7 @@ helpers.describe("file_watchers", function()
 				local now_ms = 1000
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 				local fired = false
 				fw.start({ now_ms = function() return now_ms end,
 					hotstrings_dir = dir,
@@ -633,7 +633,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("clears all pump entries and the pending deadline", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/hotstrings.toml")
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ hotstrings_dir = dir, on_reload = function() fired = fired + 1 end })
 
@@ -665,7 +665,7 @@ helpers.describe("file_watchers", function()
 				local now_ms = 1000
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
-				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+				local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 
 				local old_fired = 0
 				fw.start({ now_ms = function() return now_ms end, hotstrings_dir = dir, on_reload = function() old_fired = old_fired + 1 end })
@@ -705,7 +705,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("base_dir with no .lua files does not crash", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/readme.txt", "hello")
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ base_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -717,7 +717,7 @@ helpers.describe("file_watchers", function()
 		helpers.it("base_dir with .lua file does not crash on load", function()
 			local dir = make_temp_dir()
 			write_file(dir .. "/init.lua", "return {}")
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ base_dir = dir, on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -727,7 +727,7 @@ helpers.describe("file_watchers", function()
 		end)
 
 		helpers.it("personal_dir that does not exist is a no-op", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ personal_dir = "/nonexistent_personal_dir", on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -736,7 +736,7 @@ helpers.describe("file_watchers", function()
 		end)
 
 		helpers.it("base_dir with temp files from /tmp is still safe", function()
-			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			local fw = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			local fired = 0
 			fw.start({ base_dir = "/tmp", on_reload = function() fired = fired + 1 end })
 			fw.pump()
@@ -775,7 +775,7 @@ helpers.describe("legacy watcher native retirement ownership", function()
 		local successor = directory .. "/successor"
 		assert(native_luv.fs_mkdir(successor, 448))
 		local records, state = {}, { admit = options.close == "native", now = 1000, reloads = 0 }
-		local previous = package.loaded["infra.file_watchers"]
+		local previous = package.loaded["core.fs.engine.file_watchers"]
 		local backend = setmetatable({
 			new_fs_event = function()
 				local handle = assert(native_luv.new_fs_event())
@@ -822,8 +822,8 @@ helpers.describe("legacy watcher native retirement ownership", function()
 				error("foreign native close")
 			end,
 		}, { __index = native_luv })
-		local watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", backend)
-		package.loaded["infra.file_watchers"] = previous
+		local watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", backend)
+		package.loaded["core.fs.engine.file_watchers"] = previous
 		function state.start(path)
 			return watcher.start({ base_dir = path or directory, personal_dir = "", now_ms = function() return state.now end,
 				on_reload = function() state.reloads = state.reloads + 1 end })

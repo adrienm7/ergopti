@@ -122,16 +122,16 @@ if ok_compat and type(compat) == "table" and type(compat.install) == "function" 
 	pcall(compat.install)
 end
 
-local ok_paths, Paths = pcall(require, "infra.paths")
+local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 if not ok_paths then
-	print("FAIL infra.paths could not be loaded: " .. tostring(Paths))
+	print("FAIL core.fs.engine.paths could not be loaded: " .. tostring(Paths))
 	print("     LUA_PATH = " .. tostring(os.getenv("LUA_PATH")))
 	os.exit(1)
 end
 
 local root = Paths.shared_root()
 if not root then
-	fail("infra.paths resolved no shared tree from the installed driver.")
+	fail("core.fs.engine.paths resolved no shared tree from the installed driver.")
 elseif normalise(root) ~= normalise(expected_root) then
 	fail("shared tree resolved to %s, expected %s — the packaged layout moved.",
 		normalise(root), normalise(expected_root))

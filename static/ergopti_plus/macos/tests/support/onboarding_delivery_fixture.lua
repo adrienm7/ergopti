@@ -11,7 +11,7 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system", "infra.config_paths", "platform.remap", "core.text.engine.json",
+		"core.fs.adapters.file_system", "infra.config_paths", "platform.remap", "core.text.engine.json",
 		"modules.keymap.number_row_live" }, function()
 		-- No layout of ours types in the fixture: the number-row order is greyed.
 		package.loaded["modules.keymap.number_row_live"] = {

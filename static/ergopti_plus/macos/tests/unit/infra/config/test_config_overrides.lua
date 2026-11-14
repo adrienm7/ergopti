@@ -23,7 +23,7 @@ local test_settings = {
 	get = function(key) return stored[key] end,
 }
 
-package.loaded["adapters.storage"] = nil
+package.loaded["core.fs.adapters.storage"] = nil
 local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 -- helpers.load_with_stubs may have re-pointed _G.hs to a fresh stub via
 -- __reset; re-apply the override so the describes below still observe it.
@@ -135,6 +135,6 @@ helpers.describe("config_overrides source: no {N} log placeholders", function()
 	end)
 end)
 
-package.loaded["adapters.storage"] = nil
+package.loaded["core.fs.adapters.storage"] = nil
 package.loaded["infra.config_overrides"] = nil
 if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end

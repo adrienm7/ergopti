@@ -26,7 +26,7 @@ test("(release-archive-budget) the archive limits come from the shared declarati
 	assert(limits.absolute_ms == 300000 and limits.idle_ms == 60000)
 	p.archive_transfer.archive_idle_timeout_ms = 400000
 	assert(Budget.archive_limits(p) == nil, "an idle bound past the absolute cap is refused")
-	local file = assert(io.open(require("infra.paths").shared("updater/data/defaults.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("updater/data/defaults.json"), "rb"))
 	local shared = require("core.text.engine.json").decode(file:read("*a")); file:close()
 	local declared = assert(Budget.archive_limits(shared), "the shipped defaults declare both bounds")
 	-- Decided by the maintainer on 2026-11-12, aligned on Windows' WinHTTP bounds.

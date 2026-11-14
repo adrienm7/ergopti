@@ -17,7 +17,7 @@ local M = {}
 
 local hs            = hs
 local ShellRunner   = require("adapters.shell_runner")
-local FileSystem    = require("adapters.file_system")
+local FileSystem    = require("core.fs.adapters.file_system")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")

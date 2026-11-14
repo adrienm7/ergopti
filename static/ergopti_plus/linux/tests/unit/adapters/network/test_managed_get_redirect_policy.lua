@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Json = require("core.text.engine.json")
 local Shared = require("core.network.engine.http_redirect")
 

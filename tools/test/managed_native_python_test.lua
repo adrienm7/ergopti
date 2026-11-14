@@ -19,7 +19,7 @@ local Locator = {
 }
 package.loaded["core.lifecycle.engine.core.managed_python_locator"] = Locator
 package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30 }
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read_with_status = function() error("GUI catalogue reads are forbidden") end,
 	classify_no_follow = function() return {
 		mode = "file", permissions = "rwxr-xr-x", dev = 1, ino = 2,

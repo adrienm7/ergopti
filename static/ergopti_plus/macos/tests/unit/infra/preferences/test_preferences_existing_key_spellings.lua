@@ -43,10 +43,10 @@ end
 --- @return boolean saved
 --- @return string disk Bytes after the save.
 local function save_after(source, change)
-	return helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
+	return helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
 		local modules = core_modules()
 		local disk = source
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() return disk, "ok" end,
 			write = function() error("the save must keep its source precondition") end,
 			write_if_unchanged = function(_, content, expected)

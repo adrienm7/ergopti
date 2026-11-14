@@ -36,7 +36,7 @@ local MODULE_NAMES = {
 	"infra.teardown_transaction",
 	"infra.startup_transaction",
 	"infra.config_paths",
-	"infra.paths",
+	"core.fs.engine.paths",
 	"modules.hotstrings.hotstrings_config",
 	"infra.factory_reset_journal",
 	"modules.gestures",
@@ -45,11 +45,11 @@ local MODULE_NAMES = {
 	"core.text.engine.toml_codec.writer",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
-	"adapters.toml_cache",
+	"core.fs.adapters.toml_cache",
 	"infra.toml.reader",
 	"infra.timings",
 	"infra.launcher_guard",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"platform.remap",
 	"platform.remap.tap_hold_file",
 	"ui.menu",
@@ -350,7 +350,7 @@ local function run_isolated(options, assertions)
 			},
 			["modules.shortcuts"] = { stop = function() return true end },
 			["modules.dynamic_hotstrings"] = {},
-			["adapters.toml_cache"] = { init = function() return true end },
+			["core.fs.adapters.toml_cache"] = { init = function() return true end },
 			["infra.toml.reader"] = {
 				set_cache_provider = function() end,
 				-- The real cold hotstring controller grants terminal admission before
@@ -371,7 +371,7 @@ local function run_isolated(options, assertions)
 				init = function() return true end,
 				stop = function() return true end,
 			},
-			["adapters.file_system"] = {},
+			["core.fs.adapters.file_system"] = {},
 			["platform.remap"] = Karabiner,
 			-- The boot carries an old config_karabiner.toml over before the config
 			-- migration; this fixture has no file system, hence no old file.

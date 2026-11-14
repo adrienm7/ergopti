@@ -16,7 +16,7 @@ local MANIFEST = [[{
 }]]
 
 local function with_parent(driver, language, body)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local file = assert(io.open(Paths.shared("core/i18n/data/locales/" .. language .. ".json"), "rb"))
 	local captions = assert(Json.decode(assert(file:read("*a"))))
 	assert(file:close())
@@ -131,7 +131,7 @@ function M.register(helpers, driver)
 end
 
 local function with_physical_parent(driver, language, body)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local file = assert(io.open(Paths.shared("core/i18n/data/locales/" .. language .. ".json"), "rb"))
 	local captions = assert(Json.decode(assert(file:read("*a"))))
 	assert(file:close())

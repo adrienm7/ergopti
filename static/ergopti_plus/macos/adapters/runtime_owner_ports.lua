@@ -34,7 +34,7 @@
 
 local M = {}
 
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local FieldCheckPorts = require("adapters.field_check_ports")
 local NativePath = require("core.fs.engine.native_path")
 

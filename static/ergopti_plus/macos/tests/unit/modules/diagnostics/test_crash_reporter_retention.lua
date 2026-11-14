@@ -17,16 +17,16 @@ local helpers = require("tests.helpers")
 local function with_fixture(listing, callback)
 	local module_names = {
 		"modules.diagnostics.crash_reporter",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"infra.config_paths",
 		"infra.i18n",
 		"infra.logger",
-		"infra.fs_dir",
+		"core.fs.engine.dir",
 	}
 	helpers.with_fresh_modules(module_names, function()
 		local original_attributes, original_mkdir, original_dir = hs.fs.attributes, hs.fs.mkdir, hs.fs.dir
 		local state = { files = {}, removed = {}, warnings = {}, refuse_remove = false }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function(path, content)
 				if state.files[path] ~= nil then return false, "exists" end
 				state.files[path] = content

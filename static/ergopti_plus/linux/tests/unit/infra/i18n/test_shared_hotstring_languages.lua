@@ -57,7 +57,7 @@ helpers.describe("hotstring languages: the index declares the packs", function()
 	end)
 
 	helpers.it("(language-packs) the shipped index declares French", function()
-		local fh = assert(io.open(require("infra.paths").shared("hotstrings/data/catalogue/_index.toml"), "r"))
+		local fh = assert(io.open(require("core.fs.engine.paths").shared("hotstrings/data/catalogue/_index.toml"), "r"))
 		local raw = fh:read("*a")
 		fh:close()
 		local packs = Languages.packs(require("core.text.engine.toml_codec.codec").decode(raw))

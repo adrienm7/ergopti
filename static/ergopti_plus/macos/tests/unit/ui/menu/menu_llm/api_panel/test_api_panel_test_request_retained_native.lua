@@ -30,7 +30,7 @@ helpers.describe("API Add: retained native admission", function()
 		if provider_id then
 			local file = assert(io.open(helpers.driver_root() .. "../_shared/ai/data/api_providers.json", "rb"))
 			local raw = file:read("*a"); assert(file:close())
-			local catalogue = assert(require("adapters.json_codec").decode(raw))
+			local catalogue = assert(require("core.fs.adapters.json_codec").decode(raw))
 			remote.PROVIDER_ORDER = { provider_id }
 			remote.PROVIDERS[provider_id] = assert(catalogue.providers[provider_id])
 		end
@@ -286,7 +286,7 @@ end)
 local function api_add_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/api_add_controls.json", "rb"))
 	local raw = file:read("*a"); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 --- Holds the genuine translator/backend/renderer cohort without persisting a locale.
@@ -298,7 +298,7 @@ local function install_api_add_doubles(args, native)
 	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
-		json_decode = require("adapters.json_codec").decode,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = native,
 		logger = helpers.make_logger_stub(),
 	}))

@@ -24,7 +24,7 @@
 
 local helpers = require("tests.helpers")
 
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Config = helpers.load_with_stubs("platform.remap.config")
 local Logger = require("infra.logger")
 

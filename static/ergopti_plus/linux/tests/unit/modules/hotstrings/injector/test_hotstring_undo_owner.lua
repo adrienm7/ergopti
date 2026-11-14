@@ -48,7 +48,7 @@ local function with_undo(options, body)
 				observations.moved = true; state.path = "/field/successor"
 			end
 		end
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace")
 		logger.set_sink(function(line)
 			observations.logs[#observations.logs + 1] = line

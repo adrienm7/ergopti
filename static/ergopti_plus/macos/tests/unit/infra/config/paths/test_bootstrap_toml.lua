@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"infra.config_paths", "infra.logger", "adapters.file_system", "infra.text_utils",
+	"infra.config_paths", "infra.logger", "core.fs.adapters.file_system", "infra.text_utils",
 	"core.text.engine.utils_core", "core.fs.engine.app_dirs", "infra.log_folders", "lfs", "infra.toml.codec",
 	"core.text.engine.toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.basic_string", "core.lifecycle.engine.compat.utf8",
@@ -62,7 +62,7 @@ local function fixture(callback)
 				return key .. " = " .. state.codec.encode_value(value)
 			end
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					if fs.attributes(path, "mode") == nil then return nil, "absent" end
 					return read_file(path), "ok"

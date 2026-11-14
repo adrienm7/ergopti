@@ -19,7 +19,7 @@ local PATH = "/virtual/preferences_unowned/config.toml"
 --- @return table preferences, table writes
 local function load_preferences(disk)
 	local writes = {}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			if disk[path] == nil then return nil, "absent" end
 			return disk[path], "ok"

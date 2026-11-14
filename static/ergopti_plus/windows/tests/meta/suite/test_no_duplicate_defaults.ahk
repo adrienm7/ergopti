@@ -41,7 +41,7 @@ _MetaDuplicateDefaultsResult() {
 		'""', true, "300", true, "100", true, "50", true
 	)
 	Seen := Map()
-	for Sub in ["infra", "modules", "platform"] {
+	for Sub in ["infra", "modules", "platform", "core"] {
 		for AbsPath in _MetaListAhkFilesDups(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

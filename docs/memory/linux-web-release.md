@@ -413,7 +413,7 @@ is keyed by that path. Query the unique name, not `org.freedesktop.FileManager1`
 active tab is not published (the `go-to-tab` action state stays 0), so tabs on
 different folders are ambiguous. Thunar's D-Bus methods only take
 caller-supplied folders and Dolphin's MainWindow only says whether a URL is open
-in some tab. Action: keep `adapters/file_manager_folder.lua` refusing every
+in some tab. Action: keep `core/fs/adapters/file_manager_folder.lua` refusing every
 other owner, and prove a new file manager with
 `tests/hardware/run_file_manager_folder.sh`.
 
@@ -481,7 +481,7 @@ WTF honours this one. A new signal the daemon handles must not be 12.
 
 ### project-linux-a-corrupt-store-moves-aside-without-replacing
 
-A malformed JSON store is set aside through `infra/corrupt_aside.lua`
+A malformed JSON store is set aside through `core/fs/engine/corrupt_aside.lua`
 (`<path>.corrupt`, then `.corrupt.1`, ...) with the no-replace move, never with
 `os.rename`, which replaces an older set-aside or the one another process makes
 at the same instant. `api_entries.lua` used `os.rename` until 2026-10-31;
@@ -553,7 +553,7 @@ the read. Action: any new keymap event kind that can change the keymap bumps
 ### project-linux-directory-walks-in-process
 
 Hotstring discovery and the log retention purge walk directories through
-`infra/native_directory.lua` (libuv opendir/readdir, lstat only without
+`core/fs/engine/native_directory.lua` (libuv opendir/readdir, lstat only without
 d_type) with GNU `find -P` semantics kept exactly: pre-order, readdir order,
 links reported and never followed, `-maxdepth`, find's path spelling for a
 root with trailing slashes. It needs no logger, so the sink can use it. Action:

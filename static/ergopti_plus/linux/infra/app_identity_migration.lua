@@ -131,7 +131,7 @@ end
 --- @return boolean done Whether the marker is set.
 function M.run(opts)
 	opts = opts or {}
-	local storage = opts.storage or require("adapters.storage")
+	local storage = opts.storage or require("core.fs.adapters.storage")
 	if storage.get(M.MARKER_KEY, nil) == M.MARKER_VALUE then return true end
 	local aliases, same = M.load_table()
 	Logger.start(LOG, "Converting saved application lists to the WM class identity…")

@@ -199,7 +199,7 @@ local function load_api(state, daemon)
 		helpers.assert_eq(actual_nonce, nonce)
 		return "exec /fixture/native-runtime --caller-nonce '" .. nonce .. "' --owned-stdin"
 	end }
-	package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+	package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 	package.loaded["modules.llm.parser"] = {}
 	package.loaded["modules.llm.profiles"] = {}
 	package.loaded["modules.llm.progressive_reveal"] = {}
@@ -251,7 +251,7 @@ local function load_mlx_checker(state)
 	-- A fresh checker must consume this fixture's filesystem, not a cached
 	-- policy admission bound to the preceding fake native table.
 	package.loaded["modules.llm.network_env"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
@@ -285,13 +285,13 @@ local STUBBED_MODULES = {
 	"core.events.timer_scheduler", "modules.llm.ollama_deps_checker",
 	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
-	"modules.llm.network_env", "adapters.file_system",
+	"modules.llm.network_env", "core.fs.adapters.file_system",
 	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",
-	"adapters.http_client", "adapters.shell_runner", "adapters.json_codec",
+	"adapters.http_client", "adapters.shell_runner", "core.fs.adapters.json_codec",
 	"modules.llm.ollama_server_command", "modules.llm.parser", "modules.llm.profiles",
 	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
 	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
-	"modules.llm.ollama_endpoint", "adapters.storage", "adapters.owned_program_runner",
+	"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "adapters.owned_program_runner",
 	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
 	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",

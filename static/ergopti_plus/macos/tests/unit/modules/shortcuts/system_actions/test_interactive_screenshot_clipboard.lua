@@ -19,7 +19,7 @@ local SETTINGS_URL =
 
 local SUBJECT_MODULES = {
 	"adapters.task_lifecycle",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"infra.notifications",
@@ -74,7 +74,7 @@ local function with_pixel(options, scenario)
 			end,
 			start = function() return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function()
 				local path = "/private/tmp/ergopti-shot-" .. (#f.temp_paths + 1)
 				f.temp_paths[#f.temp_paths + 1] = path

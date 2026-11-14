@@ -70,7 +70,7 @@ local function is_sticky(action)
 end
 
 helpers.with_fresh_modules({
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"infra.keycodes",
 	"infra.logger",
@@ -107,7 +107,7 @@ helpers.with_fresh_modules({
 		if file_cache[path] == nil then file_cache[path] = SourceFile.read(path) end
 		return file_cache[path]
 	end
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = read_once,
 		read_with_status = function(path) return read_once(path), "ok" end,
 	}

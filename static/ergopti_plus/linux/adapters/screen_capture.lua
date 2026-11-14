@@ -207,7 +207,7 @@ function M.capture(mode, max_edge, on_done)
 		for _, item in ipairs({ path .. ".scaled.png", path, dir }) do
 			local removed, err = os.remove(item)
 			if not removed then
-				local checked, kind, _, code = pcall(function() return require("infra.native_directory").target_kind(item) end)
+				local checked, kind, _, code = pcall(function() return require("core.fs.engine.native_directory").target_kind(item) end)
 				if not checked or kind ~= nil or code ~= "ENOENT" then
 					removed_all = false
 					Logger.error(LOG, "A screenshot file could not be deleted: %s", tostring(err))

@@ -32,7 +32,7 @@ end
 function M.register(helpers, driver, count, load_owner)
 	local Json = require("core.text.engine.json")
 	local Ports = require("core.fs.engine.ports")
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/file_system/port_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/file_system/port_vectors.json"), "rb"))
 	local corpus = assert(Json.decode(file:read("*a")))
 	file:close()
 	assert(#corpus.vectors == count, "port_vectors.json holds another number of vectors")

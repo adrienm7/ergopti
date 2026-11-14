@@ -80,7 +80,7 @@ helpers.describe("LLM hardware defaults", function()
 				helpers.assert_eq(found, true)
 			end
 			local content = '[llm.models]\nselected = "api:old"\nfuture = 7\n'
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return content, "ok" end,
 				write_if_unchanged = function(_, value, expected)
 					if expected.content ~= content then return false end

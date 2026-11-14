@@ -8,8 +8,8 @@
 
 --- Lazy installed-layout binding; ordinary no-follow requests do not load it.
 local M = {}
-local Paths = require("infra.paths")
-local Reader = require("infra.regular_file_reader")
+local Paths = require("core.fs.engine.paths")
+local Reader = require("core.fs.engine.regular_file_reader")
 local Json = require("core.text.engine.json")
 local Shared = require("core.network.engine.http_redirect")
 local initialized, policy, refusal = false, nil, nil

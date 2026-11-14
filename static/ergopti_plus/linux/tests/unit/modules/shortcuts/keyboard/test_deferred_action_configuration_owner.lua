@@ -22,7 +22,7 @@ local function with_owner(domain, body)
 	local called, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local ctx = { deferred = {}, executed = {}, paused = false, path = path }
-			local Logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+			local Logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			Logger.set_level("debug")
 			Logger.set_sink(function(line)
 				if line:find("fired", 1, true) and ctx.on_log then ctx.on_log() end

@@ -28,8 +28,8 @@
 
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
-local saved_file_system = package.loaded["adapters.file_system"]
-local saved_ledger_append = package.loaded["adapters.ledger_append"]
+local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+local saved_ledger_append = package.loaded["core.fs.adapters.ledger_append"]
 local Logger = helpers.load_with_stubs("infra.logger")
 
 local function matching_errors(needle_a, needle_b)
@@ -360,8 +360,8 @@ local function load_real_day_rollover(stall, ingest_error)
 		read = function() return nil end,
 	}
 	EmptyLedger.extend(files)
-	package.loaded["adapters.file_system"] = files
-	package.loaded["adapters.ledger_append"] = {
+	package.loaded["core.fs.adapters.file_system"] = files
+	package.loaded["core.fs.adapters.ledger_append"] = {
 		recover = function(path, outbox)
 			helpers.assert_eq(observed.phase, "init", "only absent startup receipt recovery is modeled")
 			helpers.assert_eq(path, observed.paths.data_sql_path)
@@ -576,5 +576,5 @@ helpers.describe("day_rollover source: loop + conditional rollover", function()
 end)
 
 print("[PASS] test_day_rollover_drain")
-package.loaded["adapters.file_system"] = saved_file_system
-package.loaded["adapters.ledger_append"] = saved_ledger_append
+package.loaded["core.fs.adapters.file_system"] = saved_file_system
+package.loaded["core.fs.adapters.ledger_append"] = saved_ledger_append

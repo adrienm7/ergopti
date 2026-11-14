@@ -418,7 +418,7 @@ local function with_magic_frame(language, stored, mode, body)
 		storage, restore_storage = stub_storage({ stored = stored })
 		restore_manifest = stub_manifest("★")
 		local json = require("core.text.engine.json")
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
 		local native_locale = require("infra.locale")
 		native_locale.set_locale(language)

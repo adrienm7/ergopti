@@ -18,7 +18,7 @@ local uv = require("luv")
 
 local restore = helpers.keep_loaded({ "modules.llm.local_server_ports" })
 
-local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
+local CATALOGUE = Json.decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 
 -- Answers GET <anything>/models like an OpenAI-compatible server. The port
 -- comes from the flag the real server takes, else from FAKE_PORT.

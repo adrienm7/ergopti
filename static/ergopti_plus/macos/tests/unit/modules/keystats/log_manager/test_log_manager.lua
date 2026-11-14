@@ -21,7 +21,7 @@
 
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
-local saved_file_system = package.loaded["adapters.file_system"]
+local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 
 
 
@@ -42,7 +42,7 @@ package.loaded["infra.i18n"] = {
 
 -- Every harness below models a fresh install. Identity publication is a
 -- prerequisite owned by the filesystem adapter, not the behavior under test.
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -737,4 +737,4 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 	end)
 end)
 
-package.loaded["adapters.file_system"] = saved_file_system
+package.loaded["core.fs.adapters.file_system"] = saved_file_system

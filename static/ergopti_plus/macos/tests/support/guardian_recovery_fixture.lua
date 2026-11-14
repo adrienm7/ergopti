@@ -21,8 +21,8 @@ local TOKENS = {
 }
 
 local STUB_MODULES = {
-	"adapters.file_system",
-	"infra.fs_dir",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.dir",
 	"infra.logger",
 	"infra.config_paths",
 	"infra.timings",
@@ -784,8 +784,8 @@ local function with_remap(options, body)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["platform.remap"] = nil
-	package.loaded["adapters.file_system"] = nil
-	package.loaded["infra.fs_dir"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
+	package.loaded["core.fs.engine.dir"] = nil
 	local remap = require("platform.remap")
 	remap.init({ expand_path = function(path) return path end })
 	local scenario_cancel_fails = calls.cancel_fails

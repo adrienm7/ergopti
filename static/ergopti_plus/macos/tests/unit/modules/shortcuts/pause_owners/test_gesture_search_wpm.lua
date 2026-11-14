@@ -81,7 +81,7 @@ local function load_real_wpm_surface(module_name)
 	}
 	-- A healthy idle surface still needs its canonical display configuration.
 	-- Keep only the scheduler timings controlled by this ownership fixture.
-	package.loaded["infra.paths"] = { shared = helpers.shared }
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.2 end,
 		ms = function() return 200 end,

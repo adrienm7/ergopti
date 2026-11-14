@@ -104,7 +104,7 @@ end
 --- @param options table Native fault controls.
 --- @param callback function Receives the module and independently observable native state.
 local function with_native_world(options, callback)
-	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "adapters.file_system", "adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.app_dirs" }, function()
+	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "core.fs.adapters.file_system", "adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.app_dirs" }, function()
 		local state = { files = {}, stops = 0, starts = 0, created = 0, running = false, options = options }
 		state.errors = {}
 		local module
@@ -154,7 +154,7 @@ local function with_native_world(options, callback)
 			cancel = function(handle) handle.cancelled = true; return true end,
 		}
 		package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				if options.read_error and path:sub(-#"/session.json") == "/session.json" then return nil end
 				return path == "declaration" and SPEC_TEXT or state.files[path]

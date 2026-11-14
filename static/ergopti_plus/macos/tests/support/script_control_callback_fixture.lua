@@ -122,8 +122,8 @@ end
 --- @param callback function Receives the constructed subject and observations.
 function M.with_configurable(callback)
 	local names = {
-		"infra.logger", "infra.paths", "adapters.file_system",
-		"adapters.hotkey_registrar", "adapters.storage", "modules.gestures.actions",
+		"infra.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
+		"adapters.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
 		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
@@ -135,8 +135,8 @@ function M.with_configurable(callback)
 		catalogue_file:close()
 		catalogue.keys = {{id = "a", label = "A"}}
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,
 			read_with_status = function() return '[shortcuts.keyboard]\nprimary_a = "throwing_action"\n', "ok" end,
 			write = function() error("callback dispatch must not publish preferences") end,
@@ -154,7 +154,7 @@ function M.with_configurable(callback)
 			is_assignable = function(action_id) return action_id == "throwing_action" end,
 			execute_single = function() error("gesture exploded") end,
 		}
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["infra.config_paths"] = { get = function() return "callback-fixture-config" end }
 		package.loaded["infra.preferences"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil

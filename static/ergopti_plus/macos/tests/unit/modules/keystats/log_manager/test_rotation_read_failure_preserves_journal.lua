@@ -29,8 +29,8 @@ local STUBBED_MODULES = {
 	"modules.keystats.rotation",
 	"modules.keystats.export",
 	"metrics.engine.metrics",
-	"adapters.file_system",
-	"adapters.ledger_append",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.ledger_append",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"modules.keystats.timestamp",
@@ -180,7 +180,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			now = os.time,
 		}
 		-- A typed unit owner, not a second implementation of the disk protocol.
-		package.loaded["adapters.ledger_append"] = {
+		package.loaded["core.fs.adapters.ledger_append"] = {
 			recover = function(...)
 				assert(select("#", ...) == 3)
 				local ledger, batch, journal = ...
@@ -274,7 +274,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			sync_foreign_data_sql = function() return {} end,
 		}
 		package.loaded["metrics.engine.metrics"] = {}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			-- This non-IO scenario begins with an existing user metrics ignore.
 			path_status = function(path)
 				assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -285,7 +285,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			read = function() return nil end,
 		}
 		require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-			package.loaded["adapters.file_system"], false)
+			package.loaded["core.fs.adapters.file_system"], false)
 		local rotation = helpers.load_with_stubs("modules.keystats.rotation")
 		manager = helpers.load_with_stubs("modules.keystats.log_manager", {
 			execute = function(command)

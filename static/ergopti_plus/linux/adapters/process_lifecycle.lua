@@ -35,7 +35,7 @@ local Logger = require("core.logger.engine.shim")
 local WindowInfo = require("adapters.window_info")
 -- The process table is read in this process: minimal Arch, Fedora and
 -- openSUSE images ship no `ps`, and a poll every two seconds forked one.
-local NativeDirectory = require("infra.native_directory")
+local NativeDirectory = require("core.fs.engine.native_directory")
 
 local LOG = "adapters.process_lifecycle"
 

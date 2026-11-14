@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local M = {}
-local Json = require("adapters.json_codec")
+local Json = require("core.fs.adapters.json_codec")
 local Logger = require("infra.logger")
 local LOG = "adapters.keyboard_geometry"
 local ENVIRONMENT_KEY = "ERGOPTI_KEYBOARD_GEOMETRY_V1"

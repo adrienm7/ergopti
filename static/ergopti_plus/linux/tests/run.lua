@@ -145,7 +145,7 @@ local TEST_DIRS = {
 --- @return string|nil Discovery error.
 local function discover_tests(dir)
 	local results = {}
-	local Directory = require("infra.native_directory")
+	local Directory = require("core.fs.engine.native_directory")
 	local ok, failure = pcall(Directory.walk, driver_root .. "/" .. dir, nil, function(path, kind)
 		if kind ~= "file" or not path:match("/test_[^/]+%.lua$") then return end
 		local relative = path:sub(#driver_root + 2):gsub("%.lua$", "")

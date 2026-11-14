@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Active File Manager Folder Tests (Linux)
 --- DESCRIPTION:
---- Drives adapters/file_manager_folder.lua with the exact xprop and gdbus
+--- Drives core/fs/adapters/file_manager_folder.lua with the exact xprop and gdbus
 --- answers a real Nautilus 46 gave in a headless X11 session (Xvfb, Openbox,
 --- a D-Bus session bus), and with the answers of the cases it must refuse.
 ---
@@ -22,7 +22,7 @@
 
 local helpers = require("tests.helpers")
 
-local Folder = require("adapters.file_manager_folder")
+local Folder = require("core.fs.adapters.file_manager_folder")
 
 -- Recorded from Nautilus 46.4 under Xvfb and Openbox (2026-11-10).
 local NAUTILUS_PROPS = table.concat({

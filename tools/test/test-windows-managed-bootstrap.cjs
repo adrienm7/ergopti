@@ -41,7 +41,7 @@ assert.match(flow, /"retire_runtime"/);
 assert.match(flow, /LLM_OllamaListModels_Async/);
 assert.match(flow, /this\.Runtime\.ObserveReady\(\)/);
 assert.match(flow, /CryptoSha256Bytes\(FSReadBytesStrict\(Path\)\)/);
-const fileSystem = fs.readFileSync(path.join(root, 'adapters/file_system.ahk'), 'utf8');
+const fileSystem = fs.readFileSync(path.join(root, 'core/fs/adapters/file_system.ahk'), 'utf8');
 // The strict reader first refuses an inadmissible (NUL-bearing) path by throwing,
 // then reads the raw bytes; neither step may fall back to a silent result.
 function assertStrictRawRead(source) {

@@ -21,7 +21,7 @@ local ConfigKeys = require("settings.engine.keys")
 function M.new(options)
 	assert(type(options) == "table" and type(options.gestures) == "table", "gesture scope requires its runtime owner")
 	local gestures = options.gestures
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local source, decoded
 	local function parameter_domain(path)
 		local key = path:match("^gesture_parameters%.(.+)$")

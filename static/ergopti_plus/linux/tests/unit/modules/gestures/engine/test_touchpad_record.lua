@@ -203,7 +203,7 @@ helpers.describe("touchpad record: replaying into the decoder", function()
 	helpers.it("(touchpad-record) every kept trace decodes into the gestures it declares", function()
 		-- Traces sit beside the other fixtures as touchpad_record_<name>.yml.
 		local directory = helpers.driver_root() .. "/tests/fixtures"
-		local Directory = require("infra.native_directory")
+		local Directory = require("core.fs.engine.native_directory")
 		local entries = assert(Directory.entries(directory))
 		helpers.assert_true(#entries > 0, "the fixture directory is listed")
 		for _, entry in ipairs(entries) do

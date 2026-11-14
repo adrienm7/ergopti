@@ -86,7 +86,7 @@ helpers.describe("personal metadata complete-record ownership", function()
 				local original = '[_meta]\ndelay = 0.33\ndescription = "kept"\n' .. preserved
 					.. '\n[[live]]\n"probe" = "replacement"\n'
 				local content, writes = original, 0
-				package.loaded["adapters.file_system"] = {
+				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function() return content, "ok" end,
 					write_if_unchanged = function(path, candidate, expected)
 						helpers.assert_eq(path, "/personal/sample.toml")
@@ -118,7 +118,7 @@ helpers.describe("personal metadata complete-record ownership", function()
 		Fixture.with_window(function()
 			local original = '[_meta]\ndelay = 0.33\n\n[[live]]\n"probe" = "replacement"\n'
 			local content, writes = original, 0
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return content, "ok" end,
 				write_if_unchanged = function() writes = writes + 1; return true end,
 			}

@@ -25,9 +25,9 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local TomlCodec = require("infra.toml.codec")
-local JsonCodec = require("adapters.json_codec")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local SharedFile = require("tap_hold.engine.shared_file")
 local Migrate = require("tap_hold.engine.migrate")
 local KeyCatalog = require("tap_hold.engine.key_catalog")

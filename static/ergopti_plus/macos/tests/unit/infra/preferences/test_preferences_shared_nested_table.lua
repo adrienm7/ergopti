@@ -18,8 +18,8 @@ local codec = require("core.text.engine.toml_codec")
 --- @param source string Initial file content.
 --- @param body function Receives (prefs, read_source).
 local function with_prefs(source, body)
-	helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
-		package.loaded["adapters.file_system"] = {
+	helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() return source, "ok" end,
 			write = function() error("unguarded publication") end,
 			write_if_unchanged = function(_, content)

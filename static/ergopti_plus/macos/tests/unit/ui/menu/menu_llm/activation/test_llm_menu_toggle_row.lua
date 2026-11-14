@@ -312,7 +312,7 @@ end)
 local function outer_parent_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/macos_llm_outer_parent.json"), "rb"))
 	local raw = file:read("*a"); file:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 local function with_genuine_outer_parent(calls, callback)

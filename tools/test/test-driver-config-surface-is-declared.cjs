@@ -564,7 +564,7 @@ function hasSecondaryPublicationOwner(source, sourceRoot = DRIVERS_DIR) {
 		/TomlRecordEditor\.patch_table_field\(content,/.test(prepare[0]) &&
 		/local prepared, prepare_error = prepare_override_content\(overrides\)/.test(save[0]) &&
 		/content = prepared/.test(save[0]) &&
-		/^local FileSystem\s*= require\("adapters\.file_system"\)\s*$/m.test(source) &&
+		/^local FileSystem\s*= require\("core\.fs\.adapters\.file_system"\)\s*$/m.test(source) &&
 		/^local PublicationRecovery = require\("hotstrings\.engine\.publication_recovery"\)\s*$/m.test(
 			source
 		) &&
@@ -831,7 +831,7 @@ function M.new(options)
 	assert(type(slot) == "string" and parameters.validate_action_parameter("run_program", options.scalar) == true,
 		"program binding model is invalid")
 	local owner, held, retiring, busy = {}, {}, false, false
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local checkpoint, reconcile_pending, inverse_source = nil, false, nil
 	local ports = { { acquire = parameters.acquire_parameter_configuration, release = parameters.release_parameter_configuration,
 		snapshot = function()

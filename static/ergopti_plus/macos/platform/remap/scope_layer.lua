@@ -20,7 +20,7 @@ local receipts = setmetatable({}, { __mode = "k" })
 --- @param record table Private import identity.
 --- @return string|nil, string, string|nil Classified native source.
 local function read(record)
-	return require("core.text.engine.toml_codec.writer").read_classified(record.path, require("adapters.file_system"))
+	return require("core.text.engine.toml_codec.writer").read_classified(record.path, require("core.fs.adapters.file_system"))
 end
 
 --- Removes only the acknowledged import. A changed or unreadable source
@@ -35,7 +35,7 @@ local function remove(record)
 	if status == "absent" then return true, nil, false end
 	if status ~= "ok" then return false, "navigation-layer-source-unreadable: " .. tostring(detail or status) end
 	if content ~= record.content then return false, "navigation-layer-source-changed" end
-	local removed = require("platform.remap.nav_layer").undo_import(record, require("adapters.file_system"))
+	local removed = require("platform.remap.nav_layer").undo_import(record, require("core.fs.adapters.file_system"))
 	local _, observed, observed_detail = read(record)
 	if removed ~= true then
 		-- A native refusal may follow a partial removal. Keep its possible
@@ -74,7 +74,7 @@ local function replace(record)
 		return false, "navigation-layer-restore-conflict: " .. tostring(detail or status)
 	end
 	local written, write_err, retry_cleanup = require("core.text.engine.toml_codec.writer").publish_if_unchanged(record.path, record.content,
-		require("adapters.file_system"), { status = "absent" })
+		require("core.fs.adapters.file_system"), { status = "absent" })
 	if type(retry_cleanup) == "function" then record.restoration_receipt = { publication_cleanup = retry_cleanup } end
 	return written, write_err
 end

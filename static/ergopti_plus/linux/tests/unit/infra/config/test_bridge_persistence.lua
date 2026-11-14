@@ -101,10 +101,10 @@ end
 helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("paths_editor_bridge makes the selected config directory authoritative", function()
-		local saved_storage = package.loaded["adapters.storage"]
+		local saved_storage = package.loaded["core.fs.adapters.storage"]
 		local saved_paths = package.loaded["infra.config_paths"]
 		local values, publications = {}, 0
-		package.loaded["adapters.storage"] = {
+		package.loaded["core.fs.adapters.storage"] = {
 			get = function(key, fallback)
 				local value = values[key]
 				if value == nil then return fallback end
@@ -156,7 +156,7 @@ helpers.describe("bridge handler TOML persistence", function()
 			helpers.assert_eq(values["paths.config_dir"], nil)
 			helpers.assert_eq(ConfigPaths.get_config_dir(), ConfigPaths.default_config_dir())
 		end)
-		package.loaded["adapters.storage"] = saved_storage
+		package.loaded["core.fs.adapters.storage"] = saved_storage
 		package.loaded["infra.config_paths"] = saved_paths
 		package.loaded["ui.paths_editor.bridge"] = nil
 		if not ok then error(err, 0) end
@@ -406,7 +406,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		assert(made == true or made == 0)
 		local path = root .. "/personal.toml"
 		local native_open, native_rename = io.open, os.rename
-		local NativeWriter = require("infra.regular_file_writer")
+		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local native_stage = NativeWriter.open
 		local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
 		local old_manager = package.loaded["ui.webview_manager"]
@@ -561,19 +561,19 @@ end)
 
 helpers.describe("configuration filesystem root persistence", function()
 	helpers.it("linux-config-invalid-stored-path: refuses embedded NUL in persisted override", function()
-		local saved_storage = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = { get = function() return "/tmp\0/other" end }
+		local saved_storage = package.loaded["core.fs.adapters.storage"]
+		package.loaded["core.fs.adapters.storage"] = { get = function() return "/tmp\0/other" end }
 		local paths = require("infra.config_paths")
 		local ok, actual = pcall(paths.get_config_dir)
-		package.loaded["adapters.storage"] = saved_storage
+		package.loaded["core.fs.adapters.storage"] = saved_storage
 		helpers.assert_true(ok)
 		helpers.assert_eq(actual, paths.default_config_dir(), "a corrupt override must not reach native path APIs")
 	end)
 	for _, selected in ipairs({ "/", "///" }) do
 		helpers.it("linux-config-root: selected root survives bootstrap storage: " .. selected, function()
-			local saved_storage, saved_paths = package.loaded["adapters.storage"], package.loaded["infra.config_paths"]
+			local saved_storage, saved_paths = package.loaded["core.fs.adapters.storage"], package.loaded["infra.config_paths"]
 			local values, deleted = {}, 0
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key, fallback) return values[key] or fallback end,
 				set = function(key, value) values[key] = value; return true end,
 				delete = function(key) values[key] = nil; deleted = deleted + 1; return true end,
@@ -590,7 +590,7 @@ helpers.describe("configuration filesystem root persistence", function()
 				helpers.assert_true(paths.set_config_dir(""))
 				helpers.assert_eq(paths.get_config_dir(), paths.default_config_dir())
 			end, debug.traceback)
-			package.loaded["adapters.storage"], package.loaded["infra.config_paths"] = saved_storage, saved_paths
+			package.loaded["core.fs.adapters.storage"], package.loaded["infra.config_paths"] = saved_storage, saved_paths
 			if not ok then error(err, 0) end
 		end)
 	end

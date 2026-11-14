@@ -334,8 +334,8 @@ try {
 		assert.equal(head.status, 0, head.stderr);
 		const shared = path.join(library, '_shared');
 		const probe = [
-			'local Paths = require("infra.paths")',
-			'local Fs = require("adapters.file_system")',
+			'local Paths = require("core.fs.engine.paths")',
+			'local Fs = require("core.fs.adapters.file_system")',
 			'local Snapshot = require("diagnostics.engine.snapshot")',
 			'assert(Paths.driver_root() == os.getenv("ARCH_LIBRARY_ROOT"), "staged driver root")',
 			'assert(Paths.shared_root() == os.getenv("ARCH_SHARED_ROOT"), "staged shared root")',

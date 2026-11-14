@@ -315,7 +315,7 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 	end)
 
 	helpers.it("replays the shared base delay corpus the other drivers replay", function()
-		local path = assert(helpers.load_module("infra.paths").shared("tests/corpus/hotstrings/base_delay_vectors.json"))
+		local path = assert(helpers.load_module("core.fs.engine.paths").shared("tests/corpus/hotstrings/base_delay_vectors.json"))
 		local handle = assert(io.open(path, "rb"))
 		local corpus = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()

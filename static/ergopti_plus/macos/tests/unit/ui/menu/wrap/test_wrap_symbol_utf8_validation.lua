@@ -19,7 +19,7 @@ local function run_action(responses)
 		"ui.menu.menu_shortcuts",
 		"infra.logger",
 		"infra.deferred_work",
-		"infra.fs_dir",
+		"core.fs.engine.dir",
 		"infra.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
@@ -36,7 +36,7 @@ local function run_action(responses)
 		local updates = 0
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function()
 				prompt_index = prompt_index + 1

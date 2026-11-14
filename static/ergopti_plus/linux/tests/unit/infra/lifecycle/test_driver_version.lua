@@ -104,7 +104,7 @@ end)
 
 describe("linux-version-read-admission", function()
 	local Version = require("infra.version")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	for _, case in ipairs({
 		{ "regular release bytes", "version=1.2.3\n", "1.2.3", "build" },
 		{ "refused native source", false, "local", "local" },
@@ -176,8 +176,8 @@ describe("Driver version: infra/version.lua resolves the stamp", function()
 	it("a fresh load takes M.VERSION from the stamp, never from a typed literal", function()
 		-- Loads the module itself over a stamped shared root: a version typed in
 		-- the source (the old "3.0.0") would ignore the stamp and fail here.
-		local Paths = require("infra.paths")
-		local FileSystem = require("adapters.file_system")
+		local Paths = require("core.fs.engine.paths")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local restore = helpers.keep_loaded({ "infra.version" })
 		local original_root, original_read = Paths.shared_root, FileSystem.read
 		Paths.shared_root = function() return SHARED end
@@ -206,7 +206,7 @@ end)
 describe("Driver version: the crash dump names the version and the app dir", function()
 	it("writes both lines although the daemon passes no context", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
-			local Paths = require("infra.paths")
+			local Paths = require("core.fs.engine.paths")
 			local Version = require("infra.version")
 			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
 			local ok, err = pcall(Reporter.dump, "ergopti_hotstrings", "boom")

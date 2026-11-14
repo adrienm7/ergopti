@@ -150,7 +150,7 @@ local function configuration_parent_fixture(body)
 	if not completed then error(failure, 0) end
 end
 
-local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
+local configuration_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
 local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
 require("tests.lua.settings.configuration_parent_contract").register(helpers, configuration_parent_fixture,
@@ -205,7 +205,7 @@ local function language_callback_fixture(body)
 		local module_file = assert(package.searchpath("ui.menu.menu_language", package.path)):gsub("^%./", "")
 		helpers.assert_true(production_source:sub(-#module_file) == module_file,
 			"the producer must be defined in " .. module_file .. ", got " .. production_source)
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())
 		local corpus = assert(require("core.text.engine.json").decode(raw))

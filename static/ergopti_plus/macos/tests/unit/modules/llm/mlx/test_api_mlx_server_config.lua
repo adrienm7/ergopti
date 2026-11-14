@@ -114,8 +114,8 @@ end)
 -- =====================================================
 
 local function require_with_registry_port(port)
-	local Paths = require("infra.paths")
-	local Storage = require("adapters.storage")
+	local Paths = require("core.fs.engine.paths")
+	local Storage = require("core.fs.adapters.storage")
 	local original_shared = Paths.shared
 	local original_get = Storage.get
 	local original_open = io.open

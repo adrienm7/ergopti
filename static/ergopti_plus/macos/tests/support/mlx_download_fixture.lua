@@ -9,8 +9,8 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.json_codec",
-	"adapters.file_system",
+	"core.fs.adapters.json_codec",
+	"core.fs.adapters.file_system",
 	"hs",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
@@ -25,7 +25,7 @@ local MODULES = {
 	"ui.download_window",
 	"ui.download_window.javascript",
 	"ui.ui_builder",
-	"infra.paths",
+	"core.fs.engine.paths",
 	"infra.deferred_work",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.prediction_lock_registry",
@@ -80,7 +80,7 @@ local function with_fixture(plan, callback)
 				tasks = {launcher = {}, tail = {}},
 			}
 
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				classify_no_follow = function(path)
 					if plan.session_classify_failure then return nil, "error" end
 					if controls.files[path] == nil then return nil, "absent" end
@@ -515,7 +515,7 @@ local function with_fixture(plan, callback)
 			}
 			if plan.real_window then
 				_G.hs.timer.secondsSinceEpoch = function() return 100 end
-				package.loaded["infra.paths"] = { shared = function()
+				package.loaded["core.fs.engine.paths"] = { shared = function()
 					return helpers.driver_root() .. "../_shared"
 				end }
 				package.loaded["infra.deferred_work"] = { after = function() return true end }

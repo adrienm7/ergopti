@@ -22,9 +22,9 @@ local SOURCE = '[other]\nvalue = 17\n[tap_holds]\nfuture = "keep"\n'
 --- @param source string Configuration, in the Karabiner model layout.
 --- @param body function Assertions receiving save, state and captured bytes.
 local function with_source(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.toml.codec", "core.text.engine.toml_codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.toml.codec", "core.text.engine.toml_codec" }, function()
 		local config = helpers.load_with_stubs("platform.remap.config")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		-- The source is stated in the Karabiner model; the file holds its
 		-- shared tap_hold.toml text, read back through the same translation.
 		local Text = require("tests.support.tap_hold_file_text")

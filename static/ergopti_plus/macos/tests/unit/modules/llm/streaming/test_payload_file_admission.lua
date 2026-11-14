@@ -17,7 +17,7 @@ helpers.describe("streaming requires an acknowledged complete payload", function
 				helpers.assert_true(h.request())
 				helpers.assert_eq(h.writes, 1); helpers.assert_eq(h.closes, 1)
 				helpers.assert_eq(h.spawns, 1)
-				local payload = require("adapters.json_codec").decode(h.payload)
+				local payload = require("core.fs.adapters.json_codec").decode(h.payload)
 				helpers.assert_eq(payload.stream, true)
 				helpers.assert_true(h.payload:find("typed context", 1, true) ~= nil)
 			end)

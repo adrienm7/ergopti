@@ -15,7 +15,7 @@ local root, catalog, mode = arg[1], arg[2], arg[3]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
   .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
 require('core.lifecycle.engine.compat.utf8').install()
-local paths = require('infra.paths')
+local paths = require('core.fs.engine.paths')
 local original = paths.shared
 paths.shared = function(name)
   if name == 'core/i18n/data/locales' then return catalog end
@@ -50,7 +50,7 @@ end
 local selected, stored = false, nil
 if ok and (mode == 'directory-entry' or mode == 'regular-link') then
   selected = i18n.persist_locale(mode == 'directory-entry' and 'zz' or 'ja')
-  stored = require('adapters.storage').get('locale')
+  stored = require('core.fs.adapters.storage').get('locale')
 end
 print('CATALOG_RESULT ' .. require('core.text.engine.json').encode({
   ok=ok,codes=ok and codes or {},reason=ok and '' or tostring(codes),retained=retained,

@@ -11,7 +11,7 @@
 
 local M = {}
 
-local RegularFileReader = require("infra.regular_file_reader")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
 
 --- Whether the configuration file is absent, the wizard's only trigger.
 --- @param path string Absolute config.toml path.

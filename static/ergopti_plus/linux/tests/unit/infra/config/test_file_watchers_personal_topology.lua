@@ -1,7 +1,7 @@
 --- tests/unit/infra/config/test_file_watchers_personal_topology.lua
 
 ---
---- Unit tests for infra/file_watchers.lua. Exercises the public API —
+--- Unit tests for core/fs/engine/file_watchers.lua. Exercises the public API —
 --- has_inotify(), start/stop lifecycle, debounce deadline logic, and
 --- pump-mode mtime polling — by creating a real temporary directory
 --- with .toml files and driving changes through M.pump().
@@ -184,7 +184,7 @@ helpers.describe("file_watchers Personal topology", function()
 			move_parent_timestamp(path)
 			for index, value in ipairs(directories) do if value == path then table.remove(directories, index); break end end
 		end
-		local previous_watch = package.loaded["infra.file_watchers"]
+		local previous_watch = package.loaded["core.fs.engine.file_watchers"]
 		local previous_posix, previous_posix_preload = package.loaded["posix"], package.preload["posix"]
 		local previous_shell = package.loaded["adapters.shell_runner"]
 		local watcher
@@ -197,7 +197,7 @@ helpers.describe("file_watchers Personal topology", function()
 					package.preload["posix"] = function() error("explicit supported no-posix watcher backend") end
 				end
 				package.loaded["adapters.shell_runner"] = shell_port
-				watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", backend_name == "native" and backend or false)
+				watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", backend_name == "native" and backend or false)
 				package.loaded["posix"], package.preload["posix"] = previous_posix, previous_posix_preload
 				package.loaded["adapters.shell_runner"] = previous_shell
 			end
@@ -259,7 +259,7 @@ helpers.describe("file_watchers Personal topology", function()
 			end
 		end
 		native_luv.run("nowait")
-		package.loaded["infra.file_watchers"], package.loaded["posix"] = previous_watch, previous_posix
+		package.loaded["core.fs.engine.file_watchers"], package.loaded["posix"] = previous_watch, previous_posix
 		package.preload["posix"], package.loaded["adapters.shell_runner"] = previous_posix_preload, previous_shell
 		for path in pairs(files) do local deleted, detail = native_luv.fs_unlink(path); if not deleted then failures[#failures + 1] = tostring(detail) end end
 		for index = #directories, 1, -1 do local deleted, detail = native_luv.fs_rmdir(directories[index]); if not deleted then failures[#failures + 1] = tostring(detail) end end

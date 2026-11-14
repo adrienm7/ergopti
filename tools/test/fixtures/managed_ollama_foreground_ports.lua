@@ -30,10 +30,10 @@ function M.new(root, production, options)
 	modules["modules.llm.progressive_reveal"], modules["ai.engine.ollama.local_model_policy"] = {}, {}
 	modules["modules.llm.api_common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,
 		get_retry_policy = function() return 1, 0, 0 end }
-	modules["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+	modules["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 	-- The backend imports its stream file owner too; foreground restarts must
 	-- never allocate inference payloads through that independent dependency.
-	modules["adapters.file_system"] = { create_secure_temp_file = function()
+	modules["core.fs.adapters.file_system"] = { create_secure_temp_file = function()
 		error("Streaming payload allocation is not admitted by this foreground fixture")
 	end }
 	modules["adapters.http_client"] = { new = function()

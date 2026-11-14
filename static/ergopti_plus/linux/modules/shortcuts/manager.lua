@@ -35,7 +35,7 @@ local M = {}
 local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local Manifest = require("infra.manifest_reader")
 local TextCase = require("core.text.engine.unicode_case")
 local WrapPair = require("keyboard.engine.wrap_pair")
@@ -1142,7 +1142,7 @@ function M.capture_collision_inventory()
 			and collision_generation == epoch and _enabled == enabled and _wrap_on_type == wrap
 			and rawequal(wrap_source, source) and wrap_pairs_equal(WRAP_PAIRS, source.pairs)
 			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
-			and rawequal(package.loaded["infra.paths"], Paths) and Paths.shared == collision_shared
+			and rawequal(package.loaded["core.fs.engine.paths"], Paths) and Paths.shared == collision_shared
 			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
 			and rawequal(package.loaded["core.text.engine.toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode
 			and rawequal(package.loaded["core.text.engine.json"], collision_json) and collision_json.decode == collision_json_decode

@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local helper = assert(package.searchpath("platform.network.system_proxy_probe", package.path))
 
 --- Runs the helper against a shared root and returns its one receipt.
@@ -76,7 +76,7 @@ helpers.describe("system proxy probe: selection limits come from the shared poli
 					read = function() error("controlled read failure") end,
 					close = function() closed = closed + 1; return true end,
 				} end }
-				local binding = helpers.load_module_with_dependency("infra.proxy_policy", "infra.regular_file_reader", reader)
+				local binding = helpers.load_module_with_dependency("infra.proxy_policy", "core.fs.engine.regular_file_reader", reader)
 				local called, result, reason = pcall(binding[method])
 				helpers.assert_true(called, "read failure must return a refusal")
 				helpers.assert_nil(result)
