@@ -24,7 +24,7 @@ local OWNED = {
 	"infra.logger", "infra.notifications", "infra.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "infra.paths", "adapters.storage",
 	"adapters.http_client", "adapters.json_codec", "adapters.shell_runner",
-	"adapters.timer_scheduler", "modules.llm.profiles",
+	"core.events.timer_scheduler", "modules.llm.profiles",
 	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx",
@@ -75,7 +75,7 @@ local function with_api(scenario)
 				return { start = function() return true end }
 			end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			awake_time = function() return 100 end,
 			after = function(delay, callback)
 				local handle = { timer = {}, delay = delay, callback = callback }

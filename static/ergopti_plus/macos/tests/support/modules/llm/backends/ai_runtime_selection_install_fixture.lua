@@ -235,7 +235,7 @@ local function load_ollama_checker(state, daemon)
 		remove = function() return true end,
 	}
 	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
@@ -258,7 +258,7 @@ local function load_mlx_checker(state)
 		remove = function() return true end,
 	}
 	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	return helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
@@ -282,7 +282,7 @@ end
 local STUBBED_MODULES = {
 	"ui.download_window", "modules.llm.ollama_binary", "modules.llm.api_ollama",
 	"modules.llm.pty_process_group", "adapters.task_lifecycle",
-	"adapters.timer_scheduler", "modules.llm.ollama_deps_checker",
+	"core.events.timer_scheduler", "modules.llm.ollama_deps_checker",
 	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
 	"modules.llm.network_env", "adapters.file_system",

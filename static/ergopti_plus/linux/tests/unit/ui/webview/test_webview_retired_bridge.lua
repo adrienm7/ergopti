@@ -82,7 +82,7 @@ end)
 --- @param run function Receives the actual bridge, manager and presentation receipts.
 local function with_download_page(run)
 	local names = { "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
-		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
+		"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
 		"ui.download_window.bridge", "infra.manifest_reader" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end

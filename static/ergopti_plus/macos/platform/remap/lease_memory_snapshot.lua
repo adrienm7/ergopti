@@ -21,7 +21,7 @@ local M = {}
 
 local Logger         = require("infra.logger")
 local ShellRunner    = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "lease_memory"
 

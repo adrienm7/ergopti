@@ -23,7 +23,7 @@ local CONFIGURED_SEC = 0.5
 --- Returns the native timer list of the stub the scheduler captured.
 --- @return table timers
 local function native_timers()
-	local scheduler_after = require("adapters.timer_scheduler").after
+	local scheduler_after = require("core.events.timer_scheduler").after
 	for index = 1, 60 do
 		local name, value = debug.getupvalue(scheduler_after, index)
 		if not name then break end

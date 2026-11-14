@@ -57,7 +57,7 @@ end
 --- @return table Script-control module.
 local function fresh_script_control(scheduler, tap_factory)
 	install_dependency_stubs()
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["modules.shortcuts.script_control"] = nil
 	return helpers.load_with_stubs("modules.shortcuts.script_control", {
 		eventtap = {

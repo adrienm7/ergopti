@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"platform.remap.watchers", "adapters.shell_runner", "adapters.timer_scheduler",
+	"platform.remap.watchers", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.input_source_broker", "adapters.task_environment", "infra.launcher_environment",
 	"infra.deferred_work", "diagnostics.engine.runtime_log", "infra.logger", "infra.timings", "infra.keycodes",
 	"adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
@@ -63,7 +63,7 @@ function M.with_world(options, callback)
 			end },
 		}
 		w.shell = require("adapters.shell_runner")
-		w.scheduler = require("adapters.timer_scheduler")
+		w.scheduler = require("core.events.timer_scheduler")
 		w.watchers = require("platform.remap.watchers")
 		function w.start()
 			local accepted = w.watchers.start_input_source_watcher(function(layout) w.changes[#w.changes + 1] = layout end)

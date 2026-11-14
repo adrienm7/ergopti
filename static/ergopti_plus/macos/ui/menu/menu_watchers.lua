@@ -17,7 +17,7 @@ local Logger      = require("infra.logger")
 local git_status  = require("infra.git_status")
 local reload_gate = require("core.lifecycle.engine.reload.gate")
 local Timings     = require("infra.timings")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local TableUtil   = require("core.text.engine.table_util")
 local LOG         = "menu_watchers"
 

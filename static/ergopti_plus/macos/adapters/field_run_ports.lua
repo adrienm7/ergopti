@@ -39,7 +39,7 @@ local Logger = require("infra.logger")
 local Json = require("core.text.engine.json")
 local FileSystem = require("adapters.file_system")
 local ShellRunner = require("adapters.shell_runner")
-local Timer = require("adapters.timer_scheduler")
+local Timer = require("core.events.timer_scheduler")
 local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "adapters.field_run_ports"

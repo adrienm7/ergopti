@@ -229,7 +229,7 @@ helpers.describe("notifications.notify", function()
 		click()
 		click()
 		helpers.assert_eq(actions, 1, "a retired notification must not repeat its action")
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local previous_after = scheduler.after
 		local expire
 		scheduler.after = function(_, callback) expire = callback; return {}, true end

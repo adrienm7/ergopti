@@ -16,7 +16,7 @@ local function with_host(scenario)
 	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
 		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "ui.ui_builder", "ui.webview_close_owner",
 		"infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "adapters.file_system",
-		"core.ui.engine.window_titles", "core.text.engine.json", "adapters.json_codec", "infra.deferred_work", "adapters.timer_scheduler",
+		"core.ui.engine.window_titles", "core.text.engine.json", "adapters.json_codec", "infra.deferred_work", "core.events.timer_scheduler",
 		"infra.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "tests.support.webview_recursive_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
@@ -91,7 +91,7 @@ local function with_host(scenario)
 				return bridge
 			end } },
 		})
-		local scheduler = package.loaded["adapters.timer_scheduler"]
+		local scheduler = package.loaded["core.events.timer_scheduler"]
 		local after = scheduler.after
 		scheduler.after = function(delay, callback)
 			h.retirement_callbacks[#h.retirement_callbacks + 1] = callback

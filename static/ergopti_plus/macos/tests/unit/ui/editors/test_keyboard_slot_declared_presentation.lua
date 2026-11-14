@@ -19,7 +19,7 @@ local function fixture(callback, cleanup_failures)
 		helpers.with_stub_scope({
 			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
-			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
+			"adapters.json_codec", "core.events.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
 			"adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
 			"_generated.locale_table", "_generated.logger_sub_files", "adapters.log_transport", "core.fs.engine.app_dirs",
@@ -76,7 +76,7 @@ local function fixture(callback, cleanup_failures)
 						return view
 					end,
 				}
-				local scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+				local scheduler = helpers.load_with_stubs("core.events.timer_scheduler", {
 					json = { decode = Json.decode, encode = function(payload)
 						state.payloads[#state.payloads + 1] = payload
 						if state.encode_hook then state.encode_hook(payload) end

@@ -23,7 +23,7 @@ local FIXTURE_MODULES = {
 	"adapters.graphics_renderer",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -135,7 +135,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				resolve_group_hex = function() return nil end,
 				unit_label = function() return "MPM" end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				every = function(_, callback)
 					local handle = { callback = callback, active = true }
 					timer_handles[#timer_handles + 1] = handle

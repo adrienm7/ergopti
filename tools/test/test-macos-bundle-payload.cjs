@@ -369,13 +369,13 @@ const CURATED_READS = [
 		needles: [
 			'require("core.lifecycle.engine.core.managed_python_locator")',
 			'require("adapters.native_python_probe")',
-			'require("adapters.timer_scheduler")',
+			'require("core.events.timer_scheduler")',
 			'require("modules.llm.bootstrap_retry_generated")'
 		],
 		targets: [
 			'ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua',
 			'ergopti_plus/macos/adapters/native_python_probe.lua',
-			'ergopti_plus/macos/adapters/timer_scheduler.lua',
+			'ergopti_plus/macos/core/events/timer_scheduler.lua',
 			'ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'
 		],
 		why: 'private Python selection consumes the generated pinned locator and retained native header probe'

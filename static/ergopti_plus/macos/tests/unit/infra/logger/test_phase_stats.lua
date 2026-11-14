@@ -121,9 +121,9 @@ end)
 helpers.describe("infra.phase_stats lifecycle", function()
 	helpers.it("arms one timer, refuses a second start and stops it paired", function()
 		fresh()
-		local real_timer = package.loaded["adapters.timer_scheduler"]
+		local real_timer = package.loaded["core.events.timer_scheduler"]
 		local armed, cancelled, tick = 0, 0, nil
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function(_, fn) armed = armed + 1; tick = fn; return { id = armed }, true end,
 			cancel = function() cancelled = cancelled + 1; return true end,
 		}
@@ -136,7 +136,7 @@ helpers.describe("infra.phase_stats lifecycle", function()
 		helpers.assert_eq(Stats.stop_reporting(), true)
 		helpers.assert_eq(cancelled, 1)
 		helpers.assert_eq(Stats.stop_reporting(), true, "stopping twice is harmless")
-		package.loaded["adapters.timer_scheduler"] = real_timer
+		package.loaded["core.events.timer_scheduler"] = real_timer
 	end)
 end)
 

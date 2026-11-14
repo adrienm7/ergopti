@@ -49,7 +49,7 @@ local OWNED_MODULES = {
 	"adapters.key_state",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.http_client",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -218,7 +218,7 @@ local function with_fixture(callback)
 				end,
 			}
 
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				every = function(delay, timer_callback)
 					return {
 						delay = delay,

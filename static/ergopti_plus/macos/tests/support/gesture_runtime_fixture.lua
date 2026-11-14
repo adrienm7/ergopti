@@ -23,7 +23,7 @@ local M = {}
 -- =======================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"hs",
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
@@ -150,7 +150,7 @@ function M.with_fixture(options, scenario)
 		if handle then handle.active = false end
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	local watcher = {
 		running_state = false,

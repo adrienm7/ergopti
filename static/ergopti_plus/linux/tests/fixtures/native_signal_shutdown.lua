@@ -63,7 +63,7 @@ if arg[1] == "child" then
 			return original()
 		end
 		env.install_signal_handlers = compile(installer .. "\nreturn install_signal_handlers", env)()
-		env.event_loop = require("adapters.event_loop")
+		env.event_loop = require("core.events.loop")
 		local admission = assert(text:match("(%-%- Admit graceful terminal signals.-)\n\tBootProfiler.stage%(\"input hooks\"%)"))
 		local capture_reached = false
 		env.fixture_capture = function() capture_reached = true end

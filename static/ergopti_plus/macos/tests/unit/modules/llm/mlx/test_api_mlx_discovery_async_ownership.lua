@@ -15,7 +15,7 @@ local function snapshot_modules()
 	return {
 		http_client = package.loaded["adapters.http_client"],
 		shell_runner = package.loaded["adapters.shell_runner"],
-		timer_scheduler = package.loaded["adapters.timer_scheduler"],
+		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		discovery = package.loaded["modules.llm.api_mlx_discovery"],
 		hs_module = package.loaded["hs"],
 		global_hs = rawget(_G, "hs"),
@@ -39,7 +39,7 @@ local function make_env(options)
 		tasks = {},
 	}
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now = function() return env.wall_now end,
 		awake_time = function() return env.awake_now end,
 		after = function(delay, callback)
@@ -152,7 +152,7 @@ end
 local function restore_modules(saved)
 	package.loaded["adapters.http_client"] = saved.http_client
 	package.loaded["adapters.shell_runner"] = saved.shell_runner
-	package.loaded["adapters.timer_scheduler"] = saved.timer_scheduler
+	package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 	package.loaded["modules.llm.api_mlx_discovery"] = saved.discovery
 	package.loaded["hs"] = saved.hs_module
 	_G.hs = saved.global_hs

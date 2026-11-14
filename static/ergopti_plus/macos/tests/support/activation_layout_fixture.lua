@@ -32,7 +32,7 @@ local STUB_MODULES = {
 	"platform.remap.lease_controller",
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
@@ -432,7 +432,7 @@ local function with_remap(options, body)
 			return timer
 		end
 
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = {
 					fired = false,

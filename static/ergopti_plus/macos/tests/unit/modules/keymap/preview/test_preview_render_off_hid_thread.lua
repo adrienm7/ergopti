@@ -172,7 +172,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 	helpers.it("reset_predictions drops a render already queued for the next tick", function()
 		local dependency_names = {
 			"adapters.synthetic_input",
-			"adapters.timer_scheduler",
+			"core.events.timer_scheduler",
 			"modules.keymap.utils",
 			"modules.llm",
 			"modules.llm.prediction_engine",
@@ -212,7 +212,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			scheduled[#scheduled + 1] = handle
 			return handle, true
 		end
-		package.loaded["adapters.timer_scheduler"] = timer_scheduler
+		package.loaded["core.events.timer_scheduler"] = timer_scheduler
 		package.loaded["modules.keymap.utils"] = {
 			tokens_from_repl = function(value) return value end,
 			plain_text = function(value) return value end,

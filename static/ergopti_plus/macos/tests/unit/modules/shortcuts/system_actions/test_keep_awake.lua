@@ -18,7 +18,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	local function make_sys_with_alert_spy()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 
 		local show_calls      = {}
 		local close_all_calls = 0
@@ -51,7 +51,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		with_fixture(function()
 			package.loaded["infra.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 
 			local close_calls = 0
 
@@ -74,7 +74,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		with_fixture(function()
 			package.loaded["infra.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 
 			local close_calls = 0
 
@@ -101,7 +101,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		with_fixture(function()
 			package.loaded["infra.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 
 			local close_all_calls = 0
 			local closed_ids      = {}
@@ -132,7 +132,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		with_fixture(function()
 			package.loaded["infra.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 
 			local close_all_calls = 0
 
@@ -158,7 +158,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	local function activate_with_watcher()
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
 		local sys = load_system()
@@ -252,7 +252,7 @@ local function fake_activity_event()
 			local F18 = require("infra.keycodes").F18_WAKE_OS
 			package.loaded["infra.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["adapters.synthetic_input"] = nil
 			package.loaded["adapters.event_provenance"] = nil
 

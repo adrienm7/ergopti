@@ -69,7 +69,7 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 	helpers.it("uses the monotonic clock and rejects an unowned or expired sentinel", function()
 		local rg = fresh()
 		local storage = require("adapters.storage")
-		local timer = require("adapters.timer_scheduler")
+		local timer = require("core.events.timer_scheduler")
 		local previous_clock, previous_wall = timer.now_ns, os.time
 		local tick, wall = 1000000000, 100000
 		timer.now_ns = function() return tick end

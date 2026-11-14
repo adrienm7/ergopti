@@ -184,7 +184,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 	helpers.it("acquires terminator replay before committing a paced terminal replacement", function()
 		local expander, synthetic = SyntheticStack.load("modules.keymap.expander")
 		local text_sender = require("adapters.text_sender")
-		local timer_scheduler = require("adapters.timer_scheduler")
+		local timer_scheduler = require("core.events.timer_scheduler")
 		local terminator_replay = require("modules.keymap.terminator_replay")
 		local target = { id = "terminal-app" }
 		local original_target = text_sender.terminalInputTarget

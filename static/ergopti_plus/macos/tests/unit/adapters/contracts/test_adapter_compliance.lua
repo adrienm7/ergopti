@@ -62,7 +62,7 @@ local ADAPTERS_UNDER_TEST = {
 	{ module = "adapters.text_sender", port = "TextSender" },
 	{ module = "adapters.tooltip_renderer", port = "TooltipRenderer" },
 	{ module = "adapters.http_client", port = "HttpClient" },
-	{ module = "adapters.timer_scheduler", port = "TimerScheduler" },
+	{ module = "core.events.timer_scheduler", port = "TimerScheduler" },
 	{ module = "adapters.notifier", port = "Notifier" },
 	{ module = "adapters.hotkey_registrar", port = "HotkeyRegistrar" },
 	{ module = "adapters.tray_menu", port = "TrayMenu" },

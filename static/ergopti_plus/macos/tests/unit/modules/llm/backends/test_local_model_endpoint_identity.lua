@@ -25,7 +25,7 @@ end
 
 local function with_world(body)
 	return helpers.with_stub_scope({ "modules.llm.api_ollama", "modules.llm.ollama_endpoint", "adapters.http_client",
-		"adapters.storage", "infra.logger", "adapters.timer_scheduler", "adapters.json_codec" }, function()
+		"adapters.storage", "infra.logger", "core.events.timer_scheduler", "adapters.json_codec" }, function()
 		local Api = helpers.load_with_stubs("modules.llm.api_ollama")
 		local Storage = require("adapters.storage")
 		local Json = require("core.text.engine.json")

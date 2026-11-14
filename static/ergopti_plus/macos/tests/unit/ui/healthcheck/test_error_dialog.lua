@@ -38,7 +38,7 @@ local function load_dialog(controls)
 	local sharing_schema = require("diagnostics.engine.healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler", "adapters.storage", "infra.manifest_reader",
 		"infra.termination_coordinator",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -61,7 +61,7 @@ local function load_dialog(controls)
 	}
 	local function catalogue() return { ["common.error_title"] = "Error" } end
 	package.loaded["infra.locale"] = { all = catalogue, catalogue = catalogue }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, fn)
 			if delay == 0 then
 				context.close_cleanup = context.close_cleanup or {}

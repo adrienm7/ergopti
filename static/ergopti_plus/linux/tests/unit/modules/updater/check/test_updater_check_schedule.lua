@@ -31,7 +31,7 @@ local function with_manager(opts, body)
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local previous = {}
-	for _, name in ipairs({ "adapters.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+	for _, name in ipairs({ "core.events.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
 		previous[name] = package.loaded[name]
 	end
 	local ctx = { timers = {}, dispatches = {}, clock = { now = opts.now }, available = {} }
@@ -46,7 +46,7 @@ local function with_manager(opts, body)
 		return true
 	end
 	ctx.timer = timer
-	package.loaded["adapters.timer_scheduler"] = timer
+	package.loaded["core.events.timer_scheduler"] = timer
 	local initial = {}
 	ctx.state_key = nil
 	package.loaded["adapters.storage"] = nil

@@ -39,7 +39,7 @@ local text_utils = require("infra.text_utils")
 local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
 local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 
 local LOG = "shortcuts.actions.system"

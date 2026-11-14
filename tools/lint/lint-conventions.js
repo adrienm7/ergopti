@@ -737,6 +737,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
@@ -765,12 +766,14 @@ const ahkAll = [
 // file count and passes.
 const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/events'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/crypto'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/infra'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),

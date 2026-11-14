@@ -7,7 +7,7 @@ local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(body)
  local names = { "modules.updater.manager", "ui.changelog.bridge", "infra.installation", "menu.engine.manifest_reader_core",
-  "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.event_loop",
+  "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline", "core.events.loop",
   "adapters.notifier", "ui.webkit_host", "ui.webview_manager" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { backups = 0, installs = 0, restarts = 0 }

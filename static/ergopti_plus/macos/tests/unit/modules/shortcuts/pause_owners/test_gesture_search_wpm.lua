@@ -55,7 +55,7 @@ local function load_real_wpm_surface(module_name)
 	local cancel_mode = "true"
 	local handles = {}
 	local cancellations = {}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		every = function(_, callback)
 			local handle = { callback = callback }
 			handles[#handles + 1] = handle
@@ -190,7 +190,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}
-		package.loaded["adapters.timer_scheduler"] = permissive({
+		package.loaded["core.events.timer_scheduler"] = permissive({
 			cancel = function() return true end,
 		})
 		package.loaded["modules.gestures"] = nil

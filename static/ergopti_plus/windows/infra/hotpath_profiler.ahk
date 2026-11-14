@@ -32,7 +32,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../adapters/boot_clock.ahk
+#Include ../core/events/boot_clock.ahk
 #Include phase_stats.ahk
 
 ; QueryPerformanceFrequency is constant for the life of the process; cache it on

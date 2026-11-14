@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 
 local function with_client(scenario)
-	helpers.with_fresh_modules({ "adapters.http_client", "adapters.timer_scheduler", "infra.logger",
+	helpers.with_fresh_modules({ "adapters.http_client", "core.events.timer_scheduler", "infra.logger",
 		"infra.http_header_policy" }, function()
 		local world = { calls = {}, timers = 0, logs = {}, mutate = function() end }
 		local http = {}

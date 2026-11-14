@@ -1624,13 +1624,13 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["infra.logger_sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }
 		modules["modules.llm.agent_learning"] = { flush = noop }
-		modules["adapters.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
+		modules["core.events.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
 		modules["adapters.keyboard_hook"] = {
 			isRunning = function() return state.running end,
 			stop = function() state.running = false; state.hooks = state.hooks + 1; record("hook.stop") end,
 			emergency_stop = function() error("ordinary quit must not borrow emergency cleanup") end,
 		}
-		modules["adapters.event_loop"] = { stop = function() state.loops = state.loops + 1; record("loop.stop") end }
+		modules["core.events.loop"] = { stop = function() state.loops = state.loops + 1; record("loop.stop") end }
 		local runtime = runtime_pending and {
 			shutdown_runtime = function() record("runtime.stop"); return state.runtime_ack end,
 			cancel = function() state.cancellations = state.cancellations + 1 end,
@@ -1762,7 +1762,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 	--- Owns one actual libuv timer; only its stop/close refusal ports are controlled.
 	local function with_native_scheduler(refusal, body)
 		local uv = require("luv")
-		local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+		local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 		local state = { allocations = 0, stops = 0, closes = 0, physical_closes = 0,
 			business_calls = 0, admitted = refusal == "accepted" }
 		local function census(owned)
@@ -1796,8 +1796,8 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 				end)
 			end,
 		}, { __index = uv })
-		local scheduler = helpers.load_module_with_dependency("adapters.timer_scheduler", "luv", backend)
-		package.loaded["adapters.timer_scheduler"] = previous_scheduler
+		local scheduler = helpers.load_module_with_dependency("core.events.timer_scheduler", "luv", backend)
+		package.loaded["core.events.timer_scheduler"] = previous_scheduler
 		local token = scheduler.every(60, function() state.business_calls = state.business_calls + 1 end)
 		local cancel_all = scheduler.cancelAll
 		local ok, detail = pcall(function()
@@ -1897,9 +1897,9 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 	end)
 
 	helpers.it("(timer-main-shutdown-ack) an empty real scheduler adds no phantom debt", function()
-		local previous = package.loaded["adapters.timer_scheduler"]
-		local scheduler = helpers.load_module("adapters.timer_scheduler")
-		package.loaded["adapters.timer_scheduler"] = previous
+		local previous = package.loaded["core.events.timer_scheduler"]
+		local scheduler = helpers.load_module("core.events.timer_scheduler")
+		package.loaded["core.events.timer_scheduler"] = previous
 		local coordinator, main = actual_main(nil, false, scheduler)
 		helpers.assert_true(scheduler.HAS_ASYNC and scheduler.activeCount() == 0)
 		helpers.assert_true(coordinator.request("tray quit"))

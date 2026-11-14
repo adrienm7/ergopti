@@ -401,7 +401,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 ; that references adapter functions (e.g. NI_GetSsidHash in keystats_network).
 #Include core/crypto/crypto.ahk
 #Include adapters/clipboard.ahk
-#Include adapters/timer_scheduler.ahk
+#Include core/events/timer_scheduler.ahk
 #Include adapters/file_system.ahk
 ; Crash-safe multi-file config transitions bind strict Windows-only filesystem
 ; operations at this integration boundary; the portable core remains OS-free.

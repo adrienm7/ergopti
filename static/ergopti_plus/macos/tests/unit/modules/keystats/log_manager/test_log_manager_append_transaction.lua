@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 local MUTATED_PACKAGE_SLOTS = {
-	"adapters.file_system", "adapters.timer_scheduler",
+	"adapters.file_system", "core.events.timer_scheduler",
 	"hs", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer",
 	"infra.logger", "infra.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
@@ -151,7 +151,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 		"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
 		"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
-		"infra.timings", "adapters.timer_scheduler",
+		"infra.timings", "core.events.timer_scheduler",
 		"modules.keystats.physical_accounting_mode",
 	}) do
 		package.loaded[name] = nil

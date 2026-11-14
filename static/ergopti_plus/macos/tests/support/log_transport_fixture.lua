@@ -332,7 +332,7 @@ end
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"adapters.log_transport", "tests.stubs.hs", "hs",
-		"adapters.timer_scheduler", "infra.logger",
+		"core.events.timer_scheduler", "infra.logger",
 	}, callback)
 end
 

@@ -184,7 +184,7 @@ helpers.describe("modifier injector: atomic post-eventtap policy handoff", funct
 	-- (stale-physical-event): the one-shot modifier must wait for the next key.
 	helpers.it("leaves a key that waited behind the main thread untouched and the arm live (stale-physical-event)", function()
 		local fixture = make_fixture(true)
-		local EventClock = require("adapters.event_clock")
+		local EventClock = require("core.events.clock")
 		EventClock.reset()
 		local host_ns = 3600 * 1e9
 		local saved = hs.timer.absoluteTime

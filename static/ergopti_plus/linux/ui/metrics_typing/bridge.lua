@@ -87,7 +87,7 @@ end
 --- @param delay_ms number
 --- @return boolean
 local function default_defer(fn, delay_ms)
-	local ok_loop, EventLoop = pcall(require, "adapters.event_loop")
+	local ok_loop, EventLoop = pcall(require, "core.events.loop")
 	if not ok_loop or type(EventLoop.defer) ~= "function" then
 		Logger.error(LOG, "Cannot schedule the dashboard refresh: the event loop has no defer().")
 		return false

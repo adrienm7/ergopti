@@ -37,7 +37,7 @@ local function make_fixture()
 	-- Timers of an earlier scenario must not fire in this one.
 	for index = #hs.timer.__timers, 1, -1 do hs.timer.__timers[index] = nil end
 	-- The scheduler captured the previous scenario's native timers at require time.
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.keystats.context_tracker"] = nil
 	local tracker = helpers.load_with_stubs("modules.keystats.context_tracker", {
 		axuielement = {

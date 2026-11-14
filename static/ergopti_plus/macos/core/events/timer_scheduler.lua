@@ -1,4 +1,4 @@
---- adapters/timer_scheduler.lua
+--- core/events/timer_scheduler.lua
 
 --- ==============================================================================
 --- MODULE: TimerScheduler Adapter (Hammerspoon)
@@ -32,7 +32,7 @@ local Logger = require("infra.logger")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local NumberPolicy = require("core.text.engine.number_policy")
 
-local LOG = "adapters.timer_scheduler"
+local LOG = "core.events.timer_scheduler"
 
 -- hs.timer.new(0) creates a one-shot, while every() promises repetition.
 -- Match the Linux adapter's one-millisecond minimum repeating interval.

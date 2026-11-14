@@ -133,7 +133,7 @@ local function with_healthcheck(controls, callback)
 	helpers.with_fresh_modules({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
 		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-		"infra.dialog_util", "adapters.timer_scheduler", "hs", "tests.stubs.hs",
+		"infra.dialog_util", "core.events.timer_scheduler", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
 		local state = {
@@ -150,7 +150,7 @@ local function with_healthcheck(controls, callback)
 		package.loaded["infra.paths"] = { shared = function() return "/shared" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function() error("the diagnostics window polls nothing") end,
 			cancel = function() return true end,
 			after = function() return true end,

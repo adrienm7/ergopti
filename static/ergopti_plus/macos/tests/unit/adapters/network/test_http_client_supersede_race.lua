@@ -69,7 +69,7 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 		}
 
 		package.loaded["adapters.http_client"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", hs_overrides)
 		local client = HttpClient.new()
 
@@ -124,7 +124,7 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 		}
 
 		package.loaded["adapters.http_client"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", hs_overrides)
 		local client = HttpClient.new()
 

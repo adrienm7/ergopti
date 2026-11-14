@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_fixture(scenario)
 	local names = {
 		"infra.logger", "infra.timings", "adapters.task_lifecycle",
-		"adapters.timer_scheduler", "modules.keystats.log_manager",
+		"core.events.timer_scheduler", "modules.keystats.log_manager",
 		"modules.keystats.watchers",
 	}
 	local saved, saved_hs = {}, _G.hs
@@ -26,7 +26,7 @@ local function with_fixture(scenario)
 		pcall = function(_, callback) return pcall(callback) end,
 	}
 	package.loaded["infra.timings"] = { ms = function() return 1 end }
-	package.loaded["adapters.timer_scheduler"] = { cancel = function() return true end }
+	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
 	package.loaded["adapters.task_lifecycle"] = {
 		native = function(_, _, callback)
 			local task = { complete = callback }

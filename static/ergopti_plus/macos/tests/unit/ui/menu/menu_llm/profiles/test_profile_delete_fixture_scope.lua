@@ -40,7 +40,7 @@ helpers.describe("Profile deletion fixture ownership (profile-delete-fixture-sco
 					local sentinel
 					if initial == "false" then sentinel = false end
 					if initial == "existing" then sentinel = {} end
-					for _, name in ipairs({ "adapters.timer_scheduler", "ui.menu.preferences_transaction",
+					for _, name in ipairs({ "core.events.timer_scheduler", "ui.menu.preferences_transaction",
 						"ui.menu.menu_llm.prediction_lock_registry", "ui.menu.menu_llm.profiles_manager",
 						"ui.menu.menu_llm.trigger_orchestrator", "infra.logger" }) do
 						package.loaded[name] = sentinel
@@ -83,7 +83,7 @@ helpers.describe("Profile deletion fixture ownership (profile-delete-fixture-sco
 
 	helpers.it("rebinds the real timer consumer on consecutive profile fixtures", function()
 		with_observer(function()
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			local previous
 			for attempt = 1, 2 do
 				Fixture.with_delete_fixture({ real_switcher = true }, function()
@@ -92,7 +92,7 @@ helpers.describe("Profile deletion fixture ownership (profile-delete-fixture-sco
 						reads = reads + 1
 						return attempt * 101
 					end
-					local timer = require("adapters.timer_scheduler")
+					local timer = require("core.events.timer_scheduler")
 					helpers.assert_eq(timer.now(), attempt * 101)
 					helpers.assert_eq(reads, 1, "the current native clock must receive the call")
 					if previous then helpers.assert_true(timer ~= previous) end

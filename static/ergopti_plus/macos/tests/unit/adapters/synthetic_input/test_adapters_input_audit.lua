@@ -95,7 +95,7 @@ helpers.describe("adapters-input-2: timer_scheduler cancelAll must reach unretai
 			absoluteTime = function() return 0 end,
 			usleep = function(_) end,
 		}
-		local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+		local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 
 		-- Schedule WITHOUT retaining the returned handle (fire-and-forget), the
 		-- exact pattern used by api_mlx/api_ollama/api_remote (e.g. after(0, fn)).

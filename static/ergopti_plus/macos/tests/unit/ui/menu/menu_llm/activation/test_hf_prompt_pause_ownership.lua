@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.task_environment", "infra.launcher_environment", "diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy", "adapters.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
 	"infra.i18n",

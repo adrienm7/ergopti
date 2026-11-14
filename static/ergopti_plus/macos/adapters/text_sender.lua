@@ -31,7 +31,7 @@ local Timings  = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local CapsWordOutput = require("infra.capsword_output")
 
 local LOG = "adapters.text_sender"

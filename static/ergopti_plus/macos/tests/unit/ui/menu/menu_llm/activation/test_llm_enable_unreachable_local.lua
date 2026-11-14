@@ -259,7 +259,7 @@ end
 --- @param callback function Receives (world).
 local function with_startup(options, callback)
 	helpers.with_fresh_modules({
-		"infra.logger", "modules.llm", "adapters.timer_scheduler",
+		"infra.logger", "modules.llm", "core.events.timer_scheduler",
 		"ui.menu.menu_llm.startup_controller", "modules.llm.ollama_endpoint",
 	}, function()
 		local logger, records = recording_logger()

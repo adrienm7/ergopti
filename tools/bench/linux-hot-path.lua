@@ -35,8 +35,8 @@ os.execute = function(...) forks = forks + 1; return native_execute(...) end
 do
 	local ticks_per_s, cpu = {}, {}
 	for _ = 1, samples do
-		package.loaded["adapters.event_loop"] = nil
-		local loop = require("adapters.event_loop")
+		package.loaded["core.events.loop"] = nil
+		local loop = require("core.events.loop")
 		local ticks, started, cpu0 = 0, luv.hrtime(), os.clock()
 		local stop_after_ms = 400
 		loop.run({
@@ -66,8 +66,8 @@ do
 		and reader.use_ffi_backend() and reader.open(path, reader.KEYBOARD) then
 		local ticks_per_s, cpu = {}, {}
 		for _ = 1, samples do
-			package.loaded["adapters.event_loop"] = nil
-			local loop = require("adapters.event_loop")
+			package.loaded["core.events.loop"] = nil
+			local loop = require("core.events.loop")
 			local ticks, started, cpu0 = 0, luv.hrtime(), os.clock()
 			loop.run({
 				onIdle = function()

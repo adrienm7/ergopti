@@ -106,7 +106,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	-- is not acted on late: pause, reload or quit 1.2 s after the press is a
 	-- surprise, and macOS may already have delivered the key without the tap.
 	helpers.it("a genuine sentinel that waited behind the main thread passes untouched (stale-physical-event)", function()
-		local EventClock = require("adapters.event_clock")
+		local EventClock = require("core.events.clock")
 		local Health = require("infra.key_event_health")
 		EventClock.reset()
 		Health.reset()

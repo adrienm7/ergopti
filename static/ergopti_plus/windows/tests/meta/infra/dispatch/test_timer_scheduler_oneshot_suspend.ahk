@@ -4,7 +4,7 @@
 ; MODULE: Timer Scheduler One-Shot Suspend Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "timer-scheduler-oneshot-suspend" audit finding
-; in adapters/timer_scheduler.ahk.
+; in core/events/timer_scheduler.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; _TimerAdapterMakeOneShot used a one-shot SetTimer (negative delay). Its inner

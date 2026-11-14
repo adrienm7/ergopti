@@ -19,7 +19,7 @@ local RESET_MODULES = {
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 	"adapters.synthetic_input", "adapters.event_provenance",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger", "infra.perf", "infra.hotpath_profiler",
 	"infra.manifest_reader", "infra.keycodes", "layouts.engine.layers.terminators",
 }
@@ -829,7 +829,7 @@ end)
 local INPUT_MODULES = {
 	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
 	"modules.keymap.one_shot_shift", "modules.keymap.control_sentinels",
-	"modules.keymap.magic_key_source", "adapters.event_clock",
+	"modules.keymap.magic_key_source", "core.events.clock",
 	"infra.key_event_health", "infra.keystroke_integrity", "infra.deferred_work",
 	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
 	"infra.hotstring_engine", "hotstrings.engine.matcher", "infra.text_utils", "core.text.engine.utils_core",
@@ -889,7 +889,7 @@ local function with_input_fixture(callback)
 			end }
 			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
 		end)
-		local clock = require("adapters.event_clock")
+		local clock = require("core.events.clock")
 		clock.reset()
 		require("infra.key_event_health").reset()
 		local properties = hs.eventtap.event.properties

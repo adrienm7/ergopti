@@ -108,7 +108,7 @@ end
 
 -- Direct injections and the timing reader's native path consumer form one fixture.
 local NATIVE_MODULES = {
-	"adapters.shell_runner", "adapters.timer_scheduler", "ui.healthcheck.report",
+	"adapters.shell_runner", "core.events.timer_scheduler", "ui.healthcheck.report",
 	"infra.logger", "infra.timings", "infra.paths",
 }
 
@@ -130,7 +130,7 @@ local function native_opener()
 	package.loaded["infra.logger"].error = function(_, message, ...)
 		native.errors[#native.errors + 1] = string.format(message, ...)
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			if native.timer_throw then error("controlled timer refusal") end
 			local timer = { callback = callback, delay = delay }

@@ -19,7 +19,7 @@ local function probed(servers)
 end
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "adapters.event_loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
+		"adapters.http_client", "core.events.loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
 		"modules.llm.local_server_ports" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -33,7 +33,7 @@ local function isolated(body)
 	end
 	require("tests.support.modules.llm.local_server_scan_fake").install(scan_overrides)
 	-- Native scheduling is covered independently by test_local_server_startup.
-	package.loaded["adapters.event_loop"] = { defer = function(fn) fn(); return true end }
+	package.loaded["core.events.loop"] = { defer = function(fn) fn(); return true end }
 	local path = os.tmpname(); os.remove(path)
 	local calls = {}
 	package.loaded["adapters.http_client"] = { get_owned = function(url, headers, options, callback)
@@ -81,7 +81,7 @@ end
 helpers.describe("Linux local server discovery ownership", function()
 	helpers.it("a shutdown during deferred source reading prevents later target lookup", function()
 		isolated(function(servers, entries, calls)
-			local loop = require("adapters.event_loop")
+			local loop = require("core.events.loop")
 			local defer, source, target = loop.defer, entries.source_is_current, servers.target
 			local pending, armed, stopping, ack, after = {}, false, false, nil, 0
 			loop.defer = function(fn) pending[#pending + 1] = fn; return true end
@@ -173,7 +173,7 @@ helpers.describe("Linux local server discovery ownership", function()
 
 	helpers.it("review-deferred-admit: shutdown cannot ACK before the deferred acquisition frame ends", function()
 		isolated(function(servers, entries)
-			local loop = require("adapters.event_loop")
+			local loop = require("core.events.loop")
 			local original_defer, original_current = loop.defer, entries.source_is_current
 			local pending, armed, ack, after = {}, false, nil, 0
 			loop.defer = function(fn) pending[#pending + 1] = fn; return true end

@@ -338,8 +338,8 @@ local function with_native_apps_parent(language, body)
 	local cleanup, cleanup_error = pcall(function()
 		local bridge = package.loaded["modules.keystats.kc_bridge"]
 		if bridge and not rawequal(bridge, previous["modules.keystats.kc_bridge"]) then bridge.stop() end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then helpers.assert_eq(scheduler.cancelAll(), true) end
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then helpers.assert_eq(scheduler.cancelAll(), true) end
 		if scratch then
 			os.remove(scratch .. "/metrics/karabiner_kc.log"); os.remove(scratch .. "/paths.toml")
 			if hs.fs.attributes(scratch .. "/hammerspoon") then assert(hs.fs.rmdir(scratch .. "/hammerspoon")) end

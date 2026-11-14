@@ -33,7 +33,7 @@ local OWNED_MODULES = {
 	"infra.manifest_menu",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",

@@ -27,7 +27,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 		if selection == "" then selection = nil end
 		package.loaded["infra.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"]   = nil
 		package.loaded["adapters.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil

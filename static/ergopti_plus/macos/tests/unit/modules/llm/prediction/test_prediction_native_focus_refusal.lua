@@ -14,7 +14,7 @@ local OWNED = {
 	"adapters.log_transport",
 	"adapters.secure_field_detector",
 	"adapters.storage",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"core.fs.engine.app_dirs",
 	"core.lifecycle.engine.compat.utf8",
 	"diagnostics.engine.operation_reporter",

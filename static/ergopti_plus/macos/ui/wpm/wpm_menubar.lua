@@ -18,7 +18,7 @@ local hs        = hs
 local keystats = require("modules.keystats")
 local WPMShared = require("ui.wpm.shared")
 local Logger    = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "wpm_menubar"
 

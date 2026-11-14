@@ -108,7 +108,7 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 	end
 	package.loaded["adapters.file_system"] = native.make_adapter(nil, nil, nil, link)
 	hs.timer = loop.api
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.ledger_append"] = nil
 	package.loaded["infra.logger"] = logger
 	package.loaded["hs.sqlite3"], package.loaded["hs.json"], package.loaded["hs.timer"] = sqlite_port, json_port, loop.api
@@ -160,7 +160,7 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 		end
 		return stream
 	end
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local original_after, original_cancel = Scheduler.after, Scheduler.cancel
 	if fault == "schedule" then Scheduler.after = function() return nil, false end end
 	local cancelled_once = false

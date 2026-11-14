@@ -50,7 +50,7 @@ local function native()
 		end,
 		alert = function(...) return require("infra.dialog_util").block_alert(...) end,
 		copy = function(text) return hs.pasteboard.setContents(text) end,
-		after = function(seconds, fn) return require("adapters.timer_scheduler").after(seconds, fn) end,
+		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
 	}
 end
 

@@ -184,7 +184,7 @@ end)
 
 helpers.describe("hotstring suppression monotonic timing (hotstring-clock-regression)", function()
 	helpers.it("expires both suppression modes despite civil clock changes", function()
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original = scheduler.hotstring_time
 		local original_wall = hs.timer.secondsSinceEpoch
 		local awake, wall = 100, 100

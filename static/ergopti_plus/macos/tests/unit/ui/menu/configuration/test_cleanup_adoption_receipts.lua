@@ -25,7 +25,7 @@ local function with_cleanup(callback)
 		"infra.config_overrides", "ui.onboarding", "modules.shortcuts.tap_keys",
 		"modules.shortcuts.keyboard_shortcuts",
 		"adapters.hotkey_registrar", "adapters.json_codec", "adapters.keyboard_geometry",
-		"adapters.storage", "adapters.timer_scheduler", "settings.engine.migration.migrate", "infra.config_paths",
+		"adapters.storage", "core.events.timer_scheduler", "settings.engine.migration.migrate", "infra.config_paths",
 		"infra.deferred_work", "infra.hotstring_choice_catalogue", "infra.manifest_reader",
 		"infra.notifications", "infra.personal_file_adoption", "infra.toml.writer",
 		"modules.shortcuts.ai_actions", "core.text.engine.toml_codec.reader",

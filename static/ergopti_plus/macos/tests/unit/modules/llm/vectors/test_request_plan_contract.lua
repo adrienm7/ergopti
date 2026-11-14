@@ -18,7 +18,7 @@ Contract.run_live(helpers, helpers.shared("tests/corpus/llm/request_plan_live_ve
 Contract.run_agent(helpers, helpers.shared("tests/corpus/llm/request_plan_agent_vectors.json"))
 Contract.run_ports(helpers, {
 	HttpClient = require("adapters.http_client"),
-	TimerScheduler = require("adapters.timer_scheduler"),
+	TimerScheduler = require("core.events.timer_scheduler"),
 	TooltipRenderer = require("adapters.prediction_tooltip_port").wrap({
 		show_predictions = function() return true end,
 		hide = function() return true end,

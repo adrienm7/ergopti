@@ -29,7 +29,7 @@ local M = {}
 
 local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Paths      = require("infra.paths")
 local ShellRunner = require("adapters.shell_runner")
 local OwnWindow  = require("adapters.own_window")

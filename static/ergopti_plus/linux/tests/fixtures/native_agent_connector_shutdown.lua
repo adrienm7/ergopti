@@ -21,7 +21,7 @@ for name, value in pairs({ XDG_CONFIG_HOME = scratch .. "/.config", XDG_DATA_HOM
 end
 local Shell = require("adapters.shell_runner")
 local Connectors = require("modules.llm.agent_connectors")
-local Loop, Coordinator = require("adapters.event_loop"), require("infra.shutdown_coordinator")
+local Loop, Coordinator = require("core.events.loop"), require("infra.shutdown_coordinator")
 local function read(path)
 	local file = io.open(path, "rb"); if not file then return nil end
 	local data = file:read("*a"); assert(file:close()); return data
@@ -134,7 +134,7 @@ print('tool-finished',flush=True)
 		package = { loaded = { ["modules.llm.agent_connectors"] = Connectors } }, keystats = { stop = function() return true end }, privacy_owners = {},
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false, webview_manager = false,
 		tooltip_preview = false, gestures = false, input_capture_gate = false, prediction_engine = false,
-		TimerScheduler = require("adapters.timer_scheduler"),
+		TimerScheduler = require("core.events.timer_scheduler"),
 		require = function(name)
 			if name == "modules.llm.agent_connectors" then return Connectors end
 			assert(name == "modules.llm.agent_learning", "unexpected Main dependency")

@@ -32,7 +32,7 @@ package.loaded["infra.logger"] = {
 	LEVELS  = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
 }
 
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["infra.hotpath_profiler"] = nil
 local hot = require("infra.hotpath_profiler")
 
@@ -184,6 +184,6 @@ end)
 
 hs.timer.absoluteTime = orig_abs
 package.loaded["infra.logger"] = _real_logger
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 
 require("tests.lua.diagnostics.adapter_errors_contract").register(helpers)

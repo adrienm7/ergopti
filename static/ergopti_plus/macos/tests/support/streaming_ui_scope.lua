@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"modules.llm.parser", "modules.llm.streaming_handler", "adapters.timer_scheduler",
+	"modules.llm.parser", "modules.llm.streaming_handler", "core.events.timer_scheduler",
 	"ui.tooltip.init", "ui.tooltip.config", "ui.tooltip.tooltip_llm",
 	"ui.tooltip.tooltip_hotstring", "infra.logger",
 }

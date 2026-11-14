@@ -15,7 +15,7 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps", "adapters.window_info",
-		"adapters.synthetic_input", "adapters.timer_scheduler", "adapters.clipboard", "infra.logger",
+		"adapters.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "infra.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
@@ -78,7 +78,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			timer_calls = timer_calls + 1
 			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]

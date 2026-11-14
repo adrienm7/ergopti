@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 local function reset_fixture_modules()
 	package.loaded["modules.keymap.input_sources"] = nil
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.task_lifecycle"] = nil
 end
 

@@ -90,7 +90,7 @@ local function load_fixture(render_result, previews_enabled, options)
 			fixture.scheduled[#fixture.scheduled + 1] = handle
 			return handle, true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	if options.real_scheduler then
 		fixture.native_timers = {}
 		fixture.native_cancel_mode = nil
@@ -121,7 +121,7 @@ local function load_fixture(render_result, previews_enabled, options)
 			fixture.native_timers[#fixture.native_timers + 1] = candidate
 			return candidate
 		end
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 	end
 	package.loaded["modules.keymap.utils"] = {
 		tokens_from_repl = function(value) return value end,

@@ -22,7 +22,7 @@ local function load_controller(options)
 	package.loaded["adapters.task_output_turn"] = nil
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["adapters.storage"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
 	local log_events = { debug = {}, info = {}, warn = {}, error = {}, evidence = {} }
@@ -144,7 +144,7 @@ local function load_controller(options)
 		end,
 	}
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		-- Seconds on the fixture's clock; tests advance ctx.clock to model a
 		-- run loop parked past a deadline.
 		awake_time = function() return ctx.clock end,
@@ -347,7 +347,7 @@ end
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "adapters.storage",
-		"adapters.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
+		"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
 		"infra.logger",
 	}, function()
 		return callback(load_controller)

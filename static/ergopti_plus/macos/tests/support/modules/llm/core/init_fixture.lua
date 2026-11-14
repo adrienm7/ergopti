@@ -100,7 +100,7 @@ local function load_core_with_timer_spy(options)
 		end
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler_stub
+	package.loaded["core.events.timer_scheduler"] = scheduler_stub
 	local fresh_core = helpers.load_with_stubs("modules.llm")
 	local loaded_hs = package.loaded["hs"]
 	local load_time_calls = {}

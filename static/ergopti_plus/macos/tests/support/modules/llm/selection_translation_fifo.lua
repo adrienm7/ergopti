@@ -27,7 +27,7 @@ function M.build(configure, options)
 	end
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.storage"] = nil
 	if configure then configure(world, quartz) end
 	world.synthetic = require("adapters.synthetic_input")

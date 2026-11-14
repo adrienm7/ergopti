@@ -34,7 +34,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local Timer  = require("adapters.timer_scheduler")
+local Timer  = require("core.events.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
 local Segments = require("metrics.engine.perf.hotpath_segments")
 local Timings = require("infra.timings")

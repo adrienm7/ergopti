@@ -1,4 +1,4 @@
---- adapters/wake_watcher.lua
+--- core/events/wake_watcher.lua
 
 --- ==============================================================================
 --- MODULE: Wake Watcher Adapter (Hammerspoon)
@@ -23,7 +23,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
-local LOG = "adapters.wake_watcher"
+local LOG = "core.events.wake_watcher"
 
 --- Creates a stopped watcher.
 --- @param on_wake function Zero-arity callback run after each wake.

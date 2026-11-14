@@ -380,7 +380,7 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 				"modules.gestures.actions", "modules.gestures.conflicts", "modules.gestures.actions_click",
 				"modules.gestures.actions_aux_owner", "modules.gestures.sticky_modifiers",
 				"adapters.file_system",
-				"adapters.synthetic_input", "adapters.event_provenance", "adapters.timer_scheduler",
+				"adapters.synthetic_input", "adapters.event_provenance", "core.events.timer_scheduler",
 				"infra.preferences", "ui.menu.gesture_scope", "ui.menu.scoped_preferences",
 				"ui.menu.preferences_transaction", "ui.menu.menu_gestures", "infra.manifest_menu",
 			}, function()

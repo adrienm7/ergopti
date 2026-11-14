@@ -631,7 +631,7 @@ end
 function M.start_watch(scheduler)
 	if watch_handle and watch_handle.active then return true end
 	if watch_handle and M.stop_watch() ~= true then return false end
-	local timers = scheduler or require("adapters.timer_scheduler")
+	local timers = scheduler or require("core.events.timer_scheduler")
 	local watch = { timers = timers, active = false, starting = true }
 	watch_handle = watch
 	local ok, handle, committed = pcall(timers.every, Timings.sec("gestures", "system_prefs_recheck_ms"),

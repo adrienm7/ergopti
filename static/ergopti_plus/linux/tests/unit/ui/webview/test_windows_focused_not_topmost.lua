@@ -23,7 +23,7 @@ local ON_TOP_METHODS = { "set_keep_above", "set_type_hint", "stick", "set_transi
 --- @param scenario function(manager, windows) Behavioural assertions.
 --- @param session string|nil The display server kind; X11 when nil.
 local function with_gtk(scenario, session)
-	local names = { "lgi", "ui.webview_manager", "infra.i18n", "adapters.event_loop" }
+	local names = { "lgi", "ui.webview_manager", "infra.i18n", "core.events.loop" }
 	local DisplayServer = require("infra.display_server")
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -67,7 +67,7 @@ local function with_gtk(scenario, session)
 			},
 			GLib = {},
 		}
-		package.loaded["adapters.event_loop"] = { add_idle_handler = function() end }
+		package.loaded["core.events.loop"] = { add_idle_handler = function() end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["ui.webview_manager"] = nil
 		local manager = require("ui.webview_manager")

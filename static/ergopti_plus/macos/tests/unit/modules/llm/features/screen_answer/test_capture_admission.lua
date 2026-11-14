@@ -19,7 +19,7 @@ local MODULES = {
 	"modules.llm.api_remote", "modules.llm.api_mlx", "modules.llm.api_ollama",
 	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
-	"adapters.json_codec", "adapters.storage", "adapters.timer_scheduler",
+	"adapters.json_codec", "adapters.storage", "core.events.timer_scheduler",
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
 	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
@@ -47,7 +47,7 @@ local function with_capture(callback)
 		package.loaded["adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return { x = 0, y = 0, w = 640, h = 480 } end,
 		}
-		package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
+		package.loaded["core.events.timer_scheduler"] = PortFakes.timer_scheduler({
 			now = function() return 0 end,
 		})
 		package.loaded["modules.llm"] = {

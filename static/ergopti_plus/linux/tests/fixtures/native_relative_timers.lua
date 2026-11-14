@@ -6,7 +6,7 @@ local root = assert(source:match("^(.*)/tests/fixtures/native_relative_timers%.l
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
-local Scheduler = require("adapters.timer_scheduler")
+local Scheduler = require("core.events.timer_scheduler")
 local Process = require("adapters.process_runner")
 local checks, failures = 0, 0
 

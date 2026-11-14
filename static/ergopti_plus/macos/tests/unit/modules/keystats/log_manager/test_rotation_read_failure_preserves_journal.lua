@@ -31,7 +31,7 @@ local STUBBED_MODULES = {
 	"metrics.engine.metrics",
 	"adapters.file_system",
 	"adapters.ledger_append",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
@@ -166,7 +166,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				assert(delay == 0 and type(callback) == "function" and scheduled == nil)
 				scheduled = { timer = {}, committed = true, callback = callback }
@@ -359,7 +359,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		cleanup(function() if handle.running then handle:stop() end; assert(handle.running == false) end)
 	end
 	cleanup(function()
-		if scheduled then assert(package.loaded["adapters.timer_scheduler"].cancel(scheduled) == true) end
+		if scheduled then assert(package.loaded["core.events.timer_scheduler"].cancel(scheduled) == true) end
 		assert(scheduled == nil and active_db == nil and transaction == nil)
 	end)
 	io.open, os.remove, _G.hs = real_open, real_remove, real_hs

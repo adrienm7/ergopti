@@ -19,7 +19,7 @@ local ok_luv, luv = pcall(require, "luv")
 --- @param window_ms number Run length.
 --- @return number ticks, table loop
 local function count_ticks(options, window_ms)
-	local loop = helpers.load_module("adapters.event_loop")
+	local loop = helpers.load_module("core.events.loop")
 	local ticks, started = 0, luv.hrtime()
 	local run_options = { onIdle = function()
 		ticks = ticks + 1
@@ -61,7 +61,7 @@ helpers.describe("event loop idle wait: the luv idle tick yields", function()
 	end)
 
 	helpers.it("counts input wakes and quiet waits", function()
-		local loop = helpers.load_module("adapters.event_loop")
+		local loop = helpers.load_module("core.events.loop")
 		local perf = require("infra.perf_counters")
 		perf._reset_for_test()
 		local answers, calls = { true, false, true }, 0
@@ -89,14 +89,14 @@ helpers.describe("event loop idle wait: the luv idle tick yields", function()
 	end)
 
 	helpers.it("returns at once when a callback stops the loop", function()
-		local loop = helpers.load_module("adapters.event_loop")
+		local loop = helpers.load_module("core.events.loop")
 		local waited = 0
 		loop.run({ onIdle = function() loop.stop() end, idleWait = function() waited = waited + 1; return false end })
 		helpers.assert_eq(waited, 0, "stop() must not be followed by a wait")
 	end)
 
 	helpers.it("refuses a wait that is not a function", function()
-		local loop = helpers.load_module("adapters.event_loop")
+		local loop = helpers.load_module("core.events.loop")
 		helpers.assert_throws(function() loop.run({ onIdle = function() end, idleWait = 8 }) end)
 		helpers.assert_true(not loop.isRunning())
 	end)

@@ -27,7 +27,7 @@ local _scope = require("settings.engine.scope.owner").new({ name = "infra.i18n",
 local hs     = hs
 local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local LOG    = "i18n"
 
 local locale_mod = require("infra.locale")

@@ -10,7 +10,7 @@ local function with_api(kind, callback)
 	nonce = string.format("%032x", nonce_counter)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "adapters.managed_ollama_daemon",
 		"adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-		"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+		"adapters.http_client", "core.events.timer_scheduler", "adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
 		"modules.shortcuts.script_control" }, function()
@@ -55,7 +55,7 @@ local function with_api(kind, callback)
 			shell.clients[#shell.clients + 1] = client
 			return client
 		end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() error("no launch delay or readiness timer is admitted") end,
 			cancel = function() return true end,
 		}

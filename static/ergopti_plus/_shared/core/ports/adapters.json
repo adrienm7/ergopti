@@ -76,9 +76,9 @@
 			"macos": "static/ergopti_plus/macos/adapters/text_sender.lua"
 		},
 		"TimerScheduler": {
-			"windows": "static/ergopti_plus/windows/adapters/timer_scheduler.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
-			"linux": "static/ergopti_plus/linux/adapters/timer_scheduler.lua"
+			"windows": "static/ergopti_plus/windows/core/events/timer_scheduler.ahk",
+			"macos": "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
+			"linux": "static/ergopti_plus/linux/core/events/timer_scheduler.lua"
 		},
 		"TooltipRenderer": {
 			"windows": "static/ergopti_plus/windows/adapters/tooltip_renderer.ahk",

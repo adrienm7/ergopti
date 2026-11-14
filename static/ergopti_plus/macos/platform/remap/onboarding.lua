@@ -45,7 +45,7 @@ local LabelValue = require("core.i18n.engine.label_value")
 local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.

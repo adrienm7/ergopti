@@ -20,7 +20,7 @@
 ---    armed therefore leaves shift armed and cmd released — mirroring what the
 ---    same action does when the remap layer performs it.
 --- 3. Policy only. Every OS call lives in adapters/modifier_injector.lua and
----    adapters/timer_scheduler.lua; this file decides WHICH modifiers and for
+---    core/events/timer_scheduler.lua; this file decides WHICH modifiers and for
 ---    HOW LONG, and can be tested without Hammerspoon at all.
 --- 4. Auto-cancel is the user's value, never a default invented here. The delay
 ---    is the same `sticky_timeout_ms` the remap menu writes, passed in by the
@@ -31,7 +31,7 @@ local M = {}
 
 local Logger         = require("infra.logger")
 local Injector       = require("adapters.modifier_injector")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "gestures.sticky"

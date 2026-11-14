@@ -183,7 +183,7 @@ local function with_extension_boundary(callback)
 		"ui.menu.menu_shortcuts", "infra.logger", "infra.deferred_work", "infra.fs_dir",
 		"infra.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
 		"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.paths", "adapters.json_codec",
-		"adapters.storage", "adapters.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
+		"adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
 		"infra.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader", "hs", "tests.stubs.hs",
 	}

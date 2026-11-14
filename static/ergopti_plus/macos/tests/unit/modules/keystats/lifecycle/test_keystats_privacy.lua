@@ -193,7 +193,7 @@ local function start_real_keystats()
 	-- across scenarios would bind later cleanup to an earlier scenario's hs table.
 	package.loaded["modules.keystats.log_manager"] = nil
 	package.loaded["adapters.ledger_append"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 

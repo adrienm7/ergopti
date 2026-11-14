@@ -378,7 +378,7 @@ local function load_remap(options)
 		if options.settle_timer_synchronous and delay ~= 2.0 then timer:fire() end
 		return timer
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			return new_timer(delay, callback), true
 		end,

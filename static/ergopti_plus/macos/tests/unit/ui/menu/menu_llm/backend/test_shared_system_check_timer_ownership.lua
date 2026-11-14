@@ -7,7 +7,7 @@ local DF_OUTPUT = "Filesystem 512-blocks Used Available Capacity Mounted\n/dev/d
 
 local MODULES = {
 	"adapters.shell_runner",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
@@ -68,7 +68,7 @@ local function with_fixture(callback)
 		-- backend stubs. load_with_stubs intentionally clears every ui.menu module;
 		-- using it on the router itself would erase those stubs and silently compose
 		-- this focused test with the real Ollama maintenance prewarm.
-		helpers.load_with_stubs("adapters.timer_scheduler", {
+		helpers.load_with_stubs("core.events.timer_scheduler", {
 			timer = timer_stub,
 			-- The system probes are asynchronous tasks now; a blocking hs.execute
 			-- would hold the main thread (issue #101) and is recorded as a failure.

@@ -20,7 +20,7 @@ local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local ManifestMenu  = require("infra.manifest_menu")
 local AppProfileOverrides = require("ai.engine.policy.app_profile_overrides")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "menu_llm.profiles"

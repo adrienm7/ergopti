@@ -27,7 +27,7 @@ end
 
 local function load_engine()
 	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local Engine = helpers.load_with_stubs("modules.gestures.engine")
 	_G.hs.eventtap.__reset()
 	_G.hs.timer.secondsSinceEpoch = function() return 1 end

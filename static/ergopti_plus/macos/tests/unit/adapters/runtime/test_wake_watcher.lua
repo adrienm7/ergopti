@@ -17,8 +17,8 @@ local WAKE, SLEEP = 1, 2
 --- Loads a fresh adapter over a recording caffeinate watcher.
 local function load_adapter()
 	local native = { started = 0, stopped = 0, callback = nil }
-	package.loaded["adapters.wake_watcher"] = nil
-	local Adapter = helpers.load_with_stubs("adapters.wake_watcher", {
+	package.loaded["core.events.wake_watcher"] = nil
+	local Adapter = helpers.load_with_stubs("core.events.wake_watcher", {
 		caffeinate = {
 			watcher = {
 				systemDidWake = WAKE,
@@ -36,7 +36,7 @@ local function load_adapter()
 	return Adapter, native
 end
 
-helpers.describe("adapters.wake_watcher", function()
+helpers.describe("core.events.wake_watcher", function()
 	helpers.it("calls back on a wake only", function()
 		local Adapter, native = load_adapter()
 		local wakes = 0
@@ -73,7 +73,7 @@ helpers.describe("adapters.wake_watcher", function()
 			helpers.assert_contains(errors[1], "boom in the wake handler", "with its message")
 		end)
 		package.loaded["infra.logger"] = previous_logger
-		package.loaded["adapters.wake_watcher"] = nil
+		package.loaded["core.events.wake_watcher"] = nil
 		if not finished then error(err, 0) end
 	end)
 

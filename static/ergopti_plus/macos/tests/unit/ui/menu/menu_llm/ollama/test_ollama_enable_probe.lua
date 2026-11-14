@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "infra.logger", "adapters.http_client", "adapters.timer_scheduler",
+local OWNED = { "infra.logger", "adapters.http_client", "core.events.timer_scheduler",
 	"ui.menu.menu_llm.ollama_enable_probe", "ai.engine.settings.enable_admission_core" }
 
 -- ===================================
@@ -41,7 +41,7 @@ local function with_probe(options, callback)
 			if handle.timer == nil then observer() else handle.observers[#handle.observers + 1] = observer end
 			return true
 		end
-		package.loaded["adapters.timer_scheduler"] = scheduler
+		package.loaded["core.events.timer_scheduler"] = scheduler
 		local Probe = helpers.load_with_stubs("ui.menu.menu_llm.ollama_enable_probe", {
 			http = { doAsyncRequest = function(url, method, body, headers, done, cache_policy, follow_redirects)
 				local request = { url = url, done = done, cancels = 0, method = method,

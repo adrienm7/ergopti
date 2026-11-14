@@ -9,7 +9,7 @@ helpers.describe("agent command timer admission", function()
 		local world = World.build_world()
 		helpers.assert_true(World.trigger(world, "llm_agent_selection"))
 		helpers.assert_eq(#world.posts, 1)
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original = scheduler.after
 		scheduler.after = function() return {}, false end
 		local ok, result = pcall(world.runner.run_command)
@@ -23,7 +23,7 @@ helpers.describe("agent command timer admission", function()
 	helpers.it("preserves the existing request if timer admission raises", function()
 		local world = World.build_world()
 		helpers.assert_true(World.trigger(world, "llm_agent_selection"))
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original = scheduler.after
 		scheduler.after = function() error("controlled timer failure") end
 		local ok, result = pcall(world.runner.run_command)
@@ -37,7 +37,7 @@ helpers.describe("agent command timer admission", function()
 	helpers.it("delivers the existing answer during reentrant timer admission", function()
 		local world = World.build_world()
 		helpers.assert_true(World.trigger(world, "llm_agent_selection"))
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original = scheduler.after
 		scheduler.after = function()
 			World.answer(world.posts[1], World.TWO_ACTIONS)
@@ -52,7 +52,7 @@ helpers.describe("agent command timer admission", function()
 
 	helpers.it("does not revive a command when timer admission reenters an AI-off transition", function()
 		local world = World.build_world()
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local after, cancel = scheduler.after, scheduler.cancel
 		local delivered, cancelled = nil, 0
 		scheduler.after = function(_, callback)

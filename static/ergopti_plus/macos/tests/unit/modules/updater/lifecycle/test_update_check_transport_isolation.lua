@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"modules.updater.auto_check", "modules.updater", "infra.paths", "infra.logger", "infra.timings",
-	"adapters.http_client", "adapters.timer_scheduler", "adapters.file_system",
+	"adapters.http_client", "core.events.timer_scheduler", "adapters.file_system",
 	"adapters.json_codec", "adapters.update_launcher", "infra.notifications", "infra.i18n",
 	"infra.http_header_policy",
 }

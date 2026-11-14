@@ -19,7 +19,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ../infra/webview_script.ahk
 ; Browser messages and JavaScript payloads share the actual native JSON owner.
 #Include ../infra/json.ahk
-#Include ../adapters/timer_scheduler.ahk
+#Include ../core/events/timer_scheduler.ahk
 #Include ../adapters/window_manager.ahk
 
 ; --- Globals the browser module reads ---

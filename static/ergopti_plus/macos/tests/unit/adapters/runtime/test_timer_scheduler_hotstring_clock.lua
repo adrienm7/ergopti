@@ -3,8 +3,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("hotstring clock sleep and clock changes (hotstring-clock-wake)", function()
 	helpers.it("advances through sleep, tolerates rollback and ignores invalid samples and jitter", function()
-		local saved = package.loaded["adapters.timer_scheduler"]
-		local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+		local saved = package.loaded["core.events.timer_scheduler"]
+		local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 		local awake, wall = 100, 1000
 		local original_awake = Scheduler.awake_time
 		Scheduler.awake_time = function() return awake end
@@ -35,7 +35,7 @@ helpers.describe("hotstring clock sleep and clock changes (hotstring-clock-wake)
 			helpers.assert_eq(Scheduler.hotstring_time(), awake + 420, "a throwing civil clock cannot stop deadlines")
 		end)
 		Scheduler.awake_time = original_awake
-		package.loaded["adapters.timer_scheduler"] = saved
+		package.loaded["core.events.timer_scheduler"] = saved
 		if not ok then error(err, 0) end
 	end)
 end)

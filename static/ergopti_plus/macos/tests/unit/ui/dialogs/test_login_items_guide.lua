@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"ui.permission_dialog.login_items_guide", "ui.permission_dialog", "adapters.timer_scheduler",
+	"ui.permission_dialog.login_items_guide", "ui.permission_dialog", "core.events.timer_scheduler",
 	"infra.logger", "infra.i18n", "infra.notifications",
 }
 
@@ -65,7 +65,7 @@ local function install_doubles(h)
 
 	h.timers = {}
 	h.clock = 0
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return h.clock end,
 		every = function(seconds, fn)
 			local handle = { seconds = seconds, fn = fn, cancelled = false }
@@ -289,9 +289,9 @@ local function with_monotonic_guide(body)
 	helpers.with_stub_scope(MODULES, function()
 		local h = {}
 		install_doubles(h)
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["ui.permission_dialog.login_items_guide"] = nil
-		local scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+		local scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 		h.clock = 0
 		hs.timer.absoluteTime = function() return math.floor(h.clock * 1e9) end
 		h.guide = require("ui.permission_dialog.login_items_guide")
@@ -353,8 +353,8 @@ helpers.describe("the Login Items poll ends with a reload (guardian-approval-ste
 		helpers.with_stub_scope(MODULES, function()
 			local h = {}
 			install_doubles(h)
-			package.loaded["adapters.timer_scheduler"] = nil
-			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			package.loaded["core.events.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 			local guide = require("ui.permission_dialog.login_items_guide")
 			helpers.assert_true(guide.offer(h.remap) == true)
 			local natives = hs.timer.__timers
@@ -412,8 +412,8 @@ helpers.describe("Login Items guide follows Tap-Holds eligibility (guardian-appr
 		helpers.with_stub_scope(MODULES, function()
 			local h = {}
 			install_doubles(h)
-			package.loaded["adapters.timer_scheduler"] = nil
-			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			package.loaded["core.events.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 			local guide = require("ui.permission_dialog.login_items_guide")
 			helpers.assert_true(guide.offer(h.remap))
 			local natives = hs.timer.__timers
@@ -446,8 +446,8 @@ helpers.describe("Login Items cleanup keeps its original owners (guardian-approv
 		helpers.with_stub_scope(MODULES, function()
 			local h = {}
 			install_doubles(h)
-			package.loaded["adapters.timer_scheduler"] = nil
-			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			package.loaded["core.events.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 			local guide = require("ui.permission_dialog.login_items_guide")
 			local dialog = package.loaded["ui.permission_dialog"]
 			local close, attempts = dialog.close, 0
@@ -499,8 +499,8 @@ helpers.describe("Login Items cleanup keeps its original owners (guardian-approv
 		helpers.with_stub_scope(MODULES, function()
 			local h = {}
 			install_doubles(h)
-			package.loaded["adapters.timer_scheduler"] = nil
-			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			package.loaded["core.events.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 			local guide = require("ui.permission_dialog.login_items_guide")
 			helpers.assert_true(guide.offer(h.remap))
 			local native = hs.timer.__timers[#hs.timer.__timers]

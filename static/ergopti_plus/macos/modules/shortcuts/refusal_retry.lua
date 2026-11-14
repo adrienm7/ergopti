@@ -20,7 +20,7 @@
 
 local M = {}
 
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Logger         = require("infra.logger")
 
 -- Seconds before each retry. The first ones cover a keyboard layout that

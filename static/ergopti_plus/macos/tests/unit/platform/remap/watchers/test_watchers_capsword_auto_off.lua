@@ -58,7 +58,7 @@ local function fresh_harness(overrides)
 		return table.unpack(results, 1, results.n)
 	end
 	package.loaded["infra.logger"] = logger
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, cancelled = false }

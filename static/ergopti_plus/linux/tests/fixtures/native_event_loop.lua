@@ -14,7 +14,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 
 local luv = require("luv")
-local native = require("adapters.event_loop")
+local native = require("core.events.loop")
 local idle, periodic, leaked = 0, 0, 0
 local timed_out = false
 local watchdog = luv.new_timer()

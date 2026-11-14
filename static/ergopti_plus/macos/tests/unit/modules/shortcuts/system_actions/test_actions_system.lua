@@ -16,7 +16,7 @@ helpers.describe("shortcuts.actions.system", function()
 		with_fixture(function()
 			package.loaded["infra.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			local sys = load_system()
 			-- load_with_stubs builds a FRESH stub table per call, so the one captured
 			-- at the top of this file is not the one the module just bound. Read the

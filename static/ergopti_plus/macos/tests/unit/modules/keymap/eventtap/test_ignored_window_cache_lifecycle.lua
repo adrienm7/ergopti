@@ -75,11 +75,11 @@ end
 
 local function new_fixture()
 	package.loaded["modules.keymap.utils"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 
 	local scheduler = make_scheduler()
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	local state = {
 		now = 100,
 		window_id = 42,

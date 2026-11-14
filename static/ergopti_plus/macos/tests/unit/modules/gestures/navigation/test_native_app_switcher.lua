@@ -11,7 +11,7 @@ local METHODS = {
 
 local function with_facade(callback, configure)
 	local names = { "modules.gestures.native_app_switcher", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.window_manager" }
+		"core.events.timer_scheduler", "adapters.window_manager" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local f = { front = 100, time = 10, source = true, release = true,
@@ -48,7 +48,7 @@ local function with_facade(callback, configure)
 	f.publication = { current = function() return f.source end, cached = function() return f.source end }
 	if configure then configure(f) end
 	package.loaded["adapters.synthetic_input"] = input
-	package.loaded["adapters.timer_scheduler"] = f.scheduler
+	package.loaded["core.events.timer_scheduler"] = f.scheduler
 	package.loaded["adapters.window_manager"] = windows
 	local ok, failure = xpcall(function()
 		f.facade = require("modules.gestures.native_app_switcher")
@@ -153,7 +153,7 @@ helpers.describe("macOS product native switcher facade", function()
 		end)
 	end)
 	local function with_real_scheduler(callback, options)
-		helpers.with_stub_scope({ "adapters.timer_scheduler", "infra.logger" }, function()
+		helpers.with_stub_scope({ "core.events.timer_scheduler", "infra.logger" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			with_facade(callback, function(f)
 				local native = { running_state = false, stop_calls = 0 }
@@ -172,7 +172,7 @@ helpers.describe("macOS product native switcher facade", function()
 				end
 				f.native_timer = native
 				f.timer_ack = options.stop_ack
-				f.scheduler = helpers.load_with_stubs("adapters.timer_scheduler", { timer = {
+				f.scheduler = helpers.load_with_stubs("core.events.timer_scheduler", { timer = {
 					new = function(_, fn) native.callback = fn; return native end,
 					absoluteTime = function() return f.time * 1e9 end,
 				} })

@@ -1460,7 +1460,7 @@ end)
 local function with_managed_session(options, callback)
 	options = options or {}
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "adapters.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
+		"adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
 		"modules.keystats", "modules.keystats.context_tracker", "modules.keystats.watchers",
 		"modules.shortcuts.script_control", "adapters.shell_runner", "modules.keystats.physical_key_identity",
 		"modules.keystats.log_manager", "modules.keystats.physical_protocol", "modules.keystats.physical_transport",
@@ -1646,7 +1646,7 @@ helpers.describe("managed driver independent prerequisite qualification", functi
 	end)
 	helpers.it("exercises actual timer commit, callback and refused cancellation debt", function()
 		with_managed_session({ omit_manager = true }, function(_, d)
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local calls, hints = 0, 0
 			local handle, committed = scheduler.after(1, function() calls = calls + 1 end)
 			helpers.assert_eq(committed, true); helpers.assert_eq(d.timers[1].running_value, true)
@@ -2080,7 +2080,7 @@ local Lifetime = require("metrics.engine.capture.physical_subscription_lifetime"
 local function with_managed_session(options, callback)
 	options = options or {}
 	local names = { "modules.keystats.physical_history_session", "adapters.physical_history_context",
-		"adapters.physical_observation_clock", "adapters.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
+		"adapters.physical_observation_clock", "core.events.timer_scheduler", "metrics.engine.capture.physical_lease_policy",
 		"modules.keystats", "modules.keystats.context_tracker", "modules.keystats.watchers",
 		"modules.shortcuts.script_control", "adapters.shell_runner", "modules.keystats.physical_key_identity",
 		"modules.keystats.log_manager", "modules.keystats.physical_protocol", "modules.keystats.physical_transport",

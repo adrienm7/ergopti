@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"ui.menu.menu_watchers", "infra.logger", "infra.git_status", "core.lifecycle.engine.reload.gate",
-	"adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
 --- Runs a real menu watcher with deterministic events and reload decisions.

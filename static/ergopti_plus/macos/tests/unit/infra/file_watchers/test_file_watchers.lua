@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 
 -- Each scenario owns its freshly bound scheduler and the parent that captures it.
 local SCHEDULER_OWNERS = {
-	"infra.file_watchers", "adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"infra.file_watchers", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
 --- Restores exact predecessor modules even when a scenario assertion raises.

@@ -69,7 +69,7 @@ local function load_healthcheck(scheduler, title_label)
 		context.close_cleanup[#context.close_cleanup + 1] = receive
 		return true
 	end }
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	local logger = helpers.make_logger_stub()
 	context.warnings = {}
 	logger.warn = function(_, message, ...)

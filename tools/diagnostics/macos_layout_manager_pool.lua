@@ -50,11 +50,11 @@ function M.run(config, done)
 	}
 	Host = require("ui.layout_manager")
 	local UI, Pool = require("ui.ui_builder"), require("ui.webview_controller_pool")
-	local Scheduler, Result = require("adapters.timer_scheduler"), require("adapters.webview_result")
+	local Scheduler, Result = require("core.events.timer_scheduler"), require("adapters.webview_result")
 	require("infra.i18n").init()
 	for fn, suffix in pairs({ [Host.open] = "/macos/ui/layout_manager/init.lua",
 		[Pool.new] = "/macos/ui/webview_controller_pool.lua", [UI.show_webview] = "/macos/ui/ui_builder.lua",
-		[Scheduler.activeCount] = "/macos/adapters/timer_scheduler.lua" }) do
+		[Scheduler.activeCount] = "/macos/core/events/timer_scheduler.lua" }) do
 		assert(debug.getinfo(fn, "S").source == "@" .. root .. suffix, "foreign production owner")
 	end
 	local baseline, started = Scheduler.activeCount(), hs.timer.absoluteTime()

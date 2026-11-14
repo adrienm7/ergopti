@@ -38,12 +38,12 @@ local PROC_AFTER = {
 --- @param absent table|nil Programs the probe of has_command answers absent for.
 local function with_probes(async, body, absent)
 	local names = { "ui.healthcheck.probes", "adapters.http_client", "adapters.shell_runner",
-		"adapters.timer_scheduler" }
+		"core.events.timer_scheduler" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { requests = {}, children = {}, cancelled_owners = {}, cancelled_children = 0, timers = {},
 		cancelled_timers = 0, proc = PROC_BEFORE }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		HAS_ASYNC = async,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn, armed = true }
@@ -136,7 +136,7 @@ end
 helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("(healthcheck-timer-refusal) reports failed starts and retains cancellation owners", function()
 		with_probes(true, function(Probes, world)
-			package.loaded["adapters.timer_scheduler"].after = function()
+			package.loaded["core.events.timer_scheduler"].after = function()
 				local handle = { armed = false, fired = true, timer = {} }
 				world.timers[#world.timers + 1] = handle
 				return handle

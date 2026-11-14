@@ -35,7 +35,7 @@ local function load_fixture(options)
 	package.loaded["modules.keystats.export"] = nil
 	package.loaded["metrics.engine.metrics"] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 
 	local appended = {}
 	local sink_failures = options.sink_failures or 0
@@ -399,7 +399,7 @@ for _, name in ipairs({
 	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
 	"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }) do
 	package.loaded[name] = nil
 end

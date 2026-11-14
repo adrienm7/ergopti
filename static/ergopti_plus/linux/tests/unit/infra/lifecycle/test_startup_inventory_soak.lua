@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local source_file = assert(io.open("tests/e2e/startup_child.lua", "rb"))
 local source = source_file:read("*a")
 source_file:close()
-local first = assert(source:find('\tlocal adapter = dofile("adapters/event_loop.lua")', 1, true))
+local first = assert(source:find('\tlocal adapter = dofile("core/events/loop.lua")', 1, true))
 local last = assert(source:find("\tlocal native_run = adapter.run", first, true))
 local body = source:sub(first, last - 1)
 assert(#body > 100 and body:find("local function soak", 1, true), "the actual soak fragment must be nonempty")
@@ -59,7 +59,7 @@ local function fixture(options)
 		error("unexpected bootstrap dependency: " .. name)
 	end
 	env.dofile = function(path)
-		helpers.assert_eq(path, "adapters/event_loop.lua")
+		helpers.assert_eq(path, "core/events/loop.lua")
 		return { _run_idle_tick = function() end }
 	end
 	env.record = function() error("the no-debt metrics owner must remain inactive") end

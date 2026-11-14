@@ -19,8 +19,8 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 	local saved = {
 		logger = package.loaded["infra.logger"],
 		deferred = package.loaded["infra.deferred_work"],
-		timer = package.loaded["adapters.timer_scheduler"],
-		clock = package.loaded["adapters.event_clock"],
+		timer = package.loaded["core.events.timer_scheduler"],
+		clock = package.loaded["core.events.clock"],
 		subject = package.loaded["infra.key_event_health"],
 		hs = _G.hs,
 	}
@@ -37,14 +37,14 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 	package.loaded["infra.deferred_work"] = {
 		after = function(_, callback) deferred[#deferred + 1] = callback; return true end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return host_ns end,
 		now = function() return host_ns / 1e9 + slept_s end,
 	}
 	_G.hs = { timer = { absoluteTime = function() return host_ns end } }
-	package.loaded["adapters.event_clock"] = nil
+	package.loaded["core.events.clock"] = nil
 	package.loaded["infra.key_event_health"] = nil
-	local EventClock = require("adapters.event_clock")
+	local EventClock = require("core.events.clock")
 	local Health = require("infra.key_event_health")
 
 	local UPTIME_NS = 3600 * 1e9
@@ -243,8 +243,8 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 
 	package.loaded["infra.logger"] = saved.logger
 	package.loaded["infra.deferred_work"] = saved.deferred
-	package.loaded["adapters.timer_scheduler"] = saved.timer
-	package.loaded["adapters.event_clock"] = saved.clock
+	package.loaded["core.events.timer_scheduler"] = saved.timer
+	package.loaded["core.events.clock"] = saved.clock
 	package.loaded["infra.key_event_health"] = saved.subject
 	_G.hs = saved.hs
 end)

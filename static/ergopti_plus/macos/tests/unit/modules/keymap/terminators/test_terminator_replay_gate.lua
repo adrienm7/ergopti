@@ -21,7 +21,7 @@ local function load_gate(options)
 	package.loaded["hs"] = hs_stub
 
 	for _, name in ipairs({
-		"adapters.timer_scheduler", "adapters.synthetic_input", "adapters.event_provenance",
+		"core.events.timer_scheduler", "adapters.synthetic_input", "adapters.event_provenance",
 		"modules.keymap.terminator_replay",
 	}) do
 		package.loaded[name] = nil
@@ -91,7 +91,7 @@ local function load_gate(options)
 		end
 		return handle, true
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return awake_time end,
 		after = function(delay, callback)
 			return schedule_timer(delay, callback, false)
@@ -963,7 +963,7 @@ end)
 
 
 package.loaded["adapters.text_sender"] = nil
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["adapters.synthetic_input"] = nil
 package.loaded["adapters.event_provenance"] = nil
 package.loaded["modules.keymap.terminator_replay"] = nil

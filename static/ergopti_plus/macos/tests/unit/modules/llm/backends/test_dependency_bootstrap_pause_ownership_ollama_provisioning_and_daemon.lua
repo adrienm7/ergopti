@@ -211,7 +211,7 @@ helpers.describe("HS-113 dependency bootstrap deadline", function()
 			helpers.assert_true(fixture.timers[1].running_state)
 
 			fixture.timer_stop_mode = "true"
-			helpers.assert_true(require("adapters.timer_scheduler").retryCleanup())
+			helpers.assert_true(require("core.events.timer_scheduler").retryCleanup())
 			helpers.assert_eq(fixture.checker.get_state(), "ready",
 				"exact timer settlement must resume the retained terminal outcome")
 			helpers.assert_eq(fixture.tasks[1].terminate_calls, 0)

@@ -28,7 +28,7 @@ local hs      = hs
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local LOG     = "keystats.watchers"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be

@@ -135,7 +135,7 @@ end
 --- @return boolean armed
 arm = function()
 	if _collector_armed then return true end
-	_collector_armed = require("adapters.event_loop").defer(collect, POLL_MS) == true
+	_collector_armed = require("core.events.loop").defer(collect, POLL_MS) == true
 	return _collector_armed
 end
 

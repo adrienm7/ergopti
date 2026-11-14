@@ -106,7 +106,7 @@ local function ports()
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}
-	package.loaded["adapters.timer_scheduler"] = { after = function()
+	package.loaded["core.events.timer_scheduler"] = { after = function()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset
@@ -453,7 +453,7 @@ local function ports()
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}
-	package.loaded["adapters.timer_scheduler"] = { after = function()
+	package.loaded["core.events.timer_scheduler"] = { after = function()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset

@@ -33,7 +33,7 @@ _G.hs = { processInfo = { arch = arch }, fs = {
 local header = string.char(0xcf, 0xfa, 0xed, 0xfe, 0x0c, 0, 0, 1)
 local real_open = io.open
 io.open = function() error("GUI binary reads are forbidden") end
-package.loaded["adapters.timer_scheduler"] = {
+package.loaded["core.events.timer_scheduler"] = {
 	now_ns = function() return 1000000000 end,
 	after = function(_, callback) return { timer = {}, callback = callback }, true end,
 	onSettled = function() return true end,

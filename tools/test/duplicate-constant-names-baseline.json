@@ -68,7 +68,7 @@
 	"NS_PER_MS": {
 		"files": [
 			"linux/infra/monotonic.lua",
-			"macos/adapters/event_clock.lua",
+			"macos/core/events/clock.lua",
 			"macos/infra/boot_profiler.lua",
 			"macos/infra/hotpath_profiler.lua",
 			"macos/infra/key_event_health.lua",

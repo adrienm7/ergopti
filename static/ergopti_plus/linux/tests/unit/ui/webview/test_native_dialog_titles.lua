@@ -18,7 +18,7 @@ local DIALOG = require("ui.native_dialog").command()
 local function scenario(body)
 	local names = { "ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
 		"modules.gestures.system_actions", "infra.i18n", "adapters.shell_runner", "ui.modal",
-		"adapters.storage", "adapters.event_loop", "adapters.keyboard_hook",
+		"adapters.storage", "core.events.loop", "adapters.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -39,7 +39,7 @@ local function scenario(body)
 		get = function(_, default) return default end,
 		set = function(key, value) observed.writes[#observed.writes + 1] = { key, value }; return true end,
 	}
-	package.loaded["adapters.event_loop"] = {
+	package.loaded["core.events.loop"] = {
 		defer = function(fn) observed.queued[#observed.queued + 1] = fn; return true end,
 	}
 	local shell = {

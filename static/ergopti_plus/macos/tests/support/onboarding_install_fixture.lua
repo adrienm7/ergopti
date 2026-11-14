@@ -14,7 +14,7 @@ local CACHE_PATH = "/cache/Karabiner-Elements.dmg"
 local MODULE_NAMES = {
 	"adapters.task_environment",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	-- The onboarding names its download cache from the shared folder table.
 	"core.fs.engine.app_dirs",
 	-- The task lifecycle adapter formats raised errors through the shared owner.
@@ -303,7 +303,7 @@ local function run_fixture(options, scenario)
 		calls.timers[#calls.timers + 1] = timer
 		return timer, true
 	end
-	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.notifications"] = { notify = noop }

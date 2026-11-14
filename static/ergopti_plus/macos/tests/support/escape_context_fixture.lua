@@ -12,7 +12,7 @@ local STUBBED_MODULES = {
 	"infra.logger",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keymap.utils",
 	"infra.text_utils",
 	"modules.llm",
@@ -53,7 +53,7 @@ local function load_fixture(options, lifetime)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return {}, true

@@ -59,7 +59,7 @@ local ManifestMenu     = require("infra.manifest_menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("adapters.shell_runner")
-local TimerScheduler      = require("adapters.timer_scheduler")
+local TimerScheduler      = require("core.events.timer_scheduler")
 local Timings             = require("infra.timings")
 
 local LOG = "menu_llm"

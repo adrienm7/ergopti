@@ -23,7 +23,7 @@ local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local GraphicsRenderer = require("adapters.graphics_renderer")
 local Storage = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Timings = require("infra.timings")
 local TomlCodec = require("core.text.engine.toml_codec")
 -- What the readouts decide — colours, frames, the graph, the default place —

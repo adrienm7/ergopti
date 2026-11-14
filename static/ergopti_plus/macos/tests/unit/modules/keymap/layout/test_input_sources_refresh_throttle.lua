@@ -15,7 +15,7 @@ local OWNED = {
 	"infra.logger", "infra.timings", "adapters.python_interpreter",
 	"adapters.input_source_selector", "core.fs.engine.native_path", "adapters.shell_runner",
 	"infra.deferred_work", "adapters.task_environment", "infra.launcher_environment",
-	"diagnostics.engine.runtime_log", "adapters.timer_scheduler", "diagnostics.engine.reports.error_description",
+	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy", "infra.openstep_plist",
 }
 
@@ -87,7 +87,7 @@ local function with_sources(scenario)
 		}
 		local sources = require("modules.keymap.input_sources")
 		local runner = require("adapters.shell_runner")
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		function w.sample(awake, step)
 			helpers.assert_true(awake >= w.awake, "the independent awake clock never regresses")
 			w.awake, w.wall = awake, 1000 + awake + (step or 0)

@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local WAKE = 1
-local OWNERS = { "adapters.wake_watcher", "infra.logger" }
+local OWNERS = { "core.events.wake_watcher", "infra.logger" }
 
 --- Runs a fresh wake adapter over independently observable native watcher state.
 --- @param callback function Receives the adapter and native watcher inventory.
@@ -18,7 +18,7 @@ local function with_adapter(callback, options)
 	return helpers.with_stub_scope(OWNERS, function()
 		local natives = {}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local Adapter = helpers.load_with_stubs("adapters.wake_watcher", {
+		local Adapter = helpers.load_with_stubs("core.events.wake_watcher", {
 			caffeinate = { watcher = {
 				systemDidWake = WAKE,
 				new = function(on_event)

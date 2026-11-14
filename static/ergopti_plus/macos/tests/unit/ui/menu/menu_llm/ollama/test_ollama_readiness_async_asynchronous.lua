@@ -452,7 +452,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			}
 
 			package.loaded["adapters.shell_runner"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 			local manager = require("ui.menu.menu_llm.models_manager_ollama").new({
 				-- The warm-up timer below is armed only with the AI on
@@ -461,7 +461,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			}, {}, function() return 0 end)
 			helpers.assert_eq(#native_timers, 1)
 			helpers.assert_eq(
-				require("adapters.timer_scheduler").cancelAll(), true)
+				require("core.events.timer_scheduler").cancelAll(), true)
 			helpers.assert_eq(native_timers[1]:running(), false)
 			table.remove(native_timers, 1)
 

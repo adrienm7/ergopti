@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local INJECTED = { "modules.gestures.engine", "adapters.mouse_control", "infra.timings", "infra.logger", "adapters.timer_scheduler" }
+local INJECTED = { "modules.gestures.engine", "adapters.mouse_control", "infra.timings", "infra.logger", "core.events.timer_scheduler" }
 
 local current_time = 0
 
@@ -41,7 +41,7 @@ local function with_engine(body)
 	for _, name in ipairs(INJECTED) do saved[name] = package.loaded[name] end
 	local buttons = { down = false }
 	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.logger"] = nil
 	package.loaded["infra.timings"] = {
 		sec = function(_, key)

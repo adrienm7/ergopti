@@ -55,7 +55,7 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 			end,
 		}
 		package.loaded["adapters.synthetic_input"] = immediate_synthetic(function() return true end)
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			awake_time = function() return clock end,
 			after = function(delay, callback)
 				local handle = { timer = {}, callback = function()
@@ -90,7 +90,7 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 
 		package.loaded["adapters.clipboard"]   = nil
 		package.loaded["adapters.synthetic_input"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["adapters.text_sender"] = nil
 	end)
 end)
@@ -100,7 +100,7 @@ local function load_failure_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"infra.logger", "infra.timings",
 	}) do package.loaded[name] = nil end
 	local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
@@ -151,7 +151,7 @@ local function load_failure_fixture(options)
 		end)
 	local timer_calls = 0
 	local cancel_calls = 0
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return clock end,
 		after = function(delay, callback)
 			timer_calls = timer_calls + 1

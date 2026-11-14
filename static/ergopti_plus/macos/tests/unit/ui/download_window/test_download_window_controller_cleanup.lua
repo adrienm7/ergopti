@@ -18,7 +18,7 @@ local function with_window(scenario)
 		helpers.with_stub_scope({ "ui.download_window", "ui.download_window.javascript",
 			"ui.download_window.pending_queue", "ui.ui_builder", "infra.logger", "infra.paths", "infra.timings",
 			"infra.i18n", "infra.deferred_work", "adapters.shell_runner",
-			"adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }, function()
+			"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.paths"] = { shared = function() return "/virtual/assets" end }
 			helpers.provide_timings()

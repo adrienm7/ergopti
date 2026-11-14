@@ -530,11 +530,11 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 	helpers.it("a background check announces a newer release and downloads nothing", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local saved = {}
-		for _, name in ipairs({ "adapters.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+		for _, name in ipairs({ "core.events.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
 			saved[name] = package.loaded[name]
 		end
 		local timers = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			HAS_ASYNC = true,
 			after = function(delay, fn)
 				local handle = { armed = true, delay = delay, fn = fn }

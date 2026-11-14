@@ -18,7 +18,7 @@ local OWNED_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"infra.timings",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.config_paths",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
@@ -488,7 +488,7 @@ return function(run, dependencies)
 				return true
 			end
 			function timer_scheduler.every() return { committed = false, fired = true }, false end
-			package.loaded["adapters.timer_scheduler"] = timer_scheduler
+			package.loaded["core.events.timer_scheduler"] = timer_scheduler
 			-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 			-- at start. The folder exists, as the product's does, so choosing the
 			-- layer hold imports the recommended layer the way a Mac would.
@@ -631,7 +631,7 @@ return function(run, dependencies)
 				"infra.notifications",
 				"infra.text_utils",
 				"platform.remap.ke_paths",
-				"adapters.timer_scheduler",
+				"core.events.timer_scheduler",
 				"adapters.task_lifecycle",
 				"platform.remap.network_download",
 				"platform.remap.onboarding",
@@ -696,7 +696,7 @@ return function(run, dependencies)
 				CORE_SERVICE = "/test/Karabiner-Core-Service",
 				GRABBER = "/test/karabiner_grabber",
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(delay, callback)
 					local timer = { callback = callback, cancelled = false, delay = delay }
 					installer.timers[#installer.timers + 1] = timer
@@ -831,7 +831,7 @@ return function(run, dependencies)
 			-- Bind both native timer owners to the same fresh hs run loop as script_control;
 			-- cached adapters would retain prior timers or an obsolete commitment contract.
 			package.loaded["adapters.synthetic_input"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
 			local script_hs = hs
 			package.loaded["modules.shortcuts"] = {

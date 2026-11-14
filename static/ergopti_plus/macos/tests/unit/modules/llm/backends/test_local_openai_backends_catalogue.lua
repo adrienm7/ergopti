@@ -296,7 +296,7 @@ local function with_persistence(store, entries, active_id, body)
 	local owned = {
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama", "modules.llm.api_mlx",
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.llm.api_common",
-		"infra.logger", "infra.paths", "adapters.timer_scheduler", "adapters.storage",
+		"infra.logger", "infra.paths", "core.events.timer_scheduler", "adapters.storage",
 	}
 	helpers.with_fresh_modules(owned, function()
 		local fixture = { encrypt_jobs = {}, errors = {} }
@@ -325,7 +325,7 @@ local function with_persistence(store, entries, active_id, body)
 		logger.error = function(_, fmt, ...) fixture.errors[#fixture.errors + 1] = string.format(tostring(fmt), ...) end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = { shared = function(relative) return "static/ergopti_plus/_shared/" .. relative end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() return { timer = true }, true end, cancel = function() return true end,
 			now = function() return 0 end,
 		}

@@ -560,7 +560,7 @@ end
 
 --- Exercises the actual manager and menu around durable writer and timer ports.
 local function with_frequency_owner(refusal, body)
-	local names = {"adapters.timer_scheduler", "adapters.storage", "modules.updater.manager"}
+	local names = {"core.events.timer_scheduler", "adapters.storage", "modules.updater.manager"}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local writer = require("core.text.engine.toml_codec.writer")
@@ -573,7 +573,7 @@ local function with_frequency_owner(refusal, body)
 	local original = "[updater]\ncheck_interval_seconds = 3600\nfuture_interval_option = 42\n"
 	local file = assert(io.open(path, "wb"))
 	assert(file:write(original)); assert(file:close())
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		HAS_ASYNC = true,
 		after = function(delay, fn)
 			local handle = {delay = delay, fn = fn, armed = true}
@@ -651,7 +651,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 		helpers.it("refuses cadence publication when the owned timer cannot stop: " .. refusal .. " (update-frequency-timer-receipt)", function()
 			with_frequency_owner(nil, function(up, obs, path)
 				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
-				local timer = package.loaded["adapters.timer_scheduler"]
+				local timer = package.loaded["core.events.timer_scheduler"]
 				local previous_cancel = timer.cancel
 				local current_timer, timer_count = obs.timers[#obs.timers], #obs.timers
 				timer.cancel = function()
@@ -680,7 +680,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 	helpers.it("refuses cadence publication when a replacement timer is not armed (update-frequency-timer-receipt)", function()
 		with_frequency_owner(nil, function(up, obs)
 			local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
-			local timer = package.loaded["adapters.timer_scheduler"]
+			local timer = package.loaded["core.events.timer_scheduler"]
 			local previous_after, attempts = timer.after, 0
 			local current_timer, timer_count = obs.timers[#obs.timers], #obs.timers
 			timer.after = function()

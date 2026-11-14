@@ -27,7 +27,7 @@
 local M = {}
 
 local Shell = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Owner = require("adapters.apple_shortcuts")
 local Native = require("adapters.apple_shortcuts_native")
 local Parameter = require("settings.engine.program_parameter")

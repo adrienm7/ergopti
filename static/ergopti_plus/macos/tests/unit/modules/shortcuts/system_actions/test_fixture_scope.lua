@@ -13,7 +13,7 @@ local OWNERS = {
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 	"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
 	"adapters.event_provenance", "adapters.file_system", "adapters.key_state",
-	"adapters.shell_runner", "adapters.synthetic_input", "adapters.timer_scheduler",
+	"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 	"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
 	"infra.deferred_work", "infra.fs_dir", "modules.keymap.utils",
 	"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",

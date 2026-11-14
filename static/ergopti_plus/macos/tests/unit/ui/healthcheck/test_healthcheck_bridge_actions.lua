@@ -29,7 +29,7 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler",
+		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler",
 		"adapters.clipboard", "adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -52,7 +52,7 @@ local function load_window(controls)
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
 	package.loaded["infra.locale"] = { all = function() return { ["menu.debug.healthcheck"] = "Diagnostics" } end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		every = function() context.every = context.every + 1; return { timer = {} }, true end,
 		after = function() return { timer = {} }, true end,
 		cancel = function() return true end,

@@ -4,7 +4,7 @@
 --- Existing previous-window actions retain their direct activation semantics.
 local NativeOwner = require("core.ui.engine.native_app_switcher_owner")
 local SyntheticInput = require("adapters.synthetic_input")
-local Scheduler = require("adapters.timer_scheduler")
+local Scheduler = require("core.events.timer_scheduler")
 local Windows = require("adapters.window_manager")
 local M = {}
 

@@ -43,7 +43,7 @@ local function load_subject()
 		OS_REFUSAL = "OS_REFUSED",
 	}
 	controls.timers = {}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			local timer = {delay = delay, callback = callback, cancelled = false}
 			controls.timers[#controls.timers + 1] = timer

@@ -69,11 +69,11 @@ local function run_local_state(step_costs, failing)
 	local saved_absolute = hs.timer.absoluteTime
 	local clock_ns = 0
 	local ok, err = pcall(helpers.with_stub_scope, {
-		"infra.logger", "ui.healthcheck.probes", "ui.healthcheck.core", "adapters.timer_scheduler",
+		"infra.logger", "ui.healthcheck.probes", "ui.healthcheck.core", "core.events.timer_scheduler",
 	}, function()
 		helpers.load_with_stubs("infra.logger")
 		hs.timer.absoluteTime = function() return clock_ns end
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback }
 				world.timers[#world.timers + 1] = handle

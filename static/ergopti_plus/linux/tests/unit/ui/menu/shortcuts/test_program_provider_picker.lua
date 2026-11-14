@@ -257,7 +257,7 @@ local function contextual_native_fixture(body)
 			"apps.engine.program_provider_picker" }) do package.loaded[name] = nil end
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["adapters.program_providers"] = {}
-		package.loaded["adapters.event_loop"] = { add_idle_handler = function() end }
+		package.loaded["core.events.loop"] = { add_idle_handler = function() end }
 		local state = { creates = 0, windows = {}, scripts = {}, signals = {}, confirmations = 0 }
 		local window_type = setmetatable({}, { __call = function(_, properties)
 			state.creates = state.creates + 1

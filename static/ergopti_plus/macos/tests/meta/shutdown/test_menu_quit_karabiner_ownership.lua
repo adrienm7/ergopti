@@ -30,8 +30,8 @@ local function load_menu_quit_action()
 	local exit_calls = {}
 	local exit_mode = { value = "true" }
 	local stock_calls = { execute = 0, launch = 0, notifications = {}, timers = {}, clock = 0 }
-	local real_scheduler = require("adapters.timer_scheduler")
-	package.loaded["adapters.timer_scheduler"] = setmetatable({
+	local real_scheduler = require("core.events.timer_scheduler")
+	package.loaded["core.events.timer_scheduler"] = setmetatable({
 		after = function(_, callback)
 			stock_calls.timers[#stock_calls.timers + 1] = callback
 			return {}, true

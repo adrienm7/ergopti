@@ -32,7 +32,7 @@ local M = {}
 local Logger  = require("infra.logger")
 local LOG     = "reload_guard"
 local Storage = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 
 

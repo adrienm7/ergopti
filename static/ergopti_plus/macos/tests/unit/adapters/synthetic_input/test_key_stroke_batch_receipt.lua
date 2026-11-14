@@ -12,7 +12,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 --- Runs the actual broker with controlled native timing and Quartz ports.
 local function with_broker(scenario)
 	helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance",
-		"adapters.storage", "adapters.timer_scheduler", "infra.logger", "core.text.engine.json" }, function()
+		"adapters.storage", "core.events.timer_scheduler", "infra.logger", "core.text.engine.json" }, function()
 		local f = Fixture.make()
 		scenario(f, f.load())
 	end)

@@ -10,7 +10,7 @@
 
 local M = {}
 local ShellRunner = require("adapters.shell_runner")
-local Scheduler = require("adapters.timer_scheduler")
+local Scheduler = require("core.events.timer_scheduler")
 local Logger = require("infra.logger")
 local TableUtil = require("core.text.engine.table_util")
 local runtime = hs

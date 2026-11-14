@@ -31,7 +31,7 @@ end
 
 --- Drains the real deferred programmable callback without changing its policy.
 local function drain()
-	local timer, uv = require("adapters.timer_scheduler"), require("luv")
+	local timer, uv = require("core.events.timer_scheduler"), require("luv")
 	for _ = 1, 16 do
 		uv.run("nowait")
 		if timer.activeCount() == 0 then return end

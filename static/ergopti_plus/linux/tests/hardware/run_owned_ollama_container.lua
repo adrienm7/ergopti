@@ -65,7 +65,7 @@ local Engine = require("modules.llm.prediction_engine")
 local Download = require("modules.llm.model_download")
 local Window = require("ui.download_window.bridge")
 local Http = require("adapters.http_client")
-local EventLoop = require("adapters.event_loop")
+local EventLoop = require("core.events.loop")
 
 Engine.init({ is_paused = function() return false end })
 assert(Profiles.init({ port = Bridge.OLLAMA_OWNED_PORT }), "profiles take the owned port")
