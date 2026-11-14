@@ -47,6 +47,9 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
    Windows lane state (worker I, 2026-11-14): the whole Windows verdict is green on run 43549510667 (Build,
    Install and launch, Driver startup included).
 2. **The maintainer decisions of 2026-11-13 below** (section « Maintainer decisions of 2026-11-13, to implement »).
+   State at 01:50 Paris (2026-11-14), worker D (Linux desktop): COSMIC v1/v2+ focus, the GNOME switch through the
+   extension (daemon and installer) and GTK 3 Compose through IBus are on `dev` (proof run 43519814090); next for D:
+   the Linux E2E confirmation of the pause-argument fix, then only hardware checks remain in its queue.
 3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
    or a release stay for the maintainer; say so on the item and move on.
 
