@@ -20,7 +20,8 @@ _SIC_Require(Condition, Message) {
 LoggerError(Args*) {
 }
 
-LoggerWarn(Tag, Message, Reason) {
+; Values* admits the value check's refusal log, which the child includes but never calls.
+LoggerWarn(Tag, Message, Reason, Values*) {
 	global _SIC_Warnings
 	_SIC_Require(Reason == "incomplete-scalar" || Reason == "incomplete-timeout" || Reason == "incomplete-control-prefix",
 		"the warning must report a reason code instead of converting an invalid surrogate to text")
