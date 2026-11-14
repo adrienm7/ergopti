@@ -84,6 +84,17 @@
 	white-space: nowrap;
 }
 
+/* The analysers' statistics are long: they wrap inside the panel. */
+.la-panel-analysers td {
+	font-size: 0.9em;
+	white-space: normal;
+}
+
+.la-panel-analysers small {
+	color: var(--theme-sub);
+	display: block;
+}
+
 .la-panel-delta {
 	color: var(--theme-sub);
 	font-size: 0.85em;

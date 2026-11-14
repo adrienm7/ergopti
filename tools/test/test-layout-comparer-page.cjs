@@ -208,6 +208,8 @@ for (const file of ['comparer_page.js', 'analysis_panel.js', 'info_popover.js', 
 const PANEL_SCRIPTS = [
 	'../layout_analysis/_generated/analysis_data.js',
 	'../layout_analysis/analysis_engine.js',
+	// The panel shows every analyser's score beside Ergopti's.
+	'../layout_analysis/analyser_scores.js',
 	'../layout_analysis/info_popover.js',
 	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',

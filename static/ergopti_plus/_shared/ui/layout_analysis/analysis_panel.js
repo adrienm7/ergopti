@@ -21,8 +21,10 @@
  *    « Comparer » (its saved settings) apply here.
  * 4. « Ma frappe »: the app's 'studio-ngrams' event adds the user's own
  *    typing as the default corpus, as in the Comparer.
- * 5. Extra scorers (other analysers' scores) register with addSection and
- *    draw after each analysis.
+ * 5. The other analysers' scores (LAYOUT_ANALYSER_SCORES): each analyser's
+ *    official score is drawn with the analysis, the score with the user's
+ *    finger model on the next tick, so the panel paints first. Extra
+ *    sections register with addSection and draw after each analysis.
  * 6. A layout the page cannot analyse says why; nothing is shown as a score
  *    that was not computed.
  * ==============================================================================
@@ -37,6 +39,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const INFO = window.LAYOUT_ANALYSIS_INFO;
 	const FILES = window.LAYOUT_ANALYSIS_FILES;
+	const SCORES = window.LAYOUT_ANALYSER_SCORES;
 	const t = INFO.t;
 	// The metrics the panel lists; the Comparer shows them all.
 	const PANEL_METRICS = [
@@ -65,6 +68,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const SCORE_DIGITS = 1;
 	// A change smaller than this is shown as none.
 	const DELTA_EPSILON = 0.005;
+	// Digits of the headline statistics of an analyser without a score.
+	const PART_DIGITS = 1;
+	// Shown in a score's cell until it is computed.
+	const PENDING_TEXT = '…';
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -174,8 +181,21 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const metrics = el('table', 'la-panel-metrics');
 		const fingersTitle = el('h3');
 		const fingers = el('div', 'la-panel-fingers');
+		const analysersTitle = el('h3');
+		const analysers = el('table', 'la-panel-metrics la-panel-analysers');
 		const extra = el('div', 'la-panel-extra');
-		node.append(summary, controls, headline, note, metrics, fingersTitle, fingers, extra);
+		node.append(
+			summary,
+			controls,
+			headline,
+			note,
+			metrics,
+			fingersTitle,
+			fingers,
+			analysersTitle,
+			analysers,
+			extra
+		);
 
 		function persist() {
 			try {
@@ -193,6 +213,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			corpusLabel.textContent = t('layout_analysis.corpus.label');
 			keyboardLabel.textContent = t('layout_analysis.keyboard.label');
 			fingersTitle.textContent = t('layout_analysis.details.fingers');
+			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
 			corpusSelect.replaceChildren(
 				...corpora.map((c) => {
@@ -242,6 +263,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			headline.className = 'la-panel-score la-panel-error';
 			metrics.replaceChildren();
 			fingers.replaceChildren();
+			analysers.replaceChildren();
 			extra.replaceChildren();
 		}
 
@@ -296,6 +318,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				state.previous.keyboard === state.keyboard;
 			drawMetrics(result, same ? state.previous.metrics : null);
 			drawFingers(result);
+			drawAnalysers(layout, prepared, settings, mine);
 			extra.replaceChildren();
 			for (const draw of sections) {
 				const box = el('div', 'la-panel-section');
@@ -348,6 +371,62 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				row.children[1].append(bar);
 				fingers.append(row);
 			}
+		}
+
+		/** One analyser's score, or the headline statistics of one without a score. */
+		function scoreText(analyser, score) {
+			// The value alone, as in the Comparer: the units are the analysers' own words.
+			if (analyser.better !== 'none') return format(score.value, analyser.digits);
+			return analyser.headline
+				.map(
+					(part) =>
+						`${t(`layout_analysis.analysers.part.${part}`)} ${format(score.parts[part], PART_DIGITS)} %`
+				)
+				.join(' · ');
+		}
+
+		/**
+		 * Each analyser's official score now, its score with the user's finger
+		 * model on the next tick (an analysis that started since drops it).
+		 */
+		function drawAnalysers(layout, prepared, settings, mine) {
+			const head = el('tr');
+			head.append(
+				el('th'),
+				el('th', '', t('layout_analysis.analysers.official')),
+				el('th', '', t('layout_analysis.analysers.custom'))
+			);
+			const rows = SCORES.analysers().map((analyser) => {
+				const tr = el('tr');
+				const th = el('th', '', analyser.name);
+				th.scope = 'row';
+				th.append(
+					' ',
+					INFO.button(`analyser.${analyser.id}`),
+					' ',
+					el('small', 'la-muted', t(`layout_analysis.analysers.better.${analyser.better}`))
+				);
+				const official = SCORES.score(analyser.id, layout, prepared, {
+					keyboard: state.keyboard,
+					fingering: 'official'
+				});
+				const custom = el('td', '', PENDING_TEXT);
+				tr.append(th, el('td', '', scoreText(analyser, official)), custom);
+				return { analyser, tr, custom };
+			});
+			analysers.replaceChildren(head, ...rows.map((row) => row.tr));
+			setTimeout(() => {
+				if (mine !== state.generation) return;
+				for (const row of rows)
+					row.custom.textContent = scoreText(
+						row.analyser,
+						SCORES.score(row.analyser.id, layout, prepared, {
+							keyboard: state.keyboard,
+							profile: settings.profile,
+							fingering: 'custom'
+						})
+					);
+			}, 0);
 		}
 
 		function schedule() {

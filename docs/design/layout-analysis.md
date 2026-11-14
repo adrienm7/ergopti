@@ -441,9 +441,15 @@ does not load the panel's scripts gets no panel.
   app's `studio-ngrams` event and becomes the default corpus.
 - It lists the main metrics with « i » buttons and the change the last edit
   made (green better, red worse), then the finger load.
+- Then every analyser's score (`LAYOUT_ANALYSER_SCORES.score`, see
+  [analyser-scores.md](analyser-scores.md)): the official score is drawn with
+  the analysis, the score with the user's finger model on the next tick, so
+  the panel paints first. An analysis started since drops the late half.
+  Each row has the analyser's « i » button (`analyser.<id>`); an analyser
+  without a score shows its headline statistics. About 50 ms per half in
+  Node for the 11 analysers.
 - `addSection(draw)` adds a view drawn after each analysis with
-  `(container, {layout, tables, keyboard, result})`. Other analysers' scores
-  use it.
+  `(container, {layout, tables, keyboard, result})`.
 
 The built-in corpus scripts load through `LAYOUT_ANALYSIS_FILES.builtinTables`,
 relative to `corpus_files.js`, from any page folder. The « i » popovers
