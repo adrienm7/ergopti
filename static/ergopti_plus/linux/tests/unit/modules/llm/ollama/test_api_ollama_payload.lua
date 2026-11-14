@@ -65,10 +65,10 @@ end
 --- @param opts table Request options.
 --- @return table The composed transport request.
 local function captured_request(opts)
-	local previous_client = package.loaded["adapters.http_client"]
+	local previous_client = package.loaded["core.network.adapters.http_client"]
 	local previous_api = package.loaded["modules.llm.api_ollama"]
 	local seen = nil
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		postStream = function(url, headers, body, options, _on_chunk, on_done)
 			seen = { url = url, headers = headers, body = body, options = options }
 			on_done({ ok = false, error = "fixture complete" })
@@ -84,7 +84,7 @@ local function captured_request(opts)
 			function() end, function() end)
 	end)
 
-	package.loaded["adapters.http_client"] = previous_client
+	package.loaded["core.network.adapters.http_client"] = previous_client
 	package.loaded["modules.llm.api_ollama"] = previous_api
 	helpers.assert_true(ok, "the request must compose: " .. tostring(err))
 	return seen

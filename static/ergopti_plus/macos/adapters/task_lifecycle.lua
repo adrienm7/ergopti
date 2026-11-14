@@ -100,7 +100,7 @@ function M.native(label, executable, on_done, on_chunk_or_args, args)
 		return nil
 	end
 	-- The system curl is checked at its point of use; the gate logs and tells.
-	local SystemCurl = require("adapters.system_curl")
+	local SystemCurl = require("core.network.adapters.system_curl")
 	if executable == SystemCurl.PATH and not SystemCurl.check(tostring(label)) then return nil end
 	local task = M.create(function()
 		local guarded_done = M.guard_callback(on_done, tostring(label) .. " completion")

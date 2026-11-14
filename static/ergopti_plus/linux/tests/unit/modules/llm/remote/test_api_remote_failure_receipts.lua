@@ -11,10 +11,10 @@ local DECISION = { provider = "typesafe", token = "synthetic-key" }
 local BACKBOARD = { provider = "backboard", token = "synthetic-key", model = "openai/gpt-4o" }
 
 local function with_remote(control)
-	local names = { "adapters.http_client", "modules.llm.api_remote" }
+	local names = { "core.network.adapters.http_client", "modules.llm.api_remote" }
 	local previous, calls = {}, {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, body, done, options)
 			calls[#calls + 1] = { url = url, done = done, options = options }
 			return true

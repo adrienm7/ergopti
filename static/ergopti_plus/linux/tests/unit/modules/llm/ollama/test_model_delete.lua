@@ -28,7 +28,7 @@ end
 local function load_fixture()
 	local transport = { deletes = {} }
 	package.loaded["infra.llm_bridge"] = nil
-	replace("adapters.http_client", {
+	replace("core.network.adapters.http_client", {
 		delete_owned = function(url, headers, body, options, callback)
 			local operation = { started = true, closed = false, cancelled = false, listeners = {} }
 			if transport.refuse_start then operation.started = false end

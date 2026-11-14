@@ -119,7 +119,7 @@ for (const block of blocks) {
 }
 const warningSources = [
 	['static/ergopti_plus/windows/infra/toml/toml_document.ahk', '_TOML_ConfigInlineAssignment'],
-	['static/ergopti_plus/windows/adapters/http_client.ahk', 'SystemProxy_ResolveAsync']
+	['static/ergopti_plus/windows/core/network/adapters/http_client.ahk', 'SystemProxy_ResolveAsync']
 ].map(([file, functionName]) => {
 	const text = fs.readFileSync(path.join(root, file), 'utf8');
 	const match = new RegExp('^' + functionName + '\\([^\\n]+\\) \\{\\n.*?^\\}\\n', 'ms').exec(text);

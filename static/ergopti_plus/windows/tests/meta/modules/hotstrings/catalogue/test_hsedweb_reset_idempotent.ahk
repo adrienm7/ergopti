@@ -61,7 +61,7 @@ _HSEDRI_TryOpenBody() {
 ; ===================================================
 
 _HSEDRI_GlobalFlagDeclared() {
-	Src := _DriverDirConcat("ui")
+	Src := _DriverDirsConcat("ui", "core/network")
 	Assert(Src != "", "ui/ source must be readable")
 
 	Assert(InStr(Src, "_HsEdWeb_ResetDone") > 0,
@@ -119,7 +119,7 @@ _HSEDRI_DoubleCloseReachesReset() {
 	; both the JS bridge and the native Gui Close event route through the SAME
 	; _HsEdWeb_Close() -> _HsEdWeb_Reset() call, so the guard is load-bearing
 	; rather than protecting a path that can no longer be re-entered.
-	Src := _DriverDirConcat("ui")
+	Src := _DriverDirsConcat("ui", "core/network")
 	Assert(InStr(Src, '_HsEdWeb_Close()') > 0,
 		'_HsEdWeb_Close must still exist as the shared teardown entry point for both the JS "close" message and the native Gui Close event (hsedweb-reset-idempotent)')
 

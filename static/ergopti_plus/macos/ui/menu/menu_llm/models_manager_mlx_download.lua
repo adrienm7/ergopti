@@ -41,7 +41,7 @@ local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
 local _source_sep = "[" .. NativePath.separators() .. "]"
 local _native_network_directory = _module_source:match("^(.*)" .. _source_sep .. "ui" .. _source_sep
 	.. "menu" .. _source_sep .. "menu_llm" .. _source_sep .. "[^" .. NativePath.separators() .. "]+$")
-_native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
+_native_network_directory = _native_network_directory and (_native_network_directory .. "/core/network/adapters")
 
 --- Quotes the Python import directory without a table-only native JSON encoder.
 --- Invalid UTF-8 and quotation failures refuse before any helper is published.

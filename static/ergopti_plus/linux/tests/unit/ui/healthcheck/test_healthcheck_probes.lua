@@ -37,7 +37,7 @@ local PROC_AFTER = {
 --- @param body function(Probes, world)
 --- @param absent table|nil Programs the probe of has_command answers absent for.
 local function with_probes(async, body, absent)
-	local names = { "ui.healthcheck.probes", "adapters.http_client", "adapters.shell_runner",
+	local names = { "ui.healthcheck.probes", "core.network.adapters.http_client", "adapters.shell_runner",
 		"core.events.timer_scheduler" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -62,7 +62,7 @@ local function with_probes(async, body, absent)
 		if content ~= nil then return content end
 		return real_read(path)
 	end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		HAS_ASYNC = async,
 		get = function(url, headers, options, callback)
 			world.requests[#world.requests + 1] = { url = url, headers = headers, options = options, callback = callback }
@@ -151,7 +151,7 @@ helpers.describe("diagnostics probes (linux)", function()
 
 	helpers.it("(healthcheck-http-refusal) preserves an inline completion despite a false dispatch receipt", function()
 		with_probes(true, function(Probes)
-			package.loaded["adapters.http_client"].get = function(_, _, _, done)
+			package.loaded["core.network.adapters.http_client"].get = function(_, _, _, done)
 				done({ status = 200, body = "{}" }); return false
 			end
 			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
@@ -165,7 +165,7 @@ helpers.describe("diagnostics probes (linux)", function()
 
 	helpers.it("(healthcheck-http-refusal) completes probes when HTTP admission refuses without callback", function()
 		with_probes(true, function(Probes, world)
-			package.loaded["adapters.http_client"].get = function() return false end
+			package.loaded["core.network.adapters.http_client"].get = function() return false end
 			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
 				get_backend = function() return "ollama" end,
 				get_base_url = function() return "http://127.0.0.1:11434" end } })

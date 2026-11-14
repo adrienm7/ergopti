@@ -337,7 +337,9 @@ def stage_tree(temp):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
     if (
-        hashlib.sha256((base / "linux/adapters/curl_http_client.lua").read_bytes()).hexdigest()
+        hashlib.sha256(
+            (base / "linux/core/network/adapters/curl_http_client.lua").read_bytes()
+        ).hexdigest()
         != EXPECTED_NATIVE_SHA256
     ):
         raise RuntimeError("Sole reviewed native engine is required")

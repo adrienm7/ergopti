@@ -17,7 +17,7 @@ local MESSAGES = { { role = "user", content = "Synthetic probe." } }
 --- Runs the actual remote module with an explicit HTTP acquisition boundary.
 --- @param body function Receives the remote module and transport controls.
 local function with_remote(body)
-	local names = { "adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
+	local names = { "core.network.adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
 	local previous, originals = {}, {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	for _, name in ipairs({ "backboard_assistant_id", "backboard_message_request" }) do
@@ -26,7 +26,7 @@ local function with_remote(body)
 	local state = { allowed = true, calls = {}, done = 0 }
 	state.admit = function() return state.allowed end
 	state.completed = function() state.done = state.done + 1 end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, _, _, callback, options)
 			if state.on_post then state.on_post() end
 			if options.authorized and options.authorized() ~= true then return false end

@@ -30,7 +30,7 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 		return original(tag, format, ...)
 	end
 end
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local Native = require("adapters.owned_process")
 local Timings = require("infra.timings")
 local Engine, Profiles
@@ -43,7 +43,7 @@ local function trace(step)
 	io.stdout:flush()
 end
 local function host_of(url) return tostring(type(url) == "string" and url:match("^%a+://([^/]+)") or "?") end
-local SystemProxy = require("adapters.system_proxy")
+local SystemProxy = require("core.network.adapters.system_proxy")
 local original_lookup_owned = SystemProxy.lookup_owned
 SystemProxy.lookup_owned = function(url, options, callback)
 	trace("proxy-lookup-start " .. host_of(url))
@@ -113,7 +113,7 @@ Http.download_output_owned = function(url, headers, target, options, callback)
 	archive_operation = operation
 	return operation
 end
-local Digest, Archive = require("infra.fd_sha256"), require("infra.archive_output")
+local Digest, Archive = require("core.network.engine.fd_sha256"), require("infra.archive_output")
 local original_digest_native, original_artifact_new = Digest.native, Archive.native_ollama_artifact
 local observed_digest_workers, observed_artifact_factories = {}, {}
 -- Observe the real same-FD digest callback; never echo the expected asset hash.

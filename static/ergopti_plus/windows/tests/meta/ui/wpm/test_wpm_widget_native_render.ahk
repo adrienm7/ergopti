@@ -114,7 +114,7 @@ Test("meta wpm widget: every frame retains complete GDI+ ownership",
 ; wpm-webview-temp-dir-leak: the WPM widget has no live WebView2 (GDI+ migration).
 _ATG_WpmWidgetHasNoLiveWebView2() {
 	; Scope the scan to ui/wpm (both init.ahk and the wpm_widget.ahk render layer
-	; after the F3 split) — NOT _DriverDirConcat("ui"): other ui/ files (changelog,
+	; after the F3 split) — NOT _DriverDirsConcat("ui", "core/network"): other ui/ files (changelog,
 	; model browser, healthcheck) reference WebView2 in live code, so a whole-tree
 	; scan would false-trip this module-scoped "wpm widget has none" invariant.
 	Src := _StripFullLineComments(_DriverDirConcat("ui/wpm"))

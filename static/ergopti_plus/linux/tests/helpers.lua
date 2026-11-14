@@ -167,7 +167,7 @@ end
 --- The source of a production module, resolved from its module name through
 --- package.searchpath exactly as require would find it, so a test listing
 --- several modules names them as the code does, never by a driver path.
---- @param module_name string Dotted module name, e.g. "adapters.http_client".
+--- @param module_name string Dotted module name, e.g. "core.network.adapters.http_client".
 --- @return string|nil body, string|nil err Body, or nil plus why.
 function M.read_module_source(module_name)
 	local path, missing = package.searchpath(module_name, package.path)

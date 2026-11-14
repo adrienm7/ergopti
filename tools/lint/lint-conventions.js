@@ -747,6 +747,7 @@ const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/core/network'),
 	// Portable AHK policy is audited with its native consumers.
 	join(REPO_ROOT, 'static/ergopti_plus/_shared')
 ];
@@ -782,6 +783,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/adapters'),
@@ -794,6 +796,7 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/linux/core/fs/engine'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/linux/core/network'),
 	join(REPO_ROOT, 'static/ergopti_plus/linux/tests'),
 	// platform/ is where the OS seams live — the remap generator and the tray
 	// binding — and it held Lua that no convention check had ever read.
