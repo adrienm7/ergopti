@@ -19,7 +19,7 @@ local function with_fixture(callback)
 		helpers.with_stub_scope({
 			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "infra.i18n", "infra.locale", "core.i18n.engine.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
-			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
+			"adapters.json_codec", "core.events.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "hs", "tests.stubs.hs",
 		}, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()

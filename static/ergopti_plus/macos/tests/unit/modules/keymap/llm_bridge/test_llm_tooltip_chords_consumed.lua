@@ -368,7 +368,7 @@ end)
 --- predictions until something resets them.
 --- @return table fixture
 local function load_keymap()
-	local scheduler = require("adapters.timer_scheduler")
+	local scheduler = require("core.events.timer_scheduler")
 	local original_awake = scheduler.hotstring_time
 	scheduler.hotstring_time = function() return original_awake() + 10000 end
 	for name in pairs(package.loaded) do

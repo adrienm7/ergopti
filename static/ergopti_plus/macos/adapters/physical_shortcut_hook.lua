@@ -16,7 +16,7 @@ local M = {}
 
 local hs = hs
 local Provenance = require("adapters.event_provenance")
-local Timer = require("adapters.timer_scheduler")
+local Timer = require("core.events.timer_scheduler")
 local Broker = require("adapters.input_source_broker")
 local Logger = require("infra.logger")
 

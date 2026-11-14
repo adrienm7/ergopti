@@ -37,7 +37,7 @@ local function selection_test(name, body)
 	helpers.it(name, function()
 		helpers.with_stub_scope({ "modules.keymap.input_sources", "modules.keymap.layout_install",
 			"adapters.input_source_selector", "platform.remap.lease_helper",
-			"adapters.shell_runner", "adapters.timer_scheduler", "adapters.task_lifecycle" }, function()
+			"adapters.shell_runner", "core.events.timer_scheduler", "adapters.task_lifecycle" }, function()
 			local resolutions = 0
 			package.loaded["platform.remap.lease_helper"] = {
 				resolve = function()
@@ -54,7 +54,7 @@ end
 helpers.describe("set_input_source: a setLayout that returns false must fall through", function()
 	selection_test("tries both hs.keycodes names and then reaches the native TIS fallback", function(resolutions)
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local task_args = nil
 		local IS = helpers.load_with_stubs("modules.keymap.input_sources", {
 			task = {
@@ -110,7 +110,7 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 
 		package.loaded["modules.keymap.input_sources"] = nil
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 	end)
 
 	selection_test("still short-circuits on the first name when setLayout RETURNS true", function(resolutions)
@@ -136,6 +136,6 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 
 		package.loaded["modules.keymap.input_sources"] = nil
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 	end)
 end)

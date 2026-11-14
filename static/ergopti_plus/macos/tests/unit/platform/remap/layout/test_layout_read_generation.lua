@@ -45,7 +45,7 @@ local helpers = require("tests.helpers")
 local function load_watchers()
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 
 	local ctx = { spawns = {}, watchdogs = {}, poll_cb = nil }
 
@@ -78,7 +78,7 @@ local function load_watchers()
 		_active_tasks = {},
 	}
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_delay, fn)
 			local handle = { fn = fn, cancelled = false }
 			table.insert(ctx.watchdogs, handle)
@@ -199,5 +199,5 @@ end)
 -- through package.loaded into whichever module the runner loads next, and the
 -- failure surfaces as an order-dependent crash — green locally, red in CI.
 package.loaded["adapters.shell_runner"] = nil
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["platform.remap.watchers"] = nil

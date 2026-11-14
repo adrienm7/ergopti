@@ -15,7 +15,7 @@ local function fresh_owner()
 	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.gestures.actions_aux_owner",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"adapters.shell_runner",
 		"infra.logger",
 		"tests.stubs.hs",
@@ -150,7 +150,7 @@ local function fresh_owner()
 	package.loaded["infra.logger"] = logger
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.gestures.actions_aux_owner"] = nil
 	fixture.subject = require("modules.gestures.actions_aux_owner")
 	package.loaded["adapters.shell_runner"] = saved_shell_runner

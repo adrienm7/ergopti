@@ -69,7 +69,7 @@ local HttpClient = require("adapters.http_client")
 local FileDigest = require("adapters.file_digest")
 local ok_storage, Storage = pcall(require, "adapters.storage")
 if not ok_storage then Storage = nil end
-local ok_timer, Timer = pcall(require, "adapters.timer_scheduler")
+local ok_timer, Timer = pcall(require, "core.events.timer_scheduler")
 if not ok_timer then Timer = nil end
 
 local LOG = "modules.updater.manager"

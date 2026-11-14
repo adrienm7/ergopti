@@ -233,7 +233,7 @@ end)
 helpers.describe("prediction triggers: preview expiry bridge", function()
 	helpers.it("hides and rejects a preview whose expiry cannot be armed", function()
 		local hidden = 0
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function() return { armed = false, fired = true } end,
 			cancel = function() end,
 		})
@@ -263,7 +263,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 	helpers.it("publishes expiry only after the rendered bubble's own delay", function()
 		local scheduler = Fakes.timer_scheduler()
 		local expired = 0
-		replace("adapters.timer_scheduler", scheduler)
+		replace("core.events.timer_scheduler", scheduler)
 		replace("adapters.graphics_renderer", {
 			is_available = function() return true end,
 			show = function() return true end,
@@ -295,7 +295,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 
 	helpers.it("(preview-expiry-stale) ignores a cancelled timer after a newer preview", function()
 		local callbacks, hidden, expired = {}, 0, 0
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function(_, callback) callbacks[#callbacks + 1] = callback; return { armed = true } end,
 			cancel = function() return true end,
 		})
@@ -321,7 +321,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 
 	helpers.it("(preview-expiry-stale) ignores queued timers after a cover or failed redraw", function()
 		local callbacks, hidden, expired, draws = {}, 0, 0, 0
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function(_, callback) callbacks[#callbacks + 1] = callback; return { armed = true } end,
 			cancel = function() return false end,
 		})
@@ -348,7 +348,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 
 	helpers.it("(preview-expiry-stale) does not retain a timer that fires before after returns", function()
 		local hidden, expired, cancelled = 0, 0, 0
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function(_, callback) callback(); return { armed = true } end,
 			cancel = function() cancelled = cancelled + 1; return true end,
 		})
@@ -371,7 +371,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 
 	helpers.it("(preview-expiry-stale) does not publish expiry over a reentrant replacement", function()
 		local callbacks, expired = {}, 0
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function(_, callback) callbacks[#callbacks + 1] = callback; return { armed = true } end,
 			cancel = function() return true end,
 		})
@@ -397,7 +397,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 	helpers.it("(preview-cancel-reentry) keeps a replacement opened during " .. action, function()
 		local preview, hidden, again = nil, 0, false
 		local candidate = { { replacement = "text", group = "rolls", fires = true } }
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function() return { armed = true } end,
 			cancel = function()
 				if not again then again = true; preview.show(candidate, "autocorrect") end
@@ -423,7 +423,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 
 	helpers.it("(preview-hide-debt) delays expiry until a refused hide is acknowledged", function()
 		local callback, expired, allowed, hides = nil, 0, false, 0
-		replace("adapters.timer_scheduler", {
+		replace("core.events.timer_scheduler", {
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
 		})
@@ -451,7 +451,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 	helpers.it("(preview-destroy-expiry) retires its timer and rows before a new owner draws", function()
 		local scheduler = Fakes.timer_scheduler()
 		local hidden, expired = 0, 0
-		replace("adapters.timer_scheduler", scheduler)
+		replace("core.events.timer_scheduler", scheduler)
 		replace("adapters.graphics_renderer", {
 			is_available = function() return true end,
 			show = function() return true end,

@@ -33,7 +33,7 @@ end
 --- @return table fixture Loaded module and native tap observations.
 local function load_fixture(plans, timer_plans)
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.keycodes"] = nil
 
 	package.loaded["tests.stubs.hs"] = nil

@@ -32,7 +32,7 @@ local function with_fixture(callback)
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 		"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
 		"adapters.event_provenance", "adapters.file_system", "adapters.key_state",
-		"adapters.shell_runner", "adapters.synthetic_input", "adapters.timer_scheduler",
+		"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 		"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
 		"infra.deferred_work", "infra.fs_dir", "modules.keymap.utils",
 		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
@@ -106,7 +106,7 @@ end
 
 local function load_capslock_fixture(toggle_impl)
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.key_state"] = {
 		toggle_capslock = toggle_impl,
@@ -170,7 +170,7 @@ end
 local function make_sys_screenshot_spies(window_override)
 	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["adapters.file_system"] = nil
@@ -333,7 +333,7 @@ local function load_h01_system(options)
 	package.loaded["infra.notifications"] = nil
 	local previous_logger = package.loaded["infra.logger"]
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
 	package.loaded["adapters.shell_runner"] = nil

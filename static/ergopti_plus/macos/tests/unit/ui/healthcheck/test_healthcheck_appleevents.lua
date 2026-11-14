@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local MODULE = "ui.healthcheck.appleevents"
-local FIXTURE_MODULES = { MODULE, "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger" }
+local FIXTURE_MODULES = { MODULE, "adapters.shell_runner", "core.events.timer_scheduler", "infra.logger" }
 local NONCE = "00000000000000000000000000000001"
 
 local function with_probe(options, body)
@@ -32,7 +32,7 @@ local function with_probe(options, body)
 				return options.allowed ~= false
 			end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			now_ns = function() return world.now * 1e6 end,
 			after = function(delay, callback)
 				if options.timer_refused then return nil, false end

@@ -80,7 +80,7 @@ local run_contract = function(helpers,load_manager,load_host)
    helpers.assert_eq(blocking,false,'Native GTK dispatch cannot block keyboard input')
    controls.iterations=controls.iterations+1
   end}end}
-  package.loaded['adapters.event_loop']={add_idle_handler=function(fn)
+  package.loaded['core.events.loop']={add_idle_handler=function(fn)
    if controls.pump_refused then error('private event loop detail')end
    controls.idle_handlers[#controls.idle_handlers+1]=fn
   end}

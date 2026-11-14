@@ -162,9 +162,9 @@ helpers.describe("modules.updater.manager", function()
 	end)
 
 	helpers.it("reports unavailable background scheduling instead of silently dropping checks", function()
-		local previous_timer = package.loaded["adapters.timer_scheduler"]
+		local previous_timer = package.loaded["core.events.timer_scheduler"]
 		local previous_manager = package.loaded["modules.updater.manager"]
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			HAS_ASYNC = false,
 			cancel = function() end,
 		}
@@ -172,14 +172,14 @@ helpers.describe("modules.updater.manager", function()
 		local unavailable = require("modules.updater.manager")
 		local started = unavailable.start_background_checks(nil, 60)
 
-		package.loaded["adapters.timer_scheduler"] = previous_timer
+		package.loaded["core.events.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(started, false,
 			"missing luv must be a truthful unavailable capability, not a green schedule")
 	end)
 
 	helpers.it("reports a schedule whose timer was not armed", function()
-		local previous_timer = package.loaded["adapters.timer_scheduler"]
+		local previous_timer = package.loaded["core.events.timer_scheduler"]
 		local previous_manager = package.loaded["modules.updater.manager"]
 		local timer = { HAS_ASYNC = true }
 		function timer.after() return { id = "refused", armed = false, fired = true } end
@@ -187,13 +187,13 @@ helpers.describe("modules.updater.manager", function()
 			handle.armed = false
 			return true
 		end
-		package.loaded["adapters.timer_scheduler"] = timer
+		package.loaded["core.events.timer_scheduler"] = timer
 		package.loaded["modules.updater.manager"] = nil
 		local refused = require("modules.updater.manager")
 		refused.current_version = function() return "1.0.0" end
 		local started = refused.start_background_checks()
 
-		package.loaded["adapters.timer_scheduler"] = previous_timer
+		package.loaded["core.events.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(started, false, "a refused timer must not read as a running schedule")
 	end)

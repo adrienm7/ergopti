@@ -12,7 +12,7 @@ local M = {}
 local OWNED = {
 	"adapters.clipboard", "adapters.event_provenance", "adapters.python_interpreter",
 	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
-	"adapters.text_sender", "adapters.timer_scheduler", "adapters.tooltip_renderer",
+	"adapters.text_sender", "core.events.timer_scheduler", "adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "hs.application", "hs.canvas",
 	"hs.dialog", "hs.distributednotifications", "hs.eventtap",
@@ -86,7 +86,7 @@ function M.with_world(options, scenario)
 			local sender = require("adapters.text_sender")
 			helpers.assert_eq(sender.terminalInputTarget() ~= nil, options.terminal == true)
 			local expander = require("modules.keymap.expander")
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local state = { buffer = "abcdefghijkl", magic_key = "star" }
 			helpers.assert_true(expander.init(state, {}, { get_llm_enabled = function() return false end }))
 			function w.attempt(replacement)

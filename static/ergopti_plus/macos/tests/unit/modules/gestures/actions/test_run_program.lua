@@ -15,7 +15,7 @@ local function with_program(callback, program_admission)
 	local tasks, actions, auxiliary = {}, nil, nil
 	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
 		"adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
-		"adapters.task_environment", "adapters.file_system", "adapters.timer_scheduler", "infra.preferences",
+		"adapters.task_environment", "adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
 		"infra.config_paths", "infra.paths", "infra.i18n", "infra.logger", "infra.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end

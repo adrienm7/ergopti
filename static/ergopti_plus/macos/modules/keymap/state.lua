@@ -21,7 +21,7 @@
 ---    change, but the invariant lives here with the state definition.
 --- ==============================================================================
 
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local M  = {}
 
 

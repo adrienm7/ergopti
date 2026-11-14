@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
 local previous_renderer = package.loaded["adapters.graphics_renderer"]
-local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 
 local shown = 0
 package.loaded["adapters.graphics_renderer"] = {
@@ -21,7 +21,7 @@ package.loaded["adapters.graphics_renderer"] = {
 	is_visible = function() return shown > 0 end,
 	destroy = function() end,
 }
-package.loaded["adapters.timer_scheduler"] = Fakes.timer_scheduler()
+package.loaded["core.events.timer_scheduler"] = Fakes.timer_scheduler()
 
 local Preview = helpers.load_module("ui.tooltip.preview")
 local CANDIDATES = {
@@ -66,4 +66,4 @@ end)
 
 package.loaded["ui.tooltip.preview"] = nil
 package.loaded["adapters.graphics_renderer"] = previous_renderer
-package.loaded["adapters.timer_scheduler"] = previous_scheduler
+package.loaded["core.events.timer_scheduler"] = previous_scheduler

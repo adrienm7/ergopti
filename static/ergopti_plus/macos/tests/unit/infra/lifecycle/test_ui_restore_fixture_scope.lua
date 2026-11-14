@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.ui_restore_fixture")
 local OWNERS = {
-	"adapters.storage", "adapters.timer_scheduler", "infra.logger", "infra.timings",
+	"adapters.storage", "core.events.timer_scheduler", "infra.logger", "infra.timings",
 	"infra.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }

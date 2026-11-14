@@ -22,8 +22,8 @@ local HANG_DEADLINE_MS = 5000
 -- still ends on the watchdog, which these cases expect, so it stays short.
 local REFUSAL_WATCHDOG_MS = 25
 local function fresh()
-	package.loaded["adapters.event_loop"] = nil
-	return require("adapters.event_loop")
+	package.loaded["core.events.loop"] = nil
+	return require("core.events.loop")
 end
 local function resources()
 	local list = {}

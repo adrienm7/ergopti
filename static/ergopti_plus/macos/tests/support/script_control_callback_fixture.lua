@@ -34,7 +34,7 @@ function M.with_sentinel(callback)
 		"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n",
 		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 		"adapters.event_provenance", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.key_state",
+		"core.events.timer_scheduler", "adapters.key_state",
 		"modules.shortcuts.script_control",
 	}
 	return helpers.with_stub_scope(names, function()
@@ -72,7 +72,7 @@ function M.with_sentinel(callback)
 				return true
 			end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function(_, callback) return {callback = callback}, true end,
 			cancel = function() return true end,
 		}

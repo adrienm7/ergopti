@@ -104,7 +104,7 @@ end
 --- @param options table Native fault controls.
 --- @param callback function Receives the module and independently observable native state.
 local function with_native_world(options, callback)
-	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "adapters.file_system", "adapters.shell_runner", "adapters.timer_scheduler", "core.fs.engine.app_dirs" }, function()
+	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "adapters.file_system", "adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.app_dirs" }, function()
 		local state = { files = {}, stops = 0, starts = 0, created = 0, running = false, options = options }
 		state.errors = {}
 		local module
@@ -145,7 +145,7 @@ local function with_native_world(options, callback)
 			end },
 		})
 		state.deferred = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback }
 				state.deferred[#state.deferred + 1] = handle

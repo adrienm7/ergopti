@@ -62,7 +62,7 @@ local function new_harness()
 	local hs = _G.hs
 	local saved_clock = hs.timer.secondsSinceEpoch
 	local saved_absolute = hs.timer.absoluteTime
-	local saved_scheduler = package.loaded["adapters.timer_scheduler"]
+	local saved_scheduler = package.loaded["core.events.timer_scheduler"]
 	local saved_timings = package.loaded["infra.timings"]
 	local saved_logger = package.loaded["infra.logger"]
 	-- Records every DEBUG line the engine writes, so the rejection diagnostics
@@ -79,7 +79,7 @@ local function new_harness()
 	local clock = 1000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.timings"] = nil
 	package.loaded["modules.gestures.engine"] = nil
 	hs.eventtap.__reset()
@@ -155,7 +155,7 @@ local function new_harness()
 		Engine.stop()
 		hs.timer.secondsSinceEpoch = saved_clock
 		hs.timer.absoluteTime = saved_absolute
-		package.loaded["adapters.timer_scheduler"] = saved_scheduler
+		package.loaded["core.events.timer_scheduler"] = saved_scheduler
 		package.loaded["infra.timings"] = saved_timings
 		package.loaded["infra.logger"] = saved_logger
 		package.loaded["modules.gestures.engine"] = nil

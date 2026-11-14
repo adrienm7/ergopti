@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"infra.logger", "infra.config_paths", "adapters.timer_scheduler",
+	"infra.logger", "infra.config_paths", "core.events.timer_scheduler",
 	"modules.keystats.kc_bridge", "modules.keystats", "tests.stubs.hs",
 }
 

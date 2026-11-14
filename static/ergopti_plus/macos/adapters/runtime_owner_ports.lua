@@ -231,8 +231,8 @@ local function approval()
 			end)
 		end,
 		now = function() return hs.timer.absoluteTime() / 1e9 end,
-		after = function(seconds, fn) return require("adapters.timer_scheduler").after(seconds, fn) end,
-		cancel = function(handle) return require("adapters.timer_scheduler").cancel(handle) end,
+		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
+		cancel = function(handle) return require("core.events.timer_scheduler").cancel(handle) end,
 		open_settings = function(url) return hs.urlevent.openURL(url) end,
 		reload = function() hs.reload() end,
 		version = M.virtual_hid_extension_version,
@@ -321,7 +321,7 @@ function M.new()
 			fetch = M.fetch_artifact,
 		},
 		capture = require("adapters.runtime_capture_port").new(),
-		timer = require("adapters.timer_scheduler"),
+		timer = require("core.events.timer_scheduler"),
 		observer = M.automatic_observer(function(text)
 			require("infra.notifications").notify(text, nil, "warning")
 		end),

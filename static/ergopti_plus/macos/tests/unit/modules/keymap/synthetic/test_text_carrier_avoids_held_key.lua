@@ -30,7 +30,7 @@ local function load_fixture()
 			or name:match("^ui%.tooltip")
 			or name == "adapters.synthetic_input"
 			or name == "adapters.event_provenance"
-			or name == "adapters.event_clock"
+			or name == "core.events.clock"
 			or name == "adapters.unicode_carrier"
 			or name == "infra.key_event_health"
 		) then
@@ -175,7 +175,7 @@ helpers.describe("replacement text never rides a held key (hsfix-held-carrier)",
 		load_fixture()
 		local Carrier = require("adapters.unicode_carrier")
 		local KeyEventHealth = require("infra.key_event_health")
-		local clock = require("adapters.timer_scheduler")
+		local clock = require("core.events.timer_scheduler")
 		local saved = clock.now_ns
 		local now_ns = 1e12
 		clock.now_ns = function() return now_ns end

@@ -334,7 +334,7 @@ helpers.describe("model manager generation fences", function()
 		local modules = {
 			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
+			"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
 			"adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
 			"infra.dialog_util", "ui.download_window",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
@@ -376,7 +376,7 @@ helpers.describe("model manager generation fences", function()
 					return task
 				end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() error("healthy readiness must not schedule a retry") end,
 				cancel = function() return true end,
 			}
@@ -547,7 +547,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
-			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
+			"hs", "adapters.shell_runner", "core.events.timer_scheduler", "infra.logger", "infra.i18n",
 			"infra.dialog_util", "infra.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
@@ -781,7 +781,7 @@ helpers.describe("model manager generation fences", function()
 		local modules = {
 			"adapters.json_codec",
 			"hs", "infra.logger", "infra.i18n", "infra.notifications",
-			"adapters.task_lifecycle", "adapters.timer_scheduler", "ui.download_window",
+			"adapters.task_lifecycle", "core.events.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
 			"adapters.file_system",
@@ -862,7 +862,7 @@ helpers.describe("model manager generation fences", function()
 					end,
 					start = function(task) return task:start() == true end,
 				}
-				package.loaded["adapters.timer_scheduler"] = {
+				package.loaded["core.events.timer_scheduler"] = {
 					after = function(delay, callback)
 						local handle = {timer = true}
 						local function fire()

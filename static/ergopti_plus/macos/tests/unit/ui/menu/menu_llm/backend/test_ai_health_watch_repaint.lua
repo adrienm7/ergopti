@@ -11,13 +11,13 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "ui.menu.menu_llm", "adapters.timer_scheduler" }
+local MODULES = { "ui.menu.menu_llm", "core.events.timer_scheduler" }
 
 --- Loads the menu with a manual timer so each tick is driven by the test.
 local function with_watch(fn)
 	return helpers.with_fresh_modules(MODULES, function()
 		local timers = { armed = 0, cancelled = 0, tick = nil }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function(_, tick)
 				timers.armed = timers.armed + 1
 				timers.tick = tick

@@ -39,7 +39,7 @@ function M.run(config, done)
 	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
 		.. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
 	local Logger, UI = require("infra.logger"), require("ui.ui_builder")
-	local Scheduler, Result = require("adapters.timer_scheduler"), require("adapters.webview_result")
+	local Scheduler, Result = require("core.events.timer_scheduler"), require("adapters.webview_result")
 	local json = require("hs.json")
 	local policy = assert(io.open(root .. "/_shared/diagnostics/data/redaction.json", "rb"))
 	local raw_policy = assert(policy:read("*a")); assert(policy:close())

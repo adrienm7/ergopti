@@ -18,7 +18,7 @@ local function with_world(scenario)
 		local native_write = hs.pasteboard.writeAllData
 		local native_clear = hs.pasteboard.clearContents
 		local native_count = hs.pasteboard.changeCount
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local debts = {}
 		local begin = w.synthetic.begin
 		w.synthetic.begin = function(owner, ...)

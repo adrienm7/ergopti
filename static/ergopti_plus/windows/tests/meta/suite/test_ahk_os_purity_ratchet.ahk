@@ -110,7 +110,10 @@ _AOPR_IsUiSource(Path) {
 }
 
 ; Every .ahk file under the given driver subdirectories, recursively, with
-; adapters/ excluded — OS calls there are the legitimate isolation layer.
+; adapters/ excluded — OS calls there are the legitimate isolation layer. The
+; crypto adapter (S02), the boot clock and timer scheduler (S03) and the
+; driver control adapter (S06), the one adapter of core/lifecycle, live in
+; core/ outside any adapters/ folder: they stay the same isolation layer.
 ; The UI sources are left to the ui pair, which counts them wherever they live.
 _AOPR_FilesIn(SubDirs) {
 	Files := []
@@ -121,6 +124,7 @@ _AOPR_FilesIn(SubDirs) {
 			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
 			if InStr(A_LoopFilePath, "\adapters\") || _AOPR_IsUiSource(A_LoopFilePath)
+				|| RegExMatch(A_LoopFilePath, "\\core\\(?:crypto\\crypto|events\\(?:boot_clock|timer_scheduler)|lifecycle\\driver_control)\.ahk$")
 				continue
 			Files.Push(A_LoopFilePath)
 		}

@@ -141,7 +141,7 @@ do
 			bundle_path = process_info.bundlePath,
 			launcher_running = launcher_ok and launcher_app ~= nil or "unknown",
 		})
-		local timers_ok, timers_err = pcall(function() require("adapters.timer_scheduler").cancelAll() end)
+		local timers_ok, timers_err = pcall(function() require("core.events.timer_scheduler").cancelAll() end)
 		if not timers_ok then
 			Logger.error("init", "Refused instance could not cancel its timers: %s.", tostring(timers_err))
 		end
@@ -175,7 +175,7 @@ end
 -- admission, so a refused process leaves every folder as it found it, and
 -- before the breadcrumb, the logs and config_paths read them.
 require("adapters.legacy_folder_migration").run(Logger)
-local TimerScheduler     = require("adapters.timer_scheduler")
+local TimerScheduler     = require("core.events.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
 end

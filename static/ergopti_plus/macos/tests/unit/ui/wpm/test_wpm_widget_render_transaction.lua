@@ -46,7 +46,7 @@ helpers.describe("WPM widget render lifecycle", function()
 	helpers.it("(wpm-menubar-stop-owner) timer failure logging preserves a restarted native item", function()
 		with_menubar(function(menubar, state)
 			helpers.assert_eq(menubar.start(), true)
-			local scheduler = package.loaded["adapters.timer_scheduler"]
+			local scheduler = package.loaded["core.events.timer_scheduler"]
 			local cancel, refused = scheduler.cancel, false
 			scheduler.cancel = function(handle)
 				if not refused then refused = true; return false end

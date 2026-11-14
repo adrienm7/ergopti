@@ -1,4 +1,4 @@
-﻿; adapters/boot_clock.ahk
+﻿; core/events/boot_clock.ahk
 
 ; ==============================================================================
 ; MODULE: Measurement Clock Adapter

@@ -654,7 +654,7 @@ do
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
 			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
-				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "adapters.timer_scheduler",
+				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
 				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
@@ -678,7 +678,7 @@ do
 			end, get_config_dir = function() return marker .. ".config-dir" end })
 			put("adapters.storage", require("tests.fakes").storage())
 			local scheduler = require("tests.fakes").timer_scheduler()
-			put("adapters.timer_scheduler", scheduler)
+			put("core.events.timer_scheduler", scheduler)
 			put("infra.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
 			local logger = assert(dofile(root .. "/../_shared/core/logger/engine/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
 			put("core.logger.engine.shim", logger)
@@ -783,7 +783,7 @@ do
 			  ["adapters.window_info"] = window, ["adapters.secure_field_detector"] = require("adapters.secure_field_detector") }
 			put("infra.runtime_guard", { optional_require = function(name) return optional[name] end,
 			  call = function(_, callback) return true, callback() end })
-			put("adapters.event_loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
+			put("core.events.loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
 			-- Selected keyboard bindings are absent; the classifier itself is the production module.
 			local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 			local function start_successor(port)

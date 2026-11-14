@@ -104,7 +104,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"infra.keycodes",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -173,7 +173,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			end,
 			admission_open = function() return admission_fence == nil end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function() return { timer = nil }, true end,
 			cancel = function() return true end,
 		}
@@ -310,7 +310,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		-- Save every module we are about to replace so the suite is left clean
 		local saved = {}
 		for _, name in ipairs({
-			"adapters.http_client", "adapters.timer_scheduler", "modules.llm.api_mlx",
+			"adapters.http_client", "core.events.timer_scheduler", "modules.llm.api_mlx",
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
@@ -321,7 +321,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 
 		-- Deferred timer queue: nothing runs until the drain below
 		local timer_queue = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn, cancelled = false }
 				timer_queue[#timer_queue + 1] = handle

@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
 local Fixture = require("tests.support.keystats_provenance_fixture")
 local OWNERS = {
-	"adapters.event_clock",
+	"core.events.clock",
 	"infra.timings",
 	"infra.toml.reader",
 	"metrics.engine.metrics",
@@ -31,7 +31,7 @@ local OWNERS = {
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
 	"adapters.keyboard_hook", "adapters.input_source_broker", "adapters.storage",
-	"adapters.timer_scheduler", "modules.keystats.aggregator.events",
+	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
 	"modules.keystats.aggregator.physical", "ui.metrics_typing.init", "ui.metrics_typing", "modules.keymap",
 }

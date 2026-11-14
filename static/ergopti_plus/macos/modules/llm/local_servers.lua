@@ -41,7 +41,7 @@ local Json           = require("core.text.engine.json")
 local Discovery      = require("ai.engine.local_servers.discovery")
 local PortPolicy     = require("ai.engine.local_servers.ports_core")
 local Fingerprint    = require("ai.engine.local_servers.fingerprint")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "llm.local_servers"
 

@@ -81,7 +81,7 @@ helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", functio
 			end,
 			_active_tasks = {},
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_delay, callback)
 			return { callback = callback, fired = false }, true
 			end,
@@ -151,7 +151,7 @@ helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", functio
 			end,
 			_active_tasks = {},
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_delay, callback)
 				local watchdog = { callback = callback, fired = false }
 				state.watchdogs[#state.watchdogs + 1] = watchdog
@@ -226,6 +226,6 @@ end)
 -- (shell_runner without exec) would otherwise leak through package.loaded
 -- into whichever module the runner loads next
 package.loaded["adapters.shell_runner"] = nil
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["adapters.input_source_broker"] = nil
 package.loaded["platform.remap.watchers"] = nil

@@ -8,7 +8,7 @@ local OWNED = {
 	"modules.llm", "modules.llm.api_mlx_fetch", "modules.llm.stream_payload_cleanup",
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
-	"adapters.shell_runner", "adapters.timer_scheduler", "adapters.http_client", "adapters.file_system",
+	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "adapters.file_system",
 	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"adapters.json_codec", "adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
@@ -45,7 +45,7 @@ function M.with_stream(backend, callback)
 			return timer, true
 		end
 		function scheduler.cancel(timer) timer.active = false; timer.callback = nil; return true end
-		package.loaded["adapters.timer_scheduler"] = scheduler
+		package.loaded["core.events.timer_scheduler"] = scheduler
 		local api, ctx
 		if backend == "ollama" then
 			api = helpers.load_with_stubs("modules.llm.api_ollama")

@@ -59,7 +59,7 @@ local function with_foreground(port, callback)
 		"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 		"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.managed_native_python",
 		"modules.llm.ollama_endpoint", "adapters.file_system", "adapters.task_lifecycle",
-		"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+		"adapters.http_client", "core.events.timer_scheduler", "adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
 		"modules.shortcuts.script_control", "ui.menu.menu_llm.models_manager_ollama",
@@ -76,7 +76,7 @@ local function with_foreground(port, callback)
 			return { cancel = function() return true end, isActive = function() return false end,
 				isSettled = function() return true end }
 		end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() error("rollover context control must not acquire a detached launch or readiness timer") end,
 			cancel = function() return true end,
 		}

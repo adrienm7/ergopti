@@ -24,7 +24,7 @@ local Logger         = require("infra.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
 local TokenBudget = require("ai.engine.request_plan.token_budget")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"

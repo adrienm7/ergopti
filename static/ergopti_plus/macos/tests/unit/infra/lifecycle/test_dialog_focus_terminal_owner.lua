@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "infra.logger",
-	"adapters.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
+	"core.events.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
 	"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
 	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "infra.i18n" }
@@ -81,7 +81,7 @@ local function with_dialog(callback)
 				return process
 			end }
 			fixture.subject = helpers.load_with_stubs("infra.dialog_util", overrides)
-			fixture.scheduler = assert(package.loaded["adapters.timer_scheduler"])
+			fixture.scheduler = assert(package.loaded["core.events.timer_scheduler"])
 			return callback(fixture)
 		end, debug.traceback))
 		for _, timer in ipairs(fixture.timers) do timer.refuse_stop = false end

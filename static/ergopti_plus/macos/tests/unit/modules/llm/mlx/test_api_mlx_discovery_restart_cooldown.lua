@@ -45,7 +45,7 @@ local helpers = require("tests.helpers")
 local function make_env()
 	local env = { now = 1000, timers = {}, probes = 0, next_timer_id = 0 }
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now = function() return env.now end,
 		awake_time = function() return env.now end,
 		after = function(delay, fn)

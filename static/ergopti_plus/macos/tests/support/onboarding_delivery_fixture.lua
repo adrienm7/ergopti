@@ -100,8 +100,8 @@ local function with_delivery(callback, native_timers)
 					owned_timers[#owned_timers + 1] = timer
 					return timer
 				end
-				package.loaded["adapters.timer_scheduler"] = nil
-				scheduler = require("adapters.timer_scheduler")
+				package.loaded["core.events.timer_scheduler"] = nil
+				scheduler = require("core.events.timer_scheduler")
 				package.loaded["infra.deferred_work"] = nil
 				require("infra.deferred_work")
 				package.loaded["ui.onboarding"] = nil

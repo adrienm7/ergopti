@@ -33,7 +33,7 @@ local text_utils    = require("infra.text_utils")
 local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local ShellRunner   = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 
 -- Required to inform the discovery poller of the active server PID so it can

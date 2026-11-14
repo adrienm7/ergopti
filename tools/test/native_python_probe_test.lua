@@ -73,7 +73,7 @@ local function with_case(options, callback)
 	end }
 	package.loaded["adapters.task_lifecycle"] = { start = function(task) return task.start() end,
 		terminate = function(task) return task.terminate() end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function()
 			if options.clock_refused_once and not fixture.clock_refused then
 				fixture.clock_refused = true; return nil
