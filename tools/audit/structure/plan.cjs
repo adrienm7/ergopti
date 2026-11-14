@@ -494,6 +494,15 @@ function resolvePathToken(
 			drivers: [toolDriver],
 			abs: path.posix.normalize(`${PREFIX}${toolDriver}/${token}`)
 		});
+	// '#Include ../infra/json.ahk' in a tool that checks the Windows suite's
+	// entry: run_all.ahk includes from windows/tests, so the climb names the
+	// driver's file from there.
+	if (toolDriver === 'windows' && /^(?:\.\.\/)+[\w./-]+\.ahk$/.test(token)) {
+		const base = `${PREFIX}windows/tests`;
+		const abs = path.posix.normalize(`${base}/${token}`);
+		if (abs.startsWith(`${PREFIX}windows/`))
+			candidates.push({ form: 'tests-relative', lead: '', keep: base, abs });
+	}
 	// require('../../static/ergopti_plus/_shared/x.json') from a tool.
 	if (!inTree && /^\.\.?\//.test(token))
 		candidates.push({
@@ -1822,7 +1831,9 @@ function scanFile(file, text, ctx) {
 	// tool does not spell. A tail exactly one file ends with follows that file
 	// from the same base, escaped the same way.
 	if (/^tools\/.*\.(c?js|mjs)$/.test(file))
-		for (const m of text.matchAll(/(?<![\w\\/])((?:[\w-]+\\\/)+[\w-]+)\\\.(\w+)(?![\w\\])/g)) {
+		// The path ends where no word or escaped path character follows: \s*$
+		// after it is the expression's own syntax.
+		for (const m of text.matchAll(/(?<![\w\\/])((?:[\w-]+\\\/)+[\w-]+)\\\.(\w+)(?!\w|\\[./-])/g)) {
 			const tail = `${m[1].replace(/\\\//g, '/')}.${m[2]}`;
 			const owners = filesEndingWith(tail);
 			if (owners.length !== 1 || !byRepoPath.has(owners[0])) continue;
