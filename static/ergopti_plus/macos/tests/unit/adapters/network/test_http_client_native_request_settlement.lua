@@ -8,7 +8,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.http_client", "adapters.timer_scheduler", "infra.logger",
+	"adapters.http_client", "core.events.timer_scheduler", "infra.logger",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
@@ -42,7 +42,7 @@ local function isolated(scenario, options)
 			},
 		})
 		local client = HttpClient.new(options)
-		local scheduler = package.loaded["adapters.timer_scheduler"]
+		local scheduler = package.loaded["core.events.timer_scheduler"]
 		local ok, err = xpcall(function() scenario(client, state) end, debug.traceback)
 		-- Cleanup also owns the preimage's failing assertion path. New callbacks
 		-- cannot escape this native port; drain every captured exact completion.

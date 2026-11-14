@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
 	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
-	"diagnostics.engine.runtime_log", "adapters.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"adapters.storage", "infra.timings", "adapters.file_system",
 	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "ui.hotstring_editor",
 }
@@ -92,7 +92,7 @@ local function with_watchers(callback)
 			package.loaded["ui.hotstring_editor"] = { is_open = function() return world.ui_open end }
 			local Watchers = require("infra.file_watchers")
 			local Restore = require("infra.ui_restore")
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			_G.script_watchers = nil
 			local body_ok, body_failure = xpcall(function()
 				helpers.assert_eq(Watchers.start({

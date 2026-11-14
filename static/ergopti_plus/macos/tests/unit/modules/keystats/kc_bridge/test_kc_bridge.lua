@@ -86,7 +86,7 @@ local hs_overrides = {
 --- @param overrides table Hammerspoon API overrides.
 --- @return table module Fresh bridge module.
 local function load_kc_bridge(overrides)
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	return helpers.load_with_stubs("modules.keystats.kc_bridge", overrides)
 end
 
@@ -360,7 +360,7 @@ local hs_lifecycle_overrides = {
 
 -- The adapter captures its native timer table at require time; rebind it with
 -- the lifecycle hs override before this behavior group starts.
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 
 helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", function()
 
@@ -445,7 +445,7 @@ end)
 -- This section pins the behavioral contract: a public function called before
 -- M.init() must both (a) not crash and (b) log via Logger.error, exactly like
 -- every other keystats sibling module's require_state helper.
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 helpers.describe("kc_bridge — require_state guard fires Logger.error before init (F-LOW-14)", function()
 
 	--- Loads a fresh kc_bridge with a Logger.error spy installed, so tests can

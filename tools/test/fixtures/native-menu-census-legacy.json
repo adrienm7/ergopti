@@ -104,7 +104,7 @@
 			"sourceFiles": [
 				"windows/ErgoptiPlus.ahk",
 				"windows/adapters/app_launcher.ahk",
-				"windows/adapters/boot_clock.ahk",
+				"windows/core/events/boot_clock.ahk",
 				"windows/adapters/clipboard.ahk",
 				"windows/adapters/console_window.ahk",
 				"windows/adapters/crash_report_worker.ahk",
@@ -131,7 +131,7 @@
 				"windows/adapters/storage.ahk",
 				"windows/adapters/system_control.ahk",
 				"windows/adapters/text_sender.ahk",
-				"windows/adapters/timer_scheduler.ahk",
+				"windows/core/events/timer_scheduler.ahk",
 				"windows/adapters/tooltip_renderer.ahk",
 				"windows/adapters/tray_startup_click.ahk",
 				"windows/adapters/tray_startup_commands.ahk",

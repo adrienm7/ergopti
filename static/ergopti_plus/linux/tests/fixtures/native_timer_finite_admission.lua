@@ -55,7 +55,7 @@ local invalid = {
 for _, method in ipairs({ "after", "every" }) do
 	for _, case in ipairs(invalid) do
 		check(method .. " rejects " .. case.name, function()
-			local scheduler = fresh("adapters.timer_scheduler")
+			local scheduler = fresh("core.events.timer_scheduler")
 			local calls = 0
 			local token = scheduler[method](case.value, function() calls = calls + 1 end)
 			local armed_on_return, handles_on_return = token.armed, handle_count()
@@ -79,7 +79,7 @@ end
 
 for _, case in ipairs({ invalid[1], invalid[2], invalid[3] }) do
 	check("defer rejects " .. case.name .. " without queue ownership", function()
-		local loop = fresh("adapters.event_loop")
+		local loop = fresh("core.events.loop")
 		local calls = 0
 		local weak = setmetatable({}, { __mode = "v" })
 		local function owned_callback()
@@ -105,7 +105,7 @@ for _, method in ipairs({ "after", "every" }) do
 	for _, case in ipairs({ { name = "zero", value = 0 },
 		{ name = "finite negative", value = -0.05 }, { name = "fractional", value = 0.003 } }) do
 		check(method .. " preserves " .. case.name .. " semantics", function()
-			local scheduler = fresh("adapters.timer_scheduler")
+			local scheduler = fresh("core.events.timer_scheduler")
 			local calls = 0
 			local token = scheduler[method](case.value, function() calls = calls + 1 end)
 			assert(token.armed == true and uv.is_active(token.timer), "healthy timer was not armed")
@@ -123,7 +123,7 @@ end
 
 for _, method in ipairs({ "after", "every" }) do
 	check(method .. " preserves large finite native delays", function()
-		local scheduler = fresh("adapters.timer_scheduler")
+		local scheduler = fresh("core.events.timer_scheduler")
 		local calls = 0
 		local token = scheduler[method](1e12, function() calls = calls + 1 end)
 		assert(token.armed == true and uv.is_active(token.timer), "large representable delay was refused")
@@ -137,7 +137,7 @@ for _, method in ipairs({ "after", "every" }) do
 end
 
 check("defer preserves zero and nested next-tick delivery", function()
-	local loop = fresh("adapters.event_loop")
+	local loop = fresh("core.events.loop")
 	local calls = 0
 	assert(loop.defer(function()
 		calls = calls + 1
@@ -152,7 +152,7 @@ check("defer preserves zero and nested next-tick delivery", function()
 end)
 
 check("defer preserves fractional native elapsed delay", function()
-	local loop = fresh("adapters.event_loop")
+	local loop = fresh("core.events.loop")
 	local calls = 0
 	assert(loop.defer(function() calls = calls + 1 end, 250.5)) -- far above any scheduling stall between defer and tick
 	loop._run_idle_tick()
@@ -163,7 +163,7 @@ check("defer preserves fractional native elapsed delay", function()
 end)
 
 check("defer refuses a finite delay above the timer ceiling without starving ordinary work", function()
-	local loop = fresh("adapters.event_loop")
+	local loop = fresh("core.events.loop")
 	local delayed, ordinary = 0, 0
 	assert(loop.defer(function() delayed = delayed + 1 end, 1e308) == false,
 		"a finite delay above the shared timer ceiling entered the deferred queue")
@@ -174,7 +174,7 @@ end)
 
 for _, method in ipairs({ "after", "every" }) do
 	check(method .. " refuses a real libuv delay above the timer ceiling", function()
-		local scheduler = fresh("adapters.timer_scheduler")
+		local scheduler = fresh("core.events.timer_scheduler")
 		local calls = 0
 		-- 9007199254741 s is 9007199254741000 ms, just above 2^53 ms.
 		local token = scheduler[method](9007199254741, function() calls = calls + 1 end)

@@ -67,7 +67,7 @@ local function load_commit_staged_backend(kind, options)
 		end,
 	}
 	cancel_timer = timer_scheduler.cancel
-	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return false end,
 		get_pause_epoch = function() return 0 end,

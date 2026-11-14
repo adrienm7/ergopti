@@ -25,7 +25,7 @@ end
 --- Runs the failure scenario while restoring every process-global module.
 local function run_scenario()
 	local dependency_names = {
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"hotstrings.engine.dynamic.core",
 		"infra.logger",
 		"core.logger.engine.shim",
@@ -56,7 +56,7 @@ local function run_scenario()
 	-- keystats now arms its independent KC bridge poller during init, which would
 	-- consume this fixture's sole repeating-timer counter before the mailbox does
 	package.loaded["modules.keystats"] = { notify_synthetic = function() end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function()
 			after_calls = after_calls + 1
 			error("resolver diagnostics must not allocate a one-shot timer", 0)

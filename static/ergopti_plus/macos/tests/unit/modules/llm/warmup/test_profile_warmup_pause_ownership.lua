@@ -74,7 +74,7 @@ local function load_fixture()
 		is_pause_transition_pending = function() return fixture.pending end,
 	}
 	package.loaded["modules.llm.profiles"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.llm"] = nil
 	fixture.core = helpers.load_with_stubs("modules.llm", { timer = timer_stub })
 	fixture.baseline = #fixture.timers

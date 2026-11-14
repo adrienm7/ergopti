@@ -76,7 +76,7 @@ local function replay(backend, during)
 	helpers.assert_eq(type(fixture.on_partial), "function", "streaming multi hands the backend a partial port")
 	local held
 	helpers.with_stub_scope({ backend.module_name, "modules.llm.profiles", "adapters.http_client",
-		"adapters.timer_scheduler", "adapters.shell_runner" }, function()
+		"core.events.timer_scheduler", "adapters.shell_runner" }, function()
 		local module = helpers.load_with_stubs(backend.module_name, {
 			application = { frontmostApplication = function()
 				return { title = function() return "FixtureApp" end }

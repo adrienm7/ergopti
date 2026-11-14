@@ -93,7 +93,7 @@ local function fresh_bridge(options)
 
 	package.loaded["platform.remap.ke_variables"] = nil
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.json_codec"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_contract"] = nil
@@ -190,7 +190,7 @@ local function fresh_bridge(options)
 			}
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay_sec, fn)
 			local timer_index = #ctx.timers + 1
 			local configured = ctx.timer_results[timer_index]
@@ -998,7 +998,7 @@ end)
 
 package.loaded["platform.remap.ke_variables"] = nil
 package.loaded["adapters.shell_runner"] = nil
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["adapters.json_codec"] = nil
 package.loaded["platform.remap.ke_paths"] = nil
 package.loaded["platform.remap.lease_contract"] = nil

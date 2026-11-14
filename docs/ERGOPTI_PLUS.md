@@ -618,7 +618,7 @@ dans un générateur JS, ce qui crée l'illusion d'une transpilation — et ⚠
 `_shared/README.md` documente le contraire comme un fait.
 
 Le prétexte historique « l'AHK ne peut pas lire les données partagées » est **faux** :
-`windows/infra/json.ahk` et `windows/infra/toml/` existent, et l'AHK lit déjà au runtime
+`windows/core/text/engine/json.ahk` et `windows/core/text/engine/toml/` existent, et l'AHK lit déjà au runtime
 `menu_manifest.json`, `priority.json`, les 21 locales, tous les TOML de hotstrings et
 `profiles.json`. Le codegen n'a donc jamais été une question de **capacité**, seulement de
 **coût de boot** et de **pré-résolution**.

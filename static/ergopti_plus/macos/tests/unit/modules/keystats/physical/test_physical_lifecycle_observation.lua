@@ -7,7 +7,7 @@ local describe, it = helpers.describe, helpers.it
 
 local MODULE_NAMES = {
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"infra.timings",
 	"modules.keystats.context_tracker",
@@ -195,7 +195,7 @@ local function with_fixture(options, scenario)
 		handle.timer = nil
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["modules.keystats.log_manager"] = {
 		append_log = function(entry)
 			fixture.log_entries[#fixture.log_entries + 1] = entry

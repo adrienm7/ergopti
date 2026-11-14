@@ -65,7 +65,7 @@ local _capability_clients = {}
 -- decisions provider): it must cancel neither a prediction nor an agent request
 local _probe_client = _http_adapter.new(_http_options)
 local JsonCodec      = require("adapters.json_codec")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ResponseClassifier = require("ai.engine.policy.remote_response_classifier")
 local Formats        = require("ai.engine.api.remote_formats")

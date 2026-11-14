@@ -16,7 +16,7 @@
 ;    or delay boot — if the logger is not ready yet the mark is simply silent.
 ; ==============================================================================
 
-#Include ../adapters/boot_clock.ahk
+#Include ../core/events/boot_clock.ahk
 #Include phase_stats.ahk
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark

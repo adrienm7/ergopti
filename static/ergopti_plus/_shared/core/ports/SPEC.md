@@ -85,7 +85,7 @@ Each `.spec.js` file exports:
 | TextSender          | `adapters/text_sender.ahk`           | `adapters/text_sender.lua`           |
 | TooltipRenderer     | `adapters/tooltip_renderer.ahk`      | `adapters/tooltip_renderer.lua`      |
 | HttpClient          | `adapters/http_client.ahk`           | `adapters/http_client.lua`           |
-| TimerScheduler      | `adapters/timer_scheduler.ahk`       | `adapters/timer_scheduler.lua`       |
+| TimerScheduler      | `core/events/timer_scheduler.ahk`    | `core/events/timer_scheduler.lua`    |
 | Notifier            | `adapters/notifier.ahk`              | `adapters/notifier.lua`              |
 | TrayMenu            | `adapters/tray_menu.ahk`             | `adapters/tray_menu.lua`             |
 | FileSystem          | `adapters/file_system.ahk`           | `adapters/file_system.lua`           |

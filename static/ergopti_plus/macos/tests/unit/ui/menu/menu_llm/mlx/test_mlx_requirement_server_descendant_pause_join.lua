@@ -11,7 +11,7 @@ local MODULES = {
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -56,7 +56,7 @@ local function with_fixture(callback)
 			reset_endpoints = function() return true end,
 			set_active_server_pgid = function() return true end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback_fn)
 				local handle = {
 					delay = delay,

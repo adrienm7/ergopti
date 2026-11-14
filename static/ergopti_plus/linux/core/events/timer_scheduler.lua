@@ -1,4 +1,4 @@
---- adapters/timer_scheduler.lua
+--- core/events/timer_scheduler.lua
 
 --- ==============================================================================
 --- MODULE: TimerScheduler Adapter (Linux)
@@ -28,7 +28,7 @@ local NativeTimer = require("infra.native_timer")
 local NumberPolicy = require("core.text.engine.number_policy")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
-local LOG = "adapters.timer_scheduler"
+local LOG = "core.events.timer_scheduler"
 
 
 -- =========================================

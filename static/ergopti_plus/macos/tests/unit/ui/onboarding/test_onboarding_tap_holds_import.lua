@@ -360,7 +360,7 @@ end)
 local function with_wizard_timeout_native_refusal(exercise)
 	with_finish({}, function(state)
 		local previous_hs = rawget(_G, "hs")
-		local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+		local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 		local previous_deferred = package.loaded["infra.deferred_work"]
 		local previous_after = previous_deferred.after
 		local scheduler, deferred, original_after
@@ -398,9 +398,9 @@ local function with_wizard_timeout_native_refusal(exercise)
 		end
 		local outcome = table.pack(pcall(function()
 			_G.hs = native_hs
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["infra.deferred_work"] = nil
-			scheduler = require("adapters.timer_scheduler")
+			scheduler = require("core.events.timer_scheduler")
 			original_after = scheduler.after
 			-- Forward every call to the actual producer, retaining only its exact
 			-- returned handles for this fresh fixture's finally cleanup.
@@ -424,7 +424,7 @@ local function with_wizard_timeout_native_refusal(exercise)
 		end
 		attempt("held DeferredWork facade restoration", function() previous_deferred.after = previous_after end)
 		attempt("DeferredWork module restoration", function() package.loaded["infra.deferred_work"] = previous_deferred end)
-		attempt("scheduler module restoration", function() package.loaded["adapters.timer_scheduler"] = previous_scheduler end)
+		attempt("scheduler module restoration", function() package.loaded["core.events.timer_scheduler"] = previous_scheduler end)
 		attempt("native namespace restoration", function() assert(rawget(_G, "hs") == native_hs); _G.hs = previous_hs end)
 		if #cleanup_errors > 0 then
 			if not outcome[1] then

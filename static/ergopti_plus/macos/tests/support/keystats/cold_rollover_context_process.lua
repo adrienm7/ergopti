@@ -207,7 +207,7 @@ local function main()
 			manager = require("modules.keystats.log_manager")
 			writer = require("modules.keystats.sqlite_writer")
 			rotation = require("modules.keystats.rotation")
-			scheduler = require("adapters.timer_scheduler")
+			scheduler = require("core.events.timer_scheduler")
 			assert(require("modules.keystats.text_cipher").is_enabled() == false,
 				"regression requires native default unencrypted typing rows")
 			local before_ingest

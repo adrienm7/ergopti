@@ -20,7 +20,7 @@ local PICKER_OWNERS = {
 	"infra.dialog_util",
 	"adapters.file_system",
 	"infra.config_paths",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"adapters.webview_result",
 	"adapters.running_application",
@@ -62,7 +62,7 @@ helpers.describe("metrics_apps: discovery outcome", function()
 					package.loaded["infra.logger"].debug = function(_, message, ...)
 						logs[#logs + 1] = string.format(message, ...)
 					end
-					package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+					package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 						local handle = { timer = {} }
 						pending[#pending + 1] = function() handle.timer = nil; callback() end
 						return handle, true

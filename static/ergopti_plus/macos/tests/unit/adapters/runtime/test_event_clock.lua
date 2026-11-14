@@ -1,6 +1,6 @@
 --- tests/unit/adapters/runtime/test_event_clock.lua
 local helpers = require("tests.helpers")
-local Clock = require("adapters.event_clock")
+local Clock = require("core.events.clock")
 
 helpers.describe("event clock (event-clock-window)", function()
 	helpers.it("measures stale events against the recent floor and retires old samples", function()

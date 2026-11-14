@@ -44,7 +44,7 @@ local function load_wrap_fixture(restore_outcomes)
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["infra.logger"],
 		synthetic = package.loaded["adapters.synthetic_input"],
-		timer_scheduler = package.loaded["adapters.timer_scheduler"],
+		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		text = package.loaded["modules.shortcuts.actions.text"],
 	}
 	local original = {
@@ -128,7 +128,7 @@ local function load_wrap_fixture(restore_outcomes)
 		end,
 	}
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	Destination.install()
 	local text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
@@ -150,7 +150,7 @@ local function load_wrap_fixture(restore_outcomes)
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["infra.logger"] = saved.logger
 			package.loaded["adapters.synthetic_input"] = saved.synthetic
-			package.loaded["adapters.timer_scheduler"] = saved.timer_scheduler
+			package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 			package.loaded["hs"] = saved.hs_module
 			_G.hs = saved.hs_global
 		end,

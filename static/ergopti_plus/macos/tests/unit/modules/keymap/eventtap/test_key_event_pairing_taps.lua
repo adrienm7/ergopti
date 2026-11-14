@@ -27,7 +27,7 @@ local function load_fixture()
 			or name:match("^ui%.tooltip")
 			or name == "adapters.synthetic_input"
 			or name == "adapters.event_provenance"
-			or name == "adapters.event_clock"
+			or name == "core.events.clock"
 			or name == "infra.key_event_health"
 		) then
 			package.loaded[name] = nil

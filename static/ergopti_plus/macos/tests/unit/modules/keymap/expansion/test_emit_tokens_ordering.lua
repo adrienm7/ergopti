@@ -60,7 +60,7 @@ local function load_utils()
 	end
 
 	package.loaded["modules.keymap.utils"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = {
 		current_transaction = function() return current end,
 		begin = function()

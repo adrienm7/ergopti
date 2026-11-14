@@ -33,7 +33,7 @@ local function load_fixture(reset_result)
 	package.loaded["adapters.synthetic_input"] = {
 		current_action_epoch = function() return current_token end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		hotstring_time = function() return 0 end,
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback, timer = {} }

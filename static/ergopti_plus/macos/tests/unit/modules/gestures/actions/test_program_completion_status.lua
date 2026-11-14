@@ -8,7 +8,7 @@ local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 
 local OWNED_MODULES = {
 	"modules.gestures.actions_aux_owner", "adapters.shell_runner", "adapters.task_environment",
-	"adapters.timer_scheduler", "infra.logger", "tests.stubs.hs", "hs",
+	"core.events.timer_scheduler", "infra.logger", "tests.stubs.hs", "hs",
 	"adapters.owned_program_runner", "platform.remap.lease_helper",
 }
 

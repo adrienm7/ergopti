@@ -28,7 +28,7 @@ helpers.describe("init: instance admission runs before any side effect (hs-secon
 		helpers.assert_true(privacy_at < decide_at, "no line may be logged before privacy admission")
 		for _, later in ipairs({
 			"Storage.migrate_legacy_namespace()",
-			'require("adapters.timer_scheduler")\n',
+			'require("core.events.timer_scheduler")\n',
 			"config_paths.init(base_dir)",
 			'require("modules.gestures")',
 			"Storage.set(",
@@ -42,7 +42,7 @@ helpers.describe("init: instance admission runs before any side effect (hs-secon
 	helpers.it("exits only in the stray branch and never shows it a dialog", function()
 		local code = init_code()
 		local decide_at = assert(code:find("InstanceAdmission.decide(", 1, true))
-		local storage_at = assert(code:find('local TimerScheduler     = require("adapters.timer_scheduler")', decide_at, true))
+		local storage_at = assert(code:find('local TimerScheduler     = require("core.events.timer_scheduler")', decide_at, true))
 		local block = code:sub(decide_at, storage_at)
 		local may_exit_at = block:find("InstanceAdmission.may_exit_process(decision)", 1, true)
 		local cancel_at = block:find(".cancelAll()", 1, true)

@@ -32,7 +32,7 @@ local OWNERS = {
 	"adapters.keyboard_hook",
 	"adapters.input_source_broker",
 	"adapters.storage",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state",
 	"modules.keystats.aggregator.core",

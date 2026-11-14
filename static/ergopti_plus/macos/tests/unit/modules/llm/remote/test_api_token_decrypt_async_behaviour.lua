@@ -14,7 +14,7 @@ local function with_crypto_fixture(options, body)
 	options = options or {}
 	local names = {
 		"modules.llm.api_token_crypto", "adapters.shell_runner",
-		"adapters.timer_scheduler", "infra.timings", "infra.logger",
+		"core.events.timer_scheduler", "infra.timings", "infra.logger",
 		"platform.remap.lease_helper",
 	}
 	local saved = {}
@@ -58,7 +58,7 @@ local function with_crypto_fixture(options, body)
 			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			helpers.assert_eq(delay, 10)
 			fixture.timeout = callback
@@ -433,7 +433,7 @@ end
 local function with_real_remote_crypto_settlement(stop_mode, body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"adapters.shell_runner", "adapters.timer_scheduler",
+		"adapters.shell_runner", "core.events.timer_scheduler",
 		"adapters.http_client", "modules.shortcuts.script_control",
 		"platform.remap.lease_helper",
 	}
@@ -469,7 +469,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		end,
 	}
 	local ok, err = xpcall(function()
-		helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+		helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 		package.loaded["platform.remap.lease_helper"] = {
 			resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end,
 		}

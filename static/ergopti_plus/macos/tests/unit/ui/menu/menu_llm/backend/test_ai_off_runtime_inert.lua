@@ -108,7 +108,7 @@ end
 -- ========================================
 
 local STARTUP_MODULES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.json_codec",
 	"infra.logger",
 	"modules.llm",
@@ -124,7 +124,7 @@ local function with_startup(body)
 		local logger, lines = recording_logger()
 		local scheduler, timers = counting_scheduler()
 		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = scheduler
+		package.loaded["core.events.timer_scheduler"] = scheduler
 		package.loaded["adapters.json_codec"] = {
 			decode = function() return { log_path = "/tmp/fixture.log" } end,
 		}
@@ -426,7 +426,7 @@ local OLLAMA_MODULES = {
 	"modules.llm.ollama_endpoint",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -466,7 +466,7 @@ local function with_ollama_manager(enabled, body)
 		package.loaded["adapters.shell_runner"] = {}
 		package.loaded["adapters.http_client"] = {}
 		package.loaded["ui.download_window"] = {}
-		package.loaded["adapters.timer_scheduler"] = scheduler
+		package.loaded["core.events.timer_scheduler"] = scheduler
 		package.loaded["adapters.task_lifecycle"] = {
 			native = function(label, executable, on_done, args)
 				local task = { label = label, executable = executable, args = args, on_done = on_done }

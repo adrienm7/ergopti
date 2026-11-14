@@ -471,7 +471,7 @@ helpers.describe("Linux system actions", function()
 					emit("ctrl+c"); return false, "", "no_file_selection"
 				end },
 				["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
-				["adapters.event_loop"] = { sleep_ms = function() return true end },
+				["core.events.loop"] = { sleep_ms = function() return true end },
 			}, function() Gestures.execute_action("make_executable_selection", "tap_3") end)
 		end)
 		Open._set_deps_for_test(nil)
@@ -495,7 +495,7 @@ helpers.describe("Linux system actions", function()
 						return true, "file:///home/ana/run.sh", nil
 					end },
 					["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
-					["adapters.event_loop"] = { sleep_ms = function() return true end },
+					["core.events.loop"] = { sleep_ms = function() return true end },
 				}, function()
 					with_recorded_shell(function(commands)
 						Gestures.execute_action("make_executable_selection", "tap_3")
@@ -521,7 +521,7 @@ helpers.describe("Linux system actions", function()
 				end,
 			},
 			["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo return true end },
-			["adapters.event_loop"] = { sleep_ms = function() return true end },
+			["core.events.loop"] = { sleep_ms = function() return true end },
 		}, function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action("make_executable_selection", "tap_3")
@@ -543,7 +543,7 @@ helpers.describe("Linux system actions", function()
 					read_selection_uri_list = function() return report[1], report[2], report[3] end,
 				},
 				["modules.gestures.combo_emitter"] = { press = function() return true end },
-				["adapters.event_loop"] = { sleep_ms = function() return true end },
+				["core.events.loop"] = { sleep_ms = function() return true end },
 				["adapters.application_notifier"] = { send = function() return true end },
 			}, function()
 				with_recorded_shell(function(commands)

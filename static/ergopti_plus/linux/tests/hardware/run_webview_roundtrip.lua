@@ -39,7 +39,7 @@ local ok_webkit = pcall(function() return lgi.require("WebKit2", "4.1") end)
 if not ok_webkit then abort("WebKit2GTK is not available to lgi.") end
 local Gtk = lgi.require("Gtk", "3.0")
 
-local EventLoop = require("adapters.event_loop")
+local EventLoop = require("core.events.loop")
 local register_idle = EventLoop.add_idle_handler
 local idle_registrations = 0
 EventLoop.add_idle_handler = function(handler)

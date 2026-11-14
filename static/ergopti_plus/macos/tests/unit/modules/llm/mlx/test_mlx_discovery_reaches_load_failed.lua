@@ -37,7 +37,7 @@ local MODEL = "some-model"
 local function load_api_mlx()
 	for _, m in ipairs({
 		"modules.llm.api_mlx", "modules.llm.api_mlx_discovery",
-		"adapters.timer_scheduler", "infra.logger",
+		"core.events.timer_scheduler", "infra.logger",
 	}) do package.loaded[m] = nil end
 	_ = helpers.load_with_stubs("infra.logger")
 
@@ -50,7 +50,7 @@ local function load_api_mlx()
 		ctl.wall = ctl.wall + seconds
 	end
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now   = function() return ctl.wall end,
 		awake_time = function() return ctl.awake end,
 		after = function(_d, _fn) return { stop = function() end } end,

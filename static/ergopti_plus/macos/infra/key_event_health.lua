@@ -19,7 +19,7 @@
 ---    switch happened while it was down, and how late its key-up reached the
 ---    taps, so a popup the user did not ask for can be traced to its cause.
 --- 3. Late callbacks: an event the taps saw LATE_CALLBACK_MS or more later than
----    the freshest recent events (adapters/event_clock.lua) waited behind the
+---    the freshest recent events (core/events/clock.lua) waited behind the
 ---    main thread; a late key-up is a key-up every application received late.
 --- 4. Off the event tap: recording is table writes, never a timer or a file
 ---    write; the keymap tap watchdog (every second) and a lease failure call
@@ -37,8 +37,8 @@
 local M = {}
 
 local Logger       = require("infra.logger")
-local Timer        = require("adapters.timer_scheduler")
-local EventClock   = require("adapters.event_clock")
+local Timer        = require("core.events.timer_scheduler")
+local EventClock   = require("core.events.clock")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "key_event_health"
@@ -200,7 +200,7 @@ end
 
 --- Records how late one event reached the taps.
 --- @param phase string "down" or "up".
---- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
+--- @param lateness_ms number|nil Callback lateness from core/events/clock.lua.
 local function note_lateness(phase, lateness_ms)
 	if lateness_ms == nil then
 		_counts.unclocked = _counts.unclocked + 1
@@ -230,8 +230,8 @@ end
 --- @param key any Opaque key identity (the key code); never logged.
 --- @param autorepeat boolean Whether macOS marked the key-down as a repeat.
 --- @param character boolean Whether the key types a character.
---- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
---- @param stamp integer|nil The event's raw stamp from adapters/event_clock.lua.
+--- @param lateness_ms number|nil Callback lateness from core/events/clock.lua.
+--- @param stamp integer|nil The event's raw stamp from core/events/clock.lua.
 function M.observe(phase, key, autorepeat, character, lateness_ms, stamp)
 	assert(phase == "down" or phase == "up",
 		"infra.key_event_health.observe: phase must be 'down' or 'up'")

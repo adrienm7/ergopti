@@ -279,7 +279,7 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 	end)
 
 	helpers.it("the event loop runs a deferred callback only once it is due", function()
-		local EventLoop = helpers.load_module("adapters.event_loop")
+		local EventLoop = helpers.load_module("core.events.loop")
 		local ran = 0
 		helpers.assert_true(EventLoop.defer(function() ran = ran + 1 end, 0))
 		helpers.assert_true(EventLoop.defer(function() ran = ran + 10 end, 60000))

@@ -1257,7 +1257,7 @@ updater_callback_defer_ms = 50
 layout_registry_watch_poll_ms = 100
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
-# AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).
+# AHK: core/text/engine/toml/helpers.ahk StaleTempAgeMs (pinned copy).
 stale_temp_age_ms = 60000
 
 # Deadline of one HTTP request, file digest or child process when its caller
