@@ -215,3 +215,18 @@ _ValueCheckTest_WebAddresses() {
 	} finally Features := Saved
 }
 Test("Value check: the ChatGPT link and the search addresses must be web addresses", _ValueCheckTest_WebAddresses)
+
+; Regression: the programmable hotstrings handed config.toml's activation delay
+; to the engine unchecked; a refused one now declines the expansion with a log.
+_ValueCheckTest_UserCodeDelay() {
+	global Features
+	Saved := Features
+	try {
+		for Case in [[0.5, 0.5], [0, 0], [3600, 3600], ["0.5", ""], [-1, ""], [3601, ""]] {
+			Features := Map("hotstrings", Map("dynamic", Map(ConfigLeaf.USER_CODE,
+				Map(ConfigLeaf.TIME_ACTIVATION_SECONDS, Case[1]))))
+			AssertEqual(Case[2], _UserHotstringsDelay(), "user-code delay " . String(Case[1]))
+		}
+	} finally Features := Saved
+}
+Test("Value check: the programmable hotstring delay is checked where it reaches the engine", _ValueCheckTest_UserCodeDelay)
