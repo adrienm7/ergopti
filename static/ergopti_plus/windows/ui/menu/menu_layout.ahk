@@ -166,7 +166,12 @@ _LAY_ChooseEmulation(Id, SelectFn, ErrorFn, InstallFn := 0, AfterFn := 0) {
 		InstallFn.Call(Id, _LAY_OnEmulationInstalled.Bind(Id, SelectFn, ErrorFn, AfterFn))
 		return true
 	}
-	if SelectFn.Call(Id)
+	; The emulated layout applies through a reload handoff: the span ends when the
+	; handoff is committed, the successor's boot is measured by its own profiler.
+	SpanStart := HotPath_SpanTrace("layout.switch")
+	Selected := SelectFn.Call(Id)
+	HotPath_SpanDone("layout.switch", SpanStart, Selected ? "emulation handoff" : "emulation refused")
+	if Selected
 		return true
 	ErrorFn.Call(t("menu.layout.emulation_not_saved"))
 	return false
@@ -229,7 +234,10 @@ _LAY_ActiveLayoutRows(ChoicesFn := 0, ActiveFn := 0, SelectFn := 0, ErrorFn := 0
 ; Switches to one installed layout from the menu and tells a refusal.
 _LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn) {
 	try LoggerInfo("Layout", "Switching the keyboard layout to {1} from the menu.", Klid)
+	SpanStart := HotPath_SpanTrace("layout.switch")
 	Result := SelectFn.Call(Klid)
+	HotPath_SpanDone("layout.switch", SpanStart,
+		((Result is Integer) && Result == 1) ? "input source" : "input source refused")
 	if (Result is Integer) && Result == 1
 		return 1
 	ErrorFn.Call(t("menu.layout.select_failed"))

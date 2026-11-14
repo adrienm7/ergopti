@@ -1321,6 +1321,16 @@ _HSE_ExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar
 		return HSE_PlanBuild(Request)
 }
 
+; The outcome of one HSE_DispatchMatch verdict for the « hotstring.expand » span
+; line: an asynchronous owner still types it, a decline typed nothing.
+; @param Verdict {Map|Boolean} What HSE_DispatchMatch returned.
+; @returns {String} "pending", "fired" or "declined".
+HotstringDispatchOutcome(Verdict) {
+	if (Verdict is Map) && Verdict.Has("Pending")
+		return "pending"
+	return Verdict ? "fired" : "declined"
+}
+
 ; Returns TRUE when the match actually produced an expansion, FALSE when it declined
 ; (no spec, a raw callback that refused, a time-activation timeout, or a mixed-case
 ; conform verdict). Callers use this to decide whether a fire really happened: logging

@@ -592,6 +592,19 @@ coordinator on 2026-11-11, to review by the maintainer.
       `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
       `input.latency`; a `load` phase before `BootProfiler` starts; the last interval summary at exit.
+      2026-11-14 (worker L), code done, the field read stays on the maintainer's PC: `HotPath_SpanTrace` /
+      `HotPath_SpanDone` (`infra/hotpath_profiler.ahk`) write the Linux and macOS pair, `[TRACE] [Span] <name>…` and
+      `[DONE] [Span] <name> done in N ms (<outcome>)`, at DEBUG only, for `hotstring.expand` (the InputHook typing
+      path, its held-back end key and the Space tap-hold; outcome fired, declined or pending), `tray.fill` (each
+      deferred submenu build) and `layout.switch` (an input source from the menu, and an emulated layout up to its
+      reload handoff). Test: `test_hotpath_span_lines.ahk`. Already present before, verified in the source: the `load`
+      phase is BootProfile's « Pre-logger initialization (including script parse + load) » line with its replayed
+      stamps, and the last interval summary is written at exit by the logger's `OnExit` (`_LoggerOnExitFlush` →
+      `HotPath_StopStatistics` → a final `HotPath_FlushStatistics` with the PerfCounters line). Decided by the agent
+      on 2026-11-14, to review by the maintainer: no `input.latency` on Windows, because the InputHook callbacks
+      receive no event time (only `vk`, `sc` or the character); only the opt-in input probe's low-level hook sees
+      `KBDLLHOOKSTRUCT.time`, and a second permanent low-level hook for a metric would add a hook timeout risk to
+      every key.
 
 - [x] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
       cost about 30 ms of sqlite3 processes.
