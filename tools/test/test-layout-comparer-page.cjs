@@ -29,6 +29,7 @@ const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const PREFIX = 'layout_analysis.';
 const SCRIPTS = [
 	'../i18n.js',
+	'../host_bridge.js',
 	'_generated/analysis_data.js',
 	'analysis_engine.js',
 	'../layout_composer/_generated/composer_data.js',
@@ -65,7 +66,7 @@ const keys = new Set();
 for (const m of html.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) keys.add(m[1]);
 for (const m of html.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
 	for (const option of m[2].matchAll(/value="([^"]+)"/g)) keys.add(`${m[1]}.${option[1]}`);
-for (const m of page.matchAll(/\bt\('([a-z_.]+)'/g)) keys.add(PREFIX + m[1]);
+for (const m of page.matchAll(/\bt\('([a-z_.]+)'/g)) keys.add(m[1]);
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);

@@ -40,7 +40,6 @@
 	const E = window.LAYOUT_ANALYSIS;
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const HOST = window.LAYOUT_ANALYSIS_HOST || {};
-	const PREFIX = 'layout_analysis.';
 	const STORAGE_KEY = 'ergopti.layout_analysis.v1';
 	const CUSTOM_ID = 'custom';
 	// The metrics shown as table columns; every metric is in the details.
@@ -82,8 +81,7 @@
 	/** Translates a locale key; an unknown key shows itself so the gap is visible. */
 	function t(key, values) {
 		const strings = window._i18n_strings || {};
-		const full = PREFIX + key;
-		let text = typeof strings[full] === 'string' ? strings[full] : full;
+		let text = typeof strings[key] === 'string' ? strings[key] : key;
 		for (const [name, value] of Object.entries(values || {}))
 			text = text.split(`{${name}}`).join(String(value));
 		return text;
@@ -249,7 +247,7 @@
 		try {
 			tables = await corpusTables();
 		} catch {
-			showStatus(t('status.corpus_failed'));
+			showStatus(t('layout_analysis.status.corpus_failed'));
 			return;
 		}
 		if (mine !== generation) return;
@@ -257,7 +255,7 @@
 		const chosen = layouts.filter((layout) => state.selected.has(layout.id));
 		if (!tables || chosen.length === 0) {
 			state.results = [];
-			showStatus(t('status.empty'));
+			showStatus(t('layout_analysis.status.empty'));
 			render();
 			return;
 		}
@@ -265,7 +263,7 @@
 		state.results = E.compare(chosen, tables, { keyboard: state.keyboard, weights: state.weights });
 		const ms = Math.round(performance.now() - start);
 		showStatus(
-			t('status.ready', {
+			t('layout_analysis.status.ready', {
 				count: chosen.length,
 				chars: format(tables.totalChars, 0),
 				ms
@@ -327,13 +325,18 @@
 		table.replaceChildren();
 		if (state.results.length === 0) return;
 		const columns = [
-			{ key: 'rank', label: t('table.rank'), value: (r) => r.rank },
-			{ key: 'name', label: t('table.layout'), value: (r) => r.layout.name },
-			{ key: 'score', label: t('table.score'), value: (r) => r.score.total, digits: 1 }
+			{ key: 'rank', label: t('layout_analysis.table.rank'), value: (r) => r.rank },
+			{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name },
+			{
+				key: 'score',
+				label: t('layout_analysis.table.score'),
+				value: (r) => r.score.total,
+				digits: 1
+			}
 		].concat(
 			TABLE_METRICS.map((id) => ({
 				key: id,
-				label: t(`metric.${id}`),
+				label: t(`layout_analysis.metric.${id}`),
 				value: (r) => r.metrics[id],
 				digits: metricDigits(id)
 			}))
@@ -435,7 +438,7 @@
 			const partners = (result.keys[code].sfbWith || [])
 				.map(([other, pct]) => `${(layout.rows[other] || [''])[0] || other} ${format(pct, 2)} %`)
 				.join(', ');
-			key.title = `${t(`heat.${state.heat}`)}: ${format(values[k], 2)} %${
+			key.title = `${t(`layout_analysis.heat.${state.heat}`)}: ${format(values[k], 2)} %${
 				state.heat === 'sfb' && partners ? ` (${partners})` : ''
 			}`;
 			box.append(key);
@@ -448,7 +451,7 @@
 		const result = state.results.find((r) => r.layout.id === state.details);
 		section.hidden = !result;
 		if (!result) return;
-		$('la-details-title').textContent = t('details.title', {
+		$('la-details-title').textContent = t('layout_analysis.details.title', {
 			layout: result.layout.name,
 			rank: result.rank
 		});
@@ -456,9 +459,9 @@
 		const credit = $('la-details-credit');
 		credit.textContent =
 			layout.authors.length > 0
-				? t('details.by', { authors: layout.authors.join(', ') })
+				? t('layout_analysis.details.by', { authors: layout.authors.join(', ') })
 				: layout.source
-					? t('details.from', { source: layout.source })
+					? t('layout_analysis.details.from', { source: layout.source })
 					: '';
 		const link = $('la-details-link');
 		link.hidden = !layout.url;
@@ -468,20 +471,20 @@
 		const contributions = Object.entries(result.score.contributions)
 			.filter(([, v]) => v !== 0)
 			.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-			.map(([id, v]) => [t(`metric.${id}`), v]);
+			.map(([id, v]) => [t(`layout_analysis.metric.${id}`), v]);
 		signedBars($('la-contributions'), contributions, 1);
 		signedBars(
 			$('la-fingers'),
-			DATA.model.fingers.map((id) => [t(`finger.${id}`), result.fingers[id]]),
+			DATA.model.fingers.map((id) => [t(`layout_analysis.finger.${id}`), result.fingers[id]]),
 			1
 		);
 		const table = $('la-metrics');
 		table.replaceChildren();
 		for (const id of Object.keys(E.METRICS)) {
 			const tr = el('tr');
-			const th = el('th', '', t(`metric.${id}`));
+			const th = el('th', '', t(`layout_analysis.metric.${id}`));
 			th.scope = 'row';
-			const unit = E.METRICS[id].unit === 'mm' ? t('unit.mm') : '%';
+			const unit = E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
 			tr.append(th, el('td', '', `${format(result.metrics[id], metricDigits(id))} ${unit}`));
 			table.append(tr);
 		}
@@ -494,7 +497,9 @@
 					: char
 			)
 			.join(' ');
-		$('la-unsupported').textContent = missing ? t('details.unsupported', { chars: missing }) : '';
+		$('la-unsupported').textContent = missing
+			? t('layout_analysis.details.unsupported', { chars: missing })
+			: '';
 	}
 
 	// ===========================
@@ -507,9 +512,9 @@
 		for (const corpus of corpora) {
 			const label =
 				corpus.id === CUSTOM_ID
-					? t('corpus.custom')
+					? t('layout_analysis.corpus.custom')
 					: corpus.id === MY_TYPING_ID && !corpus.title
-						? t('corpus.my_typing')
+						? t('layout_analysis.corpus.my_typing')
 						: corpus.title;
 			const option = el('option', '', label);
 			option.value = corpus.id;
@@ -523,14 +528,14 @@
 		const corpus = corpora.find((c) => c.id === state.corpus);
 		$('la-custom').hidden = corpus.id !== CUSTOM_ID;
 		$('la-corpus-info').textContent = corpus.builtin
-			? t('corpus.info', {
+			? t('layout_analysis.corpus.info', {
 					chars: format(corpus.builtin.characters, 0),
 					licence: corpus.builtin.licence,
 					source: corpus.builtin.source
 				})
 			: corpus.host
-				? t('corpus.private')
-				: t('corpus.local');
+				? t('layout_analysis.corpus.private')
+				: t('layout_analysis.corpus.local');
 	}
 
 	function fillLayouts() {
@@ -560,7 +565,7 @@
 		list.replaceChildren();
 		for (const id of Object.keys(E.defaultWeights())) {
 			const label = el('label', 'la-weight');
-			label.append(el('span', '', t(`metric.${id}`)));
+			label.append(el('span', '', t(`layout_analysis.metric.${id}`)));
 			const input = el('input');
 			input.type = 'number';
 			input.min = '0';
@@ -616,8 +621,8 @@
 			state.selected.add(id);
 			report.textContent =
 				result.unmapped.length === 0
-					? t('layouts.imported', { name: layout.name, format: result.format })
-					: t('layouts.import_partial', {
+					? t('layout_analysis.layouts.imported', { name: layout.name, format: result.format })
+					: t('layout_analysis.layouts.import_partial', {
 							name: layout.name,
 							format: result.format,
 							count: result.unmapped.length,
@@ -630,7 +635,9 @@
 			fillLayouts();
 			analyse();
 		} catch (error) {
-			report.textContent = t('layouts.import_failed', { reason: error.code || error.message });
+			report.textContent = t('layout_analysis.layouts.import_failed', {
+				reason: error.code || error.message
+			});
 		}
 	}
 
@@ -671,8 +678,8 @@
 			} catch (failure) {
 				error.textContent =
 					failure.code === 'file_unsupported'
-						? t('corpus.file_unsupported')
-						: t('corpus.file_unreadable');
+						? t('layout_analysis.corpus.file_unsupported')
+						: t('layout_analysis.corpus.file_unreadable');
 				error.hidden = false;
 			}
 		});
@@ -776,7 +783,10 @@
 		analyse();
 		reportHeight();
 		// The host's personal layouts (app data folder, site IndexedDB).
-		if (HOST.store) HOST.store.list().then(addLayouts, () => showStatus(t('status.store_failed')));
+		if (HOST.store)
+			HOST.store
+				.list()
+				.then(addLayouts, () => showStatus(t('layout_analysis.status.store_failed')));
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
