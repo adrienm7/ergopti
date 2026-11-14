@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\value_check.ahk
 #Include ../../../_shared/hotstrings/data/catalogue/user_code.ahk
 #Include ../../adapters/user_hotstrings_native.ahk
 
@@ -350,6 +351,21 @@ _UserHotstringsWindowProcess(Hwnd) {
 	return ProcessId
 }
 
+; The activation delay, checked against its shared value schema declaration
+; where it reaches the engine. A stored value the declaration refuses (a
+; string, a negative or oversized delay) is logged and answered "", so the
+; caller declines this expansion rather than handing the engine a bad delay.
+; @returns {Number|String} Seconds, or "" when refused.
+_UserHotstringsDelay() {
+	global Features
+	Raw := Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE][ConfigLeaf.TIME_ACTIVATION_SECONDS]
+	try return ValueCheckRequire(ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS, Raw)
+	catch ValueError as Err {
+		LoggerError("UserHotstrings", "Programmable expansion declined: {1}.", Err.Message)
+		return ""
+	}
+}
+
 _UserHotstringsCaptureRule(Rule) {
 	global _UserHotstringsCapture
 	return _UserHotstringsCapture
@@ -368,7 +384,9 @@ UserHotstringsOnChar(BufferValue) {
 	Rule := _UserHotstringsOwner.Find(LogicalBuffer)
 	if !(Rule is Map)
 		return false
-	Delay := Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE][ConfigLeaf.TIME_ACTIVATION_SECONDS]
+	Delay := _UserHotstringsDelay()
+	if (Delay == "")
+		return false
 	Trigger := Rule["suffix"] . MagicKey
 	Spec := {Replacement: Rule["preview"], Trigger: Trigger, Length: StrLen(Trigger),
 		TimeActivationSeconds: Delay, PrevCharKey: _TextPenultimateCodepoint(Trigger), OnlyText: true}
@@ -581,10 +599,13 @@ UserHotstringsPreviewSpec(BufferBefore, Completion) {
 	Rule := _UserHotstringsOwner.Preview(BufferBefore)
 	if !(Rule is Map)
 		return ""
+	Delay := _UserHotstringsDelay()
+	if (Delay == "")
+		return ""
 	Trigger := Rule["suffix"] . Completion
 	return {Replacement: Rule["preview"], Trigger: Trigger, Length: StrLen(Trigger),
 		OnlyText: true, IsPrivate: true, Category: "dynamichotstrings",
-		TimeActivationSeconds: Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE][ConfigLeaf.TIME_ACTIVATION_SECONDS],
+		TimeActivationSeconds: Delay,
 		PrevCharKey: _TextPenultimateCodepoint(Trigger), UserCodeGeneration: _UserHotstringsOwner.generation,
 		TransientKind: ConfigLeaf.USER_CODE}
 }
