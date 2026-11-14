@@ -19,8 +19,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const Plan = require('../audit/structure/plan.cjs');
 const Apply = require('../audit/structure/apply-step.cjs');
+
+const REPO = path.resolve(__dirname, '..', '..');
 
 function run() {
 	// The write gains its folder, once per fixture that creates the old one.
@@ -53,6 +57,23 @@ function run() {
 	const climbed = Apply.rewriteText(text, rows, new Map(), FILE);
 	assert.ok(climbed.includes('TestsRoot := TestDir . "/../../../../.."'), climbed);
 	assert.ok(climbed.includes('TestDir . "/../../../../../support/x.ahk"'), climbed);
+	// A climb from the suite folder joined onto a variable that holds it
+	// (TestsRoot . "/../infra/x.ahk") follows the driver file it names.
+	const HANDOFF = 'windows/infra/reload_terminal_handoff.ahk';
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus', HANDOFF))) {
+		const suiteFile = 'static/ergopti_plus/windows/tests/unit/zz_probe/test_zz_suite_climb.ahk';
+		const handoffMap = new Map([
+			[HANDOFF, 'windows/core/zz_lifecycle/engine/reload/terminal_handoff.ahk']
+		]);
+		const include =
+			'Probe := StrReplace(Probe, "@@H@@", TestsRoot . "/../infra/reload_terminal_handoff.ahk")\n';
+		const includeRows = Plan.scanFile(suiteFile, include, Plan.referenceContext(handoffMap));
+		const includeOut = Apply.rewriteText(include, includeRows, new Map(), suiteFile);
+		assert.ok(
+			includeOut.includes('TestsRoot . "/../core/zz_lifecycle/engine/reload/terminal_handoff.ahk"'),
+			includeOut
+		);
+	}
 	console.log('[OK] AutoHotkey fixtures keep their created folders and their climbs.');
 }
 
