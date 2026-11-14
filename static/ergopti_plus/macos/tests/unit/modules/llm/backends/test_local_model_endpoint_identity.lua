@@ -25,11 +25,11 @@ end
 
 local function with_world(body)
 	return helpers.with_stub_scope({ "modules.llm.api_ollama", "modules.llm.ollama_endpoint", "adapters.http_client",
-		"core.fs.adapters.storage", "infra.logger", "core.events.timer_scheduler", "core.fs.adapters.json_codec" }, function()
+		"core.fs.adapters.storage", "core.logger.engine.logger", "core.events.timer_scheduler", "core.fs.adapters.json_codec" }, function()
 		local Api = helpers.load_with_stubs("modules.llm.api_ollama")
 		local Storage = require("core.fs.adapters.storage")
 		local Json = require("core.text.engine.json")
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local world = { api = Api, gets = {}, posts = {}, failures = {}, successes = {} }
 		world.client = upvalue(Api.request_chat, "_vision_client")
@@ -147,7 +147,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("does not log acquisition exception details", function(world)
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		local original_url = world.api.get_base_url
 		local messages, reason = {}, nil
 		logger.error = function(_, format, ...)
@@ -308,7 +308,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("rechecks endpoint identity after the last logging boundary before private POST", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local info = Logger.info
 		Logger.info = function(topic, template, ...)
@@ -331,7 +331,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	for _, installed in ipairs({ false, true }) do
 		test("refuses a verify result invalidated at the final inventory publication: installed=" .. tostring(installed), function(world)
-			local Logger = require("infra.logger")
+			local Logger = require("core.logger.engine.logger")
 			helpers.admit_logger_privacy(Logger)
 			local debug_log = Logger.debug
 			Logger.debug = function(topic, template, ...)
@@ -350,7 +350,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end
 
 	test("does not offer a missing model after the final list consumer loses its endpoint", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local debug_log = Logger.debug
 		Logger.debug = function(topic, template, ...)
@@ -364,7 +364,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("rechecks an empty inventory after the last missing-model logging boundary", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local warn = Logger.warn
 		Logger.warn = function(topic, template, ...)
@@ -378,7 +378,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("refuses stale text after the final successful response logging boundary", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local info = Logger.info
 		Logger.info = function(topic, template, ...)
@@ -391,7 +391,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("keeps an old endpoint's missing response from forgetting the newly acknowledged inventory", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local error_log = Logger.error
 		Logger.error = function(topic, template, ...)
@@ -411,7 +411,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("refuses stale empty-answer publication after its last logging boundary", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local warn = Logger.warn
 		Logger.warn = function(topic, template, ...)
@@ -425,7 +425,7 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 	end)
 
 	test("preserves an admitted response across an independent refresh of the same endpoint", function(world)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local info = Logger.info
 		Logger.info = function(topic, template, ...)

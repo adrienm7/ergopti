@@ -101,7 +101,7 @@ end)
 --- @param cancel_result boolean|nil Cancellation outcome.
 --- @param scenario function Scenario receiving Dialog, counters, and handle getter.
 local function with_dialog_fixture(timer_mode, cancel_result, scenario)
-	local previous_logger = package.loaded["infra.logger"]
+	local previous_logger = package.loaded["core.logger.engine.logger"]
 	local previous_shell_runner = package.loaded["adapters.shell_runner"]
 	local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 	local previous_dialog = package.loaded["infra.dialog_util"]
@@ -110,7 +110,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	local previous_global_hs = _G.hs
 	local calls = { alerts = 0, spawns = 0, starts = 0, cancels = 0, errors = 0 }
 	local candidate = nil
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		error = function() calls.errors = calls.errors + 1 end,
 	}, { __index = function() return function() end end })
 	package.loaded["adapters.shell_runner"] = {
@@ -152,7 +152,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	local ok, err = xpcall(function()
 		scenario(Dialog, calls, function() return candidate end)
 	end, debug.traceback)
-	package.loaded["infra.logger"] = previous_logger
+	package.loaded["core.logger.engine.logger"] = previous_logger
 	package.loaded["adapters.shell_runner"] = previous_shell_runner
 	package.loaded["core.events.timer_scheduler"] = previous_scheduler
 	package.loaded["infra.dialog_util"] = previous_dialog

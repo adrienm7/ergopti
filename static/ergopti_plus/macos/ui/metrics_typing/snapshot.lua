@@ -23,7 +23,7 @@
 local M = {}
 
 local FileSystem = require("core.fs.adapters.file_system")
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 
 local LOG = "metrics_typing.snapshot"
 

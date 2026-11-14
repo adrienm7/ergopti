@@ -19,14 +19,14 @@ local EXPANSION_DELAY = require("infra.manifest_reader").default_for("hotstrings
 local MODULE_NAMES = {
 	"hs",
 	"tests.stubs.hs",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.events.timer_scheduler",
 	"adapters.keyboard_geometry",
 	"adapters.synthetic_input",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
-	"infra.boot_profiler",
-	"adapters.boot_journal",
+	"core.logger.engine.boot_profiler",
+	"core.logger.adapters.boot_journal",
 	"core.i18n.engine.i18n",
 	"core.i18n.engine.locale",
 	"modules.diagnostics.crash_reporter",
@@ -226,7 +226,7 @@ local function run_isolated(options, assertions)
 		helpers.assert_not_nil(journal_source, tostring(journal_err))
 		local journal_factory, journal_load_err = load(journal_source, "owned boot journal", "t", setmetatable({
 			require = function(name)
-				helpers.assert_eq(name, "infra.logger", "The bootstrap reader imports only this captured logger")
+				helpers.assert_eq(name, "core.logger.engine.logger", "The bootstrap reader imports only this captured logger")
 				return Logger
 			end,
 		}, { __index = _G }))
@@ -234,7 +234,7 @@ local function run_isolated(options, assertions)
 		local JournalReader = journal_factory()
 
 		local fakes = {
-			["infra.logger"] = Logger,
+			["core.logger.engine.logger"] = Logger,
 			["core.events.timer_scheduler"] = {
 				cancelAll = function()
 					state.cancel_all_calls = state.cancel_all_calls + 1
@@ -251,7 +251,7 @@ local function run_isolated(options, assertions)
 			},
 			["platform.remap.ke_lifecycle"] = { HS_BOOT_READY_SETTING_KEY = "test.boot.ready" },
 			["platform.remap.lease_controller"] = LeaseController,
-			["infra.boot_profiler"] = {
+			["core.logger.engine.boot_profiler"] = {
 				begin = function() end,
 				trace_requires = function() end,
 				stage = function() end,
@@ -261,7 +261,7 @@ local function run_isolated(options, assertions)
 				current_stage = function() return "fixture stage" end,
 				is_complete = function() return false end,
 			},
-			["adapters.boot_journal"] = {
+			["core.logger.adapters.boot_journal"] = {
 				read_privacy_policy = function(shared_root)
 					state.privacy_policy_reads = (state.privacy_policy_reads or 0) + 1
 					local raw = JournalReader.read_privacy_policy(shared_root)

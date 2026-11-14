@@ -114,7 +114,7 @@ local require = function(name) assert(name == "infra.native_timer"); return nati
 				return start_timer(backend, {}, timeout, 0, function() end) == 0
 			end }
 			invoke(backend, http, function() end, function() remembered = remembered + 1 end,
-				function(name) assert(name == "infra.monotonic"); return { backend = function() return "luv.hrtime" end } end)
+				function(name) assert(name == "core.logger.engine.monotonic"); return { backend = function() return "luv.hrtime" end } end)
 			assert(remembered == 1 and expiry ~= nil)
 			return timeout, wall, expiry - wall
 		end

@@ -19,7 +19,7 @@ local KEYS = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_
 --- @param with_engine boolean
 --- @return table perf snapshot
 local function drive(events, with_engine)
-	local perf = helpers.load_module("infra.perf_counters")
+	local perf = helpers.load_module("core.logger.engine.perf_counters")
 	perf._reset_for_test()
 	local kh = helpers.load_module("adapters.keyboard_hook")
 	if with_engine then

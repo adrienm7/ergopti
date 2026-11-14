@@ -19,7 +19,7 @@ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/?.
 local Json = require('core.text.engine.json')
 local logger = {}
 for _, name in ipairs({'start','success','trace','done','info','debug','warn','error'}) do logger[name]=function() end end
-package.preload['infra.logger']=function() return logger end
+package.preload['core.logger.engine.logger']=function() return logger end
 package.preload['core.fs.engine.paths']=function() return {shared=function(path)
     assert(path=='../macos/adapters/release_stage.sh');return driver..'/adapters/release_stage.sh'
 end} end

@@ -21,7 +21,7 @@ local SUBJECT_MODULES = {
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.screen_capture_flow",
@@ -117,7 +117,7 @@ local function with_screenshot(options, scenario)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			return key
 		end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			info = function(_, message, ...)
 				f.infos[#f.infos + 1] = string.format(tostring(message), ...)

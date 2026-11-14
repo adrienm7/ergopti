@@ -66,7 +66,7 @@ local function load_bridge(controls)
 	}
 	package.loaded["infra.config_paths"] = setmetatable({ home = function() return HOME end },
 		{ __index = require("infra.config_paths") })
-	local sink = require("infra.logger_sink")
+	local sink = require("core.logger.engine.sink")
 	local previous_log_dir = sink.log_dir
 	if controls.logs_dir ~= nil then
 		assert(type(controls.logs_dir) == "string" and controls.logs_dir:sub(1, #HOME) == HOME)
@@ -558,7 +558,7 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end
-		local logger, sink = require("core.logger.engine.shim"), require("infra.logger_sink")
+		local logger, sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 		local warn, log_dir, getenv = logger.warn, sink.log_dir, os.getenv
 		local failure, visited = {}, 0
 		local ok, detail = pcall(with_bridge, nil, function(bridge, context)

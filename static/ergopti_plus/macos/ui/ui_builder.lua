@@ -16,7 +16,7 @@
 
 local M = {}
 local hs = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Paths = require("core.fs.engine.paths")
 local NativePath = require("core.fs.engine.native_path")
 local TextUtils = require("core.text.engine.utils_core")

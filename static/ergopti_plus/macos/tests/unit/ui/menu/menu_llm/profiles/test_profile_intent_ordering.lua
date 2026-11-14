@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.dialog_util",
 	"infra.notifications",
@@ -40,7 +40,7 @@ local function with_fixture(spec, body)
 	local dialog_calls = 0
 
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function()

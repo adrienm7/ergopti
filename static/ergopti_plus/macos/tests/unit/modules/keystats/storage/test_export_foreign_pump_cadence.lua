@@ -14,7 +14,7 @@ local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 --- Replays one importer over real timer owners and a deterministic native queue.
 --- @param check function Receives the exporter, scheduler and native observations.
 local function observe(check)
-	helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "modules.keystats.export",
+	helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export",
 		"adapters.foreign_ledger_snapshot", "core.events.timer_scheduler", "infra.paced_job" }, function()
 		local source = BATCH:rep(8000)
 		local h = { now = 0, timers = {}, read_bytes = 0, foreground = 0, watermark = 0, applied = {}, closes = 0 }
@@ -40,7 +40,7 @@ local function observe(check)
 			selected.callback()
 			if selected.active then selected.due = h.now + selected.delay end
 		end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "foreign" }, true end }
 		local db = {
 			prepare = function() return { bind_values = function() return 0 end,

@@ -25,11 +25,11 @@ local OWNED_OUT = "/ergopti-test/ErgoptiPlus/karabiner/karabiner.json"
 --- @param run function Receives { Generator, Config, file_state, config }.
 local function with_generator(existing, run)
 	helpers.with_fresh_modules({
-		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.config_paths", "infra.keycodes", "infra.logger",
+		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.config_paths", "infra.keycodes", "core.logger.engine.logger",
 		"infra.toml.codec", "platform.remap.config", "platform.remap.generator",
 		"modules.keymap.layout_registry", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.text.engine.toml_codec",
 	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/tmp/ergopti_test" end }
 		package.loaded["infra.keycodes"] = {
 			to_name = function(code) return "key_" .. tostring(code) end,

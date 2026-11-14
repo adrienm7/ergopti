@@ -74,7 +74,7 @@ local function load_remap(options)
 			}
 		end
 	end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = log("start"),
 		debug = log("debug"),
 		info = log("info"),

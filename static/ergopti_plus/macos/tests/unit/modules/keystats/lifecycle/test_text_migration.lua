@@ -542,7 +542,7 @@ end)
 require("tests.lua.core.text_migration_durability").register(helpers, {
 	make_store = make_store, load = load_runner, install = install_shell,
 	restore = restore_shell, drain = drain,
-	logger = function() return require("infra.logger") end,
+	logger = function() return require("core.logger.engine.logger") end,
 	log_tag = "metrics.engine.privacy.text_migration_core", device = DEVICE,
 	resume = function(migration, mode) return migration.resume_for_posture(mode == Plan.MODE_ENCRYPT, DEVICE) end,
 })

@@ -24,7 +24,7 @@
 
 local M = {}
 
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Updater = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local ConfigKeys = require("settings.engine.keys")

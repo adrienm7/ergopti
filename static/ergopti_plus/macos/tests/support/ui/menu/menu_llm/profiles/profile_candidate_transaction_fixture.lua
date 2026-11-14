@@ -14,7 +14,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
 	"modules.llm",
@@ -145,7 +145,7 @@ local function with_fixture(options, body)
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function()
@@ -164,7 +164,7 @@ local function with_fixture(options, body)
 				return manifest
 			end,
 			i18n = package.loaded["core.i18n.engine.i18n"],
-			logger = package.loaded["infra.logger"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,

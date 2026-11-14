@@ -28,8 +28,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Minimal core_llm surface: prediction_engine reads DEFAULT_STATE at load time
 -- and queries the backend during perform_check, which this test never reaches.

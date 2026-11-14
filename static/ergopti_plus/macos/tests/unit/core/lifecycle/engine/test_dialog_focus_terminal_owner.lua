@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "infra.logger",
+local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "core.logger.engine.logger",
 	"core.events.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
 	"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
@@ -70,7 +70,7 @@ local function with_dialog(callback)
 		local result = table.pack(xpcall(function()
 			local logger = helpers.make_logger_stub()
 			logger.run_modal = function(work, ...) return work(...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["adapters.running_application"] = {
 				current = function() return { activate = function() return true end } end,
 			}

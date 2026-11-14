@@ -25,7 +25,7 @@
 
 local M = {}
 
-local Logger           = require("infra.logger")
+local Logger           = require("core.logger.engine.logger")
 local SyntheticInput   = require("adapters.synthetic_input")
 local FieldRunSelftest = require("infra.field_run_selftest")
 local LOG = "keymap.selftest_gate"

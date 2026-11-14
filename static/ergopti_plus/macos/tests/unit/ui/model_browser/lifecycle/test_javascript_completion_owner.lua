@@ -34,7 +34,7 @@ end
 local function with_browser(scenario)
 	Fixture("ui.model_browser", function(host, h)
 		assert(h.show())
-		local logger, errors = require("infra.logger"), {}
+		local logger, errors = require("core.logger.engine.logger"), {}
 		local previous = logger.error
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 		local result = table.pack(xpcall(function() scenario(host, h, errors) end, debug.traceback))

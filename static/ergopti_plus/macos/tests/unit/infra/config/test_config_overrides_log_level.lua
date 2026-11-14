@@ -84,13 +84,13 @@ if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end
 
 helpers.describe("Expert known-value admission", function()
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "core.logger.engine.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local observed, warnings, errors, writes = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.LEVELS = require("core.logger.engine").LEVELS
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			local controls = {}
 			local native = {
 				set = function(key, value)
@@ -237,14 +237,14 @@ end)
 helpers.describe("Expert classified source admission", function()
 	local SOURCE = '[script]\nlog_level = "INFO"\n[future]\nkeep = "independent"\n'
 	local function with_file(body)
-		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local observed, warnings, errors, debug_messages = {}, {}, {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.LEVELS = require("core.logger.engine").LEVELS
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			logger.debug = function(_, fmt, ...) debug_messages[#debug_messages + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			local native = {
 				set = function(key, value) observed[key] = value end,
 				get = function(key) return observed[key] end,
@@ -357,7 +357,7 @@ end)
 
 helpers.describe("Persisted native consent admission", function()
 	local function with_native(value, body)
-		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "infra.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
+		helpers.with_stub_scope({ "infra.config_overrides", "core.fs.adapters.storage", "core.logger.engine.logger", "core.logger.engine.shim", "infra.manifest_reader" }, function()
 			local stored = { ["ergopti.llm.enabled"] = value, ["ergopti.log_level"] = "ERROR",
 				["foreign.future"] = { keep = false, values = { 1, "future" } } }
 			local function detached(value)
@@ -372,7 +372,7 @@ helpers.describe("Persisted native consent admission", function()
 			logger.LEVELS = require("core.logger.engine").LEVELS
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.callback = function(_, _, callback) callback() end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			local native = {
 				set = function(key, replacement) writes = writes + 1; stored[key] = replacement end,
 				clear = function(key) writes = writes + 1; stored[key] = nil end,

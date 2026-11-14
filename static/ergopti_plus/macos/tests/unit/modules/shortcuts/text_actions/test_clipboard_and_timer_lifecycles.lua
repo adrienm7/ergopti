@@ -42,7 +42,7 @@ local function load_wrap_fixture(restore_outcomes)
 		hs_global = _G.hs,
 		destination = package.loaded["modules.keymap.utils"],
 		hs_module = package.loaded["hs"],
-		logger = package.loaded["infra.logger"],
+		logger = package.loaded["core.logger.engine.logger"],
 		synthetic = package.loaded["adapters.synthetic_input"],
 		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		text = package.loaded["modules.shortcuts.actions.text"],
@@ -58,7 +58,7 @@ local function load_wrap_fixture(restore_outcomes)
 	local restore_calls = 0
 	local change_count = 0
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.synthetic_input"] = {
 		begin = function() return {} end,
 		on_dispatched = function(tx, callback) tx.dispatched_callback = callback end,
@@ -148,7 +148,7 @@ local function load_wrap_fixture(restore_outcomes)
 		restore = function()
 			package.loaded["modules.keymap.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
-			package.loaded["infra.logger"] = saved.logger
+			package.loaded["core.logger.engine.logger"] = saved.logger
 			package.loaded["adapters.synthetic_input"] = saved.synthetic
 			package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 			package.loaded["hs"] = saved.hs_module

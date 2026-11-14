@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 
 local function with_client(scenario)
-	helpers.with_fresh_modules({ "adapters.http_client", "core.events.timer_scheduler", "infra.logger",
+	helpers.with_fresh_modules({ "adapters.http_client", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"infra.http_header_policy" }, function()
 		local world = { calls = {}, timers = 0, logs = {}, mutate = function() end }
 		local http = {}
@@ -29,7 +29,7 @@ local function with_client(scenario)
 		end
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...) world.logs[#world.logs + 1] = string.format(template, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local client = helpers.load_with_stubs("adapters.http_client", { http = http, timer = timer }).new()
 		scenario(client, world)
 	end)

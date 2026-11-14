@@ -77,7 +77,7 @@ helpers.describe("developer source mode: bundle-only resources come from the app
 		local searcher = DevSource.payload_searcher(payload,
 			function(path) files[#files + 1] = path; return function() return "socket" end end,
 			function(path, entry) libs[#libs + 1] = path .. "#" .. entry; return function() return "core" end end)
-		helpers.assert_eq(searcher("infra.logger"), nil, "a clone module must never come from the payload")
+		helpers.assert_eq(searcher("core.logger.engine.logger"), nil, "a clone module must never come from the payload")
 		helpers.assert_eq(searcher("socket.http"), nil)
 		local loader, origin = searcher("socket")
 		helpers.assert_eq(type(loader), "function")

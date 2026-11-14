@@ -14,7 +14,7 @@ local fixture = require("tests.support.preferences_roundtrip_fixture")
 local function check_ownership(fail)
 	local previous_hs = _G.hs
 	local previous_preferences = package.loaded["infra.preferences"]
-	local previous_logger = package.loaded["infra.logger"]
+	local previous_logger = package.loaded["core.logger.engine.logger"]
 	local output_path, sidecar_path
 	local observed_output, observed_lock
 	local outcome = table.pack(pcall(fixture.with_roundtrip, { delays = { rolls = 0.25 } },
@@ -49,7 +49,7 @@ local function check_ownership(fail)
 	helpers.assert_eq(remaining[sidecar_path], false, "sidecar must be absent before rescue cleanup")
 	helpers.assert_true(rawequal(_G.hs, previous_hs), "restore native stub identity")
 	helpers.assert_true(rawequal(package.loaded["infra.preferences"], previous_preferences), "restore preference module")
-	helpers.assert_true(rawequal(package.loaded["infra.logger"], previous_logger), "restore logger module")
+	helpers.assert_true(rawequal(package.loaded["core.logger.engine.logger"], previous_logger), "restore logger module")
 	helpers.assert_eq(outcome[1], not fail, tostring(outcome[2]))
 	if fail then
 		helpers.assert_true(tostring(outcome[2]):find("injected preference assertion failure", 1, true) ~= nil)

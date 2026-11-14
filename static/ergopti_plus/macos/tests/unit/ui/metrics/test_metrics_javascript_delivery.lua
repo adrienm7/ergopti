@@ -68,7 +68,7 @@ helpers.describe("metrics JavaScript delivery", function()
 	helpers.it("(metrics-js-delivery) failure logging cannot transfer an old completion", function()
 		with_delivery(false, function(dashboard, _, evaluations, errors, successes)
 			evaluations[1].done("function")
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local report = logger.error
 			logger.error = function(...)
 				report(...)

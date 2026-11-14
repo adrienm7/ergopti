@@ -69,7 +69,7 @@ local function with_subject(stage, body, options)
 				for _, name in ipairs({ "infra.preferences", "core.text.engine.toml_codec.writer", "ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction", "modules.shortcuts.keyboard_shortcuts" }) do package.loaded[name] = nil end
 				local logs, logger = {}, helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do logger[level] = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end end
-				package.loaded["infra.logger"] = logger
+				package.loaded["core.logger.engine.logger"] = logger
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 				package.loaded["infra.config_paths"] = { get = function() return path end }
 				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }

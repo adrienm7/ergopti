@@ -12,14 +12,14 @@ global _ConfigDir := A_Temp . "\ergopti_llm_persistence_test_" . DllCall("GetCur
 global _AhkSubDir := ""
 global ConfigurationFile := _ConfigDir . "config.toml"
 global _LogsDir := _ConfigDir . "logs\"
-#Include ../infra/tick_count.ahk
-#Include ../infra/wall_clock.ahk
+#Include ../core/logger/engine/tick_count.ahk
+#Include ../core/logger/engine/wall_clock.ahk
 #Include ../_generated/config_keys.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
 #Include ../infra/legacy_folder_migration.ahk
 #Include ../_generated/logger_sub_files.ahk
-#Include ../infra/logger.ahk
+#Include ../core/logger/engine/logger.ahk
 #Include ../core/crypto/crypto.ahk
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../core/events/timer_scheduler.ahk

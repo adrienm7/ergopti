@@ -460,7 +460,7 @@ function M.production_deps(ports)
 			return require("modules.gestures.combo_emitter").press_codes(chord, { key.evdev },
 				"emulated layout source key") == true
 		end,
-		now_ms = function() return require("infra.monotonic").now_ms() end,
+		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
 		magic_evdev = ports.magic_evdev,
 		is_active = function() return not ports.is_paused() end,

@@ -104,7 +104,7 @@ end)
 helpers.describe("keystats-export-log-privacy", function()
 	for _, phase in ipairs({ "invalid", "partial", "derived", "success", "watermark", "rollback" }) do
 		helpers.it("keystats-export-log-privacy: " .. phase .. " preserves sync outcome without logging device identity", function()
-			helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
+			helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 				local previous_open = io.open
 				local ok, err = xpcall(function()
 					local identity = "private-foreign-device"
@@ -115,7 +115,7 @@ helpers.describe("keystats-export-log-privacy", function()
 					for _, level in ipairs({ "warn", "debug" }) do
 						logger[level] = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
 					end
-					package.loaded["infra.logger"] = logger
+					package.loaded["core.logger.engine.logger"] = logger
 					package.loaded["core.fs.engine.dir"] = {
 						try_entries = function(path)
 							helpers.assert_eq(path, "/owned-metrics/by_device/")

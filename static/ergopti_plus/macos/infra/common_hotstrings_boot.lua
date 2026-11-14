@@ -7,7 +7,7 @@
 --- optional common source stays unavailable while unrelated boot groups continue.
 --- ==============================================================================
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local M = {}
 
 --- Loads one cold-boot group and records only an acknowledged native image.

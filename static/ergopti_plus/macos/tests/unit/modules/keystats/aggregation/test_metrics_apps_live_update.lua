@@ -81,7 +81,7 @@ local function load_dashboard(options)
 		encode = function() return "{}" end,
 	}
 	package.loaded["core.events.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }

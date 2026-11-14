@@ -314,7 +314,7 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 			local i18n = package.loaded["core.i18n.engine.i18n"]
 			local renderer = assert(Renderer.new({
 				platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
-				json_decode = function() return document end, i18n = i18n, logger = package.loaded["infra.logger"],
+				json_decode = function() return document end, i18n = i18n, logger = package.loaded["core.logger.engine.logger"],
 			}))
 			local binding = package.loaded["infra.manifest_menu"]
 			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
@@ -458,7 +458,7 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 			i18n.section = function(key) return require("menu.engine.labels").decorate_section(i18n.get(key)) end
 			local renderer = assert(require("menu.engine.renderer").new({platform="hs",
 				manifest_path=function() return helpers.shared("menu/data/menu_manifest.json") end,
-				json_decode=function() return document end,i18n=i18n,logger=package.loaded["infra.logger"]}))
+				json_decode=function() return document end,i18n=i18n,logger=package.loaded["core.logger.engine.logger"]}))
 			local binding = package.loaded["infra.manifest_menu"]
 			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
 			body({document=document,i18n=i18n,heading_index=2,other_platform="linux",

@@ -16,7 +16,7 @@ local PICKER_OWNERS = {
 	"hs.json",
 	"ui.metrics_apps",
 	"ui.ui_builder",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.dialog_util",
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
@@ -37,7 +37,7 @@ local PICKER_OWNERS = {
 	"core.text.engine.toml_codec.bom",
 	"core.text.engine.toml_codec.basic_string",
 	"core.fs.engine.app_dirs",
-	"infra.log_folders",
+	"core.logger.engine.log_folders",
 	"diagnostics.engine.operation_reporter",
 	"core.fs.engine.dir",
 }
@@ -59,7 +59,7 @@ helpers.describe("metrics_apps: discovery outcome", function()
 					local complete
 					package.loaded["infra.app_picker"] = { discover_apps = function(callback) complete = callback end }
 					local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
-					package.loaded["infra.logger"].debug = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].debug = function(_, message, ...)
 						logs[#logs + 1] = string.format(message, ...)
 					end
 					package.loaded["core.events.timer_scheduler"].after = function(_, callback)

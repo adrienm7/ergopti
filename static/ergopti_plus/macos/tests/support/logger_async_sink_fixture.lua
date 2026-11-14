@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"infra.logger", "adapters.log_transport", "tests.stubs.hs", "hs", "core.logger.engine",
+	"core.logger.engine.logger", "core.logger.adapters.log_transport", "tests.stubs.hs", "hs", "core.logger.engine",
 	"core.lifecycle.engine.launcher_environment", "_generated.logger_sub_files", "socket",
 }
 
@@ -18,7 +18,7 @@ local function load_policy_logger()
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	return helpers.admit_logger_privacy(require("infra.logger"))
+	return helpers.admit_logger_privacy(require("core.logger.engine.logger"))
 end
 
 local function load_fixture(config)
@@ -65,7 +65,7 @@ local function load_fixture(config)
 		cancel = function() return true end,
 		now_ns = function() return 100000000000 end,
 	}
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Logger)
 	Logger.set_level("DEBUG")
 	Logger.reset_dedup()

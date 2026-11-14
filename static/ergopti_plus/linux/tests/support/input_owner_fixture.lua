@@ -10,7 +10,7 @@ local h = require("tests.helpers")
 --- @param body function Receives the controlled consumer session.
 function M.with_session(options, body)
 	options = options or {}
-	local names = { "ffi", "infra.monotonic", "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook",
+	local names = { "ffi", "core.logger.engine.monotonic", "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook",
 		"adapters.xkb_capture", "modules.hotstrings.device_finder", "platform.remap.tap_hold_engine",
 		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "infra.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -35,7 +35,7 @@ function M.with_session(options, body)
 	local s = { rows = {}, captures = {}, paths = paths, acquisitions = 0, held = {}, clock_ms = 0 }
 	-- Event stamps and idle ticks belong to this controlled transport, not real
 	-- source-reader wall time spent parsing or writing the fixture config.
-	package.loaded["infra.monotonic"] = {
+	package.loaded["core.logger.engine.monotonic"] = {
 		now_ms = function() return s.clock_ms end,
 		now_sec = function() return s.clock_ms / 1000 end,
 		resolution_ms = function() return 0 end,

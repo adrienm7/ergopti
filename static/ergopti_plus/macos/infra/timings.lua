@@ -23,7 +23,7 @@
 ---   local IDLE_CHECK_SEC = Timings.sec("keystats", "idle_check_interval_ms")
 --- ==============================================================================
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Paths = require("core.fs.engine.paths")
 local TomlReader = require("infra.toml.reader")
 

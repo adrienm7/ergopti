@@ -14,7 +14,7 @@ local OWNERS = {
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
 	"core.text.engine.toml_codec.source_open",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.config_paths",
 	"infra.dialog_util",
@@ -144,7 +144,7 @@ function M.with_runtime(callback)
 		local obs = { stages = {}, tracker_receipts = {}, native_queries = {} }
 		local function run()
 			obs.logs, obs.caffeinate = {}, { created = 0, stopped = 0 }
-			local initial_logger = assert(package.loaded["infra.logger"])
+			local initial_logger = assert(package.loaded["core.logger.engine.logger"])
 			for _, level in ipairs({ "error", "warn" }) do
 				initial_logger[level] = function(_, format, ...)
 					local row = { kind = "fixture_diagnostic", level = level, message = string.format(format, ...) }

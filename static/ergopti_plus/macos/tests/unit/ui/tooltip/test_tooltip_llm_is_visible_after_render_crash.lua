@@ -42,19 +42,19 @@ helpers.describe("tooltip_llm: is_visible() stays false after a show_predictions
 			set_element_text = function() return true end,
 			render = function() return false end,
 		}
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		local Tooltip = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
 		-- Tooltip captured the fault injector; release the cache slot so it cannot
 		-- become another order-dependent fixture for later modules.
 		package.loaded["ui.tooltip.renderer"] = nil
-		package.loaded["infra.logger"].error = function(_log, fmt, ...)
+		package.loaded["core.logger.engine.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		-- tooltip_llm already bound its own upvalue to the real (mutated)
 		-- module above — release the cache entry now so the monkey-patched
-		-- .error doesn't leak into every later require("infra.logger") for the
+		-- .error doesn't leak into every later require("core.logger.engine.logger") for the
 		-- rest of the full-suite process.
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		return Tooltip, logged_errors
 	end
 

@@ -40,7 +40,7 @@ helpers.describe("input_sources.resolve_installed_ergopti_version", function()
 		-- load_with_stubs() resets the hs stub AND nils both keymap layout modules
 		-- (helpers/init.lua), so install our layout_install stub AFTER it and require
 		-- input_sources by hand so the stub is the one captured at its require-time.
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 
 		-- Stub the install layer: report an Ergopti bundle in BOTH scopes so the
 		-- `if user_best and system_best then` branch (the one calling version_gt) is taken.
@@ -80,7 +80,7 @@ helpers.describe("input_sources.resolve_installed_ergopti_version", function()
 	-- rebuild (57-415 ms stage spikes on a field Mac); it now reads them once
 	-- and hands that snapshot to every reader, which must then list nothing.
 	helpers.it("reads no folder when the caller hands both scopes in", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local listings = 0
 		package.loaded["modules.keymap.layout_install"] = {
 			USER_LAYOUTS_DIR   = "/Users/x/Library/Keyboard Layouts/",

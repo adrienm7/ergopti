@@ -10,7 +10,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 	local logger={error=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,success=noop}
 	package.loaded['core.fs.engine.paths']={shared=function(path)return shared_path(path) end}
 	package.loaded['core.i18n.engine.i18n']={get=function(key)return key end}
-	package.loaded['core.logger.engine.shim']=logger;package.loaded['infra.logger']=logger
+	package.loaded['core.logger.engine.shim']=logger;package.loaded['core.logger.engine.logger']=logger
 	local catalogue={get_action_label=function(a)return a end,is_assignable=function(a)return a=='send_text' or a=='none' end,get_action_parameter_spec=function(a)return a=='send_text' and 'text' or nil end,validate_action_parameter=function(a,v)return a=='send_text' and v=='★' end,split_action_parameter_key=function(k)return k:match('^(keyboard__.+)__(.+)$')end,get_picker_items=function()return{}end,get_picker_parameter_fields=function()return{}end}
 	local function scope()
 	 local receipt={};local writes=0

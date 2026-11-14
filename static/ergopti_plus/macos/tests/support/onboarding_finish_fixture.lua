@@ -21,7 +21,7 @@ local MODULE_NAMES = {
 	"infra.deferred_work",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.fs.engine.paths",
 	"infra.text_utils",
@@ -165,7 +165,7 @@ function M.with_finish(opts, scenario)
 		return imported, err
 	end
 	package.loaded["platform.remap.nav_layer"] = nav_stub
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["core.fs.engine.paths"] = { shared = opts.canonical_files and helpers.shared
 		or function() return "/virtual/shared" end }
 	package.loaded["infra.text_utils"] = { applescript_format = string.format }

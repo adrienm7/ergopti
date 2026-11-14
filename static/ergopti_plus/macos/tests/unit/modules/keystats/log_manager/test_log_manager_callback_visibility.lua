@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
-local Logger = helpers.load_with_stubs("infra.logger")
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
 local function matching_errors(needle_a, needle_b)
 	local count = 0
@@ -39,7 +39,7 @@ local function fresh_manager()
 		errmsg = function() return "" end,
 	}
 
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["infra.timings"] = {
 		ms = function() return 1000 end,
 		sec = function() return 1 end,

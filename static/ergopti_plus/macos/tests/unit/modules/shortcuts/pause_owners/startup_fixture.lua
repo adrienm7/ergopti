@@ -139,7 +139,7 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		llm_backend = "mlx",
 		llm_model = "startup-model",
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.llm"] = {
 		BUILTIN_PROFILES = {},
 		get_current_model = function() return state.llm_model end,

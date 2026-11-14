@@ -37,8 +37,8 @@
 local M = {}
 
 local hs         = hs
-local Logger     = require("infra.logger")
-local KeyEventHealth = require("infra.key_event_health")
+local Logger     = require("core.logger.engine.logger")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 local NativePath = require("core.fs.engine.native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("core.fs.adapters.file_system")

@@ -44,7 +44,7 @@ local function attach_refused(pid)
 		append_log = function() return true end,
 	}, function() return false end))
 	local lines = {}
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Logger)
 	Logger.set_level("DEBUG")
 	Logger.set_sink(function(line) lines[#lines + 1] = line end)

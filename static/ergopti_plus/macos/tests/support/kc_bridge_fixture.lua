@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"infra.logger", "infra.config_paths", "core.events.timer_scheduler",
+	"core.logger.engine.logger", "infra.config_paths", "core.events.timer_scheduler",
 	"modules.keystats.kc_bridge", "modules.keystats", "tests.stubs.hs",
 }
 
@@ -66,7 +66,7 @@ function M.with_context(callback)
 			--- @return table bridge
 			function ctx.load()
 				assert(bridge == nil, "fixture bridge already constructed")
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["infra.config_paths"] = { get_config_dir = function() return root end }
 				bridge = helpers.load_with_stubs("modules.keystats.kc_bridge", overrides)
 				return bridge

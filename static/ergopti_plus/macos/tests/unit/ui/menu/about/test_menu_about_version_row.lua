@@ -30,7 +30,7 @@ local APP_SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergo
 
 -- The modules a case replaces or reloads; restored after each case.
 local FIXTURE_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.diagnostic_snapshot",
 	"modules.updater",
 	"ui.menu.menu_about",
@@ -112,8 +112,8 @@ local function load_updater(is_local, version)
 	logger.error = function(tag, fmt, ...)
 		errors[#errors + 1] = tostring(tag) .. ": " .. string.format(fmt, ...)
 	end
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = logger
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.diagnostic_snapshot"] = nil
 	package.loaded["modules.updater"] = nil
 	local Updater = require("modules.updater")

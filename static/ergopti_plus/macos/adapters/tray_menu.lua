@@ -23,7 +23,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "adapters.tray_menu"
 

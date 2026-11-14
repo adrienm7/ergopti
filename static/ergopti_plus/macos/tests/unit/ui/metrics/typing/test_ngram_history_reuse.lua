@@ -31,7 +31,7 @@ end
 --- Loads a fresh projection over a fake reader.
 --- @return table projection, table reader, table world
 local function fixture()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local Real = helpers.load_with_stubs("modules.keystats.sqlite_reader")
 	local projection = helpers.load_with_stubs("ui.metrics_typing.projection")
 	projection.reset()

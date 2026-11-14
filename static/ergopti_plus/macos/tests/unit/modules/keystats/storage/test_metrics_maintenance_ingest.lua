@@ -21,7 +21,7 @@ local function child()
   assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
- package.loaded['infra.logger'] = logger
+ package.loaded['core.logger.engine.logger'] = logger
  package.loaded['modules.keystats.text_cipher'] = { encrypt = function(_, _, value) return value end }
  local writer = helpers.load_with_stubs('modules.keystats.sqlite_writer', { sqlite3 = sqlite, json = json })
  writer.init({ paths = { sqlite_path = path }, device_obj = { device_id = 'device' }, device_id = 'device' })

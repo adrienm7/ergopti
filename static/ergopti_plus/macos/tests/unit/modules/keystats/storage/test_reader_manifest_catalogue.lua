@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 --- @param end_date string|nil
 --- @return table statements
 local function manifest_statements(start_date, end_date)
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,

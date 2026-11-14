@@ -15,9 +15,9 @@ local FusedMetadataCommand = require("tests.support.fused_metadata_command")
 local function with_fixture(callback, native_overrides)
 	local saved_open, saved_rename = io.open, os.rename
 	local outcome = table.pack(xpcall(function()
-		return helpers.with_stub_scope({ "core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger" }, function()
+		return helpers.with_stub_scope({ "core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger" }, function()
 			-- Capture a fresh host before installing this transaction's filesystem doubles.
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local host = helpers.load_with_stubs("hs", native_overrides)
 			local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
 			local WriteLockPath = require("core.fs.adapters.write_lock_path")

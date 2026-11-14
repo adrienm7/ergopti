@@ -551,7 +551,7 @@ local function native_ports()
 	assert(ffi.os == "Linux", "archive output requires Linux")
 	ffi.cdef([[int open(const char *path, int flags, ...); int close(int fd);
 		int ftruncate(int fd, long length);]])
-	local Clock = require("infra.monotonic")
+	local Clock = require("core.logger.engine.monotonic")
 	local Deadline = require("infra.managed_http_deadline")
 	local function errno()
 		local code = ffi.errno()
@@ -617,7 +617,7 @@ end
 local function native_artifact_backend()
  local loaded, backend = pcall(function()
   local ffi, uv = require("ffi"), require("luv")
-  local Paths, Clock = require("core.fs.engine.paths"), require("infra.monotonic")
+  local Paths, Clock = require("core.fs.engine.paths"), require("core.logger.engine.monotonic")
   local hrtime = rawget(uv, "hrtime")
   local has_hires, clock_backend = rawget(Clock, "has_hires"), rawget(Clock, "backend")
   if ffi.os ~= "Linux" or type(hrtime) ~= "function" or type(has_hires) ~= "function"

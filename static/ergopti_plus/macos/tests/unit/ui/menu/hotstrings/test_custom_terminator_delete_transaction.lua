@@ -53,7 +53,7 @@ end
 --- @param callback function Assertion callback, outside production catches.
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
-		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
 		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
@@ -70,7 +70,7 @@ local function with_fixture(outcome, callback)
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_renderer.command_row,

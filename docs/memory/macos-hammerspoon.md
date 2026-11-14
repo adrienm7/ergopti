@@ -65,7 +65,7 @@ the picked folder keeps its permissions, and `dangling_logs` is a LogsDirPath
 link to nothing that must be refused by name. To see where a boot stopped, read
 `~/Library/Logs/Ergopti/ErgoptiPlus_boot.log` (the default logs folder, beside
 launcher.log; it was the shared `/tmp` root until 2026-09): every `Boot.stage`/`Boot.mark` pair is appended
-there synchronously by `adapters/boot_journal.lua` (and to launcher.log until
+there synchronously by `core/logger/adapters/boot_journal.lua` (and to launcher.log until
 the native logger commits); the last START without SUCCESS is the stage. Log folders are resolved once with
 realpath and opened with `O_NOFOLLOW_ANY` (`OwnedLogDirectory.swift`); never
 reintroduce a final-component-only no-follow check on a user folder.
@@ -747,7 +747,7 @@ inside a tap callback; an off-tap read relies on the timeout, not on luck.
 
 ### project-hs-key-event-health-counters
 
-`infra/key_event_health.lua` counts per session what the keymap taps see:
+`core/logger/engine/key_event_health.lua` counts per session what the keymap taps see:
 key-ups without key-down, key-downs whose key-up was lost, keys stuck 3 s,
 character keys held 500 ms or more (with autorepeats and the rule switch they
 crossed: lease fence, karabiner.json reload, tap outage), late callbacks, stale

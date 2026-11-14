@@ -325,7 +325,7 @@ helpers.describe("wpm readouts: the live speed", function()
 	helpers.it("(wpm-pointer-parity) orders a raw key and mouse inside the same millisecond", function()
 		require("tests.support.keystats_native_fixture").with(function(keystats)
 			require("tests.support.metrics_consent_fixture").enable(keystats)
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local previous = clock.now_ms
 			clock.now_ms = function() return 10000.9 end
 			local ok, err = pcall(function()

@@ -32,7 +32,7 @@ local function load_fixture()
 			or name == "adapters.event_provenance"
 			or name == "core.events.clock"
 			or name == "adapters.unicode_carrier"
-			or name == "infra.key_event_health"
+			or name == "core.logger.engine.key_event_health"
 		) then
 			package.loaded[name] = nil
 		end
@@ -174,7 +174,7 @@ helpers.describe("replacement text never rides a held key (hsfix-held-carrier)",
 	helpers.it("forgets a held key whose key-up was lost once it stops repeating", function()
 		load_fixture()
 		local Carrier = require("adapters.unicode_carrier")
-		local KeyEventHealth = require("infra.key_event_health")
+		local KeyEventHealth = require("core.logger.engine.key_event_health")
 		local clock = require("core.events.timer_scheduler")
 		local saved = clock.now_ns
 		local now_ns = 1e12

@@ -375,7 +375,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			local daemon = foreground_fixture({})
 			package.loaded["modules.llm.api_ollama"] = daemon.api
 
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = {notify = function() return true end}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			package.loaded["infra.text_utils"] = {shell_quote = function(value) return tostring(value) end}

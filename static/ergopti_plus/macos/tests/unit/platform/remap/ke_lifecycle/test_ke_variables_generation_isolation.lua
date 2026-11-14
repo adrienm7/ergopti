@@ -56,7 +56,7 @@ local function replay_old_writer_after_reload(logical_name, personal_value)
 		status = function() return "active", { token = current_token } end,
 	}
 	package.loaded["platform.remap.ke_paths"] = { CLI = "/test/karabiner_cli" }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function(values)
 			payload_serial = payload_serial + 1
@@ -116,7 +116,7 @@ local function replay_old_writer_after_reload(logical_name, personal_value)
 	package.loaded["platform.remap.lease_contract"] = nil
 	package.loaded["platform.remap.lease_controller"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	package.loaded["core.fs.adapters.json_codec"] = nil
 	package.loaded["adapters.shell_runner"] = nil
 

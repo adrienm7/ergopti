@@ -102,7 +102,7 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 		package.loaded["adapters.shell_runner"] = nil
 		local sr      = helpers.load_with_stubs("adapters.shell_runner", hs_overrides)
 		local hs_stub = _G.hs
-		local logger  = require("infra.logger")
+		local logger  = require("core.logger.engine.logger")
 
 		helpers.admit_logger_privacy(logger)
 		-- Capture log output via Logger.set_sink. Real signature is

@@ -56,7 +56,7 @@ local SharedPaths = require("core.fs.engine.paths")
 local Files = require("core.fs.adapters.file_system")
 local Codec = require("core.text.engine.toml_codec")
 local Hotstrings = require("modules.hotstrings.engine")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local source_name = "Ergopti simultaneous controlled virtual source " .. tostring(ffi.C.getpid())
 local output_slot = "simultaneous-native-output"

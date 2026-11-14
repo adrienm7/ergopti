@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local ApiOllama = helpers.load_with_stubs("modules.llm.api_ollama")
 
@@ -53,7 +53,7 @@ local function with_pending_warmup(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_ollama", "adapters.http_client", "core.events.timer_scheduler",
 		"modules.llm", "modules.llm.warmup_controller",
-		"modules.llm.ollama_endpoint", "infra.logger", "infra.notifications",
+		"modules.llm.ollama_endpoint", "core.logger.engine.logger", "infra.notifications",
 	}, function()
 		local fixture = { requests = {}, timers = {}, origin = "http://localhost:16107" }
 		local function post(url, body, _, done)

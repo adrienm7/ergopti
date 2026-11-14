@@ -8,7 +8,7 @@ return function(helpers, driver)
 		local saved = {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
 		local names = { "core.fs.adapters.storage", "infra.script_scope", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"infra.script_settings", "infra.logger", "infra.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
+			"infra.script_settings", "core.logger.engine.logger", "infra.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
 			"settings.engine.scope.script_scope_runtime", "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "settings.engine.scope.transaction", "ui.menu.scoped_preferences",
 			"ui.menu.preferences_transaction" }
 		for _, name in ipairs(names) do package.loaded[name] = nil end
@@ -56,7 +56,7 @@ return function(helpers, driver)
 			local i18n, backend = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 			if driver == "macos" then i18n.set_locale_injector(backend.set_locale) end
 			i18n.init()
-			local logger = require(driver == "linux" and "infra.script_settings" or "infra.logger")
+			local logger = require(driver == "linux" and "infra.script_settings" or "core.logger.engine.logger")
 			if driver == "linux" then assert(logger.apply()) else logger.set_level("DEBUG") end
 			local dialog = require(driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog")
 			local function create(overrides)
@@ -127,7 +127,7 @@ return function(helpers, driver)
 				local owner = ctx.create()
 				helpers.assert_eq(owner.apply("clear"), true)
 				helpers.assert_eq(owner.release(), true)
-				local locale_name, log_name = "core.i18n.engine.i18n", driver == "linux" and "infra.script_settings" or "infra.logger"
+				local locale_name, log_name = "core.i18n.engine.i18n", driver == "linux" and "infra.script_settings" or "core.logger.engine.logger"
 				local dialog_name = driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog"
 				package.loaded[locale_name], package.loaded[log_name], package.loaded[dialog_name] = nil, nil, nil
 				local locale, logger, dialog = require(locale_name), require(log_name), require(dialog_name)
@@ -279,7 +279,7 @@ return function(helpers, driver)
 				local participant = require("settings.engine.scope.participant").synchronous({
 					apply = function(mode) return owner.apply(mode) end, owner = function() return owner end })
 				local composition = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"),
-					scope = "global", logger = require(driver == "linux" and "core.logger.engine.shim" or "infra.logger"),
+					scope = "global", logger = require(driver == "linux" and "core.logger.engine.shim" or "core.logger.engine.logger"),
 					participants = function() return { global = participant } end })
 				local committed, report
 				composition.apply("recommended", function(ok, result) committed, report = ok, result end)

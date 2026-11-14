@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local function load_emergency(logger_error)
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
 		error = logger_error or noop, success = noop, done = noop, trace = noop,
 	}

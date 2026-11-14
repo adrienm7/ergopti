@@ -26,7 +26,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Timings = require("infra.timings")
 local AuxOwner = require("modules.gestures.actions_aux_owner")
 local UserActions = require("modules.gestures.user_actions")

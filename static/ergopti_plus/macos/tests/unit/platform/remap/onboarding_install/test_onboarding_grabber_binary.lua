@@ -19,8 +19,8 @@ local helpers = require("tests.helpers")
 --- Loads a fresh onboarding module instance.
 --- @return table Onboarding module.
 local function fresh_onboarding()
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["infra.dialog_util"] = { block_alert = function() return "later" end }

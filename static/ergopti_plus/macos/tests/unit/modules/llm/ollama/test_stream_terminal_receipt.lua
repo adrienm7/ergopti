@@ -35,7 +35,7 @@ local function run_case(case)
 		"modules.llm.ollama_endpoint", "modules.llm.progressive_reveal",
 		"core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.notifications",
 		"adapters.shell_runner", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
-		"modules.llm.parser", "infra.logger" }, function()
+		"modules.llm.parser", "core.logger.engine.logger" }, function()
 		-- The parser only reads the core's defaults. Keep that data port truthful
 		-- without booting unrelated backends or acquiring their module lifetimes.
 		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))

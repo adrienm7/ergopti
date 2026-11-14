@@ -31,7 +31,7 @@ local LOG = "core.lifecycle.engine.reload.outcome"
 --- @return number|nil count Active mapping count when reloaded.
 function M.run(reload)
 	assert(type(reload) == "function", "a reload function is required")
-	local Perf = require("infra.perf_counters")
+	local Perf = require("core.logger.engine.perf_counters")
 	local started = Perf.trace("config.reload")
 	local ok, count, published, refusal = pcall(reload)
 	if not ok then

@@ -192,7 +192,7 @@ local function main()
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 			logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			os.date = function(format, epoch)
 				if format == "%Y-%m-%d" and epoch == nil then return active_day end
 				return real_date(format, epoch)

@@ -130,7 +130,7 @@ helpers.describe("paths JavaScript delivery", function()
 	end)
 	helpers.it("(paths-js-delivery) logging reentry cannot redirect initData", function()
 		with_editor(function(editor, calls, _, evaluations)
-			package.loaded["infra.logger"].debug = function(_, message)
+			package.loaded["core.logger.engine.logger"].debug = function(_, message)
 				if message == "Injecting initData into webview…" then
 					calls.options.on_close()
 					helpers.assert_true(editor.open_editor())

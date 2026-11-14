@@ -32,7 +32,7 @@ end
 --- @param rows table Rows the stubbed statement yields.
 --- @return table reader
 local function reader_answering(table_name, rows)
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,
@@ -50,7 +50,7 @@ end
 
 helpers.describe("macOS manifest: fields under the dashboard's keys", function()
 	helpers.it("keeps reserved application labels separate from system totals", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local sqlite = {OK = 0, open = function()
 			return {exec = function() return 0 end, close = function() end, nrows = function(_, sql)
 				local rows = {}

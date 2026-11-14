@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.logger",
+local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.logger.engine.logger",
 	"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
 	"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "adapters.webview_result", "hs.json", "lfs" }
 
@@ -110,7 +110,7 @@ local function with_diagnostic(scenario)
 		end
 		local logger = helpers.make_logger_stub()
 		logger.initialize_privacy = function() return true end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local function new_view(_, _, controller)
 			-- A closed file supplies actual userdata without retaining an OS file.
 			-- Its test metatable models the native view, never WebKit behavior.

@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local with_activation = require("tests.support.llm_activation_fixture")
 
 local OWNED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
@@ -106,7 +106,7 @@ helpers.describe("LLM activation fixture scope", function()
 			for attempt = 1, 2 do
 				with_activation("ollama", {}, nil, function()
 					local registry = package.loaded[REGISTRY]
-					local logger = package.loaded["infra.logger"]
+					local logger = package.loaded["core.logger.engine.logger"]
 					helpers.assert_type(registry.new, "function")
 					if attempt == 2 then
 						helpers.assert_true(registry ~= previous_registry)
@@ -115,7 +115,7 @@ helpers.describe("LLM activation fixture scope", function()
 					previous_registry, previous_logger = registry, logger
 				end)
 				helpers.assert_nil(package.loaded[REGISTRY])
-				helpers.assert_nil(package.loaded["infra.logger"])
+				helpers.assert_nil(package.loaded["core.logger.engine.logger"])
 			end
 		end)
 	end)

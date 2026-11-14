@@ -30,7 +30,7 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Paths  = require("core.fs.engine.paths")
 local Queries = require("metrics.engine.queries")
 local LocalTime = require("metrics.engine.local_time")

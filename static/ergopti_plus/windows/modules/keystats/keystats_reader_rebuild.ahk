@@ -32,7 +32,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
-#Include ../../infra/tick_count.ahk
+#Include ../../core/logger/engine/tick_count.ahk
 #Include keystats_reader_frames.ahk
 
 

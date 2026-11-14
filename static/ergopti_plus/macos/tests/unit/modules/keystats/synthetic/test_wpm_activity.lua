@@ -27,7 +27,7 @@ helpers.describe("keystats WPM activity", function()
 			return event
 		end
 		local errors = {}
-		package.loaded["infra.logger"].error = function(_, message) errors[#errors + 1] = message end
+		package.loaded["core.logger.engine.logger"].error = function(_, message) errors[#errors + 1] = message end
 		local physical = key_event(fixtures.physical_key(fixture.hs, "a"))
 		fixture.dispatch(physical)
 		helpers.assert_eq(fixture.keystats.get_live_stats().last_input_time, 10)

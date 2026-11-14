@@ -60,7 +60,7 @@ end
 local previous_luv, previous_preload = package.loaded.luv, package.preload.luv
 package.loaded.luv = nil
 package.preload.luv = function() error("the scripted clock selects the coarse source") end
-local clock_loaded, coarse_clock = pcall(require, "infra.monotonic")
+local clock_loaded, coarse_clock = pcall(require, "core.logger.engine.monotonic")
 package.loaded.luv, package.preload.luv = previous_luv, previous_preload
 assert(clock_loaded, coarse_clock)
 assert(coarse_clock.backend() == "os.time" and not coarse_clock.has_hires(), "expected real coarse clock")

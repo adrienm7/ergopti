@@ -5,7 +5,7 @@ local root = assert(source:match("^(.*)/tools/test/native_python_probe_test%.lua
 local repository = arg[1] or root
 -- The provider names its folders through the generated app_dirs table.
 package.path = root .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
-package.loaded["infra.logger"] = { error = function() end }
+package.loaded["core.logger.engine.logger"] = { error = function() end }
 local Parser = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
 local locator = assert(loadfile(root .. "/static/ergopti_plus/_shared/core/lifecycle/engine/core/managed_python_locator.lua"))()
 local cases, assertions = 0, 0
@@ -29,7 +29,7 @@ local function with_case(options, callback)
 		end }
 	package.loaded["core.lifecycle.engine.core.managed_python_locator"] = locator
 	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, idle_seconds = 60, retirement_seconds = 600 }
-	package.loaded["infra.logger"] = { error = function() end }
+	package.loaded["core.logger.engine.logger"] = { error = function() end }
 	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() error("GUI catalogue byte reads are forbidden") end,
 		classify_no_follow = function()

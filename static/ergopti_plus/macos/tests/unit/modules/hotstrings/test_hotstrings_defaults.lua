@@ -20,8 +20,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local defaults_path = helpers.shared("hotstrings/data/catalogue/defaults.toml")
 

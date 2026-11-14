@@ -11,7 +11,7 @@ local ENOENT, EACCES = 2, 13 -- Canonical Linux missing-source and permission re
 -- Actual policy admission and redactor, with explicit portable filesystem ports.
 -- Real file output is independently exercised by the native causal receipt.
 local function with_fixture(body, cold)
-	local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim", "infra.diagnostic_snapshot",
+	local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim", "infra.diagnostic_snapshot",
 		"infra.version", "core.fs.engine.paths", "core.fs.adapters.file_system", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local open, popen, execute, remove, stderr = io.open, io.popen, os.execute, os.remove, io.stderr
@@ -91,7 +91,7 @@ local function with_fixture(body, cold)
 			end
 		end
 		package.loaded["core.fs.engine.regular_file_reader"], package.loaded["core.fs.engine.regular_file_writer"] = reader_ports, writer_ports
-		Sink = require("infra.logger_sink")
+		Sink = require("core.logger.engine.sink")
 		state.try_install = function(context)
 			return Sink.install(Logger, { log_dir = DIRECTORY, redaction_context = context or { home = HOME, user = USER } })
 		end
@@ -280,12 +280,12 @@ if package.config:sub(1, 1) == "/" then
 		helpers.it("acknowledges only a retained redacted report image (crash-published-image)", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-image-XXXXXX"))
-			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
+			local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local Writer = require("core.fs.engine.regular_file_writer")
 			local native_write, Sink, Logger = Writer.open
 			local ok, err = xpcall(function()
-				Logger, Sink = require("core.logger.engine.shim"), require("infra.logger_sink")
+				Logger, Sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				local Reporter = require("modules.diagnostics.crash_reporter")
 				for _, mode in ipairs({ "intact", "replaced", "removed" }) do
@@ -342,11 +342,11 @@ if package.config:sub(1, 1) == "/" then
 		helpers.it("native retention preserves a foreign undelimited timestamp file", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-retention-XXXXXX"))
-			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
+			local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local date, Sink, Logger = os.date
 			local ok, err = xpcall(function()
-				Logger, Sink = require("core.logger.engine.shim"), require("infra.logger_sink")
+				Logger, Sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				local reports = directory .. "/crash_reports"
 				assert(uv.fs_mkdir(reports, 448))
@@ -389,14 +389,14 @@ if package.config:sub(1, 1) == "/" then
 		helpers.it("preserves same-second reports across reporter reloads (crash-exclusive-history)", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-history-XXXXXX"))
-			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
+			local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local date, Sink, Logger = os.date
 			local Writer = require("core.fs.engine.regular_file_writer")
 			local native_write = Writer.open
 			local timestamp = "2026-10-25T12:00:00Z"
 			local ok, err = xpcall(function()
-				Logger, Sink = require("core.logger.engine.shim"), require("infra.logger_sink")
+				Logger, Sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				os.date = function(format, ...)
 					if format == "!%Y-%m-%dT%H:%M:%SZ" then return timestamp end

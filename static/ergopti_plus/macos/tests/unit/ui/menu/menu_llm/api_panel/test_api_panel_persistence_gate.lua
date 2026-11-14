@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 helpers.describe("API panel durable persistence gate", function()
 	helpers.it("rolls back a validated Add when Keychain persistence fails", function()
 		local module_names = {
-			"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved = {}
@@ -60,7 +60,7 @@ helpers.describe("API panel durable persistence gate", function()
 			end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
 		package.loaded["infra.dialog_util"] = {

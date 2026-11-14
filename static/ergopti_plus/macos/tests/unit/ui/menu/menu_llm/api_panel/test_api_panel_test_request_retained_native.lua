@@ -22,7 +22,7 @@ local with_api_add_locale = Fixture.with_api_add_locale
 
 
 helpers.describe("API Add: retained native admission", function()
-	local owned = { "modules.keymap.llm_bridge", "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.keymap.llm_bridge", "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	local function install_add(provider_id)
 		local entry = { id = "old", provider = "openai", model = "old-model", token = "inert-old-secret" }
@@ -309,7 +309,7 @@ local function install_api_add_doubles(args, native)
 end
 
 helpers.describe("Shared API Add frame (api-add-controls)", function()
-	local owned = { "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	helpers.it("uses the shared Add label and retains the genuine provider action (api-add-controls)", function()
 		helpers.with_fresh_modules(owned, function()

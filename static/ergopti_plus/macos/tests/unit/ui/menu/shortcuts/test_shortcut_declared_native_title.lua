@@ -27,7 +27,7 @@ local function fixture(body, secondary)
 	local restored, scope_failure = pcall(function()
 		helpers.with_stub_scope({
 			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "core.i18n.engine.i18n",
-			"core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "infra.logger", "core.fs.adapters.json_codec",
+			"core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.logger.engine.logger", "core.fs.adapters.json_codec",
 			"core.fs.adapters.storage", "core.events.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
 			"ui.menu.shortcut_utils", "infra.text_utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()

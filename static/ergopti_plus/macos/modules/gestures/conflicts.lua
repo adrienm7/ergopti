@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local i18n        = require("core.i18n.engine.i18n")
 local ShellRunner = require("adapters.shell_runner")
 local Timings     = require("infra.timings")

@@ -24,7 +24,7 @@ local function load_ports(script)
 		end,
 	}
 	package.loaded["adapters.runtime_owner_ports"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local ports = helpers.load_with_stubs("adapters.runtime_owner_ports", {
 		processInfo = { processID = 777 },
 	}).new()

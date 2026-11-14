@@ -42,7 +42,7 @@
 local Emulation = require("layouts.engine.composer.keylayout_emulation")
 local SourceEmulation = require("layouts.engine.composer.source_emulation")
 local Settings = require("layouts.engine.emulation.settings")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local M = {}
 

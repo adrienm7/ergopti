@@ -29,7 +29,7 @@ local NativePath = require("core.fs.engine.native_path")
 
 local hs                = hs
 local ui_builder        = require("ui.ui_builder")
-local Logger            = require("infra.logger")
+local Logger            = require("core.logger.engine.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
 local NumberPolicy      = require("core.text.engine.number_policy")

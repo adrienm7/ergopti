@@ -22,7 +22,7 @@ local function load_menubar(scheduler, stats_calls)
 			return {}
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("ui.wpm.wpm_menubar", {
 		timer = { absoluteTime = function() return 0 end },
 	})
@@ -100,7 +100,7 @@ end)
 local function load_widget(scheduler, eventtap)
 	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["modules.keystats"] = { get_live_stats = function() return {} end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("ui.wpm.wpm_widget", {
 		timer = { absoluteTime = function() return 0 end },
 		eventtap = eventtap,

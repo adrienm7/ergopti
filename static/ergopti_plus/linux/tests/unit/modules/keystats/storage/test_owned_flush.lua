@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local it = require("tests.support.metrics_preferences_fixture").it
 local Fakes = require("tests.fakes")
 local function assert_false(value) helpers.assert_eq(value, false) end
-require("infra.monotonic") -- Load the genuine clock before temporary native ports.
+require("core.logger.engine.monotonic") -- Load the genuine clock before temporary native ports.
 
 local function read_committed_input(database)
 	local shell = require("adapters.shell_runner")
@@ -743,7 +743,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 	--- with. A fixed small stamp read as typed long ago once the host had been up
 	--- longer than the session gap, so the session closed at the first flush.
 	local function recent_stamp(index)
-		return math.floor(require("infra.monotonic").now_ms()) - 1000 + 100 * index
+		return math.floor(require("core.logger.engine.monotonic").now_ms()) - 1000 + 100 * index
 	end
 	--- Starts one collector process against a shared logical database.
 	local function process(writer, body)
@@ -950,7 +950,7 @@ end)
 helpers.describe("session reset receipt currency", function()
 	it("reset-preserves-history: an ordinary successor flush cannot reuse the old reset receipt", function()
 		with_collector(function(k, operations)
-			local now = math.floor(require("infra.monotonic").now_ms())
+			local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 			k.on_keydown("a", now, "owned")
 			assert_false(k.reset_session())
 			operations[1].outcome, operations[1].physical = "commit", true
@@ -1003,7 +1003,7 @@ helpers.describe("session reset refusal keeps exact session ownership", function
 	for _, reentrant in ipairs({ false, true }) do
 		it("reset-refusal-owner: retains the original session with reentrant=" .. tostring(reentrant), function()
 			local writer, admitted, launches = Fakes.sqlite_writer(), false, 0
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local calendar = require("modules.keystats.calendar")
 			local previous_now, previous_capture = clock.now_ms, calendar.capture
 			local now, initial = math.floor(clock.now_ms()), calendar.capture()
@@ -1098,7 +1098,7 @@ helpers.describe("session reset construction frame retirement", function()
 		end
 		local ok, err = pcall(function()
 			with_collector(function(k)
-				local now = math.floor(require("infra.monotonic").now_ms())
+				local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 				k.on_keydown("a", now, "owned")
 				intercept = true
 				helpers.assert_eq(pcall(k.reset_session), false)
@@ -1137,7 +1137,7 @@ helpers.describe("session reset construction frame retirement", function()
 		local writer = Fakes.sqlite_writer()
 		local ok, err = pcall(function()
 			with_collector(function(k)
-				local now = math.floor(require("infra.monotonic").now_ms())
+				local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 				k.on_keydown("a", now, "owned")
 				local called, failure = pcall(k.reset_session)
 				helpers.assert_eq(called, false)
@@ -1222,7 +1222,7 @@ helpers.describe("one-click owned metrics session reset", function()
 	it("reset-one-click: a refused constructor completes false without altering its session", function()
 		local admitted, writer = false, Fakes.sqlite_writer()
 		with_collector(function(k)
-			local now = math.floor(require("infra.monotonic").now_ms())
+			local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 			k.on_keydown("a", now, "owned")
 			local origin, replies, receipt = k.get_flush_status().generation, {}, nil
 			helpers.assert_true(k.request_session_reset(function(success, completed)
@@ -1266,7 +1266,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				k.on_keydown("a", math.floor(require("infra.monotonic").now_ms()), "owned")
+				k.on_keydown("a", math.floor(require("core.logger.engine.monotonic").now_ms()), "owned")
 				local menu = helpers.load_module("ui.menu.builder").build({ keystats = k })
 				local reset
 				for _, parent in ipairs(menu) do
@@ -1352,7 +1352,7 @@ helpers.describe("owned reset native bridge", function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				k.on_keydown("a", math.floor(require("infra.monotonic").now_ms()), "owned")
+				k.on_keydown("a", math.floor(require("core.logger.engine.monotonic").now_ms()), "owned")
 				local bridge = helpers.load_module("ui.metrics_apps.bridge")
 				bridge._reset()
 				local pushed = {}
@@ -1541,12 +1541,12 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 	Native.with(function(collector)
 		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
 		require("tests.support.metrics_consent_fixture").enable(collector)
-		local now = require("infra.monotonic").now_ms()
+		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
 		Native.flush(collector)
 		Native.flush(collector)
 		local until_ms = now + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
-		while not collector.stop() and require("infra.monotonic").now_ms() < until_ms do
+		while not collector.stop() and require("core.logger.engine.monotonic").now_ms() < until_ms do
 			require("luv").run("nowait")
 			require("luv").sleep(1)
 		end
@@ -1564,7 +1564,7 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 	require("tests.support.keystats_native_fixture").with(function(collector)
 		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
 		local writer = require("modules.keystats.sqlite_writer")
-		local now = require("infra.monotonic").now_ms
+		local now = require("core.logger.engine.monotonic").now_ms
 		local uv = require("luv")
 		local groups = { { word = "bad" }, { word = -1 }, { word = 0 / 0 }, { word = {} },
 			{ word = { c = 0, sources = "bad" } }, { word = { c = 0, td = "bad" } },

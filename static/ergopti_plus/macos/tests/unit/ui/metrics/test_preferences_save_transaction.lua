@@ -268,7 +268,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 		logger.error = function(_, fmt, ...)
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
 
 		local function sync_with(setter)
@@ -292,7 +292,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 
 		local nil_result = sync_with(function() end)
 		local throw_result = sync_with(function() error("runtime setter failure", 0) end)
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["ui.menu.menu_state"] = nil
 
 		helpers.assert_eq(nil_result, true,
@@ -311,7 +311,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 		logger.error = function(_, fmt, ...)
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
 		local transaction = require("ui.menu.preferences_transaction")
 		local state = {
@@ -348,7 +348,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 
 		state.preview_star_enabled = true
 		local committed = save()
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["ui.menu.menu_state"] = nil
 		package.loaded["ui.menu.preferences_transaction"] = nil
 
@@ -379,7 +379,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 
 	helpers.it("restores the keystats cipher posture without starting migration", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local cipher_values = {}
 		package.loaded["modules.keystats.text_cipher"] = {
 			set_enabled = function(value) cipher_values[#cipher_values + 1] = value end,
@@ -404,7 +404,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 
 	helpers.it("restores gesture registries owned outside the flat state", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["ui.menu.menu_state"] = nil
 		local MenuState = require("ui.menu.menu_state")
 		local observed = {}

@@ -37,7 +37,7 @@ local hs      = hs
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Literal = require("core.fs.engine.sqlite.literal")
 local Queries = require("metrics.engine.queries")
 local KUtils = require("metrics.engine.utils")

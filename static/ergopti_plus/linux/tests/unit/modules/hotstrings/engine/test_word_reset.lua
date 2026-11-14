@@ -309,7 +309,7 @@ helpers.describe("word reset: the input path", function()
 	helpers.it("word reset, resets after the configured pause, measured from the previous key", function()
 		with_settings("[hotstrings]\nidle_reset_seconds = 2\n", function(_, _, _, reload)
 			-- An exact clock, so the vectors do not depend on the host's backend.
-			package.loaded["infra.monotonic"] = { resolution_ms = function() return 0 end }
+			package.loaded["core.logger.engine.monotonic"] = { resolution_ms = function() return 0 end }
 			local subject = reload()
 			helpers.assert_eq(subject.observe_key(10000), false, "the first key has no pause before it")
 			helpers.assert_eq(subject.observe_key(11000), false)

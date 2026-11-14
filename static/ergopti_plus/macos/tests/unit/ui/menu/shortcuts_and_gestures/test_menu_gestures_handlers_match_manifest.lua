@@ -117,7 +117,7 @@ end)
 -- Independent mode expectations predate this presentation migration. Drive the
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
-	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.logger",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
 }
@@ -169,7 +169,7 @@ local function with_mode_fixture(options, callback)
 		}
 		package.loaded["infra.manifest_menu"] = renderer
 		package.loaded["core.i18n.engine.i18n"] = i18n
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
 		for _, name in ipairs({ "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 			"ui.menu.shortcut_utils", "infra.deferred_work" }) do package.loaded[name] = {} end
@@ -437,7 +437,7 @@ local function with_gesture_controls(options, callback)
 			if options.rollback_no_effect and #f.control_writes == 2 then return false end
 			f.action = value
 			if options.rollback_throw and #f.control_writes == 2 then
-				package.loaded["infra.logger"].error = function() error("logger failure") end
+				package.loaded["core.logger.engine.logger"].error = function() error("logger failure") end
 				error("logger failure after restoration")
 			end
 			if options.setter and #f.control_writes == 1 then return options.setter() end

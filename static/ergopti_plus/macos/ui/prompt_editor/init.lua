@@ -20,7 +20,7 @@ local WebviewResult = require("adapters.webview_result")
 
 local hs         = hs
 local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local i18n       = require("core.i18n.engine.i18n")
 local Paths      = require("core.fs.engine.paths")
 

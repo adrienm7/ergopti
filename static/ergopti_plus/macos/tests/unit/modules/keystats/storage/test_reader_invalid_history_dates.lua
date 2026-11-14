@@ -39,7 +39,7 @@ local function child()
  assert(db:close() == sqlite.OK)
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub(); local errors = {}
  logger.error = function(_, message, ...) errors[#errors+1] = string.format(message, ...) end
- package.loaded['infra.logger'] = logger
+ package.loaded['core.logger.engine.logger'] = logger
  local reader = helpers.load_with_stubs('modules.keystats.sqlite_reader', { sqlite3 = sqlite })
  local pacer = { pause = function() end }
  local ok, result, complete

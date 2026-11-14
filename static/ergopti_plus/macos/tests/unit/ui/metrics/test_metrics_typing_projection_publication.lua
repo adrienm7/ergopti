@@ -69,7 +69,7 @@ local function fake_reader(per_day, failing)
 end
 
 local function load_projection()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local projection = helpers.load_with_stubs("ui.metrics_typing.projection")
 	projection.reset()
 	return projection

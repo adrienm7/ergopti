@@ -22,7 +22,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
 
 local SHORTCUTS = "/usr/bin/shortcuts"
 local BREW = "/opt/homebrew/bin/brew"
@@ -70,7 +70,7 @@ end
 local function run(ports)
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		local Engine = require("infra.field_check")
@@ -217,10 +217,10 @@ helpers.describe("toolchain check", function()
 			.. "file modified: " .. APP .. "/Contents/Resources/en.lproj/Localizable.strings\n" }
 		local logged = {}
 		local steps, result
-		helpers.with_stub_scope({ "infra.logger" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.evidence = function(_, format, ...) logged[#logged + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["infra.field_check_checks"] = nil
 			package.loaded["infra.field_check"] = nil
 			local Engine = require("infra.field_check")
@@ -260,7 +260,7 @@ helpers.describe("toolchain check", function()
 	helpers.it("bounds a long diagnostic in the log", function()
 		local Checks
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.field_check_checks"] = nil
 			Checks = require("infra.field_check_checks")
 		end)

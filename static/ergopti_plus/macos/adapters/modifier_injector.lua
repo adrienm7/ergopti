@@ -25,10 +25,10 @@
 local M = {}
 
 local hs            = hs
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
-local KeyEventHealth = require("infra.key_event_health")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 local ControlSentinels = require("modules.keymap.control_sentinels")
 
 local LOG = "adapters.modifier_injector"

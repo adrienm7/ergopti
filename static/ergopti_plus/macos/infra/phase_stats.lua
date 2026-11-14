@@ -42,14 +42,14 @@ end
 local M = Core.new({
 	now_ns = now_ns,
 	info_enabled = function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		return Logger.is_enabled(Logger.LEVELS.INFO)
 	end,
-	evidence = function(format, ...) require("infra.logger").evidence(LOG, format, ...) end,
+	evidence = function(format, ...) require("core.logger.engine.logger").evidence(LOG, format, ...) end,
 	-- The log-volume figures ride on the memory line: both are process-wide and
 	-- one record per interval is what the CI and the diagnostics read.
 	memory_note = function(interval_sec)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		return string.format("Log volume over %d s: %s.", math.floor(interval_sec),
 			Logger.volume_text(Logger.volume_interval()))
 	end,
@@ -71,7 +71,7 @@ local _handle = nil
 --- @param interval_sec number|nil Flush interval in seconds.
 --- @return boolean started
 function M.start(interval_sec)
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	if _handle ~= nil then
 		Logger.error(LOG, "Phase summary timer is already running; a second start is refused.")
 		return false
@@ -94,7 +94,7 @@ end
 --- @return boolean stopped
 function M.stop_reporting()
 	if _handle == nil then return true end
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	Logger.start(LOG, "Stopping the phase summary timer…")
 	M.flush()
 	local settled = require("core.events.timer_scheduler").cancel(_handle)

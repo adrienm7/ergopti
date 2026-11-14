@@ -40,7 +40,7 @@ helpers.describe("Onboarding fixture ownership (onboarding-fixture-scope)", func
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "platform.remap.onboarding", "adapters.task_lifecycle",
 						"adapters.task_environment", "core.lifecycle.engine.launcher_environment",
-						"core.events.timer_scheduler", "infra.logger", "hs", "tests.stubs.hs" }) do
+						"core.events.timer_scheduler", "core.logger.engine.logger", "hs", "tests.stubs.hs" }) do
 						package.loaded[name] = sentinel
 					end
 					_G.hs = sentinel

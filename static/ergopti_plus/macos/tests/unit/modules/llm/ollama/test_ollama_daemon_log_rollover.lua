@@ -61,7 +61,7 @@ local function with_foreground(port, callback)
 		"modules.llm.ollama_endpoint", "core.fs.adapters.file_system", "adapters.task_lifecycle",
 		"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "core.i18n.engine.i18n",
+		"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
 		"modules.shortcuts.script_control", "ui.menu.menu_llm.models_manager_ollama",
 		"ui.menu.menu_llm.requirement_operation_registry",
 	}, function()
@@ -70,7 +70,7 @@ local function with_foreground(port, callback)
 		local owner_script = helpers.driver_root() .. "modules/llm/managed_ollama_serve.py"
 		local logger = helpers.make_logger_stub()
 		logger.today_log_path = function() return SENTINEL_LOG end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["adapters.http_client"] = { new = function()
 			return { cancel = function() return true end, isActive = function() return false end,
@@ -236,7 +236,7 @@ helpers.describe("Ollama daemon log rollover", function()
 	end)
 
 	helpers.it("delegates a verified runtime's daemon launch to ApiOllama ownership", function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local original_log = Logger.today_log_path
 		local previous_progress = package.loaded["ui.download_window"]

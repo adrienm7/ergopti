@@ -22,17 +22,17 @@
 --- @param helpers table Driver test helpers.
 --- @param driver string "linux" or "macos".
 return function(helpers, driver)
-	local owner_module = driver == "macos" and "infra.logger" or "infra.script_settings"
+	local owner_module = driver == "macos" and "core.logger.engine.logger" or "infra.script_settings"
 
 	--- The live numeric threshold, read from the logger this driver owns.
 	local function live()
-		if driver == "macos" then return require("infra.logger").current_level end
+		if driver == "macos" then return require("core.logger.engine.logger").current_level end
 		return require("core.logger.engine").get_level()
 	end
 
 	--- The numeric threshold a canonical token must produce.
 	local function threshold(token)
-		if driver == "macos" then return require("infra.logger").LEVELS[token] end
+		if driver == "macos" then return require("core.logger.engine.logger").LEVELS[token] end
 		return require("core.logger.engine").LEVELS[token]
 	end
 

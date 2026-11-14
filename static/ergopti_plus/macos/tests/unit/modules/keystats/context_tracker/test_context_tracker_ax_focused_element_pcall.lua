@@ -24,8 +24,8 @@ local helpers = require("tests.helpers")
 --- while the script is paused. These scenarios exercise the RUNNING state.
 local function NOT_PAUSED() return false end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Builds an hs override that stubs hs.axuielement with an application element
 --- whose AXFocusedUIElement attributeValue() read throws.

@@ -75,7 +75,7 @@ local function transformed_by(action_name, selected)
 	}
 	_G.hs = hs_stub
 	package.loaded.hs = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.paths"] = nil
 	package.loaded["infra.timings"] = nil
 	package.loaded["adapters.synthetic_input"] = {

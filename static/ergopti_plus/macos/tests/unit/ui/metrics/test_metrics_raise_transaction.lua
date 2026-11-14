@@ -71,7 +71,7 @@ helpers.describe("metrics native presentation", function()
 				view.show = function() error("private native detail") end
 				return view
 			end
-			package.loaded["infra.logger"].success = function() successes = successes + 1 end
+			package.loaded["core.logger.engine.logger"].success = function() successes = successes + 1 end
 			helpers.assert_eq(dashboard.show(), false)
 			helpers.assert_eq(state.deleted, 1)
 			helpers.assert_eq(successes, 0)
@@ -89,7 +89,7 @@ helpers.describe("metrics native presentation", function()
 						return handle, true
 					end
 					helpers.assert_true(dashboard.show())
-					package.loaded["infra.logger"].error = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 						errors[#errors + 1] = string.format(message, ...)
 					end
 					local function invoke(name)

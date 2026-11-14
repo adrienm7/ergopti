@@ -27,7 +27,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -65,7 +65,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -108,7 +108,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -144,7 +144,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -182,7 +182,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -221,7 +221,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -260,7 +260,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -301,7 +301,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -347,7 +347,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -384,7 +384,7 @@ helpers.describe("API panel test request", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -426,7 +426,7 @@ helpers.describe("API panel test request", function()
 end)
 
 helpers.describe("Active API commands: canonical labels and retained owner", function()
-	local owned = { "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, locale in ipairs({ "ar", "da", "de", "en", "es", "cs", "fr", "he", "hi", "it",
 		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
@@ -474,7 +474,7 @@ helpers.describe("Active API commands: canonical labels and retained owner", fun
 end)
 
 helpers.describe("Active API commands: strict native pause receipt", function()
-	local owned = { "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, fault in ipairs({ "missing", "nil", "number", "table", "throw" }) do
 		helpers.it("refuses a retained request after the native pause reader becomes " .. fault, function()

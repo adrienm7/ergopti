@@ -25,7 +25,7 @@ local OWNED_MODULES = {
 	"modules.shortcuts",
 	"platform.remap.onboarding",
 	"platform.remap",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.notifications",
 	"infra.text_utils",

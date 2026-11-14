@@ -86,8 +86,8 @@ local function load_tooltip(faults)
 	}
 	package.loaded["ui.tooltip.renderer"] = renderer
 
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local errors = {}
 	local logger_spy = setmetatable({
@@ -95,14 +95,14 @@ local function load_tooltip(faults)
 			errors[#errors + 1] = string.format(tostring(format), ...)
 		end,
 	}, { __index = real_logger })
-	package.loaded["infra.logger"] = logger_spy
+	package.loaded["core.logger.engine.logger"] = logger_spy
 	package.loaded["ui.tooltip.tooltip_llm"] = nil
 	local tooltip = require("ui.tooltip.tooltip_llm")
 
 	-- The tooltip keeps the exact spy and adapter instances it loaded. Restoring
 	-- the package cache prevents this test's capture sink from leaking into later
 	-- modules while preserving the live fixture's dependency graph
-	package.loaded["infra.logger"] = real_logger
+	package.loaded["core.logger.engine.logger"] = real_logger
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 

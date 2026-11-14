@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 
 local function load_subject()
 	package.loaded["core.lifecycle.engine.startup_transaction"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return require("core.lifecycle.engine.startup_transaction")
 end
 

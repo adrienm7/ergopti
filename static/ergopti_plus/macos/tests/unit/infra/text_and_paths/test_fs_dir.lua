@@ -82,7 +82,7 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 
 	helpers.it("quiet listing preserves refusal without logging private details", function()
 		local fs_dir = require("core.fs.engine.dir")
-		local logger, previous_dir = require("infra.logger"), hs.fs.dir
+		local logger, previous_dir = require("core.logger.engine.logger"), hs.fs.dir
 		local previous_error, calls = logger.error, 0
 		logger.error = function() calls = calls + 1 end
 		hs.fs.dir = function() error("private path") end

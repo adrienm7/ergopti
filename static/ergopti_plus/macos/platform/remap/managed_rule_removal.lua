@@ -36,7 +36,7 @@
 
 local M = {}
 
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local LeaseContract = require("platform.remap.lease_contract")
 
 local LOG = "karabiner"

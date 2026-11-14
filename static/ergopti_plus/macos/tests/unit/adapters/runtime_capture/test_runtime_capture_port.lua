@@ -41,7 +41,7 @@ end
 --- @return table port
 --- @return table world
 local function load_port(tweak)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.runtime_capture_port"] = nil
 	package.loaded["adapters.installed_physical_source"] = nil
 	local world = { prepared = {}, started = {}, stops = {}, shutdowns = 0, state = "prepared", retired = false,

@@ -40,7 +40,7 @@ local Codec = require("core.text.engine.toml_codec")
 local ScopeFile = require("settings.engine.scope.file")
 local Extensions = require("hotstrings.engine.extensions")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu.hotstrings_scope"

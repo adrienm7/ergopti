@@ -1,0 +1,19 @@
+--- tests/unit/core/logger/engine/test_hotpath_segments_declared.lua
+
+--- ==============================================================================
+--- MODULE: Hot-path Segment Inventory Test (macOS driver)
+--- DESCRIPTION:
+--- Holds the macOS driver to the shared segment inventory: the keydown tripwire
+--- and its sub-segments (trigger match, preview rebuild, expansion output,
+--- prediction tooltip) are declared with their reason, and a new
+--- HotPath.log_if_slow site must be declared before it can pass.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+require("tests.lua.core.hotpath_segments_contract").register(helpers, {
+	driver = "macos",
+	root = helpers.driver_root(),
+	call_patterns = { 'HotPath%.log_if_slow%(%s*"([^"]+)"', 'HotPath%.done%(%s*"([^"]+)"' },
+	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
+})

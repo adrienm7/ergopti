@@ -28,7 +28,7 @@ local previous_config, previous_state = os.getenv("XDG_CONFIG_HOME"), os.getenv(
 assert(uv.os_setenv("XDG_CONFIG_HOME", root .. "/config"))
 assert(uv.os_setenv("XDG_STATE_HOME", root .. "/state"))
 local Logger = require("core.logger.engine.shim")
-local Sink = require("infra.logger_sink")
+local Sink = require("core.logger.engine.sink")
 local checks, failures = 0, 0
 local directories = {}
 local restricted_directories = {}

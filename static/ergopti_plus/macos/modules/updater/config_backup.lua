@@ -27,7 +27,7 @@
 
 local M = {}
 
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Paths       = require("core.fs.engine.paths")
 local ConfigPaths = require("infra.config_paths")
 local FsDir       = require("core.fs.engine.dir")

@@ -1152,19 +1152,19 @@ flush_interval_ms = 500
 # so nothing there waits for an acknowledgement.
 # Wait before the first resend of an unacknowledged batch; each later resend
 # doubles the wait, up to ack_retry_cap_ms.
-# HS: adapters/log_transport.lua ACK_RETRY_SEC (seconds).
+# HS: core/logger/adapters/log_transport.lua ACK_RETRY_SEC (seconds).
 ack_retry_ms = 500
 
 # Longest wait between two resends of the same batch, and the most a parked
 # run loop (a modal dialog, a busy main thread) counts against stall_fatal_ms.
-# HS: adapters/log_transport.lua ACK_RETRY_CAP_SEC (seconds).
+# HS: core/logger/adapters/log_transport.lua ACK_RETRY_CAP_SEC (seconds).
 ack_retry_cap_ms = 4000
 
 # How long the native worker may leave one batch unacknowledged, in running
 # pump time, before the transport is declared failed and the driver exits. A
 # slow disk, a sync tool or App Nap can stall it for seconds; that is not a
 # failure, and neither is a dialog the user reads while the run loop is parked.
-# HS: adapters/log_transport.lua STALL_FATAL_SEC (seconds).
+# HS: core/logger/adapters/log_transport.lua STALL_FATAL_SEC (seconds).
 stall_fatal_ms = 30000
 
 # A native worker datagram or retention pass slower than this is reported to
@@ -1176,7 +1176,7 @@ native_slow_batch_ms = 500
 # slower than this is logged at WARNING as "Slow <segment>". One value for the
 # three drivers: 5 ms is below the threshold of perceptible single-keystroke lag
 # yet far above the sub-millisecond cost of a healthy keystroke.
-# HS: infra/hotpath_profiler.lua. Linux: infra/perf_counters.lua (both through
+# HS: infra/hotpath_profiler.lua. Linux: core/logger/engine/perf_counters.lua (both through
 # _shared/metrics/engine/perf/hotpath_segments.lua threshold_ms).
 # AHK: infra/hotpath_profiler.ahk HotPath_LoadTimings.
 hotpath_slow_ms = 5
@@ -1192,14 +1192,14 @@ hotpath_slow_ms = 5
 # are taken from the macOS field logs of 2026-10-30 (report
 # mac-2026-10-30_191337: 38 boots, 27 reloads, 54 menu rebuilds), so a healthy
 # day passes and a regression does not. The wording of the warning is
-# _shared/core/logger/engine/perf_budget.lua (macOS, Linux) and infra/perf_budget.ahk.
+# _shared/core/logger/engine/perf_budget.lua (macOS, Linux) and core/logger/engine/perf_budget.ahk.
 
 [budgets]
 
 # Boot, process or VM start to "Boot complete". Measured p50 1667 ms, the
 # slowest healthy boot 2834 ms; the two 25 s and 32 s boots waited for the
 # Accessibility grant. 2500 ms is 1.5 times the median.
-# HS: infra/boot_profiler.lua. LX: infra/boot_profiler.lua. AHK: ErgoptiPlus.ahk.
+# HS: core/logger/engine/boot_profiler.lua. LX: core/logger/engine/boot_profiler.lua. AHK: ErgoptiPlus.ahk.
 boot_total_ms = 2500
 
 # One driver reload, from its request to the next boot's completion. Measured
@@ -1210,7 +1210,7 @@ driver_reload_ms = 4000
 
 # One rebuild of the menu tree. It runs on the main thread, and from 250 ms key
 # events reach the taps late ([logger]'s main-thread hold count threshold,
-# infra/logger.lua SLOW_TIMER_CALLBACK_COUNT_MS); measured p50 283 ms, so the
+# core/logger/engine/logger.lua SLOW_TIMER_CALLBACK_COUNT_MS); measured p50 283 ms, so the
 # budget names a defect the log already shows.
 # HS: ui/menu/init.lua.
 menu_rebuild_ms = 250
@@ -1393,7 +1393,7 @@ user_action_output_bytes = 65536
 
 # Encoded log lines the macOS log transport prepares in one tick, also the
 # longest single line it enqueues. Read before infra.timings exists, through the
-# generated macos/_generated/registry_limits.lua. HS: adapters/log_transport.lua.
+# generated macos/_generated/registry_limits.lua. HS: core/logger/adapters/log_transport.lua.
 log_prepare_tick_bytes = 65536
 
 # Output a synchronous macOS shell capture keeps before it stops the child and

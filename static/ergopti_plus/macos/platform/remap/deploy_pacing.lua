@@ -18,7 +18,7 @@
 
 local M = {}
 
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local SystemInfo = require("adapters.system_info")
 
 local LOG = "karabiner"

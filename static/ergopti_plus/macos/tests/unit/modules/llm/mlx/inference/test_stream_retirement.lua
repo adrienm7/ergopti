@@ -12,12 +12,12 @@ local helpers = require("tests.helpers")
 require("core.logger.engine")
 
 local OWNED = {
-	"core.fs.engine.app_dirs", "infra.config_paths", "core.lifecycle.engine.launcher_environment", "infra.log_folders",
+	"core.fs.engine.app_dirs", "infra.config_paths", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders",
 	"infra.notifications", "core.text.engine.json", "modules.llm.progressive_reveal",
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
-	"infra.logger", "core.events.timer_scheduler", "adapters.http_client",
+	"core.logger.engine.logger", "core.events.timer_scheduler", "adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.timings",
@@ -35,7 +35,7 @@ local function with_stream(scenario)
 	local scope_ok, scope_error = xpcall(function()
 		helpers.with_stub_scope(OWNED, function()
 			local f = { native = {}, timers = {}, failures = 0 }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["modules.keystats"] = {}
 			package.loaded["adapters.http_client"] = { new = function() return {} end }
 			package.loaded["core.events.timer_scheduler"] = {

@@ -67,7 +67,7 @@ helpers.describe("changelog bridge retirement", function()
 	helpers.it("fetch logging cannot dispatch after its window retires (changelog-bridge-owner)", function()
 		with_changelog(function(changelog, state, post)
 			helpers.assert_true(changelog.open({ channel = "dev" }))
-			package.loaded["infra.logger"].trace = function() changelog.close() end
+			package.loaded["core.logger.engine.logger"].trace = function() changelog.close() end
 			post({ action = "fetch", channel = "dev" })
 			helpers.assert_eq(#state.callbacks, 0)
 			helpers.assert_eq(state.deletes, 1)

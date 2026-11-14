@@ -9,7 +9,7 @@ local run_contract = function(helpers, load_host, load_builder)
   local c={views={},bridges={},created=0,delete_calls=0,detach_calls=0,received=0,retired=0,diagnostics={}}
   local noop=function()end
   local logger={info=noop,debug=noop,warn=noop,error=function(_,fmt,...)c.diagnostics[#c.diagnostics+1]=fmt end}
-  package.loaded['infra.logger']=logger
+  package.loaded['core.logger.engine.logger']=logger
   package.loaded['core.fs.engine.paths']={shared=function(p)return p end}
   package.loaded['core.i18n.engine.i18n']={get=function(k)return k end}
   package.loaded['core.ui.engine.webview.i18n_seed']={}

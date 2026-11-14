@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.pause_transaction_fixture")
 local OWNERS = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"infra.keycodes",
 	"modules.gestures.engine",
@@ -92,7 +92,7 @@ helpers.describe("Pause transaction fixture ownership", function()
 
 	helpers.it("(pause-fixture-scope) dispatches deferred pause on the current native timer host", function()
 		helpers.with_stub_scope(OWNERS, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local predecessor_scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 			local predecessor_hs = hs
 			local fired = 0

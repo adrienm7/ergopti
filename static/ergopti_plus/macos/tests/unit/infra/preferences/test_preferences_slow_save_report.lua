@@ -27,7 +27,7 @@ local function save_with_clock(reads_ms)
 	local disk = { [Fixture.PATH] = Fixture.SOURCE }
 	local preferences = Fixture.load_preferences(disk)
 	preferences.load(Fixture.PATH)
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	local original_warn = Logger.warn
 	local lines = {}
 	Logger.warn = function(_, format, ...)

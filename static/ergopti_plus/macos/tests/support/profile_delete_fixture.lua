@@ -24,7 +24,7 @@ local MODULES = {
 	"infra.app_picker",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
 	"core.text.engine.json",
@@ -246,7 +246,7 @@ local function with_trigger_fixture(options, body)
 				end,
 			}
 		end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.llm"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
@@ -440,7 +440,7 @@ local function with_delete_fixture(options, body)
 			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
 			i18n = package.loaded["core.i18n.engine.i18n"],
-			logger = package.loaded["infra.logger"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,

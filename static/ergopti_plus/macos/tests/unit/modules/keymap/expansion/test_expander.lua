@@ -20,8 +20,8 @@
 local helpers = require("tests.helpers")
 local SyntheticStack = require("tests.support.synthetic_input_stack")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local Expander = helpers.load_with_stubs("modules.keymap.expander")
 
@@ -65,7 +65,7 @@ end
 --- @param callback function Replacement operation.
 --- @return table Ordered lifecycle observations.
 local function capture_replacement_logs(callback)
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	local original, records = {}, {}
 	for _, level in ipairs({ "trace", "done", "error" }) do
@@ -135,14 +135,14 @@ end)
 
 helpers.describe("keymap.expander: require_state guard", function()
 	helpers.it("HS-L-01 every state-dependent public entry fails closed before init", function()
-		local previous_logger = package.loaded["infra.logger"]
+		local previous_logger = package.loaded["core.logger.engine.logger"]
 		local errors = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...)
 			local ok_fmt, message = pcall(string.format, tostring(fmt), ...)
 			errors[#errors + 1] = ok_fmt and message or tostring(fmt)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 
 		local ok_body, body_err = pcall(function()
 			local E = helpers.load_with_stubs("modules.keymap.expander")
@@ -177,7 +177,7 @@ helpers.describe("keymap.expander: require_state guard", function()
 		end)
 
 		package.loaded["modules.keymap.expander"] = nil
-		package.loaded["infra.logger"] = previous_logger
+		package.loaded["core.logger.engine.logger"] = previous_logger
 		if not ok_body then error(body_err, 0) end
 	end)
 

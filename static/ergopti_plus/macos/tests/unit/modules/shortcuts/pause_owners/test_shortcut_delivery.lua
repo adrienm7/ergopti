@@ -202,7 +202,7 @@ local function load_real_shortcut_delivery_owner()
 	package.loaded["modules.shortcuts.actions.system"] = system_actions
 	package.loaded["modules.shortcuts.actions.text"] = inert_actions
 	package.loaded["modules.shortcuts.actions.apps"] = inert_actions
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	-- The real i18n and a gestures owner loaded against it. A cached gestures
 	-- module may have been bound by an earlier file to a get-only i18n double,
 	-- which made the combined run fail in `i18n.format` while this file passed alone.

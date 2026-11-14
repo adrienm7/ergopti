@@ -27,13 +27,13 @@
 --- 6. Paired debug lines for the paths a person waits on (trace() / done()): at
 ---    DEBUG an expansion writes "[TRACE] [Span] hotstring.expand…" and "[DONE]
 ---    [Span] hotstring.expand done in N ms", the Linux driver's tag and names
----    (linux/infra/perf_counters.lua), so one search reads both field logs.
+---    (linux/core/logger/engine/perf_counters.lua), so one search reads both field logs.
 ---    Below DEBUG they cost one level read.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Timer  = require("core.events.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
 local Segments = require("metrics.engine.perf.hotpath_segments")

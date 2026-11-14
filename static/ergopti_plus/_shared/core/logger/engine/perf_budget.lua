@@ -7,7 +7,7 @@
 --- reload, a menu rebuild, an AI request, a prediction display) took longer
 --- than its budget of the [budgets] section of
 --- _shared/core/timing/data/constants.toml. The Windows driver writes the same
---- line from infra/perf_budget.ahk; tools/dev/field-log-analyse.py judges the
+--- line from core/logger/engine/perf_budget.ahk; tools/dev/field-log-analyse.py judges the
 --- measures against the same keys.
 ---
 --- FEATURES & RATIONALE:

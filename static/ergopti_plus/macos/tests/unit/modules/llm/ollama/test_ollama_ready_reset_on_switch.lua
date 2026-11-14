@@ -34,8 +34,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 helpers.describe("core_llm resets Ollama readiness on every switch", function()
 	helpers.it("set_backend and set_llm_model_ollama call ApiOllama.reset_ready", function()

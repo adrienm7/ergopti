@@ -60,7 +60,7 @@ local AI_LOCAL_BACKEND = "ollama"
 --- Milliseconds, for durations.
 --- @return number
 local function now_ms()
-	return require("infra.monotonic").now_ms()
+	return require("core.logger.engine.monotonic").now_ms()
 end
 
 --- A refused dispatch may still own a started native process. Defer the

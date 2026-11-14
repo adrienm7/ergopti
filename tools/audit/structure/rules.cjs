@@ -846,7 +846,7 @@ function isTargetShaped(tree, parts) {
 }
 
 /**
- * Maps one tree-relative path ("linux/infra/logger_sink.lua") to its target,
+ * Maps one tree-relative path ("linux/core/logger/engine/sink.lua") to its target,
  * before the singleton pass.
  */
 function mapPath(treeRel) {

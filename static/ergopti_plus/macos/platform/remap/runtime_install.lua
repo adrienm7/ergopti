@@ -31,7 +31,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Update = require("platform.remap.runtime_vhid_update")
 
 local LOG = "remap.runtime_install"

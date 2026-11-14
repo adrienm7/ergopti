@@ -17,11 +17,11 @@ local LEDGER = "/generation-lifecycle/by_device/foreign/data.sql"
 --- Hold one production verification reader over independently observed native IO.
 --- @param check function Receives export and controlled native state.
 local function observe(check)
-	helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "modules.keystats.export" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "modules.keystats.export" }, function()
 		local digest = ContentDigest.create()
 		local runloop = RunloopTimers.create()
 		local state = { ledger_opens = 0, ledger_closes = 0, live = false, sql = {} }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local files = {}
 		for key, value in pairs(require("core.fs.adapters.file_system")) do files[key] = value end
 		files.classify_no_follow = function() return nil, "absent" end

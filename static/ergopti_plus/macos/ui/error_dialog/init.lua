@@ -12,7 +12,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The logger hands every emitted ERROR here after its native ACK, from the
----    transport pump (infra/logger.lua), never from the event tap that may
+---    transport pump (core/logger/engine/logger.lua), never from the event tap that may
 ---    have logged it; the window itself opens present_delay_ms later on a
 ---    timer. It replaces the system notification every ERROR used to raise.
 --- 2. diagnostics.error_policy decides: one window per error signature per
@@ -42,7 +42,7 @@ local M = {}
 local _scope = require("settings.engine.scope.owner").new({ name = "ui.error_dialog", module = M })
 
 local hs             = hs
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local Paths          = require("core.fs.engine.paths")
 local Policy         = require("diagnostics.engine.reports.error_policy")
 local DialogCore     = require("core.ui.engine.error_dialog_core")

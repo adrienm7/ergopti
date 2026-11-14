@@ -82,10 +82,10 @@ local function build_world()
 		path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,

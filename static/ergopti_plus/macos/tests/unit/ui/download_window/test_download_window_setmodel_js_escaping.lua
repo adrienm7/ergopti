@@ -20,14 +20,14 @@ helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)
 		-- re-requires ui.download_window below:
 		--  1. Many other test files install a partial lib.logger stub via
 		--     package.loaded and never restore it; download_window/init.lua
-		--     captures `local Logger = require("infra.logger")` at require-time.
+		--     captures `local Logger = require("core.logger.engine.logger")` at require-time.
 		--  2. ui_builder.lua captures `local hs = hs` at require-time. Since
 		--     load_with_stubs only clears the module under test (not its
 		--     dependencies), a cached ui.ui_builder from an earlier test keeps
 		--     calling hs.webview.new() against THAT test's stale hs stub instead
 		--     of the fresh one this test installs below — so the returned
 		--     webview object silently lacks evaluateJavaScript entirely.
-		package.loaded["infra.logger"]  = nil
+		package.loaded["core.logger.engine.logger"]  = nil
 		package.loaded["ui.ui_builder"] = nil
 
 		local overrides, get_evaluated, fire_navigation = make_webview_overrides()
@@ -66,7 +66,7 @@ end)
 
 helpers.describe("download-window-control-character-escaping", function()
 	helpers.it("escapes CRLF errors and control bytes in every text presentation path", function()
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["ui.ui_builder"] = nil
 		local overrides, get_evaluated, fire_navigation = make_webview_overrides()
 		local window = helpers.load_with_stubs("ui.download_window", overrides)

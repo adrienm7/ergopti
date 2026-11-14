@@ -48,7 +48,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = setmetatable({
+		package.loaded["core.logger.engine.logger"] = setmetatable({
 			error = function(_log, message, ...)
 				logs[#logs + 1] = string.format(message, ...)
 			end,
@@ -91,7 +91,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 		}
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		install_temp_file_stub()
 
 		actions = helpers.load_with_stubs("modules.shortcuts.actions.system_pixel", {

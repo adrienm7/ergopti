@@ -29,7 +29,7 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local Injector       = require("adapters.modifier_injector")
 local TimerScheduler = require("core.events.timer_scheduler")
 local TableUtil = require("core.text.engine.table_util")

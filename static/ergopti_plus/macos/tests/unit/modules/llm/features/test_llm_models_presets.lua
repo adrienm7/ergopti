@@ -2,8 +2,8 @@
 local helpers = require("tests.helpers")
 
 -- Bootstrap the hs stub so hs.json.decode is available
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- No models_mgr stub here. Two used to sit at this spot — "modules.llm.models_mgr"
 -- and "ui.menu.menu_llm.models_mgr" — and neither module has ever existed:

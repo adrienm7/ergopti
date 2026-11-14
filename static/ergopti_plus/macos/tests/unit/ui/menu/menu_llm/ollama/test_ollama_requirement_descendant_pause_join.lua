@@ -39,7 +39,7 @@ end
 local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"infra.text_utils",
@@ -107,7 +107,7 @@ local function with_fixture(callback)
 				shared_system_mode = "dispatch",
 			}
 
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = {
 				notify = function() return true end,
 			}

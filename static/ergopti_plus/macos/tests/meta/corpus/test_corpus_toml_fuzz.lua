@@ -43,8 +43,8 @@ local function read_corpus()
 	end
 	local raw = fh:read("*a")
 	fh:close()
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local ok, result = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(result) end
 	return result, nil

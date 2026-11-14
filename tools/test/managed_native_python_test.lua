@@ -4,7 +4,7 @@ local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/managed_native_python_test%.lua$"))
 local repository = arg[1] or root
 package.path = repository .. "/static/ergopti_plus/_shared/?.lua;" .. package.path
-package.loaded["infra.logger"] = { error = function() end }
+package.loaded["core.logger.engine.logger"] = { error = function() end }
 local Interpreter = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
 local system = nil
 Interpreter.resolve = function() return system end

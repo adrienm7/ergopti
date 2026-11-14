@@ -18,7 +18,7 @@ local Names=require('infra.device_names')
 local Reader=require('adapters.evdev_reader')
 local Finder=require('modules.hotstrings.device_finder')
 local Layout=require('adapters.keyboard_layout')
-local Clock=require('infra.monotonic')
+local Clock=require('core.logger.engine.monotonic')
 local Json=require('core.text.engine.json')
 local mode=assert(arg[1]);assert(mode=='add' or mode=='remove')
 local names,paths,keyboards,caps,chars,rows={},{},{},{},{},{}

@@ -21,7 +21,7 @@ helpers.describe("typing metrics JavaScript delivery", function()
 				cancel = function() return true end,
 			})
 			local errors, calls = {}, 0
-			package.loaded["infra.logger"].error = function(_, template, ...)
+			package.loaded["core.logger.engine.logger"].error = function(_, template, ...)
 				errors[#errors + 1] = string.format(template, ...)
 			end
 			context.webview.evaluateJavaScript = function(self, code, callback)
@@ -52,7 +52,7 @@ helpers.describe("typing metrics callback ownership", function()
 				cancel = function() return true end,
 			})
 			local errors, calls = 0, 0
-			package.loaded["infra.logger"].error = function() errors = errors + 1 end
+			package.loaded["core.logger.engine.logger"].error = function() errors = errors + 1 end
 			context.webview.evaluateJavaScript = function(self, _, callback)
 				calls = calls + 1
 				completion = callback

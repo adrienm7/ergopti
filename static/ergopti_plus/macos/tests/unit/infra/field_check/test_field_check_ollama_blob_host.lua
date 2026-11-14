@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
 
 local function make_ports()
 	local world = { code = 0, output = "", model = { name = "Tiny", runtime_name = "tiny:0.5b", download_gb = 0.4 } }
@@ -30,7 +30,7 @@ end
 local function run(ports)
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		package.loaded["infra.field_check_probes"] = nil

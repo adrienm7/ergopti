@@ -20,7 +20,7 @@ local function fresh_owner()
 	logger.error = function(_module, format_string, ...)
 		errors[#errors + 1] = string.format(format_string, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	return require("infra.capsword_auto_off"), errors
 end
 
@@ -36,7 +36,7 @@ end
 
 helpers.describe("CapsWord auto-off settings owner", function()
 	helpers.it("takes the pointer kinds and defaults from the manifest", function()
-		helpers.with_stub_scope({ "infra.capsword_auto_off", "infra.logger" }, function()
+		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner = fresh_owner()
 			local Manifest = require("infra.manifest_reader")
 			local declared = {}
@@ -56,7 +56,7 @@ helpers.describe("CapsWord auto-off settings owner", function()
 	end)
 
 	helpers.it("applies a valid state and keeps the previous one on refusal", function()
-		helpers.with_stub_scope({ "infra.capsword_auto_off", "infra.logger" }, function()
+		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner, errors = fresh_owner()
 			local Policy = require("keyboard.engine.caps_word_auto_off")
 			local state = default_state(Owner)
@@ -77,7 +77,7 @@ helpers.describe("CapsWord auto-off settings owner", function()
 	end)
 
 	helpers.it("persists through Preferences at the manifest paths", function()
-		helpers.with_stub_scope({ "infra.capsword_auto_off", "infra.logger" }, function()
+		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner = fresh_owner()
 			local Preferences = require("infra.preferences")
 			helpers.assert_eq(Preferences.flat_key_for("shortcuts.caps_word.idle_timeout_seconds"), Owner.IDLE_KEY)

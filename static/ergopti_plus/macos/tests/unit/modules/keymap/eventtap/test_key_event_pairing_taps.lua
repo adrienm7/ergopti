@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Drives the production keymap keyDown and keyUp eventtaps with physical
 --- events and checks that every one of them reaches the session's pairing
---- counters (infra/key_event_health.lua), so the next macOS report says
+--- counters (core/logger/engine/key_event_health.lua), so the next macOS report says
 --- whether a key-down or a key-up went missing (issues #99 and #100), while
 --- Ergopti's own tagged output is never counted as typing (key-event-pairing).
 --- ==============================================================================
@@ -28,7 +28,7 @@ local function load_fixture()
 			or name == "adapters.synthetic_input"
 			or name == "adapters.event_provenance"
 			or name == "core.events.clock"
-			or name == "infra.key_event_health"
+			or name == "core.logger.engine.key_event_health"
 		) then
 			package.loaded[name] = nil
 		end
@@ -68,7 +68,7 @@ local function load_fixture()
 	end
 	helpers.assert_not_nil(down_tap, "the keymap keyDown tap must exist")
 	helpers.assert_not_nil(up_tap, "the keymap keyUp tap must exist")
-	local Health = require("infra.key_event_health")
+	local Health = require("core.logger.engine.key_event_health")
 	Health.reset()
 	return { down = down_tap.callback, up = up_tap.callback, hs = hs_stub, health = Health }
 end

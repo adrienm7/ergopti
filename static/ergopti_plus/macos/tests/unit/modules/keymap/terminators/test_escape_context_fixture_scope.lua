@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.escape_context_fixture")
 
 local OWNERS = {
-	"infra.logger", "adapters.event_provenance", "adapters.synthetic_input",
+	"core.logger.engine.logger", "adapters.event_provenance", "adapters.synthetic_input",
 	"core.events.timer_scheduler", "modules.keymap.utils", "infra.text_utils",
 	"modules.llm", "infra.keycodes", "modules.keystats", "ui.tooltip",
 	"modules.llm.prediction_engine", "modules.keymap.registry",
@@ -28,7 +28,7 @@ helpers.describe("Escape context fixture isolation", function()
 				local prior_hs = _G.hs
 				local prior_utils = {}
 				package.loaded["modules.keymap.utils"] = prior_utils
-				package.loaded["infra.logger"] = false
+				package.loaded["core.logger.engine.logger"] = false
 				package.loaded["modules.keymap.registry"] = nil
 				local native_eventtap, original_new
 				local foreign_new = function() end
@@ -69,7 +69,7 @@ helpers.describe("Escape context fixture isolation", function()
 				helpers.assert_true(native_eventtap.new == original_new, "restore the captured native eventtap field")
 				helpers.assert_true(foreign_hs.eventtap.new == foreign_new, "never mutate a successor native host")
 				helpers.assert_nil(package.loaded["modules.keymap.registry"])
-				helpers.assert_eq(package.loaded["infra.logger"], false)
+				helpers.assert_eq(package.loaded["core.logger.engine.logger"], false)
 				helpers.assert_true(package.loaded["modules.keymap.utils"] == prior_utils)
 				helpers.assert_true(_G.hs == prior_hs)
 			end)

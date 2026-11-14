@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
 
 local APP = "/Applications/ErgoptiPlus.app"
 local HOME = "/Users/someone"
@@ -118,7 +118,7 @@ end
 local function run(ports)
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		local Engine = require("infra.field_check")
@@ -132,7 +132,7 @@ end
 --- Loads the checks module for its pure parsers.
 --- @return table checks
 local function load_checks()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.field_check_checks"] = nil
 	return require("infra.field_check_checks")
 end

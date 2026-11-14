@@ -35,7 +35,7 @@ local DEFAULTS = {
 
 
 local function load_fixture(streaming)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	hs.application.frontmostApplication = function()
 		return { title = function() return "FixtureApp" end }
 	end
@@ -55,7 +55,7 @@ local function load_fixture(streaming)
 	for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 		Logger[level] = function() effects.logs = effects.logs + 1 end
 	end
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["infra.timings"] = {
 		sec = function(_section, key)
 			if key == "chain_fallback_ms" then return 1 end

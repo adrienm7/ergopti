@@ -13,7 +13,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local Crypto = require("core.crypto.crypto")
 local Json = require("core.text.engine.json")
 local Receipt = require("core.lifecycle.engine.core.native_pty_receipt")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local hs = hs
 local LOG = "adapters.native_bootstrap_pty"
 

@@ -27,8 +27,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must load first so every subsequent require can resolve it.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local SW = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 
@@ -499,7 +499,7 @@ end)
 
 helpers.describe("keystats-device-log-privacy", function()
 	helpers.it("keystats-device-log-privacy: SQLite initialization retains storage identity without logging it", function()
-		helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
 			local messages = {}
 			local logger = helpers.make_logger_stub()
 			for _, level in ipairs({ "start", "success", "warn", "error" }) do
@@ -507,7 +507,7 @@ helpers.describe("keystats-device-log-privacy", function()
 					messages[#messages + 1] = string.format(format, ...)
 				end
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 			local identity = "private-device-identity"
 			writer.init({ paths = {}, device_obj = { name = "Private Test Host" }, device_id = identity })
@@ -522,11 +522,11 @@ end)
 
 helpers.describe("sqlite_writer — media schema startup ownership", function()
 	local function observe(schedule, check)
-		helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
 			local state = { opens = 0, reads = 0, file_closes = 0, db_closes = 0, applied = 0, logs = {} }
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) state.logs[#state.logs + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			local db = {
 				exec = function(_, sql)
 					if sql:find("CREATE TABLE media_fixture", 1, true) then

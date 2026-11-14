@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 --- @param rows table Rows answered for ngram_chars statements.
 --- @return table reader, table statements
 local function reader_with(rows)
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,
@@ -38,8 +38,8 @@ helpers.describe("macOS n-gram reads: the shared catalogue", function()
 	local Queries = require("metrics.engine.queries")
 
 	helpers.it("reads cross-device days even when the local timezone skipped a calendar date", function()
-		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "infra.logger"}, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "core.logger.engine.logger"}, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local fake = require("tests.support.fake_ngram_sqlite").new({ngram_chars = {
 				{date = "2011-12-29", app = "Code", token = "a", c = 1},
 				{date = "2011-12-30", app = "Code", token = "a", c = 1},

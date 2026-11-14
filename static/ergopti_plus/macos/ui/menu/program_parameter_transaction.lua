@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Codec = require("core.text.engine.toml_codec")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Assignment = require("shortcuts.engine.assignment")

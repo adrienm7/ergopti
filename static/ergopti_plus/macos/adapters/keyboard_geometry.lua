@@ -18,7 +18,7 @@
 
 local M = {}
 local Json = require("core.fs.adapters.json_codec")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "adapters.keyboard_geometry"
 local ENVIRONMENT_KEY = "ERGOPTI_KEYBOARD_GEOMETRY_V1"
 local MAXIMUM = 32767 -- KBGetLayoutType takes a nonnegative signed Int16 model.
