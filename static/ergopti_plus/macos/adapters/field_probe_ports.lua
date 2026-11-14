@@ -271,7 +271,7 @@ end
 --- @param callback function fn(exit_code|nil, stdout, stderr).
 --- @param environment table|nil Explicit child environment.
 local function exec_input(executable, args, input, timeout_s, callback, environment)
-	local ShellRunner = M._shell_runner or require("adapters.shell_runner")
+	local ShellRunner = M._shell_runner or require("core.process.adapters.shell_runner")
 	local Timer = require("core.events.timer_scheduler")
 	local settled, timer = false, nil
 	local function settle(code, stdout, stderr)

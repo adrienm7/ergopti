@@ -54,7 +54,7 @@ helpers.describe("i18n persistence", function()
       if not ok then error(err, 0) end
     end)
     helpers.it("native-locale-catalog: only actual locale files establish availability", function()
-      local shell = require("adapters.shell_runner")
+      local shell = require("core.process.adapters.shell_runner")
       helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
         "native locale catalog receipts require Python and LuaJIT")
       local quote = require("core.text.engine.utils_core").shell_quote

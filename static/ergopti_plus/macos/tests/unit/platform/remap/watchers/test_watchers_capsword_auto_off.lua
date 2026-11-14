@@ -39,7 +39,7 @@ local function fresh_harness(overrides)
 	package.loaded["adapters.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 
 	local h = {
 		clock = 1000, writers = {}, supersede_calls = 0, timers = {}, capslock = {},

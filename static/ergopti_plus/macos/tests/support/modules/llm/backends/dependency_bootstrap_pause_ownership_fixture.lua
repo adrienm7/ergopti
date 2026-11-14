@@ -147,7 +147,7 @@ local function load_fixture(options)
 	end
 
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.llm.ollama_binary"] = {
 		-- These existing daemon-ready cases model a native-owned source.

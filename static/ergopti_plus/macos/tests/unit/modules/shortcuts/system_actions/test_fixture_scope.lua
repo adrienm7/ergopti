@@ -13,8 +13,8 @@ local OWNERS = {
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 	"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "infra.notifications",
 	"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
-	"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
-	"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
+	"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
+	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
 	"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 	"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 }
@@ -110,7 +110,7 @@ helpers.describe("System action fixture isolation", function()
 						helpers.assert_eq(#entries, 1)
 						helpers.assert_eq(entries[1], "22")
 					elseif consumer == "task" then
-						local task = require("adapters.task_lifecycle").native(
+						local task = require("core.process.adapters.task_lifecycle").native(
 							"fixture_probe", "/fixture-task", function() end, {})
 						helpers.assert_not_nil(task)
 						helpers.assert_eq(calls[11], 0, "retired native constructor must not run")

@@ -20,7 +20,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local uv = require("luv")
 
 local helper = assert(package.searchpath("core.network.adapters.system_proxy_probe", package.path))

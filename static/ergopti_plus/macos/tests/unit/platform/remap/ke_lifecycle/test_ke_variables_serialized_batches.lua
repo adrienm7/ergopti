@@ -92,7 +92,7 @@ local function fresh_bridge(options)
 	ctx.engine["ergopti_revoked_" .. TOKEN_B] = 0
 
 	package.loaded["platform.remap.ke_variables"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["core.fs.adapters.json_codec"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
@@ -147,7 +147,7 @@ local function fresh_bridge(options)
 			return payload, nil
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			local task = {
 				executable = executable,
@@ -997,7 +997,7 @@ end)
 
 
 package.loaded["platform.remap.ke_variables"] = nil
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["core.fs.adapters.json_codec"] = nil
 package.loaded["platform.remap.ke_paths"] = nil

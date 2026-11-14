@@ -132,7 +132,7 @@ helpers.describe("common autocorrection failed override admission", function()
 			source = source .. '[hotstrings.modules.magickey]\ntext_expansion_symbols = true\n'
 			local path = os.tmpname(); os.remove(path)
 			local directory = path .. "-overrides"
-			assert(require("adapters.shell_runner").run("mkdir -p " .. require("adapters.shell_runner").quote(directory)))
+			assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. require("core.process.adapters.shell_runner").quote(directory)))
 			local override_path = directory .. "/hotstrings_overrides.toml"
 			local original = '[autocorrection.caps]\ndelay = 0.3\n# retain every legacy byte\n'
 			local handle = assert(io.open(override_path, "wb")); assert(handle:write(original)); assert(handle:close())
@@ -252,7 +252,7 @@ helpers.describe("common autocorrection migrated runtime policies", function()
 		local load = engine.load_mappings
 		engine.load_mappings = function(self, mappings) published = mappings; return load(self, mappings) end
 		local directory = os.tmpname(); os.remove(directory)
-		assert(require("adapters.shell_runner").run("mkdir -p " .. require("adapters.shell_runner").quote(directory)))
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. require("core.process.adapters.shell_runner").quote(directory)))
 		local path = directory .. "/hotstrings_overrides.toml"
 		local input = read_file(Paths.shared("tests/corpus/common_autocorrection_migration/input.toml"))
 		local expected = read_file(Paths.shared("tests/corpus/common_autocorrection_migration/expected.toml"))
@@ -306,7 +306,7 @@ helpers.describe("common autocorrection classified cold startup", function()
 			.. '[hotstrings.modules.magickey]\ntext_expansion_symbols = true\n'
 		local scratch = os.tmpname(); os.remove(scratch)
 		local directory = scratch .. "-cold-overrides"
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		assert(Shell.run("mkdir -p " .. Shell.quote(directory)))
 		local path = directory .. "/hotstrings_overrides.toml"
 		local original = '[autocorrection.caps]\ndelay = 0.3\n# retain the failed source exactly\n'

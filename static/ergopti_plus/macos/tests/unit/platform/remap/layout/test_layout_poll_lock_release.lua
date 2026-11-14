@@ -35,12 +35,12 @@ local helpers = require("tests.helpers")
 --- @return table ctx {spawns=int, watchdogs=array, poll_cb=function|nil}.
 local function load_watchers_with_dead_spawn()
 	package.loaded["platform.remap.watchers"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 
 	local ctx = { spawns = 0, terminates = 0, watchdogs = {}, poll_cb = nil }
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(_executable, _args, _on_done)
 			ctx.spawns = ctx.spawns + 1
 			local settled, observer = false, nil
@@ -204,13 +204,13 @@ helpers.describe("karabiner.watchers: layout poll watchdog lifecycle", function(
 
 	helpers.it("is cancelled by a completing read so it cannot fire spuriously", function()
 		package.loaded["platform.remap.watchers"] = nil
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 
 		local ctx = { spawns = 0, watchdogs = {}, poll_cb = nil }
 
 		-- This spawn DOES complete, immediately and synchronously.
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_executable, _args, on_done)
 				ctx.spawns = ctx.spawns + 1
 				return {
@@ -283,6 +283,6 @@ end)
 -- Restore the real adapters for later test files: the stubs installed above
 -- (shell_runner without exec, fake timer_scheduler) would otherwise leak
 -- through package.loaded into whichever module the runner loads next
-package.loaded["adapters.shell_runner"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["platform.remap.watchers"] = nil

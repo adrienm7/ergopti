@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local FAULTS = { "write_nil", "write_false", "write_throw", "close_nil", "close_false", "close_throw" }
 

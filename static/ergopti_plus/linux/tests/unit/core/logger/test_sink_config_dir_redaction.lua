@@ -131,13 +131,13 @@ helpers.describe("config_paths: hands its folder to the log sink (linux-logger-c
 	helpers.it("hands over the folder the user moves to", function()
 		with_sink(nil, function(Sink)
 			local stored = {}
-			local saved_storage, saved_shell = package.loaded["core.fs.adapters.storage"], package.loaded["adapters.shell_runner"]
+			local saved_storage, saved_shell = package.loaded["core.fs.adapters.storage"], package.loaded["core.process.adapters.shell_runner"]
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key, default) if stored[key] ~= nil then return stored[key] end return default end,
 				set = function(key, value) stored[key] = value; return true end,
 				delete = function(key) stored[key] = nil; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				run = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 			}
@@ -148,7 +148,7 @@ helpers.describe("config_paths: hands its folder to the log sink (linux-logger-c
 				helpers.assert_eq(redact("Loaded /srv/Moved/Jean Dupont/famille.toml"), "Loaded " .. CONFIG .. "/" .. NAME,
 					"the committed folder must reach the sink, or lines after the move show its names")
 			end)
-			package.loaded["core.fs.adapters.storage"], package.loaded["adapters.shell_runner"] = saved_storage, saved_shell
+			package.loaded["core.fs.adapters.storage"], package.loaded["core.process.adapters.shell_runner"] = saved_storage, saved_shell
 			if not ok then error(err, 0) end
 		end)
 	end)

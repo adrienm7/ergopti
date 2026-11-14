@@ -21,11 +21,11 @@ end
 
 
 local function fresh_apps()
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps",
 		"core.events.timer_scheduler",
-		"adapters.shell_runner",
+		"core.process.adapters.shell_runner",
 		"adapters.app_launcher",
 		"adapters.window_info",
 		"adapters.window_manager",
@@ -246,7 +246,7 @@ local function fresh_apps()
 		return true, handle
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		open = function(target, callback) return start_shell("open", target, callback) end,
 		applescript = function(script, callback)
 			return start_shell("applescript", script, callback)
@@ -310,7 +310,7 @@ local function fresh_apps()
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.apps"] = nil
 	fixture.subject = require("modules.shortcuts.actions.apps")
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

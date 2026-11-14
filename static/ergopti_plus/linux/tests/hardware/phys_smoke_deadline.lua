@@ -26,7 +26,7 @@
 local uv = require("luv")
 local Installer = require("modules.updater.installer")
 local Budget = require("updater.engine.install_budget")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local INSTALL_ROOT, INSTALL_SH, WORK = arg[1], arg[2], arg[3]
 for _, program in ipairs({ "tar" }) do

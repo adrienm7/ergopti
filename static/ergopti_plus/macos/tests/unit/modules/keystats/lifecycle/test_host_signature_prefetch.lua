@@ -51,7 +51,7 @@ local function load_prefetch()
 	local env = { runs = {}, timers = {} }
 	package.loaded["modules.keystats.host_signature"] = nil
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		run = function(executable, args, on_done)
 			env.runs[#env.runs + 1] = { executable = executable, args = args, on_done = on_done }
 			return true, {}
@@ -69,7 +69,7 @@ end
 
 local PREFETCH_MODULES = {
 	"modules.keystats.host_signature", "core.logger.engine.logger",
-	"adapters.shell_runner", "infra.deferred_work",
+	"core.process.adapters.shell_runner", "infra.deferred_work",
 }
 
 local function with_prefetch(run)
@@ -131,7 +131,7 @@ helpers.describe("keystats host signature prefetch", function()
 
 	helpers.it("a launch that fails synchronously answers ready without running the callback", function()
 		with_prefetch(function(env)
-			package.loaded["adapters.shell_runner"].run = function(_, _, on_done)
+			package.loaded["core.process.adapters.shell_runner"].run = function(_, _, on_done)
 				on_done(false, nil, nil)
 				return false, nil
 			end

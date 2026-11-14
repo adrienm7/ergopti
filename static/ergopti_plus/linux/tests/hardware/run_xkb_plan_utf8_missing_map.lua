@@ -11,7 +11,7 @@
 
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local FileSystem = require("core.fs.adapters.file_system")
 local Rmlvo = require("infra.xkb_rmlvo")
 local _checks, _failures = 0, 0

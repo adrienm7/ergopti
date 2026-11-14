@@ -4,7 +4,7 @@
 --- native regressions exercise the same public transport with real SQLite.
 local helpers = require("tests.helpers")
 require("core.logger.engine.monotonic") -- Never freeze a temporary native port into the clock.
-local names = { "luv", "adapters.owned_process", "core.fs.engine.sqlite_batch_process" }
+local names = { "luv", "core.process.adapters.owned_process", "core.fs.engine.sqlite_batch_process" }
 local function with_transport(body)
 	local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local ports = { writes = {}, shutdowns = {} }
@@ -30,7 +30,7 @@ local function with_transport(body)
 			return {}
 		end,
 	}
-	package.loaded["adapters.owned_process"] = { start = function(executable, args, options, callback)
+	package.loaded["core.process.adapters.owned_process"] = { start = function(executable, args, options, callback)
 		ports.executable, ports.args, ports.options, ports.complete = executable, args, options, callback
 		return operation
 	end }

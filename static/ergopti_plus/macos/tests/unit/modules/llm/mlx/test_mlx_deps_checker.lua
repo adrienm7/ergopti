@@ -273,7 +273,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 		-- The refused-start test above intentionally loaded it against a task
 		-- stub that always returns false, so a cached adapter would make every
 		-- later "fresh" checker inherit that unrelated native result.
-		package.loaded["adapters.task_lifecycle"] = nil
+		package.loaded["core.process.adapters.task_lifecycle"] = nil
 		package.loaded["modules.llm.mlx_deps_checker"] = nil
 		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", hs_overrides)
 

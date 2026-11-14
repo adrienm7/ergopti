@@ -80,7 +80,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		"core.network.adapters.http_client",
 		"core.fs.adapters.json_codec",
 		"core.events.timer_scheduler",
-		"adapters.shell_runner",
+		"core.process.adapters.shell_runner",
 		"core.logger.engine.logger",
 		"infra.notifications",
 		"core.fs.engine.paths",
@@ -181,7 +181,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"modules.llm.api_common", "modules.llm.parser", "core.network.adapters.http_client",
-		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "adapters.shell_runner",
+		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.process.adapters.shell_runner",
 		"core.logger.engine.logger", "infra.notifications", "core.fs.engine.paths", "core.i18n.engine.i18n", "hs", "tests.stubs.hs",
 	}
 	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end

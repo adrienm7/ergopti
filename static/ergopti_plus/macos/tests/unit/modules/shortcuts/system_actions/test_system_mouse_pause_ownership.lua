@@ -38,7 +38,7 @@ local function fresh_mouse_owner()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.system_mouse",
 		"core.events.timer_scheduler",
-		"adapters.shell_runner",
+		"core.process.adapters.shell_runner",
 		"adapters.mouse_control",
 		"adapters.synthetic_input",
 		"core.logger.engine.logger",
@@ -373,7 +373,7 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = shell_runner
 	package.loaded["core.events.timer_scheduler"] = nil
 	fixture.python = helpers.healthy_python_resolver()
 	package.loaded["adapters.python_interpreter"] = fixture.python

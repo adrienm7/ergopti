@@ -63,7 +63,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(relay-cancel-identity) a stale cancellation does not suppress the new launcher", function()
 		if ON_WINDOWS then return end
-		local Shell, Storage = require("adapters.shell_runner"), require("core.fs.adapters.storage")
+		local Shell, Storage = require("core.process.adapters.shell_runner"), require("core.fs.adapters.storage")
 		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
 		local original = Storage.path
 		local ok, detail = xpcall(function()
@@ -126,7 +126,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(relay-cancel-identity) quits the actual relay without rereading unavailable proc identity", function()
 		if ON_WINDOWS then return end
-		local Shell, Storage = require("adapters.shell_runner"), require("core.fs.adapters.storage")
+		local Shell, Storage = require("core.process.adapters.shell_runner"), require("core.fs.adapters.storage")
 		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
 		local old_path, old_open = Storage.path, io.open
 		local child
@@ -202,7 +202,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(restart-relay-pid-reuse) does not wait on a different process with the same numeric pid", function()
 		if ON_WINDOWS then return end
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local dir = os.tmpname(); os.remove(dir); assert(Shell.run("mkdir " .. Shell.quote(dir)))
 		local marker, launcher = dir .. "/started", dir .. "/launcher"
 		local file = assert(io.open(launcher, "w")); file:write("#!/bin/sh\necho started > " .. Shell.quote(marker) .. "\n"); file:close()
@@ -251,7 +251,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		end)
 	else
 		helpers.it("(restart-relay-dispatch-ack) refuses shutdown when native relay dispatch exits unsuccessfully", function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			os.remove(folder)
 			helpers.assert_true(Shell.run("mkdir " .. Shell.quote(folder)))

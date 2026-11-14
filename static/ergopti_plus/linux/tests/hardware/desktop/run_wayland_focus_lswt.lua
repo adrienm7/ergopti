@@ -24,7 +24,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 require("core.lifecycle.engine.compat.utf8").install()
 local Logger = require("core.logger.engine.shim")
 local Display = require("infra.display_server")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local NO_QUERY_LINE = "No focused-window query on this compositor"
 local QUERIES = 5
@@ -42,7 +42,7 @@ end
 assert(Display.refresh() == Display.WAYLAND, "the session must be a Wayland one")
 assert(Shell.has_command("lswt"), "the lswt listing must be on the PATH")
 local WindowInfo = require("adapters.window_info")
-local Lifecycle = require("adapters.process_lifecycle")
+local Lifecycle = require("core.process.adapters.lifecycle")
 print(string.format("SESSION mode=%s desktop=%s", mode, Display.desktop()))
 
 if mode == "gnome" or mode == "kde" then

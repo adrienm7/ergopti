@@ -379,7 +379,7 @@ function M._focused_app_excluded()
 	if app_id == nil then
 		local ok_app
 		ok_app, app_id = pcall(function()
-			local lifecycle = require("adapters.process_lifecycle")
+			local lifecycle = require("core.process.adapters.lifecycle")
 			local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
 			return type(foreground) == "table" and rawget(foreground, "appId") or nil
 		end)
@@ -407,7 +407,7 @@ local function _is_secure_context()
 		if app_id == nil then
 			local ok_app
 			ok_app, app_id = pcall(function()
-				local lifecycle = require("adapters.process_lifecycle")
+				local lifecycle = require("core.process.adapters.lifecycle")
 				local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
 				return type(foreground) == "table" and rawget(foreground, "appId") or nil
 			end)

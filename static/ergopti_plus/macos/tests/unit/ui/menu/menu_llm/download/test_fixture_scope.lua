@@ -33,7 +33,7 @@ helpers.describe("MLX download fixture isolation", function()
 
 	for _, subject in ipairs({
 		{ option = "real_switcher", module = "ui.menu.menu_llm.prediction_lock_registry", api = "new" },
-		{ option = "real_window", module = "adapters.shell_runner", api = "spawn" },
+		{ option = "real_window", module = "core.process.adapters.shell_runner", api = "spawn" },
 	}) do
 		helpers.it("(mlx-fixture-scope) releases captured dependencies for " .. subject.option, function()
 			helpers.with_fresh_modules({ "hs", subject.module }, function()

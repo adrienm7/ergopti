@@ -21,7 +21,7 @@ local function fixture(callback, cleanup_failures)
 			"core.logger.engine.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
-			"adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
+			"core.process.adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
 			"_generated.locale_table", "_generated.logger_sub_files", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
 			"diagnostics.engine.reports.redact", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders", "core.logger.engine", "menu.engine.labels",
 		}, function()
@@ -107,7 +107,7 @@ local function fixture(callback, cleanup_failures)
 				end
 				package.loaded["ui.ui_builder"] = nil
 				local builder = require("ui.ui_builder")
-				package.loaded["adapters.program_providers"] = {}
+				package.loaded["core.process.adapters.program_providers"] = {}
 				package.loaded["adapters.apple_shortcuts_native"] = {}
 				package.loaded["ui.action_picker"] = nil
 				local picker = require("ui.action_picker")

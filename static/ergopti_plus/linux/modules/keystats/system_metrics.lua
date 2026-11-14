@@ -48,7 +48,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Calendar = require("modules.keystats.calendar")
 local TableUtil = require("core.text.engine.table_util")
 local StorageOwned = require("core.fs.engine.storage_owned")

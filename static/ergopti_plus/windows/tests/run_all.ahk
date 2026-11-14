@@ -333,7 +333,7 @@ global _DefaultLogsDir := _LogsDir
 ; Keep the standalone assertion library independent of production JSON symbols.
 TestQualificationRegisterParser(JsonParse)
 #Include ../infra/program_parameter.ahk
-#Include ../adapters/program_providers.ahk
+#Include ../core/process/adapters/program_providers.ahk
 #Include ../ui/action_picker_webview.ahk
 #Include ../infra/program_actions.ahk
 #Include ../infra/user_actions.ahk
@@ -365,7 +365,7 @@ InstallHotstringHooks()
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../adapters/window_info.ahk
-#Include ../adapters/uia_worker.ahk
+#Include ../core/process/adapters/uia_worker.ahk
 #Include ../adapters/tray_menu.ahk
 #Include ../adapters/text_sender.ahk
 #Include ../core/network/adapters/http_client.ahk
@@ -373,7 +373,7 @@ InstallHotstringHooks()
 #Include ../adapters/clipboard.ahk
 #Include ../infra/input_probe.ahk
 #Include ../core/fs/adapters/storage.ahk
-#Include ../adapters/process_lifecycle.ahk
+#Include ../core/process/adapters/lifecycle.ahk
 #Include ../adapters/key_state.ahk
 #Include ../adapters/keyboard_layout_switch.ahk
 #Include ../adapters/app_launcher.ahk
@@ -391,7 +391,7 @@ InstallHotstringHooks()
 #Include ../adapters/graphics_renderer.ahk
 #Include ../adapters/notify_icon.ahk
 #Include ../ui/spotlight/ownership.ahk
-#Include ../adapters/shell_runner.ahk
+#Include ../core/process/adapters/shell_runner.ahk
 #Include ../../_shared/shortcuts/data/actions/brightness.ahk
 #Include ../adapters/screen_brightness.ahk
 #Include ../adapters/crash_report_worker.ahk
@@ -779,7 +779,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/adapters/test_filesystem_native_write.ahk
 #Include unit/adapters/test_filesystem_nul_paths.ahk
-#Include unit/adapters/test_process_lifecycle_app_events.ahk
+#Include unit/core/process/test_lifecycle_app_events.ahk
 #Include unit/core/logger/test_native_write.ahk
 #Include unit/modules/keystats/test_keystats_sql_native_write.ahk
 #Include unit/modules/keystats/test_keystats_sql_write_compensation.ahk
@@ -1911,7 +1911,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ui/wpm/test_wpm_persistence_transaction.ahk
 #Include meta/infra/config/persistence/test_config_full_save_generation_guard.ahk
 #Include meta/ui/wpm/test_wpm_ring_buffer_cross_thread_race.ahk
-#Include unit/adapters/shell_runner/test_coalesced_job_callbacks_dropped.ahk
+#Include unit/core/process/shell_runner/test_coalesced_job_callbacks_dropped.ahk
 #Include unit/modules/hotstrings/personal/test_count_regex_vs_entry_pattern_divergence.ahk
 #Include unit/infra/toml/test_counttoml_overcounts_personal_meta_sections.ahk
 #Include unit/modules/hotstrings/personal/test_delay_edit_non_integer_personal_truncation.ahk
@@ -1926,8 +1926,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
 #Include unit/modules/hotstrings/personal/test_per_entry_priority_divergence_cache_vs_toml.ahk
-#Include unit/adapters/shell_runner/test_plc_closure_callable.ahk
-#Include unit/adapters/shell_runner/test_win_ps_version_check.ahk
+#Include unit/core/process/shell_runner/test_plc_closure_callable.ahk
+#Include unit/core/process/shell_runner/test_win_ps_version_check.ahk
 #Include unit/modules/llm/servers/test_remote_parse_first_content_match.ahk
 #Include unit/modules/hotstrings/engine/test_stale_cache_survives_reset_and_pause.ahk
 #Include unit/modules/hotstrings/engine/test_time_activation_fails_open_on_missing_prev_char.ahk
@@ -1956,7 +1956,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/infra/dispatch/test_timer_scheduler_ms_guard.ahk
 #Include meta/core/network/test_http_cancel_aborts.ahk
 #Include meta/adapters/input/test_keyboard_hook_vk_format.ahk
-#Include meta/adapters/shell_runner/test_plc_stop_clears_callbacks.ahk
+#Include meta/core/process/shell_runner/test_plc_stop_clears_callbacks.ahk
 #Include meta/infra/toml/test_toml_coerce_quoted_commas.ahk
 #Include meta/core/i18n/test_setlocale_resets_fallback.ahk
 #Include meta/modules/shortcuts/test_ws_save_atomic.ahk
@@ -2087,10 +2087,10 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/input/test_text_sender_clipboard_suspend_guard.ahk
 #Include meta/modules/llm/prediction/test_llm_output_physical_generation.ahk
 #Include meta/adapters/input/test_text_sender_callback_on_bailout.ahk
-#Include meta/adapters/shell_runner/test_shell_runner_poll_suspend_guard.ahk
-#Include meta/adapters/shell_runner/test_shell_runner_legacy_claims.ahk
+#Include meta/core/process/shell_runner/test_poll_suspend_guard.ahk
+#Include meta/core/process/shell_runner/test_legacy_claims.ahk
 #Include meta/modules/gestures/test_screenshot_tree_owned_default.ahk
-#Include meta/adapters/shell_runner/test_shell_runner_isolated_logger.ahk
+#Include meta/core/process/shell_runner/test_isolated_logger.ahk
 #Include meta/adapters/uia/test_disable_password_fields_gate.ahk
 #Include meta/modules/dynamic_hotstrings/test_menu_dynamic_hotstrings_category_gate.ahk
 #Include meta/ui/menu/test_menu_master_category_cache.ahk
@@ -2214,7 +2214,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/crash_report/test_crash_report_sysinfo_dedup.ahk
 #Include meta/core/logger/test_dedup_exit_flush.ahk
 #Include meta/core/logger/test_repeat_collapsing.ahk
-#Include meta/adapters/shell_runner/test_shell_runner_boot_crash_and_quoting.ahk
+#Include meta/core/process/shell_runner/test_boot_crash_and_quoting.ahk
 #Include meta/infra/dispatch/test_hotpath_priority_starvation.ahk
 #Include meta/suite/test_priority_baseline_single_source.ahk
 
@@ -2227,7 +2227,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/hotstrings/catalogue/test_hcw_reset_all_teardown.ahk
 #Include meta/ui/healthcheck/test_healthcheck_sysinfo_git_nonblocking.ahk
 #Include meta/modules/keystats/test_keystats_pause_metrics.ahk
-#Include meta/adapters/test_processentry32w_size.ahk
+#Include meta/core/process/test_processentry32w_size.ahk
 #Include meta/platform/remap/altgr/test_script_altgr_hotkeys.ahk
 #Include meta/platform/remap/keys/test_space_hold_exception_guard.ahk
 #Include meta/modules/llm/api/test_stream_handle_type.ahk
@@ -2417,7 +2417,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/personal/test_personal_reload_bakes_resolved_delay.ahk
 #Include unit/modules/keystats/test_prefetch_apps_list_deduped.ahk
 #Include unit/modules/keystats/test_prefetch_dbg_write_level_gated.ahk
-#Include unit/adapters/shell_runner/test_worker_spawn_args_are_strings.ahk
+#Include unit/core/process/shell_runner/test_worker_spawn_args_are_strings.ahk
 #Include unit/modules/keystats/test_keystats_prefetch_worker_failure.ahk
 #Include unit/modules/hotstrings/preview/test_preview_picks_engine_winner.ahk
 #Include unit/modules/hotstrings/personal/test_priority_missing_defaults_to_common.ahk
@@ -2425,9 +2425,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_repeat_key_honours_rebuild_fence.ahk
 #Include unit/modules/hotstrings/engine/test_repeat_activation_window.ahk
 #Include unit/modules/hotstrings/engine/test_backspace_undo.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_legacy_state_machine.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_multiline_arg.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_tree_owned.ahk
+#Include unit/core/process/shell_runner/test_legacy_state_machine.ahk
+#Include unit/core/process/shell_runner/test_multiline_arg.ahk
+#Include unit/core/process/shell_runner/test_tree_owned.ahk
 #Include unit/modules/llm/servers/test_ollama_install_files_port.ahk
 #Include unit/modules/llm/servers/test_ollama_runtime_owner.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk
@@ -2443,21 +2443,21 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/gestures/test_display_mirror_query_pause.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk
 #Include unit/modules/shortcuts/test_program_providers.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_launch_cleanup.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_native_argv.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_nul_arguments.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_native_exit_code.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_exit_query_failure.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_native_ownership.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_native_teardown.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_tree_native_refusal.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_tree_close_recovery.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_capture_debt.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_capture_lock.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_creator_debt.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_completion_pause.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_deferred_completion.ahk
-#Include unit/adapters/shell_runner/test_shell_runner_tree_deferred_completion.ahk
+#Include unit/core/process/shell_runner/test_launch_cleanup.ahk
+#Include unit/core/process/shell_runner/test_native_argv.ahk
+#Include unit/core/process/shell_runner/test_nul_arguments.ahk
+#Include unit/core/process/shell_runner/test_native_exit_code.ahk
+#Include unit/core/process/shell_runner/test_exit_query_failure.ahk
+#Include unit/core/process/shell_runner/test_native_ownership.ahk
+#Include unit/core/process/shell_runner/test_native_teardown.ahk
+#Include unit/core/process/shell_runner/test_tree_native_refusal.ahk
+#Include unit/core/process/shell_runner/test_tree_close_recovery.ahk
+#Include unit/core/process/shell_runner/test_capture_debt.ahk
+#Include unit/core/process/shell_runner/test_capture_lock.ahk
+#Include unit/core/process/shell_runner/test_creator_debt.ahk
+#Include unit/core/process/shell_runner/test_completion_pause.ahk
+#Include unit/core/process/shell_runner/test_deferred_completion.ahk
+#Include unit/core/process/shell_runner/test_tree_deferred_completion.ahk
 #Include unit/adapters/crash_report/test_crash_report_worker_transport.ahk
 #Include unit/adapters/crash_report/test_crash_report_shared_document.ahk
 #Include unit/adapters/crash_report/test_crash_mapping_drain_reentry.ahk

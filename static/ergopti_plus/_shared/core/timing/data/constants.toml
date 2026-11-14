@@ -1398,7 +1398,7 @@ log_prepare_tick_bytes = 65536
 
 # Output a synchronous macOS shell capture keeps before it stops the child and
 # reports the output limit. Read through macos/_generated/registry_limits.lua.
-# HS: adapters/shell_runner.lua.
+# HS: core/process/adapters/shell_runner.lua.
 shell_captured_output_bytes = 4194304
 
 # Read granularity of the macOS TOML cache when it collects a source's exact

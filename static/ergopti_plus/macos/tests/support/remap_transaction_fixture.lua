@@ -30,7 +30,7 @@ local OWNED_MODULES = {
 	"infra.notifications",
 	"infra.text_utils",
 	"platform.remap.ke_paths",
-	"adapters.task_lifecycle",
+	"core.process.adapters.task_lifecycle",
 	"infra.keycodes",
 	"modules.gestures.actions",
 	"adapters.key_state",
@@ -46,7 +46,7 @@ local OWNED_MODULES = {
 	"modules.shortcuts.script_control",
 	"platform.remap.ke_variables",
 	"core.fs.adapters.json_codec",
-	"adapters.shell_runner",
+	"core.process.adapters.shell_runner",
 	"infra.deferred_work",
 	"platform.remap.lease_contract",
 	"modules.keymap.layout",
@@ -632,7 +632,7 @@ return function(run, dependencies)
 				"infra.text_utils",
 				"platform.remap.ke_paths",
 				"core.events.timer_scheduler",
-				"adapters.task_lifecycle",
+				"core.process.adapters.task_lifecycle",
 				"platform.remap.network_download",
 				"platform.remap.onboarding",
 			}
@@ -717,7 +717,7 @@ return function(run, dependencies)
 					return "/bin/sh", args, function() return nil end
 				end,
 			}
-			package.loaded["adapters.task_lifecycle"] = nil
+			package.loaded["core.process.adapters.task_lifecycle"] = nil
 			package.loaded["platform.remap.onboarding"] = nil
 			local onboarding = require("platform.remap.onboarding")
 			onboarding.load_manifest = function()

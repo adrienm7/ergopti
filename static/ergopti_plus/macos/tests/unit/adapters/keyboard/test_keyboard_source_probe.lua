@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local MODULES = {
-	"adapters.keyboard_source_probe", "adapters.shell_runner", "core.events.timer_scheduler",
+	"adapters.keyboard_source_probe", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"core.fs.adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "core.logger.engine.logger",
 }
 local SOURCE = "com.apple.keylayout.US"
@@ -81,7 +81,7 @@ local function fixture(options)
 		end,
 	}
 	package.loaded["core.fs.adapters.json_codec"] = { decode = Json.decode }
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, callback, chunks, environment)
 			context.calls.spawned = (context.calls.spawned or 0) + 1
 			context.executable, context.args, context.chunks, context.environment = executable, args, chunks, environment

@@ -108,7 +108,7 @@ check('the integrity check requires every data file the Lua manager reads', () =
 check('the Lua pieces and shared data of the conversion ship', () => {
 	const expected = [
 		'linux/modules/keymap/layout_registry.lua',
-		'linux/adapters/process_runner.lua',
+		'linux/core/process/adapters/runner.lua',
 		'_shared/layouts/engine/registry/registry_core.lua',
 		'_shared/layouts/engine/composer/catalogue.lua',
 		'_shared/layouts/engine/composer/keylayout.lua',

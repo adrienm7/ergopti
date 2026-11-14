@@ -16,7 +16,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 -- when an assertion fails.
 require("core.logger.engine").set_sink(function(line) io.stderr:write(line, "\n") end)
 local Json = require("core.text.engine.json")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local source_path = os.getenv("ERGOPTI_AI_DAEMON_SOURCE") or "ergopti_hotstrings.lua"
 local file = assert(io.open(source_path, "r"))
 local source = file:read("*a")
@@ -142,7 +142,7 @@ local function snapshot(fields)
 	fields.target = focus_id()
 	fields.cached_verdict = Detector.getVerdict()
 	fields.url_filter = require("modules.llm.trigger_settings").get("url_bar_filter_enabled")
-	fields.foreground_type = type(require("adapters.process_lifecycle").getForegroundApp())
+	fields.foreground_type = type(require("core.process.adapters.lifecycle").getForegroundApp())
 	fields.window = Window.focused_identity()
 	fields.applied, fields.requests, fields.reads = applied, request, reads
 	fields.offered = Engine.has_suggestions()

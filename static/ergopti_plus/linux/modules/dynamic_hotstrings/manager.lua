@@ -155,7 +155,7 @@ local function _seed_missing_source(path)
 	Logger.info(LOG, "Writing default personal_info.toml at '%s'…", path)
 	-- A fresh install starts before anything created the configuration folder:
 	-- the exclusive create then failed with ENOENT, and the editor had no source.
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local directory = require("core.fs.engine.native_path").dirname(path)
 	if not directory or not Shell.run("mkdir -p -- " .. Shell.quote(directory) .. " 2>/dev/null") then
 		Logger.error(LOG, "Could not create the configuration folder for personal_info.toml — the editor has no source.")

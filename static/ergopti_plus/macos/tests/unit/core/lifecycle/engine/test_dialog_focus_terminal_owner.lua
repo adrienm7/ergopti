@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "core.logger.engine.logger",
-	"core.events.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
+	"core.events.timer_scheduler", "core.process.adapters.shell_runner", "adapters.running_application",
 	"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
 	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "core.i18n.engine.i18n" }
@@ -74,7 +74,7 @@ local function with_dialog(callback)
 			package.loaded["adapters.running_application"] = {
 				current = function() return { activate = function() return true end } end,
 			}
-			package.loaded["adapters.shell_runner"] = { spawn = function(executable, args)
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args)
 				local process = { executable = executable, args = args, start_calls = 0 }
 				process.start = function() process.start_calls = process.start_calls + 1; return true end
 				fixture.spawns[#fixture.spawns + 1] = process

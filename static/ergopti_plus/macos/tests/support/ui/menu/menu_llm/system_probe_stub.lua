@@ -10,7 +10,7 @@ local M = {}
 --- @param ram_gb integer Installed memory the sysctl probe reports.
 --- @param free_gb integer Free disk gigabytes the df probe reports.
 function M.install(ram_gb, free_gb)
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		run = function(executable, _, on_done)
 			if executable:find("sysctl", 1, true) then
 				on_done(true, tostring(ram_gb * 1024 * 1024 * 1024))

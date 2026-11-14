@@ -16,12 +16,12 @@ local OWNED = {
 	"infra.notifications", "core.text.engine.json", "modules.llm.progressive_reveal",
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
-	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
+	"modules.llm.api_mlx_inference", "core.process.adapters.shell_runner", "modules.keystats",
 	"core.logger.engine.logger", "core.events.timer_scheduler", "core.network.adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.timings",
-	"infra.deferred_work", "adapters.task_environment", "diagnostics.engine.runtime_log",
+	"infra.deferred_work", "core.process.adapters.task_environment", "diagnostics.engine.runtime_log",
 	"diagnostics.engine.operation_reporter", "diagnostics.engine.reports.redact", "core.logger.engine.shim",
 	"infra.manifest_reader", "infra.toml.reader", "core.fs.adapters.storage",
 	"core.fs.engine.dir", "hotstrings.engine.catalogue.personal_files", "settings.engine.publication.defaults", "lfs",
@@ -62,7 +62,7 @@ local function with_stream(scenario)
 					return native
 				end },
 			})
-			f.shell = require("adapters.shell_runner")
+			f.shell = require("core.process.adapters.shell_runner")
 			f.controller = require("modules.llm.api_mlx")
 			for index = 1, 100 do
 				local name, value = debug.getupvalue(f.controller.cancel_streaming, index)

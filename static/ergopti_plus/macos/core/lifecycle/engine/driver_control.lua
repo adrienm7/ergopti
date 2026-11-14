@@ -53,7 +53,7 @@ local quote = TextUtils.shell_quote
 --- @return table ports
 local function native_ports()
 	local FileSystem = require("core.fs.adapters.file_system")
-	local ShellRunner = require("adapters.shell_runner")
+	local ShellRunner = require("core.process.adapters.shell_runner")
 	return {
 		read = FileSystem.read_with_status,
 		write = function(path, text) return FileSystem.write(path, text) == true end,

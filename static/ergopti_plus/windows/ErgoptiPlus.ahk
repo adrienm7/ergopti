@@ -408,7 +408,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include infra/config_transition.ahk
 #Include infra/config_transition_runtime.ahk
 #Include adapters/window_info.ahk
-#Include adapters/uia_worker.ahk
+#Include core/process/adapters/uia_worker.ahk
 #Include adapters/hotkey_registrar.ahk
 #Include ../_shared/shortcuts/data/magic_editor.ahk
 #Include infra/magic_editor.ahk
@@ -419,7 +419,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/network/adapters/http_client.ahk
 #Include adapters/secure_field_detector.ahk
 #Include core/fs/adapters/storage.ahk
-#Include adapters/process_lifecycle.ahk
+#Include core/process/adapters/lifecycle.ahk
 #Include adapters/key_state.ahk
 #Include adapters/keyboard_layout_switch.ahk
 #Include adapters/app_launcher.ahk
@@ -436,7 +436,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/graphics_renderer.ahk
 #Include adapters/notify_icon.ahk
 #Include adapters/tooltip_renderer.ahk
-#Include adapters/shell_runner.ahk
+#Include core/process/adapters/shell_runner.ahk
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
 #Include adapters/screen_brightness.ahk
 #Include adapters/crash_report_worker.ahk
@@ -536,7 +536,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
 #Include infra/program_parameter.ahk
-#Include adapters/program_providers.ahk
+#Include core/process/adapters/program_providers.ahk
 #Include infra/program_actions.ahk
 #Include infra/user_actions.ahk
 #Include infra/sticky_modifiers.ahk

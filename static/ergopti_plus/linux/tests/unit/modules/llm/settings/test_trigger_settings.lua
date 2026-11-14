@@ -161,10 +161,10 @@ local function with_url_request(options, body)
 		if options.window_throw then error("controlled native window failure") end
 		return { appId = options.app, windowTitle = "Owned document", bundleId = "", executablePath = "" }, "x11:123:42"
 	end })
-	replace("adapters.process_lifecycle", nil)
-	local lifecycle = require("adapters.process_lifecycle")
+	replace("core.process.adapters.lifecycle", nil)
+	local lifecycle = require("core.process.adapters.lifecycle")
 	if options.replace_lifecycle then
-		replace("adapters.process_lifecycle", { getForegroundApp = function()
+		replace("core.process.adapters.lifecycle", { getForegroundApp = function()
 			if options.lifecycle_throw then error("controlled lifecycle failure") end
 			return options.foreground
 		end })

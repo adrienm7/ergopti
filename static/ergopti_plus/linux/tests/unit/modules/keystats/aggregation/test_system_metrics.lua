@@ -44,7 +44,7 @@ end
 ---   names the commands this machine lacks (every other command is installed).
 --- @param body function Receives the module.
 local function with_shell(answers, body)
-	local shell_name = "adapters.shell_runner"
+	local shell_name = "core.process.adapters.shell_runner"
 	local module_name = "modules.keystats.system_metrics"
 	local previous_shell = package.loaded[shell_name]
 	local previous_module = package.loaded[module_name]
@@ -203,7 +203,7 @@ helpers.describe("system metrics: reading the machine", function()
 		with_shell({ { match = "power_supply", out = "80" } }, function(metrics, sample)
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
-			package.loaded["adapters.shell_runner"].exec_line = function(command)
+			package.loaded["core.process.adapters.shell_runner"].exec_line = function(command)
 				if command:find("power_supply", 1, true) then return "30" end
 				return ""
 			end
@@ -478,7 +478,7 @@ end)
 helpers.describe("system metrics: network changes", function()
 
 	helpers.it("keeps network changes readable under a translated nmcli locale", function()
-		local real_shell = require("adapters.shell_runner")
+		local real_shell = require("core.process.adapters.shell_runner")
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(real_shell.run("mkdir -- " .. real_shell.quote(dir)))
@@ -493,7 +493,7 @@ helpers.describe("system metrics: network changes", function()
 		local okay, detail = pcall(function()
 			local ssid = "maison"
 			with_shell({ missing = { iwgetid = true } }, function(metrics, sample)
-				local shell = package.loaded["adapters.shell_runner"]
+				local shell = package.loaded["core.process.adapters.shell_runner"]
 				shell.exec_line = function(command)
 					if not command:find("nmcli", 1, true) then return "" end
 					return real_shell.exec_line("PATH=" .. real_shell.quote(dir .. ":/usr/bin:/bin")
@@ -518,7 +518,7 @@ helpers.describe("system metrics: network changes", function()
 		}, function(metrics, sample)
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
-			package.loaded["adapters.shell_runner"].exec_line = function(command)
+			package.loaded["core.process.adapters.shell_runner"].exec_line = function(command)
 				if command:find("nmcli", 1, true) then return "yes:bureau" end
 				if command:find("power_supply", 1, true) then return "50" end
 				return ""
@@ -556,7 +556,7 @@ helpers.describe("system metrics: network changes", function()
 		}, function(metrics, sample)
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
-			package.loaded["adapters.shell_runner"].exec_line = function(command)
+			package.loaded["core.process.adapters.shell_runner"].exec_line = function(command)
 				if command:find("power_supply", 1, true) then return "50" end
 				return ""
 			end
@@ -572,7 +572,7 @@ helpers.describe("system metrics: network changes", function()
 	-- an empty PATH, so only a reader that needs no tool passes; the stats move
 	-- between samples, so only the interface's name counts as the network.
 	helpers.it("reads the wireless interface with no tool on the PATH (wireless-without-awk)", function()
-		local real_shell = require("adapters.shell_runner")
+		local real_shell = require("core.process.adapters.shell_runner")
 		local dir = os.tmpname()
 		os.remove(dir)
 		os.execute("mkdir " .. dir)
@@ -585,7 +585,7 @@ helpers.describe("system metrics: network changes", function()
 			fh:close()
 		end
 		with_shell({}, function(metrics, sample)
-			local shell = package.loaded["adapters.shell_runner"]
+			local shell = package.loaded["core.process.adapters.shell_runner"]
 			shell.has_command = function() return false end
 			shell.exec_line = function(command)
 				if not command:find(listing, 1, true) then return "" end

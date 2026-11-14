@@ -35,7 +35,7 @@ local LAUNCHER_ENV = {
 local OWNED = {
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
-	"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
+	"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
 	"modules.llm.ollama_deps_checker", "modules.llm.backend_detector",
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
@@ -223,7 +223,7 @@ local function load_world(world)
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	for _, name in ipairs({ "adapters.task_lifecycle", "core.events.timer_scheduler",
+	for _, name in ipairs({ "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 		"modules.llm.backend_detector", "modules.llm.mlx_bootstrap_diagnosis" }) do
 		package.loaded[name] = nil
 	end
@@ -286,7 +286,7 @@ local function load_world(world)
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args)
 			world.spawns[#world.spawns + 1] = { executable = executable, args = args }
 			return { start = function() return true end }
@@ -323,7 +323,7 @@ local function scoped(scenario, env)
 			with_environment(env or LAUNCHER_ENV, scenario)
 			-- The scope restores the real module; releasing the stub here too
 			-- keeps the suite-wide shell_runner hygiene gate able to see it.
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 		end)
 	end
 end

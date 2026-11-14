@@ -15,7 +15,7 @@
 --- same hs.task-based async pattern used throughout modules/llm/api_*.lua and
 --- platform/remap/watchers.lua's read_layout_async()).
 ---
---- Two angles, matching the style of tests/unit/adapters/processes/test_shell_runner_on_done_visible.lua:
+--- Two angles, matching the style of tests/unit/core/process/test_shell_runner_on_done_visible.lua:
 ---   1. Source check: neither method calls hs.execute directly anymore.
 ---   2. Behaviour: driving the stubbed hs.task completion callback updates the
 ---      cached result that a subsequent call returns.
@@ -71,10 +71,10 @@ helpers.describe("NetworkInfo: async shell-out (F-LOW-8 source)", function()
 			"isVpnActive() must not shell out synchronously via hs.execute — use the async ShellRunner adapter instead")
 	end)
 
-	helpers.it("network_info.lua requires adapters.shell_runner", function()
+	helpers.it("network_info.lua requires core.process.adapters.shell_runner", function()
 		local src = read_network_info_src()
-		helpers.assert_true(src:find('require%("adapters%.shell_runner"%)') ~= nil,
-			"network_info.lua must dispatch its shell-outs through adapters.shell_runner")
+		helpers.assert_true(src:find('require%("core%.process%.adapters%.shell_runner"%)') ~= nil,
+			"network_info.lua must dispatch its shell-outs through core.process.adapters.shell_runner")
 	end)
 
 end)
@@ -121,7 +121,7 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 	-- `hs` stub happened to be active the first time some earlier test in the
 	-- suite required it — not the fresh task stub built for this test.
 	local function reload_network_info(hs_overrides)
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		return helpers.load_with_stubs("core.network.adapters.info", hs_overrides)
 	end
 

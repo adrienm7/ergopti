@@ -22,7 +22,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ManifestMenu = require("infra.manifest_menu")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local COMMAND = require("settings.engine.keys").COMMAND
 
 local LOG = "ui.menu.active_layout_rows"

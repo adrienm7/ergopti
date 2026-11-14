@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local function receive(mode)
 	local actual_uv = require("luv")
 	local construct = require("infra.archive_tar_feeder").new
-	local names = { "luv", "core.network.engine.managed_http_deadline", "adapters.owned_process" }
+	local names = { "luv", "core.network.engine.managed_http_deadline", "core.process.adapters.owned_process" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local pipe, captured, reads = nil, nil, 0
 	local ok, reason = xpcall(function()
@@ -28,7 +28,7 @@ local function receive(mode)
 		function timer:on_settled(listener) listener(); return true end
 		package.loaded.luv = uv
 		package.loaded["core.network.engine.managed_http_deadline"] = { start = function() return timer end }
-		package.loaded["adapters.owned_process"] = { start = function(program, args, options)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(program, args, options)
 			assert(program == "tar" and options.stdin_owner.handle == pipe)
 			captured = { args = args, options = options }
 			local actor = { started = true }
