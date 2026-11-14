@@ -80,7 +80,7 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       NaN, out of range) fails fast with a log line instead of crashing. Start with an inventory of every prompt and
       key per OS, then regression tests per OS that feed a wrong type, a boundary and an out-of-range value at each
       of the three places.
-      Claimed by worker B (2026-11-13). Landed on 2026-11-14 after CI run 43539039731: the inventory
+      Claimed by worker B (2026-11-13). Landed on 2026-11-14 after CI run 43543560868: the inventory
       ([docs/design/value-validation-inventory.md](docs/design/value-validation-inventory.md), its « Migration status
       » table is the state per family), the shared schema `_shared/settings/data/value_schema/value_schema.json` and
       its check in JS, Lua (macOS, Linux) and AHK, pinned by shared vectors, with the localized refusals in 21
