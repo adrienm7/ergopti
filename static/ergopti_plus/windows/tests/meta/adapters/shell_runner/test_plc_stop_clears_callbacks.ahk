@@ -20,8 +20,10 @@
 
 #Requires AutoHotkey v2.0
 
-_TPSCC_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol: a structure move may
+; rename the file to a base name another file shares, its symbol stays.
+_TPSCC_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 _TPSCC_StripLineComments(Src) {
@@ -41,7 +43,7 @@ _TPSCC_StripLineComments(Src) {
 ; ================================================================
 
 _TPSCC_AllCallbacksCleared() {
-	Src := _TPSCC_StripLineComments(_TPSCC_ReadSource("process_lifecycle.ahk"))
+	Src := _TPSCC_StripLineComments(_TPSCC_ReadSource("PLC_OnFocusChange"))
 	Assert(Src != "", "adapters/process_lifecycle.ahk must be readable")
 
 	Body := _DriverFuncBody("PLC_Stop")
