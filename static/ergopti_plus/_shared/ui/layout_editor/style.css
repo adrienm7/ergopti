@@ -461,6 +461,28 @@ body {
 	border-style: dashed;
 }
 
+/* The shortcut view: an overridden key stands out, the others read « = » muted. */
+.le-key.overridden {
+	background: var(--le-accent-soft);
+	border-color: var(--le-accent);
+}
+
+.le-key.same .le-legend {
+	color: var(--le-sub);
+}
+
+.le-shortcut-tab {
+	border-style: solid;
+}
+
+.le-shortcut-list li {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 4px;
+}
+
 .le-key.remapped {
 	outline: 2px dotted var(--le-sub);
 }

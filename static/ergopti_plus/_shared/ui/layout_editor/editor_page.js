@@ -328,6 +328,11 @@ var LayoutEditorPage = (function () {
 			tool: TOOLS[0],
 			// The key inspector's groups unfolded by the user (see inspectorGroup).
 			openGroups: new Set(),
+			// The « Shortcuts » view: the board shows each key's shortcut overrides
+			// instead of a layer, and the inspector edits them.
+			shortcutView: false,
+			// The override loaded in the shortcut form by « Edit » (null: a new one).
+			shortcutDraft: null,
 			// The keyboard an imported .keylayout is described on, and the key
 			// held for an imported navigation layer ('' until chosen).
 			importConvention: 'iso',
@@ -719,24 +724,46 @@ var LayoutEditorPage = (function () {
 		 */
 		function layerLabel(layer) {
 			if (!layer.required.length) return layer.id;
-			return layer.required
-				.map((mod) => {
-					const code = MODIFIER_NAME_KEYS[mod];
-					if (!code) return mod;
-					const name = keyName(code);
-					if (name !== code) return name;
-					// A key each OS names its own way (Meta) when the view states no OS.
-					const names = LayoutEditorModel.PLATFORMS.map((os) =>
-						LayerModel.keyLegend(code, Object.assign({}, keyView, { os }))
-					).filter((each) => each !== code);
-					return names.length ? [...new Set(names)].join(' / ') : mod;
-				})
+			return layer.required.map(modifierLabel).join(' + ');
+		}
+
+		/** A modifier as the keycaps name it; one no key names keeps its id. */
+		function modifierLabel(mod) {
+			const code = MODIFIER_NAME_KEYS[mod];
+			if (!code) return mod;
+			const name = keyName(code);
+			if (name !== code) return name;
+			// A key each OS names its own way (Meta) when the view states no OS.
+			const names = LayoutEditorModel.PLATFORMS.map((os) =>
+				LayerModel.keyLegend(code, Object.assign({}, keyView, { os }))
+			).filter((each) => each !== code);
+			return names.length ? [...new Set(names)].join(' / ') : mod;
+		}
+
+		/** A chord as the keycaps name it: Ctrl + Maj + C. */
+		function chordLabel(modifiers, code) {
+			return modifiers
+				.map(modifierLabel)
+				.concat([keyName(code)])
 				.join(' + ');
+		}
+
+		/** The overrides of one key, in the order the source lists them. */
+		function keyShortcuts(code) {
+			return (doc().shortcuts || []).filter((entry) => entry.key === code);
 		}
 
 		/** Selects a layer and redraws. */
 		function showLayer(id) {
 			state.layer = id;
+			state.shortcutView = false;
+			render();
+		}
+
+		/** Shows the « Shortcuts » view. */
+		function showShortcuts() {
+			state.shortcutView = true;
+			state.shortcutDraft = null;
 			render();
 		}
 
@@ -746,6 +773,7 @@ var LayoutEditorPage = (function () {
 		 */
 		function layerBar() {
 			const preserved = LayoutSourceIO.isPreserved(doc());
+			const current = state.shortcutView ? null : state.layer;
 			const levelIds = new Set();
 			const levels = LayoutSourceIO.LEVEL_LAYERS.map((level) => {
 				const layer = levelLayer(level);
@@ -755,8 +783,8 @@ var LayoutEditorPage = (function () {
 					return el('button', {
 						type: 'button',
 						role: 'tab',
-						class: `le-tab${layer.id === state.layer ? ' active' : ''}`,
-						'aria-selected': String(layer.id === state.layer),
+						class: `le-tab${layer.id === current ? ' active' : ''}`,
+						'aria-selected': String(layer.id === current),
 						'data-layer': layer.id,
 						'data-level': level.id,
 						title: layer.required.join('+') || tl('layer.no_modifier'),
@@ -784,8 +812,8 @@ var LayoutEditorPage = (function () {
 					el('button', {
 						type: 'button',
 						role: 'tab',
-						class: `le-tab${layer.id === state.layer ? ' active' : ''}`,
-						'aria-selected': String(layer.id === state.layer),
+						class: `le-tab${layer.id === current ? ' active' : ''}`,
+						'aria-selected': String(layer.id === current),
 						'data-layer': layer.id,
 						title: `${layer.id} (${layer.required.join('+') || tl('layer.no_modifier')})`,
 						text: layerLabel(layer),
@@ -818,6 +846,18 @@ var LayoutEditorPage = (function () {
 					others.length
 						? el('div', { class: 'le-tabs le-other-layers', role: 'tablist' }, others)
 						: null,
+					preserved
+						? null
+						: el('button', {
+								type: 'button',
+								role: 'tab',
+								id: 'le-shortcut-view',
+								class: `le-tab le-shortcut-tab${state.shortcutView ? ' active' : ''}`,
+								'aria-selected': String(state.shortcutView),
+								title: tl('shortcut.view_title'),
+								text: tl('shortcut.view'),
+								onclick: showShortcuts
+							}),
 					preserved
 						? null
 						: el('button', {
@@ -1068,7 +1108,7 @@ var LayoutEditorPage = (function () {
 		}
 
 		function editableLayer() {
-			return Boolean(state.layer) && !LayoutSourceIO.isPreserved(doc());
+			return Boolean(state.layer) && !state.shortcutView && !LayoutSourceIO.isPreserved(doc());
 		}
 
 		function copyMapping(code) {
@@ -1114,10 +1154,21 @@ var LayoutEditorPage = (function () {
 			const remap = doc().remap || {};
 			for (const key of keys) {
 				const g = key.geometry[form];
-				const found = currentMapping(key.code);
-				const label = found ? legend(found.mapping, doc()) : '';
+				const overrides = state.shortcutView ? keyShortcuts(key.code) : [];
+				const found = state.shortcutView ? null : currentMapping(key.code);
+				// In the shortcut view a key shows its overrides, or « = » for « same as the base key ».
+				const label = state.shortcutView
+					? overrides.length
+						? overrides
+								.map((entry) => `→ ${chordLabel(entry.send_modifiers, entry.send_key)}`)
+								.join(' · ')
+						: '='
+					: found
+						? legend(found.mapping, doc())
+						: '';
 				const classes = ['le-key'];
 				if (found) classes.push(found.scope === 'all' ? 'mapped' : 'platform');
+				if (state.shortcutView) classes.push(overrides.length ? 'overridden' : 'same');
 				if (key.code === state.selected) classes.push('selected');
 				if (Object.prototype.hasOwnProperty.call(remap, key.code)) classes.push('remapped');
 				container.append(
@@ -1128,7 +1179,18 @@ var LayoutEditorPage = (function () {
 							class: classes.join(' '),
 							'data-code': key.code,
 							// The full label, which a long one only shows here once fitted.
-							title: label ? `${keyName(key.code)}: ${label}` : keyName(key.code),
+							title: state.shortcutView
+								? overrides.length
+									? overrides
+											.map(
+												(entry) =>
+													`${chordLabel(entry.modifiers, entry.key)} → ${chordLabel(entry.send_modifiers, entry.send_key)}`
+											)
+											.join('\n')
+									: `${keyName(key.code)}: ${tl('shortcut.same')}`
+								: label
+									? `${keyName(key.code)}: ${label}`
+									: keyName(key.code),
 							style: `--x:${g.col};--y:${g.row};--w:${g.width};--h:${g.height || 1}`,
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
@@ -1723,20 +1785,32 @@ var LayoutEditorPage = (function () {
 			]);
 		}
 
+		/**
+		 * The shortcut overrides of a key: every one listed with Edit and Remove,
+		 * and a form for any combination of modifiers sending any chord. A
+		 * combination with no override acts as on the base key.
+		 */
 		function shortcutEditor(code) {
-			const shortcuts = (doc().shortcuts || []).filter((s) => s.key === code);
-			const modifierChecks = (prefix) =>
+			const shortcuts = keyShortcuts(code);
+			const draft =
+				state.shortcutDraft && state.shortcutDraft.key === code ? state.shortcutDraft : null;
+			const modifierChecks = (prefix, chosen) =>
 				modifierOptions().map((id) =>
-					el('label', { class: 'le-check' }, [
-						el('input', { type: 'checkbox', value: id, 'data-group': prefix }),
-						id
+					el('label', { class: 'le-check', title: id }, [
+						el('input', {
+							type: 'checkbox',
+							value: id,
+							'data-group': prefix,
+							checked: chosen.includes(id)
+						}),
+						modifierLabel(id)
 					])
 				);
-			const from = modifierChecks('from');
-			const to = modifierChecks('to');
+			const from = modifierChecks('from', draft ? draft.modifiers : []);
+			const to = modifierChecks('to', draft ? draft.send_modifiers : []);
 			const sendKey = select(
 				data.keys.filter((k) => k.kind === 'key').map((k) => [k.code, keyName(k.code)]),
-				code,
+				draft ? draft.send_key : code,
 				() => {},
 				{ id: 'le-shortcut-send' }
 			);
@@ -1745,16 +1819,38 @@ var LayoutEditorPage = (function () {
 					.map((c) => c.firstChild)
 					.filter((c) => c.checked)
 					.map((c) => c.value);
-			return inspectorGroup('shortcuts', [
+			const group = state.shortcutView
+				? (id, children) =>
+						el(
+							'div',
+							{ class: 'le-group', id: `le-group-${id}` },
+							[el('h3', { text: tl(`inspector.${id}`) })].concat(children)
+						)
+				: inspectorGroup;
+			return group('shortcuts', [
+				shortcuts.length
+					? null
+					: el('p', { class: 'le-note', id: 'le-shortcut-none', text: tl('shortcut.none') }),
 				el(
 					'ul',
-					{ class: 'le-list', id: 'le-shortcuts' },
+					{ class: 'le-list le-shortcut-list', id: 'le-shortcuts' },
 					shortcuts.map((s) =>
-						el('li', {}, [
-							`${s.modifiers.concat([keyName(s.key)]).join('+')} → ${s.send_modifiers.concat([keyName(s.send_key)]).join('+')} `,
+						el('li', { 'data-chord': s.modifiers.slice().sort().join('+') }, [
+							el('span', {
+								text: `${chordLabel(s.modifiers, s.key)} → ${chordLabel(s.send_modifiers, s.send_key)} `
+							}),
 							el('button', {
 								type: 'button',
-								class: 'danger',
+								class: 'le-shortcut-edit',
+								text: tl('btn.edit'),
+								onclick: () => {
+									state.shortcutDraft = JSON.parse(JSON.stringify(s));
+									render();
+								}
+							}),
+							el('button', {
+								type: 'button',
+								class: 'danger le-shortcut-remove',
 								text: tl('btn.remove'),
 								onclick: () => apply((d) => LayoutEditorModel.removeShortcut(d, s.key, s.modifiers))
 							})
@@ -1769,17 +1865,42 @@ var LayoutEditorPage = (function () {
 				el('button', {
 					type: 'button',
 					id: 'le-shortcut-add',
-					text: tl('btn.add'),
-					onclick: () =>
-						apply((d) =>
-							LayoutEditorModel.setShortcut(d, {
+					class: 'primary',
+					text: tl(draft ? 'btn.apply' : 'btn.add'),
+					onclick: () => {
+						const modifiers = checked(from);
+						if (!modifiers.length) return notify('error', tl('shortcut.need_modifier'));
+						// An edited override whose combination changed replaces the old one.
+						const replaced =
+							draft &&
+							draft.modifiers.slice().sort().join('+') !== modifiers.slice().sort().join('+')
+								? draft
+								: null;
+						state.shortcutDraft = null;
+						apply((d) => {
+							const base = replaced
+								? LayoutEditorModel.removeShortcut(d, code, replaced.modifiers)
+								: d;
+							return LayoutEditorModel.setShortcut(base, {
 								key: code,
-								modifiers: checked(from),
+								modifiers,
 								send_key: sendKey.value,
 								send_modifiers: checked(to)
-							})
-						)
-				})
+							});
+						});
+					}
+				}),
+				draft
+					? el('button', {
+							type: 'button',
+							id: 'le-shortcut-cancel',
+							text: tl('btn.cancel'),
+							onclick: () => {
+								state.shortcutDraft = null;
+								render();
+							}
+						})
+					: null
 			]);
 		}
 
@@ -1887,10 +2008,11 @@ var LayoutEditorPage = (function () {
 				);
 			return el('section', { class: 'le-inspector', id: 'le-inspector' }, [
 				el('h2', { text: keyName(code) }),
-				state.layer ? mappingEditor(code) : null,
+				state.shortcutView ? shortcutEditor(code) : null,
+				state.layer && !state.shortcutView ? mappingEditor(code) : null,
 				keyProperties(code),
 				remapEditor(code),
-				shortcutEditor(code),
+				state.shortcutView ? null : shortcutEditor(code),
 				tapHoldEditor(code)
 			]);
 		}
@@ -2523,6 +2645,26 @@ var LayoutEditorPage = (function () {
 			});
 		}
 
+		/**
+		 * The targets that cannot hold the shortcut overrides, named in one line: the
+		 * format owner reports them as omitted (shortcut_output_not_in_*), and only
+		 * ErgoptiPlus's emulation performs them.
+		 */
+		function shortcutExportNote(report) {
+			const count = (doc().shortcuts || []).length;
+			if (!count) return null;
+			const without = report
+				.filter((row) => (row.omitted || []).some((entry) => /^shortcuts\./.test(entry.path)))
+				.map((row) => tl(`target.${row.target}`));
+			return el('p', {
+				class: 'le-message ok le-export-shortcuts',
+				id: 'le-export-shortcuts',
+				text: without.length
+					? tl('shortcut.export_partial', { count, targets: without.join(', ') })
+					: tl('shortcut.export_all', { count })
+			});
+		}
+
 		function exportPanel() {
 			let report = [];
 			try {
@@ -2702,6 +2844,7 @@ var LayoutEditorPage = (function () {
 							)
 						]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
+				shortcutExportNote(report),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
 				el('p', { class: 'le-note', id: 'le-dll-note', text: tl('export.windows_dll_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),

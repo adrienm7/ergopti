@@ -10,7 +10,8 @@
  * .keylayout, export it unchanged, convert it, import the navigation layer,
  * show and add the Base, Shift, AltGr and Shift+AltGr layers from the layer
  * selector, lay out at phone width in light and dark without a sideways page
- * scroll, fit every key label inside its key, and check that no raw locale key is shown in any tool tab of the 21
+ * scroll, fit every key label inside its key, override shortcuts per modifier
+ * combination through save and reload, and check that no raw locale key is shown in any tool tab of the 21
  * locales. Page errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
  */
@@ -423,6 +424,113 @@ async function exerciseLayerSelector(browser, origin) {
 		),
 		[]
 	);
+	assert.deepEqual(errors, []);
+	await page.context().close();
+}
+
+/**
+ * The « Shortcuts » view: a key with no override reads « = » (same as the base
+ * key); an override for any modifier combination sends any chord, is marked on
+ * the board, listed with Edit and Remove, named by the export tab for the
+ * targets that cannot hold it, and kept through save and reload.
+ */
+async function exerciseShortcuts(browser, origin) {
+	const { page, errors } = await open(browser, origin, 'en');
+	// « é » on the base layer, where Ergopti has it, so Ctrl+é is Ctrl + that key.
+	await page.click('#le-board [data-code="KeyW"]');
+	await page.selectOption('#le-kind', 'text');
+	await page.fill('#le-text', 'é');
+	await page.click('#le-apply');
+	await page.click('#le-shortcut-view');
+	assert.equal(await page.getAttribute('#le-shortcut-view', 'aria-selected'), 'true');
+	assert.equal(await page.getAttribute('[data-layer="base"]', 'aria-selected'), 'false');
+	const key = (code) =>
+		page.$eval(`#le-board [data-code="${code}"]`, (node) => ({
+			legend: node.querySelector('.le-legend').textContent,
+			overridden: node.classList.contains('overridden'),
+			same: node.classList.contains('same')
+		}));
+	assert.deepEqual(await key('KeyW'), { legend: '=', overridden: false, same: true });
+	assert.equal(await page.locator('#le-shortcut-none').count(), 1);
+	const define = async (code, from, sendKey, to) => {
+		await page.click(`#le-board [data-code="${code}"]`);
+		for (const mod of from) await page.check(`#le-shortcut-from input[value="${mod}"]`);
+		await page.selectOption('#le-shortcut-send', sendKey);
+		for (const mod of to) await page.check(`#le-shortcut-to input[value="${mod}"]`);
+		await page.click('#le-shortcut-add');
+	};
+	// Ctrl+é sends Ctrl+Shift+C; Ctrl+A sends Ctrl+B.
+	await define('KeyW', ['control'], 'KeyC', ['control', 'shift']);
+	await define('KeyQ', ['control'], 'KeyB', ['control']);
+	assert.ok((await key('KeyW')).overridden, 'an overridden key is marked');
+	assert.ok((await key('KeyQ')).overridden);
+	assert.ok((await key('KeyE')).same);
+	// A combination needs a modifier: the refusal says so and nothing is added.
+	await page.click('#le-board [data-code="KeyE"]');
+	await page.click('#le-shortcut-add');
+	assert.match(await page.textContent('#le-message'), /modifier/);
+	assert.ok((await key('KeyE')).same);
+	// Edit changes the chord sent; Cancel leaves the override as it was.
+	await page.click('#le-board [data-code="KeyQ"]');
+	assert.equal(await page.locator('#le-shortcuts li').count(), 1);
+	await page.click('#le-shortcuts .le-shortcut-edit');
+	assert.ok(await page.isChecked('#le-shortcut-from input[value="control"]'));
+	assert.equal(await page.inputValue('#le-shortcut-send'), 'KeyB');
+	await page.click('#le-shortcut-cancel');
+	await page.click('#le-shortcuts .le-shortcut-edit');
+	await page.check('#le-shortcut-from input[value="alt"]');
+	await page.click('#le-shortcut-add');
+	assert.equal(
+		await page.locator('#le-shortcuts li').count(),
+		1,
+		'the edited combination replaces the old one'
+	);
+	await page.click('#le-undo');
+	assert.equal(await page.locator('#le-shortcuts li').count(), 1);
+	// Remove, then undo, keeps the history honest.
+	await page.click('#le-shortcuts .le-shortcut-remove');
+	assert.equal(await page.locator('#le-shortcuts li').count(), 0);
+	await page.click('#le-undo');
+	assert.equal(await page.locator('#le-shortcuts li').count(), 1);
+	// The export tab names the targets that cannot hold them.
+	await tool(page, 'export');
+	assert.match(await page.textContent('#le-export-shortcuts'), /\(2\)/);
+	assert.match(await page.textContent('#le-export-shortcuts'), /ErgoptiPlus/);
+	// Save and reload: both overrides come back from the TOML.
+	const saved = await downloaded(page, () => page.click('#le-save'));
+	const sorted = (list) => list.slice().sort();
+	assert.deepEqual(
+		require('smol-toml')
+			.parse(saved.text)
+			.shortcuts.map((entry) => [
+				entry.key,
+				sorted(entry.modifiers),
+				entry.send_key,
+				sorted(entry.send_modifiers)
+			]),
+		[
+			['KeyW', ['control'], 'KeyC', ['control', 'shift']],
+			['KeyQ', ['control'], 'KeyB', ['control']]
+		]
+	);
+	const reopened = path.join(require('node:os').tmpdir(), `layout-shortcuts-${process.pid}.toml`);
+	fs.writeFileSync(reopened, saved.text);
+	try {
+		await page.click('#le-new');
+		await page.click('#le-start [data-start="blank"]');
+		if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
+		await page.setInputFiles('#le-open-file', reopened);
+	} finally {
+		fs.rmSync(reopened);
+	}
+	await page.click('#le-shortcut-view');
+	assert.ok((await key('KeyW')).overridden);
+	assert.ok((await key('KeyQ')).overridden);
+	await page.click('#le-board [data-code="KeyW"]');
+	assert.match(await page.textContent('#le-shortcuts li'), /→ .*C/);
+	// Back on a layer, the board edits mappings again.
+	await page.click('[data-layer="base"]');
+	assert.equal(await page.textContent('#le-board [data-code="KeyW"] .le-legend'), 'é');
 	assert.deepEqual(errors, []);
 	await page.context().close();
 }
@@ -908,6 +1016,7 @@ async function exercisePhoneWidth(browser, origin) {
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);
+		await exerciseShortcuts(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {
@@ -923,6 +1032,9 @@ async function exercisePhoneWidth(browser, origin) {
 				await tool(opened.page, id);
 				raw.push(...(await rawKeys(opened.page)));
 			}
+			await opened.page.click('#le-shortcut-view');
+			await opened.page.click('#le-board [data-code="KeyQ"]');
+			raw.push(...(await rawKeys(opened.page)));
 			assert.deepEqual(raw, [], `${lang}: raw locale keys are shown`);
 			assert.deepEqual(opened.errors, [], `${lang}: page errors`);
 			await opened.page.close();
