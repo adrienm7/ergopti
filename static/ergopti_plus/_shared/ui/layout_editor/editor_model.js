@@ -240,6 +240,17 @@ var LayoutEditorModel = (function () {
 		return commit(next);
 	}
 
+	/**
+	 * Makes every modifier combination of a key but the text levels act as another
+	 * physical key (keys.<code>.shortcut_key), or clears it with null.
+	 */
+	function setShortcutKey(doc, code, target) {
+		const properties = Object.assign({}, (doc.keys || {})[code]);
+		if (target === null) delete properties.shortcut_key;
+		else properties.shortcut_key = target;
+		return setKeyProperties(doc, code, properties);
+	}
+
 	/** Makes a physical key act as another one ('' disables it), or clears it. */
 	function setRemap(doc, code, target) {
 		const next = editable(doc);
@@ -624,6 +635,7 @@ var LayoutEditorModel = (function () {
 		setDeadRule,
 		removeDeadKey,
 		setKeyProperties,
+		setShortcutKey,
 		setRemap,
 		setShortcut,
 		removeShortcut,

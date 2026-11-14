@@ -333,6 +333,8 @@ var LayoutEditorPage = (function () {
 			shortcutView: false,
 			// The override loaded in the shortcut form by « Edit » (null: a new one).
 			shortcutDraft: null,
+			// The key whose shortcut_key the next board click chooses (null: none).
+			pickingShortcutKey: null,
 			// The keyboard an imported .keylayout is described on, and the key
 			// held for an imported navigation layer ('' until chosen).
 			importConvention: 'iso',
@@ -748,6 +750,31 @@ var LayoutEditorPage = (function () {
 				.join(' + ');
 		}
 
+		/** The key every other combination of a key acts as (keys.<code>.shortcut_key), or null. */
+		function shortcutKeyOf(code) {
+			const entry = (doc().keys || {})[code];
+			return entry && typeof entry.shortcut_key === 'string' ? entry.shortcut_key : null;
+		}
+
+		/** A key as its cap reads: one letter in capitals (« C »), else its name. */
+		function capLabel(code) {
+			const name = keyName(code);
+			// A letter or digit key the layout does not map yet reads as its position (KeyC: « C »).
+			const position = name === code ? /^(?:Key|Digit)(.)$/.exec(code) : null;
+			if (position) return position[1];
+			return Array.from(name).length === 1 ? name.toUpperCase() : name;
+		}
+
+		/** A key's tooltip in the shortcut view: what it acts as, then each override. */
+		function shortcutTitle(code, actsAs, overrides) {
+			const lines = overrides.map(
+				(entry) =>
+					`${chordLabel(entry.modifiers, entry.key)} → ${chordLabel(entry.send_modifiers, entry.send_key)}`
+			);
+			if (actsAs) lines.unshift(`${keyName(code)}: ${tl('shortcut.act_as')} ${capLabel(actsAs)}`);
+			return lines.length ? lines.join('\n') : `${keyName(code)}: ${tl('shortcut.same')}`;
+		}
+
 		/** The overrides of one key, in the order the source lists them. */
 		function keyShortcuts(code) {
 			return (doc().shortcuts || []).filter((entry) => entry.key === code);
@@ -764,6 +791,7 @@ var LayoutEditorPage = (function () {
 		function showShortcuts() {
 			state.shortcutView = true;
 			state.shortcutDraft = null;
+			state.pickingShortcutKey = null;
 			render();
 		}
 
@@ -1155,20 +1183,27 @@ var LayoutEditorPage = (function () {
 			for (const key of keys) {
 				const g = key.geometry[form];
 				const overrides = state.shortcutView ? keyShortcuts(key.code) : [];
+				const actsAs = state.shortcutView ? shortcutKeyOf(key.code) : null;
 				const found = state.shortcutView ? null : currentMapping(key.code);
 				// In the shortcut view a key shows its overrides, or « = » for « same as the base key ».
 				const label = state.shortcutView
-					? overrides.length
-						? overrides
-								.map((entry) => `→ ${chordLabel(entry.send_modifiers, entry.send_key)}`)
-								.join(' · ')
-						: '='
+					? actsAs
+						? overrides.length
+							? `${capLabel(actsAs)} +${overrides.length}`
+							: capLabel(actsAs)
+						: overrides.length
+							? overrides
+									.map((entry) => `→ ${chordLabel(entry.send_modifiers, entry.send_key)}`)
+									.join(' · ')
+							: '='
 					: found
 						? legend(found.mapping, doc())
 						: '';
 				const classes = ['le-key'];
 				if (found) classes.push(found.scope === 'all' ? 'mapped' : 'platform');
-				if (state.shortcutView) classes.push(overrides.length ? 'overridden' : 'same');
+				if (state.shortcutView) classes.push(overrides.length || actsAs ? 'overridden' : 'same');
+				if (state.pickingShortcutKey && key.code !== state.pickingShortcutKey)
+					classes.push('pickable');
 				if (key.code === state.selected) classes.push('selected');
 				if (Object.prototype.hasOwnProperty.call(remap, key.code)) classes.push('remapped');
 				container.append(
@@ -1180,20 +1215,21 @@ var LayoutEditorPage = (function () {
 							'data-code': key.code,
 							// The full label, which a long one only shows here once fitted.
 							title: state.shortcutView
-								? overrides.length
-									? overrides
-											.map(
-												(entry) =>
-													`${chordLabel(entry.modifiers, entry.key)} → ${chordLabel(entry.send_modifiers, entry.send_key)}`
-											)
-											.join('\n')
-									: `${keyName(key.code)}: ${tl('shortcut.same')}`
+								? shortcutTitle(key.code, actsAs, overrides)
 								: label
 									? `${keyName(key.code)}: ${label}`
 									: keyName(key.code),
 							style: `--x:${g.col};--y:${g.row};--w:${g.width};--h:${g.height || 1}`,
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
+								// « Pick on the board »: this click chooses the key to act as.
+								const picking = state.pickingShortcutKey;
+								if (picking) {
+									state.pickingShortcutKey = null;
+									if (key.code !== picking)
+										return apply((d) => LayoutEditorModel.setShortcutKey(d, picking, key.code));
+									return render();
+								}
 								state.selected = key.code;
 								render();
 							},
@@ -1827,7 +1863,37 @@ var LayoutEditorPage = (function () {
 							[el('h3', { text: tl(`inspector.${id}`) })].concat(children)
 						)
 				: inspectorGroup;
+			// The simple case first, in one action: every other combination acts as one key.
+			const actsAs = shortcutKeyOf(code);
+			const actAsSelect = select(
+				[['', tl('shortcut.same')]].concat(
+					data.keys
+						.filter((k) => k.kind === 'key' && k.code !== code)
+						.map((k) => [k.code, capLabel(k.code)])
+				),
+				actsAs || '',
+				(value) =>
+					apply((d) => LayoutEditorModel.setShortcutKey(d, code, value === '' ? null : value)),
+				{ id: 'le-shortcut-key' }
+			);
+			const picking = state.pickingShortcutKey === code;
 			return group('shortcuts', [
+				el('div', { class: 'le-act-as', id: 'le-act-as' }, [
+					el('label', { class: 'le-field' }, [tl('shortcut.act_as'), actAsSelect]),
+					el('button', {
+						type: 'button',
+						id: 'le-shortcut-key-pick',
+						class: picking ? 'primary' : null,
+						'aria-pressed': String(picking),
+						text: tl(picking ? 'shortcut.picking' : 'shortcut.pick'),
+						onclick: () => {
+							state.pickingShortcutKey = picking ? null : code;
+							render();
+						}
+					}),
+					el('p', { class: 'le-note', text: tl('shortcut.act_as_note') })
+				]),
+				el('h4', { class: 'le-advanced', text: tl('shortcut.advanced') }),
 				shortcuts.length
 					? null
 					: el('p', { class: 'le-note', id: 'le-shortcut-none', text: tl('shortcut.none') }),
@@ -2651,10 +2717,12 @@ var LayoutEditorPage = (function () {
 		 * ErgoptiPlus's emulation performs them.
 		 */
 		function shortcutExportNote(report) {
-			const count = (doc().shortcuts || []).length;
+			const actsAs = Object.values(doc().keys || {}).filter((entry) => entry.shortcut_key);
+			const count = (doc().shortcuts || []).length + actsAs.length;
 			if (!count) return null;
+			const shortcutPath = /^shortcuts\.|^keys\.[^.]+\.shortcut_key$/;
 			const without = report
-				.filter((row) => (row.omitted || []).some((entry) => /^shortcuts\./.test(entry.path)))
+				.filter((row) => (row.omitted || []).some((entry) => shortcutPath.test(entry.path)))
 				.map((row) => tl(`target.${row.target}`));
 			return el('p', {
 				class: 'le-message ok le-export-shortcuts',

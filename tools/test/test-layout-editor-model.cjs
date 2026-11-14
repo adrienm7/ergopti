@@ -125,6 +125,19 @@ test('platform overrides win on their OS only and vanish when cleared', () => {
 	refuses(() => M.setMapping(doc, 'base', 'KeyQ', { text: 'x' }, 'beos'), 'platform_unknown');
 });
 
+test("a key's shortcut_key keeps its other properties, round-trips and clears", () => {
+	let doc = IO.create('a', 'A');
+	doc = M.setKeyProperties(doc, 'KeyW', { name: 'E acute' });
+	doc = M.setShortcutKey(doc, 'KeyW', 'KeyC');
+	assert.deepEqual(plain(doc.keys.KeyW), { name: 'E acute', shortcut_key: 'KeyC' });
+	assert.deepEqual(plain(IO.parse(IO.serialize(doc)).doc.keys.KeyW), plain(doc.keys.KeyW));
+	refuses(() => M.setShortcutKey(doc, 'KeyW', 'KeyW'), 'source_shortcut_key_self');
+	doc = M.setShortcutKey(doc, 'KeyW', null);
+	assert.deepEqual(plain(doc.keys.KeyW), { name: 'E acute' });
+	doc = M.setKeyProperties(doc, 'KeyW', null);
+	assert.equal(Object.prototype.hasOwnProperty.call(doc, 'keys'), false);
+});
+
 test('an invalid edit is refused and leaves the document as it was', () => {
 	const doc = IO.create('a', 'A');
 	const before = JSON.stringify(doc);

@@ -492,9 +492,27 @@ async function exerciseShortcuts(browser, origin) {
 	assert.equal(await page.locator('#le-shortcuts li').count(), 0);
 	await page.click('#le-undo');
 	assert.equal(await page.locator('#le-shortcuts li').count(), 1);
+	// The one-action default: every other combination of é acts as the key C,
+	// chosen in the list; the explicit Ctrl override above still wins.
+	await page.click('#le-board [data-code="KeyW"]');
+	await page.selectOption('#le-shortcut-key', 'KeyC');
+	assert.equal((await key('KeyW')).legend, 'C +1');
+	// … or picked on the board: KeyE acts as KeyR.
+	await page.click('#le-board [data-code="KeyE"]');
+	await page.click('#le-shortcut-key-pick');
+	assert.equal(await page.getAttribute('#le-shortcut-key-pick', 'aria-pressed'), 'true');
+	await page.click('#le-board [data-code="KeyR"]');
+	assert.equal((await key('KeyE')).legend, 'R');
+	assert.ok((await key('KeyE')).overridden);
+	assert.equal(await page.inputValue('#le-shortcut-key'), 'KeyR');
+	// « Same as the base key » clears it, and undo brings it back.
+	await page.selectOption('#le-shortcut-key', '');
+	assert.ok((await key('KeyE')).same);
+	await page.click('#le-undo');
+	assert.equal((await key('KeyE')).legend, 'R');
 	// The export tab names the targets that cannot hold them.
 	await tool(page, 'export');
-	assert.match(await page.textContent('#le-export-shortcuts'), /\(2\)/);
+	assert.match(await page.textContent('#le-export-shortcuts'), /\(4\)/);
 	assert.match(await page.textContent('#le-export-shortcuts'), /ErgoptiPlus/);
 	// Save and reload: both overrides come back from the TOML.
 	const saved = await downloaded(page, () => page.click('#le-save'));
@@ -513,6 +531,9 @@ async function exerciseShortcuts(browser, origin) {
 			['KeyQ', ['control'], 'KeyB', ['control']]
 		]
 	);
+	const parsedKeys = require('smol-toml').parse(saved.text).keys;
+	assert.equal(parsedKeys.KeyW.shortcut_key, 'KeyC');
+	assert.equal(parsedKeys.KeyE.shortcut_key, 'KeyR');
 	const reopened = path.join(require('node:os').tmpdir(), `layout-shortcuts-${process.pid}.toml`);
 	fs.writeFileSync(reopened, saved.text);
 	try {
@@ -528,6 +549,8 @@ async function exerciseShortcuts(browser, origin) {
 	assert.ok((await key('KeyQ')).overridden);
 	await page.click('#le-board [data-code="KeyW"]');
 	assert.match(await page.textContent('#le-shortcuts li'), /→ .*C/);
+	assert.equal(await page.inputValue('#le-shortcut-key'), 'KeyC');
+	assert.equal((await key('KeyE')).legend, 'R');
 	// Back on a layer, the board edits mappings again.
 	await page.click('[data-layer="base"]');
 	assert.equal(await page.textContent('#le-board [data-code="KeyW"] .le-legend'), 'é');

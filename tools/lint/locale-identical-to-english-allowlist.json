@@ -1234,6 +1234,30 @@
 				"zh"
 			]
 		},
+		"layout_editor.error.source_shortcut_key_self": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_editor.fill.level.altgr": {
 			"reason": "keyboard-key-name",
 			"locales": [
@@ -1502,6 +1526,78 @@
 				"zh"
 			]
 		},
+		"layout_editor.shortcut.act_as": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.shortcut.act_as_note": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.shortcut.advanced": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_editor.shortcut.export_all": {
 			"reason": "pending-translation",
 			"locales": [
@@ -1575,6 +1671,54 @@
 			]
 		},
 		"layout_editor.shortcut.none": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.shortcut.pick": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.shortcut.picking": {
 			"reason": "pending-translation",
 			"locales": [
 				"ar",

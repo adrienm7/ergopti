@@ -471,6 +471,22 @@ body {
 	color: var(--le-sub);
 }
 
+.le-key.pickable {
+	cursor: crosshair;
+}
+
+.le-act-as {
+	border-bottom: 1px solid var(--le-border);
+	margin-bottom: 8px;
+	padding-bottom: 8px;
+}
+
+.le-advanced {
+	color: var(--le-sub);
+	font-size: 0.9em;
+	margin: 4px 0;
+}
+
 .le-shortcut-tab {
 	border-style: solid;
 }
