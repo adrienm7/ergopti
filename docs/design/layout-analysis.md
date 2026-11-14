@@ -350,6 +350,21 @@ onResults}`. A second mount throws.
   scripts and mounts the Comparer into its « Comparer » tab.
 - Keystats tables sent before the mount are kept and applied when it happens.
 
+« Doigté » (`fingering_editor.js`, global `LAYOUT_ANALYSIS_FINGERING`) edits
+the fingering profile under the weights. It draws a key map coloured by
+finger, with the home keys marked; the user clicks a key, then picks its
+finger or makes it that finger's home key. It also has a base fingering
+(standard or angle mod), reset, and JSON export and import.
+
+- `current()` is the profile every analysis passes: the Comparer, the
+  editor's panel and the other analysers' scores. `onChange(listener)`
+  tells them when it changes.
+- An edit the engine refuses is not applied, and the page shows the reason.
+- The profile is kept by the host when it offers `store.loadProfile()` and
+  `store.saveProfile(profile)` (promises). Otherwise it goes to
+  localStorage, and another page of the same site follows it through the
+  `storage` event.
+
 The host `store` contract:
 
 - `list()` resolves to the saved layouts.

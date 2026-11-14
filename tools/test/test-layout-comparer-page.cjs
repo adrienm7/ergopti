@@ -43,6 +43,7 @@ const SCRIPTS = [
 	'_generated/analysis_data.js',
 	'analysis_engine.js',
 	'info_popover.js',
+	'fingering_editor.js',
 	'../layout_composer/_generated/composer_data.js',
 	'../layout_composer/composer_model.js',
 	'../layout_editor/toml_prelude.js',
@@ -81,11 +82,22 @@ for (const m of markup.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g))
 for (const m of markup.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
 	for (const option of m[2].matchAll(/value="([^"]+)"/g)) keys.add(`${m[1]}.${option[1]}`);
 // The page, its popovers and the editor's analysis panel share these strings.
-for (const file of ['comparer_page.js', 'info_popover.js', 'analysis_panel.js'])
+for (const file of [
+	'comparer_page.js',
+	'info_popover.js',
+	'analysis_panel.js',
+	'fingering_editor.js'
+])
 	for (const m of fs.readFileSync(path.join(PAGE_DIR, file), 'utf8').matchAll(/\bt\('([a-z_.]+)'/g))
 		keys.add(m[1]);
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
+// The fingering editor's base choices and the errors it reports.
+for (const id of Object.keys(DATA.model.fingerings)) keys.add(`${PREFIX}fingering.base_${id}`);
+for (const m of fs
+	.readFileSync(path.join(PAGE_DIR, 'fingering_editor.js'), 'utf8')
+	.matchAll(/notifyError\('([a-z_.]+)'/g))
+	keys.add(m[1]);
 for (const id of Object.keys(DATA.sources.items)) keys.add(`${PREFIX}info.${id}`);
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);
 const locales = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
@@ -190,6 +202,7 @@ const PANEL_SCRIPTS = [
 	'../layout_analysis/_generated/analysis_data.js',
 	'../layout_analysis/analysis_engine.js',
 	'../layout_analysis/info_popover.js',
+	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',
 	'../layout_analysis/analysis_panel.js',
 	'../layout_editor/editor_page.js'

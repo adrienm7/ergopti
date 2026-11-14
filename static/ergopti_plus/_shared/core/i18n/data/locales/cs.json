@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Řazení vůči knihovně…",
 	"layout_analysis.panel.unavailable": "Toto rozložení zde nelze analyzovat ({reason}).",
 	"layout_analysis.panel.weights_note": "Hodnoceno s váhami a ideálním zatížením prstů nastavenými v « Porovnat ».",
-	"layout_analysis.corpus.word_list": "Sestaveno ze seznamu četností slov: jen n-gramy uvnitř slov a na jejich hranicích, bez velkých písmen, interpunkce a dvojic přes hranice slov."
+	"layout_analysis.corpus.word_list": "Sestaveno ze seznamu četností slov: jen n-gramy uvnitř slov a na jejich hranicích, bez velkých písmen, interpunkce a dvojic přes hranice slov.",
+	"layout_analysis.fingering.title": "Prstoklad",
+	"layout_analysis.fingering.help": "Vyberte klávesu na plánu a pak prst, který ji stiskne, nebo z ní udělejte základní klávesu tohoto prstu. Všechny míry se řídí tímto prstokladem.",
+	"layout_analysis.fingering.base": "Základní prstoklad",
+	"layout_analysis.fingering.base_standard": "Standardní",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Prst",
+	"layout_analysis.fingering.set_home": "Udělat z ní základní klávesu tohoto prstu",
+	"layout_analysis.fingering.reset": "Obnovit výchozí prstoklad",
+	"layout_analysis.fingering.export": "Exportovat (JSON)",
+	"layout_analysis.fingering.import": "Importovat prstoklad:",
+	"layout_analysis.fingering.custom": "Používá se vlastní prstoklad.",
+	"layout_analysis.fingering.invalid": "Tento prstoklad nelze použít: {reason}",
+	"layout_analysis.fingering.save_failed": "Prstoklad se nepodařilo uložit.",
+	"layout_analysis.fingering.load_failed": "Uložený prstoklad se nepodařilo načíst."
 }

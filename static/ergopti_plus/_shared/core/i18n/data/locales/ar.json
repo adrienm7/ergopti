@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "جارٍ الترتيب مقارنة بالمكتبة…",
 	"layout_analysis.panel.unavailable": "لا يمكن تحليل هذا التخطيط هنا ({reason}).",
 	"layout_analysis.panel.weights_note": "احتُسبت النتيجة بالأوزان والحِمل المثالي للأصابع المضبوطة في « مقارنة ».",
-	"layout_analysis.corpus.word_list": "مبني من قائمة تكرار الكلمات: n-غرامات داخل الكلمات وعند حدودها فقط، بلا أحرف كبيرة ولا علامات ترقيم ولا أزواج بين الكلمات."
+	"layout_analysis.corpus.word_list": "مبني من قائمة تكرار الكلمات: n-غرامات داخل الكلمات وعند حدودها فقط، بلا أحرف كبيرة ولا علامات ترقيم ولا أزواج بين الكلمات.",
+	"layout_analysis.fingering.title": "توزيع الأصابع",
+	"layout_analysis.fingering.help": "اختر مفتاحًا على المخطط، ثم الإصبع الذي يضغطه، أو اجعله مفتاح ارتكاز ذلك الإصبع. كل المقاييس تتبع هذا التوزيع.",
+	"layout_analysis.fingering.base": "التوزيع الأساسي",
+	"layout_analysis.fingering.base_standard": "قياسي",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "الإصبع",
+	"layout_analysis.fingering.set_home": "اجعله مفتاح ارتكاز هذا الإصبع",
+	"layout_analysis.fingering.reset": "استعادة التوزيع الافتراضي",
+	"layout_analysis.fingering.export": "تصدير (JSON)",
+	"layout_analysis.fingering.import": "استيراد توزيع أصابع:",
+	"layout_analysis.fingering.custom": "يُستخدم توزيع أصابع مخصص.",
+	"layout_analysis.fingering.invalid": "لا يمكن استخدام هذا التوزيع: {reason}",
+	"layout_analysis.fingering.save_failed": "تعذر حفظ توزيع الأصابع.",
+	"layout_analysis.fingering.load_failed": "تعذرت قراءة توزيع الأصابع المحفوظ."
 }

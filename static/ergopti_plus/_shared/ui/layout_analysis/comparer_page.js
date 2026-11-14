@@ -39,6 +39,8 @@
  *    its popover says where the value comes from and links the sources.
  * 9. The ideal finger load of finger_imbalance is editable (eight targets
  *    summing to 100 %), kept with the other conveniences.
+ * 10. The user's fingering profile (fingering_editor.js: finger of each key,
+ *    home key of each finger) is edited here and applies to every analysis.
  * ==============================================================================
  */
 
@@ -48,6 +50,7 @@
 	const E = window.LAYOUT_ANALYSIS;
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const INFO = window.LAYOUT_ANALYSIS_INFO;
+	const FINGERING = window.LAYOUT_ANALYSIS_FINGERING;
 	const infoButton = INFO.button;
 	const STORAGE_KEY = window.LAYOUT_ANALYSIS_FILES.SETTINGS_KEY;
 	const CUSTOM_ID = 'custom';
@@ -230,7 +233,9 @@
 	></button>
 	<div id="la-ideal-list" class="la-weight-list"></div>
 	<p id="la-ideal-sum" class="la-muted" role="status"></p>
-</section>`;
+</section>
+
+<section id="la-fingering" class="la-weights la-fingering"></section>`;
 
 	let mounted = null;
 	// The app's last keystats tables, kept when they arrive before the mount.
@@ -442,7 +447,8 @@
 			state.results = E.compare(chosen, tables, {
 				keyboard: state.keyboard,
 				weights: state.weights,
-				idealLoad: state.idealLoad
+				idealLoad: state.idealLoad,
+				profile: FINGERING.current() || undefined
 			});
 			const ms = Math.round(performance.now() - start);
 			for (const listener of resultListeners)
@@ -603,7 +609,7 @@
 		function renderHeatmap(result) {
 			const box = $('la-heatmap');
 			box.replaceChildren();
-			const board = E.keyboard(result.keyboard);
+			const board = E.keyboard(result.keyboard, result.profile || undefined);
 			const layout = byId.get(result.layout.id);
 			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
 			const values = board.codes.map((code) => result.keys[code][state.heat]);
@@ -1063,6 +1069,8 @@
 			fillLayouts();
 			fillWeights();
 			fillIdealLoad();
+			FINGERING.mount($('la-fingering'));
+			FINGERING.onChange(() => analyse());
 			bind();
 			analyse();
 			if (opts.reportHeight) reportHeight();

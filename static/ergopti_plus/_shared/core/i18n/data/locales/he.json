@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "מדרג מול הספרייה…",
 	"layout_analysis.panel.unavailable": "לא ניתן לנתח כאן את הפריסה הזו ({reason}).",
 	"layout_analysis.panel.weights_note": "הציון חושב עם המשקלים ועומס האצבעות האידיאלי שהוגדרו ב« השוואה ».",
-	"layout_analysis.corpus.word_list": "נבנה מרשימת שכיחות מילים: רק n-גרמים בתוך מילים ובגבולותיהן, בלי אותיות גדולות, סימני פיסוק או זוגות בין מילים."
+	"layout_analysis.corpus.word_list": "נבנה מרשימת שכיחות מילים: רק n-גרמים בתוך מילים ובגבולותיהן, בלי אותיות גדולות, סימני פיסוק או זוגות בין מילים.",
+	"layout_analysis.fingering.title": "אצבוע",
+	"layout_analysis.fingering.help": "בחרו מקש במפה, ואז את האצבע שלוחצת עליו, או הפכו אותו למקש הבית של אותה אצבע. כל המדדים עוקבים אחר האצבוע הזה.",
+	"layout_analysis.fingering.base": "אצבוע בסיסי",
+	"layout_analysis.fingering.base_standard": "רגיל",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "אצבע",
+	"layout_analysis.fingering.set_home": "להפוך למקש הבית של אצבע זו",
+	"layout_analysis.fingering.reset": "שחזור האצבוע המוגדר כברירת מחדל",
+	"layout_analysis.fingering.export": "ייצוא (JSON)",
+	"layout_analysis.fingering.import": "ייבוא אצבוע:",
+	"layout_analysis.fingering.custom": "נעשה שימוש באצבוע מותאם.",
+	"layout_analysis.fingering.invalid": "לא ניתן להשתמש באצבוע הזה: {reason}",
+	"layout_analysis.fingering.save_failed": "לא ניתן היה לשמור את האצבוע.",
+	"layout_analysis.fingering.load_failed": "לא ניתן היה לקרוא את האצבוע השמור."
 }

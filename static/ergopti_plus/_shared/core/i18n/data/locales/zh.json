@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "正在与布局库排名…",
 	"layout_analysis.panel.unavailable": "无法在此分析该布局（{reason}）。",
 	"layout_analysis.panel.weights_note": "使用「比较」中设定的权重和理想手指负荷计分。",
-	"layout_analysis.corpus.word_list": "由词频列表生成：仅包含词内和词边界处的 n 元组，没有大写字母、标点符号或跨词字符对。"
+	"layout_analysis.corpus.word_list": "由词频列表生成：仅包含词内和词边界处的 n 元组，没有大写字母、标点符号或跨词字符对。",
+	"layout_analysis.fingering.title": "指法",
+	"layout_analysis.fingering.help": "在键位图上选择一个键，然后选择按它的手指，或将其设为该手指的基准键。所有指标都遵循此指法。",
+	"layout_analysis.fingering.base": "基础指法",
+	"layout_analysis.fingering.base_standard": "标准",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "手指",
+	"layout_analysis.fingering.set_home": "设为该手指的基准键",
+	"layout_analysis.fingering.reset": "恢复默认指法",
+	"layout_analysis.fingering.export": "导出（JSON）",
+	"layout_analysis.fingering.import": "导入指法：",
+	"layout_analysis.fingering.custom": "正在使用自定义指法。",
+	"layout_analysis.fingering.invalid": "无法使用此指法：{reason}",
+	"layout_analysis.fingering.save_failed": "无法保存指法。",
+	"layout_analysis.fingering.load_failed": "无法读取已保存的指法。"
 }

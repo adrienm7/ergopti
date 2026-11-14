@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "라이브러리와 순위 비교 중…",
 	"layout_analysis.panel.unavailable": "이 자판은 여기서 분석할 수 없습니다({reason}).",
 	"layout_analysis.panel.weights_note": "« 비교 »에서 설정한 가중치와 이상적인 손가락 부하로 채점했습니다.",
-	"layout_analysis.corpus.word_list": "단어 빈도 목록으로 만들었습니다: 단어 안과 단어 경계의 n-그램만 있으며, 대문자, 문장 부호, 단어를 넘는 쌍은 없습니다."
+	"layout_analysis.corpus.word_list": "단어 빈도 목록으로 만들었습니다: 단어 안과 단어 경계의 n-그램만 있으며, 대문자, 문장 부호, 단어를 넘는 쌍은 없습니다.",
+	"layout_analysis.fingering.title": "운지법",
+	"layout_analysis.fingering.help": "지도에서 키를 고른 뒤 그 키를 누르는 손가락을 고르거나, 그 손가락의 기본 키로 만드세요. 모든 지표가 이 운지법을 따릅니다.",
+	"layout_analysis.fingering.base": "기본 운지법",
+	"layout_analysis.fingering.base_standard": "표준",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "손가락",
+	"layout_analysis.fingering.set_home": "이 손가락의 기본 키로 만들기",
+	"layout_analysis.fingering.reset": "기본 운지법 복원",
+	"layout_analysis.fingering.export": "내보내기(JSON)",
+	"layout_analysis.fingering.import": "운지법 가져오기:",
+	"layout_analysis.fingering.custom": "사용자 운지법을 사용 중입니다.",
+	"layout_analysis.fingering.invalid": "이 운지법은 사용할 수 없습니다: {reason}",
+	"layout_analysis.fingering.save_failed": "운지법을 저장하지 못했습니다.",
+	"layout_analysis.fingering.load_failed": "저장된 운지법을 읽지 못했습니다."
 }

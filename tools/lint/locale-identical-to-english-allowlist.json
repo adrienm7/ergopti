@@ -1159,6 +1159,39 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "it", "pt", "sv"]
 		},
+		"layout_analysis.fingering.base_angle": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_analysis.fingering.base_standard": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "it", "no", "sv"]
+		},
+		"layout_analysis.fingering.finger": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "sv"]
+		},
 		"layout_analysis.ideal.sum": {
 			"reason": "loanword-or-cognate",
 			"locales": ["es", "pt"]

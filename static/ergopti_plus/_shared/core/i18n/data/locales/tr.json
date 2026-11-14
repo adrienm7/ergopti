@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Kütüphaneyle sıralanıyor…",
 	"layout_analysis.panel.unavailable": "Bu düzen burada analiz edilemiyor ({reason}).",
 	"layout_analysis.panel.weights_note": "« Karşılaştır » bölümünde ayarlanan ağırlıklar ve ideal parmak yüküyle puanlandı.",
-	"layout_analysis.corpus.word_list": "Bir kelime sıklığı listesinden oluşturuldu: yalnızca kelime içindeki ve kelime sınırlarındaki n-gramlar; büyük harf, noktalama ve kelimeler arası çiftler yok."
+	"layout_analysis.corpus.word_list": "Bir kelime sıklığı listesinden oluşturuldu: yalnızca kelime içindeki ve kelime sınırlarındaki n-gramlar; büyük harf, noktalama ve kelimeler arası çiftler yok.",
+	"layout_analysis.fingering.title": "Parmak düzeni",
+	"layout_analysis.fingering.help": "Haritada bir tuş seçin, sonra ona basan parmağı seçin ya da onu o parmağın temel tuşu yapın. Tüm ölçüler bu parmak düzenini izler.",
+	"layout_analysis.fingering.base": "Temel parmak düzeni",
+	"layout_analysis.fingering.base_standard": "Standart",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Parmak",
+	"layout_analysis.fingering.set_home": "Bu parmağın temel tuşu yap",
+	"layout_analysis.fingering.reset": "Varsayılan parmak düzenini geri yükle",
+	"layout_analysis.fingering.export": "Dışa aktar (JSON)",
+	"layout_analysis.fingering.import": "Parmak düzeni içe aktar:",
+	"layout_analysis.fingering.custom": "Özel parmak düzeni kullanılıyor.",
+	"layout_analysis.fingering.invalid": "Bu parmak düzeni kullanılamaz: {reason}",
+	"layout_analysis.fingering.save_failed": "Parmak düzeni kaydedilemedi.",
+	"layout_analysis.fingering.load_failed": "Kayıtlı parmak düzeni okunamadı."
 }

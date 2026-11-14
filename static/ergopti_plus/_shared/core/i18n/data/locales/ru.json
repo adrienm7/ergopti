@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Сравнение с библиотекой…",
 	"layout_analysis.panel.unavailable": "Эту раскладку нельзя проанализировать здесь ({reason}).",
 	"layout_analysis.panel.weights_note": "Оценка по весам и идеальной нагрузке на пальцы из « Сравнить ».",
-	"layout_analysis.corpus.word_list": "Построено по списку частот слов: только n-граммы внутри слов и на их границах, без заглавных букв, пунктуации и пар между словами."
+	"layout_analysis.corpus.word_list": "Построено по списку частот слов: только n-граммы внутри слов и на их границах, без заглавных букв, пунктуации и пар между словами.",
+	"layout_analysis.fingering.title": "Аппликатура",
+	"layout_analysis.fingering.help": "Выберите клавишу на схеме, затем палец, который её нажимает, или сделайте её исходной клавишей этого пальца. Все показатели следуют этой аппликатуре.",
+	"layout_analysis.fingering.base": "Базовая аппликатура",
+	"layout_analysis.fingering.base_standard": "Стандартная",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Палец",
+	"layout_analysis.fingering.set_home": "Сделать исходной клавишей этого пальца",
+	"layout_analysis.fingering.reset": "Восстановить аппликатуру по умолчанию",
+	"layout_analysis.fingering.export": "Экспорт (JSON)",
+	"layout_analysis.fingering.import": "Импортировать аппликатуру:",
+	"layout_analysis.fingering.custom": "Используется своя аппликатура.",
+	"layout_analysis.fingering.invalid": "Эту аппликатуру нельзя использовать: {reason}",
+	"layout_analysis.fingering.save_failed": "Не удалось сохранить аппликатуру.",
+	"layout_analysis.fingering.load_failed": "Не удалось прочитать сохранённую аппликатуру."
 }

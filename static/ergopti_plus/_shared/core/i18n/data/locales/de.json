@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Einordnung in die Bibliothek…",
 	"layout_analysis.panel.unavailable": "Dieses Layout kann hier nicht analysiert werden ({reason}).",
 	"layout_analysis.panel.weights_note": "Bewertet mit den Gewichten und der idealen Fingerlast aus « Vergleichen ».",
-	"layout_analysis.corpus.word_list": "Aus einer Worthäufigkeitsliste erstellt: nur N-Gramme innerhalb von Wörtern und an Wortgrenzen, ohne Großbuchstaben, Satzzeichen oder Paare über Wortgrenzen hinweg."
+	"layout_analysis.corpus.word_list": "Aus einer Worthäufigkeitsliste erstellt: nur N-Gramme innerhalb von Wörtern und an Wortgrenzen, ohne Großbuchstaben, Satzzeichen oder Paare über Wortgrenzen hinweg.",
+	"layout_analysis.fingering.title": "Fingersatz",
+	"layout_analysis.fingering.help": "Wählen Sie eine Taste auf dem Plan und dann den Finger, der sie drückt, oder machen Sie sie zur Grundtaste dieses Fingers. Alle Maße folgen diesem Fingersatz.",
+	"layout_analysis.fingering.base": "Grundfingersatz",
+	"layout_analysis.fingering.base_standard": "Standard",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Finger",
+	"layout_analysis.fingering.set_home": "Zur Grundtaste dieses Fingers machen",
+	"layout_analysis.fingering.reset": "Standardfingersatz wiederherstellen",
+	"layout_analysis.fingering.export": "Exportieren (JSON)",
+	"layout_analysis.fingering.import": "Fingersatz importieren:",
+	"layout_analysis.fingering.custom": "Eigener Fingersatz aktiv.",
+	"layout_analysis.fingering.invalid": "Dieser Fingersatz kann nicht verwendet werden: {reason}",
+	"layout_analysis.fingering.save_failed": "Der Fingersatz konnte nicht gespeichert werden.",
+	"layout_analysis.fingering.load_failed": "Der gespeicherte Fingersatz konnte nicht gelesen werden."
 }

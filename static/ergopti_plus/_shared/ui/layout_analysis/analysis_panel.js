@@ -128,6 +128,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		} catch {
 			settings.idealLoad = undefined;
 		}
+		// The user's fingering profile, shared with the Comparer.
+		settings.profile = window.LAYOUT_ANALYSIS_FINGERING.current() || undefined;
 		return settings;
 	}
 
@@ -226,7 +228,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				state.library = E.compare(E.libraryLayouts(), prepared, {
 					keyboard: state.keyboard,
 					weights: settings.weights,
-					idealLoad: settings.idealLoad
+					idealLoad: settings.idealLoad,
+					profile: settings.profile
 				}).map((r) => r.score.total);
 				state.libraryKey = key;
 			}
@@ -267,8 +270,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			const result = E.analyse(layout, prepared, {
 				keyboard: state.keyboard,
 				weights: settings.weights,
-				idealLoad: settings.idealLoad
+				idealLoad: settings.idealLoad,
+				profile: settings.profile
 			});
+			note.textContent = settings.profile
+				? `${t('layout_analysis.panel.weights_note')} ${t('layout_analysis.fingering.custom')}`
+				: t('layout_analysis.panel.weights_note');
 			if (state.libraryKey !== JSON.stringify([state.corpus, state.keyboard, settings]))
 				headline.textContent = t('layout_analysis.panel.ranking');
 			// The first ranking of a corpus takes a moment: let the page paint first.
@@ -365,6 +372,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		});
 		document.addEventListener('i18n:applied', () => {
 			fillControls();
+			schedule();
+		});
+		// A new fingering profile changes every metric and the library's ranking.
+		window.LAYOUT_ANALYSIS_FINGERING.onChange(() => {
+			state.previous = null;
 			schedule();
 		});
 		document.addEventListener(NGRAMS_EVENT, (event) => {

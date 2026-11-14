@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Rangerer i forhold til biblioteket…",
 	"layout_analysis.panel.unavailable": "Dette layout kan ikke analyseres her ({reason}).",
 	"layout_analysis.panel.weights_note": "Scoret med vægtene og den ideelle fingerbelastning fra « Sammenlign ».",
-	"layout_analysis.corpus.word_list": "Bygget af en ordfrekvensliste: kun n-gram inde i ord og ved ordgrænser, uden store bogstaver, tegnsætning eller par på tværs af ord."
+	"layout_analysis.corpus.word_list": "Bygget af en ordfrekvensliste: kun n-gram inde i ord og ved ordgrænser, uden store bogstaver, tegnsætning eller par på tværs af ord.",
+	"layout_analysis.fingering.title": "Fingersætning",
+	"layout_analysis.fingering.help": "Vælg en tast på kortet og derefter den finger, der trykker på den, eller gør den til fingerens hjemmetast. Alle mål følger denne fingersætning.",
+	"layout_analysis.fingering.base": "Grundfingersætning",
+	"layout_analysis.fingering.base_standard": "Standard",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Finger",
+	"layout_analysis.fingering.set_home": "Gør den til denne fingers hjemmetast",
+	"layout_analysis.fingering.reset": "Gendan standardfingersætningen",
+	"layout_analysis.fingering.export": "Eksportér (JSON)",
+	"layout_analysis.fingering.import": "Importér en fingersætning:",
+	"layout_analysis.fingering.custom": "Egen fingersætning i brug.",
+	"layout_analysis.fingering.invalid": "Denne fingersætning kan ikke bruges: {reason}",
+	"layout_analysis.fingering.save_failed": "Fingersætningen kunne ikke gemmes.",
+	"layout_analysis.fingering.load_failed": "Den gemte fingersætning kunne ikke læses."
 }

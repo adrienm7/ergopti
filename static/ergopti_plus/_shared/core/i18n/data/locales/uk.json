@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Порівняння з бібліотекою…",
 	"layout_analysis.panel.unavailable": "Цю розкладку не можна проаналізувати тут ({reason}).",
 	"layout_analysis.panel.weights_note": "Оцінка за вагами та ідеальним навантаженням на пальці з « Порівняти ».",
-	"layout_analysis.corpus.word_list": "Побудовано зі списку частот слів: лише n-грами всередині слів і на їхніх межах, без великих літер, пунктуації та пар між словами."
+	"layout_analysis.corpus.word_list": "Побудовано зі списку частот слів: лише n-грами всередині слів і на їхніх межах, без великих літер, пунктуації та пар між словами.",
+	"layout_analysis.fingering.title": "Аплікатура",
+	"layout_analysis.fingering.help": "Виберіть клавішу на схемі, потім палець, який її натискає, або зробіть її вихідною клавішею цього пальця. Усі показники відповідають цій аплікатурі.",
+	"layout_analysis.fingering.base": "Базова аплікатура",
+	"layout_analysis.fingering.base_standard": "Стандартна",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Палець",
+	"layout_analysis.fingering.set_home": "Зробити вихідною клавішею цього пальця",
+	"layout_analysis.fingering.reset": "Відновити типову аплікатуру",
+	"layout_analysis.fingering.export": "Експорт (JSON)",
+	"layout_analysis.fingering.import": "Імпортувати аплікатуру:",
+	"layout_analysis.fingering.custom": "Використовується власна аплікатура.",
+	"layout_analysis.fingering.invalid": "Цю аплікатуру не можна використати: {reason}",
+	"layout_analysis.fingering.save_failed": "Не вдалося зберегти аплікатуру.",
+	"layout_analysis.fingering.load_failed": "Не вдалося прочитати збережену аплікатуру."
 }

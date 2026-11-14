@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "लाइब्रेरी के साथ क्रम तय हो रहा है…",
 	"layout_analysis.panel.unavailable": "इस लेआउट का यहाँ विश्लेषण नहीं हो सकता ({reason})।",
 	"layout_analysis.panel.weights_note": "« तुलना करें » में तय भारों और आदर्श उँगली भार से अंक दिए गए।",
-	"layout_analysis.corpus.word_list": "शब्द आवृत्ति सूची से बना: केवल शब्दों के भीतर और शब्द-सीमाओं पर n-ग्राम, बड़े अक्षर, विराम चिह्न या शब्दों के बीच के जोड़े नहीं।"
+	"layout_analysis.corpus.word_list": "शब्द आवृत्ति सूची से बना: केवल शब्दों के भीतर और शब्द-सीमाओं पर n-ग्राम, बड़े अक्षर, विराम चिह्न या शब्दों के बीच के जोड़े नहीं।",
+	"layout_analysis.fingering.title": "अँगुली-क्रम",
+	"layout_analysis.fingering.help": "नक्शे पर एक कुंजी चुनें, फिर उसे दबाने वाली उँगली चुनें, या उसे उस उँगली की होम कुंजी बनाएँ। हर माप इस अँगुली-क्रम का पालन करता है।",
+	"layout_analysis.fingering.base": "मूल अँगुली-क्रम",
+	"layout_analysis.fingering.base_standard": "मानक",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "उँगली",
+	"layout_analysis.fingering.set_home": "इसे इस उँगली की होम कुंजी बनाएँ",
+	"layout_analysis.fingering.reset": "डिफ़ॉल्ट अँगुली-क्रम बहाल करें",
+	"layout_analysis.fingering.export": "निर्यात (JSON)",
+	"layout_analysis.fingering.import": "अँगुली-क्रम आयात करें:",
+	"layout_analysis.fingering.custom": "कस्टम अँगुली-क्रम उपयोग में है।",
+	"layout_analysis.fingering.invalid": "यह अँगुली-क्रम उपयोग नहीं हो सकता: {reason}",
+	"layout_analysis.fingering.save_failed": "अँगुली-क्रम सहेजा नहीं जा सका।",
+	"layout_analysis.fingering.load_failed": "सहेजा गया अँगुली-क्रम पढ़ा नहीं जा सका।"
 }

@@ -807,6 +807,8 @@ var LAYOUT_ANALYSIS = (function () {
 				language: layout.language
 			},
 			keyboard: board.id,
+			// The fingering profile measured with (null: the defaults), for the key map.
+			profile: board.profile,
 			metrics,
 			fingers,
 			hands: { left: pct(left, left + right), right: pct(right, left + right) },

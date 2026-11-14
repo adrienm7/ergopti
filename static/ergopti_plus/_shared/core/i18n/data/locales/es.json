@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Clasificando frente a la biblioteca…",
 	"layout_analysis.panel.unavailable": "Esta distribución no se puede analizar aquí ({reason}).",
 	"layout_analysis.panel.weights_note": "Puntuada con los pesos y la carga ideal de los dedos de « Comparar ».",
-	"layout_analysis.corpus.word_list": "Creado a partir de una lista de frecuencias de palabras: solo n-gramas dentro de las palabras y en sus bordes, sin mayúsculas, puntuación ni pares entre palabras."
+	"layout_analysis.corpus.word_list": "Creado a partir de una lista de frecuencias de palabras: solo n-gramas dentro de las palabras y en sus bordes, sin mayúsculas, puntuación ni pares entre palabras.",
+	"layout_analysis.fingering.title": "Digitación",
+	"layout_analysis.fingering.help": "Elija una tecla en el plano y luego el dedo que la pulsa, o conviértala en la tecla de reposo de ese dedo. Todas las medidas siguen esta digitación.",
+	"layout_analysis.fingering.base": "Digitación base",
+	"layout_analysis.fingering.base_standard": "Estándar",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Dedo",
+	"layout_analysis.fingering.set_home": "Convertirla en la tecla de reposo de este dedo",
+	"layout_analysis.fingering.reset": "Restablecer la digitación predeterminada",
+	"layout_analysis.fingering.export": "Exportar (JSON)",
+	"layout_analysis.fingering.import": "Importar una digitación:",
+	"layout_analysis.fingering.custom": "Digitación personalizada en uso.",
+	"layout_analysis.fingering.invalid": "Esta digitación no se puede usar: {reason}",
+	"layout_analysis.fingering.save_failed": "No se pudo guardar la digitación.",
+	"layout_analysis.fingering.load_failed": "No se pudo leer la digitación guardada."
 }

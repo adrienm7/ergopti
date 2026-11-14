@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Rangordnar mot biblioteket…",
 	"layout_analysis.panel.unavailable": "Den här layouten kan inte analyseras här ({reason}).",
 	"layout_analysis.panel.weights_note": "Poängsatt med vikterna och den idealiska fingerbelastningen från « Jämför ».",
-	"layout_analysis.corpus.word_list": "Byggd från en ordfrekvenslista: bara n-gram inuti ord och vid ordgränser, utan versaler, skiljetecken eller par mellan ord."
+	"layout_analysis.corpus.word_list": "Byggd från en ordfrekvenslista: bara n-gram inuti ord och vid ordgränser, utan versaler, skiljetecken eller par mellan ord.",
+	"layout_analysis.fingering.title": "Fingersättning",
+	"layout_analysis.fingering.help": "Välj en tangent på kartan och sedan fingret som trycker på den, eller gör den till fingrets hemtangent. Alla mått följer denna fingersättning.",
+	"layout_analysis.fingering.base": "Grundfingersättning",
+	"layout_analysis.fingering.base_standard": "Standard",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Finger",
+	"layout_analysis.fingering.set_home": "Gör den till detta fingers hemtangent",
+	"layout_analysis.fingering.reset": "Återställ standardfingersättningen",
+	"layout_analysis.fingering.export": "Exportera (JSON)",
+	"layout_analysis.fingering.import": "Importera en fingersättning:",
+	"layout_analysis.fingering.custom": "Egen fingersättning används.",
+	"layout_analysis.fingering.invalid": "Denna fingersättning kan inte användas: {reason}",
+	"layout_analysis.fingering.save_failed": "Fingersättningen kunde inte sparas.",
+	"layout_analysis.fingering.load_failed": "Den sparade fingersättningen kunde inte läsas."
 }

@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Rangschikken tegen de bibliotheek…",
 	"layout_analysis.panel.unavailable": "Deze indeling kan hier niet worden geanalyseerd ({reason}).",
 	"layout_analysis.panel.weights_note": "Gescoord met de gewichten en de ideale vingerbelasting uit « Vergelijken ».",
-	"layout_analysis.corpus.word_list": "Gemaakt van een woordfrequentielijst: alleen n-grammen binnen woorden en aan woordgrenzen, zonder hoofdletters, leestekens of paren over woordgrenzen heen."
+	"layout_analysis.corpus.word_list": "Gemaakt van een woordfrequentielijst: alleen n-grammen binnen woorden en aan woordgrenzen, zonder hoofdletters, leestekens of paren over woordgrenzen heen.",
+	"layout_analysis.fingering.title": "Vingerzetting",
+	"layout_analysis.fingering.help": "Kies een toets op de kaart en dan de vinger die hem indrukt, of maak hem de thuistoets van die vinger. Alle maten volgen deze vingerzetting.",
+	"layout_analysis.fingering.base": "Basisvingerzetting",
+	"layout_analysis.fingering.base_standard": "Standaard",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Vinger",
+	"layout_analysis.fingering.set_home": "Maak er de thuistoets van deze vinger van",
+	"layout_analysis.fingering.reset": "Standaardvingerzetting herstellen",
+	"layout_analysis.fingering.export": "Exporteren (JSON)",
+	"layout_analysis.fingering.import": "Vingerzetting importeren:",
+	"layout_analysis.fingering.custom": "Eigen vingerzetting actief.",
+	"layout_analysis.fingering.invalid": "Deze vingerzetting kan niet worden gebruikt: {reason}",
+	"layout_analysis.fingering.save_failed": "De vingerzetting kon niet worden opgeslagen.",
+	"layout_analysis.fingering.load_failed": "De opgeslagen vingerzetting kon niet worden gelezen."
 }

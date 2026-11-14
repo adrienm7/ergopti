@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Porównywanie z biblioteką…",
 	"layout_analysis.panel.unavailable": "Tego układu nie można tu przeanalizować ({reason}).",
 	"layout_analysis.panel.weights_note": "Oceniono z wagami i idealnym obciążeniem palców ustawionymi w « Porównaj ».",
-	"layout_analysis.corpus.word_list": "Zbudowany z listy częstości słów: tylko n-gramy wewnątrz słów i na ich granicach, bez wielkich liter, interpunkcji i par między słowami."
+	"layout_analysis.corpus.word_list": "Zbudowany z listy częstości słów: tylko n-gramy wewnątrz słów i na ich granicach, bez wielkich liter, interpunkcji i par między słowami.",
+	"layout_analysis.fingering.title": "Palcowanie",
+	"layout_analysis.fingering.help": "Wybierz klawisz na mapie, potem palec, który go naciska, albo ustaw go jako klawisz spoczynkowy tego palca. Wszystkie miary stosują to palcowanie.",
+	"layout_analysis.fingering.base": "Palcowanie bazowe",
+	"layout_analysis.fingering.base_standard": "Standardowe",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Palec",
+	"layout_analysis.fingering.set_home": "Ustaw jako klawisz spoczynkowy tego palca",
+	"layout_analysis.fingering.reset": "Przywróć domyślne palcowanie",
+	"layout_analysis.fingering.export": "Eksportuj (JSON)",
+	"layout_analysis.fingering.import": "Importuj palcowanie:",
+	"layout_analysis.fingering.custom": "Używane jest własne palcowanie.",
+	"layout_analysis.fingering.invalid": "Tego palcowania nie można użyć: {reason}",
+	"layout_analysis.fingering.save_failed": "Nie udało się zapisać palcowania.",
+	"layout_analysis.fingering.load_failed": "Nie udało się odczytać zapisanego palcowania."
 }

@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "Classement parmi la bibliothèque…",
 	"layout_analysis.panel.unavailable": "Cette disposition ne peut pas être analysée ici ({reason}).",
 	"layout_analysis.panel.weights_note": "Score calculé avec les poids et la charge idéale des doigts réglés dans « Comparer ».",
-	"layout_analysis.corpus.word_list": "Construit à partir d’une liste de fréquences de mots : n-grammes à l’intérieur des mots et à leurs bords seulement, sans majuscules, ponctuation ni paires entre deux mots."
+	"layout_analysis.corpus.word_list": "Construit à partir d’une liste de fréquences de mots : n-grammes à l’intérieur des mots et à leurs bords seulement, sans majuscules, ponctuation ni paires entre deux mots.",
+	"layout_analysis.fingering.title": "Doigté",
+	"layout_analysis.fingering.help": "Choisissez une touche sur le plan, puis le doigt qui la tape, ou faites-en la touche de repos de ce doigt. Toutes les mesures suivent ce doigté.",
+	"layout_analysis.fingering.base": "Doigté de base",
+	"layout_analysis.fingering.base_standard": "Standard",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Doigt",
+	"layout_analysis.fingering.set_home": "En faire la touche de repos de ce doigt",
+	"layout_analysis.fingering.reset": "Rétablir le doigté par défaut",
+	"layout_analysis.fingering.export": "Exporter (JSON)",
+	"layout_analysis.fingering.import": "Importer un doigté :",
+	"layout_analysis.fingering.custom": "Doigté personnalisé en cours.",
+	"layout_analysis.fingering.invalid": "Ce doigté ne peut pas être utilisé : {reason}",
+	"layout_analysis.fingering.save_failed": "Le doigté n’a pas pu être enregistré.",
+	"layout_analysis.fingering.load_failed": "Le doigté enregistré n’a pas pu être lu."
 }

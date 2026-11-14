@@ -4540,5 +4540,19 @@
 	"layout_analysis.panel.ranking": "A classificar face à biblioteca…",
 	"layout_analysis.panel.unavailable": "Esta disposição não pode ser analisada aqui ({reason}).",
 	"layout_analysis.panel.weights_note": "Pontuada com os pesos e a carga ideal dos dedos definidos em « Comparar ».",
-	"layout_analysis.corpus.word_list": "Construído a partir de uma lista de frequências de palavras: só n-gramas dentro das palavras e nos seus limites, sem maiúsculas, pontuação nem pares entre palavras."
+	"layout_analysis.corpus.word_list": "Construído a partir de uma lista de frequências de palavras: só n-gramas dentro das palavras e nos seus limites, sem maiúsculas, pontuação nem pares entre palavras.",
+	"layout_analysis.fingering.title": "Dedilhado",
+	"layout_analysis.fingering.help": "Escolha uma tecla no mapa e depois o dedo que a prime, ou torne-a a tecla de repouso desse dedo. Todas as medidas seguem este dedilhado.",
+	"layout_analysis.fingering.base": "Dedilhado base",
+	"layout_analysis.fingering.base_standard": "Padrão",
+	"layout_analysis.fingering.base_angle": "Angle mod",
+	"layout_analysis.fingering.finger": "Dedo",
+	"layout_analysis.fingering.set_home": "Torná-la a tecla de repouso deste dedo",
+	"layout_analysis.fingering.reset": "Repor o dedilhado predefinido",
+	"layout_analysis.fingering.export": "Exportar (JSON)",
+	"layout_analysis.fingering.import": "Importar um dedilhado:",
+	"layout_analysis.fingering.custom": "Dedilhado personalizado em uso.",
+	"layout_analysis.fingering.invalid": "Este dedilhado não pode ser usado: {reason}",
+	"layout_analysis.fingering.save_failed": "Não foi possível guardar o dedilhado.",
+	"layout_analysis.fingering.load_failed": "Não foi possível ler o dedilhado guardado."
 }
