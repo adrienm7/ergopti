@@ -137,10 +137,12 @@ key size)` per axis, lateral ×2.0, vertical pinky 1.6 / ring 1.3 / middle 1.1
     1.85, thumb 1.0, left hand ×1.1. The three constants are fitted (the first
     two match Keyboard Layout Optimizer's 0.44 and 490.2; Same Hand is one
     constant fitted on two published rows).
-- **Fidelity: approximate.** Vector (published): QWERTY ANSI on « Chained
-  English Bigrams 7 », 207.32 (ours 207.26, line breaks kept). On tables cut at
-  line breaks the blank lines (Enter repeats) are lost: about 4 % lower on this
-  corpus of short lines. Re-fit when the live site is reachable.
+- **Fidelity: approximate.** Checked once, not in the gate: QWERTY ANSI on
+  « Chained English Bigrams 7 », published 207.32, ours 207.26 with line breaks
+  kept (the text is not kept in the repository: its licence is unknown). On
+  tables cut at line breaks the blank lines (Enter repeats) are lost: about 4 %
+  lower on that corpus of short lines. Gate: hand-computed (`the` on QWERTY
+  ANSI, 174.2699: distance only). Re-fit when the live site is reachable.
 
 ### a200 (200-analyzer)
 

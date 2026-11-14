@@ -62,15 +62,18 @@
 		},
 		{
 			"analyser": "klanext",
-			"basis": "published",
+			"basis": "hand",
 			"layout": "qwerty",
 			"keyboard": "ansi",
-			"file": "../../../../../corpus/original/en/Chained English Bigrams 7.txt",
-			"keep_line_breaks": true,
-			"value": 207.32,
-			"tolerance": 0.2,
-			"parts": { "distance": 100.53, "same_finger": 92.21, "same_hand": 14.58 },
-			"parts_tolerance": 0.4
+			"text": "the",
+			"value": 174.26992717323174,
+			"tolerance": 1e-9,
+			"parts": {
+				"distance": 174.26992717323174,
+				"same_finger": 0,
+				"same_hand": 0
+			},
+			"parts_tolerance": 1e-9
 		},
 		{
 			"analyser": "a200",
@@ -102,7 +105,11 @@
 			"text": "the",
 			"value": 3.463054595,
 			"tolerance": 1e-6,
-			"parts": { "base": 1.847693475, "penalty": 0.42032112, "path": 1.19504 },
+			"parts": {
+				"base": 1.847693475,
+				"penalty": 0.42032112,
+				"path": 1.19504
+			},
 			"parts_tolerance": 1e-6
 		},
 		{
@@ -210,9 +217,20 @@
 			"layout": "qwerty",
 			"keyboard": "ansi",
 			"tables": {
-				"chars": { "d": 1 },
-				"bigrams": { "de": 1, "th": 1, "aa": 1 },
-				"trigrams": { "the": 2, "ded": 1, "abc": 1, "zq€": 1 }
+				"chars": {
+					"d": 1
+				},
+				"bigrams": {
+					"de": 1,
+					"th": 1,
+					"aa": 1
+				},
+				"trigrams": {
+					"the": 2,
+					"ded": 1,
+					"abc": 1,
+					"zq€": 1
+				}
 			},
 			"parts": {
 				"sfb": 33.333333333333336,
