@@ -12,6 +12,10 @@
 //   composer_emulate, nav_save
 // Each host checks them again before acting
 // (_shared/layouts/engine/manager_bridge.lua, windows/ui/layout_manager).
+// Ergopti Studio reads the user's own typing with keystats_ngrams: the host
+// answers keystatsNgrams with the counts of the local keystats store
+// (_shared/metrics/engine/studio_ngrams.lua), read only and never sent
+// anywhere; the page asks only when the user clicks « Analyse my typing ».
 // The downloads the site offers (Linux XKB, Windows KLC and DLL images, macOS
 // bundle) are built here, offline, with the export data the app ships
 // (layout_editor/_generated/export_assets.js); source_export hands their bytes
@@ -35,7 +39,8 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'source_save',
 	'source_pick',
 	'source_export',
-	'nav_save'
+	'nav_save',
+	'keystats_ngrams'
 ]);
 
 // Locale strings, pushed by the host with initData.
@@ -100,6 +105,7 @@ window.initData = function (data) {
 	_hostAppliesNav = data.nav_apply === true;
 	_hostEmulates = data.emulate === true;
 	_hostExports = data.source_export === true;
+	showKeystatsSource(data.keystats === true);
 	window.updateState(data.state);
 };
 
@@ -379,7 +385,94 @@ window.sourceResult = function (result) {
 
 // ========================================
 // ========================================
-// ======= 4/ Ready =======================
+// ======= 4/ My typing (keystats) ========
+// ========================================
+// ========================================
+
+// The user's own n-gram counts once loaded ({schema, source, chars, bigrams,
+// trigrams, total}); the Studio analysis reads them from here.
+let _keystatsNgrams = null;
+let _keystatsPending = false;
+
+// The message of each refusal code the hosts send (metrics/engine/studio_ngrams.lua
+// CODES); an unknown code reads as unreadable, never as an empty success.
+const KEYSTATS_REFUSALS = Object.freeze({
+	keystats_absent: 'layout_editor.studio.keystats.keystats_absent',
+	keystats_unreadable: 'layout_editor.studio.keystats.keystats_unreadable'
+});
+
+/**
+ * Formats one translated string, replacing {1}, {2}… with the arguments.
+ * @param {string} key
+ * @param {...*} args
+ * @returns {string}
+ */
+function tr(key) {
+	const args = Array.prototype.slice.call(arguments, 1);
+	const text = Object.prototype.hasOwnProperty.call(_strings, key) ? _strings[key] : key;
+	return text.replace(/\{(\d+)\}/g, function (whole, index) {
+		const value = args[Number(index) - 1];
+		return value === undefined ? whole : String(value);
+	});
+}
+
+/**
+ * Shows the « My typing » bar when the host reads keystats.
+ * @param {boolean} offered
+ */
+function showKeystatsSource(offered) {
+	document.getElementById('studio-keystats').hidden = !offered;
+}
+
+/**
+ * Writes the bar's status line.
+ * @param {string} text
+ * @param {boolean} [error]
+ */
+function setKeystatsStatus(text, error) {
+	const status = document.getElementById('studio-keystats-status');
+	status.textContent = text;
+	status.classList.toggle('error', error === true);
+}
+
+/** Asks the host for the user's n-grams, once at a time. */
+function loadKeystats() {
+	if (_keystatsPending) return;
+	_keystatsPending = true;
+	document.getElementById('studio-keystats-load').disabled = true;
+	setKeystatsStatus(tr('layout_editor.studio.keystats.loading'));
+	send('keystats_ngrams');
+}
+
+/**
+ * Called by the host with the user's n-grams: { ok, ngrams } or { ok: false, code }.
+ * A refusal keeps the previous data and says why.
+ * @param {Object} result
+ */
+window.keystatsNgrams = function (result) {
+	_keystatsPending = false;
+	document.getElementById('studio-keystats-load').disabled = false;
+	const ngrams = result && result.ok === true ? result.ngrams : null;
+	if (!ngrams || typeof ngrams !== 'object' || typeof ngrams.chars !== 'object') {
+		const code = result && typeof result.code === 'string' ? result.code : '';
+		const key = Object.prototype.hasOwnProperty.call(KEYSTATS_REFUSALS, code)
+			? KEYSTATS_REFUSALS[code]
+			: KEYSTATS_REFUSALS.keystats_unreadable;
+		setKeystatsStatus(tr(key), true);
+		return;
+	}
+	_keystatsNgrams = ngrams;
+	setKeystatsStatus(
+		tr('layout_editor.studio.keystats.loaded', Math.round(ngrams.total || 0).toLocaleString())
+	);
+	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
+};
+
+document.getElementById('studio-keystats-load').addEventListener('click', loadKeystats);
+
+// ========================================
+// ========================================
+// ======= 5/ Ready =======================
 // ========================================
 // ========================================
 

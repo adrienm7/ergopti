@@ -29,3 +29,37 @@ body {
 	/* The editor page sets its own gutters and fills the window. */
 	padding: 0;
 }
+
+/* ============================================ */
+/* ============================================ */
+/* ======= 2/ Ergopti Studio: My typing ======= */
+/* ============================================ */
+/* ============================================ */
+
+.studio-keystats {
+	align-items: center;
+	border-bottom: 1px solid var(--theme-grey-ccc);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	margin-bottom: 12px;
+	padding-bottom: 8px;
+}
+
+.studio-keystats[hidden] {
+	display: none;
+}
+
+.studio-keystats-status {
+	font-weight: 600;
+}
+
+.studio-keystats-status.error {
+	color: var(--theme-danger);
+}
+
+.studio-keystats-privacy {
+	color: var(--theme-grey-666);
+	flex-basis: 100%;
+	margin: 0;
+}

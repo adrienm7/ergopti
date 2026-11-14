@@ -144,8 +144,11 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		i18nElements.push(el);
 	}
 
+	const events = [];
 	const document = {
 		title: '',
+		events,
+		dispatchEvent: (event) => events.push(event),
 		getElementById: (id) => byId.get(id) || null,
 		createElement: makeElement,
 		querySelectorAll: (selector) => {
@@ -166,12 +169,18 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		console,
 		setTimeout: (fn) => fn(),
 		TextDecoder,
+		CustomEvent: class CustomEvent {
+			constructor(type, init) {
+				this.type = type;
+				this.detail = init && init.detail;
+			}
+		},
 		atob: (text) => Buffer.from(text, 'base64').toString('binary'),
 		btoa: (text) => Buffer.from(text, 'binary').toString('base64')
 	});
 	vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });
 	vm.runInContext(page.source, context, { filename: 'script.js' });
-	return { context, byId, messages, window };
+	return { context, byId, messages, window, document };
 }
 
 /** The layout editor's own window, as the hosts open it. */
@@ -774,7 +783,14 @@ check('the manager opens the layout editor in its own window', () => {
 });
 
 check('the editor window declares its strings for the hosts, present in every locale', () => {
-	const keys = [...editorHtml.matchAll(/data-i18n="([^"]+)"/g)].map((m) => m[1]).sort();
+	// The page's own script names the Ergopti Studio status lines it writes.
+	const script = fs.readFileSync(path.join(EDITOR_PAGE, 'script.js'), 'utf8');
+	const keys = [
+		...new Set([
+			...[...editorHtml.matchAll(/data-i18n="([^"]+)"/g)].map((m) => m[1]),
+			...[...script.matchAll(/'(layout_editor\.studio\.[a-z_.]+)'/g)].map((m) => m[1])
+		])
+	].sort();
 	const declared = JSON.parse(fs.readFileSync(path.join(EDITOR_PAGE, 'strings.json'), 'utf8')).keys;
 	assert.deepEqual(
 		[...declared].sort(),
@@ -789,6 +805,63 @@ check('the editor window declares its strings for the hosts, present in every lo
 			`${code}.json lacks layout editor window strings`
 		);
 	}
+});
+
+check('Ergopti Studio reads « My typing » only on a click, from a host that offers it', () => {
+	const keys = JSON.parse(fs.readFileSync(path.join(EDITOR_PAGE, 'strings.json'), 'utf8')).keys;
+	const strings = Object.fromEntries(keys.map((key) => [key, 'T:' + key + ' {1}']));
+	const contract = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'metrics/data/studio_ngrams.json'), 'utf8')
+	);
+	assert.deepEqual(
+		Object.keys(plain(vm.runInContext('KEYSTATS_REFUSALS', loadEditorPage().context))).sort(),
+		Object.values(contract.codes).sort(),
+		'the page translates exactly the refusal codes the hosts send'
+	);
+	const quiet = loadEditorPage();
+	quiet.window.initData({ strings, state: { platform: 'linux' } });
+	assert.equal(
+		quiet.byId.get('studio-keystats').hidden,
+		true,
+		'a host without keystats hides the bar'
+	);
+	const { window, byId, messages, document } = loadEditorPage();
+	window.initData({ strings, state: { platform: 'linux' }, keystats: true });
+	assert.equal(byId.get('studio-keystats').hidden, false);
+	assert.ok(
+		!messages.some((m) => m.action === 'keystats_ngrams'),
+		'nothing is read before the user asks'
+	);
+	byId.get('studio-keystats-load').click();
+	byId.get('studio-keystats-load').click();
+	assert.equal(
+		messages.filter((m) => m.action === 'keystats_ngrams').length,
+		1,
+		'one read at a time'
+	);
+	assert.equal(byId.get('studio-keystats-load').disabled, true);
+	window.keystatsNgrams({ ok: false, code: 'keystats_absent' });
+	const status = byId.get('studio-keystats-status');
+	assert.match(status.textContent, /^T:layout_editor\.studio\.keystats\.keystats_absent/);
+	assert.ok(status.classList.contains('error'));
+	assert.equal(document.events.length, 0, 'a refusal publishes no data');
+	window.keystatsNgrams({ ok: false, code: 'something_else' });
+	assert.match(status.textContent, /keystats_unreadable/, 'an unknown code reads as unreadable');
+	const ngrams = {
+		schema: 1,
+		source: 'keystats',
+		chars: { e: 7 },
+		bigrams: {},
+		trigrams: {},
+		total: 7
+	};
+	window.keystatsNgrams({ ok: true, ngrams });
+	assert.match(status.textContent, /^T:layout_editor\.studio\.keystats\.loaded 7/);
+	assert.ok(!status.classList.contains('error'));
+	assert.equal(byId.get('studio-keystats-load').disabled, false);
+	assert.equal(document.events.length, 1);
+	assert.equal(document.events[0].type, 'studio-ngrams');
+	assert.deepEqual(plain(document.events[0].detail), ngrams);
 });
 
 check(

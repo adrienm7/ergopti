@@ -204,6 +204,55 @@ KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset
 		return out . "}"
 }
 
+/**
+ * Reads Ergopti Studio's contract (_shared/metrics/data/studio_ngrams.json):
+ * the payload schema, its families and the refusal codes, shared with the Lua
+ * hosts and the page.
+ * @returns {Map} The decoded contract.
+ */
+KLR_StudioContract() {
+		global _SharedDir
+		Path := _SharedDir . "\metrics\data\studio_ngrams.json"
+		Text := FSRead(Path)
+		if !(Text is String)
+				throw Error("The Ergopti Studio n-gram contract is missing: " . Path)
+		Contract := JsonParse(Text)
+		if !(Contract is Map) || !Contract.Has("schema") || !Contract.Has("families") || !Contract.Has("codes")
+				throw Error("The Ergopti Studio n-gram contract is malformed.")
+		return Contract
+}
+
+/**
+ * Projects Ergopti Studio's « My typing » payload in SQLite: for each family
+ * of the contract, the all-time count of each token the user typed on the
+ * keyboard, every device and app summed. Synthetic sources (hotstrings, AI,
+ * other synthetic labels; KLR_NgramSourceProjection) are subtracted, as
+ * _shared/metrics/engine/studio_ngrams.lua does on macOS and Linux. No LIMIT:
+ * a truncated table would be shown as the user's data.
+ * @param db Open SQLite handle.
+ * @param Contract {Map} KLR_StudioContract().
+ * @returns {String} {"schema", "source", <field>: {token: count}…, "total"}.
+ */
+KLR_BuildStudioNgramsJson(db, Contract) {
+		if !db
+				throw Error("Ergopti Studio needs an open keystats database.")
+		out := '{"schema":' . Contract["schema"] . ',"source":' . JsonStringLiteral(Contract["source"])
+		total := 0
+		for Family in Contract["families"] {
+				sql := "SELECT " . KLR_SqlJsonObjectAgg("token", "n") . " AS j, COALESCE(SUM(n), 0) AS total"
+						. " FROM (SELECT token, c - hs - llm - o AS n FROM (SELECT token, SUM(c) AS c,"
+						. KLR_NgramSourceProjection() . " FROM " . Family["table"] . " GROUP BY token)"
+						. " WHERE token <> '' AND c - hs - llm - o > 0)"
+				rows := SQLite_Query(db, sql)
+				if rows.Length != 1 || !rows[1].Has("j")
+						throw Error("The Ergopti Studio projection returned no aggregate for " . Family["table"])
+				out .= "," . JsonStringLiteral(Family["field"]) . ":" . rows[1]["j"]
+				if Family["code"] = "c"
+						total := rows[1]["total"]
+		}
+		return out . ',"total":' . total . "}"
+}
+
 ; One historical type's aggregate. A missing aggregate row is a reader defect,
 ; not a refused read, so it stays fatal even inside a partial read.
 KLR__HistoricalFragment(db, sql, code) {

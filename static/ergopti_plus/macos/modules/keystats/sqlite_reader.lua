@@ -799,6 +799,37 @@ function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps, pacer)
 	return out, complete
 end
 
+--- Reads the all-time character, bigram and trigram families Ergopti Studio
+--- analyses (_shared/metrics/engine/studio_ngrams.lua), every device and app
+--- summed. The open is read only; the other families are skipped so a large
+--- store answers quickly.
+--- @param sqlite_path string Absolute path to db.sqlite.
+--- @return table ngrams { c, bg, tg } dictionaries.
+--- @return boolean complete True only when the open and every query succeeded.
+function M.read_studio_ngrams(sqlite_path)
+	local out = { c = {}, bg = {}, tg = {} }
+	local db = _open(sqlite_path)
+	if not db then return out, false end
+	local complete = true
+	for _, family in ipairs(require("metrics.engine.studio_ngrams").FAMILIES) do
+		local tbl = NGRAM_TYPE_TABLE[family.code]
+		local ok = _safe_query(tbl, function()
+			for r in _rows(db, Queries.render("ngram.tokens", "native",
+				{ table = tbl, where = "", conjunction = " WHERE " })) do
+				local item = out[family.code][r.token]
+				if not item then
+					item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					out[family.code][r.token] = item
+				end
+				_merge_ngram_row(item, r)
+			end
+		end)
+		if ok ~= true then complete = false end
+	end
+	db:close()
+	return out, complete
+end
+
 --- Adds every entry of `from` into `into`, using the same additive fields as
 --- the row handlers. Used to extend a cached historical dict by new days.
 --- An all-time history holds every distinct token, so the merge pauses at each

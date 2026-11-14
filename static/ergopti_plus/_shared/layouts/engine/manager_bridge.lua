@@ -39,7 +39,13 @@
 ---    {filename, data} hands their bytes (base64) to the registry's
 ---    source_export, which writes them to the Downloads folder
 ---    (composer/source_store.lua) and answers exportResult {ok, code, detail, path}.
---- 8. PURE Lua: the driver injects the layout registry client, the push to the
+--- 8. Ergopti Studio reads the user's own typing (keystats_ngrams): the host's
+---    deps.read_keystats answers with the character, bigram and trigram counts
+---    of the local keystats store (_shared/metrics/engine/studio_ngrams.lua),
+---    read only and pushed to this page alone (keystatsNgrams {ok, ngrams} or
+---    {ok = false, code}). Only the editor window offers it, and only when the
+---    user asks: the page posts it from its « Analyse my typing » button.
+--- 9. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -64,6 +70,7 @@ M.ACTIONS = {
 	source_export = true,
 	nav_save = true,
 	open_editor = true,
+	keystats_ngrams = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -355,6 +362,9 @@ end
 --- deps.open_editor_window() opens (or focuses) the layout editor window; without
 ---   it open_editor is refused.
 --- deps.editor_window is true for the controller of the layout editor window.
+--- deps.read_keystats(on_done) optionally reads the user's keystats n-grams for
+---   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }).
+---   Only the editor window offers it; elsewhere keystats_ngrams is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -414,7 +424,8 @@ function M.new(deps)
 				source_pick = type(deps.pick_source) == "function",
 				source_export = offers_export(deps.registry),
 				nav_apply = type(deps.apply_nav) == "function",
-				emulate = offers_emulate(deps) })
+				emulate = offers_emulate(deps),
+				keystats = editor_window and type(deps.read_keystats) == "function" })
 			-- The editor window lists no catalogue: it needs the platform alone.
 			if not editor_window then deps.registry.refresh(function() push_state() end) end
 			if editor_wanted then
@@ -446,6 +457,22 @@ function M.new(deps)
 		end
 		if action == "source_export" then
 			return M.handle_export(deps, payload)
+		end
+		if action == "keystats_ngrams" then
+			if not editor_window or type(deps.read_keystats) ~= "function" then
+				deps.log("warn", "Refused a keystats read: only the Ergopti Studio window of a host that reads keystats offers it.")
+				return false
+			end
+			deps.read_keystats(function(result)
+				result = type(result) == "table" and result or {}
+				if result.ok == true and type(result.ngrams) == "table" then
+					deps.push("keystatsNgrams", { ok = true, ngrams = result.ngrams })
+				else
+					deps.push("keystatsNgrams", { ok = false,
+						code = type(result.code) == "string" and result.code or require("metrics.engine.studio_ngrams").CODES.unreadable })
+				end
+			end)
+			return true
 		end
 		if action == "source_pick" then
 			if type(deps.pick_source) ~= "function" then

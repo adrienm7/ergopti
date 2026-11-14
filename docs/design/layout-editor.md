@@ -215,6 +215,22 @@ NSIS installer for distribution ([layout-windows-dll.md](layout-windows-dll.md#s
   `test-layout-editor-model.cjs` proves equal to the tool's.
 - A manual check on a PC: install, type, uninstall, as in [layout-windows-dll.md](layout-windows-dll.md).
 
+## Ergopti Studio: « My typing »
+
+The editor window is Ergopti Studio. Its « Analyse my typing » button (`keystats_ngrams`) reads the user's own
+character, bigram and trigram counts from the local keystats store so the Studio analyses the layout on what this
+user really types. The contract (schema, families, refusal codes) is `_shared/metrics/data/studio_ngrams.json`.
+
+- Read only and local: macOS opens `db.sqlite` read only, Linux runs `sqlite3 -readonly`, Windows projects the
+  journals in a keystats worker (`KLPF_RequestStudio`, mode `studio`) that writes one private stage. Nothing is
+  written to the store and nothing leaves the machine; the counts go to the Studio window alone, and only after the
+  user clicks.
+- Physical keystrokes: hotstring expansions, AI completions and other synthetic sources are subtracted
+  (`_shared/metrics/engine/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`).
+- Fail fast: an absent store answers `keystats_absent`, a refused or partial read `keystats_unreadable`; the page
+  shows the translated reason and keeps no partial data.
+- The page publishes the loaded counts as a `studio-ngrams` DOM event for the analysis panel.
+
 ## Limits stated to the user
 
 - An imported `.keylayout` stays verbatim (exportable unchanged) until « Convert to an editable source »: the

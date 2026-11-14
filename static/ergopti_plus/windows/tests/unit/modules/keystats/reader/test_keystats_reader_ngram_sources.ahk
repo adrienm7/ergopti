@@ -295,3 +295,73 @@ _KLRNul_TokenKeysStayDistinct() {
 }
 Test("Keystats reader: a NUL token stays a distinct JSON key (windows-reader-nul-json-keys)",
 	_KLRNul_TokenKeysStayDistinct)
+
+; Ergopti Studio counts only the keystrokes typed on the keyboard: the shared
+; fixture's shared-token (6 typed, 5 hotstring, 1 AI) and other-token (2 typed,
+; 2 synthetic) contribute nothing, a manual row counts in full, and a token of
+; another family never leaks in.
+_KLRSource_StudioCountsPhysicalKeystrokes() {
+	db := _KLRSource_OpenFixture()
+	try {
+		today := FormatTime(A_Now, "yyyy-MM-dd")
+		AssertTrue(SQLite_Exec(db, "INSERT INTO ngram_chars (device_id,date,app,token,c,esrc_json) VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
+			. SQLite_Q("e") . ",7," . SQLite_Q("{}") . ");"
+			. "INSERT INTO ngram_bigrams (device_id,date,app,token,c,esrc_json) VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
+			. SQLite_Q("es") . ",3," . SQLite_Q('{"llm":1}') . ");"
+			. "INSERT INTO ngram_words (device_id,date,app,token,c,esrc_json) VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
+			. SQLite_Q("est") . ",4," . SQLite_Q("{}") . ");"))
+		Contract := KLR_StudioContract()
+		Json := KLR_BuildStudioNgramsJson(db, Contract)
+		Payload := JsonParse(Json)
+		AssertEqual(Contract["schema"], Payload["schema"])
+		AssertEqual("keystats", Payload["source"])
+		AssertEqual(1, Payload["chars"].Count, "synthetic-only tokens are not keystrokes: " . Json)
+		AssertEqual(7, Payload["chars"]["e"])
+		AssertEqual(2, Payload["bigrams"]["es"], "the AI share of a bigram is subtracted")
+		AssertEqual(0, Payload["trigrams"].Count, "a word is not a trigram")
+		AssertEqual(7, Payload["total"])
+	} finally {
+		try SQLite_Close(db)
+	}
+}
+Test("Keystats reader: Ergopti Studio reads the physical keystrokes of three families (studio-keystats-bridge)",
+	_KLRSource_StudioCountsPhysicalKeystrokes)
+
+; The Ergopti Studio window answers keystats_ngrams: an absent keystats folder
+; and a failed worker read are refusals, a finished read pushes the staged JSON
+; as is, and the worker is the only reader of the store.
+_KLRSource_StudioWindowAnswers() {
+	Contract := KLR_StudioContract()
+	Pushed := []
+	Requests := []
+	Dir := A_Temp . "\ergopti_studio_test_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Outcome := Map("status", "ok", "stage", Dir . "\stage.json")
+		FileAppend('{"schema":1,"chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
+		Deps := Map(
+			"metrics_dir", Dir . "\absent",
+			"request_studio", (MetricsDir, OnTerminal) => (Requests.Push(MetricsDir),
+				OnTerminal.Call(Outcome["status"], Outcome["stage"]), true),
+			"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
+			"read_stage", FSRead)
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["absent"] . '"}', Pushed[1])
+		AssertEqual(0, Requests.Length, "an absent store starts no worker")
+		Deps["metrics_dir"] := Dir
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"e":7}}}', Pushed[2])
+		AssertEqual(Dir, Requests[1])
+		Outcome["status"] := "failed", Outcome["stage"] := ""
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[3])
+		AssertTrue(LAYOUT_EDITOR_WINDOW_ACTIONS.Has("keystats_ngrams"), "the page's action is allowlisted")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: Ergopti Studio answers keystats_ngrams with the worker's read (studio-keystats-bridge)",
+	_KLRSource_StudioWindowAnswers)

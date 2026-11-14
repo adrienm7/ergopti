@@ -23,6 +23,11 @@
 ; 4. The editor's downloads (XKB archive, KLC, DLL images, macOS bundle) are
 ;    built in the page with the export data the app ships; source_export hands
 ;    their bytes to SourceStore_Export, which writes them to the Downloads folder.
+; 5. Ergopti Studio reads the user's own typing (keystats_ngrams), only when the
+;    user asks: a keystats worker projects the local store read only
+;    (KLPF_RequestStudio, mode "studio") and its JSON is pushed to this window
+;    alone as keystatsNgrams; an absent store or a failed read answers with the
+;    refusal codes of _shared/metrics/data/studio_ngrams.json.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -42,7 +47,7 @@
 global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"composer_open", true, "composer_save", true, "composer_emulate", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
-	"nav_save", true)
+	"nav_save", true, "keystats_ngrams", true)
 
 
 
@@ -90,14 +95,54 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 			"state", LayoutManager_PageState(Deps["local_dir"]),
 			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
 			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true),
-			"source_export", LayMgrJsonBool_Of(true)))
+			"source_export", LayMgrJsonBool_Of(true), "keystats", LayMgrJsonBool_Of(true)))
 		return LayoutManager_HandleEditorAction("source_open", Map("action", "source_open"), Deps)
 	}
 	if (Action == "close") {
 		Deps["close"].Call()
 		return true
 	}
+	if (Action == "keystats_ngrams")
+		return LayoutEditorWindow_ReadKeystats(Deps)
 	return LayoutManager_HandleEditorAction(Action, Payload, Deps)
+}
+
+/**
+ * Reads Ergopti Studio's « My typing » counts for this window. The keystats
+ * folder is never written: a worker projects it read only, and its staged JSON
+ * goes to this window alone.
+ * @param {Map} Deps - "metrics_dir", "request_studio" (MetricsDir, OnTerminal),
+ *   "push_raw" (FunctionName, Json) and "read_stage" (Path).
+ * @returns {Boolean} Whether the read was accepted.
+ */
+LayoutEditorWindow_ReadKeystats(Deps) {
+	Codes := KLR_StudioContract()["codes"]
+	MetricsDir := Deps["metrics_dir"]
+	if (MetricsDir == "") || !DirExist(MetricsDir) {
+		_LayEdWin_PushRefusal(Deps, Codes["absent"])
+		return true
+	}
+	return Deps["request_studio"].Call(MetricsDir, _LayEdWin_OnStudioTerminal.Bind(Deps, Codes))
+}
+
+; The worker's one terminal: its staged JSON, read before the stage is deleted.
+_LayEdWin_OnStudioTerminal(Deps, Codes, Status, Stage) {
+	if (Status != "ok") || (Stage == "") {
+		LoggerWarn("LayoutEditorWindow", "Ergopti Studio could not read the typing statistics ({1}).", Status)
+		_LayEdWin_PushRefusal(Deps, Codes["unreadable"])
+		return
+	}
+	Json := Deps["read_stage"].Call(Stage)
+	if !(Json is String) || (SubStr(Json, 1, 1) != "{") {
+		LoggerError("LayoutEditorWindow", "The Ergopti Studio projection staged no JSON object.")
+		_LayEdWin_PushRefusal(Deps, Codes["unreadable"])
+		return
+	}
+	Deps["push_raw"].Call("keystatsNgrams", '{"ok":true,"ngrams":' . Json . "}")
+}
+
+_LayEdWin_PushRefusal(Deps, Code) {
+	Deps["push_raw"].Call("keystatsNgrams", '{"ok":false,"code":' . JsonStringLiteral(Code) . "}")
 }
 
 
@@ -132,8 +177,19 @@ _LayEdWin_Deps(Host) {
 	return Map(
 		"push", _LayEdWin_Push.Bind(Host),
 		"local_dir", LayoutRegistry_LocalDir(_ConfigDir),
-		"close", () => Host.Close()
+		"close", () => Host.Close(),
+		"metrics_dir", KL_MetricsDirFor(_ConfigDir),
+		"request_studio", KLPF_RequestStudio,
+		"push_raw", _LayEdWin_PushRaw.Bind(Host),
+		"read_stage", FSRead
 	)
+}
+
+; Evaluates window.<Name>(<Json>) with an already encoded JSON object: the
+; Studio's counts arrive encoded by SQLite and are never re-parsed here.
+_LayEdWin_PushRaw(Host, Name, Json) {
+	Host.Eval("if(window." . Name . ")window." . Name . "(" . Json . ")")
+	return true
 }
 
 ; Evaluates window.<Name>(Payload) in the host; an install or an emulation

@@ -237,6 +237,124 @@ helpers.describe("layout manager bridge (Linux)", function()
 	end)
 end)
 
+helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
+	local StudioNgrams = require("metrics.engine.studio_ngrams")
+
+	helpers.it("projects physical keystrokes only and refuses an absent or partial store (studio-keystats-bridge)", function()
+		local payload = StudioNgrams.project({
+			c = { a = { c = 10, hs = 3, llm = 1, o = 1 }, b = { c = 2, hs = 2 }, [""] = { c = 4 } },
+			bg = { ab = { c = 5 } },
+			tg = { abc = { c = 1, llm = 1 } },
+		})
+		helpers.assert_eq(payload.schema, StudioNgrams.SCHEMA)
+		helpers.assert_eq(payload.source, "keystats")
+		helpers.assert_eq(payload.chars, { a = 5 }, "synthetic sources are not keystrokes")
+		helpers.assert_eq(payload.bigrams, { ab = 5 })
+		helpers.assert_eq(payload.trigrams, {})
+		helpers.assert_eq(payload.total, 5)
+		local function read(exists, dict, complete)
+			return StudioNgrams.read({ path = "/db.sqlite", exists = function() return exists end,
+				read = function() return dict, complete end })
+		end
+		helpers.assert_eq(read(false, {}, true), { ok = false, code = "keystats_absent" })
+		helpers.assert_eq(read(true, { c = {} }, false), { ok = false, code = "keystats_unreadable" },
+			"a partial read is never offered as the user's data")
+		helpers.assert_eq(StudioNgrams.read({ path = "/db.sqlite", exists = function() return true end,
+			read = function() error("database is locked") end }), { ok = false, code = "keystats_unreadable" })
+		helpers.assert_eq(StudioNgrams.read({ path = nil, exists = function() return true end,
+			read = function() return {}, true end }), { ok = false, code = "keystats_absent" })
+		helpers.assert_true(read(true, { c = {}, bg = {}, tg = {} }, true).ok)
+	end)
+
+	helpers.it("the Studio window answers keystats_ngrams with the store's counts, the manager refuses it (studio-keystats-bridge)", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		local read_paths = {}
+		daemon_state.config_paths = { metrics_path = function() return "/home/u/.config/ergopti/metrics.sqlite" end }
+		daemon_state.keystats_reader = {
+			read_studio_ngrams = function(path)
+				read_paths[#read_paths + 1] = path
+				return { c = { e = { c = 7 } }, bg = {}, tg = {} }, true
+			end,
+		}
+		local saved_fs = package.loaded["core.fs.adapters.file_system"]
+		local ok, err = pcall(function()
+			local FileSystem = require("core.fs.adapters.file_system")
+			local native_exists = FileSystem.exists
+			FileSystem.exists = function(path) return path == "/home/u/.config/ergopti/metrics.sqlite" end
+			local Editor = Bridge.editor
+			Editor._reset()
+			local done, inner = pcall(function()
+				helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+				helpers.assert_contains(state.pushes[1].js, '"keystats":true')
+				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
+				local last = state.pushes[#state.pushes]
+				helpers.assert_eq(last.app, "layout_editor_window", "the counts reach the Studio window alone")
+				helpers.assert_contains(last.js, "window.keystatsNgrams(")
+				helpers.assert_contains(last.js, '"ok":true')
+				helpers.assert_contains(last.js, '"chars":{"e":7}')
+				helpers.assert_eq(read_paths, { "/home/u/.config/ergopti/metrics.sqlite" })
+				FileSystem.exists = function() return false end
+				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
+				helpers.assert_contains(state.pushes[#state.pushes].js, '"code":"keystats_absent"')
+				helpers.assert_eq(#read_paths, 1, "an absent store is not opened")
+			end)
+			FileSystem.exists = native_exists
+			Editor._reset()
+			if not done then error(inner, 0) end
+			Bridge.on_message({ action = "ready" }, daemon_state)
+			helpers.assert_true(Bridge.on_message({ action = "keystats_ngrams" }, daemon_state).handled == false,
+				"the layout manager window does not read keystats")
+		end)
+		package.loaded["core.fs.adapters.file_system"] = saved_fs
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("reads the three Studio families read only from a real store (studio-keystats-bridge)", function()
+		local shell = io.popen("command -v sqlite3 2>/dev/null")
+		local found = shell and shell:read("*a") or ""
+		if shell then shell:close() end
+		-- CI installs sqlite3 for this suite (ci-linux.yml); a missing binary fails here.
+		helpers.assert_true(found ~= "", "sqlite3 must be installed to run the Linux reader on a real store")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local path = dir .. ".sqlite"
+		local schema = assert(io.open(require("core.fs.engine.paths").shared("metrics/data/db/schema.sql"), "rb")):read("*a")
+		local sql = schema .. [[
+INSERT INTO ngram_chars(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'e', 9, '{"hotstring":2}');
+INSERT INTO ngram_chars(device_id, date, app, token, c, esrc_json) VALUES ('d2', '2026-11-02', 'Other', 'e', 3, '{}');
+INSERT INTO ngram_bigrams(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'es', 4, '{}');
+INSERT INTO ngram_trigrams(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'est', 2, '{}');
+INSERT INTO ngram_words(device_id, date, app, token, c, esrc_json) VALUES ('d1', '2026-11-01', 'App', 'est', 2, '{}');
+]]
+		local writer = assert(io.popen("sqlite3 '" .. path .. "' >/dev/null", "w"))
+		writer:write(sql)
+		writer:close()
+		local saved = package.loaded["modules.keystats.sqlite_reader"]
+		package.loaded["modules.keystats.sqlite_reader"] = nil
+		local ok, err = pcall(function()
+			local Reader = require("modules.keystats.sqlite_reader")
+			local dict, complete = Reader.read_studio_ngrams(path)
+			helpers.assert_true(complete, "every Studio family was read")
+			helpers.assert_eq(dict.c.e.c, 12, "every device and app is summed")
+			helpers.assert_eq(dict.c.e.hs, 2)
+			helpers.assert_eq(dict.bg.es.c, 4)
+			helpers.assert_eq(dict.tg.est.c, 2)
+			helpers.assert_nil(dict.w, "the other families are not read")
+			local payload = StudioNgrams.project(dict)
+			helpers.assert_eq(payload.chars, { e = 10 })
+			local _, missing_complete = Reader.read_studio_ngrams(dir .. "-absent.sqlite")
+			helpers.assert_true(missing_complete == false, "a read-only open never creates the store")
+			local probe = io.open(dir .. "-absent.sqlite", "rb")
+			helpers.assert_nil(probe, "the absent store stays absent")
+		end)
+		package.loaded["modules.keystats.sqlite_reader"] = saved
+		os.remove(path)
+		helpers.assert_true(ok, tostring(err))
+	end)
+end)
+
 helpers.describe("layout editor menu row (Linux)", function()
 	helpers.it("« Create or edit a layout… » shows the layout editor's own window (layout-editor-own-window)", function()
 		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["ui.menu.builder"] }

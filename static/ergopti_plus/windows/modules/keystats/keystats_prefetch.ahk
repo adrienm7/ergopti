@@ -729,6 +729,83 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 		return true
 }
 
+/**
+ * Asks a worker for Ergopti Studio's « My typing » counts (mode "studio") and
+ * calls on_terminal(status, stage) once: "ok" with the staged JSON, which is
+ * deleted right after the call, or "failed" / "canceled" without one.
+ * @param metrics_dir {String} The keystats folder (KL_MetricsDirFor).
+ * @param on_terminal {Func} Called with (status, stage).
+ * @returns {Boolean} Whether the worker was started.
+ */
+KLPF_RequestStudio(metrics_dir, on_terminal) {
+		global _ConfigDir
+		if A_IsSuspended || (metrics_dir = "") || !HasMethod(on_terminal, "Call") {
+				KLPF_InvokeTerminal(on_terminal, A_IsSuspended ? "canceled" : "failed")
+				return false
+		}
+		if KLPF_ReloadKeepsWorkersOut() {
+				KLPF_InvokeTerminal(on_terminal, "canceled")
+				return false
+		}
+		job_key := "studio:typing"
+		if KLPFWorker.jobs.Has(job_key) {
+				KLPF_CancelBuild(job_key)
+				if KLPFWorker.jobs.Has(job_key) {
+						KLPF_InvokeTerminal(on_terminal, "canceled")
+						return false
+				}
+		}
+		generation := ++KLPFWorker.generation
+		stage := A_Temp . "\ergopti_studio_ngrams.stage." . KLPFWorker.process_id . "."
+				. KLPFWorker.owner_id . "." . generation . ".json"
+		job := Map("generation", generation, "epoch", 0, "stage", stage, "handle", 0,
+				"kind", "studio", "mode", "studio", "on_terminal", on_terminal)
+		KLPFWorker.jobs[job_key] := job
+		if !KLPF_DeletePrivateStage(stage) {
+				try LoggerError("KLReader", "Could not clear the Ergopti Studio stage before dispatch.")
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
+		args := A_IsCompiled
+				? ["/force", "/ErrorStdOut", "--keystats-prefetch-worker", "typing", metrics_dir, "studio", stage, _ConfigDir]
+				: ["/force", "/ErrorStdOut", A_ScriptFullPath, "--keystats-prefetch-worker", "typing", metrics_dir, "studio", stage, _ConfigDir]
+		for TimingArg in KLPF_WorkerTimingArgs()
+				args.Push(TimingArg)
+		done := KLPF_OnWorkerDone.Bind(job_key, generation)
+		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
+		try handle := spawn.Call(executable, args, done)
+		catch as err {
+				try LoggerError("KLReader", "Could not spawn the Ergopti Studio projection worker: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+				if !KLPFWorker.jobs.Has(job_key) || KLPFWorker.jobs[job_key]["generation"] != generation {
+						try handle.terminate()
+						return false
+				}
+				job["handle"] := handle
+		} finally {
+				Critical(PreviousCritical)
+		}
+		try started := handle.start()
+		catch as err {
+				try LoggerError("KLReader", "Could not start the Ergopti Studio projection worker: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		; start() may drive the completion seam synchronously: a missing job already settled.
+		if !KLPFWorker.jobs.Has(job_key)
+				return true
+		if !started {
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		return true
+}
+
 KLPF_CancelBuild(which) {
 		if !KLPFWorker.jobs.Has(which)
 				return true
@@ -830,7 +907,7 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 				; dashboard open reads the history again.
 				delivery_stage := owned_stage
 		} else if (status = "ok") {
-				if (job["kind"] = "range" || job["kind"] = "delta") {
+				if (job["kind"] = "range" || job["kind"] = "delta" || job["kind"] = "studio") {
 						delivery_stage := owned_stage
 				} else {
 						publish := IsObject(KLPFWorker.publish_fn) ? KLPFWorker.publish_fn : KLPF_MoveAtomic
@@ -863,7 +940,7 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 		; Delta delivery is synchronous: the recipient reads its captured stage
 		; before returning. Unlike range fetches, it never transfers file ownership;
 		; neither does an incomplete snapshot, which is read the same way.
-		if ((job["kind"] = "delta") || (job["kind"] = "range" && !delivered)
+		if ((job["kind"] = "delta") || (job["kind"] = "studio") || (job["kind"] = "range" && !delivered)
 						|| (job["kind"] = "prefetch" && status = "incomplete")) && (delivery_stage != "")
 				KLPF_DeletePrivateStage(delivery_stage)
 		if KLPFWorker.jobs.Has(job_key)
@@ -1047,15 +1124,25 @@ KLPF_WorkerMain() {
 				KLWConst.SESSION_GAP_MS := Integer(A_Args[flag + 9])
 				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[flag + 10])
 				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[flag + 11])
-				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
+				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range" && mode != "studio")
 						KLPF_WorkerRefuse("unsupported dashboard/mode pair")
-				if mode != "range" && A_Args.Length >= flag + 13 {
+				if mode != "range" && mode != "studio" && A_Args.Length >= flag + 13 {
 						Snapshot := JsonParse(A_Args[flag + 13])
 						if !KLR_ForegroundSnapshotValid(Snapshot)
 								throw ValueError("Detached foreground snapshot is invalid.")
 						CapturedForeground := Snapshot
 				}
-				if (mode = "range") {
+				if (mode = "studio") {
+						; Ergopti Studio's « My typing » counts: read only, nothing published
+						; but this private stage, which the resident hands to the page.
+						phase := "projection"
+						db := KLR_BuildDatabase(metrics_dir)
+						if !db
+								KLPF_WorkerFail(stage, phase)
+						if !KLPF_WriteAtomic(stage, KLR_BuildStudioNgramsJson(db, KLR_StudioContract()))
+								KLPF_WorkerFail(stage, phase)
+						KLPF_SettleReaderCache(true)
+				} else if (mode = "range") {
 						phase := "range projection"
 						if (A_Args.Length < flag + 14)
 								KLPF_WorkerRefuse("range mode expects at least 14 arguments after "

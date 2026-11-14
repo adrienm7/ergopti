@@ -312,3 +312,78 @@ helpers.describe("layout manager bridge: the layout editor in its own window", f
 			helpers.assert_eq(#state.calls, 0, "the editor window fetches no catalogue")
 		end)
 end)
+
+helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
+	helpers.it("the Studio window pushes the store's counts, the manager refuses them (studio-keystats-bridge)", function()
+		local reads = 0
+		local instance, state = editor_controller({ editor_window = true, read_keystats = function(on_done)
+			reads = reads + 1
+			on_done(reads == 1 and { ok = true, ngrams = { schema = 1, chars = { e = 7 } } }
+				or { ok = false, code = "keystats_absent" })
+		end })
+		helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+		helpers.assert_true(state.pushes[1].payload.keystats == true, "initData offers « My typing »")
+		helpers.assert_true(instance.on_message({ action = "keystats_ngrams" }) == true)
+		local last = state.pushes[#state.pushes]
+		helpers.assert_eq(last.name, "keystatsNgrams")
+		helpers.assert_eq(last.payload, { ok = true, ngrams = { schema = 1, chars = { e = 7 } } })
+		helpers.assert_true(instance.on_message({ action = "keystats_ngrams" }) == true)
+		helpers.assert_eq(state.pushes[#state.pushes].payload, { ok = false, code = "keystats_absent" })
+		local manager, manager_state = editor_controller({ read_keystats = function() error("never read") end })
+		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
+		helpers.assert_true(manager_state.pushes[1].payload.keystats == false)
+		helpers.assert_true(manager.on_message({ action = "keystats_ngrams" }) == false,
+			"the layout manager window does not read keystats")
+	end)
+
+	helpers.it("the reader opens the store read only and reads the three Studio families (studio-keystats-bridge)", function()
+		local queries, flags = {}, nil
+		local rows = {
+			ngram_chars = { { token = "e", c = 9, td = 0, e = 0, esrc_json = '{"hotstring":2}', source_rows = 1 } },
+			ngram_bigrams = { { token = "es", c = 4, td = 0, e = 0, esrc_json = "{}", source_rows = 1 } },
+			ngram_trigrams = { { token = "est", c = 2, td = 0, e = 0, esrc_json = "{}", source_rows = 1 } },
+		}
+		local fake = {
+			OPEN_READONLY = 1,
+			open = function(_, given_flags)
+				flags = given_flags
+				return {
+					exec = function() return 0 end,
+					close = function() end,
+					nrows = function(_, sql)
+						queries[#queries + 1] = sql
+						local table_name = sql:match("FROM (ngram_[a-z]+)")
+						local list, index = rows[table_name] or {}, 0
+						return function() index = index + 1; return list[index] end
+					end,
+				}
+			end,
+		}
+		local saved_sqlite, saved_reader = package.loaded["hs.sqlite3"], package.loaded["modules.keystats.sqlite_reader"]
+		package.loaded["hs.sqlite3"] = fake
+		package.loaded["modules.keystats.sqlite_reader"] = nil
+		local ok, err = pcall(function()
+			local Reader = require("modules.keystats.sqlite_reader")
+			local dict, complete = Reader.read_studio_ngrams("/Users/u/.ergopti/db.sqlite")
+			helpers.assert_true(complete)
+			helpers.assert_eq(flags, fake.OPEN_READONLY, "the store is opened read only")
+			helpers.assert_eq(#queries, 3, "only the three Studio families are read")
+			helpers.assert_eq(dict.c.e.c, 9)
+			helpers.assert_eq(dict.c.e.hs, 2)
+			local payload = require("metrics.engine.studio_ngrams").project(dict)
+			helpers.assert_eq(payload.chars, { e = 7 }, "hotstring expansions are not keystrokes")
+			helpers.assert_eq(payload.bigrams, { es = 4 })
+			helpers.assert_eq(payload.trigrams, { est = 2 })
+		end)
+		package.loaded["hs.sqlite3"] = saved_sqlite
+		package.loaded["modules.keystats.sqlite_reader"] = saved_reader
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("the macOS host reads keystats for the Studio window alone, deferred (studio-keystats-bridge)", function()
+		local host = assert(helpers.read_module_source("ui.layout_manager"))
+		helpers.assert_contains(host, "read_keystats = spec.editor_window and function(on_done)")
+		helpers.assert_contains(host, 'read = require("modules.keystats.sqlite_reader").read_studio_ngrams,')
+		helpers.assert_contains(host, 'path = require("modules.keystats.log_manager").get_sqlite_path(),')
+	end)
+end)

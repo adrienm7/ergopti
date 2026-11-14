@@ -146,6 +146,9 @@ local function new_handler(spec)
 		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
 		if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
+		local keystats_reader = dependency(state, "keystats_reader", "modules.keystats.sqlite_reader")
+		if keystats_reader and type(keystats_reader.read_studio_ngrams) ~= "function" then keystats_reader = nil end
+		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")
 		local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
 		if not (preferences and type(preferences.choose) == "function" and emulation
@@ -213,6 +216,17 @@ local function new_handler(spec)
 			apply_nav = layer_editor and function(text, done)
 				if not current() then return false end
 				local result = layer_editor.apply_text(text, state)
+				if current() then done(result) end
+			end or nil,
+			-- Ergopti Studio reads the user's own typing from the local keystats
+			-- store, read only, for this window alone (metrics/engine/studio_ngrams.lua).
+			read_keystats = spec.editor_window and keystats_reader and function(done)
+				if not current() then return false end
+				local result = require("metrics.engine.studio_ngrams").read({
+					path = config_paths and config_paths.metrics_path() or nil,
+					exists = FileSystem.exists,
+					read = keystats_reader.read_studio_ngrams,
+				})
 				if current() then done(result) end
 			end or nil,
 			-- « Emulate without installing »: the composed layout becomes the emulated

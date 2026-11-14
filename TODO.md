@@ -276,6 +276,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       are moved. Reuse one shared metrics engine (the site's benchmark computation, `src/routes/benchmarks`, and
       `_shared/metrics`), not a second implementation; keystats keeps its privacy rules (local only, the user's own
       data, documented in the Studio).
+      Bridge done 2026-11-14 (`claude/ergopti-todo-studio-app`): « Analyse my typing » reads the store read only on
+      the three OS (docs/design/layout-editor.md, « Ergopti Studio: My typing »); the metrics wait for the shared
+      engine.
 - [ ] **Corpus analysis.** Load a text corpus (file picker, local) and analyse the edited layout on it with the same
       metrics; keep the corpora the site already uses as built-in choices.
 - [ ] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts

@@ -49,6 +49,16 @@
 		<script src="../layout_editor/_generated/export_assets.js"></script>
 	</head>
 	<body>
+		<!-- Ergopti Studio's « My typing » source: shown only when the host reads keystats. -->
+		<section id="studio-keystats" class="studio-keystats" hidden>
+			<button
+				type="button"
+				id="studio-keystats-load"
+				data-i18n="layout_editor.studio.keystats.load"
+			></button>
+			<span id="studio-keystats-status" class="studio-keystats-status" role="status"></span>
+			<p class="studio-keystats-privacy" data-i18n="layout_editor.studio.keystats.privacy"></p>
+		</section>
 		<main id="layout-editor" class="layout-editor"></main>
 
 		<script src="script.js"></script>

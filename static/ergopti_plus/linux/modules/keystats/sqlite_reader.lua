@@ -589,6 +589,25 @@ function M.read_ngrams(sqlite_path, start_date, end_date, apps, exclude_date)
 	return out, complete
 end
 
+--- Reads the all-time character, bigram and trigram families Ergopti Studio
+--- analyses (_shared/metrics/engine/studio_ngrams.lua), every device and app
+--- summed. Read only, like every reader query; the other families are skipped
+--- so a large store answers quickly.
+--- @param sqlite_path string Database path.
+--- @return table ngrams { c, bg, tg } dictionaries.
+--- @return boolean complete Whether every query was accepted.
+function M.read_studio_ngrams(sqlite_path)
+	local out, complete = { c = {}, bg = {}, tg = {} }, true
+	for _, family in ipairs(require("metrics.engine.studio_ngrams").FAMILIES) do
+		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[family.code], "", false))
+		if not accepted then complete = false end
+		for _, row in ipairs(rows) do
+			merge_ngram(out[family.code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
+		end
+	end
+	return out, complete
+end
+
 --- Resolves inclusive date bounds against one captured local calendar day.
 --- Invalid optional bounds are ignored, matching the reader's SQL filters.
 --- @param start_date string|nil Inclusive lower bound.
