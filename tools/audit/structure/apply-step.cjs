@@ -46,6 +46,14 @@ function git(...args) {
 	return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
+/** True when Git ignores `repoPath`: a build output, never a source. */
+function isIgnored(repoPath) {
+	const run = spawnSync('git', ['check-ignore', '-q', '--no-index', '--', repoPath], { cwd: ROOT });
+	if (run.status !== 0 && run.status !== 1)
+		throw new Error(`git check-ignore failed for ${repoPath}`);
+	return run.status === 0;
+}
+
 // The kinds whose new token newPathToken spells from the referencing file's
 // place; every other kind carries its new text in the row.
 const SPELLED_KINDS = new Set(['path', 'dir', 'dir-successor', 'dir-split-prose', 'dir-split']);
@@ -120,6 +128,22 @@ function rewriteOwnIncludes(text, oldRepo, newRepo, finalRepo) {
 			const sep = target.includes('\\') && !target.includes('/') ? '\\' : '/';
 			const posix = target.replace(/\\/g, '/');
 			const resolvedOld = path.posix.normalize(`${path.posix.dirname(oldRepo)}/${posix}`);
+			// An optional include of a build output (bundle.ahk's
+			// `#Include *i ../build/bundle_inventory.ahk`) names a file only a
+			// build writes: it keeps naming that path of its driver. S06 left
+			// it on core/lifecycle/build/, so the compiled exe had no asset
+			// inventory and refused its own bundle.
+			const optional = /\*i\s+$/.test(head);
+			const driver = oldRepo.split('/').slice(0, 3).join('/');
+			if (
+				optional &&
+				!fs.existsSync(path.join(ROOT, resolvedOld)) &&
+				resolvedOld.startsWith(`${driver}/`) &&
+				isIgnored(resolvedOld)
+			) {
+				const rel = path.posix.relative(path.posix.dirname(newRepo), resolvedOld);
+				return head + (lead || '') + (sep === '\\' ? rel.replace(/\//g, '\\') : rel);
+			}
 			if (!fs.existsSync(path.join(ROOT, resolvedOld))) return all; // A_ScriptDir-relative or a directory: untouched
 			const finalTarget = finalRepo.get(resolvedOld) || resolvedOld;
 			const rel = path.posix.relative(path.posix.dirname(newRepo), finalTarget);
