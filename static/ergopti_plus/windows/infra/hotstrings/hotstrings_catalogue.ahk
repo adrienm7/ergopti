@@ -24,7 +24,7 @@
 ; The generated config-key constants; #Include skips a file the entry script
 ; already loaded, so a unit harness that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 ; The shared matcher between a runtime category and its manifest rows, which the
 ; delay a built-in section declares is read through.
 #Include %A_LineFile%\..\..\..\..\_shared\hotstrings\data\catalogue\scope_overrides.ahk

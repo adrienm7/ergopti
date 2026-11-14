@@ -193,7 +193,10 @@ check('the Windows driver implements the protocol from the declarations', () => 
 	);
 	assert.equal(main.split('FieldRun_Start(').length, 2, 'started once');
 	assert.match(main, /^#Include infra\/field_run\.ahk$/m);
-	const lifecycle = fs.readFileSync(path.join(ROOT, WINDOWS, 'infra/lifecycle.ahk'), 'utf8');
+	const lifecycle = fs.readFileSync(
+		path.join(ROOT, WINDOWS, 'core/lifecycle/engine/lifecycle.ahk'),
+		'utf8'
+	);
 	assert.match(lifecycle, /try FieldRun_Stop\(\)/, 'stopped with the driver');
 	assert.match(code, /TimingsGet\("ui", "field_run_poll_ms"\)/);
 });

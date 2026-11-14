@@ -42,7 +42,7 @@
 #Requires Autohotkey v2.0+
 
 ; The score bounds are the shared value schema declaration (metrics_apps.*.score).
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 #Include keystats_app_category_store.ahk
 #Include keystats_app_category_edits.ahk
 

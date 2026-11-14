@@ -6,7 +6,7 @@ local Json = require("core.text.engine.json")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(body)
- local names = { "modules.updater.manager", "ui.changelog.bridge", "infra.installation", "menu.engine.manifest_reader_core",
+ local names = { "modules.updater.manager", "ui.changelog.bridge", "core.lifecycle.engine.installation", "menu.engine.manifest_reader_core",
   "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline", "core.events.loop",
   "adapters.notifier", "ui.webkit_host", "ui.webview_manager" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
@@ -28,7 +28,7 @@ local function scenario(body)
    end,
   }
   package.loaded["modules.updater.manager"] = manager
-  package.loaded["infra.installation"] = { is_source_run = function() return false end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return false end }
   package.loaded["ui.changelog.bridge"] = nil
   h.bridge = require("ui.changelog.bridge")
   local asset = "ergopti-plus-linux.tar.gz"

@@ -348,7 +348,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/infra/termination_coordinator.lua",
+			"source": "static/ergopti_plus/macos/core/lifecycle/engine/shutdown/termination_coordinator.lua",
 			"template": "Controlled %s requested (reason: %s).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: hammerspoon_reload).",
 			"expect": {
@@ -702,7 +702,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"source": "static/ergopti_plus/windows/core/lifecycle/engine/lifecycle.ahk",
 			"template": "Complete configured menu usable at {1} ms since process start; input initialization pending={2}.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Complete configured menu usable at 1980 ms since process start; input initialization pending=0.",
 			"expect": {
@@ -718,7 +718,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"source": "static/ergopti_plus/windows/core/lifecycle/engine/lifecycle.ahk",
 			"template": "Tray global commands usable at {1} ms since process start.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Tray global commands usable at 820 ms since process start.",
 			"expect": {
@@ -820,7 +820,7 @@
 		},
 		{
 			"driver": "windows",
-			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"source": "static/ergopti_plus/windows/core/lifecycle/engine/lifecycle.ahk",
 			"template": "Reload requested by {1} (suspended={2}).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [Lifecycle] Reload requested by tray (suspended=0).",
 			"expect": {

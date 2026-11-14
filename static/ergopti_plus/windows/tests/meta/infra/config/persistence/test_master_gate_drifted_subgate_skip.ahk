@@ -18,7 +18,7 @@
 
 _MGDS_DriftedSubGateSkippedBeforeProbe() {
 	Body := _DriverFuncBody("ApplyMasterGatesToFeatures")
-	Assert(Body != "", "ApplyMasterGatesToFeatures must exist in infra/master_gates.ahk")
+	Assert(Body != "", "ApplyMasterGatesToFeatures must exist in core/lifecycle/engine/master_gates.ahk")
 
 	LoopPos := InStr(Body, "for SubV1, SubV2 in SubGates")
 	Assert(LoopPos > 0, "ApplyMasterGatesToFeatures must iterate the manifest sub-gates")

@@ -345,7 +345,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         admission = r"""source "$1/install/native_modules_env.sh"
 ergopti_admit_native_modules "$1" required
 export ERGOPTI_LITERAL_DRIVER_ROOT="$1" ERGOPTI_LITERAL_SHARED_ROOT="$2"
-exec "$3" -e 'local d=os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT"); assert(os.getenv("ERGOPTI_LITERAL_NATIVE_MODULES")=="1"); assert(loadfile(d.."/infra/literal_module_loader.lua"))().install(d,os.getenv("ERGOPTI_LITERAL_SHARED_ROOT")); assert(type(require("luv").new_timer)=="function"); assert(type(require("lfs").attributes)=="function")'
+exec "$3" -e 'local d=os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT"); assert(os.getenv("ERGOPTI_LITERAL_NATIVE_MODULES")=="1"); assert(loadfile(d.."/core/lifecycle/engine/literal_module_loader.lua"))().install(d,os.getenv("ERGOPTI_LITERAL_SHARED_ROOT")); assert(type(require("luv").new_timer)=="function"); assert(type(require("lfs").attributes)=="function")'
 """
         run(
             ["bash", "-c", admission, "native-test", driver, app / "_shared", luajit],
@@ -353,7 +353,7 @@ exec "$3" -e 'local d=os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT"); assert(os.getenv
         )
         direct_native = r"""
 local d=os.getenv('LITERAL_DRIVER'); local s=os.getenv('LITERAL_SHARED')
-assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,s,nil,'direct')
+assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,s,nil,'direct')
 local ok,err=pcall(require,'lfs')
 assert(not ok and err:find('error loading',1,true), 'direct entry must retain host native errors')
 """
@@ -364,7 +364,7 @@ assert(not ok and err:find('error loading',1,true), 'direct entry must retain ho
         lua = r"""
 local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT')
 local s=os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')
-local owner=assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,s,os.getenv('ERGOPTI_RUNTIME_PREFIX'),'daemon')
+local owner=assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,s,os.getenv('ERGOPTI_RUNTIME_PREFIX'),'daemon')
 package.path=os.getenv('LITERAL_HOST')..'/?.lua;'..package.path
 package.preload.lfs=function() return 'preload' end
 assert(require('lfs')=='preload')
@@ -393,7 +393,7 @@ print('ok')
         assert run([usr / "bin/luajit", "-e", lua], env=env, cwd=scratch) == "ok\n"
         order = r"""
 local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT')
-local owner=assert(loadfile(d..'/infra/literal_module_loader.lua'))()
+local owner=assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))()
 owner.install(d,os.getenv('LITERAL_ALTERNATE_SHARED'),nil,os.getenv('LITERAL_MODE'))
 assert(require('literal_collision') == os.getenv('LITERAL_EXPECTED'))
 """

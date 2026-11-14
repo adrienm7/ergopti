@@ -17,7 +17,7 @@
 ; never handed. In AutoHotkey v2 that reads an unset local and THROWS.
 ;
 ; The throw travelled up through MenuRenderer_Build into the deferred tray
-; build's catch in infra/lifecycle.ahk, which logs and continues — so the entire
+; build's catch in core/lifecycle/engine/lifecycle.ahk, which logs and continues — so the entire
 ; tray menu vanished, leaving only the submenus that add themselves to
 ; A_TrayMenu directly (the IA menu). One unset variable, the whole menu gone,
 ; and a log line naming neither the file nor the row.

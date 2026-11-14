@@ -120,12 +120,12 @@ Test("metrics: the focus poll has generation-bound arm/cancel ownership (F-06)",
 ; for the rest of the session (dead feature).
 _MFS_SuspendReactorOwnsThePoll() {
 	Enter := _DriverFuncBody("Ergopti_OnSuspendEnter")
-	Assert(Enter != "", "Ergopti_OnSuspendEnter must exist in infra/lifecycle.ahk")
+	Assert(Enter != "", "Ergopti_OnSuspendEnter must exist in core/lifecycle/engine/lifecycle.ahk")
 	Assert(InStr(Enter, "MF_StopFocusRefresh") > 0,
 		"Ergopti_OnSuspendEnter must stop the metrics focus poll, like it already stops the LLM pointer watch and the updater async checks — all three are timers that bypass native Suspend")
 
 	Resume := _DriverFuncBody("Ergopti_OnSuspendResume")
-	Assert(Resume != "", "Ergopti_OnSuspendResume must exist in infra/lifecycle.ahk")
+	Assert(Resume != "", "Ergopti_OnSuspendResume must exist in core/lifecycle/engine/lifecycle.ahk")
 	Assert(InStr(Resume, "MF_StartFocusRefresh") > 0,
 		"Ergopti_OnSuspendResume must re-arm the metrics focus poll — a stop with no matching re-arm leaves the focus cache frozen after the first pause, so every metrics privacy filter reads a stale foreground window for the rest of the session")
 }

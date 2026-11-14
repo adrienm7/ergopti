@@ -251,6 +251,7 @@ const OLLAMA_ROOTS = [
 	'static/ergopti_plus/macos/ui',
 	'static/ergopti_plus/linux/modules',
 	'static/ergopti_plus/linux/infra',
+	'static/ergopti_plus/linux/core/lifecycle/engine',
 	'static/ergopti_plus/linux/core/i18n/engine',
 	'static/ergopti_plus/linux/core/fs/engine',
 	'static/ergopti_plus/_shared/ai/engine',

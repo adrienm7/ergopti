@@ -61,9 +61,9 @@ local function fixture(body)
 end
 
 local function terminal_fixture(config, body)
-	helpers.with_fresh_modules({ "infra.termination_coordinator", "infra.emergency_exit" }, function()
+	helpers.with_fresh_modules({ "core.lifecycle.engine.shutdown.termination_coordinator", "core.lifecycle.engine.shutdown.emergency_exit" }, function()
 		local f = { leases = 0, watchdogs = 0, teardowns = 0, reloads = 0, exits = 0 }
-		local coordinator = require("infra.termination_coordinator")
+		local coordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 		helpers.assert_true(coordinator.init({
 			capture_publication_admission = config.capture_terminal_admission,
 			request_lease = function(_, callback) f.leases = f.leases + 1; f.lease = callback; return true end,

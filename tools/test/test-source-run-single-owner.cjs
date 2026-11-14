@@ -94,10 +94,10 @@ function ahkBody(file, name) {
 // what an installed build may do. Every product decision asks the owner.
 const WINDOWS_MECHANICS = {
 	'ErgoptiPlus.ahk': 'the compiled exe extracts and recovers its bundle',
-	'infra/boot.ahk': 'where each launch mode keeps paths.toml',
-	'infra/bundle.ahk': 'only the exe carries an embedded bundle',
+	'core/lifecycle/engine/boot.ahk': 'where each launch mode keeps paths.toml',
+	'core/lifecycle/engine/bundle.ahk': 'only the exe carries an embedded bundle',
 	'infra/config_registry_cache.ahk': 'fingerprint the executable when parser sources are embedded',
-	'infra/lifecycle.ahk': 'which executable a reload relaunches',
+	'core/lifecycle/engine/lifecycle.ahk': 'which executable a reload relaunches',
 	'infra/toml/toml_helpers.ahk': "the compiled exe's former paths.toml location",
 	'infra/diagnostic_snapshot.ahk': 'the snapshot reports the flag itself',
 	'infra/startup_smoke.ahk':
@@ -168,7 +168,7 @@ expect(
 	'core.ahk reads A_IsCompiled in Updater_IsLocalSource only'
 );
 for (const [file, name] of [
-	['infra/uninstall.ahk', 'ShowUninstallErgopti'],
+	['core/lifecycle/engine/shutdown/uninstall.ahk', 'ShowUninstallErgopti'],
 	['infra/start_at_login.ahk', 'StartAtLoginEnabled'],
 	['infra/start_at_login.ahk', 'StartAtLoginToggle'],
 	['modules/updater/self_update.ahk', 'Updater_DownloadAndInstall'],
@@ -179,7 +179,7 @@ for (const [file, name] of [
 		`${name} must ask Updater_IsLocalSource()`
 	);
 }
-const uninstall = ahkBody('infra/uninstall.ahk', 'ShowUninstallErgopti');
+const uninstall = ahkBody('core/lifecycle/engine/shutdown/uninstall.ahk', 'ShowUninstallErgopti');
 const refusal = uninstall.indexOf('Updater_IsLocalSource()');
 expect(
 	refusal >= 0 &&
@@ -231,7 +231,7 @@ expect(
 // ==========================================
 // ==========================================
 
-const LINUX_OWNER = path.join('infra', 'installation.lua');
+const LINUX_OWNER = path.join('core', 'lifecycle', 'engine', 'installation.lua');
 // Where the updater decides who may REPLACE the files (system package,
 // bundle, standalone install): a different question, with its own tests.
 const LINUX_REPLACEMENT = path.join('modules', 'updater', 'installer.lua');

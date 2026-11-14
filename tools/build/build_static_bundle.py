@@ -5,7 +5,7 @@ MODULE: Static Bundle Builder
 DESCRIPTION:
 Assembles the runtime assets the compiled Windows executable reads into a single
 zip archive. The compiled AHK script embeds this archive via FileInstall and
-extracts it on first launch (infra/bundle.ahk), so the EXE is self-contained.
+extracts it on first launch (core/lifecycle/engine/bundle.ahk), so the EXE is self-contained.
 What ships is declared in tools/build/windows_bundle_manifest.json; this script
 only resolves and writes it.
 

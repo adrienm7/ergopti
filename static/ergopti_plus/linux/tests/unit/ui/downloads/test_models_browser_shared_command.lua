@@ -19,7 +19,7 @@ local function with_browser(callback)
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
 		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
-		"ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "infra.installation",
+		"ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation",
 		"updater.engine.version_label", "updater.engine.schedule", "ui.model_browser.bridge" }
 	local saved = {}
 	for _, name in ipairs(names) do

@@ -59,7 +59,7 @@ local function receiving(body)
 				return state.handle, state.prepared
 			end,
 		}
-		package.loaded["infra.launcher_environment"] = nil
+		package.loaded["core.lifecycle.engine.launcher_environment"] = nil
 		package.loaded["core.lifecycle.engine.core.ollama_runtime_choice"] = nil
 		package.loaded["adapters.managed_ollama_bootstrap"] = nil
 		local choice = require("core.lifecycle.engine.core.ollama_runtime_choice")
