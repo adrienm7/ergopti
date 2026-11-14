@@ -326,6 +326,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       layouts, see every metric, the global score and the ranking side by side, with charts). A layout being edited
       enters the comparison in one click. Site routes: /studio and /studio/comparer.
 
+- [ ] **Read every common layout format (maintainer, 2026-11-14).** A layout is only what each physical key types
+      (base, Shift, AltGr, AltGr+Shift, dead keys). The Studio (app and site) imports, at least: the Keyboard Layout
+      Analyzer JSON format (used by KLA, KLAnext and similar tools), Kalamine's TOML (Ergo-L), the Ergopti TOML source,
+      and the other formats the analyser study finds in use (e.g. XKB symbols, KLC, macOS .keylayout, and the JSON or
+      text formats of open-source analysers/generators). Each importer converts to the Ergopti source model, reports
+      what it could not map, and is tested on real files from those tools. Saving stays in the Ergopti TOML source
+      (one format of record, already compiled to XKB, KLC and keylayout); export to KLA JSON and Kalamine TOML is
+      offered for interoperability (decided by the coordinator on 2026-11-14, to review by the maintainer). The
+      hundred-layout library is built from those imports, with each layout's source and licence recorded.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
