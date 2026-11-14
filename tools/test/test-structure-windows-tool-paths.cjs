@@ -30,6 +30,7 @@ const MAP = new Map([
 	['windows/infra/uninstall.ahk', 'windows/core/lifecycle/engine/shutdown/uninstall.ahk'],
 	['windows/infra/bundle.ahk', 'windows/core/lifecycle/engine/bundle.ahk'],
 	['windows/infra/json.ahk', 'windows/core/text/engine/json.ahk'],
+	['windows/adapters/program_providers.ahk', 'windows/core/process/adapters/program_providers.ahk'],
 	['linux/infra/installation.lua', 'linux/core/lifecycle/engine/installation.lua'],
 	['macos/infra/paths.lua', 'macos/infra/paths.lua']
 ]);
@@ -83,6 +84,15 @@ function run() {
 	{
 		const out = rewrite(`${head}principal.indexOf('#Include ../infra/json.ahk');\n`);
 		assert.ok(out.includes("'#Include ../core/text/engine/json.ahk'"), out);
+	}
+	// A call taking the driver and one path argument keeps that shape: one
+	// piece per segment would shift the next argument into the path.
+	{
+		const out = rewrite("const p = code('windows', 'adapters/program_providers.ahk', strip);\n");
+		assert.ok(
+			out.includes("code('windows', 'core/process/adapters/program_providers.ahk', strip)"),
+			out
+		);
 	}
 	// A tool naming both Lua drivers: a bare path only one of them holds.
 	{
