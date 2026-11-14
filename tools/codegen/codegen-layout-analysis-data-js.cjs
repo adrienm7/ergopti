@@ -47,6 +47,9 @@ const SHIP_STATUS = 'ship';
 const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
+// The repository and the host a repository document is linked on (one source each).
+const REPOSITORY_DEFAULTS_PATH = shared('updater', 'data', 'defaults.json');
+const IDENTIFIERS_PATH = shared('core', 'text', 'data', 'identifiers.json');
 // The values the « i » popovers explain besides the metrics.
 const INFO_VALUES = ['ideal_finger_load', 'shortcut_letters', 'weights', 'fingering'];
 // The ideal finger load per hand, pinky to index (maintainer 2026-11-14).
@@ -512,9 +515,14 @@ function buildInfoSources(engine) {
 			throw new Error(`sources.json: no references for ${id}`);
 	for (const id of Object.keys(items))
 		if (!expected.includes(id)) throw new Error(`sources.json: unknown item ${id}`);
+	const { owner, repo } = JSON.parse(fs.readFileSync(REPOSITORY_DEFAULTS_PATH, 'utf8')).github;
+	const host = JSON.parse(fs.readFileSync(IDENTIFIERS_PATH, 'utf8')).hosts.github;
+	if (!owner || !repo || !host || !raw.repository_branch)
+		throw new Error('sources.json: the repository owner, name, host or branch is missing');
+	// Parts, not a typed URL: the page composes the link (repository URL single source).
+	const repository = { host, owner, repo, branch: raw.repository_branch };
 	const references = {};
 	for (const [id, ref] of Object.entries(raw.references)) {
-		let url = ref.url;
 		if (ref.path !== undefined) {
 			const file = path.join(REPO_ROOT, ref.path);
 			if (!fs.existsSync(file)) throw new Error(`sources.json: ${id}: no ${ref.path}`);
@@ -525,22 +533,24 @@ function buildInfoSources(engine) {
 				if (!anchors.includes(ref.anchor))
 					throw new Error(`sources.json: ${id}: no heading #${ref.anchor} in ${ref.path}`);
 			}
-			url = raw.repository_base + ref.path + (ref.anchor ? `#${ref.anchor}` : '');
+			references[id] = {
+				title: ref.title,
+				path: ref.path,
+				anchor: ref.anchor || '',
+				checked: true
+			};
+			continue;
 		}
-		if (typeof url !== 'string' || !url.startsWith('https://'))
+		if (typeof ref.url !== 'string' || !ref.url.startsWith('https://'))
 			throw new Error(`sources.json: ${id}: needs an https url or a repository path`);
-		references[id] = {
-			title: ref.title,
-			url,
-			checked: ref.checked === undefined ? true : ref.checked !== null
-		};
+		references[id] = { title: ref.title, url: ref.url, checked: ref.checked !== null };
 	}
 	const used = new Set(Object.values(items).flat());
 	for (const id of used)
 		if (!references[id]) throw new Error(`sources.json: unknown reference ${id}`);
 	for (const id of Object.keys(references))
 		if (!used.has(id)) throw new Error(`sources.json: unused reference ${id}`);
-	return { references, items };
+	return { repository, references, items };
 }
 
 /**

@@ -94,6 +94,13 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		};
 	}
 
+	/** A reference's link: its own URL, or its document on the repository. */
+	function referenceUrl(repository, ref) {
+		if (ref.url) return ref.url;
+		const { host, owner, repo, branch } = repository;
+		return `https://${host}/${owner}/${repo}/blob/${branch}/${ref.path}${ref.anchor ? `#${ref.anchor}` : ''}`;
+	}
+
 	/** The default values an explanation quotes, from the data. */
 	function values(item) {
 		if (item !== 'ideal_finger_load') return {};
@@ -136,7 +143,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 			const ref = data.references[id];
 			const li = el('li');
 			const a = el('a', '', ref.title);
-			a.href = ref.url;
+			a.href = referenceUrl(data.repository, ref);
 			routeLink(a);
 			li.append(a);
 			if (!ref.checked) li.append(` (${t('layout_analysis.info.unchecked')})`);

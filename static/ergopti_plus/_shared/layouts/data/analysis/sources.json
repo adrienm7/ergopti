@@ -1,7 +1,7 @@
 {
-	"_description": "Where each value of the layout analysis comes from: the « i » popovers of Ergopti Studio (_shared/ui/layout_analysis) list these references next to every metric and sourced value. « references » are the works cited: an external page (url) or a document of this repository (path, optional anchor; the link is repository_base + path). « items » maps every engine metric and every sourced value (ideal_finger_load, shortcut_letters, weights, fingering) to its references; its explanation is the locale key layout_analysis.info.<item>. « checked » is the date the page was last read, null when it could not be fetched (to verify). codegen-layout-analysis-data-js.cjs checks that every metric has an item, every reference exists and every repository path and anchor is real.",
+	"_description": "Where each value of the layout analysis comes from: the « i » popovers of Ergopti Studio (_shared/ui/layout_analysis) list these references next to every metric and sourced value. « references » are the works cited: an external page (url) or a document of this repository (path, optional anchor; the page links it on the repository named in _shared/updater/data/defaults.json, branch « repository_branch »). « items » maps every engine metric and every sourced value (ideal_finger_load, shortcut_letters, weights, fingering) to its references; its explanation is the locale key layout_analysis.info.<item>. « checked » is the date the page was last read, null when it could not be fetched (to verify). codegen-layout-analysis-data-js.cjs checks that every metric has an item, every reference exists and every repository path and anchor is real.",
 	"schema_version": 1,
-	"repository_base": "https://github.com/adrienm7/ergopti/blob/dev/",
+	"repository_branch": "dev",
 	"references": {
 		"engine_doc": {
 			"title": "Ergopti — layout analysis engine",
