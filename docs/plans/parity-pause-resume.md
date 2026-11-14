@@ -38,17 +38,35 @@ must be root-caused before landing.
 
 ## Still open in the pause item
 
-- AI model selector and API entry rows (`macos/ui/menu/menu_llm/api_panel.lua`,
-  the Linux `delete_model` admission, the Windows `menu_api_entries.ahk` and
-  `menu_models.ahk` gates). Selecting a model may start a warmup: check each
-  driver's warmup is pause-aware first (Linux `warmup_target` already returns
-  nil while paused; the macOS `warmup_controller` is not pause-aware).
-- macOS keyboard-slot and script-chord slot rows, and the personal legacy
-  shortcut row: they bind hotkeys, so they need a replay on resume.
-- macOS magic key source capture: it listens to a physical key press.
-- The audit that every typing feature stays inert while paused.
-- Windows: the tray still greys the AI submenu while paused
-  (`TrayMenu_ApplyPauseGreying`); that belongs to the EDD-1 on AHK item.
+Order asked by the coordinator on 2026-11-14 at 19:06 Paris: (1) the AI model
+and API rows on the three OS, (2) the macOS slot and legacy shortcut rows,
+replayed on resume, (3) the macOS magic key capture, (4) the audit that every
+typing feature stays inert while paused. One CI run per block.
+
+Done for (1) on the branch, not landed: dfb5df1a « warm a model chosen while
+paused on resume on macOS ». `modules/llm/init.lua` already skipped a warmup
+while paused but never replayed it; `ui/menu/menu_llm/warmup_controller.lua`
+now hands it to `modules.llm.warmup_controller.defer_to_resume`, which
+`resume_warmup` runs. Linux reschedules its warmup on resume
+(`warmup_target` is nil while paused); Windows defers the bridge start
+(`bootstrap_pending`, `LLM_Menu_OnResume`).
+
+Left for (1), with the gates found so far:
+
+- macOS: `ui/menu/menu_llm/model_selector_page.lua` (`ctx.is_paused()` at the
+  page build, install state, selection and the bridge entry points, about six
+  sites), `ui/menu/menu_llm/api_panel.lua` (`paused` and `native_unpaused`,
+  about twelve sites) and the `llm_model` row in `ui/menu/menu_llm/init.lua`
+  (`MenuLayout.row_disabled("llm_model", is_disabled, paused)`).
+- Linux: `ui/menu/llm_backend_rows.lua` (two sites) and `delete_model` in
+  `ui/menu/menu_llm.lua`.
+- Windows: `ui/menu/menu_llm/menu_models.ahk` and `menu_api_entries.ahk` (ten
+  `A_IsSuspended` sites); the tray still greys the whole AI submenu while
+  paused (`TrayMenu_ApplyPauseGreying`, the EDD-1 on AHK item).
+- Downloads and deletions are installs: EDD-1 keeps them available while
+  paused, but each must not start a runtime (warmup, server) until resume.
+
+Then (2), (3) and (4) as listed above.
 
 ## Traps met
 
