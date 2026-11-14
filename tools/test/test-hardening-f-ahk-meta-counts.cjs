@@ -527,6 +527,8 @@ function call(name, args, context) {
 			return model.noComments;
 		case '_DriverDirConcat':
 			return model.dirConcat(str(args[0]));
+		case '_DriverDirsConcat':
+			return args.map((arg) => model.dirConcat(str(arg))).join('');
 		case 'StrLen':
 			return str(args[0]).length;
 		default:
