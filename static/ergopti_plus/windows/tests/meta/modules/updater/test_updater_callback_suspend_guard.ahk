@@ -170,15 +170,16 @@ _UCSG_EveryUpdaterProducerCarriesAndRevalidatesProvenance() {
 		"_Updater_RequestMayPublish(Request")
 	BeginAt := InStr(DownloadBody,
 		"_Updater_BeginDownloadTransaction(", , PublicPolicyAt)
+	; An install is held to the install policy, which keeps AHK-14 (UPD-2).
 	ReservePolicyAt := InStr(ReserveBody,
-		"_Updater_RequestPolicy(Request")
+		"_Updater_InstallRequestPolicy(Request")
 	OwnerAt := InStr(ReserveBody,
 		"_UpdaterDownloadRequest := Request", , ReservePolicyAt)
 	Assert(PublicPolicyAt > 0 and BeginAt > PublicPolicyAt
 		and ReservePolicyAt > 0 and OwnerAt > ReservePolicyAt,
 		"download ownership must retain only a request admitted by the shared AHK-14 policy")
 	TakeAt := InStr(Cancel, "_UpdaterDownloadRequest := 0")
-	TerminalAt := InStr(Cancel, "_Updater_RequestMayPublish(Request, true)", , TakeAt)
+	TerminalAt := InStr(Cancel, "_Updater_RequestMayPublish(Request, true, 0, true)", , TakeAt)
 	Assert(TakeAt > 0 and TerminalAt > TakeAt,
 		"suspend cancellation must take the download owner before queueing its one visible resume terminal")
 }
