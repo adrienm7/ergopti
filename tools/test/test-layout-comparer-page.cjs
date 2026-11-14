@@ -22,8 +22,8 @@
  *    a window property (the .keylayout import once read window.LAYOUT_COMPOSER_DATA
  *    and got undefined).
  * 6. Editor panel: the site's editor page and the app's editor window load
- *    the panel's scripts in the same order, before editor_page.js, and the
- *    window lists every built-in corpus (its hosts inline scripts).
+ *    the panel's scripts in the same order, before editor_page.js; the app
+ *    window loads built-in corpora through its host, not as static tags.
  * ==============================================================================
  */
 
@@ -219,19 +219,22 @@ for (const page of ['layout_editor', 'layout_editor_window']) {
 	);
 }
 
-// The macOS and Linux app windows inline their scripts and cannot load one
-// later: the editor window lists every built-in corpus's tables itself.
+// The app windows load built-in corpora through their host (loadCorpus), not
+// as static tags: the inlining hosts would carry every table at start.
 const windowScripts = Array.from(
 	fs
 		.readFileSync(shared('ui', 'layout_editor_window', 'index.html'), 'utf8')
 		.matchAll(/<script src="([^"]+)"/g),
 	(m) => m[1]
 );
-for (const corpus of DATA.corpora)
-	check(
-		windowScripts.includes(`../layout_analysis/${corpus.script}`),
-		`layout_editor_window/index.html: no ${corpus.script} (inlining hosts cannot load it later)`
-	);
+check(
+	!windowScripts.some((src) => /_generated\/corpus_/.test(src)),
+	'layout_editor_window/index.html: corpus tables load through LAYOUT_ANALYSIS_HOST.loadCorpus'
+);
+check(
+	fs.readFileSync(path.join(PAGE_DIR, 'corpus_files.js'), 'utf8').includes('host.loadCorpus'),
+	'corpus_files.js no longer asks the host to load a corpus'
+);
 
 // The app's Studio window mounts the Comparer in a tab: it loads every script
 // of the Comparer's page (but i18n.js: its host seeds the strings), the

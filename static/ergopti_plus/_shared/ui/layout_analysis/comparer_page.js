@@ -451,8 +451,11 @@
 				profile: FINGERING.current() || undefined
 			});
 			const ms = Math.round(performance.now() - start);
+			// The compared layouts themselves (rows, dead keys…), for extra scorers.
+			const compared = new Map(chosen.map((layout) => [layout.id, layout]));
+			state.compared = compared;
 			for (const listener of resultListeners)
-				listener(state.results, tables, { keyboard: state.keyboard });
+				listener(state.results, tables, { keyboard: state.keyboard, layouts: compared });
 			showStatus(
 				t('layout_analysis.status.ready', {
 					count: chosen.length,
@@ -1035,7 +1038,8 @@
 		}
 
 		/**
-		 * Calls a listener after each comparison with (results, tables, {keyboard}),
+		 * Calls a listener after each comparison with (results, tables, {keyboard,
+		 * layouts: Map id → the compared layout object}),
 		 * and at once with the current ones: the hook of extra views.
 		 * @param {function(object[], object, object): void} listener
 		 */
@@ -1043,7 +1047,11 @@
 			if (typeof listener !== 'function')
 				throw new Error('layout_analysis: onResults needs a function');
 			resultListeners.push(listener);
-			if (state.tables) listener(state.results, state.tables, { keyboard: state.keyboard });
+			if (state.tables)
+				listener(state.results, state.tables, {
+					keyboard: state.keyboard,
+					layouts: state.compared || new Map()
+				});
 		}
 
 		/** Fills the markup's data-i18n, -placeholder, -title and option-prefix strings. */

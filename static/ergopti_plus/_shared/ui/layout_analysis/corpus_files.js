@@ -17,9 +17,10 @@
  *    page turns into a localized message (PDF: copy its text and paste it).
  * 3. A built-in corpus's script path is relative to this folder; it resolves
  *    against this script's own URL, so a page in another folder loads it too.
- *    A page whose host inlines its scripts (the macOS and Linux app windows
- *    have no base URL to load from) lists the corpus scripts itself, and
- *    their tables are used as they are.
+ *    A host that inlines its pages (the macOS and Linux app windows have no
+ *    base URL to load from) defines LAYOUT_ANALYSIS_HOST.loadCorpus(id): a
+ *    promise resolved once window.LAYOUT_ANALYSIS_CORPORA[id] is set. Tables
+ *    already loaded are used as they are.
  * ==============================================================================
  */
 
@@ -162,10 +163,13 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	 * @throws {Error} When the script fails to load or defines no tables.
 	 */
 	async function builtinTables(corpus) {
-		const preloaded = window.LAYOUT_ANALYSIS_CORPORA && window.LAYOUT_ANALYSIS_CORPORA[corpus.id];
-		if (preloaded) return preloaded;
-		await loadScript(corpus.script);
-		const tables = window.LAYOUT_ANALYSIS_CORPORA && window.LAYOUT_ANALYSIS_CORPORA[corpus.id];
+		const loaded = () =>
+			window.LAYOUT_ANALYSIS_CORPORA && window.LAYOUT_ANALYSIS_CORPORA[corpus.id];
+		if (loaded()) return loaded();
+		const host = window.LAYOUT_ANALYSIS_HOST || {};
+		if (typeof host.loadCorpus === 'function') await host.loadCorpus(corpus.id);
+		else await loadScript(corpus.script);
+		const tables = loaded();
 		if (!tables) throw new Error(`layout_analysis: ${corpus.script} defines no ${corpus.id}`);
 		return tables;
 	}

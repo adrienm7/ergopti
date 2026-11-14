@@ -335,7 +335,11 @@ adds or replaces a corpus, listed first and selected when `default` is true, and
 `addLayouts([layout, ...])` adds or replaces layouts, ticked. The page also
 listens for the app's `studio-ngrams` DOM event (`detail` = the keystats tables)
 and turns it into the « My typing » corpus (`my_typing`), the default in the
-app. A host `store` (`{list(), save(layout), remove(id)}`, each returning a
+app. A host that inlines its pages defines `loadCorpus(id)` (a promise resolved
+once `window.LAYOUT_ANALYSIS_CORPORA[id]` is set) instead of letting the page
+load `_generated/corpus_<id>.js` by URL. `onResults` listeners get
+`(results, tables, {keyboard, layouts})`, where `layouts` maps each id to the
+layout object compared. A host `store` (`{list(), save(layout), remove(id)}`, each returning a
 promise; the app's data folder, the site's IndexedDB) replaces `localStorage`
 for the layouts imported from files.
 
