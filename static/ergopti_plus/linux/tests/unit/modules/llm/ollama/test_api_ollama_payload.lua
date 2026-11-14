@@ -28,7 +28,7 @@ local POLICY = "/ai/data"
 
 for _, name in ipairs({ "defaults.json", "inference.json" }) do
 	helpers.it("Ollama payload refuses FIFO for " .. name, function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		require("modules.llm.prediction_engine") -- Load unrelated owners before redirecting this source root.
 		local root, previous_root, previous_api = assert(Paths.shared_root()), Paths.shared_root, package.loaded["modules.llm.api_ollama"]
 		local base = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-ollama-policy-XXXXXX"))
@@ -120,7 +120,7 @@ helpers.describe("ollama payload: keep_alive", function()
 
 	helpers.it("takes the duration from the shared defaults rather than a literal", function()
 		local request = captured_request({ stream = false })
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local root = Paths.shared_root()
 		helpers.assert_not_nil(root, "the shared tree must be findable")
 		local handle = assert(io.open(root .. "/ai/data/defaults.json", "r"))

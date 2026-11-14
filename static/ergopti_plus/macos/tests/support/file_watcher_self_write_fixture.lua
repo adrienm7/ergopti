@@ -9,9 +9,9 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
+	"core.fs.engine.file_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
 	"infra.logger", "infra.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate",
-	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "adapters.file_system",
+	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.fs.adapters.file_system",
 }
 
 M.CONFIG_ROOT = "/fake/config/"
@@ -49,8 +49,8 @@ function M.with_watchers(body, options)
 			package.loaded["infra.git_status"] = {
 				operation_in_progress = options.git_probe or function() return false end,
 			}
-			package.loaded["infra.file_watchers"] = nil
-			local watchers = require("infra.file_watchers")
+			package.loaded["core.fs.engine.file_watchers"] = nil
+			local watchers = require("core.fs.engine.file_watchers")
 			local clock, reloads, scheduled_count = 0, 0, 0
 			local callbacks, watcher_paths, pending = {}, {}, nil
 			host.pathwatcher = { new = function(path, callback)

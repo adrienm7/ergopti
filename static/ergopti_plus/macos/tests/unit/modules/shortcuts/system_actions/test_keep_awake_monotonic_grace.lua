@@ -33,7 +33,7 @@ local OWNED_MODULES = {
 	"adapters.event_provenance",
 	"core.events.clock",
 	"core.events.timer_scheduler",
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
 }
@@ -118,7 +118,7 @@ local function with_awake(callback)
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.keycodes"] = { F18_WAKE_OS = 79 }
 			local stored = {}
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key) return stored[key] end,
 				set = function(key, value) stored[key] = value; return true end,
 			}

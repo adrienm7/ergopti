@@ -37,7 +37,7 @@ function M.new(options)
 		"dynamic bulk selection owners are incomplete")
 	local owner, held = {}, false
 	local active_snapshot
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local manifest_port = {}
 	function manifest_port.scope_plan(scope, mode)
 		assert(scope == "dynamic" and (mode == "enable_all" or mode == "disable_all"),

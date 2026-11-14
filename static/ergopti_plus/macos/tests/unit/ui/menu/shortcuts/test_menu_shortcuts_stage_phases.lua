@@ -20,7 +20,7 @@ local names = {
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
-	"infra.paths", "menu.engine.renderer", "infra.phase_stats",
+	"core.fs.engine.paths", "menu.engine.renderer", "infra.phase_stats",
 }
 
 helpers.describe("menu_shortcuts: each provider records a named phase (menu-shortcuts-stage-phases)", function()
@@ -41,7 +41,7 @@ helpers.describe("menu_shortcuts: each provider records a named phase (menu-shor
 			package.loaded["infra.deferred_work"] = {}
 			package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 			package.loaded["ui.menu.menu_utils"] = {}
-			package.loaded["infra.paths"] = { shared = helpers.shared }
+			package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 			local actual_manifest = require("infra.manifest_menu")
 			local invoked = {}
 			package.loaded["infra.manifest_menu"] = {

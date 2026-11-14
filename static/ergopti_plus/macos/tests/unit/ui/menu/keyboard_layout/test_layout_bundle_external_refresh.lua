@@ -28,19 +28,19 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
 				"modules.keymap.layout_install",
-				"infra.fs_dir",
+				"core.fs.engine.dir",
 				"modules.keymap.input_sources",
 				"ui.menu.menu_keyboard_layout",
 				"infra.logger",
 				"infra.text_utils",
 				"infra.i18n",
 				"infra.notifications",
-				"adapters.storage",
+				"core.fs.adapters.storage",
 				"infra.deferred_work",
 				"infra.timings",
 				"ui.menu.keymap_lifecycle",
 				"infra.manifest_menu",
-				"infra.paths",
+				"core.fs.engine.paths",
 				"hs",
 				"tests.stubs.hs",
 			}, function()
@@ -49,7 +49,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				_G.hs = hs_stub
 				package.loaded["hs"] = hs_stub
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.paths"] = { shared = helpers.shared }
+				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				package.loaded["infra.text_utils"] = {
 					shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 					applescript_format = function(template) return template end,
@@ -162,7 +162,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					if path == user_dir then user_listings = user_listings + 1 end
 					return list_directory(path)
 				end
-				package.loaded["adapters.storage"] = {
+				package.loaded["core.fs.adapters.storage"] = {
 					get = function() return nil end,
 					set = function() return true end,
 				}

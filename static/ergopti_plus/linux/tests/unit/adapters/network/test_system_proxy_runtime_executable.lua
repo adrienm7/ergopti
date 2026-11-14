@@ -96,10 +96,10 @@ local function fresh(config)
 		state.exit(code or 0, 0)
 	end
 	local saved = package.loaded.luv
-	local saved_paths = package.loaded["infra.paths"]
+	local saved_paths = package.loaded["core.fs.engine.paths"]
 	local ok, adapter = pcall(function()
 	if config.nil_driver_root then
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			driver_root = function() return nil end,
 			shared_root = function() return "/private/shared" end,
 		}
@@ -108,7 +108,7 @@ local function fresh(config)
 	return helpers.fresh_module("adapters.system_proxy")
 	end)
 	package.loaded.luv = saved
-	package.loaded["infra.paths"] = saved_paths
+	package.loaded["core.fs.engine.paths"] = saved_paths
 	if not ok then error(adapter, 0) end
 	return adapter, state, config
 end

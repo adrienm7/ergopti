@@ -3,11 +3,11 @@
 --- Actual cleanup readers preserve admitted Wrap records and classify unowned source.
 local helpers = require("tests.helpers")
 local function scan(source)
-	return helpers.with_stub_scope({ "adapters.storage", "adapters.file_system", "infra.config_overrides",
+	return helpers.with_stub_scope({ "core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.config_overrides",
 		"infra.preferences", "ui.onboarding", "ui.menu.unused_keys_cleanup", "ui.menu.builder",
 		"menu.engine.wrap_preferences", "core.lifecycle.engine.compat.utf8" }, function()
 		local stored = {}
-		package.loaded["adapters.storage"] = { set = function(key, value) stored[key] = value; return true end,
+		package.loaded["core.fs.adapters.storage"] = { set = function(key, value) stored[key] = value; return true end,
 			get = function(key) return stored[key] end, delete = function(key) stored[key] = nil; return true end,
 			keys = function() return {} end }
 		helpers.load_with_stubs("infra.preferences")

@@ -18,7 +18,7 @@ NONCE = "b" * 32
 # These literal expected values are authored independently from runner constants.
 EXPECTED_FILES = (
     "static/ergopti_plus/macos/adapters/program_providers.lua",
-    "static/ergopti_plus/macos/infra/fs_dir.lua",
+    "static/ergopti_plus/macos/core/fs/engine/dir.lua",
     "static/ergopti_plus/_shared/apps/engine/program_providers.lua",
     "static/ergopti_plus/_shared/shortcuts/data/actions/program_providers.json",
     "static/ergopti_plus/_shared/settings/engine/program_parameter.lua",

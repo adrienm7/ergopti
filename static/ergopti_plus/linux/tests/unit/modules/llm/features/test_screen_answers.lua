@@ -216,7 +216,7 @@ end
 
 helpers.it("vision configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local original_shared, original_request = Paths.shared, package.loaded["modules.llm.vision_request"]
 	local source = assert(original_shared("ai/data/vision.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-vision-XXXXXX"))

@@ -30,7 +30,7 @@ M.ACTIONS = {
 
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local TomlCodec = require("core.text.engine.toml_codec")
 local Answers = require("onboarding.engine.answers")
 local ConfigDirPicker = require("ui.config_dir_picker")
@@ -108,7 +108,7 @@ end
 local function read_shared(relative)
 	local path = Paths.shared(relative)
 	if not path then return nil end
-	return require("infra.regular_file_reader").read_source(path)
+	return require("core.fs.engine.regular_file_reader").read_source(path)
 end
 
 local function locale_strings(code)
@@ -175,7 +175,7 @@ end
 --- @return table|nil values Empty for absent files, nil when one is unreadable.
 local function values_of(state, path)
 	local values = {}
-	local reader = require("infra.regular_file_reader")
+	local reader = require("core.fs.engine.regular_file_reader")
 	local fh, err, code = reader.open_source(path)
 	if fh then
 		local read, raw = pcall(fh.read, fh, "*a")
@@ -447,7 +447,7 @@ local function finish_owned(state, answers)
 		return { done = false }
 	end
 
-	local files = dependency(state, "file_system", "adapters.file_system")
+	local files = dependency(state, "file_system", "core.fs.adapters.file_system")
 	if not files or type(files.read_with_status) ~= "function" then
 		report_failure(state, "onboarding.error.write_failed")
 		return { done = false }
@@ -463,7 +463,7 @@ local function finish_owned(state, answers)
 		end,
 		current = function()
 			return dependency(state, "writer", "core.text.engine.toml_codec.writer") == authorities.writer
-				and dependency(state, "file_system", "adapters.file_system") == files
+				and dependency(state, "file_system", "core.fs.adapters.file_system") == files
 				and dependency(state, "config_paths", "infra.config_paths") == authorities.config_paths
 				and dependency(state, "i18n", "infra.i18n") == authorities.i18n
 				and authorities.config_paths.set_config_dir == path_set and authorities.config_paths.get_config_dir == path_get

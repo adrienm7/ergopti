@@ -142,7 +142,7 @@ function M.new(options)
 		return parameters.apply_parameter_configuration(owner,snapshot.parameters) == true
 	end
 	local transaction = Transaction.new({path=options.path,backup_path=options.backup_path,
-		files=options.files or require("adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
+		files=options.files or require("core.fs.adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
 			if scope == "key_combinations_gate" then
 				assert(mode == "configured" and type(gate_value) == "boolean")
 				return { presets = {}, operations = {manifest.sparse_operation("category_enabled.key_combinations",gate_value)} }

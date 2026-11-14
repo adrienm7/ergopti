@@ -45,7 +45,7 @@ local function scoped_remap(fixture)
 		return "/remap/tap_hold.toml"
 	end
 	package.loaded["infra.config_paths"].get_config_dir = function() return CONFIG_DIR end
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	files.remove_exact = function(path)
 		disk.files[path] = nil
 		return true
@@ -97,7 +97,7 @@ local function preset()
 end
 
 local function removable(disk)
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	disk.removal_calls = {}
 	disk.removals = {}
 	files.remove_exact = function() error("layer compensation must use conditional removal") end
@@ -136,7 +136,7 @@ end
 local function cohort_remap(fixture)
 	local remap, calls, disk = scoped_remap(fixture)
 	disk.layer_reads, disk.layer_writes, disk.removals, disk.layer_at_regeneration = 0, 0, 0, {}
-	local files, read = require("adapters.file_system"), require("adapters.file_system").read_with_status
+	local files, read = require("core.fs.adapters.file_system"), require("core.fs.adapters.file_system").read_with_status
 	files.read_with_status = function(path)
 		if path == LAYERS then
 			disk.layer_reads = disk.layer_reads + 1

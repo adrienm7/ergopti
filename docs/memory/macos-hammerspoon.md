@@ -120,7 +120,7 @@ Command Line Tools), whatever processor that copy was built for. dev.155 ran it
 at every boot for the input-source probe, and on an Apple silicon Mac migrated
 from Intel macOS started it under Rosetta and posted "support for Intel-based
 apps is ending … Python". Nothing at boot may run Python (the probe reads
-`defaults read` through `infra/openstep_plist.lua`), and every helper takes
+`defaults read` through `core/fs/engine/openstep_plist.lua`), and every helper takes
 its interpreter from `adapters/python_interpreter.lua`, which reads Mach-O
 slices without executing anything and refuses one without the native slice;
 a refusal opens `ui/python_runtime_offer.lua`. Never start `python3` by a
@@ -500,11 +500,11 @@ both returns instead of treating nil as proof of a directory.
 
 ### project-macos-write-lock-lives-outside-the-destination
 
-`adapters/file_system.lua` takes a stable advisory-lock inode for every
+`core/fs/adapters/file_system.lua` takes a stable advisory-lock inode for every
 publication and conditional removal. It cannot unlink that inode after use (a
 waiter would lock the orphan while a newcomer locks a new file), so the lock
 lives in `~/Library/Application Support/Ergopti/write-locks/` under an
-FNV-1a digest of the canonical destination (`adapters/write_lock_path.lua`).
+FNV-1a digest of the canonical destination (`core/fs/adapters/write_lock_path.lua`).
 Beside its destination it stayed next to every field-run result and inside
 private folders whose exact census then refused retirement (the Ollama pull
 slot of 2026-10-31). Tests find a lock with the fixture's `write_lock_path`.
@@ -558,9 +558,9 @@ met earlier in the same document: LuaSkin's `alreadySeenObjects` is an
 value in place edits every equal one. dev.148 refused every Karabiner deploy
 (« generated rule 1 manipulator 3 has inconsistent managed conditions »)
 because CapsWord's 30 identical conditions lists were one table and each
-manipulator's generation gate was appended to it. `adapters/json_codec.lua`
+manipulator's generation gate was appended to it. `core/fs/adapters/json_codec.lua`
 returns a tree; decode through it. The test stub shares equal values the same
-way (`tests/unit/adapters/storage/test_json_codec_tree.lua`), and
+way (`tests/unit/core/fs/adapters/storage/test_json_codec_tree.lua`), and
 `tests/meta/lua_safety/test_json_decode_through_codec.lua` ratchets the remaining direct
 calls, which only read what they decode.
 

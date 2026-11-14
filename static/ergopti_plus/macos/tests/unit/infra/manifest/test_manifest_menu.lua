@@ -654,7 +654,7 @@ local function fixed_parent_native_cohort(body)
 			local invoked, result = xpcall(function()
 				assert(translator.scope_apply(owner, receipt, "en"))
 				local renderer = assert(require("menu.engine.renderer").new({platform = "hs",
-					manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("infra.logger")}))
 				package.loaded["infra.manifest_menu"] = renderer
 				return body(renderer, translator)
@@ -777,7 +777,7 @@ helpers.describe("reasoned toggle presentation", function()
 				} }
 				local linux = assert(require("menu.engine.renderer").new({ platform = "linux",
 					manifest_path = function() return manifest_path end,
-					json_decode = require("adapters.json_codec").decode, i18n = translated,
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = translated,
 					logger = helpers.make_logger_stub() }))
 				for _, renderer in ipairs({ Menu, linux }) do
 					ready = false

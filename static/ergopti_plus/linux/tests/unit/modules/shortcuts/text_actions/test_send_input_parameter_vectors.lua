@@ -229,7 +229,7 @@ helpers.it("send-input vocabulary refuses a FIFO without blocking", function()
 	os.remove(path)
 	assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
 	local code = string.format([[package.path = %q
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local original = paths.shared
 paths.shared = function(name) if name == "shortcuts/data/actions/send_keys.json" then return %q end; return original(name) end
 local ok = pcall(require("modules.shortcuts.manager").send_vocabulary)

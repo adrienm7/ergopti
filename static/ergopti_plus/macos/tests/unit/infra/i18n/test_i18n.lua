@@ -626,7 +626,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local nested, competing
 		hs.settings.set = function(key, value)
 			nested = i18n.set_locale_no_reload("ja")
-			competing = require("adapters.storage").set("i18n_locale", "ja")
+			competing = require("core.fs.adapters.storage").set("i18n_locale", "ja")
 			return prior_set(key, value)
 		end
 		local ok, err = xpcall(function()
@@ -659,7 +659,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 			local matches = backups()
 			if key == "ergopti.i18n_locale" and value == "de" then
 				captured = #matches
-				blocked = require("adapters.storage").set("i18n_locale", "ja")
+				blocked = require("core.fs.adapters.storage").set("i18n_locale", "ja")
 			end
 			return prior_set(key, value)
 		end
@@ -678,7 +678,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	end)
 
 	helpers.it("retains an acquired alias when capture and initial release both refuse", function()
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local prior_capture, prior_release = Storage.capture_owned, Storage.release_owned
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		local releases = 0
@@ -704,7 +704,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Storage = require("infra.config_paths"), require("adapters.storage")
+		local Paths, Storage = require("infra.config_paths"), require("core.fs.adapters.storage")
 		local prior_get, prior_scheduler = Paths.get, package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		local foreign = {}
@@ -724,8 +724,8 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 
 	for _, boundary in ipairs({ "release", "forget", "backup" }) do
 	helpers.it("waits for retained locale " .. boundary .. " cleanup before reloading", function()
-		local Storage = require("adapters.storage")
-		local Files = require("adapters.file_system")
+		local Storage = require("core.fs.adapters.storage")
+		local Files = require("core.fs.adapters.file_system")
 		local prior_release, prior_forget, prior_remove = Storage.release_owned, Storage.forget_owned, Files.remove_if_unchanged
 		local prior_scheduler, prior_reload = package.loaded["core.events.timer_scheduler"], hs.reload
 		local refusals, reloads = 2, 0
@@ -789,7 +789,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	end)
 
 	helpers.it("keeps the owner when a cleanup retry timer cannot be armed", function()
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local prior_release, prior_reload = Storage.release_owned, hs.reload
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		local refusals, reloads = 2, 0
@@ -814,7 +814,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	end)
 
 	helpers.it("defers timer delivery during committed storage cleanup", function()
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local prior_release, prior_reload = Storage.release_owned, hs.reload
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		local reloads, scheduler, delivered = 0, nil, false
@@ -843,7 +843,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	end)
 
 	helpers.it("fences reentrant locale changes during the timer's cleanup retry", function()
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local prior_release, prior_reload = Storage.release_owned, hs.reload
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		local calls, nested, i18n = 0, nil, nil
@@ -898,7 +898,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	end)
 
 	helpers.it("does not replace a successor started while a cleanup retry is armed", function()
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local prior_release, prior_reload = Storage.release_owned, hs.reload
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		local refusals, reloads = 2, 0

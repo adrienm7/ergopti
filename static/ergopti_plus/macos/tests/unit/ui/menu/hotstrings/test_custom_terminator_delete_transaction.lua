@@ -14,11 +14,11 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 --- Reads the independent custom-command identity used by each native provider.
 --- @return table expected Canonical command expectation.
 local function custom_command_expected()
-	local path = require("infra.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
 	local file = assert(io.open(path, "rb"))
 	local text = file:read("*a")
 	file:close()
-	local corpus = assert(require("adapters.json_codec").decode(text))
+	local corpus = assert(require("core.fs.adapters.json_codec").decode(text))
 	assert(#corpus.rows == 1, "every independent custom command must be observed")
 	return corpus.rows[1]
 end
@@ -53,13 +53,13 @@ end
 --- @param callback function Assertion callback, outside production catches.
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
-		"adapters.file_system", "infra.fs_dir", "infra.logger", "infra.preferences",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
 		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { removes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
@@ -67,8 +67,8 @@ local function with_fixture(outcome, callback)
 		package.loaded["infra.dialog_util"] = { block_alert = function() return "button.delete" end }
 		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
 			logger = require("infra.logger"),
 		}))

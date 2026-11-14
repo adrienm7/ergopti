@@ -23,7 +23,7 @@ local TIMED_ONLY = {
 
 require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 	driver = "linux",
-	directory = require("infra.native_directory"),
+	directory = require("core.fs.engine.native_directory"),
 	root = helpers.driver_root(),
 	call_patterns = { 'Perf%.span%(%s*"([^"]+)"', 'Perf%.done%(%s*"([^"]+)"', 'Perf%.record_age%(%s*"([^"]+)"' },
 	timed_only = TIMED_ONLY,

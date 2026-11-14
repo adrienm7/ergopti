@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
@@ -54,7 +54,7 @@ local function with_fixture(raw, callback)
 			return true
 		end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		delete_exact = function() return true end,
 		get = function() return nil end,
 		read_exact = function() return true, nil end,

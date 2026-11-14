@@ -83,16 +83,16 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 			unbind = function() return true end,
 			setEnabled = function() return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function() return '{"keys":[{"id":"capslock","label":"Caps Lock"},{"id":"a","label":"A"}]}' end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "catalogue.json" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.gestures.actions"] = {
 			is_assignable = function(action_id) return type(action_id) == "string" end,
 			execute_single = function() executed = executed + 1; return true end,
 		}
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["modules.shortcuts.ai_actions"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 		package.loaded["infra.capslock_chord_evidence"] = nil
@@ -115,8 +115,8 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 		subject.stop()
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 		package.loaded["adapters.hotkey_registrar"] = nil
-		package.loaded["adapters.file_system"] = nil
-		package.loaded["infra.paths"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
+		package.loaded["core.fs.engine.paths"] = nil
 		package.loaded["modules.gestures.actions"] = nil
 	end)
 

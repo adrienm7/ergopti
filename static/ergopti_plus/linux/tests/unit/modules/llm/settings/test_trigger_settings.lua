@@ -497,7 +497,7 @@ end)
 --- Reads independent combinations without deriving expectations from setters.
 --- @return table corpus
 local function trigger_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/automatic_trigger_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/automatic_trigger_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -547,7 +547,7 @@ local function with_trigger_menu(options, body)
 	if options.label or options.first then
 		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
 				local root = assert(require("core.text.engine.json").decode(raw))
 				if options.label then root.llm_trigger_menu[2].i18n = options.label end
@@ -688,7 +688,7 @@ end)
 --- Reads the independent privacy declarations and boolean pairs.
 --- @return table corpus
 local function privacy_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
 	local bytes = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(bytes))

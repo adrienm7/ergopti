@@ -26,7 +26,7 @@ end
 --- @param body function Receives owner, private directory and stream observations.
 local function with_files(name, body)
 	local previous, original_open = package.loaded[name], io.open
-	local Writer = require("infra.regular_file_writer")
+	local Writer = require("core.fs.engine.regular_file_writer")
 	local original_writer = Writer.open
 	local dir = os.tmpname()
 	assert(os.remove(dir)); assert(Shell.run("mkdir " .. Shell.quote(dir)))
@@ -204,7 +204,7 @@ end)
 
 helpers.it("calendar startup exception preserves an unowned destination", function()
 	with_files("modules.llm.agent_connectors", function(Connector, dir)
-		local uv, Writer = require("luv"), require("infra.regular_file_writer")
+		local uv, Writer = require("luv"), require("core.fs.engine.regular_file_writer")
 		local private, path = dir .. "/calendar", dir .. "/calendar/task.ics"
 		assert(uv.fs_mkdir(private, 448))
 		local foreign = assert(io.open(path, "wb")); assert(foreign:write("foreign data")); assert(foreign:close())
@@ -230,7 +230,7 @@ end)
 --- @param body function Receives writer, reader, private path and observations.
 local function with_staging_image(backend, body)
 	with_files("modules.llm.agent_learning", function(_, dir, state)
-		local Writer, Reader = require("infra.regular_file_writer"), require("infra.regular_file_reader")
+		local Writer, Reader = require("core.fs.engine.regular_file_writer"), require("core.fs.engine.regular_file_reader")
 		local previous_uv, previous_ffi, reader_open = package.loaded.luv, package.loaded.ffi, Reader.open
 		if backend == "ffi" then package.loaded.luv = {} end
 		local okay, detail = xpcall(function() body(Writer, Reader, dir .. "/image", state) end, debug.traceback)
@@ -369,7 +369,7 @@ helpers.describe("exclusive staging native cleanup", function()
 	for _, field in ipairs({ "dev", "ino" }) do
 		for _, value in ipairs({ -2 ^ 63, -1, 0.5 }) do
 			helpers.it("(agent-learning-staging) rejects " .. field .. " identity " .. tostring(value), function()
-				with_files("infra.regular_file_writer", function(Writer, dir, state)
+				with_files("core.fs.engine.regular_file_writer", function(Writer, dir, state)
 					local uv = require("luv")
 					local fstat, lstat = uv.fs_fstat, uv.fs_lstat
 					local path = dir .. "/exclusive.tmp"
@@ -398,7 +398,7 @@ helpers.describe("exclusive staging native cleanup", function()
 	for _, mode in ipairs({ "w", "a" }) do
 		for _, receipt in ipairs({ "healthy", "refused" }) do
 			helpers.it("(agent-learning-staging) preserves arity of " .. mode .. " " .. receipt, function()
-				with_files("infra.regular_file_writer", function(Writer, dir)
+				with_files("core.fs.engine.regular_file_writer", function(Writer, dir)
 					local open = io.open
 					if receipt == "refused" then
 						io.open = function(path, stream_mode)
@@ -418,7 +418,7 @@ helpers.describe("exclusive staging native cleanup", function()
 		end
 	end
 	helpers.it("(agent-learning-staging) refuses cleanup from rounded inode identities", function()
-		with_files("infra.regular_file_writer", function(Writer, dir, state)
+		with_files("core.fs.engine.regular_file_writer", function(Writer, dir, state)
 			local uv = require("luv")
 			local fstat, lstat = uv.fs_fstat, uv.fs_lstat
 			local path = dir .. "/exclusive.tmp"
@@ -445,7 +445,7 @@ helpers.describe("exclusive staging native cleanup", function()
 	for _, backend in ipairs(jit and { "luv", "ffi" } or { "luv" }) do
 		for _, failure in ipairs({ "stream_nil", "stream_false", "stream_throw", "close_nil", "close_false", "close_throw", "stream_successor", "close_successor" }) do
 			helpers.it("(agent-learning-staging) settles " .. backend .. " " .. failure, function()
-				with_files("infra.regular_file_writer", function(Writer, dir, state)
+				with_files("core.fs.engine.regular_file_writer", function(Writer, dir, state)
 					local uv = require("luv")
 					local previous_uv, previous_ffi = package.loaded.luv, package.loaded.ffi
 					local open, uv_close = io.open, uv.fs_close

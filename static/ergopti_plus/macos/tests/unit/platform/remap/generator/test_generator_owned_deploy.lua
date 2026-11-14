@@ -25,7 +25,7 @@ local OWNED_OUT = "/ergopti-test/ErgoptiPlus/karabiner/karabiner.json"
 --- @param run function Receives { Generator, Config, file_state, config }.
 local function with_generator(existing, run)
 	helpers.with_fresh_modules({
-		"adapters.file_system", "adapters.json_codec", "infra.config_paths", "infra.keycodes", "infra.logger",
+		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.config_paths", "infra.keycodes", "infra.logger",
 		"infra.toml.codec", "platform.remap.config", "platform.remap.generator",
 		"modules.keymap.layout_registry", "infra.i18n", "infra.locale", "core.i18n.engine.core", "core.text.engine.toml_codec",
 	}, function()
@@ -39,7 +39,7 @@ local function with_generator(existing, run)
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 		package.loaded["core.text.engine.toml_codec"], package.loaded["infra.toml.codec"] = toml_stub, toml_stub
 		local file_state = { content = existing, writes = {}, merged_reads = 0 }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = SourceFile.read,
 			read_with_status = function(path)
 				if path == OWNED_OUT then
@@ -124,7 +124,7 @@ helpers.describe("Generator.deploy_owned_config", function()
 	helpers.it("reports a publication the filesystem refused", function()
 		with_generator(nil, function(env)
 			env.file_state.content = nil
-			local files = require("adapters.file_system")
+			local files = require("core.fs.adapters.file_system")
 			files.write_if_unchanged = function() return false, "disk refused" end
 			local deployed, detail = env.Generator.deploy_owned_config(env.generated, OWNED_OUT)
 			helpers.assert_eq(deployed, false)

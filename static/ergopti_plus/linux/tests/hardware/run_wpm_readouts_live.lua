@@ -156,7 +156,7 @@ if has_xdotool == true or has_xdotool == 0 then
 	local nx, ny = Surface.position()
 	print(string.format("  dragged from %d,%d to %d,%d", px, py, nx, ny))
 	expect(nx == px - 150 and ny == py - 120, "a pointer drag moves the pill")
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	expect(Storage.get("wpm_widget.pos_x", nil) == nx and Storage.get("wpm_widget.pos_y", nil) == ny,
 		"and its new place is kept for the next start")
 else

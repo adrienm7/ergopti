@@ -21,7 +21,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Temperature = require("ai.engine.policy.temperature")
 
 local LOG = "modules.llm.inference"

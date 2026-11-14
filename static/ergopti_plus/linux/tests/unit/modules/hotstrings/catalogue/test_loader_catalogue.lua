@@ -36,7 +36,7 @@ local ERGOPTI_PACKS = { ["rolls.toml"] = true, ["sfbsreduction.toml"] = true }
 --- @param name string File name.
 --- @return string
 local function pack(name)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	if ERGOPTI_PACKS[name] then
 		return Paths.shared_root() .. "/../../layouts/registry/ergopti/hotstrings/" .. name
 	end
@@ -465,7 +465,7 @@ end)
 
 helpers.describe("common autocorrection interleaved source order", function()
 	local function actual_catalogue(category, selected)
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local handle = assert(io.open(Paths.shared("tests/corpus/hotstrings/source_order_entries.json"), "r"))
 		local expected = require("core.text.engine.json").decode(handle:read("*a")); assert(handle:close())
 		local path = os.tmpname()

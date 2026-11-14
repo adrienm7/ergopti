@@ -739,9 +739,9 @@ end
 LedgerSetup.start_import = function(identity, metrics_dir)
 	local LedgerImport = require("modules.keystats.ledger_import")
 	local LedgerRebuild = require("modules.keystats.ledger_rebuild")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local schema_path = Paths.shared("metrics/data/db/schema.sql")
-	local schema = schema_path and require("adapters.file_system").read(schema_path)
+	local schema = schema_path and require("core.fs.adapters.file_system").read(schema_path)
 	local Digest = require("infra.openssl_digest")
 	if type(schema) ~= "string" or not Digest.streaming then
 		Logger.error(LOG, "Foreign metrics import refused (%s); other devices' metrics are not shown.",
@@ -1092,8 +1092,8 @@ end
 local function media_policy()
 	if _media_policy == nil then
 		local ok, policy = pcall(function()
-			local path = assert(require("infra.paths").shared("layouts/data/keycodes/metrics_media_keys.json"))
-			local body, status = require("adapters.file_system").read_with_status(path)
+			local path = assert(require("core.fs.engine.paths").shared("layouts/data/keycodes/metrics_media_keys.json"))
+			local body, status = require("core.fs.adapters.file_system").read_with_status(path)
 			assert(status == "ok" and type(body) == "string", "the media catalogue is unreadable")
 			return require("metrics.engine.media.store").policy(require("core.text.engine.json").decode(body))
 		end)
@@ -3383,7 +3383,7 @@ local function flush_json()
 
 	local path = _log_dir .. "/keystrokes_" .. date .. ".json"
 
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local previous, status, read_err = FileSystem.read_with_status(path)
 	if status ~= "ok" and status ~= "absent" then
 		Logger.error(LOG, "flush(): cannot read the previous summary at '%s' — %s.", path, tostring(read_err or status))
@@ -3684,7 +3684,7 @@ function _maintenance.export(request)
 		Logger.error(LOG, "Metrics export has no destination: %s.", reason)
 		return _maintenance.finish(request, false)
 	end
-	if not require("adapters.file_system").exists(folder) then
+	if not require("core.fs.adapters.file_system").exists(folder) then
 		Logger.error(LOG, "Metrics export destination %s does not exist.", folder)
 		return _maintenance.finish(request, false)
 	end

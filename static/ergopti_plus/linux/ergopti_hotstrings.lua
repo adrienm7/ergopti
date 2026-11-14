@@ -338,7 +338,7 @@ if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
-local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
+local file_watchers = RuntimeGuard.optional_require("core.fs.engine.file_watchers")
 
 -- Every owner below may keep a luv handle referenced. They must stop BEFORE
 -- event_loop.stop(), otherwise luv.run() waits for the very cleanup that the
@@ -1021,7 +1021,7 @@ local function main()
 		local migration = require("settings.engine.migration.migrate").boot({
 			path          = require("infra.config_paths").config("config.toml"),
 			driver        = "linux",
-			registry_path = require("infra.paths").shared(require("settings.engine.migration.migrate").REGISTRY_PATH),
+			registry_path = require("core.fs.engine.paths").shared(require("settings.engine.migration.migrate").REGISTRY_PATH),
 			-- The v22 step moves the switch, the timings and [mod_combos] out of the
 			-- tap_hold.toml beside config.toml, once (maintainer decision 2026-11-11).
 			companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] =
@@ -1042,7 +1042,7 @@ local function main()
 	-- resolve absence to off, which would silence an updated install.
 	require("infra.legacy_hotstring_storage").import({
 		path     = require("infra.config_paths").config("config.toml"),
-		storage  = require("adapters.storage"),
+		storage  = require("core.fs.adapters.storage"),
 		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
 	})
 	-- The exclusion lists name applications by WM class now, not by the X11
@@ -1258,7 +1258,7 @@ local function main()
 			_undoable = nil
 			engine:reset(false)
 		end,
-		defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"),
+		defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 		-- The switch and the timings are config.toml rows on every OS.
 		config_path = require("infra.config_paths").config("config.toml"),
@@ -1299,7 +1299,7 @@ local function main()
 		is_tap_action = TapHold.is_tap_action,
 		canonical_hold = TapHold.canonical_hold,
 		layers = {
-			shared_root = require("infra.paths").shared_root(),
+			shared_root = require("core.fs.engine.paths").shared_root(),
 			config_dir = require("infra.config_paths").get_config_dir(),
 		},
 	})

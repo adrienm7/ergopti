@@ -22,7 +22,7 @@ local function make_fake_path_stub(json_content)
 		fh:write(json_content)
 		fh:close()
 	end
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name)

@@ -14,7 +14,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv, ffi = require("luv"), require("ffi")
 ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
-local Digest = require("adapters.file_digest")
+local Digest = require("core.fs.adapters.file_digest")
 local Updater = require("modules.updater.manager")
 assert(Updater._file_digest == Digest, "updater must use the actual shared adapter")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-digest-owners-XXXXXX"))

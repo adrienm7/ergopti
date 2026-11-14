@@ -68,7 +68,7 @@ end
 --- file the user keeps in the folder is never removed.
 --- @param directory string Crash folder, no trailing slash.
 local function _rotate(directory)
-	local NativeDirectory = require("infra.native_directory")
+	local NativeDirectory = require("core.fs.engine.native_directory")
 	local listed, entries, message = pcall(NativeDirectory.entries, directory)
 	if not listed then
 		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(entries))
@@ -82,7 +82,7 @@ local function _rotate(directory)
 	for _, entry in ipairs(entries) do
 		if entry.kind == "file" then names[#names + 1] = entry.name end
 	end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	for _, name in ipairs(CrashReport.expired(names)) do
 		if FileSystem.delete(directory .. "/" .. name) ~= true then
 			Logger.warn(LOG, "Crash report '%s' could not be deleted by the retention policy.", name)
@@ -100,7 +100,7 @@ end
 --- @return integer removed Number of legacy dumps deleted.
 function M.remove_legacy_dumps(directory)
 	directory = directory or crash_dir()
-	local listed, entries, message = pcall(require("infra.native_directory").entries, directory)
+	local listed, entries, message = pcall(require("core.fs.engine.native_directory").entries, directory)
 	if not listed then
 		Logger.warn(LOG, "Legacy crash dump cleanup skipped, the folder cannot be listed: %s.", tostring(entries))
 		return 0
@@ -111,7 +111,7 @@ function M.remove_legacy_dumps(directory)
 		return 0
 	end
 	Logger.start(LOG, "Removing the legacy crash text dumps from %s…", directory)
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local removed = 0
 	for _, entry in ipairs(entries) do
 		if entry.kind == "file" and entry.name:match(LEGACY_DUMP_PATTERN) then
@@ -153,7 +153,7 @@ local function _build_facts()
 		return require("infra.version").VERSION
 	end)
 	local ok_app, app_dir = pcall(function()
-		return require("infra.paths").driver_root()
+		return require("core.fs.engine.paths").driver_root()
 	end)
 	local function failed(reason) return "unknown (resolution failed: " .. tostring(reason) .. ")" end
 	return {
@@ -215,7 +215,7 @@ end
 --- @return string|nil path
 --- @return function|nil current_image Exact regular-path byte verification.
 local function open_report(directory, stem, live)
-	local available, Writer = pcall(require, "infra.regular_file_writer")
+	local available, Writer = pcall(require, "core.fs.engine.regular_file_writer")
 	if not available or type(Writer) ~= "table" or type(Writer.open) ~= "function" then return nil end
 	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
 		if not live() then return nil end
@@ -332,7 +332,7 @@ end
 --- Counts report names only, as the retention policy does.
 --- @return number
 function M.get_crash_count()
-	local listed, entries = pcall(require("infra.native_directory").entries, crash_dir())
+	local listed, entries = pcall(require("core.fs.engine.native_directory").entries, crash_dir())
 	if not listed or entries == nil then return 0 end
 	local names = {}
 	for _, entry in ipairs(entries) do

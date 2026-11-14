@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
@@ -41,7 +41,7 @@ local function with_screenshot(displays, scenario)
 		package.loaded["adapters.mouse_control"] = {
 			getMonitorCount = function() return displays end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			expand_path = function(path) return path == "~" and "/Users/alice" or path end,
 			classify_no_follow = function(path)
 				if f.files[path] == nil then return nil, "absent" end

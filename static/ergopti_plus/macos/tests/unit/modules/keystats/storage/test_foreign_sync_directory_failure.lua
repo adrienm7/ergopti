@@ -30,12 +30,12 @@ end
 
 helpers.describe("keystats export — foreign directory enumeration", function()
 	helpers.it("distinguishes a missing directory from an uninspectable directory", function()
-		helpers.with_fresh_modules({"infra.logger", "infra.i18n", "infra.fs_dir", "adapters.file_system",
+		helpers.with_fresh_modules({"infra.logger", "infra.i18n", "core.fs.engine.dir", "core.fs.adapters.file_system",
 			"modules.keystats.export"}, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.i18n"] = {get = function(key) return key end}
 			local status, failing_path = "error", "/metrics/"
-			package.loaded["adapters.file_system"] = {classify_no_follow = function(path)
+			package.loaded["core.fs.adapters.file_system"] = {classify_no_follow = function(path)
 				helpers.assert_eq(path, failing_path)
 				return nil, status
 			end}
@@ -59,13 +59,13 @@ helpers.describe("keystats export — foreign directory enumeration", function()
 
 	helpers.it("returns the canonical directory refusal without throwing", function()
 		helpers.with_fresh_modules({
-			"infra.fs_dir",
+			"core.fs.engine.dir",
 			"infra.i18n",
 			"infra.logger",
 			"modules.keystats.export",
 		}, function()
 			local try_calls = 0
-			package.loaded["infra.fs_dir"] = {
+			package.loaded["core.fs.engine.dir"] = {
 				try_entries = function(path)
 					try_calls = try_calls + 1
 					helpers.assert_eq(path, "/metrics/by_device/")
@@ -124,13 +124,13 @@ end)
 local function ingest_errors(sync_foreign_data_sql)
 	return helpers.with_fresh_modules({
 		"infra.logger",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"modules.keystats.sqlite_writer",
 		"modules.keystats.aggregator",
 		"modules.keystats.rotation",
 		"modules.keystats.export",
 		"metrics.engine.metrics",
-		"adapters.ledger_append", "modules.keystats.log_manager",
+		"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 	}, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
@@ -211,7 +211,7 @@ helpers.describe("foreign sync writer quarantine", function()
 	helpers.it("does not touch the previously captured handle after foreign sync retires it", function()
 		helpers.with_fresh_modules({ "infra.logger", "modules.keystats.sqlite_writer",
 			"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-			"metrics.engine.metrics", "adapters.ledger_append", "modules.keystats.log_manager" }, function()
+			"metrics.engine.metrics", "core.fs.adapters.ledger_append", "modules.keystats.log_manager" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local calls = 0
 			local db = { nrows = function() calls = calls + 1; error("retired handle read") end,

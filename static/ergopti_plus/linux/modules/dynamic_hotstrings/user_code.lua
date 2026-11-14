@@ -15,7 +15,7 @@
 ---    instead of being set on the native owner (no apply_time port).
 --- ==============================================================================
 local Driver = require("hotstrings.engine.dynamic.user_code_driver")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("core.logger.engine.shim")

@@ -12,7 +12,7 @@ local function with_editor(callback)
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
-			"ui.prompt_editor", "ui.ui_builder", "infra.logger", "infra.paths", "infra.i18n",
+			"ui.prompt_editor", "ui.ui_builder", "infra.logger", "core.fs.engine.paths", "infra.i18n",
 			"hs", "tests.stubs.hs",
 			"infra.deferred_work",
 		}, function()
@@ -36,7 +36,7 @@ local function with_editor(callback)
 				state.errors[#state.errors + 1] = string.format(message, ...)
 			end
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.paths"] = { shared = function() return "/shared/prompt_editor" end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared/prompt_editor" end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["ui.ui_builder"] = {
 				get_app_geometry = function()

@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"modules.llm.backend_detector",
 	"infra.manifest_reader",
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.settings_manager",
 	"ui.menu.menu_llm.trigger_panel",
@@ -120,7 +120,7 @@ end
 
 local function with_fixture(options, callback)
 	options = options or {}
-	require("infra.paths").shared_root()
+	require("core.fs.engine.paths").shared_root()
 	local preferences_owner = options.preferences or require("infra.preferences")
 	local saved_modules = {}
 	for _, name in ipairs(MODULES) do
@@ -130,7 +130,7 @@ local function with_fixture(options, callback)
 	local saved_hs = _G.hs
 	local mlx_loaded_dependencies = {}
 	local profile_loaded_dependencies = {}
-	local mlx_previous_json_codec = package.loaded["adapters.json_codec"]
+	local mlx_previous_json_codec = package.loaded["core.fs.adapters.json_codec"]
 
 	local state = {
 		llm_enabled = true,
@@ -560,7 +560,7 @@ local function with_fixture(options, callback)
 		if options.native_mlx_port then
 			local prior_dependencies = {}
 			for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
-			package.loaded["adapters.json_codec"] = nil
+			package.loaded["core.fs.adapters.json_codec"] = nil
 			package.loaded["modules.llm.api_mlx"] = nil
 			package.loaded["modules.llm.api_mlx"] = require("modules.llm.api_mlx")
 			-- Restore only actual dependency entries changed by this genuine API, including false.
@@ -685,7 +685,7 @@ local function with_fixture(options, callback)
 	_G.hs = saved_hs
 	for name, prior in pairs(mlx_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
 	for name, prior in pairs(profile_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
-	if options.native_mlx_port then package.loaded["adapters.json_codec"] = mlx_previous_json_codec end
+	if options.native_mlx_port then package.loaded["core.fs.adapters.json_codec"] = mlx_previous_json_codec end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved_modules[name] end
 	if not ok then error(err, 0) end
 end
@@ -829,7 +829,7 @@ local function info_bar_corpus()
 end
 
 local function token_streaming_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
 	return assert(require("core.text.engine.json").decode(text))

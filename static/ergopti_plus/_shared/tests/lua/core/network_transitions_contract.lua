@@ -43,7 +43,7 @@ end
 --- @param helpers table The driver's describe/it/assertion functions.
 function M.register(helpers)
 	local Transitions = require("metrics.engine.system.network_transitions")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 
 	helpers.describe("connectivity transitions (network-transitions)", function()
 		helpers.it("network-windows-kinds: the kinds and the NCSI host are the Windows ones", function()

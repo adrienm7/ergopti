@@ -170,7 +170,7 @@ local LOG_MANAGER_STUBS = {
 	"modules.keystats.export",
 	"modules.keystats.host_signature",
 	"metrics.engine.metrics",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 }
@@ -192,7 +192,7 @@ local function count_sync_ioreg(prefetched)
 			status = function() return prefetched and "resolved" or "idle" end,
 		}
 		package.loaded["metrics.engine.metrics"] = {}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() return "{broken-device-json", "ok" end,
 		}
 		package.loaded["core.events.timer_scheduler"] = nil

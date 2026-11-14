@@ -35,7 +35,7 @@ local function with_compiled_navigation(body, controls, files)
 				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
 				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
 					["platform.remap.nav_layer"] = true, ["infra.config_paths"] = true,
-					["adapters.file_system"] = true, ["core.text.engine.json"] = true, ["core.text.engine.toml_codec"] = true,
+					["core.fs.adapters.file_system"] = true, ["core.text.engine.json"] = true, ["core.text.engine.toml_codec"] = true,
 					["core.text.engine.toml_codec.writer"] = true, ["layouts.engine.layers.layers"] = true }
 				-- The scope's own recorded native/port identities stay unchanged.
 				-- Retain only the exact dependencies the compiled producer rejoins.
@@ -111,9 +111,9 @@ local function run_fixture(body, source)
 			files[path] = value; controls.writes = controls.writes + 1; return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = file_port
+	package.loaded["core.fs.adapters.file_system"] = file_port
 	package.loaded["infra.config_paths"] = { get = function() return "config" end }
-	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end

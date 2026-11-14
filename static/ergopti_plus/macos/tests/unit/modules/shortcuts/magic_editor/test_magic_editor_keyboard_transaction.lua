@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local MODULES = {
-	"adapters.file_system", "adapters.hotkey_registrar", "infra.paths", "infra.logger",
+	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "core.fs.engine.paths", "infra.logger",
 	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
@@ -26,10 +26,10 @@ local function with_subject(assignments, scenario)
 		local catalogue = Json.decode(file:read("*a"))
 		file:close()
 		catalogue.keys = { { id = "c", label = "C" } }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "modifier-chords.json" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "modifier-chords.json" end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_reader"] = nil
 		package.loaded["modules.gestures.actions"] = {

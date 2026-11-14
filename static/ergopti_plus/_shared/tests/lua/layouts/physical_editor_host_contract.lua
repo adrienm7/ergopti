@@ -8,7 +8,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 	-- Every level the real shim has: a module first loaded here (the manifest reader
 	-- logs done) must not depend on another test file having loaded it before.
 	local logger={error=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,success=noop}
-	package.loaded['infra.paths']={shared=function(path)return shared_path(path) end}
+	package.loaded['core.fs.engine.paths']={shared=function(path)return shared_path(path) end}
 	package.loaded['infra.i18n']={get=function(key)return key end}
 	package.loaded['core.logger.engine.shim']=logger;package.loaded['infra.logger']=logger
 	local catalogue={get_action_label=function(a)return a end,is_assignable=function(a)return a=='send_text' or a=='none' end,get_action_parameter_spec=function(a)return a=='send_text' and 'text' or nil end,validate_action_parameter=function(a,v)return a=='send_text' and v=='★' end,split_action_parameter_key=function(k)return k:match('^(keyboard__.+)__(.+)$')end,get_picker_items=function()return{}end,get_picker_parameter_fields=function()return{}end}
@@ -39,7 +39,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		local view,bridge,delete_refuse,clear_refuse,early_ready,early_close=false,nil,false,false,false,false
 		local delete_false,clear_false=false,false
 		hs={json=Json,webview={usercontent={new=function()local b={};function b:setCallback(fn)if fn==nil and clear_refuse then error('private refused cleanup')end;if fn==nil and clear_false then return false end;callback=fn;return self end;bridge=b;return b end}}}
-		package.loaded['adapters.file_system']={read=function(path)local f=assert(io.open(path));local bytes=f:read('*a');f:close();return bytes end}
+		package.loaded['core.fs.adapters.file_system']={read=function(path)local f=assert(io.open(path));local bytes=f:read('*a');f:close();return bytes end}
 		package.loaded['ui.menu.menu_keyboard_slots']={build_action_items=function()return{}end}
 		package.loaded['ui.menu.shortcut_utils']={picker_parameter_fields=function()return{}end}
 		package.loaded['ui.action_picker']={open=function(_,confirm)picker=confirm;return true end}

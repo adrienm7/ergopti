@@ -16,7 +16,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 -- Stub adapters.file_system so load_json_file never hits the real disk.
 -- Tests that need a classified read to return data override _fs_data below.
 local _fs_data = {}
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read = function(path) return _fs_data[path] end,
 	read_with_status = function(path)
 		local content = _fs_data[path]

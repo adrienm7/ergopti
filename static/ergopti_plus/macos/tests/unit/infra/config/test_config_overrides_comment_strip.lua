@@ -18,7 +18,7 @@ local test_settings = {
 	get = function(key) return stored[key] end,
 }
 
-package.loaded["adapters.storage"] = nil
+package.loaded["core.fs.adapters.storage"] = nil
 local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 
 local path = os.tmpname()
@@ -31,7 +31,7 @@ helpers.assert_eq(stored["ergopti.key"], "DEBUG",
 	"a quote in a trailing TOML comment must never extend the setting value")
 
 os.remove(path)
-package.loaded["adapters.storage"] = nil
+package.loaded["core.fs.adapters.storage"] = nil
 package.loaded["infra.config_overrides"] = nil
 if original_settings then _G.hs.settings = original_settings end
 print("[PASS] test_config_overrides_comment_strip")

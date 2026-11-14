@@ -593,7 +593,7 @@ return function(helpers)
 	helpers.describe("authentic configuration scope preparation epoch", function()
 		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		local Migration = require("settings.engine.migration.migrate")
-		local NativeFiles = require("adapters.file_system")
+		local NativeFiles = require("core.fs.adapters.file_system")
 		local Writer = require("core.text.engine.toml_codec.writer")
 		local shared = debug.getinfo(1, "S").source:sub(2):gsub("/tests/lua/settings/scope_transaction_contract%.lua$", "")
 		local registry = assert(Migration.load_registry(shared .. "/" .. Migration.REGISTRY_PATH))

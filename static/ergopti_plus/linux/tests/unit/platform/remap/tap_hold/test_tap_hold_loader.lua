@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 -- an earlier suite loaded under a substitute logger would report elsewhere.
 local Config = helpers.load_module("platform.remap.tap_hold_loader")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- Loads the defaults with a user file holding `text`, its switch and timings
 --- in the config.toml beside it (tests/support/tap_hold_fixture.lua).

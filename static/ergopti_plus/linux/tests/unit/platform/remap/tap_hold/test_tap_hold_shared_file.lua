@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Codec = require("core.text.engine.toml_codec")
 
 local DEFAULTS = Paths.shared("tap_hold/data/defaults.toml")
@@ -133,7 +133,7 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 			local want = expected.reads[name].linux.mod_combos
 			local defaults = Loader.load(DEFAULTS, nil)
 			local owner = require("modules.shortcuts.key_combinations").new({ keys = defaults.catalog,
-				hold_picker = defaults.hold_picker, files = require("adapters.file_system"),
+				hold_picker = defaults.hold_picker, files = require("core.fs.adapters.file_system"),
 				route = function() return CORPUS .. name .. ".config.toml" end,
 				is_paused = function() return false end, changed = function() return true end,
 				actions = { is_assignable = function(action) return action == "copy" end } })

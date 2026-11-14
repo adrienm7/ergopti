@@ -3,10 +3,10 @@
 local helpers = require("tests.helpers")
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 local Codec = require("core.text.engine.toml_codec")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 
 local function fixture(number_row_source, complete_source)
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 	local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti+" }
 	local original = '[layout]\npause_switch_enabled = true\non_pause = "French"\non_resume = "Ergopti+"\nfuture = { preserve = 7 }\n[llm]\nenabled = true\n[metrics]\nenabled = true\n'
@@ -26,7 +26,7 @@ local function fixture(number_row_source, complete_source)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local PT = require("ui.menu.preferences_transaction")
@@ -158,7 +158,7 @@ helpers.describe("macOS keyboard-layout scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FileSystem
+package.loaded["core.fs.adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("layout scope provider", LayoutFixture.scoped(function()

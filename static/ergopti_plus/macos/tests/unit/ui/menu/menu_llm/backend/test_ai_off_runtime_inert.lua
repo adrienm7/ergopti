@@ -109,7 +109,7 @@ end
 
 local STARTUP_MODULES = {
 	"core.events.timer_scheduler",
-	"adapters.json_codec",
+	"core.fs.adapters.json_codec",
 	"infra.logger",
 	"modules.llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
@@ -125,7 +125,7 @@ local function with_startup(body)
 		local scheduler, timers = counting_scheduler()
 		package.loaded["infra.logger"] = logger
 		package.loaded["core.events.timer_scheduler"] = scheduler
-		package.loaded["adapters.json_codec"] = {
+		package.loaded["core.fs.adapters.json_codec"] = {
 			decode = function() return { log_path = "/tmp/fixture.log" } end,
 		}
 		package.loaded["modules.llm"] = { BUILTIN_PROFILES = { { id = "basic" } } }

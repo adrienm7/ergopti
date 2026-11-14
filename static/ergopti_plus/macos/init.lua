@@ -111,7 +111,7 @@ do
 		return
 	end
 end
-local Storage            = require("adapters.storage")
+local Storage            = require("core.fs.adapters.storage")
 if not direct_require_installed then
 	Logger.warn("init", "Hammerspoon exposes no rawrequire: each require keeps costing about 300 us on the main thread.")
 end
@@ -174,7 +174,7 @@ end
 -- configuration folder elsewhere; they move once, here: after the instance
 -- admission, so a refused process leaves every folder as it found it, and
 -- before the breadcrumb, the logs and config_paths read them.
-require("adapters.legacy_folder_migration").run(Logger)
+require("core.fs.adapters.legacy_folder_migration").run(Logger)
 local TimerScheduler     = require("core.events.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
@@ -541,7 +541,7 @@ do
 	end
 end
 do
-	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
+	local ok_cache, toml_cache = pcall(require, "core.fs.adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
 		toml_cache.init(TOML_CACHE_DIR)
 		local ok_reader, toml_reader = pcall(require, "infra.toml.reader")
@@ -1235,7 +1235,7 @@ end
 -- model identifier. Behind Karabiner that model does not decide the ISO pair:
 -- the virtual keyboard form the bridge deploys does (registered below).
 require("adapters.keyboard_geometry").initialize()
-local file_system        = require("adapters.file_system")
+local file_system        = require("core.fs.adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
 -- This require sits above the menubar, the panic-button eventtap and every other
@@ -1364,7 +1364,7 @@ do
 	local context, context_error
 	if catalogue_ok then
 		context, context_error = ConfigMigrate.load_context(
-			require("infra.paths").shared("shortcuts/data/actions/modifier_chords.json"), action_catalogue, file_system)
+			require("core.fs.engine.paths").shared("shortcuts/data/actions/modifier_chords.json"), action_catalogue, file_system)
 	else
 		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
 	end
@@ -1389,7 +1389,7 @@ do
 		context_error = context_error,
 		path          = config_paths.get("ConfigTomlPath"),
 		driver        = "hs",
-		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
+		registry_path = require("core.fs.engine.paths").shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = file_system,
 		companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] = tap_hold_path },
 	})
@@ -1811,7 +1811,7 @@ end
 -- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is honoured in exactly one place across the driver; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("infra.fs_dir").entries
+local safe_dir_entries = require("core.fs.engine.dir").entries
 
 local function has_common_hotstring_groups(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
@@ -2238,7 +2238,7 @@ Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language
 -- hotstring load took the fast (cached) path. A miss-heavy boot (e.g. right after
 -- an edit, or a stale cache dir) explains a slower "Hotstring groups registered".
 do
-	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
+	local ok_cache, toml_cache = pcall(require, "core.fs.adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.stats) == "function" then
 		local s = toml_cache.stats()
 		Logger.info(LOG, string.format("TOML snapshot cache: %d hit(s), %d miss(es), %d write(s) (enabled=%s).",
@@ -2404,7 +2404,7 @@ ui_restore.restore()
 -- Auto-reload file watchers (hotstrings dir + personal tree + project .lua) live
 -- in infra/file_watchers; _G.script_watchers (the GC root the shutdown callback
 -- stops) is populated there. Extracted from init.lua Section 7 — same behaviour.
-local file_watchers_committed = require("infra.file_watchers").start({
+local file_watchers_committed = require("core.fs.engine.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = require("core.fs.engine.native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),

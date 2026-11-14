@@ -154,7 +154,7 @@ describe("Corpus: tap_hold/vectors.json", function()
 	-- Replayed through the daemon's own tap-hold loader. This used to be a skip:
 	-- tap-holds were kanata's, and no Lua engine existed to replay them through.
 	local Config = require("platform.remap.tap_hold_loader")
-	local defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml")
+	local defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 	--- A TOML value for one corpus field.
 	local function toml_value(value)

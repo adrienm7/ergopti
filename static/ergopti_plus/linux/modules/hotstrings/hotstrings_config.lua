@@ -36,8 +36,8 @@ local DelayResolver = require("hotstrings.engine.delay_resolver")
 local Priority = require("hotstrings.engine.priority")
 local Extensions = require("hotstrings.engine.extensions")
 local ConfigPaths = require("infra.config_paths")
-local Paths = require("infra.paths")
-local RegularFile = require("infra.regular_file_reader")
+local Paths = require("core.fs.engine.paths")
+local RegularFile = require("core.fs.engine.regular_file_reader")
 local TomlReader = require("infra.toml.reader")
 local TomlCodec = require("core.text.engine.toml_codec")
 local Overrides = require("hotstrings.engine.overrides")
@@ -1065,7 +1065,7 @@ function M.init(engine, config_dir, on_change)
 		_config_dir = config_dir
 	else
 		local xdg = require("infra.config_paths").default_config_dir() .. "/hotstrings"
-		local kind, detail, code = require("infra.native_directory").target_kind(xdg)
+		local kind, detail, code = require("core.fs.engine.native_directory").target_kind(xdg)
 		if kind == "directory" then _config_dir = xdg
 		elseif kind ~= nil or code ~= "ENOENT" then
 			Logger.error(LOG, "Hotstring directory is unavailable: %s.", tostring(detail or kind))
@@ -1397,7 +1397,7 @@ local function resolve_paths(cold_boot)
 		return { descriptor and { path = _config_dir, personal_source = descriptor } or _config_dir }, personal_sources
 	end
 
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	local bundled = ok_paths and Paths.shared("hotstrings/data/catalogue") or nil
 	assert(bundled, "bundled hotstring root is unavailable")
 	-- Language folders are not overlaid by stem: french/autocorrection.toml is
@@ -2641,7 +2641,7 @@ end
 function M.get_category_order()
 	local declared, seen, ordered = {}, {}, {}
 
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths then
 		local ok_read, parsed = pcall(function()
 			return require("infra.toml.reader").parse(Paths.shared("hotstrings/data/catalogue/_index.toml"))

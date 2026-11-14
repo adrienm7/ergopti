@@ -29,8 +29,8 @@ local NativePath = require("core.fs.engine.native_path")
 local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
-local FileSystem    = require("adapters.file_system")
-local FsDir         = require("infra.fs_dir")
+local FileSystem    = require("core.fs.adapters.file_system")
+local FsDir         = require("core.fs.engine.dir")
 local LOG           = "menu.keyboard_layout"
 
 -- Target install paths on macOS

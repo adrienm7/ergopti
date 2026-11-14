@@ -23,7 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local Storage       = require("adapters.storage")
+local Storage       = require("core.fs.adapters.storage")
 local Notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")

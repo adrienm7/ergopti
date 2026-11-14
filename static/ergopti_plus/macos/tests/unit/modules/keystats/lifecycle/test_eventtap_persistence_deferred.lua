@@ -34,7 +34,7 @@ local KEYCODE_LEFT_COMMAND = 55
 local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
-	"adapters.event_provenance", "adapters.file_system",
+	"adapters.event_provenance", "core.fs.adapters.file_system",
 	"adapters.input_source_broker", "adapters.keyboard_hook",
 	"adapters.process_lifecycle", "adapters.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
@@ -43,7 +43,7 @@ local RESET_MODULES = {
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
 	"modules.keystats.init", "modules.keystats.kc_bridge",
-	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
 	"modules.keystats.watchers", "modules.keymap", "tests.stubs.hs",
 	"ui.metrics_typing",
@@ -315,7 +315,7 @@ local function load_fixture(options)
 		},
 		execute = function() return "" end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -328,7 +328,7 @@ local function load_fixture(options)
 	}
 
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], true)
+		package.loaded["core.fs.adapters.file_system"], true)
 	local keystats = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
 	local script_control = { is_paused = function() return paused end }
 	local timers_before_start = #timers

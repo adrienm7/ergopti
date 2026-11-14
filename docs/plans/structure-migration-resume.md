@@ -209,7 +209,7 @@ A red outside this list is the step's (the coordinator, 2026-11-12 22:00).
   onto origin/dev before each proof and re-run a step where its moves meet
   new files.
 - Worker G owns the Linux updater's shared-root probe
-  (`infra/paths.lua` SHARED_PROBE_FILE, `install/ownership_schema.sh`
+  (`core/fs/engine/paths.lua` SHARED_PROBE_FILE, `install/ownership_schema.sh`
   OWNERSHIP_SHARED_SENTINEL, `_shared/data/locales/en.json` kept in the
   tarball): never change those here; if a step moves them, rebase over G's
   landing and keep G's behavior.

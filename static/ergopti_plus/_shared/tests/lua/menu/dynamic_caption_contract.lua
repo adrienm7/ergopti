@@ -13,8 +13,8 @@ local function read(path)
 end
 
 local function with_renderer(helpers, driver, language, scenario)
-	local corpus = Json.decode(read(require("infra.paths").shared("tests/corpus/menus/inert_dynamic_captions.json")))
-	local captions = Json.decode(read(require("infra.paths").shared("core/i18n/data/locales/" .. language .. ".json")))
+	local corpus = Json.decode(read(require("core.fs.engine.paths").shared("tests/corpus/menus/inert_dynamic_captions.json")))
+	local captions = Json.decode(read(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. language .. ".json")))
 	local path = os.tmpname()
 	local file = assert(io.open(path, "wb"))
 	assert(file:write(Json.encode({ format_frame = corpus.rows,

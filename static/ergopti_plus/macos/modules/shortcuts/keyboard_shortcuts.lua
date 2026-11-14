@@ -21,11 +21,11 @@
 
 local M = {}
 
-local JsonCodec   = require("adapters.json_codec")
+local JsonCodec   = require("core.fs.adapters.json_codec")
 local Chord       = require("keyboard.engine.chord")
 local Registrar   = require("adapters.hotkey_registrar")
-local FileSystem  = require("adapters.file_system")
-local Paths       = require("infra.paths")
+local FileSystem  = require("core.fs.adapters.file_system")
+local Paths       = require("core.fs.engine.paths")
 local Logger      = require("infra.logger")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local OperationReporter = require("diagnostics.engine.operation_reporter")

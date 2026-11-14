@@ -6,7 +6,7 @@ local driver = assert(source:match("^(.*)/tests/fixtures/native_hotstring_path_a
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
 	.. driver .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 if mode == "index" then
 	local shared = Paths.shared
 	Paths.shared = function(path)

@@ -296,7 +296,7 @@ it("menu_keyboard_slots: conditional publication refusal keeps the old choice", 
 	local ctx, updates = make_ctx()
 	local group = physical_groups(shortcuts)[1]
 	local slot = group.prefix .. "j"
-	local files = package.loaded["adapters.file_system"]
+	local files = package.loaded["core.fs.adapters.file_system"]
 	local writes = 0
 	files.write_if_unchanged = function()
 		writes = writes + 1
@@ -377,7 +377,7 @@ local function parameter_ctx()
 	-- Keep the retained transaction on the same real keyboard publisher and
 	-- canonical conditional file port installed by fresh().
 	local preferences = require("infra.preferences")
-	local files = package.loaded["adapters.file_system"]
+	local files = package.loaded["core.fs.adapters.file_system"]
 	local path = require("infra.config_paths").get("ConfigTomlPath")
 	preferences.load(path)
 	local state, noop = {}, function() return true end

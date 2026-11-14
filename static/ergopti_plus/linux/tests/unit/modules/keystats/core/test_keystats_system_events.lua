@@ -245,7 +245,7 @@ helpers.describe("keystats system events: the UTC offset column", function()
 		local LocalTime = require("metrics.engine.local_time")
 		local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
 		local bound = "BETWEEN -" .. LocalTime.MAX_OFFSET_MIN .. " AND " .. LocalTime.MAX_OFFSET_MIN
-		local file = assert(io.open(require("infra.paths").shared("metrics/data/db/schema.sql"), "r"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("metrics/data/db/schema.sql"), "r"))
 		local schema = file:read("*a")
 		file:close()
 		local columns, bounded = 0, 0
@@ -262,7 +262,7 @@ helpers.describe("keystats system events: the UTC offset column", function()
 
 	it("linux-utc-offset: a store created before the column gains it, with the current purge triggers", function()
 		local function older_store(path)
-			local Paths = require("infra.paths")
+			local Paths = require("core.fs.engine.paths")
 			local file = assert(io.open(Paths.shared("metrics/data/db/schema.sql"), "r"))
 			local schema = file:read("*a"):gsub("\n\tutc_offset_min INTEGER[^\n]*", "")
 			file:close()

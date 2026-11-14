@@ -82,13 +82,13 @@ local function load_real_sticky_pause_owner()
 		})
 	end
 	package.loaded["infra.notifications"] = { notify = function() end }
-	package.loaded["infra.paths"] = { shared = function(path) return "missing/" .. path end }
+	package.loaded["core.fs.engine.paths"] = { shared = function(path) return "missing/" .. path end }
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = permissive({
 		escape_gsub_replacement = function(value) return value end,
 	})
-	package.loaded["adapters.file_system"] = permissive({ read = function() return nil end })
+	package.loaded["core.fs.adapters.file_system"] = permissive({ read = function() return nil end })
 	package.loaded["adapters.key_state"] = permissive({
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,

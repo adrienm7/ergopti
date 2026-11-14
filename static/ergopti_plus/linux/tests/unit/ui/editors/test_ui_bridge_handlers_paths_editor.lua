@@ -761,7 +761,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 	end
 
 	local function with_real_locale(options)
-		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage",
+		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "core.fs.adapters.storage",
 			"infra.script_scope", "infra.scope_registry" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -785,7 +785,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 				default_config_dir = function() return root .. "/" .. FOLDER end,
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
-			package.loaded["adapters.storage"] = nil
+			package.loaded["core.fs.adapters.storage"] = nil
 			package.loaded["infra.script_scope"] = nil
 			package.loaded["infra.scope_registry"] = nil
 			package.loaded["infra.i18n"] = nil

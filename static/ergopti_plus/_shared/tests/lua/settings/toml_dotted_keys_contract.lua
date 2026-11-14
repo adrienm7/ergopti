@@ -14,7 +14,7 @@ return function(helpers)
 	end
 	local Codec = require("core.text.engine.toml_codec.codec")
 	local Writer = require("core.text.engine.toml_codec.writer")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local Json = require("core.text.engine.json")
 	local file = assert(io.open(Paths.shared("tests/corpus/toml/dotted_keys.json"), "rb"))
 	local corpus = assert(Json.decode_lossless(file:read("*a")))

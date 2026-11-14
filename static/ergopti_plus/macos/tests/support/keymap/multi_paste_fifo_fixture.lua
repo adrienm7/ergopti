@@ -11,7 +11,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 local M = {}
 local OWNED = {
 	"adapters.clipboard", "adapters.event_provenance", "adapters.python_interpreter",
-	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
+	"adapters.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
 	"adapters.text_sender", "core.events.timer_scheduler", "adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "hs.application", "hs.canvas",
@@ -25,7 +25,7 @@ local OWNED = {
 	"hs.styledtext", "hs.task", "hs.timer",
 	"hs.urlevent", "hs.webview", "hs.window",
 	"infra.capsword_output", "infra.hotstring_engine", "infra.i18n",
-	"infra.logger", "infra.paths", "infra.text_utils",
+	"infra.logger", "core.fs.engine.paths", "infra.text_utils",
 	"infra.timings", "infra.toml.reader", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
 	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",

@@ -87,7 +87,7 @@ end
 --- @param relative string Path under _shared/.
 --- @return string|nil text
 local function read_shared(relative)
-	local path = require("infra.paths").shared(relative)
+	local path = require("core.fs.engine.paths").shared(relative)
 	if not path then return nil end
 	local text, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	return status == "ok" and text or nil

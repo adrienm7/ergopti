@@ -20,7 +20,7 @@
 local M = {}
 
 local reload_gate = require("core.lifecycle.engine.reload.gate")
-local FileSystem  = require("adapters.file_system")
+local FileSystem  = require("core.fs.adapters.file_system")
 
 --- Reports whether a git write-operation is rewriting the working tree of the
 --- repository that contains `start_dir`.

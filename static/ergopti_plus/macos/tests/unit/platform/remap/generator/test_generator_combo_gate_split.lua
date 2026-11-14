@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read = function() return nil end,
 	read_with_status = function() return nil, "absent" end,
 	write = function() return true end,

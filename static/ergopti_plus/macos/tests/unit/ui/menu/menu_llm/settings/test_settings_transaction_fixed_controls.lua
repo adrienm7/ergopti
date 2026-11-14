@@ -39,7 +39,7 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 		-- The choices name their modifiers from the shared key name table in the
 		-- user's language: French reads « Maj », never the English « Shift ».
 		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
-		local french = require("adapters.json_codec").decode(file:read("*a"))
+		local french = require("core.fs.adapters.json_codec").decode(file:read("*a"))
 		file:close()
 		local translate = function(key) return key:find("^key_name%.") and french[key] or nil end
 		with_fixture({ translate = translate }, function(f)
@@ -176,7 +176,7 @@ end
 local function complete_control_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_complete_control_frames.json"), "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
-	return assert(require("adapters.json_codec").decode(bytes))
+	return assert(require("core.fs.adapters.json_codec").decode(bytes))
 end
 
 helpers.describe("Complete LLM generation: independent native images", function()
