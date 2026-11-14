@@ -268,6 +268,16 @@ rows = []
 checked_when = ["layout_enabled"]
 greyed_when_paused = true
 
+# Ergopti Studio, the layout editor, as a top-level entry beside the layout and
+# tap-hold groups (maintainer request, 2026-11-14): it opens the same layout
+# editor window as the layout submenu's « Create or edit a layout… » row, where
+# the user edits a layout, analyses it and installs it on the machine.
+[[menu.top_level]]
+type = "command"
+id = "ergopti_studio"
+i18n = "menu.studio.title"
+greyed_when_paused = true
+
 [[menu.top_level]]
 type = "group"
 id = "hotstrings"

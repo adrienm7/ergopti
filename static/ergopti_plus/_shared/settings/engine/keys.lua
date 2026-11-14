@@ -395,6 +395,7 @@ M.COMMAND = strict("COMMAND", {
 	EDIT_NAV_LAYER = "edit_nav_layer",
 	EDIT_SHORTCUTS = "edit_shortcuts",
 	ENCRYPTION = "encryption",
+	ERGOPTI_STUDIO = "ergopti_studio",
 	EXTENSION_ALL_SECTIONS = "extension_all_sections",
 	EXTENSION_DISABLE_ALL = "extension_disable_all",
 	EXTENSION_ENABLE_ALL = "extension_enable_all",

@@ -259,11 +259,15 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
 Naming (maintainer, 2026-11-14): « Ergopti » is the project; « Disposition Ergopti » the layout; « Ergopti+ » the
 software (name kept everywhere); « Ergopti Studio » the layout editor.
 
-- [ ] **Ergopti Studio tab in Ergopti+.** On Windows, macOS and Linux, the app menu gets an « Ergopti Studio » entry
+- [x] **Ergopti Studio tab in Ergopti+.** On Windows, macOS and Linux, the app menu gets an « Ergopti Studio » entry
       next to the layout and tap-hold sections; it opens the layout editor's WebView window
       (`_shared/ui/layout_editor_window`, already its own window) so a user edits a layout and installs it on the
       machine from there. Name the in-app window and its menu row « Ergopti Studio » (21 locales, i18n skill); the window title is
       exactly « Ergopti Studio », without the « ErgoptiPlus — » prefix (maintainer, 2026-11-14).
+      Done 2026-11-14: the top-level « 🎨 Ergopti Studio… » command right after « Keyboard layout » (place decided by
+      the agent, to review by the maintainer), greyed with the feature rows while the Windows driver is paused; the
+      window title is « Ergopti Studio » in every locale (a brand name). Real-machine checks: the
+      `layout_editor_window` lines of the three TODO-tests files.
 - [ ] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
       sent anywhere) and shows, for the layout being edited, the metrics computed on what this user really types:
       SFBs (same-finger bigrams), hand alternation, rolls, redirects, finger and row load. The numbers update as keys

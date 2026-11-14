@@ -138,6 +138,7 @@ initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false, PrebuiltLlm := unset) {
 _MI_TopLevelBuilders() {
 	return Map(
 		"keyboard_layout", _MI_StageLayout,
+		"ergopti_studio",  _MI_StageErgoptiStudio,
 		"hotstrings",      _MI_StageHotstrings,
 		"llm",             _MI_StageLlm,
 		"agent",           _MI_StageAgent,
@@ -236,6 +237,22 @@ _MI_StageLayout() {
 		Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")
 	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
+}
+
+
+; ── Ergopti Studio 🎨 — one top-level command opening the layout editor window
+; (ui/layout_manager/editor_window.ahk), the same window as the layout submenu's
+; « Create or edit a layout… » row. A click made before input readiness waits in
+; the startup admission like the other command rows, and a pause greys it with
+; the feature rows (greyed_when_paused).
+_MI_StageErgoptiStudio() {
+	Row := MenuRenderer_CommandRow("top_level", "ergopti_studio",
+		Map(MenuCommand.ERGOPTI_STUDIO, LayoutManager_OpenEditor))
+	if !(Row is Map) || !Row.Has("action")
+		throw Error("The declared Ergopti Studio row was refused before native construction.")
+	TrayMenuStage_AddFeatureAction(Row["label"], Row["action"])
+	if Row.Get("disabled", false)
+		TrayMenuStage_Disable(Row["label"])
 }
 
 

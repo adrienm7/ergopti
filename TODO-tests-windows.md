@@ -135,6 +135,9 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Layout editor window (2026-11-13): « Create or edit a layout… » and the layout manager's « Layout editor » open
       the editor in its own window; a second request brings it to the front with its unsaved work; « Close » closes
       it; an install from it refreshes an open layout manager.
+      Ergopti Studio (2026-11-14, `claude/ergopti-todo-studio-app`): the top-level « 🎨 Ergopti Studio… » row,
+      right after « Keyboard layout », opens the same window, titled « ErgoptiPlus — Ergopti Studio »; while the
+      driver is paused the row is greyed with the feature rows.
 
 - [ ] Layout editor downloads (2026-11-14, `layout_editor_downloads`): the editor window's XKB, KLC, DLL and macOS
       bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext »,

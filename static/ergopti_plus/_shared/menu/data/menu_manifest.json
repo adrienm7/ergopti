@@ -284,6 +284,12 @@
 			"greyed_when_paused": true
 		},
 		{
+			"type": "command",
+			"id": "ergopti_studio",
+			"i18n": "menu.studio.title",
+			"greyed_when_paused": true
+		},
+		{
 			"type": "group",
 			"id": "hotstrings",
 			"i18n": "menu.hotstrings.title",

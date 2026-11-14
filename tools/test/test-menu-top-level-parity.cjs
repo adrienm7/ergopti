@@ -392,7 +392,10 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // order of 2026-10-01, its tail reordered on 2026-10-02). The drivers build whatever the
 // manifest declares, so this is the one place a reordering of the manifest is
 // held to the decision rather than silently shipped. Changing the order means
-// changing this list, in the same commit and on purpose.
+// changing this list, in the same commit and on purpose. Ergopti Studio, the
+// layout editor, sits right after the layout group (maintainer request of
+// 2026-11-14: « next to the layout and tap-hold sections »; the exact place was
+// decided by the agent, to review by the maintainer).
 // The drivers that ship the bundled apps (App Cloner, Encryptor).
 const APPS_DRIVERS = ['ahk', 'hs', 'linux'];
 
@@ -402,6 +405,7 @@ const APPROVED_TOP_LEVEL = [
 	'gestures',
 	SEPARATOR,
 	'keyboard_layout',
+	'ergopti_studio',
 	'hotstrings',
 	'metrics',
 	SEPARATOR,

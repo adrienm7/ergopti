@@ -129,12 +129,12 @@ _TPGF_EveryFeatureRowIsStagedAsAFeature() {
 		if (Id == "llm")
 			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
 		if Features.Has(Id) {
-			Assert(InStr(Body, "TrayMenuStage_AddFeature(") > 0,
+			Assert(InStr(Body, "TrayMenuStage_AddFeature(") > 0 || InStr(Body, "TrayMenuStage_AddFeatureAction(") > 0,
 				"the " . Id . " row must be staged as a feature row so a pause greys it")
 			AssertEqual(0, InStr(Body, "TrayMenuStage_Add("),
 				"the " . Id . " row staged with the plain TrayMenuStage_Add would stay live while paused")
 		} else {
-			AssertEqual(0, InStr(Body, "TrayMenuStage_AddFeature("),
+			AssertEqual(0, InStr(Body, "TrayMenuStage_AddFeature(") + InStr(Body, "TrayMenuStage_AddFeatureAction("),
 				"the " . Id . " row is no feature: greyed by a pause, it could not be used to resume or leave")
 		}
 		Checked += 1

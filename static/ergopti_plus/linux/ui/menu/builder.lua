@@ -205,6 +205,8 @@ end
 
 local _build_layouts = require("ui.menu.menu_layouts").build
 
+local _build_ergopti_studio = require("ui.menu.menu_ergopti_studio").build
+
 local _build_hotstrings = require("ui.menu.menu_hotstrings").build
 
 local _build_llm = require("ui.menu.menu_llm").build
@@ -323,6 +325,7 @@ function M.build(ctx)
 	-- same array through its own loader all along.
 	local builders = {
 		["keyboard_layout"] = _build_layouts,
+		["ergopti_studio"]  = _build_ergopti_studio,
 		["hotstrings"]      = _build_hotstrings,
 		["llm"]             = _build_llm,
 		["agent"]           = _build_agent,

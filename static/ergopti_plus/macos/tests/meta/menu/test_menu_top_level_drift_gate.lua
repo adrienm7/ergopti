@@ -34,6 +34,7 @@ local native_hotstrings_caption = nil
 -- table does not know fails the gate: it has to be named here to be compared.
 local TITLE_KEYS = {
 	keyboard_layout = "menu.layout.title",
+	ergopti_studio  = "menu.studio.title",
 	hotstrings      = "menu.hotstrings.title",
 	llm             = "menu.llm.title",
 	agent           = "menu.agent.title",
@@ -351,6 +352,31 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 			"the shuffled top level must start with a different row")
 		local rows = render_root(with_top_level(raw, shuffled))
 		assert_same_order(rows, expected, "shuffled manifest")
+	end)
+
+	helpers.it("the Ergopti Studio row opens the layout editor window (ergopti-studio-menu-row)", function()
+		local saved = package.loaded["ui.layout_manager"]
+		local opened = 0
+		package.loaded["ui.layout_manager"] = {
+			editor_menu_command = function() return function() opened = opened + 1 end end,
+		}
+		local ok, err = pcall(function()
+			local rows = render_root(raw)
+			local studio, studio_index, layout_index
+			for index, row in ipairs(rows) do
+				local id = id_of(row)
+				if id == "ergopti_studio" then studio, studio_index = row, index end
+				if id == "keyboard_layout" then layout_index = index end
+			end
+			helpers.assert_true(type(studio) == "table", "the Ergopti Studio row reaches the tray root")
+			helpers.assert_eq(studio_index, layout_index + 1, "the row follows the keyboard layout group")
+			helpers.assert_nil(studio.menu, "the row is a command, not a submenu")
+			helpers.assert_eq(opened, 0, "drawing the tray opens no window")
+			studio.fn()
+		end)
+		package.loaded["ui.layout_manager"] = saved
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(opened, 1, "a click runs the layout editor window's menu command")
 	end)
 
 	helpers.it("a paused tray greys no row the manifest marks (edd1-paused-writes)", function()

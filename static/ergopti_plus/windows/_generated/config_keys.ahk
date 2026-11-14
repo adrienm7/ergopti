@@ -379,6 +379,7 @@ class MenuCommand {
 	static EDIT_NAV_LAYER := "edit_nav_layer"
 	static EDIT_SHORTCUTS := "edit_shortcuts"
 	static ENCRYPTION := "encryption"
+	static ERGOPTI_STUDIO := "ergopti_studio"
 	static EXTENSION_ALL_SECTIONS := "extension_all_sections"
 	static EXTENSION_DISABLE_ALL := "extension_disable_all"
 	static EXTENSION_ENABLE_ALL := "extension_enable_all"

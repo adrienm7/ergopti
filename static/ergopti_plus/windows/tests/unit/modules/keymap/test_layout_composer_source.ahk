@@ -427,3 +427,28 @@ _LCS_MenuCase() {
 	AssertFalse(Found.Has("platforms"), "the row is on every platform")
 	AssertFalse(Found.Has("reason_key"), "no grey reason is left")
 }
+
+Test("layout editor host: the top-level Ergopti Studio row opens the editor and greys with a pause (ergopti-studio-menu-row)",
+	_LCS_StudioRowCase)
+
+_LCS_StudioRowCase() {
+	global _TrayMenuStage
+	Builders := _MI_TopLevelBuilders()
+	AssertTrue(Builders.Has("ergopti_studio"), "the tray root has a builder for the row")
+	Body := _DriverFuncBody(Builders["ergopti_studio"].Name)
+	AssertContains(Body, "Map(MenuCommand.ERGOPTI_STUDIO, LayoutManager_OpenEditor)")
+	Stage := TrayMenuStage_Begin()
+	try {
+		Builders["ergopti_studio"].Call()
+		AssertEqual(1, Stage.Length, "the builder stages exactly one row")
+		Entry := Stage[1]
+		AssertEqual("action", Entry["kind"], "the row is a command, registered with the startup admission")
+		AssertEqual(t("menu.studio.title"), Entry["label"])
+		AssertTrue(HasMethod(Entry["target"], "Call"), "the row runs a command")
+		AssertTrue(Entry.Get("feature", false), "a pause greys the row with the feature rows")
+		AssertEqual(1, _TrayStageFeatureLabels(Stage).Length)
+	} finally {
+		TrayMenuStage_Abort()
+	}
+	AssertFalse(IsObject(_TrayMenuStage), "the stage is released")
+}

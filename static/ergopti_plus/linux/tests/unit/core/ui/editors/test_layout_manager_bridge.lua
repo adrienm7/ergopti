@@ -268,6 +268,38 @@ helpers.describe("layout editor menu row (Linux)", function()
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(calls, { "show layout_editor_window" })
 	end)
+
+	helpers.it("the top-level « Ergopti Studio » row shows the layout editor's own window (ergopti-studio-menu-row)", function()
+		local saved = { bridge = package.loaded["ui.layout_manager.bridge"], builder = package.loaded["ui.menu.builder"],
+			studio = package.loaded["ui.menu.menu_ergopti_studio"] }
+		local calls = {}
+		package.loaded["ui.layout_manager.bridge"] = {
+			open_editor_window = function(manager) return manager.show("layout_editor_window") end,
+		}
+		package.loaded["ui.menu.builder"], package.loaded["ui.menu.menu_ergopti_studio"] = nil, nil
+		local ok, err = pcall(function()
+			local module = helpers.load_module("ui.menu.builder")
+			local items = module.build({ webview = { show = function(name)
+				calls[#calls + 1] = "show " .. name
+				return true
+			end } })
+			local I18n = require("core.i18n.engine.i18n")
+			local studio, layout_index, studio_index = nil, nil, nil
+			for index, top in ipairs(items) do
+				if top.title == I18n.get("menu.layout.title") then layout_index = index end
+				if top.title == I18n.get("menu.studio.title") then studio, studio_index = top, index end
+			end
+			helpers.assert_eq(type(studio), "table", "the Ergopti Studio row reaches the tray root")
+			helpers.assert_eq(studio_index, layout_index + 1, "the row follows the keyboard layout group")
+			helpers.assert_eq(studio.menu, nil, "the row is a command, not a submenu")
+			helpers.assert_eq(type(studio.fn), "function")
+			studio.fn()
+		end)
+		package.loaded["ui.layout_manager.bridge"], package.loaded["ui.menu.builder"] = saved.bridge, saved.builder
+		package.loaded["ui.menu.menu_ergopti_studio"] = saved.studio
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(calls, { "show layout_editor_window" })
+	end)
 end)
 
 --- Captures actual provider data while forwarding its status and rendering to the real binding.

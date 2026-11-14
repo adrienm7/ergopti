@@ -2004,6 +2004,10 @@
 			"reason": "brand-or-feature-name",
 			"locales": ["ar", "hi", "pl", "ru", "tr", "uk"]
 		},
+		"layout_editor.title": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
 		"layout_editor.toolbar.label": {
 			"reason": "pending-translation",
 			"locales": [
@@ -2694,6 +2698,10 @@
 		"menu.shortcuts.right_opt_return": {
 			"reason": "keyboard-key-name",
 			"locales": ["ar"]
+		},
+		"menu.studio.title": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
 		},
 		"menu.tapholds.key_tap_delay_inherited": {
 			"reason": "loanword-or-cognate",

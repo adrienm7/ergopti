@@ -699,6 +699,16 @@ function M.generate(ctx, menu_mods, actions)
 		end,
 		["tap_holds"]       = function() return module_rows("tap_holds") end,
 		["gestures"]        = function() return module_rows("gestures") end,
+		-- Ergopti Studio opens the layout editor window, the same one as the
+		-- layout submenu's « Create or edit a layout… » row.
+		["ergopti_studio"]  = function()
+			local command = require("settings.engine.keys").COMMAND.ERGOPTI_STUDIO
+			local row = ManifestMenu.command_row("top_level", "ergopti_studio", {
+				-- Required on click: the window module is not loaded to draw the tray.
+				[command] = function() return require("ui.layout_manager").editor_menu_command()() end,
+			})
+			return row and { row } or {}
+		end,
 		["apps"]            = function() return module_rows("apps") end,
 		["configuration"]   = function()
 			local root, top, section, parent, fields = configuration_source(ManifestMenu, "hs")
