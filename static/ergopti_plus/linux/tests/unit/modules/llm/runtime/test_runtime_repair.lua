@@ -261,7 +261,20 @@ test('snapshot origin drift inside source callback cannot start remote service',
 end)
 test('early retry callback cannot spin fresh HTTP acquisitions',function()
 	local w=world();local r=w:start();w:last('probe'):answer({ok=false});w:last('retry'):answer(true)
-	eq(#w.ops.probe,1);eq(r.result.ok,false);eq(w.published,0)
+	-- No time passed on the budget's clock: the whole delay is waited again.
+	eq(#w.ops.probe,1);eq(#w.ops.retry,2);eq(w:last('retry').ms,10)
+	eq(r:is_settled(),false);eq(w.published,0)
+end)
+-- Regression: libuv's loop clock is the coarse monotonic one on Linux, so a
+-- delivered retry timer could end 2 ms short on the budget's precise clock,
+-- and the repair refused a daemon still starting (runtime_retry_refused).
+test('a retry timer ending short on the budget clock waits out the shortfall, then probes',function()
+	local w=world();local r=w:start();w:last('probe'):answer({ok=false})
+	w.now=8;w:last('retry'):answer(true)
+	eq(#w.ops.probe,1,'no probe before the delay elapsed');eq(w:last('retry').ms,2,'only the shortfall is waited')
+	w.now=10;w:last('retry'):answer(true)
+	eq(#w.ops.probe,2,'the readiness probe follows the full delay')
+	w:ready();eq(w.completed,1);eq(r.result.ok,true)
 end)
 test('settlement observer stopping app suppresses stale success callback',function()
 	local w=world();local r=w:start();r:on_settled(function()w.controller:stop_app()end);w:ready()
