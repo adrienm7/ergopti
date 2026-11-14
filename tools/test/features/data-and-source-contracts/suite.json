@@ -746,6 +746,14 @@
 			"args": ["tools/test/test-linux-layout-bom-gate.cjs"],
 			"repro": "npm run test:linux-layout-bom-gate",
 			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-linux-layout-python-floor",
+			"ordinal": 642,
+			"name": "Linux layout workflow runs its Python 3.8 floor on a runner setup-python serves 3.8 for",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-layout-python-floor.cjs"],
+			"repro": "npm run test:linux-layout-python-floor"
 		}
 	]
 }
