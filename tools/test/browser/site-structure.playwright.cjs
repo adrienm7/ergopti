@@ -137,6 +137,35 @@ async function exerciseHome(page, origin, basePath) {
 	);
 }
 
+/**
+ * Each embedded driver window loads once: hydration once replaced the
+ * prerendered (relative) frame address with the client's absolute one, which
+ * reloaded every window and cut off its first load.
+ */
+async function expectSingleFrameLoads(page, origin, basePath, route) {
+	const loads = [];
+	const record = (request) => {
+		if (request.isNavigationRequest() && request.frame() !== page.mainFrame())
+			loads.push(request.url());
+	};
+	page.on('request', record);
+	try {
+		await visit(page, origin, basePath, route);
+		await page.locator('.frame-wrap iframe[src]').first().waitFor({ state: 'attached' });
+		await smoke.settleFrames(page);
+		// Hydration ran before networkidle; give a late replacement time to show.
+		await page.waitForTimeout(500);
+	} finally {
+		page.off('request', record);
+	}
+	assert.ok(loads.length > 0, 'The page embeds driver windows: ' + route);
+	assert.equal(
+		new Set(loads).size,
+		loads.length,
+		'Each driver window loads once: ' + loads.join(', ')
+	);
+}
+
 /** Version selector only on the layout pages; section navigation marks the page. */
 async function exerciseSections(page, origin, basePath) {
 	for (const route of VERSION_SELECTOR.present) {
@@ -167,7 +196,7 @@ async function exerciseSections(page, origin, basePath) {
 		assert.deepEqual(shown, ids, 'Ergopti+ page renders only its own sections: ' + route);
 		assert.equal(await page.locator('nav.subnav a[aria-current="page"]').count(), 1);
 	}
-	await visit(page, origin, basePath, '/ergopti-plus/hotstrings');
+	await expectSingleFrameLoads(page, origin, basePath, '/ergopti-plus/hotstrings');
 	// The Ergopti+ version (the release the page resolved) shows on its pages.
 	await page.locator('.ep-version', { hasText: /^Ergopti\+ v\d/ }).waitFor();
 

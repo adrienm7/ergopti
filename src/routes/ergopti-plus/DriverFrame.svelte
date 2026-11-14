@@ -16,10 +16,15 @@ FEATURES & RATIONALE:
    of a separate gallery the visitor has to connect back mentally.
 2. Host Emulation: injection goes through the drivers' own contracts, so
    the demo can never diverge from the real UI.
+3. One Load: the frame gets its address on the client only. The prerendered
+   page writes asset paths relative to its depth and the client absolute ones,
+   so a server-rendered src was replaced at hydration and every window loaded
+   twice, the first load cut off midway.
 ==============================================================================
 -->
 
 <script>
+	import { onMount } from 'svelte';
 	import { asset } from '$app/paths';
 	import { driverWindowSrc, hostDriverWindow } from '#lib/js/driverWindowHost.js';
 	import WindowChrome from './WindowChrome.svelte';
@@ -47,12 +52,21 @@ FEATURES & RATIONALE:
 
 	let frameSrc = $derived(driverWindowSrc(id, asset));
 
+	/** @type {HTMLIFrameElement | undefined} */
+	let frame = $state();
+
+	onMount(() => {
+		frame.src = frameSrc;
+	});
+
 	/**
 	 * Play the native host: once the iframe loads, inject the data through
 	 * the same entry point the driver uses for this window.
 	 * @param {Event} ev
 	 */
 	function onFrameLoad(ev) {
+		// An inserted frame without an address may report its blank document.
+		if (!ev.currentTarget?.getAttribute('src')) return;
 		const win = ev.currentTarget?.contentWindow;
 		loaded = true;
 		if (!win) return;
@@ -70,7 +84,7 @@ FEATURES & RATIONALE:
 		{#if !loaded}
 			<div class="frame-skeleton" aria-hidden="true"></div>
 		{/if}
-		<iframe src={frameSrc} title={id} loading="lazy" onload={onFrameLoad}></iframe>
+		<iframe bind:this={frame} title={id} loading="lazy" onload={onFrameLoad}></iframe>
 	</div>
 </div>
 
