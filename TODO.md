@@ -305,6 +305,15 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 - [ ] **Direct-access digits metric (maintainer, 2026-11-14), a small bonus in the global score.** A layout whose
       digits are typed without a modifier (direct access) scores a little better; weight editable like the others.
 
+- [ ] **Character coverage bonus (maintainer, 2026-11-14).** The more characters a layout gives access to (on its
+      layers and dead keys), the better; layouts such as Bépo or Optimot gain on this criterion. Weight editable.
+- [ ] **Outer-column penalty (maintainer, 2026-11-14).** Using a 7th right-hand column (keys beyond the right pinky's
+      normal column) is penalised twice: in finger travel distance, and through a compact-keyboard criterion below.
+- [ ] **Compact-keyboard fitness bonus (maintainer, 2026-11-14).** The more of a layout works on a compact keyboard
+      (80 %, 75 %, 65 %, 60 %, 40 %…), the better: score each layout by the share of its characters (weighted by
+      frequency) still reachable on each form factor without extra keys, and fold it into the global score. Weights
+      and form factors editable.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
