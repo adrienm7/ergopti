@@ -453,6 +453,18 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 - [ ] **Floating Ergopti layout button only on /ergopti (maintainer, 2026-11-14 night).** The fixed bottom-right
       button that shows the Ergopti layout appears on /ergopti pages only, not on the home, Ergopti+, Studio or others.
 
+- [ ] **Editor feedback, 2026-11-14 night (maintainer).** On phones the board keeps a minimum key size and gets
+      its own horizontal scroll bar (the page itself never scrolls sideways). Non-base layer views show only that
+      layer's value, without the small base-layer hint. Extra layer chips read as their modifiers, not raw ids.
+- [ ] **Custom shortcuts in the editor (maintainer, 2026-11-14 night).** No layer view per modifier combination.
+      One « Raccourcis » view gives each key its default shortcut rule for every non-text modifier combination
+      (e.g. same as the base key, or acts as physical key X); the key inspector adds overrides for any specific
+      combination of Ctrl, Alt, Shift, Win/Cmd/Super sending any combination + key (Ctrl+é → Ctrl+Shift+C,
+      Ctrl+A → Ctrl+B), listed and editable. Stored in the Ergopti TOML shortcut model; each export target says
+      honestly what it cannot carry, Ergopti+ emulation keeps it. Playwright checks through save and reload.
+- [ ] **Google Books Ngram letter tables, later (2026-11-14 night).** The 1-gram files are several GB per language:
+      a one-off offline streaming import that ships only letter and bigram tables, with licence and attribution.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
