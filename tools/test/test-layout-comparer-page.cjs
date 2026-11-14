@@ -22,7 +22,8 @@
  *    a window property (the .keylayout import once read window.LAYOUT_COMPOSER_DATA
  *    and got undefined).
  * 6. Editor panel: the site's editor page and the app's editor window load
- *    the panel's scripts in the same order, before editor_page.js.
+ *    the panel's scripts in the same order, before editor_page.js, and the
+ *    window lists every built-in corpus (its hosts inline scripts).
  * ==============================================================================
  */
 
@@ -182,6 +183,20 @@ for (const page of ['layout_editor', 'layout_editor_window']) {
 		`${page}/index.html: panel scripts ${listed.join(', ')}`
 	);
 }
+
+// The macOS and Linux app windows inline their scripts and cannot load one
+// later: the editor window lists every built-in corpus's tables itself.
+const windowScripts = Array.from(
+	fs
+		.readFileSync(shared('ui', 'layout_editor_window', 'index.html'), 'utf8')
+		.matchAll(/<script src="([^"]+)"/g),
+	(m) => m[1]
+);
+for (const corpus of DATA.corpora)
+	check(
+		windowScripts.includes(`../layout_analysis/${corpus.script}`),
+		`layout_editor_window/index.html: no ${corpus.script} (inlining hosts cannot load it later)`
+	);
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);

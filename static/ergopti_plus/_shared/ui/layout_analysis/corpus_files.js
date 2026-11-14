@@ -17,6 +17,9 @@
  *    page turns into a localized message (PDF: copy its text and paste it).
  * 3. A built-in corpus's script path is relative to this folder; it resolves
  *    against this script's own URL, so a page in another folder loads it too.
+ *    A page whose host inlines its scripts (the macOS and Linux app windows
+ *    have no base URL to load from) lists the corpus scripts itself, and
+ *    their tables are used as they are.
  * ==============================================================================
  */
 
@@ -159,6 +162,8 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	 * @throws {Error} When the script fails to load or defines no tables.
 	 */
 	async function builtinTables(corpus) {
+		const preloaded = window.LAYOUT_ANALYSIS_CORPORA && window.LAYOUT_ANALYSIS_CORPORA[corpus.id];
+		if (preloaded) return preloaded;
 		await loadScript(corpus.script);
 		const tables = window.LAYOUT_ANALYSIS_CORPORA && window.LAYOUT_ANALYSIS_CORPORA[corpus.id];
 		if (!tables) throw new Error(`layout_analysis: ${corpus.script} defines no ${corpus.id}`);
