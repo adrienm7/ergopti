@@ -268,7 +268,10 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       a server: the analysis runs in the page.
 - [ ] **Study of the existing layout analysers, then match and exceed them.** First write a detailed report
       (`docs/audits/layout-analysers/`): Keyboard Layout Analyzer (KLA), KLAnext, the Ergo-L site's analyser and the
-      other public analysers and generators found (online sites and open-source tools), each with its metrics, its
+      other public analysers and generators found (online sites and open-source tools), including the Kalamine
+      repository (the open-source tool that builds Windows, macOS and Linux layouts from a TOML description and has
+      a small keystroke-statistics analyser): compare its TOML format and generators with Ergopti's layout source
+      and compilers, and its statistics with ours; each tool with its metrics, its
       definitions, its corpora, its UI, its strengths and its weaknesses, with links. Then implement in the shared
       engine every metric that matters, each with a written definition and tests on a small reference corpus: finger
       load per finger and per hand, row usage (home row versus top, bottom and number rows), finger travel distance,
