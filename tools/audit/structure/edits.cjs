@@ -111,6 +111,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The source-run owner check names the Linux owner by joined pieces in a
+		// tool that names every driver; S06 moves it to core/lifecycle/engine.
+		file: 'tools/test/test-source-run-single-owner.cjs',
+		moves: 'linux/infra/installation.lua',
+		from: "const LINUX_OWNER = path.join('infra', 'installation.lua');",
+		to: "const LINUX_OWNER = path.join('core', 'lifecycle', 'engine', 'installation.lua');"
+	},
+	{
 		// The flatpak manifest runs the network runtime probe from the installed
 		// tree (/app/lib/ergopti is the Linux driver root); S08 moves the probe
 		// to core/network/adapters.

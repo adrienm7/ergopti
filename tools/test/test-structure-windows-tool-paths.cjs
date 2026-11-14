@@ -11,13 +11,16 @@
  * timer inventory, the rewrite prompt wiring, the child handle audit and the
  * source-run owner check all read files that no longer existed. An .ahk path
  * in a tool that names the Windows driver now follows its file, even when
- * the tool names the Lua drivers too.
+ * the tool names the Lua drivers too; so does a windows\\infra\\x\.ahk
+ * regular expression, and a bare path only one named Lua driver holds.
  * ==============================================================================
  */
 
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const Plan = require('../audit/structure/plan.cjs');
 const Apply = require('../audit/structure/apply-step.cjs');
 
@@ -25,6 +28,8 @@ const FILE = 'tools/test/test-zz-probe-tool.cjs';
 const MAP = new Map([
 	['windows/infra/lifecycle.ahk', 'windows/core/lifecycle/engine/lifecycle.ahk'],
 	['windows/infra/uninstall.ahk', 'windows/core/lifecycle/engine/shutdown/uninstall.ahk'],
+	['windows/infra/bundle.ahk', 'windows/core/lifecycle/engine/bundle.ahk'],
+	['linux/infra/installation.lua', 'linux/core/lifecycle/engine/installation.lua'],
 	['macos/infra/paths.lua', 'macos/infra/paths.lua']
 ]);
 
@@ -36,6 +41,13 @@ function rewrite(text) {
 }
 
 function run() {
+	// The plan resolves paths against the tree: once S06 has moved
+	// infra/lifecycle.ahk, the case is gone.
+	const repo = path.resolve(__dirname, '..', '..');
+	if (!fs.existsSync(path.join(repo, 'static/ergopti_plus/windows/infra/lifecycle.ahk'))) {
+		console.log('[OK] Windows paths of a tool: the lifecycle step has landed.');
+		return;
+	}
 	const head = "const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'windows');\n";
 	{
 		const out = rewrite(`${head}read('infra/lifecycle.ahk');\n`);
@@ -49,6 +61,25 @@ function run() {
 		);
 		assert.ok(out.includes("'core/lifecycle/engine/shutdown/uninstall.ahk'"), out);
 		assert.ok(out.includes("'infra/paths.lua'"), out);
+	}
+	// The driver named only by a quoted repository path ('windows/x.ahk'),
+	// and a backslash path in a regular expression led by the driver's name.
+	{
+		const out = rewrite(
+			"const entry = read('windows/ErgoptiPlus.ahk');\n" +
+				"entry.indexOf('#Include infra/lifecycle.ahk');\n" +
+				'if (!/windows\\\\infra\\\\bundle\\.ahk/.test(step)) fail();\n'
+		);
+		assert.ok(out.includes("'#Include core/lifecycle/engine/lifecycle.ahk'"), out);
+		assert.ok(out.includes('/windows\\\\core\\\\lifecycle\\\\engine\\\\bundle\\.ahk/'), out);
+	}
+	// A tool naming both Lua drivers: a bare path only one of them holds.
+	{
+		const out = rewrite(
+			"const M = path.join(ROOT, 'macos');\nconst L = path.join(ROOT, 'linux');\n" +
+				"fail('infra/installation.lua');\n"
+		);
+		assert.ok(out.includes("fail('core/lifecycle/engine/installation.lua')"), out);
 	}
 	// A tool that never names the Windows driver keeps a bare .ahk path.
 	{
