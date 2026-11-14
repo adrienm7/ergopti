@@ -336,6 +336,14 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       offered for interoperability (decided by the coordinator on 2026-11-14, to review by the maintainer). The
       hundred-layout library is built from those imports, with each layout's source and licence recorded.
 
+- [ ] **« Comparer » is a full analyser on its own (maintainer, 2026-11-14), like KLAnext.** Most visitors only run
+      battles, so the tab stands alone: select a list of layouts to analyse or analyse all of them at once; pick a
+      corpus from a long drop-down of built-in corpora; or bring a custom corpus by pasting text (Ctrl+V into a text
+      box) or loading a file (.txt, .md, .docx, .odt, .html, .pdf text, .csv…, converted to plain text in the page,
+      never uploaded). Built-in corpora in the repository must be free to redistribute (public domain or an open
+      licence), each with its source and licence recorded; others are linked, not shipped. The user's own layouts
+      made in « Éditer » (several personal layouts, saved locally) appear in the comparison list beside the library.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
