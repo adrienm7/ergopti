@@ -41,7 +41,7 @@ class TrustedGuardianControls(unittest.TestCase):
                 ROOT / "static/ergopti_plus/macos/platform" / name, self.platform / name
             )
         shutil.copyfile(
-            SOURCE / "static/ergopti_plus/macos/platform/network/native_http.py",
+            SOURCE / "static/ergopti_plus/macos/core/network/adapters/native_http.py",
             self.platform / "network/native_http.py",
         )
         self.guardian = load(

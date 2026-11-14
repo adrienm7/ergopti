@@ -20,7 +20,7 @@ function M.run(body)
 		environment[name] = os.getenv(name); assert(uv.os_setenv(name, scratch .. "/" .. name))
 	end
 	for _, name in ipairs({ "ui.menu.llm_backend_rows", "modules.llm.prediction_engine", "modules.llm.api_entries",
-		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "core.fs.adapters.storage", "adapters.http_client",
+		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "core.fs.adapters.storage", "core.network.adapters.http_client",
 		"modules.llm.profiles", "modules.llm.settings", "modules.llm.trigger_settings", "modules.llm.display_settings",
 		"modules.llm.agent_settings", "modules.llm.profile_settings", "modules.llm.navigation_settings" }) do package.loaded[name] = nil end
 	local Logger = require("core.logger.engine.shim")
@@ -54,7 +54,7 @@ function M.run(body)
 			{ id = "successor", provider = "cerebras", label = "successor", token = "synthetic-successor", model = "successor-model", base_url = "" },
 		}) })
 		write(state.api_path, state.original); assert(uv.fs_chmod(state.api_path, 384))
-		local Entries, Http = require("modules.llm.api_entries"), require("adapters.http_client")
+		local Entries, Http = require("modules.llm.api_entries"), require("core.network.adapters.http_client")
 		Entries._set_path_for_test(state.api_path)
 		Entries._set_private_create_for_test(function(path, text)
 			state.stages = state.stages + 1

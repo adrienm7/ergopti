@@ -17,7 +17,7 @@ local OWNED = {
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
-	"core.logger.engine.logger", "core.events.timer_scheduler", "adapters.http_client",
+	"core.logger.engine.logger", "core.events.timer_scheduler", "core.network.adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "infra.timings",
@@ -37,7 +37,7 @@ local function with_stream(scenario)
 			local f = { native = {}, timers = {}, failures = 0 }
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["modules.keystats"] = {}
-			package.loaded["adapters.http_client"] = { new = function() return {} end }
+			package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
 			package.loaded["core.events.timer_scheduler"] = {
 				now = function() return 0 end,
 				after = function(delay, callback)

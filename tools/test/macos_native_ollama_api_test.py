@@ -19,7 +19,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-API = ROOT / "static/ergopti_plus/macos/platform/network/native_ollama_api.py"
+API = ROOT / "static/ergopti_plus/macos/core/network/adapters/native_ollama_api.py"
 ENGINE = API.with_name("native_http.py")
 IDENTITY = {
     "pid": 42,

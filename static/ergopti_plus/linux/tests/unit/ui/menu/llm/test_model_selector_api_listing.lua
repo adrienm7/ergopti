@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 local SAVED = { "modules.llm.api_remote", "modules.llm.api_entries", "ui.menu.llm_backend_rows",
-	"ui.menu.local_server_rows", "modules.llm.ollama_install_state", "adapters.http_client" }
+	"ui.menu.local_server_rows", "modules.llm.ollama_install_state", "core.network.adapters.http_client" }
 
 --- Runs a body with doubles of the API owners the page rows read.
 --- @param opts table { model, listings }
@@ -205,10 +205,10 @@ helpers.describe("model selector API listing on Linux", function()
 	end)
 
 	helpers.it("(model-selector-api-listing) list_models maps answers and keeps the key out of the log", function()
-		local saved = package.loaded["adapters.http_client"]
+		local saved = package.loaded["core.network.adapters.http_client"]
 		local saved_remote = package.loaded["modules.llm.api_remote"]
 		local answers, requests = {}, {}
-		package.loaded["adapters.http_client"] = setmetatable({
+		package.loaded["core.network.adapters.http_client"] = setmetatable({
 			get = function(url, headers, options, callback)
 				requests[#requests + 1] = { url = url, headers = headers, owner = options.owner }
 				callback(table.remove(answers, 1))
@@ -239,7 +239,7 @@ helpers.describe("model selector API listing on Linux", function()
 			helpers.assert_eq(Remote.list_models({ id = "d", provider = "typesafe", token = "k", model = "jev" }, done), false)
 			helpers.assert_eq(got[5].reason, "unsupported")
 		end, debug.traceback)
-		package.loaded["adapters.http_client"] = saved
+		package.loaded["core.network.adapters.http_client"] = saved
 		package.loaded["modules.llm.api_remote"] = saved_remote
 		assert(ok, err)
 	end)

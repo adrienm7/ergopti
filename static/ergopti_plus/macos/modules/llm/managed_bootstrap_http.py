@@ -28,7 +28,7 @@ SHARED_ROOT = DRIVER_ROOT.parent / "_shared"
 REDIRECT_POLICY = SHARED_ROOT / "core/network/data/http/redirect_policy.json"
 PROXY_POLICY = SHARED_ROOT / "core/network/adapters/python_network_proxy_policy.py"
 PYTHON_RELEASE = SHARED_ROOT / "ai/data/managed_python_release.json"
-NATIVE_ENGINE = DRIVER_ROOT / "platform/network/native_http.py"
+NATIVE_ENGINE = DRIVER_ROOT / "core/network/adapters/native_http.py"
 IDENTIFIERS = SHARED_ROOT / "core/text/data/identifiers.py"
 
 

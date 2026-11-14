@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 --- @param version_text string|nil What `curl --version` prints.
 --- @param body function Receives the gate, the probe count and the notifications.
 local function with_gate(version_text, body)
-	local SystemCurl = require("adapters.system_curl")
+	local SystemCurl = require("core.network.adapters.system_curl")
 	local probes, told = { n = 0 }, {}
 	SystemCurl._set_deps({
 		read_version = function() probes.n = probes.n + 1 return version_text end,
@@ -29,7 +29,7 @@ end
 
 helpers.describe("system curl gate", function()
 	helpers.it("parses the version line and holds the minimum (system-curl-sys)", function()
-		local SystemCurl = require("adapters.system_curl")
+		local SystemCurl = require("core.network.adapters.system_curl")
 		helpers.assert_eq(SystemCurl.parse_version("curl 8.7.1 (x86_64-apple-darwin24.0) libcurl/8.7.1"), "8.7.1")
 		helpers.assert_nil(SystemCurl.parse_version("zsh: no such file or directory"))
 		helpers.assert_true(SystemCurl.verdict_for("curl 7.64.1 (x86_64-apple-darwin20.0)").ok)

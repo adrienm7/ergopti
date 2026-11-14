@@ -444,7 +444,7 @@ class OwnedOllamaContainer(unittest.TestCase):
 
 
 ENGINE_CASES = r"""
-local Runtime = require("platform.network.pac_runtime")
+local Runtime = require("core.network.adapters.pac_runtime")
 local Json = require("core.text.engine.json")
 local file = assert(io.open(os.getenv("ERGOPTI_PROOF_SHARED") .. "/core/network/data/pac_helpers.js", "rb"))
 local helpers = file:read("*a")

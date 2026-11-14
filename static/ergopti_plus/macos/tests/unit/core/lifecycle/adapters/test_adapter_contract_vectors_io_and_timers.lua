@@ -223,7 +223,7 @@ end)
 --- @return table HttpClient adapter.
 local function load_http_client()
 	package.loaded["core.events.timer_scheduler"] = nil
-	return helpers.load_with_stubs("adapters.http_client")
+	return helpers.load_with_stubs("core.network.adapters.http_client")
 end
 
 helpers.describe("Adapter contract vectors: HttpClient", function()

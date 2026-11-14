@@ -125,7 +125,7 @@ local function _build_configuration(ctx)
 		end,
 		[require("settings.engine.keys").COMMAND.SETUP_WIZARD] = call_ctx("on_show_setup_wizard"),
 		-- Self-contained: the shared edit flow reads and writes its own setting.
-		[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE] = function() require("ui.proxy_override").run() end,
+		[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE] = function() require("core.network.proxy_override").run() end,
 	}
 
 	render_ctx.state_getters = {}

@@ -184,7 +184,7 @@ helpers.describe("owned application notifications", function()
 	helpers.it("restores the exact scoped dependency owners after a fixture-body refusal", function()
 		local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
 			"core.ui.engine.window_titles", "adapters.shell_runner", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.i18n.engine.locale",
-			"lgi", "core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline", "core.events.loop",
+			"lgi", "core.logger.engine.monotonic", "infra.timings", "core.network.engine.managed_http_deadline", "core.events.loop",
 			"ui.webkit_host", "ui.webview_manager", "ui.changelog.bridge" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = { value = package.loaded[name] } end

@@ -342,7 +342,7 @@ end)
 
 -- NetworkInfo vectors (NetworkInfo.spec.js). Read-only network queries.
 helpers.describe("Adapter contract vectors: NetworkInfo", function()
-	local adapter = helpers.load_with_stubs("adapters.network_info")
+	local adapter = helpers.load_with_stubs("core.network.adapters.info")
 
 	helpers.it("getSsidHash returns a string or nil, never throws (get_ssid_hash_returns_string_or_null)", function()
 		local ok, out = pcall(function() return adapter.getSsidHash() end)

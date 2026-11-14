@@ -320,7 +320,7 @@ async function run({
 			'static/ergopti_plus/linux/' + NAMESPACE,
 			'static/ergopti_plus/linux/' + CAPTURE,
 			'static/ergopti_plus/linux/' + CRYPTO,
-			'static/ergopti_plus/linux/infra/openssl_digest.lua',
+			'static/ergopti_plus/linux/core/network/engine/openssl_digest.lua',
 			'tools/test/prepare-linux-lua54-native-provider.cjs',
 			'tools/test/fixtures/lua54-provider-entry.c',
 			...Object.values(FIXTURES).map((file) => 'static/ergopti_plus/linux/tests/hardware/' + file)
@@ -600,7 +600,7 @@ async function run({
 			}
 			const crypto = await child(
 				runtime.filename,
-				[path.join(driver, CRYPTO), path.join(driver, 'infra/openssl_digest.lua')],
+				[path.join(driver, CRYPTO), path.join(driver, 'core/network/engine/openssl_digest.lua')],
 				cryptoEnvironment,
 				driver,
 				10000,
@@ -615,7 +615,8 @@ async function run({
 				exit: crypto.status,
 				signal: crypto.signal,
 				source_sha256: identities['static/ergopti_plus/linux/' + CRYPTO],
-				module_sha256: identities['static/ergopti_plus/linux/infra/openssl_digest.lua'],
+				module_sha256:
+					identities['static/ergopti_plus/linux/core/network/engine/openssl_digest.lua'],
 				interpreter_sha256: runtime.sha256,
 				admitted_checks: 3,
 				skipped: 0,

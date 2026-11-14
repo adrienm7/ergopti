@@ -51,7 +51,7 @@ end
 
 local function with_pending_warmup(callback)
 	helpers.with_stub_scope({
-		"modules.llm.api_ollama", "adapters.http_client", "core.events.timer_scheduler",
+		"modules.llm.api_ollama", "core.network.adapters.http_client", "core.events.timer_scheduler",
 		"modules.llm", "modules.llm.warmup_controller",
 		"modules.llm.ollama_endpoint", "core.logger.engine.logger", "infra.notifications",
 	}, function()

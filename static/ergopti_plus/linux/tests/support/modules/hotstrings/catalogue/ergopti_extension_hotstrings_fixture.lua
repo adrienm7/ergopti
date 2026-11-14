@@ -141,7 +141,7 @@ local function with_offline_shipped_probe(body)
 	local updater_name, registry_name = "modules.updater.manager", "modules.keymap.layout_registry"
 	local previous_updater, previous_preload = package.loaded[updater_name], package.preload[updater_name]
 	local previous_registry = package.loaded[registry_name]
-	local Http, FileSystem = require("adapters.http_client"), require("core.fs.adapters.file_system")
+	local Http, FileSystem = require("core.network.adapters.http_client"), require("core.fs.adapters.file_system")
 	local previous_get, previous_read = Http.get, FileSystem.read
 	local observed = { updater = 0, network = 0, reads = {} }
 	package.loaded[updater_name] = nil
@@ -172,10 +172,10 @@ end
 --- @param configure function Receives the recording native ports and actual owner list.
 --- @param body function Receives the fresh actual Loader.
 local function with_exact_loader_ports(configure, body)
-	local names = { "lfs", "luv", "modules.hotstrings.loader", "infra.curl_identity" }
+	local names = { "lfs", "luv", "modules.hotstrings.loader", "core.network.engine.curl_identity" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	local Exact = require("infra.curl_identity")
+	local Exact = require("core.network.engine.curl_identity")
 	local original_new = Exact.new
 	local Ports = require("tests.support.exact_identity_ports")
 	local native, state = Ports.new({ planned_inode = "9223372036855917341" })

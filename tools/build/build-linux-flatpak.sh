@@ -269,7 +269,7 @@ cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
       - test -f /app/lib/ergopti/ergopti_hotstrings.lua
       # Admit the actual /app ABI/backend/schema with the launch environment.
       # No request or desktop setting is changed by this read-only probe.
-      - bash -c 'set -euo pipefail; source /app/lib/ergopti/network-runtime-env.sh /app /app/lib/ergopti; export XDG_DATA_DIRS=/app/share XDG_DATA_HOME=/app/share; exec /app/bin/luajit /app/lib/ergopti/platform/network/runtime_probe.lua /app/lib/ergopti/_shared'
+      - bash -c 'set -euo pipefail; source /app/lib/ergopti/network-runtime-env.sh /app /app/lib/ergopti; export XDG_DATA_DIRS=/app/share XDG_DATA_HOME=/app/share; exec /app/bin/luajit /app/lib/ergopti/core/network/adapters/runtime_probe.lua /app/lib/ergopti/_shared'
       - test -x /app/bin/curl
     sources:
       - type: dir

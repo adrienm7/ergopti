@@ -85,9 +85,9 @@ local function load_remote_native_http()
 			return new_task()
 		end,
 	}
-	reset_module("adapters.http_client")
+	reset_module("core.network.adapters.http_client")
 	reset_module("core.events.timer_scheduler")
-	helpers.load_with_stubs("adapters.http_client", {
+	helpers.load_with_stubs("core.network.adapters.http_client", {
 		timer = timer_stub,
 		http = http_stub,
 	})

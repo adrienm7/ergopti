@@ -32,7 +32,7 @@ local MODULES = {
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -143,7 +143,7 @@ local function with_fixture(save_results, callback)
 				end,
 			}
 			package.loaded["core.events.timer_scheduler"] = {}
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {} }
 					function client.post(_, _, _, done)

@@ -43,14 +43,14 @@ function M.install(world)
 		return op
 	end
 	package.loaded["modules.llm.model_inventory"] = nil
-	package.loaded["infra.managed_http_deadline"] = { start = function(instant, done)
+	package.loaded["core.network.engine.managed_http_deadline"] = { start = function(instant, done)
 		local op = operation("defer", done)
 		op.instant = instant
 		world.inventory_defers[#world.inventory_defers + 1] = op
 		if world.inventory_during_defer then world.inventory_during_defer(op) end
 		return op
 	end }
-	local Http = package.loaded["adapters.http_client"]
+	local Http = package.loaded["core.network.adapters.http_client"]
 	local original = Http.get_owned
 	Http.get_owned = function(url, headers, options, done)
 		if options.owner ~= "ollama_model_inventory" then return original(url, headers, options, done) end

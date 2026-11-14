@@ -50,7 +50,7 @@ proxy.kill=function(pid,signal)
  return uv.kill(pid,signal)
 end
 package.loaded.luv=proxy
-local Http=require('adapters.http_client')
+local Http=require('core.network.adapters.http_client')
 package.loaded.luv=uv
 local server=assert(uv.new_tcp());assert(server:bind('127.0.0.1',0));local sockets,requests,timers={}, {},{}
 local slow_socket

@@ -29,7 +29,7 @@ local function load_fixture()
 	-- The real bridge: a fake that accepted any operation hid that the real one
 	-- knew no "pull", so every download failed before reaching Ollama.
 	package.loaded["infra.llm_bridge"] = nil
-	replace("adapters.http_client", {
+	replace("core.network.adapters.http_client", {
 		postStream = function(url, headers, body, opts, on_chunk, on_done)
 			transport.starts[#transport.starts + 1] = {
 				url = url, headers = headers, body = body, opts = opts,
@@ -43,7 +43,7 @@ local function load_fixture()
 		end,
 	})
 	transport.owned_http = {}
-	require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], transport.owned_http)
+	require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], transport.owned_http)
 	replace("ui.download_window.bridge", {
 		-- The real window refuses a session without a known kind; a model pull
 		-- must name its own

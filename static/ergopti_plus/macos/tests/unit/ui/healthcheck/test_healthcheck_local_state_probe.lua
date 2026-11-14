@@ -28,7 +28,7 @@ local function with_core(body)
 	-- A case may script hs.usb; the shared hs stub outlives this module
 	local saved_usb = hs.usb
 	local ok, err = pcall(helpers.with_stub_scope, {
-		"core.logger.engine.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "core.network.adapters.info", "ui.healthcheck.core", "ui.healthcheck.helpers",
 		"adapters.accessibility_permission", "adapters.screen_capture",
 	}, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
@@ -45,7 +45,7 @@ local function with_core(body)
 				return false
 			end,
 		}
-		package.loaded["adapters.network_info"] = {
+		package.loaded["core.network.adapters.info"] = {
 			getSsidHash = function() return nil end,
 			getSignalStrength = function() world.signal_reads = world.signal_reads + 1; return 64 end,
 			isInternetReachable = function() return true end,

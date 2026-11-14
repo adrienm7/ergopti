@@ -919,7 +919,7 @@ def stage(appdir, catalogue, template):
     with owned_root(appdir) as appdir:
         prefix = destination_directory(appdir / "usr")
         driver = prefix / "lib/ergopti"
-        if not (driver / "platform/network/runtime_probe.lua").is_file():
+        if not (driver / "core/network/adapters/runtime_probe.lua").is_file():
             raise RuntimeRefused("Installed runtime probe absent.")
         catalogue_data = json.loads(Path(catalogue).read_text())
         policy = catalogue_data["network_runtime"]["portable"]

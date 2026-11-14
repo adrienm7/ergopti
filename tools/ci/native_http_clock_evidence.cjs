@@ -33,8 +33,8 @@ const HEADERS = Object.freeze(
 	].map((name) => MAC + 'launcher/Sources/CPOSIXCompatibility/include/' + name)
 );
 const RUNTIME = Object.freeze([
-	MAC + 'platform/network/native_http.py',
-	MAC + 'platform/network/managed_http.py',
+	MAC + 'core/network/adapters/native_http.py',
+	MAC + 'core/network/adapters/managed_http.py',
 	'static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 ]);
@@ -261,7 +261,7 @@ function sourceReceipt(repository, epoch) {
 			'--',
 			MAC + 'tests/support',
 			'tools/diagnostics',
-			MAC + 'platform/network',
+			MAC + 'core/network/adapters',
 			'static/ergopti_plus/_shared'
 		],
 		{ cwd: repository, stdio: 'pipe' }

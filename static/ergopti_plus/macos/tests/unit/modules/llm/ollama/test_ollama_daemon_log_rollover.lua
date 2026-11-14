@@ -59,7 +59,7 @@ local function with_foreground(port, callback)
 		"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 		"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.managed_native_python",
 		"modules.llm.ollama_endpoint", "core.fs.adapters.file_system", "adapters.task_lifecycle",
-		"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
+		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
 		"modules.shortcuts.script_control", "ui.menu.menu_llm.models_manager_ollama",
@@ -72,7 +72,7 @@ local function with_foreground(port, callback)
 		logger.today_log_path = function() return SENTINEL_LOG end
 		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["adapters.http_client"] = { new = function()
+		package.loaded["core.network.adapters.http_client"] = { new = function()
 			return { cancel = function() return true end, isActive = function() return false end,
 				isSettled = function() return true end }
 		end }

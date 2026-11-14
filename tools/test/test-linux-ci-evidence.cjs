@@ -458,7 +458,10 @@ end
 					GITHUB_ACTIONS: ci,
 					GITHUB_TOKEN: token,
 					ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(
+						updaterDriver,
+						'core/network/adapters/curl_http_client.lua'
+					),
 					UPDATER_TRUSTED_RELEASE_URL: `${variant.origin}?per_page=100`,
 					UPDATER_HTTP_STATUS: String(variant.status),
 					UPDATER_ECHO_CI_TOKEN: variant.echo ? 'true' : 'false',
@@ -708,7 +711,7 @@ end`
 		GITHUB_ACTIONS: ci,
 		GITHUB_TOKEN: fixtureToken,
 		ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: evidence,
-		UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/http_client.lua'),
+		UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'core/network/adapters/http_client.lua'),
 		UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
 		UPDATER_HTTP_STATUS: String(status),
 		UPDATER_ECHO_CI_TOKEN: 'false',
@@ -900,7 +903,10 @@ end
 					LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/?/init.lua')};;`,
 					GITHUB_ACTIONS: 'true',
 					GITHUB_TOKEN: token,
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(
+						updaterDriver,
+						'core/network/adapters/curl_http_client.lua'
+					),
 					UPDATER_TRUSTED_RELEASE_URL: `${releaseOrigin}?per_page=100`,
 					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
 				}
@@ -932,7 +938,10 @@ end
 					GITHUB_TOKEN: fixtureToken,
 					UPDATER_GETTER_ABSENT: endpoint === null ? 'true' : 'false',
 					UPDATER_TRUSTED_RELEASE_URL: endpoint || '',
-					UPDATER_NATIVE_CLIENT: path.join(updaterDriver, 'adapters/curl_http_client.lua'),
+					UPDATER_NATIVE_CLIENT: path.join(
+						updaterDriver,
+						'core/network/adapters/curl_http_client.lua'
+					),
 					UPDATER_AUTH_CASES: JSON.stringify(authenticationCases)
 				}
 			}

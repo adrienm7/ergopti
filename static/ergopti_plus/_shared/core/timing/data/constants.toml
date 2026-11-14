@@ -1243,7 +1243,7 @@ http_managed_wait_poll_ms = 10
 webview_profile_cleanup_ms = 1000
 # Longest download of a desktop PAC the Linux lookup child evaluates itself
 # (GIO drops its DIRECT entries); a caller's own bound below it wins.
-# LX: adapters/system_proxy.lua, infra/managed_http.lua.
+# LX: core/network/adapters/system_proxy.lua, core/network/engine/managed_http.lua.
 proxy_pac_download_max_ms = 60000
 # Windows: the input probe's gap between sends, and its settle before reading.
 input_probe_step_ms = 10
@@ -1287,7 +1287,7 @@ window_switch_worker_sleep_ms = 10
 # selected proxy; handshake: a CONNECT with its NTLM/Negotiate legs, and a
 # client's request head; idle: an open tunnel with no byte in either direction;
 # probe: the whole probe child, from start to its JSON line.
-# LX: infra/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
+# LX: core/network/engine/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
 # modules/llm/ollama_server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
 proxy_relay_dial_timeout_ms = 10000
 proxy_relay_handshake_timeout_ms = 15000
@@ -1309,7 +1309,7 @@ proxy_relay_probe_timeout_ms = 30000
 # What a child process may print before it is stopped: a version line, a df row,
 # a probe reply, never a stream. Lua canon: _shared/ai/engine/policy/process_limits.lua
 # (every Linux process owner takes it from there; pinned to this key).
-# AHK: adapters/crash_report_worker.ahk and adapters/http_client.ahk, pinned copies.
+# AHK: adapters/crash_report_worker.ahk and core/network/adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
 
 # Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
@@ -1362,7 +1362,7 @@ input_source_id_bytes = 1024
 
 # Largest answer the Linux network field check reads: one byte over the shared
 # PAC cap (_shared/core/network/engine/pac_check.lua MAX_BYTES), so an oversized PAC is
-# seen as oversized rather than truncated. LX: adapters/network_check_ports.lua.
+# seen as oversized rather than truncated. LX: core/network/adapters/check_ports.lua.
 network_check_body_bytes = 1048577
 
 # Largest program provider catalogue (the owned launcher's JSON list of the
@@ -1371,11 +1371,11 @@ network_check_body_bytes = 1048577
 program_catalogue_bytes = 65536
 
 # Largest diagnostic file of one curl transfer (its JSON write-out and redirect
-# receipt) the Linux HTTP client reads back. LX: adapters/curl_http_client.lua.
+# receipt) the Linux HTTP client reads back. LX: core/network/adapters/curl_http_client.lua.
 http_diagnostic_bytes = 65536
 
 # Largest request or answer packet of the Linux system proxy helper.
-# LX: adapters/system_proxy.lua.
+# LX: core/network/adapters/system_proxy.lua.
 proxy_packet_bytes = 65536
 
 # Largest native reply of the Apple Shortcuts role (the list of shortcuts or

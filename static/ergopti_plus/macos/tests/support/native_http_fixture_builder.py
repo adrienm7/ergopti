@@ -42,8 +42,8 @@ HEADER_INPUTS = tuple(
     )
 )
 RUNTIME_INPUTS = (
-    MAC + "platform/network/native_http.py",
-    MAC + "platform/network/managed_http.py",
+    MAC + "core/network/adapters/native_http.py",
+    MAC + "core/network/adapters/managed_http.py",
     "static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py",
     "static/ergopti_plus/_shared/core/network/data/proxy_policy.json",
 )
@@ -146,7 +146,7 @@ class OwnedFixtureBuild:
         self.app = self.root / "OwnedNativeHTTPFixture.app"
         self.resources = self.app / "Contents/Resources"
         self.executable = self.app / "Contents/MacOS/ErgoptiPlus"
-        self.native = self.resources / "static/ergopti_plus/macos/platform/network"
+        self.native = self.resources / "static/ergopti_plus/macos/core/network/adapters"
         self.receipt_path = self.root / "source-receipt.json"
         self.receipt_digest = None
         self.identity = None

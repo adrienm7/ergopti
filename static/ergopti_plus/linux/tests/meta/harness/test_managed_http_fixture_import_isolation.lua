@@ -13,17 +13,17 @@ local driver = helpers.driver_root()
 -- The shared proxy policy the managed fixtures load beside their target.
 local POLICY_MODULE = "core.network.engine.proxy_policy_core"
 local fixtures = {
-    { path = "tests/support/managed_http_native_ports.lua", exported = true, target = "adapters.http_client", policy = true,
-      names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "core.logger.engine.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" } },
-    { path = "tests/unit/adapters/network/test_managed_http_public.lua", target = "adapters.http_client", policy = true,
-      names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "core.logger.engine.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" } },
-    { path = "tests/unit/infra/network/test_managed_http_queued_deadline.lua", target = "adapters.http_client", policy = true,
-      names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "core.logger.engine.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" } },
-    { path = "tests/unit/adapters/network/test_system_proxy_callbacks.lua", target = "adapters.system_proxy", config = { nil_driver_root = true, logs = true },
+    { path = "tests/support/managed_http_native_ports.lua", exported = true, target = "core.network.adapters.http_client", policy = true,
+      names = { "luv", "core.network.adapters.http_client", "core.network.adapters.curl_http_client", "core.network.adapters.system_proxy", "core.network.engine.proxy_policy", "core.network.engine.managed_http", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.fs.engine.paths" } },
+    { path = "tests/unit/core/network/adapters/test_managed_http_public.lua", target = "core.network.adapters.http_client", policy = true,
+      names = { "luv", "core.network.adapters.http_client", "core.network.adapters.curl_http_client", "core.network.adapters.system_proxy", "core.network.engine.proxy_policy", "core.network.engine.managed_http", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.fs.engine.paths" } },
+    { path = "tests/unit/core/network/engine/test_managed_http_queued_deadline.lua", target = "core.network.adapters.http_client", policy = true,
+      names = { "luv", "core.network.adapters.http_client", "core.network.adapters.curl_http_client", "core.network.adapters.system_proxy", "core.network.engine.proxy_policy", "core.network.engine.managed_http", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.fs.engine.paths" } },
+    { path = "tests/unit/core/network/adapters/test_system_proxy_callbacks.lua", target = "core.network.adapters.system_proxy", config = { nil_driver_root = true, logs = true },
       names = { "luv", "core.fs.engine.paths", "core.logger.engine.shim" } },
-    { path = "tests/unit/adapters/network/test_system_proxy_runtime_executable.lua", target = "adapters.system_proxy", config = { nil_driver_root = true },
+    { path = "tests/unit/core/network/adapters/test_system_proxy_runtime_executable.lua", target = "core.network.adapters.system_proxy", config = { nil_driver_root = true },
       names = { "luv", "core.fs.engine.paths" } },
-    { path = "tests/unit/infra/network/test_managed_http_deadline.lua", target = "infra.managed_http_deadline",
+    { path = "tests/unit/core/network/engine/test_managed_http_deadline.lua", target = "core.network.engine.managed_http_deadline",
       names = { "luv", "core.logger.engine.monotonic", "core.logger.engine.shim" } },
 }
 

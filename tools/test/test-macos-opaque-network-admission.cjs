@@ -507,8 +507,8 @@ function emittedBootstrapPrelude(fixturePolicy, ownerRoot, interpreter) {
 	const shared = path.join(root, 'static/ergopti_plus/_shared').replace(/\\/g, '/');
 	const owner = shellPath(ownerRoot);
 	const networkSource = fs.readFileSync(path.join(macos, 'modules/llm/network_env.lua'), 'utf8');
-	const receiver = path.join(ownerRoot, 'platform/network/native_http.py');
-	const admitted = fs.existsSync(receiver) ? [owner + '/platform/network/native_http.py'] : [];
+	const receiver = path.join(ownerRoot, 'core/network/adapters/native_http.py');
+	const admitted = fs.existsSync(receiver) ? [owner + '/core/network/adapters/native_http.py'] : [];
 	const source = [
 		`package.path = ${luaString(`${macos}/?.lua;${macos}/?/init.lua;${shared}/?.lua;${shared}/?/init.lua;`)} .. package.path`,
 		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
@@ -579,10 +579,10 @@ const managedRoot = path.join(
 	temporary,
 	'Managed.app/Contents/Resources/static/ergopti_plus/macos'
 );
-const managedReceiver = path.join(managedRoot, 'platform/network/native_http.py');
+const managedReceiver = path.join(managedRoot, 'core/network/adapters/native_http.py');
 fs.mkdirSync(path.dirname(managedReceiver), { recursive: true });
 fs.copyFileSync(
-	path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
+	path.join(root, 'static/ergopti_plus/macos/core/network/adapters/native_http.py'),
 	managedReceiver
 );
 // A shipped bundle carries the proxy override declaration every prelude reads.
@@ -1188,7 +1188,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		temporary,
 		'Bootstrap.app/Contents/Resources/static/ergopti_plus/macos'
 	);
-	fs.mkdirSync(path.join(bootstrapRoot, 'platform/network'), { recursive: true });
+	fs.mkdirSync(path.join(bootstrapRoot, 'core/network/adapters'), { recursive: true });
 	fs.mkdirSync(path.join(bootstrapRoot, 'modules/llm'), { recursive: true });
 	// A shipped bundle carries the shared proxy policy the guard's precedence is built from.
 	const bundledPolicy = path.join(bootstrapRoot, '../_shared/core/network/data');
@@ -1202,8 +1202,8 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		path.join(bundledPolicy, 'proxy_override.json')
 	);
 	fs.copyFileSync(
-		path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
-		path.join(bootstrapRoot, 'platform/network/native_http.py')
+		path.join(root, 'static/ergopti_plus/macos/core/network/adapters/native_http.py'),
+		path.join(bootstrapRoot, 'core/network/adapters/native_http.py')
 	);
 	fs.writeFileSync(
 		path.join(bootstrapRoot, 'modules/llm/managed_bootstrap_http.py'),
@@ -1215,7 +1215,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		nativeInterpreter,
 		`#!/bin/bash\n[ "$1" = -c ] || exit 64\n` +
 			`case "$2" in *'s.loader.exec_module(m); m._resolve_worker()'*) ;; *) exit 64 ;; esac\n` +
-			`[ "$3" = ${quote(shellPath(path.join(bootstrapRoot, 'platform/network/native_http.py')))} ] || exit 64\n` +
+			`[ "$3" = ${quote(shellPath(path.join(bootstrapRoot, 'core/network/adapters/native_http.py')))} ] || exit 64\n` +
 			`printf 'called\n' >> ${quote(shellPath(nativeCalls))}\n[ -f "$3" ] || exit 78\nexit "\${NATIVE_ADMISSION_CODE:-0}"\n`
 	);
 	const executable = spawnSync(bash, ['-c', `chmod +x ${quote(shellPath(nativeInterpreter))}`], {
@@ -1277,7 +1277,7 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 	);
 	for (const vector of bootstrapCases) {
 		fs.writeFileSync(nativeCalls, '');
-		const receiver = path.join(bootstrapRoot, 'platform/network/native_http.py');
+		const receiver = path.join(bootstrapRoot, 'core/network/adapters/native_http.py');
 		if (vector.missing) fs.renameSync(receiver, receiver + '.held');
 		const bootstrapPrelude = emittedBootstrapPrelude(
 			fixturePolicy,

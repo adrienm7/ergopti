@@ -141,7 +141,7 @@ check('the check files spell no address of their own', () => {
 	const files = [
 		luaSource,
 		ahkSource,
-		read('linux', 'adapters', 'network_check_ports.lua'),
+		read('linux', 'core', 'network', 'adapters', 'check_ports.lua'),
 		read('linux', 'ui', 'field_check', 'network_check.lua')
 	];
 	for (const source of files) {

@@ -22,7 +22,7 @@ ffi.cdef([[
 ]])
 local glib = ffi.load(require("_generated.native_runtime").network_runtime.libraries.glib)
 local Shell = require("adapters.shell_runner")
-local Ports = require("adapters.network_check_ports")
+local Ports = require("core.network.adapters.check_ports")
 local original_exec, original_has, original_load = Shell.exec_checked, Shell.has_command, ffi.load
 local variants, errors = {}, {}
 local acquired_variants, released_variants, acquired_errors, released_errors = 0, 0, 0, 0

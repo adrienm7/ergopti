@@ -373,7 +373,7 @@ end)
 local function with_remote_fixture(body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"adapters.http_client", "modules.shortcuts.script_control",
+		"core.network.adapters.http_client", "modules.shortcuts.script_control",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -406,7 +406,7 @@ local function with_remote_fixture(body)
 			}
 		end,
 	}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			return {
 				cancel = function() return true end,
@@ -434,7 +434,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"adapters.shell_runner", "core.events.timer_scheduler",
-		"adapters.http_client", "modules.shortcuts.script_control",
+		"core.network.adapters.http_client", "modules.shortcuts.script_control",
 		"platform.remap.lease_helper",
 	}
 	local saved = {}
@@ -486,7 +486,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 			is_paused = function() return false end,
 			get_pause_epoch = function() return 0 end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					cancel = function() return true end,

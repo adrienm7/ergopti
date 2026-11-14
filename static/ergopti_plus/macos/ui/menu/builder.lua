@@ -719,7 +719,7 @@ function M.generate(ctx, menu_mods, actions)
 				[require("settings.engine.keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
 				[require("settings.engine.keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
 				-- Self-contained: the shared edit flow reads and writes its own setting.
-				[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE]      = function() require("ui.proxy_override").run() end,
+				[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE]      = function() require("core.network.proxy_override").run() end,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end

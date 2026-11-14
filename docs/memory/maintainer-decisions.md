@@ -865,7 +865,7 @@ key of its workspace. `llm/api_url_template` (Lua, AHK port) owns the rule and
 
 The Windows driver runs `System32\curl.exe` and does not pin its own copy, the
 SYS class of the owned-runtimes registry. `HTTP_CheckCurlAtStart`
-(`windows/adapters/http_client.ahk`) names its absence or a version below
+(`windows/core/network/adapters/http_client.ahk`) names its absence or a version below
 `HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION` in words. Do not propose a pinned curl again
 unless that check stops being enough.
 

@@ -696,7 +696,7 @@ function portable() {
 					PATH: bashPath(bin),
 					SRC_DRIVER: '/private driver/linux',
 					SRC_SHARED: '/private shared/_shared',
-					EXPECTED_PROBE: '/private driver/linux/platform/network/runtime_probe.lua',
+					EXPECTED_PROBE: '/private driver/linux/core/network/adapters/runtime_probe.lua',
 					EXPECTED_SHARED: '/private shared/_shared',
 					PRESENT: bashPath(present),
 					INSTALLS: bashPath(installs),
@@ -733,9 +733,9 @@ function portable() {
 						packages.map((name) => `${manager}:${name}`)
 					);
 					assert.deepEqual(result.probes, [
-						'/private driver/linux/platform/network/runtime_probe.lua',
+						'/private driver/linux/core/network/adapters/runtime_probe.lua',
 						'/private shared/_shared',
-						'/private driver/linux/platform/network/runtime_probe.lua',
+						'/private driver/linux/core/network/adapters/runtime_probe.lua',
 						'/private shared/_shared'
 					]);
 				}
@@ -796,7 +796,7 @@ function native() {
 		fs.mkdirSync(cwd);
 		for (const name of ['runtime_probe.lua', 'native_proxy_runtime.lua'])
 			fs.copyFileSync(
-				path.join(ROOT, DRIVER, 'platform/network', name),
+				path.join(ROOT, DRIVER, 'core/network/adapters', name),
 				path.join(driver, 'platform/network', name)
 			);
 		// Each shared module is staged under its own folder, whatever its depth.
@@ -814,7 +814,7 @@ function native() {
 			path.join(driver, '_generated/native_runtime.lua'),
 			outputs[generator.LUA_OUTPUT]
 		);
-		const probe = path.join(driver, 'platform/network/runtime_probe.lua');
+		const probe = path.join(driver, 'core/network/adapters/runtime_probe.lua');
 		const run = (extra) => {
 			const result = spawnSync('luajit', [probe, shared], {
 				cwd,
@@ -871,13 +871,13 @@ function native() {
 				assert.deepEqual(receipt.receipt, { ok: false, error: 'proxy-backend-unavailable' });
 				// Exercise the actual lookup helper as well, without a destination connection.
 				fs.copyFileSync(
-					path.join(ROOT, DRIVER, 'platform/network/system_proxy_probe.lua'),
-					path.join(driver, 'platform/network/system_proxy_probe.lua')
+					path.join(ROOT, DRIVER, 'core/network/adapters/system_proxy_probe.lua'),
+					path.join(driver, 'core/network/adapters/system_proxy_probe.lua')
 				);
 				const runHelper = () => {
 					const helper = spawnSync(
 						'luajit',
-						[path.join(driver, 'platform/network/system_proxy_probe.lua'), shared],
+						[path.join(driver, 'core/network/adapters/system_proxy_probe.lua'), shared],
 						{
 							cwd,
 							encoding: 'utf8',

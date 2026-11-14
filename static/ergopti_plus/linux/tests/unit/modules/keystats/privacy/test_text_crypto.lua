@@ -59,10 +59,10 @@ local function load_cipher(provider)
 	}
 	local codec = require("core.lifecycle.engine.compat.base64")
 	provider.encode_base64, provider.decode_base64 = codec.encode, codec.decode
-	local previous = package.loaded["infra.openssl_cipher"]
-	package.loaded["infra.openssl_cipher"] = provider
+	local previous = package.loaded["core.network.engine.openssl_cipher"]
+	package.loaded["core.network.engine.openssl_cipher"] = provider
 	local ok, cipher = pcall(helpers.load_module, "modules.keystats.text_cipher")
-	package.loaded["infra.openssl_cipher"] = previous
+	package.loaded["core.network.engine.openssl_cipher"] = previous
 	assert(ok, cipher)
 	return cipher
 end
@@ -496,7 +496,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 			calls = calls + 1
 			return native_receipt(command, "Synthetic output", 0)
 		end)
-		local ok, result = pcall(require("infra.openssl_command").exec, "openssl fixture", "text")
+		local ok, result = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture", "text")
 		shell.has_command = previous
 		shell._reset_runner()
 		helpers.assert_true(ok)
@@ -511,7 +511,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 				captured = command
 				return native_receipt(command, "Synthetic output", 0)
 			end)
-			local ok, result = pcall(require("infra.openssl_command").exec, "openssl fixture", input)
+			local ok, result = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture", input)
 			shell._reset_runner()
 			helpers.assert_true(ok)
 			helpers.assert_eq(result, "Synthetic output")
@@ -540,7 +540,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 				return native_receipt(command, "Synthetic output", 0)
 			end)
 			local options = checked and { pipefail = true } or nil
-			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture", nil, options)
+			local ok, result, reason = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture", nil, options)
 			shell.has_command = previous
 			shell._reset_runner()
 			helpers.assert_true(ok)
@@ -567,7 +567,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 		helpers.it("retains only the current complete native stdout receipt " .. index .. " (openssl-capture-receipts)", function()
 			local shell = Shell()
 			shell._set_runner(function(command) return native_receipt(command, case.output, case.status) end)
-			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture")
+			local ok, result, reason = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture")
 			shell._reset_runner()
 			helpers.assert_true(ok)
 			helpers.assert_eq(result, case.expected)
@@ -581,7 +581,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 		local shell, calls = Shell(), 0
 		shell._set_runner(function() calls = calls + 1; return "" end)
 		local ok, err = pcall(function()
-			local capture = require("infra.openssl_command")
+			local capture = require("core.network.engine.openssl_command")
 			for _, pair in ipairs({ { "", "text" }, { false, "text" }, { "openssl\0hidden", "text" },
 				{ "openssl fixture", "binary\0stdin" }, { "openssl fixture", false },
 				{ "openssl fixture", "text", false }, { "openssl fixture", "text", "invalid" },

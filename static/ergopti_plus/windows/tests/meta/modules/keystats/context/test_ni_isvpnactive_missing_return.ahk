@@ -13,7 +13,7 @@
 ; contract in NetworkInfo.spec.js on the common (no-VPN) path. The typed helper
 ; must explicitly return down and the public wrapper must reduce it to boolean.
 ;
-; This is a meta-static test (scans source text) because adapters/network_info.ahk
+; This is a meta-static test (scans source text) because core/network/adapters/info.ahk
 ; is NOT part of the headless runner include graph (run_all.ahk does not include
 ; it - its DllCall paths target live iphlpapi hardware). Calling NI_IsVpnActive()
 ; from a test would be a load-time error that hangs the suite, so the regression

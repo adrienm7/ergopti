@@ -44,8 +44,8 @@ end
 -- Control discovery independently with typed ordinary listener refusal while
 -- retaining production policy and native signal ownership.
 -- The real HTTP adapter and errors remain observable for every unrelated owner.
-package.preload["adapters.http_client"] = function()
-	return require("tests.support.owned_http_fixture").local_discovery(dofile("adapters/http_client.lua"))
+package.preload["core.network.adapters.http_client"] = function()
+	return require("tests.support.owned_http_fixture").local_discovery(dofile("core/network/adapters/http_client.lua"))
 end
 
 local system_time = os.time

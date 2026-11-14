@@ -149,8 +149,8 @@ const HEADERS = [
 	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h'
 ];
 const RUNTIME = [
-	'static/ergopti_plus/macos/platform/network/native_http.py',
-	'static/ergopti_plus/macos/platform/network/managed_http.py',
+	'static/ergopti_plus/macos/core/network/adapters/native_http.py',
+	'static/ergopti_plus/macos/core/network/adapters/managed_http.py',
 	'static/ergopti_plus/_shared/core/network/adapters/python_network_proxy_policy.py',
 	'static/ergopti_plus/_shared/core/network/data/proxy_policy.json'
 ];
