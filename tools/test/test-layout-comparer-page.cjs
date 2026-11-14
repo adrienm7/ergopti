@@ -73,9 +73,12 @@ for (const file of ['_generated/analysis_data.js', 'analysis_engine.js'])
 const E = vm.runInContext('LAYOUT_ANALYSIS', sandbox);
 const DATA = vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox);
 const page = fs.readFileSync(path.join(PAGE_DIR, 'comparer_page.js'), 'utf8');
+// The Comparer's markup lives in comparer_page.js (it mounts into the site's
+// page and into the app's Studio window); index.html holds only its root.
+const markup = html + page;
 const keys = new Set();
-for (const m of html.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) keys.add(m[1]);
-for (const m of html.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
+for (const m of markup.matchAll(/data-i18n(?:-placeholder|-title)?="([^"]+)"/g)) keys.add(m[1]);
+for (const m of markup.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g))
 	for (const option of m[2].matchAll(/value="([^"]+)"/g)) keys.add(`${m[1]}.${option[1]}`);
 // The page, its popovers and the editor's analysis panel share these strings.
 for (const file of ['comparer_page.js', 'info_popover.js', 'analysis_panel.js'])
@@ -114,7 +117,7 @@ check(
 	'sources: the metrics table lost its « i » buttons'
 );
 for (const id of ['fingering', 'weights', 'ideal_finger_load'])
-	check(html.includes(`data-info="${id}"`), `sources: no « i » button for ${id}`);
+	check(markup.includes(`data-info="${id}"`), `sources: no « i » button for ${id}`);
 check(
 	page.includes("infoButton('shortcut_letters')"),
 	'sources: no « i » button for shortcut_letters'
@@ -197,6 +200,25 @@ for (const corpus of DATA.corpora)
 		windowScripts.includes(`../layout_analysis/${corpus.script}`),
 		`layout_editor_window/index.html: no ${corpus.script} (inlining hosts cannot load it later)`
 	);
+
+// The app's Studio window mounts the Comparer in a tab: it loads every script
+// of the Comparer's page (but i18n.js: its host seeds the strings), the
+// Comparer's own last, and its stylesheet.
+const windowPage = fs.readFileSync(shared('ui', 'layout_editor_window', 'index.html'), 'utf8');
+const inWindow = (src) => (src.startsWith('../') ? src : `../layout_analysis/${src}`);
+const comparerAt = windowScripts.indexOf('../layout_analysis/comparer_page.js');
+for (const src of SCRIPTS.filter((s) => s !== '../i18n.js')) {
+	const at = windowScripts.indexOf(inWindow(src));
+	check(at >= 0, `layout_editor_window/index.html: no ${inWindow(src)} for the Comparer tab`);
+	check(
+		at <= comparerAt,
+		`layout_editor_window/index.html: ${inWindow(src)} after comparer_page.js`
+	);
+}
+check(
+	windowPage.includes('href="../layout_analysis/style.css"'),
+	'layout_editor_window/index.html: no Comparer stylesheet'
+);
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);

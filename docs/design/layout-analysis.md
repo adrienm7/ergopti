@@ -265,7 +265,7 @@ the page), keyboard, layout selection, the global score chart, the sortable
 ranking, each layout's contributions, finger load and metrics, and the weights
 editor with « restore the defaults ». The site embeds it like the editor
 (`?lang=<code>`); the app's Studio window loads the same page. A host may
-define, before the page script runs:
+define, before the page script runs (or pass as `mount`'s `host`):
 
 ```js
 window.LAYOUT_ANALYSIS_HOST = {
@@ -284,6 +284,28 @@ and turns it into the « My typing » corpus (`my_typing`), the default in the
 app. A host `store` (`{list(), save(layout), remove(id)}`, each returning a
 promise; the app's data folder, the site's IndexedDB) replaces `localStorage`
 for the layouts imported from files.
+
+The Comparer mounts into an element:
+`LAYOUT_ANALYSIS_COMPARER.mount(root, {host?, reportHeight?})` fills `root`
+from the markup in `comparer_page.js` and returns `{setCorpus, addLayouts,
+onResults}`. A second mount throws.
+
+- The site's `index.html` holds only `<main id="layout-analysis">`, which the
+  script mounts by itself with `reportHeight`.
+- The app's Studio window (`layout_editor_window/index.html`) loads the same
+  scripts and mounts the Comparer into its « Comparer » tab.
+- Keystats tables sent before the mount are kept and applied when it happens.
+
+The host `store` contract:
+
+- `list()` resolves to the saved layouts.
+- `save(layout)` resolves once the layout is stored.
+- `remove(id)` resolves once it is deleted. No control calls it yet.
+
+A layout is the library shape, JSON as given: `{id, name, origin: 'user',
+source: <file name>, rows, dead, command, fingering, language, authors, url,
+licence}`. Its id is `user_<slug>`, or `user_<slug>_<n>` when that id is
+taken. The host stores and returns layouts unchanged and keys them by `id`.
 
 Framed by the site (`/studio/comparer`, owned by the site routes), the page
 needs no bridge: it uses relative URLs only, honours `?lang=<code>` (French by

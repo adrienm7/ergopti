@@ -18,7 +18,9 @@
 	box-sizing: border-box;
 }
 
-body {
+/* The site's standalone page only: in the app's Studio window the Comparer is
+   one tab of a page that styles its own body. */
+body:has(> main.layout-analysis) {
 	background: var(--theme-bg);
 	color: var(--theme-text);
 	margin: 0;
