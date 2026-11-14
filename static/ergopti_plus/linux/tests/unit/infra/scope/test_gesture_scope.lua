@@ -86,7 +86,7 @@ helpers.describe("Linux gesture scope transaction", function()
 
 	helpers.it("gesture-scope-admission: retained compensation fences sibling mutations until exact restoration", function()
 		with_scope(function(_, gestures, controls, path)
-			local adapter = require("adapters.file_system")
+			local adapter = require("core.fs.adapters.file_system")
 			local publish = adapter.write_if_unchanged
 			local phase = 1
 			local ok, err = pcall(function()

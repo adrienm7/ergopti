@@ -30,14 +30,14 @@ local function with_window(module_name, scenario)
 		package.loaded["infra.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "/virtual" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.deferred_work"] = { after = function(_, callback)
 			state.deferred[#state.deferred + 1] = callback
 			return true
 		end }
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
+		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
 		package.loaded["infra.toml.reader"] = { parse = function() return {}, true end }
 		package.loaded["infra.toml.writer"] = {}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {}

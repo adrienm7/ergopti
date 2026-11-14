@@ -21,10 +21,10 @@ local function record_progress(path, index, elapsed_ms)
 end
 
 function M.run(receipt_path, destination, nonce)
-	local Codec = require("adapters.json_codec")
+	local Codec = require("core.fs.adapters.json_codec")
 	local Config = require("platform.remap.config")
 	local Generator = require("platform.remap.generator")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local Controller = require("platform.remap.lease_controller")
 	local original = read(destination)
 	assert(not Controller.is_initialized(), "A real lease owner already exists")

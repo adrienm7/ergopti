@@ -11,11 +11,11 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 
 helpers.describe("gesture sensitivity preference admission", function()
 	helpers.it("loads supported numbers and leaves an extreme value outdated", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger",
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger",
 			"core.logger.engine.shim", "settings.engine.migration.outdated" }, function()
 			local logger = helpers.make_logger_stub()
 			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-			package.loaded["adapters.file_system"] = nil
+			package.loaded["core.fs.adapters.file_system"] = nil
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			OutputFixture.with_output(function(path)

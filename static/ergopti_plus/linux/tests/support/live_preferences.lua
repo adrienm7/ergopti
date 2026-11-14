@@ -17,7 +17,7 @@ end
 --- The caller supplies a private HOME before loading any configuration owner.
 function M.daemon()
 	local directory = M.ensure_directory()
-	local Files = require("adapters.file_system")
+	local Files = require("core.fs.adapters.file_system")
 	local _, status = Files.read_with_status(Paths.config("config.toml"))
 	assert(status == "absent", "the live daemon fixture requires a fresh configuration")
 	-- Any config.toml is a configured driver, so the setup wizard stays closed.
@@ -37,7 +37,7 @@ function M.daemon()
 	assert(Hotstrings.set_all_sections("daemon_keys", true), "the live catalogue must be explicitly selected")
 	assert(Files.write(Paths.config("tap_hold.toml"), require("tests.support.tap_hold_fixture").with_preset()),
 		"the live tap-hold fixture must explicitly import its preset")
-	local preset = require("layouts.engine.layers.editor").read_shipped(require("infra.paths").shared("layouts/data/layers.recommended.toml"))
+	local preset = require("layouts.engine.layers.editor").read_shipped(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 	assert(Files.write(directory .. "/layers.toml", preset), "the live navigation fixture must explicitly import its preset")
 	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
 		assert(require("infra.llm_preferences").set_many({

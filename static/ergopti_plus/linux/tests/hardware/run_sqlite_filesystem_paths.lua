@@ -41,7 +41,7 @@ write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 -- Resolve and load production owners before entering the owned database cwd.
-require("infra.paths")
+require("core.fs.engine.paths")
 require("modules.keystats.keystats")
 
 local function check(name, fn)

@@ -44,7 +44,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		-- The child removes lfs together with luv. Absolute loader coordinates
 		-- preserve canonical constructor admission without a native cwd module.
-		if root:sub(1, 1) ~= "/" then root = assert(require("infra.paths").current_directory()) .. "/" .. root end
+		if root:sub(1, 1) ~= "/" then root = assert(require("core.fs.engine.paths").current_directory()) .. "/" .. root end
 		local fixture = root .. "/tests/hardware/run_sqlite_private_no_luv.lua"
 		local status = os.execute("env -u LUA_PATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "public SQLite descriptor contract failed in " .. runtime)
@@ -87,7 +87,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 	for _, fault in ipairs({ "seek", "close" }) do
 		helpers.it("refuses an unacknowledged database probe " .. fault .. " (sqlite-native-file-admission)", function()
 			local writer = helpers.load_module("modules.keystats.sqlite_writer")
-			local reader = require("infra.regular_file_reader")
+			local reader = require("core.fs.engine.regular_file_reader")
 			local original = reader.open
 			local path = os.tmpname()
 			local seeks, closes = 0, 0
@@ -126,7 +126,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		helpers.it("releases failed " .. phase .. " bootstrap admission before a new store (sqlite-failed-open-state)", function()
 			local writer = helpers.load_module("modules.keystats.sqlite_writer")
 			local control = helpers.load_module("modules.keystats.sqlite_writer")
-			local paths = require("infra.paths")
+			local paths = require("core.fs.engine.paths")
 			local shared = paths.shared
 			local root = os.tmpname()
 			os.remove(root)
@@ -538,7 +538,7 @@ helpers.describe("semantic media: native SQLite storage and dashboard parity", f
 		local path = dir .. "/metrics.sqlite"
 		local ok, err = xpcall(function()
 			helpers.assert_true(writer.open_db(path), "actual SQLite CLI must acknowledge opening")
-			local file = assert(io.open(require("infra.paths").shared("metrics/data/db/media_schema.sql"), "r"))
+			local file = assert(io.open(require("core.fs.engine.paths").shared("metrics/data/db/media_schema.sql"), "r"))
 			local schema = assert(file:read("*a"))
 			assert(file:close() == true)
 			helpers.assert_true(writer.exec_sql(schema), "independent fixture provisions the committed additive schema")

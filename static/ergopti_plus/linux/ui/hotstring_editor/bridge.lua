@@ -45,7 +45,7 @@ local M = {}
 M.bridge_name = "hsEditor"
 
 local Logger = require("core.logger.engine.shim")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local MagicKey = require("modules.hotstrings.magic_key")
 
 local LOG = "bridge.hsEditor"

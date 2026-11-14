@@ -28,8 +28,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const LINUX = path.join(ROOT, 'static/ergopti_plus/linux/infra/file_watchers.lua');
-const MACOS = path.join(ROOT, 'static/ergopti_plus/macos/infra/file_watchers.lua');
+const LINUX = path.join(ROOT, 'static/ergopti_plus/linux/core/fs/engine/file_watchers.lua');
+const MACOS = path.join(ROOT, 'static/ergopti_plus/macos/core/fs/engine/file_watchers.lua');
 
 function read(f) {
 	return fs.readFileSync(f, 'utf8');
@@ -55,8 +55,8 @@ function extractMaxDepth(src, driverLabel) {
 	return val;
 }
 
-const linuxDepth = extractMaxDepth(linuxSrc, 'linux/infra/file_watchers.lua');
-const macosDepth = extractMaxDepth(macosSrc, 'macos/infra/file_watchers.lua');
+const linuxDepth = extractMaxDepth(linuxSrc, 'linux/core/fs/engine/file_watchers.lua');
+const macosDepth = extractMaxDepth(macosSrc, 'macos/core/fs/engine/file_watchers.lua');
 
 // ── 3. Verify they match ──────────────────────────────────────────────────
 if (linuxDepth !== null && macosDepth !== null && linuxDepth !== macosDepth) {
@@ -67,11 +67,13 @@ if (linuxDepth !== null && macosDepth !== null && linuxDepth !== macosDepth) {
 // Linux: `local _debounce_sec = 0.5`
 const linuxDebounceM = linuxSrc.match(/_debounce_sec\s*=\s*([\d.]+)/);
 if (!linuxDebounceM) {
-	errors.push('linux/infra/file_watchers.lua: _debounce_sec declaration not found');
+	errors.push('linux/core/fs/engine/file_watchers.lua: _debounce_sec declaration not found');
 } else {
 	const linuxDebounce = parseFloat(linuxDebounceM[1]);
 	if (linuxDebounce !== 0.5) {
-		errors.push(`linux/infra/file_watchers.lua: _debounce_sec = ${linuxDebounce} — expected 0.5`);
+		errors.push(
+			`linux/core/fs/engine/file_watchers.lua: _debounce_sec = ${linuxDebounce} — expected 0.5`
+		);
 	}
 }
 
@@ -79,25 +81,29 @@ if (!linuxDebounceM) {
 const macosDebounceM = macosSrc.match(/pcall\(\s*hs\.timer\.doAfter\s*,\s*([\d.]+)\s*,/);
 if (!macosDebounceM) {
 	errors.push(
-		'macos/infra/file_watchers.lua: protected hs.timer.doAfter debounce acquisition not found'
+		'macos/core/fs/engine/file_watchers.lua: protected hs.timer.doAfter debounce acquisition not found'
 	);
 } else {
 	const macosDebounce = parseFloat(macosDebounceM[1]);
 	if (macosDebounce !== 0.5) {
 		errors.push(
-			`macos/infra/file_watchers.lua: protected doAfter delay = ${macosDebounce} — expected 0.5`
+			`macos/core/fs/engine/file_watchers.lua: protected doAfter delay = ${macosDebounce} — expected 0.5`
 		);
 	}
 }
 
 // ── 5. Ratchet: macOS comment must mention 0.5 s for documentation parity ──
 if (!macosSrc.includes('0.5 s timer')) {
-	errors.push('macos/infra/file_watchers.lua: missing debounce documentation ("0.5 s timer")');
+	errors.push(
+		'macos/core/fs/engine/file_watchers.lua: missing debounce documentation ("0.5 s timer")'
+	);
 }
 
 // ── 6. Ratchet: Linux comment must mention "matches macOS" for traceability ──
 if (!linuxSrc.includes('matches macOS')) {
-	errors.push('linux/infra/file_watchers.lua: missing cross-reference comment ("matches macOS")');
+	errors.push(
+		'linux/core/fs/engine/file_watchers.lua: missing cross-reference comment ("matches macOS")'
+	);
 }
 
 if (errors.length > 0) {

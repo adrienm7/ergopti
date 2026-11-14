@@ -40,7 +40,7 @@ local function with_native(body, catalogue)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return native.config end }
-		package.loaded["infra.paths"] = { shared = function(relative) return "/shared/" .. relative end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/shared/" .. relative end }
 		package.loaded["infra.timings"] = Timings
 		_G.hs = { fs = {
 			symlinkAttributes = function(path)
@@ -91,10 +91,10 @@ local function with_native(body, catalogue)
 			error("user and interpreter files must never be opened during inventory", 0)
 		end
 		os.getenv = function(name) if name == "PATH" then return native.path or "/bin" end; return old_getenv(name) end
-		package.loaded["infra.fs_dir"] = nil
+		package.loaded["core.fs.engine.dir"] = nil
 		package.loaded["adapters.program_providers"] = nil
 		local adapter = require("adapters.program_providers")
-		body(adapter, native, require("infra.fs_dir"))
+		body(adapter, native, require("core.fs.engine.dir"))
 		helpers.assert_eq(#native.logs, 0, "native private errors and names must never be logged")
 	end, debug.traceback)
 	_G.hs, io.open, os.getenv = old_hs, old_open, old_getenv

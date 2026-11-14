@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local TomlReader = require("infra.toml.reader")
 local Languages = require("hotstrings.engine.languages")
 local Extensions = require("hotstrings.engine.extensions")
@@ -288,7 +288,7 @@ local function fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	package.loaded["ui.menu.hotstrings_scope"] = nil
 	package.loaded["ui.menu.scoped_preferences"] = nil
 	local prefs = helpers.load_with_stubs("infra.preferences")
@@ -916,7 +916,7 @@ end)
 helpers.describe("Hotstrings refused secondary publication receipt", function()
 	helpers.it("retains unadopted native debt and external conflicts until the exact inverse settles", function()
 		local f = fixture()
-		local fs = package.loaded["adapters.file_system"]
+		local fs = package.loaded["core.fs.adapters.file_system"]
 		local original = fs.write_if_unchanged
 		local blocked, owed, releases = true, true, 0
 		fs.write_if_unchanged = function(path, content, source)

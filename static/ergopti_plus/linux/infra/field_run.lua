@@ -240,7 +240,7 @@ end
 --- @return table spec
 function M.load(shared_root, driver_root)
 	local function decode(path)
-		local handle = require("infra.regular_file_reader").open_source(path)
+		local handle = require("core.fs.engine.regular_file_reader").open_source(path)
 		if not handle then error("field run: the declaration is unreadable: " .. path, 0) end
 		local read, text = pcall(handle.read, handle, "*a")
 		local closed, acknowledged = pcall(handle.close, handle)
@@ -824,7 +824,7 @@ M.Session = Session
 --- @return table ports
 local function native_ports()
 	local uv = require("luv")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local function timer(ms, fn)
 		local handle = uv.new_timer()
 		handle:start(math.max(0, math.floor(ms)), 0, function()
@@ -881,7 +881,7 @@ end
 function M.start(opts)
 	Logger.start(LOG, "Starting the field run session…")
 	local ok, session_or_err = pcall(function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local spec = opts.spec
 		if spec == nil then
 			local shared = Paths.shared_root()

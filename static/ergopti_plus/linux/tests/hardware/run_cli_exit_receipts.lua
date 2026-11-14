@@ -14,7 +14,7 @@ ffi.cdef[[
 assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "native fixture requires Linux child-subreaper support")
 local Shell = require("adapters.shell_runner")
 local Http = require("adapters.http_client")
-local Digest = require("adapters.file_digest")
+local Digest = require("core.fs.adapters.file_digest")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-cli-exits-XXXXXX"))
 local previous_path = assert(uv.os_getenv("PATH"))
 local previous_mode = uv.os_getenv("ERGOPTI_NATIVE_EXIT_RECEIPT")

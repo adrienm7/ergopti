@@ -13,7 +13,7 @@ local fixture = require("tests.support.toml_output_fixture")
 --- @param mode string Callback or cleanup failure mode.
 local function check_cleanup(mode)
 	return helpers.with_stub_scope({
-		"infra.toml.writer", "adapters.file_system", "infra.fs_dir", "infra.logger",
+		"infra.toml.writer", "core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local writer = helpers.load_with_stubs("infra.toml.writer")

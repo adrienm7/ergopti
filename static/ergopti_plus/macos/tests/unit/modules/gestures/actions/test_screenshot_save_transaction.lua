@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
@@ -40,7 +40,7 @@ local function with_subject(options, scenario)
 	}
 	local modes = options or {}
 
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		expand_path = function(path)
 			if modes.home_throw then error("injected home resolution failure") end
 			if path == "~" then return modes.home or "/tmp/hs015-home" end

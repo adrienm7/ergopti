@@ -43,8 +43,8 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Reader = require("infra.toml.reader")
 local Priority = require("hotstrings.engine.priority")
-local Paths  = require("infra.paths")
-local NativeDirectory = require("infra.native_directory")
+local Paths  = require("core.fs.engine.paths")
+local NativeDirectory = require("core.fs.engine.native_directory")
 local CatalogueFiles = require("hotstrings.engine.catalogue.files")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local TableUtil = require("core.text.engine.table_util")
@@ -434,7 +434,7 @@ end
 --- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
 ---
 --- The walk is `find <dir> [-maxdepth N] -type f -name '*.toml'`, kept to the
---- byte and the order (infra/native_directory.lua), run in this process: a
+--- byte and the order (core/fs/engine/native_directory.lua), run in this process: a
 --- start used to fork find five times. Filenames keep every byte, newlines
 --- included, since no text framing sits between the kernel and the paths.
 --- @param dir string Absolute path to the root directory to scan.

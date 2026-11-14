@@ -22,9 +22,9 @@ local function with_window(test)
 			end,
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
-		package.loaded["infra.paths"] = { shared = function(path) return "/virtual/" .. path end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["modules.keymap"] = {}
 		package.loaded["infra.personal_hotstrings"] = { adoptions = function() return {} end }
 		package.loaded["infra.personal_file_controls"] = {
@@ -110,7 +110,7 @@ local function install_personal_binding(path, content)
 	local context = { record = record, binding = binding, captures = 0, applications = 0,
 		current = true, acknowledged = true }
 	binding.native.current = function() return context.current == true end
-	package.loaded["infra.fs_dir"] = { entries = function(candidate)
+	package.loaded["core.fs.engine.dir"] = { entries = function(candidate)
 		return candidate == root and { name } or {}
 	end }
 	package.loaded["infra.personal_hotstrings"] = {
@@ -128,7 +128,7 @@ local function install_personal_binding(path, content)
 				"a retained native binding may not change source identity or route")
 			context.applications = context.applications + 1
 			if context.current ~= true or context.acknowledged ~= true or record.admitted ~= true then return false end
-			local fs = package.loaded["adapters.file_system"]
+			local fs = package.loaded["core.fs.adapters.file_system"]
 			local ok, bytes, status = pcall(fs.read_with_status, native_path)
 			if not ok or status ~= "ok" or type(bytes) ~= "string" or bytes ~= record.content then return false end
 			local plan = require("hotstrings.engine.catalogue.personal_metadata").prepare(bytes, section, field, value)

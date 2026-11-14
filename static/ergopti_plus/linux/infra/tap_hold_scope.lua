@@ -59,7 +59,7 @@ local function import_layer(options, files)
 	local config_dir = assert(NativePath.dirname(options.tap_hold_path),
 		"tap-hold scope needs tap_hold.toml inside a configuration folder")
 	local ok, import, err = pcall(LayerPreset.import_if_absent, {
-		shared_root = options.shared_root or require("infra.paths").shared_root(),
+		shared_root = options.shared_root or require("core.fs.engine.paths").shared_root(),
 		config_dir = config_dir, toml_decode = Codec.decode, file_adapter = files,
 	})
 	if not ok then return nil, tostring(import) end
@@ -102,7 +102,7 @@ function M.new(options)
 	local loader = options.loader or require("platform.remap.tap_hold_loader")
 	local writer = options.writer or require("platform.remap.tap_hold_writer")
 	local parameters = options.parameters or require("modules.gestures.manager")
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local owner, held, legacy, source, layer = {}, false, {}, nil, nil
 	local layer_debt = false
 	local preset = loader.preset_keys(manager.defaults_path())

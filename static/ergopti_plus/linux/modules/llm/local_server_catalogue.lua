@@ -9,12 +9,12 @@
 
 local M = {}
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Logger = require("core.logger.engine.shim")
 local Policy = require("ai.engine.local_servers.auth")
 local PortPolicy = require("ai.engine.local_servers.ports_core")
 local Fingerprint = require("ai.engine.local_servers.fingerprint")
-local Reader = require("infra.regular_file_reader")
+local Reader = require("core.fs.engine.regular_file_reader")
 
 --- Reads only admitted regular sources whose read and close both acknowledge.
 --- A partial receipt cannot grant optional-auth capability to downstream callers.

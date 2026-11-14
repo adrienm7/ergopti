@@ -37,7 +37,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local Json = require("core.text.engine.json")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local ShellRunner = require("adapters.shell_runner")
 local Timer = require("core.events.timer_scheduler")
 local TextUtils = require("core.text.engine.utils_core")
@@ -106,7 +106,7 @@ end
 --- @return table snapshot
 local function config_snapshot()
 	local ConfigPaths = require("infra.config_paths")
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	local snapshot = { files = {}, settings = {}, runtime_keys = runtime_setting_keys() }
 	for _, key in ipairs(GUARDED_FILES) do
 		local path = ConfigPaths.get(key)
@@ -125,7 +125,7 @@ end
 --- @param snapshot table From config_snapshot().
 --- @return table outcome { restored = { names }, failed = { names }, reload = boolean }
 local function config_restore(snapshot)
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	local outcome = { restored = {}, failed = {}, reload = false }
 	local function note(ok, name)
 		local list = ok and outcome.restored or outcome.failed

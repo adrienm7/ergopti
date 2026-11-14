@@ -182,7 +182,7 @@ local function channel_corpus()
 	local handle = assert(io.open(helpers.shared("tests/corpus/menus/update_channel_rows.json"), "rb"))
 	local raw = handle:read("*a")
 	handle:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("macOS published About channel choices", function()
@@ -400,7 +400,7 @@ end
 helpers.describe("About version separator shared fragment (macOS)", function()
 	helpers.it("retains actual rendered version-separator-channel order", function()
 		local handle = assert(io.open(helpers.shared("tests/corpus/menus/about_version_separator.json"), "rb"))
-		local expected = assert(require("adapters.json_codec").decode(handle:read("*a"))); assert(handle:close())
+		local expected = assert(require("core.fs.adapters.json_codec").decode(handle:read("*a"))); assert(handle:close())
 		helpers.assert_eq(require("infra.manifest_menu").get_root()[expected.section], expected.rows)
 		local rows, labels = build((fake_owner("dev")))
 		helpers.assert_not_nil(rows[expected.version_index])

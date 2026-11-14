@@ -12,7 +12,7 @@ local function expect(value, message) assert(value, message) end
 local function test(name, body) helpers.it(name .. " (ollama-install)", body) end
 local Resolver = helpers.load_module_with_dependency("modules.llm.ollama_install_resolver", "luv", false)
 local Json, AppDirs = require("core.text.engine.json"), require("core.fs.engine.app_dirs")
-local source = assert(io.open(assert(require("infra.paths").shared("ai/data/ollama_release.json")), "rb"))
+local source = assert(io.open(assert(require("core.fs.engine.paths").shared("ai/data/ollama_release.json")), "rb"))
 local release_text = assert(source:read("*a")); assert(source:close())
 local function release() return assert(Json.decode_lossless(release_text)) end
 local catalogue = release()

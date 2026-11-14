@@ -17,13 +17,13 @@ local helpers = require("tests.helpers")
 local M = {}
 
 local MODULE_NAMES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.deferred_work",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
 	"infra.notifications",
-	"infra.paths",
+	"core.fs.engine.paths",
 	"infra.text_utils",
 	"infra.toml.codec",
 	"infra.toml.writer",
@@ -166,16 +166,16 @@ function M.with_finish(opts, scenario)
 	end
 	package.loaded["platform.remap.nav_layer"] = nav_stub
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.paths"] = { shared = opts.canonical_files and helpers.shared
+	package.loaded["core.fs.engine.paths"] = { shared = opts.canonical_files and helpers.shared
 		or function() return "/virtual/shared" end }
 	package.loaded["infra.text_utils"] = { applescript_format = string.format }
 	package.loaded["infra.toml.codec"] = { decode = function() return {} end }
-	package.loaded["adapters.file_system"] = opts.canonical_files or {
+	package.loaded["core.fs.adapters.file_system"] = opts.canonical_files or {
 		read_with_status = opts.read or function() return nil, "absent" end,
 	}
 	-- Additional actual inverse ports let receipt tests drive the shared writer.
 	for name, method in pairs(opts.native_files or {}) do
-		package.loaded["adapters.file_system"][name] = method
+		package.loaded["core.fs.adapters.file_system"][name] = method
 	end
 	package.loaded["infra.toml.writer"] = {
 		batch_write = function(path, rows, expected_source)

@@ -63,7 +63,7 @@ end)
 local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
 	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "infra.logger", "infra.i18n",
-	"infra.notifications", "modules.gestures.actions_aux_owner", "adapters.file_system", "adapters.clipboard",
+	"infra.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
 	"adapters.synthetic_input", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
 }
@@ -104,7 +104,7 @@ local function with_world(body)
 			is_paused = function() return world.paused == true end,
 		}
 		local temp_count = 0
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path)
 				local status = world.status[path] or "present"
 				return status, status == "present" and { size = world.reported_size or #(world.files[path] or "") } or nil

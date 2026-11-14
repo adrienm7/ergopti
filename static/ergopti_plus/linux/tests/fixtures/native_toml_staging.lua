@@ -18,16 +18,16 @@ local stage = entry == "portable" and path .. ".tmp" or require("infra.stage_own
 local searchpath = package.searchpath
 if entry == "portable" then
 	-- Exercise module absence independently of a native owner which refuses IO.
-	package.loaded["infra.regular_file_writer"] = nil
-	package.preload["infra.regular_file_writer"] = function() error("portable fixture has no native writer") end
+	package.loaded["core.fs.engine.regular_file_writer"] = nil
+	package.preload["core.fs.engine.regular_file_writer"] = function() error("portable fixture has no native writer") end
 	package.searchpath = function(name, ...)
-		if name == "infra.regular_file_writer" then return nil end
+		if name == "core.fs.engine.regular_file_writer" then return nil end
 		return searchpath(name, ...)
 	end
 end
 local Shell, Writer = require("adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
 package.searchpath = searchpath
-local adapter = entry == "adapter" and require("adapters.file_system") or nil
+local adapter = entry == "adapter" and require("core.fs.adapters.file_system") or nil
 local function run(command) assert(Shell.run(command)) end
 local function write(candidate, bytes)
 	local file = assert(io.open(candidate, "wb")); assert(file:write(bytes)); assert(file:close())

@@ -12,8 +12,8 @@
 local M = {}
 
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
-local Reader = require("infra.regular_file_reader")
+local Paths = require("core.fs.engine.paths")
+local Reader = require("core.fs.engine.regular_file_reader")
 
 local _headers = nil
 

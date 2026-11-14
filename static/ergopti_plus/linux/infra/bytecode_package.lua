@@ -66,7 +66,7 @@ end
 --- @param driver_dir string The driver directory as the daemon spells it.
 --- @return string|nil prefix "<shared root>/", nil when no shared tree is there.
 function M.shared_lua_prefix(driver_dir)
-	local shared = require("infra.paths").shared_root_from(driver_dir)
+	local shared = require("core.fs.engine.paths").shared_root_from(driver_dir)
 	return shared and shared .. "/" or nil
 end
 

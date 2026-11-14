@@ -433,7 +433,7 @@ const closureInputs = [
 	'static/ergopti_plus/linux/infra/managed_http_deadline.lua',
 	'static/ergopti_plus/linux/infra/native_timer.lua',
 	'static/ergopti_plus/linux/infra/monotonic.lua',
-	'static/ergopti_plus/linux/infra/paths.lua'
+	'static/ergopti_plus/linux/core/fs/engine/paths.lua'
 ];
 function closureRegistration(planner) {
 	for (const input of closureInputs)

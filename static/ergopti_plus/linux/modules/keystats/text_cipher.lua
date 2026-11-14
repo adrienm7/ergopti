@@ -74,7 +74,7 @@ local function machine_id_path()
 		and { _machine_id_override }
 		or { MACHINE_ID_PATH, MACHINE_ID_FALLBACK_PATH }
 	for _, path in ipairs(candidates) do
-		local opened, fh = pcall(require("infra.regular_file_reader").open_source, path)
+		local opened, fh = pcall(require("core.fs.engine.regular_file_reader").open_source, path)
 		if opened and fh then
 			local read_ok, first = pcall(fh.read, fh, "*l")
 			local close_ok, closed = pcall(fh.close, fh)

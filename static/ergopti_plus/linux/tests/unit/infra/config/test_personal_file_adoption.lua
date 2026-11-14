@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local path = helpers.load_module("infra.paths").shared("tests/corpus/hotstrings/personal_file_adoption.json")
+local path = helpers.load_module("core.fs.engine.paths").shared("tests/corpus/hotstrings/personal_file_adoption.json")
 local Json = require("core.text.engine.json")
 local file = assert(io.open(path, "r"))
 local content = assert(file:read("*a"))

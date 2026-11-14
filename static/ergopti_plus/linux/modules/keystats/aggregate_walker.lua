@@ -50,7 +50,7 @@ local MIN5_STEP_MINUTES = 5
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	return require("adapters.file_system").read(path)
+	return require("core.fs.adapters.file_system").read(path)
 end
 
 --- Validates the physical family against its actual provider registry.
@@ -74,7 +74,7 @@ end
 --- character, and that is what the hook resolved it against.
 --- @return table|nil
 local function finger_lookup(family)
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if not ok_paths then return nil end
 	local path = Paths.shared("layouts/data/keycodes/azerty.json")
 	if not path then return nil end

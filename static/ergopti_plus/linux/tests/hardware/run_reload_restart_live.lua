@@ -235,7 +235,7 @@ check(code == 1 and result.state == "refused" and result.reason == "refused",
 check(third ~= nil and result.driver_pid == third, "the refusal comes from the successor")
 
 -- 3. A successor ready past the record's deadline reports a timeout, never completed.
-local spec = require("core.text.engine.json").decode(read(require("infra.paths").shared("diagnostics/data/control/driver_control.json")))
+local spec = require("core.text.engine.json").decode(read(require("core.fs.engine.paths").shared("diagnostics/data/control/driver_control.json")))
 spec.pending_ttl_seconds = SHORT_TTL_SECONDS
 handle = assert(io.open(scratch .. "/short_ttl.json", "wb"))
 handle:write(require("core.text.engine.json").encode(spec))

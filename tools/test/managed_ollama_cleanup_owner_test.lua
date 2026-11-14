@@ -14,7 +14,7 @@ local function check(actual, expected)
 end
 local function with_owned(options, run)
 	options = options or {}
-	local names = { "adapters.managed_ollama_pull", "adapters.file_system", "core.crypto.crypto" }
+	local names = { "adapters.managed_ollama_pull", "core.fs.adapters.file_system", "core.crypto.crypto" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	package.loaded["adapters.managed_ollama_pull"] = nil
@@ -23,7 +23,7 @@ local function with_owned(options, run)
 	local directory_closes = 0
 	local refused, rmdir_refused, refuse_path, retry_mode, retry_path, removal_calls = false, false, nil, nil, nil, {}
 	local function write(path, raw) assert(files[path]); files[path].raw = raw end
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- No refused proxy sign-in left its receipt: the pull these cases own goes
 		-- ahead (modules/llm/proxy_relay_receipt.lua).
 		exists = function(path) return not path:find("proxy_relay_refusal", 1, true) end,

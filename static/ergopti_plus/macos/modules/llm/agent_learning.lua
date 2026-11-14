@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Local runtime state, not a preference: the map lives in the driver's
----    native-settings storage adapter (adapters/storage.lua), never in config.toml.
+---    native-settings storage adapter (core/fs/adapters/storage.lua), never in config.toml.
 --- 2. Loaded on first use, saved after a change once the changes settle (a
 ---    debounce), so a burst of dismissals writes once.
 --- 3. Bounded: at most MAX_APPS applications are kept; the one used least
@@ -20,7 +20,7 @@ local M = {}
 
 local LearningStore  = require("ai.engine.agent.learning_store")
 local Logger         = require("infra.logger")
-local Storage        = require("adapters.storage")
+local Storage        = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local TableUtil = require("core.text.engine.table_util")
 

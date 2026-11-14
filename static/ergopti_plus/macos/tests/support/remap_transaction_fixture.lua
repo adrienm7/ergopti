@@ -45,15 +45,15 @@ local OWNED_MODULES = {
 	"adapters.synthetic_input",
 	"modules.shortcuts.script_control",
 	"platform.remap.ke_variables",
-	"adapters.json_codec",
+	"core.fs.adapters.json_codec",
 	"adapters.shell_runner",
 	"infra.deferred_work",
 	"platform.remap.lease_contract",
 	"modules.keymap.layout",
-	"adapters.file_system",
-	"infra.fs_dir",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.dir",
 	"adapters.event_provenance",
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"platform.remap.managed_rule_removal",
 }
 
@@ -64,7 +64,7 @@ return function(run, dependencies)
 	local results = table.pack(xpcall(helpers.with_stub_scope, debug.traceback, OWNED_MODULES, function()
 		if dependencies ~= nil then
 			assert(type(dependencies) == "table" and type(dependencies.files) == "table", "fixture file port is required")
-			package.loaded["adapters.file_system"] = dependencies.files
+			package.loaded["core.fs.adapters.file_system"] = dependencies.files
 		end
 		local RealConfig = helpers.load_with_stubs("platform.remap.config")
 		-- This fixture models a Mac on the shared runtime: a file that names no

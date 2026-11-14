@@ -145,7 +145,7 @@ local function with_repeat(source, body)
 		Sandbox.with_config(source, function(path)
 			local controls = { legacy_writes = 0 }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function() return true end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
 			}

@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Reads one shared JSON file.
 --- @param relative string
@@ -31,7 +31,7 @@ end)
 
 helpers.describe("Linux local server catalogue fingerprints (local-server-fingerprint)", function()
 	helpers.it("reports an unreadable cloud catalogue before refusing local discovery", function()
-		local Reader, Logger = require("infra.regular_file_reader"), require("core.logger.engine.shim")
+		local Reader, Logger = require("core.fs.engine.regular_file_reader"), require("core.logger.engine.shim")
 		local open, report, errors = Reader.open_source, Logger.error, {}
 		Reader.open_source = function(path, ...)
 			if path:match("api_providers%.json$") then return nil end

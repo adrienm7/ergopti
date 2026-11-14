@@ -160,7 +160,7 @@ helpers.describe("Linux clipboard copy/paste bursts", function()
 		local db = os.tmpname()
 		local script = os.tmpname()
 		local handle = assert(io.open(script, "wb"))
-		local schema = assert(io.open(require("infra.paths").shared("metrics/data/db/schema.sql"), "rb"))
+		local schema = assert(io.open(require("core.fs.engine.paths").shared("metrics/data/db/schema.sql"), "rb"))
 		handle:write(".output /dev/null\n", schema:read("*a"), "\n.output stdout\n", table.concat(inserts, "\n"),
 			"\nSELECT kind || '|' || app || '|' || meta_json FROM events_clipboard ORDER BY id;\n")
 		schema:close()

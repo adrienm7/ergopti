@@ -35,7 +35,7 @@ helpers.describe("stream payload exact-file retirement", function()
   helpers.it("handles " .. scenario .. " after the child settles", function()
    fixture.with_fixture(function(native)
     local files = native.make_adapter()
-    package.loaded["adapters.file_system"] = files
+    package.loaded["core.fs.adapters.file_system"] = files
     package.loaded["modules.llm.stream_payload_cleanup"] = nil
     local cleanup = require("modules.llm.stream_payload_cleanup")
     local path = assert(os.tmpname())

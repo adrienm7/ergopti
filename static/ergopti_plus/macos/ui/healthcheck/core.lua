@@ -28,7 +28,7 @@ local M = {}
 local hs       = hs
 local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
-local Paths    = require("infra.paths")
+local Paths    = require("core.fs.engine.paths")
 local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
 local Actions  = require("diagnostics.engine.healthcheck.actions")
@@ -517,7 +517,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.file_system",
+		id       = "core.fs.adapters.file_system",
 		contract = { "read", "write", "exists", "prepare_parent_for_create" },
 		wired    = true,
 	},
@@ -528,18 +528,18 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.ledger_append",
+		id       = "core.fs.adapters.ledger_append",
 		contract = { "cleanup", "recover", "flush" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.write_lock_path",
+		id       = "core.fs.adapters.write_lock_path",
 		contract = { "for_canonical" },
 		-- Every cooperative publication and removal of adapters.file_system.
 		wired    = true,
 	},
 	{
-		id       = "adapters.legacy_folder_migration",
+		id       = "core.fs.adapters.legacy_folder_migration",
 		contract = { "native_ports", "plan", "rewrites", "run" },
 		-- init.lua moves the old folders once at boot, before paths.toml is read.
 		wired    = true,
@@ -577,7 +577,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.json_codec",
+		id       = "core.fs.adapters.json_codec",
 		contract = { "encode", "decode" },
 		wired    = true,
 	},
@@ -647,7 +647,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.storage",
+		id       = "core.fs.adapters.storage",
 		contract = { "get", "set" },
 		wired    = true,
 	},
@@ -706,7 +706,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.toml_cache",
+		id       = "core.fs.adapters.toml_cache",
 		contract = { "init", "load", "store", "stats" },
 		wired    = true,
 	},

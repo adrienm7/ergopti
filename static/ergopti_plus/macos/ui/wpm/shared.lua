@@ -29,7 +29,7 @@ local hs = hs
 -- =================================
 
 local Logger = require("infra.logger")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local TomlCodec = require("core.text.engine.toml_codec")
 local WPMModel = require("metrics.engine.wpm_widget_model")
 

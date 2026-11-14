@@ -24,8 +24,8 @@ local SHORTCUT_OWNERS = {
 	"menu.engine.native_presentation_core",
 	"infra.locale",
 	"core.i18n.engine.core",
-	"adapters.json_codec",
-	"infra.paths",
+	"core.fs.adapters.json_codec",
+	"core.fs.engine.paths",
 	"core.fs.engine.native_path",
 }
 

@@ -25,7 +25,7 @@ helpers.describe("metrics JavaScript delivery", function()
 					return chooser
 				end
 				package.loaded["infra.dialog_util"].text_prompt = function() return "button.ok", "1" end
-				package.loaded["adapters.file_system"].write_if_unchanged = function() return true end
+				package.loaded["core.fs.adapters.file_system"].write_if_unchanged = function() return true end
 				state.submit = function(self) if mode ~= "nil" then return self end end
 				helpers.assert_true(dashboard.prompt_category("Example", "Old", 0))
 				choose({ _kind = "pick", _value = "New" })

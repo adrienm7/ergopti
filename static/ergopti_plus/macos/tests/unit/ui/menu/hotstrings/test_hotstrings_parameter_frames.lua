@@ -18,8 +18,8 @@ local function with_frame(body, paused)
 		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode, i18n = translator,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator,
 			logger = require("infra.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
@@ -157,7 +157,7 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 	end)
 	helpers.it("restores exact genuine owners after a raised scenario", function()
 		local names = { "infra.i18n", "infra.manifest_menu", "modules.hotstrings.hotstrings_config",
-			"ui.menu.menu_hotstrings_management", "infra.paths" }
+			"ui.menu.menu_hotstrings_management", "core.fs.engine.paths" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local ok, err = pcall(function()
 			with_frame(function(f) assert(f.build()); error("parameter frame scenario sentinel", 0) end)

@@ -27,14 +27,14 @@ local _files = {}
 --- @return table shortcuts, table storage
 local function load_over_config(initial, writes_fail, chatgpt)
 	if not _displaced.held then
-		_displaced.storage = package.loaded["adapters.storage"]
+		_displaced.storage = package.loaded["core.fs.adapters.storage"]
 		_displaced.chatgpt = package.loaded["modules.shortcuts.chatgpt"]
 		_displaced.module = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		_displaced.paths = package.loaded["infra.config_paths"]
 		_displaced.held = true
 	end
 	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	package.loaded["adapters.storage"] = storage
+	package.loaded["core.fs.adapters.storage"] = storage
 	local path = os.tmpname()
 	_files[#_files + 1] = path
 	local lines = { "[shortcuts.keyboard]" }
@@ -66,7 +66,7 @@ end
 
 --- Puts back exactly what was there.
 local function drop_config()
-	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["core.fs.adapters.storage"] = _displaced.storage
 	package.loaded["modules.shortcuts.chatgpt"] = _displaced.chatgpt
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = _displaced.module
 	package.loaded["infra.config_paths"] = _displaced.paths

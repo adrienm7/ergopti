@@ -22,9 +22,9 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
 local LearningStore = require("ai.engine.agent.learning_store")
-local CorruptAside = require("infra.corrupt_aside")
-local RegularFileReader = require("infra.regular_file_reader")
-local RegularFileWriter = require("infra.regular_file_writer")
+local CorruptAside = require("core.fs.engine.corrupt_aside")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
+local RegularFileWriter = require("core.fs.engine.regular_file_writer")
 local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "modules.llm.agent_learning"

@@ -417,7 +417,7 @@ local _json_cache = {}
 local function shared_json(rel, lossless)
 	if _json_cache[rel] == nil then
 		local Json = require("core.text.engine.json")
-		local text = require("adapters.file_system").read(require("infra.paths").shared(rel))
+		local text = require("core.fs.adapters.file_system").read(require("core.fs.engine.paths").shared(rel))
 		if type(text) ~= "string" then error("layout_emulation: " .. rel .. " is unreadable") end
 		local decoded = lossless and Json.decode_lossless(text) or Json.decode(text)
 		if type(decoded) ~= "table" then error("layout_emulation: " .. rel .. " is not valid JSON") end
@@ -455,7 +455,7 @@ function M.start(ports)
 	M.init({
 		read_config = function()
 			local content, status, detail = require("core.text.engine.toml_codec.writer").read_classified(
-				require("infra.config_paths").get("ConfigTomlPath"), require("adapters.file_system"))
+				require("infra.config_paths").get("ConfigTomlPath"), require("core.fs.adapters.file_system"))
 			if status ~= "ok" and status ~= "absent" then error("config.toml is unreadable: " .. tostring(detail)) end
 			return require("core.text.engine.toml_codec").decode(content or "")
 		end,

@@ -29,7 +29,7 @@
 ---    public directory preparation loads its checked capture owner lazily, after
 ---    this module is available. mkdir quotes with the same POSIX idiom; a unit
 ---    test pins it against shell_runner.quote(). The retention purge
----    lists the folder in process through infra/native_directory.lua, which
+---    lists the folder in process through core/fs/engine/native_directory.lua, which
 ---    needs no logger.
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
 ---    says so; a broken handle degrades to stdout. The daemon must not die
@@ -69,7 +69,7 @@ local TextUtils = require("core.text.engine.utils_core")
 local AppDirs = require("core.fs.engine.app_dirs")
 local Redact = require("diagnostics.engine.reports.redact")
 local Json = require("core.text.engine.json")
-local NativeDirectory = require("infra.native_directory")
+local NativeDirectory = require("core.fs.engine.native_directory")
 
 --- Topical routing table generated from _shared/core/logger/data/sub_files.toml:
 --- an array of { name = "<file name>", patterns = { ... } }.
@@ -163,10 +163,10 @@ local function admit_redaction(supplied)
 	assert(type(context.home) == "string" and context.home ~= "", "logger_sink: privacy identity unavailable: HOME is not an absolute directory")
 	assert(type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable: no account name from USER, LOGNAME or the passwd entry")
 	local captured = { home = context.home, user = context.user, case_insensitive = false }
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local root = Paths.shared_root_from(Paths.driver_root())
 	assert(type(root) == "string" and root ~= "", "logger_sink: canonical privacy tree unavailable")
-	local file = require("infra.regular_file_reader").open_source(root .. "/diagnostics/data/redaction.json")
+	local file = require("core.fs.engine.regular_file_reader").open_source(root .. "/diagnostics/data/redaction.json")
 	assert(file, "logger_sink: canonical privacy policy unavailable")
 	local read_ok, raw = pcall(file.read, file, "*a")
 	local close_ok, closed = pcall(file.close, file)
@@ -323,7 +323,7 @@ end
 --- @param date string "YYYY-MM-DD" of the line about to be written.
 --- @return string "a" or "w".
 local function topical_mode(path, date)
-	local handle = require("infra.regular_file_reader").open_source(path)
+	local handle = require("core.fs.engine.regular_file_reader").open_source(path)
 	if not handle then return "a" end
 	local ok, first = pcall(handle.read, handle, "*l")
 	pcall(handle.close, handle)
@@ -354,10 +354,10 @@ local function open_handles(date)
 	close_topical()
 	_date = date
 	if not _dir then return end
-	_main_handle = require("infra.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	_main_handle = require("core.fs.engine.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
 	local errors_path = _dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT
 	local failure
-	_errors_handle, failure = require("infra.regular_file_writer").open(errors_path, "a")
+	_errors_handle, failure = require("core.fs.engine.regular_file_writer").open(errors_path, "a")
 	if _main_handle and not _errors_handle then report_mirror_refusal(errors_path, failure) end
 end
 
@@ -505,7 +505,7 @@ local function fan_out(line)
 			local handle = _topical[sub.name]
 			if not handle then
 				local path = _dir .. "/" .. sub.name
-				handle = require("infra.regular_file_writer").open(path, topical_mode(path, _date))
+				handle = require("core.fs.engine.regular_file_writer").open(path, topical_mode(path, _date))
 				if not handle then
 					pcall(function()
 						io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
@@ -645,7 +645,7 @@ function M.prepare_dir(dir)
 	if not created or not probe_path then
 		return false, "the logs folder '" .. dir .. "' is not writable"
 	end
-	local opened, probe = pcall(require("infra.regular_file_writer").open, probe_path, "a")
+	local opened, probe = pcall(require("core.fs.engine.regular_file_writer").open, probe_path, "a")
 	local wrote, accepted = false, false
 	local closed_ok, closed = false, false
 	if opened and probe then
@@ -679,9 +679,9 @@ function M.repoint()
 	-- Acquired descriptors may still work after their path becomes unwritable.
 	-- Keep them until the candidate is usable; reopening is not a rollback.
 	local date = today()
-	local main_ok, main = pcall(require("infra.regular_file_writer").open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local main_ok, main = pcall(require("core.fs.engine.regular_file_writer").open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
 	local errors_path = target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT
-	local errors_ok, errors, errors_failure = pcall(require("infra.regular_file_writer").open, errors_path, "a")
+	local errors_ok, errors, errors_failure = pcall(require("core.fs.engine.regular_file_writer").open, errors_path, "a")
 	if not main_ok or not main then
 		if errors_ok and errors then pcall(function() errors:close() end) end
 		return false, "the logs folder '" .. target .. "' is not writable"

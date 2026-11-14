@@ -33,7 +33,7 @@ _LLOPG_MethodBody(Src, Declaration) {
 }
 
 _LLOPG_DispatcherOwnsPhysicalIntentGeneration() {
-	DispatcherSrc := _DriverDirConcat("infra")
+	DispatcherSrc := _DriverDirsConcat("infra", "core/fs/engine")
 	KeyDown := _LLOPG_MethodBody(DispatcherSrc, "static _OnKeyDown(")
 	KeyUp := _LLOPG_MethodBody(DispatcherSrc, "static _OnKeyUp(")
 	Assert(KeyDown != "" and KeyUp != "",

@@ -48,9 +48,9 @@ local _send_vocabulary = nil
 --- @return table
 local function send_vocabulary()
 	if _send_vocabulary then return _send_vocabulary end
-	local path = require("infra.paths").shared("shortcuts/data/actions/send_keys.json")
-	local raw = require("adapters.file_system").read(path)
-	local decoded = raw and require("adapters.json_codec").decode(raw) or nil
+	local path = require("core.fs.engine.paths").shared("shortcuts/data/actions/send_keys.json")
+	local raw = require("core.fs.adapters.file_system").read(path)
+	local decoded = raw and require("core.fs.adapters.json_codec").decode(raw) or nil
 	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
 		error("layouts.engine.utils: the send-input vocabulary is unreadable at " .. tostring(path))
 	end

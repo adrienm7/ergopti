@@ -14,7 +14,7 @@ local Fakes = helpers.load_module("tests.fakes")
 
 local Installer = helpers.load_module("modules.updater.installer")
 
-local Fs = helpers.load_module("adapters.file_system")
+local Fs = helpers.load_module("core.fs.adapters.file_system")
 
 --- Authors native evidence for controlled responses independently of request options.
 --- Each literal endpoint names one fixture representation, including bodyless 304s.

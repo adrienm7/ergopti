@@ -85,7 +85,7 @@ helpers.describe("Registry zero-mapping warning", function()
 			["/virtual/main.toml"] = one_section("main"),
 			["/virtual/off.toml"] = one_section("hiya"),
 		}, function(Registry, _, infos)
-			local Storage = require("adapters.storage")
+			local Storage = require("core.fs.adapters.storage")
 			Storage.set(require("modules.keymap.section_keys").current("zq_private_off", "greetings"), false)
 			helpers.assert_eq(Registry.load_toml("zq_private_main", "/virtual/main.toml"), true)
 			helpers.assert_eq(Registry.load_toml("zq_private_off", "/virtual/off.toml"), true)

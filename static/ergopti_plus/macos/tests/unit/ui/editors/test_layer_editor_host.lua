@@ -78,7 +78,7 @@ end
 --- Loads a fresh editor with native doubles and runs one scenario.
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
-	local names = { "infra.logger", "infra.i18n", "infra.paths", "infra.config_paths", "adapters.file_system",
+	local names = { "infra.logger", "infra.i18n", "core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system",
 		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
 		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
 		"infra.notifications" }
@@ -97,7 +97,7 @@ local function with_editor(scenario)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared_root = function() return helpers.shared() end,
 			shared = function(rel) return helpers.shared(rel) end,
 		}
@@ -122,7 +122,7 @@ local function with_editor(scenario)
 			write_file(path, content)
 			return true
 		end
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				if world.read_error then return nil, "error", "read refused" end
 				local fh = io.open(path, "rb")

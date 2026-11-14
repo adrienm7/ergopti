@@ -18,14 +18,14 @@ local Fakes = helpers.load_module("tests.fakes")
 local function updater(version, stored)
 	local saved = {
 		version = package.loaded["infra.version"],
-		storage = package.loaded["adapters.storage"],
+		storage = package.loaded["core.fs.adapters.storage"],
 		manager = package.loaded["modules.updater.manager"],
-		fs = package.loaded["adapters.file_system"],
+		fs = package.loaded["core.fs.adapters.file_system"],
 	}
-	local fs = require("adapters.file_system")
+	local fs = require("core.fs.adapters.file_system")
 	local config_path = "/virtual/updater-channel-test.toml"
 	local configured = stored and stored["updater.channel"]
-	package.loaded["adapters.file_system"] = setmetatable({
+	package.loaded["core.fs.adapters.file_system"] = setmetatable({
 		exists = function(path)
 			if path == require("infra.config_paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
 			return fs.exists(path)
@@ -38,7 +38,7 @@ local function updater(version, stored)
 		end,
 	}, { __index = fs })
 	package.loaded["infra.version"] = { VERSION = version }
-	package.loaded["adapters.storage"] = Fakes.storage({ initial = stored or {} })
+	package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = stored or {} })
 	package.loaded["modules.updater.manager"] = nil
 	local M = require("modules.updater.manager")
 	-- The check's second source when the API gave no list: none here, never the network.
@@ -52,9 +52,9 @@ local function updater(version, stored)
 	local function restore()
 		M.stop_background_checks()
 		package.loaded["infra.version"] = saved.version
-		package.loaded["adapters.storage"] = saved.storage
+		package.loaded["core.fs.adapters.storage"] = saved.storage
 		package.loaded["modules.updater.manager"] = saved.manager
-		package.loaded["adapters.file_system"] = saved.fs
+		package.loaded["core.fs.adapters.file_system"] = saved.fs
 	end
 	return M, restore
 end

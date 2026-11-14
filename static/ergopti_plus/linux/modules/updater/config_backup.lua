@@ -25,11 +25,11 @@ local M = {}
 
 local Logger      = require("core.logger.engine.shim")
 local TokenStore  = require("modules.llm.api_token_store")
-local Paths       = require("infra.paths")
+local Paths       = require("core.fs.engine.paths")
 local ConfigPaths = require("infra.config_paths")
 local Json        = require("core.text.engine.json")
 local Shell       = require("adapters.shell_runner")
-local NativeDirectory = require("infra.native_directory")
+local NativeDirectory = require("core.fs.engine.native_directory")
 local Writer      = require("core.text.engine.toml_codec.writer")
 local Binding     = require("updater.engine.config_backup_binding")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
@@ -186,7 +186,7 @@ end
 
 local function default_roots()
 	local roots = { { id = "config", dir = ConfigPaths.get_config_dir() } }
-	local ok_storage, Storage = pcall(require, "adapters.storage")
+	local ok_storage, Storage = pcall(require, "core.fs.adapters.storage")
 	if not (ok_storage and type(Storage) == "table" and type(Storage.path) == "function") then
 		return nil, "settings store unavailable",
 			"Configuration backup refused: the settings store path is unknown."

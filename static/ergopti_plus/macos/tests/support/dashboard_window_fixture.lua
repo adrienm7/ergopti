@@ -13,7 +13,7 @@ local function with_window(module_name, callback)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "ui.ui_builder",
-			"infra.logger", "infra.paths", "infra.i18n", "infra.deferred_work",
+			"infra.logger", "core.fs.engine.paths", "infra.i18n", "infra.deferred_work",
 			"infra.dialog_util", "core.events.timer_scheduler", "modules.keystats.log_manager",
 		}, function()
 			local native = require("tests.stubs.hs")
@@ -26,7 +26,7 @@ local function with_window(module_name, callback)
 			native.webview.windowMasks = { titled = 1, closable = 2 }
 			local state = { deleted = 0 }
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
+			package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 			package.loaded["infra.i18n"] = {
 				get = function(key) return key end,
 				get_locale = function() return "en" end,

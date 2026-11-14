@@ -105,7 +105,7 @@ end
 function M.pinned_version()
 	local source = debug.getinfo(1, "S").source:sub(2)
 	local driver = assert(source:match("^(.*)/modules/llm/ollama_binary%.lua$"), "driver root unavailable")
-	local text, status = require("adapters.file_system").read_with_status(
+	local text, status = require("core.fs.adapters.file_system").read_with_status(
 		driver .. "/../_shared/ai/data/managed_ollama_runtime.json")
 	assert(status == "ok" and type(text) == "string", "managed Ollama runtime contract is unreadable")
 	local decoded = require("core.text.engine.json").decode(text)

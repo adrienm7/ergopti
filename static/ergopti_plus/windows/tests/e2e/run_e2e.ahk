@@ -115,7 +115,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 ; The number row (test_e2e_number_row.ahk): the modules the number-row hotkeys
 ; of modules/keymap/layout.ahk read and run, in run_all.ahk's order. None of
 ; them registers a hotkey at load; layout.ahk itself, which does, stays out.
-#Include ../../adapters/file_system.ahk
+#Include ../../core/fs/adapters/file_system.ahk
 #Include ../../infra/master_gates.ahk
 #Include ../../_generated/features_manifest.ahk
 #Include ../../infra/manifest_reader.ahk

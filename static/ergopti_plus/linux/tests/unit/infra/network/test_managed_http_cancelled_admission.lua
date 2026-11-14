@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local module = helpers.fresh_module("infra.managed_http")
 local policy_module = helpers.fresh_module("core.network.engine.proxy_policy_core")
 local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))

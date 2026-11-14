@@ -9,8 +9,8 @@ local helpers = require("tests.helpers")
 --- @param position table|nil Persisted coordinates keyed by storage setting.
 local function with_widget(callback, position)
 	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "ui.tooltip",
-		"modules.keystats", "infra.logger", "infra.paths", "infra.timings", "core.events.timer_scheduler",
-		"adapters.graphics_renderer", "adapters.storage" }, function()
+		"modules.keystats", "infra.logger", "core.fs.engine.paths", "infra.timings", "core.events.timer_scheduler",
+		"adapters.graphics_renderer", "core.fs.adapters.storage" }, function()
 		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false }
 		local function phase(name)
 			if state.on_phase then state.on_phase(name) end
@@ -23,8 +23,8 @@ local function with_widget(callback, position)
 			end
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = helpers.shared }
-		package.loaded["adapters.storage"] = { get = function(key) return position and position[key] end,
+		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
+		package.loaded["core.fs.adapters.storage"] = { get = function(key) return position and position[key] end,
 			set = function() end, delete = function() end }
 		package.loaded["modules.keystats"] = { get_live_stats = function()
 			phase("stats")

@@ -960,9 +960,9 @@ local function _read_app_geometry(app_name)
 	-- One resolver, no "try the other depth" dance. The alternate path this used
 	-- to fall back to was simply wrong; keeping both meant the correct one was
 	-- indistinguishable from a lucky guess.
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	local manifest_path = ok_paths and Paths.shared("ui/apps.manifest.json") or nil
-	local raw = manifest_path and require("infra.regular_file_reader").read_source(manifest_path) or nil
+	local raw = manifest_path and require("core.fs.engine.regular_file_reader").read_source(manifest_path) or nil
 	if not raw or raw == "" then return defaults end
 	local decoded, manifest = pcall(Json.decode, raw)
 	if not decoded or type(manifest) ~= "table" or type(manifest.apps) ~= "table" then return defaults end

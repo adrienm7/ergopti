@@ -20,7 +20,7 @@ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;'
   .. driver .. '/../_shared/?.lua;' .. driver .. '/../_shared/?/init.lua;' .. package.path
 require('core.lifecycle.engine.compat.utf8').install()
 local mode, database, resource = arg[1], arg[2], arg[3]
-local paths = require('infra.paths')
+local paths = require('core.fs.engine.paths')
 local shared = paths.shared
 if mode == 'schema_fifo' then
   paths.shared = function(name)

@@ -58,7 +58,7 @@ wrap_file:close()
 local function with_wrap_controls(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "infra.i18n", "infra.paths",
+		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "infra.i18n", "core.fs.engine.paths",
 		"infra.logger", "infra.dialog_util", "modules.shortcuts.actions.text",
 		"ui.menu.menu_utils", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader",
@@ -580,7 +580,7 @@ local function with_shortcut_presentation(language, scenario)
 		"ui.menu.menu_shortcuts", "infra.manifest_menu", "ui.menu.menu_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
 		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.renderer", "infra.logger",
-		"infra.dialog_util", "infra.paths", "modules.shortcuts", "menu.engine.row_dialect",
+		"infra.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
 	}
 	return helpers.with_fresh_modules(names, function()
 		helpers.load_with_stubs("infra.manifest_menu")
@@ -651,7 +651,7 @@ helpers.describe("complete declared Shortcut presentation", function()
 			with_shortcut_presentation(language, function(f)
 				local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 				local raw = assert(file:read("*a")); assert(file:close())
-				local hand = assert(require("adapters.json_codec").decode(raw))[language]
+				local hand = assert(require("core.fs.adapters.json_codec").decode(raw))[language]
 				local actual = assert(f.build())
 				local wrap = assert(shortcut_nested_row(actual.menu, hand.lua_wrap))
 				helpers.assert_true(type(wrap.menu) == "table" and #wrap.menu > 0)
@@ -679,7 +679,7 @@ helpers.describe("complete declared Shortcut presentation", function()
 			f.ctx.shortcuts.get_chatgpt_url = function() return active end
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 			local raw = assert(file:read("*a")); assert(file:close())
-			local hand = assert(require("adapters.json_codec").decode(raw)).en
+			local hand = assert(require("core.fs.adapters.json_codec").decode(raw)).en
 			local editor = assert(shortcut_nested_row(assert(f.build()).menu, hand.mac_url))
 			editor.fn()
 			helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.changed/")
@@ -695,7 +695,7 @@ helpers.describe("complete declared Shortcut presentation", function()
 			f.ctx.save_prefs = function() return false end
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 			local raw = assert(file:read("*a")); assert(file:close())
-			local hand = assert(require("adapters.json_codec").decode(raw)).en
+			local hand = assert(require("core.fs.adapters.json_codec").decode(raw)).en
 			local editor = assert(shortcut_nested_row(assert(f.build()).menu, hand.mac_url))
 			editor.fn()
 			helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.original/")

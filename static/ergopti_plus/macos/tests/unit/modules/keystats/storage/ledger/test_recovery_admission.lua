@@ -16,7 +16,7 @@ helpers.describe("durable ledger journal admission", function()
 			state.fault = "write nil"; manager.ingest_once(); state.fault = nil
 			state.outbox = ""
 			state.restart()
-			local ledger = require("adapters.ledger_append")
+			local ledger = require("core.fs.adapters.ledger_append")
 			assert(ledger.recover(state.path, ""))
 			assert(state.bytes() == state.prefix .. state.batch, "replay must see a complete canonical batch")
 			assert(state.journal().phase == "pending", "recovery cannot claim SQLite replay or clear")

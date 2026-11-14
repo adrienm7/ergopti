@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "modules.llm.agent_connectors", "adapters.shell_runner", "adapters.file_system", "infra.logger" }
+local MODULES = { "modules.llm.agent_connectors", "adapters.shell_runner", "core.fs.adapters.file_system", "infra.logger" }
 
 --- Loads the connectors over a fake process launcher and file system.
 --- @param scenario function Receives (Connectors, world).
@@ -38,7 +38,7 @@ local function with_connectors(scenario)
 			end,
 			open = function(target) world.opens[#world.opens + 1] = target; return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function()
 				world.next_file = world.next_file + 1
 				local path = "/private/tmp/lua_agent" .. world.next_file

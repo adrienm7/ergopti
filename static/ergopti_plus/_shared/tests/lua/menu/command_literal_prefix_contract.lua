@@ -12,7 +12,7 @@ local function read(path)
 end
 
 local function with_commands(driver, language, body)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local corpus = assert(Json.decode(read(Paths.shared("tests/corpus/menus/command_literal_prefixes.json"))))
 	local captions = assert(Json.decode(read(Paths.shared("core/i18n/data/locales/" .. language .. ".json"))))
 	local path = os.tmpname()

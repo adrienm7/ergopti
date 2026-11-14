@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local shared = require("infra.paths").shared
+local shared = require("core.fs.engine.paths").shared
 
 require("tests.lua.layouts.xkb_converter_contract").register(helpers, {
 	vectors = shared("tests/corpus/keylayout/xkb_conversion_vectors.json"),

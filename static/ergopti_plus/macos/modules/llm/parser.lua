@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local Shared = require("ai.engine.api.parser_core")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 
 -- Re-export the shared surface by delegation; only process_prediction is wrapped
 -- to inject the OS-specific word limits. strip_thinking / split_blocks resolve

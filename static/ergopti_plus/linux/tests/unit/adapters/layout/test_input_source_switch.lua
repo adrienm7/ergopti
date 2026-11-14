@@ -153,7 +153,7 @@ end)
 
 helpers.describe("input source switch: switcher", function()
 	helpers.it("linux-x11-active-group: waits for owned group acknowledgement and retirement", function()
-		local names = { "adapters.owned_process", "luv", "infra.paths", "_generated.native_runtime" }
+		local names = { "adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
 		local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
 		local calls = {}
 		package.loaded["adapters.owned_process"] = { start = function(program, args, options, callback)
@@ -161,7 +161,7 @@ helpers.describe("input source switch: switcher", function()
 			return { started = false, error = "dispatch refused until retired" }
 		end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
-		package.loaded["infra.paths"] = { driver_root = function() return "/literal?root" end }
+		package.loaded["core.fs.engine.paths"] = { driver_root = function() return "/literal?root" end }
 		package.loaded["_generated.native_runtime"] = { x11 = "libX11-test.so.9" }
 		local port = Switch.native_port()
 		local received = {}
@@ -202,29 +202,29 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-x11-active-group: worker setup errors complete as refusals", function()
-		local old_process, old_luv, old_paths = package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["infra.paths"]
+		local old_process, old_luv, old_paths = package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"]
 		local done
 		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback) done = callback; return {} end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
-		package.loaded["infra.paths"] = { driver_root = function() error("unavailable") end }
+		package.loaded["core.fs.engine.paths"] = { driver_root = function() error("unavailable") end }
 		local port = Switch.native_port()
 		local result
 		port.run("setxkbmap", { "-layout", "fr" }, function(value) result = value end)
 		done({ ok = true })
 		helpers.assert_eq(result.ok, false)
 		helpers.assert_eq(result.error, "X11 group worker could not start")
-		package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["infra.paths"] = old_process, old_luv, old_paths
+		package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"] = old_process, old_luv, old_paths
 	end)
 
 	helpers.it("linux-x11-active-group: invalid declared soname never reaches a worker", function()
-		local names = { "adapters.owned_process", "luv", "infra.paths", "_generated.native_runtime" }
+		local names = { "adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
 		local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
 		local calls, done = 0, nil
 		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
 			calls = calls + 1; done = callback; return {}
 		end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
-		package.loaded["infra.paths"] = { driver_root = function() return "/driver" end }
+		package.loaded["core.fs.engine.paths"] = { driver_root = function() return "/driver" end }
 		package.loaded["_generated.native_runtime"] = { x11 = "../unexpected.so" }
 		local port, result = Switch.native_port(), nil
 		port.run("setxkbmap", { "-layout", "fr" }, function(value) result = value end)

@@ -10,4 +10,4 @@
 local helpers = require("tests.helpers")
 
 require("tests.lua.metrics.queries_contract").register(helpers,
-	require("infra.paths").shared("tests/corpus/keystats/write_query_vectors.json"))
+	require("core.fs.engine.paths").shared("tests/corpus/keystats/write_query_vectors.json"))

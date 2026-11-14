@@ -13,9 +13,9 @@ local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.http_client",
-	"adapters.json_codec",
+	"core.fs.adapters.json_codec",
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"infra.config_paths",
@@ -53,7 +53,7 @@ local function with_fixture(run)
 			return secure_path
 		end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		classify_no_follow = function(path)
 			effects.classifications = effects.classifications + 1
 			helpers.assert_eq(path, secure_path)
@@ -68,7 +68,7 @@ local function with_fixture(run)
 		end,
 	}
 	package.loaded["adapters.http_client"] = { new = function() return {} end }
-	package.loaded["adapters.json_codec"] = {
+	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function() return "{}" end,
 		decode = function() return {} end,
 	}

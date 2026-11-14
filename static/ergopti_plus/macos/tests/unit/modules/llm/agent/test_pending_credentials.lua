@@ -37,7 +37,7 @@ local function with_agent(options, scenario)
 				{ id = "board", provider = "backboard", token = "keychain:board" },
 				{ id = "decision", provider = "typesafe", token = "keychain:decision" },
 			})
-			local codec = require("adapters.json_codec")
+			local codec = require("core.fs.adapters.json_codec")
 			local encode = codec.encode
 			codec.encode = function(body)
 				if world.on_encode then world.on_encode(body) end

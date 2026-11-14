@@ -1097,7 +1097,7 @@ end)
 
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
 			"infra.config_paths", "adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -1107,7 +1107,7 @@ helpers.describe("field run ports: configuration guard", function()
 			package.loaded["infra.config_paths"] = { get = function(key)
 				return key == "ConfigTomlPath" and "/cfg/config.toml" or ("/cfg/" .. key)
 			end }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					if files[path] == nil then return nil, "absent" end
 					return files[path], "ok"
@@ -1115,7 +1115,7 @@ helpers.describe("field run ports: configuration guard", function()
 				write = function(path, text) files[path] = text; return true end,
 				delete = function(path) files[path] = nil; return true end,
 			}
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				keys = function()
 					local keys = {}
 					for key in pairs(settings) do keys[#keys + 1] = key end
@@ -1155,18 +1155,18 @@ end)
 
 helpers.describe("field run ports: configuration guard and runtime state", function()
 	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
 			"infra.config_paths", "adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.config_paths"] = { get = function(key) return "/cfg/" .. key end }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 				write = function() return true end,
 				delete = function() return true end,
 			}
 			local settings = { ["karabiner.used_tokens.v1"] = { "t1" }, llm_backend = "ollama" }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				keys = function()
 					local keys = {}
 					for key in pairs(settings) do keys[#keys + 1] = key end
@@ -1200,8 +1200,8 @@ helpers.describe("field run ports: the MLX model step", function()
 	--- @param write_ok boolean|nil False makes putting the file back fail.
 	--- @return table outcome { verdict, codes, files }
 	local function run_mlx_model(initial, write_ok)
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "infra.config_paths",
-			"adapters.shell_runner", "core.events.timer_scheduler", "infra.paths", "infra.field_run",
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "infra.config_paths",
+			"adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run",
 			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
 		local outcome = {}
 		helpers.with_stub_scope(stubbed, function()
@@ -1212,7 +1212,7 @@ helpers.describe("field run ports: the MLX model step", function()
 				assert(key == "MlxActiveModelPath", "only the active-model path is asked for")
 				return active
 			end }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read = function(path) return files[path] end,
 				read_with_status = function(path)
 					if files[path] == nil then return nil, "absent" end
@@ -1227,7 +1227,7 @@ helpers.describe("field run ports: the MLX model step", function()
 			}
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
 			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
-			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["core.fs.engine.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
 			package.loaded["infra.field_run"] = {
 				smallest_model = function() return { name = "LFM2.5-350M", download_gb = 0.38 } end,
 			}
@@ -1284,19 +1284,19 @@ end)
 
 helpers.describe("field run ports: Ollama model step", function()
 	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.shell_runner",
-			"core.events.timer_scheduler", "infra.paths", "infra.field_run", "modules.llm.ollama_binary",
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "adapters.shell_runner",
+			"core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run", "modules.llm.ollama_binary",
 			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.file_system"] = { read = function() return "{}" end }
+			package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
 			local timers = 0
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function(_, callback) timers = timers + 1; callback() end,
 				cancel = function() end,
 			}
-			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["core.fs.engine.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
 			package.loaded["infra.field_run"] = {
 				smallest_model = function() return { name = "Granite", runtime_name = "granite4:350m-h", download_gb = 0.36 } end,
 			}

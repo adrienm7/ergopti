@@ -57,9 +57,9 @@ end
 --- @return table|nil rows Sorted "NAME=value" entries.
 --- @return string|nil reason Classified refusal.
 function M.load()
-	local path = require("infra.paths").shared(SOURCE)
+	local path = require("core.fs.engine.paths").shared(SOURCE)
 	if not path then return nil, "managed_environment_unreadable" end
-	local acquired, file = pcall(require("infra.regular_file_reader").open_source, path)
+	local acquired, file = pcall(require("core.fs.engine.regular_file_reader").open_source, path)
 	if not acquired or not file then return nil, "managed_environment_unreadable" end
 	local read, data = pcall(file.read, file, MAXIMUM_BYTES + 1)
 	local closed, acknowledged = pcall(file.close, file)

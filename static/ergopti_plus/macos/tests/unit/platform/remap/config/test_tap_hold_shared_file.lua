@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger",
+local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.logger",
 	"core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }
 local CORPUS = helpers.shared() .. "/tests/corpus/tap_hold_shared_file/"
 -- The pairs of the corpus, each <name>.toml and <name>.config.toml.
@@ -61,7 +61,7 @@ local function with_folder(body)
 		os.remove(dir)
 		assert(os.execute('mkdir "' .. dir .. '"'))
 		local path = dir .. "/tap_hold.toml"
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local native_write = files.write_if_unchanged
 		-- The source fence is the writer's own; the fixture publishes the
 		-- candidate over the unchanged source it was given.
@@ -72,7 +72,7 @@ local function with_folder(body)
 			write(destination, content)
 			return true
 		end
-		local Json = require("adapters.json_codec")
+		local Json = require("core.fs.adapters.json_codec")
 		local data = helpers.driver_root() .. "/platform/remap/data/"
 		local keys = Json.decode(read(data .. "tap_hold_keys.json"))
 		local combos = Json.decode(read(data .. "mod_combos.json"))

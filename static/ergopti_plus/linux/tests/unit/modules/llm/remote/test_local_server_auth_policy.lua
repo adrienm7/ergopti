@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Policy = require("ai.engine.local_servers.auth")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Reads the independent shared fixture without deriving its expected verdicts.
 --- @param relative string

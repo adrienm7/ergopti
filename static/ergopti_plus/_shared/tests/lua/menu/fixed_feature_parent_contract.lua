@@ -16,7 +16,7 @@ local function read_json(path)
 end
 
 local function with_actual_parent(driver, language, body)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local captions = read_json(Paths.shared("core/i18n/data/locales/" .. language .. ".json"))
 	local menu = assert(Renderer.new({platform = driver == "macos" and "hs" or "linux",
 		manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
@@ -37,7 +37,7 @@ local function receipts(state, total, present, reads)
 end
 
 function M.register(helpers, driver)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local oracle = read_json(Paths.shared("tests/corpus/menus/fixed_feature_parents.json"))
 	local platform = driver == "macos" and "hs" or "linux"
 	helpers.describe("canonical fixed feature parents (fixed-feature-parent-contract)", function()

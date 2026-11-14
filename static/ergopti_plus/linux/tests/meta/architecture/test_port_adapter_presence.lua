@@ -45,7 +45,7 @@ local ADAPTERS_DIR  = DRIVER_ROOT .. "/adapters"
 --- Derived from the filesystem, never from a hardcoded list: the list is what
 --- went stale last time — it named nine adapters while the driver had far more,
 --- so a new adapter joined without anything noticing.
---- @return table Array of module names, e.g. "adapters.file_system".
+--- @return table Array of module names, e.g. "core.fs.adapters.file_system".
 local function adapter_modules()
 	local names, seen = {}, {}
 

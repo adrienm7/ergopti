@@ -98,7 +98,7 @@ helpers.describe("native metrics fixture construction deadlines", function()
 				local uv = require("luv")
 				helpers.assert_eq(debug.getinfo(uv.fs_stat, "S").what, "C", "the actual native provider is required")
 				local native = require("tests.support.keystats_native_fixture")
-				local batch = require("infra.sqlite_batch_process")
+				local batch = require("core.fs.engine.sqlite_batch_process")
 				local original_start = assert(batch.start)
 				local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
 				local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-deadline-XXXXXX"))
@@ -163,7 +163,7 @@ helpers.describe("native metrics fixture retirement observation", function()
 	it("native-fixture-retirement: observes a real timed-out child until physical retirement", function()
 		local uv = require("luv")
 		local native = require("tests.support.keystats_native_fixture")
-		local batch = require("infra.sqlite_batch_process")
+		local batch = require("core.fs.engine.sqlite_batch_process")
 		local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
 		local original_spawn, original_timer_start, original_start = uv.spawn, uv.timer_start, batch.start
 		for _, name in ipairs({ "spawn", "timer_start", "run", "sleep", "new_check", "check_start", "walk" }) do
@@ -1507,7 +1507,7 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 
 	it("metrics-maintenance-vectors: the shared helper renders the shared tombstone and export name", function()
 		local Maintenance = require("metrics.engine.maintenance")
-		local handle = assert(io.open(require("infra.paths").shared(
+		local handle = assert(io.open(require("core.fs.engine.paths").shared(
 			"tests/corpus/keystats/metrics_maintenance_vectors.json"), "rb"))
 		local vectors = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()

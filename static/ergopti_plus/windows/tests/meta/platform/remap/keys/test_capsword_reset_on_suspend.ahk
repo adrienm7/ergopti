@@ -37,7 +37,7 @@
 ; ====================================================
 
 _CWRS_ReadLifecycleSrc() {
-	return _DriverDirConcat("infra")
+	return _DriverDirsConcat("infra", "core/fs/engine")
 }
 
 _CWRS_ReadCapswordSrc() {

@@ -6,7 +6,7 @@ local driver = assert(source:match("^(.*)/tests/fixtures/native_data_fifo_admiss
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
 	.. driver .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local original = Paths.shared
 Paths.shared = function(path)
 	if mode == "locale" and path == "data" then return root end

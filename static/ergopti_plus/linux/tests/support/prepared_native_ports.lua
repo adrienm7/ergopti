@@ -209,7 +209,7 @@ end
 --- @return table digest, table state
 local function fresh_digest(config)
 	local fake, state = fake_luv(config)
-	return load_against_fake("adapters.file_digest", fake), state
+	return load_against_fake("core.fs.adapters.file_digest", fake), state
 end
 
 

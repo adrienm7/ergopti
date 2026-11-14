@@ -1084,7 +1084,7 @@ reason_ahk = "platform_reason.action_executable_permission_is_unix"
 
 [sg_actions.open_terminal_here]
 # The folder of the active Finder or Explorer window, or on Linux of the
-# active Nautilus window (linux/adapters/file_manager_folder.lua: the window's
+# active Nautilus window (linux/core/fs/adapters/file_manager_folder.lua: the window's
 # own GTK object path keys Nautilus's FileManager1 OpenWindowsWithLocations).
 # Thunar and Dolphin publish no active folder: refused with their name.
 platform = "all"

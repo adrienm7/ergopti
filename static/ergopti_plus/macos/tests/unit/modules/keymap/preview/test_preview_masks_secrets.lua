@@ -98,7 +98,7 @@ helpers.describe("preview masking: the shared cross-driver vectors", function()
 	-- same way in CI as on a dev checkout, and so the cached declaration is this
 	-- test's, not one an earlier file happened to warm.
 	local Fields = helpers.load_with_stubs("infra.personal_info_fields")
-	local Paths  = require("infra.paths")
+	local Paths  = require("core.fs.engine.paths")
 	local Codec  = require("infra.toml.codec")
 	Fields._reset()
 

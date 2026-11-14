@@ -154,10 +154,10 @@ end)
 
 helpers.describe("magic key source: boot cost", function()
 	helpers.it("(magic-key-source) the automatic key is applied without reading the key registry", function()
-		helpers.with_fresh_modules({ "modules.keymap.magic_key_source", "adapters.file_system" }, function()
-			local real = require("adapters.file_system")
+		helpers.with_fresh_modules({ "modules.keymap.magic_key_source", "core.fs.adapters.file_system" }, function()
+			local real = require("core.fs.adapters.file_system")
 			local reads = 0
-			package.loaded["adapters.file_system"] = setmetatable({
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				read = function(path)
 					reads = reads + 1
 					return real.read(path)

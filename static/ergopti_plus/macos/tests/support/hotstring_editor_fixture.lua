@@ -25,12 +25,12 @@ local function with_editor(test)
 			end,
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
-		package.loaded["infra.paths"] = { shared = function(path) return "/virtual/" .. path end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.notifications"] = { notify = function()
 			state.notifications = state.notifications + 1
 		end }
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
+		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
 		package.loaded["infra.toml.reader"] = {
 			parse = function() return { sections_order = {}, sections = {} }, true end,
 		}

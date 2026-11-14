@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 local function runtime() return helpers.fresh_module("platform.network.pac_runtime") end
 

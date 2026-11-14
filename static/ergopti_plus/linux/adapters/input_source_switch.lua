@@ -681,7 +681,7 @@ function M.native_port()
 					return finish({ ok = false, error = "X11 group worker unavailable" })
 				end
 				local prepared, executable, arguments = pcall(function()
-					local Paths = require("infra.paths")
+					local Paths = require("core.fs.engine.paths")
 					local Runtime = require("_generated.native_runtime")
 					assert(type(Runtime.x11) == "string" and Runtime.x11:match("^[%w_+%.%-]+$"), "invalid X11 soname")
 					return uv.exepath(), {

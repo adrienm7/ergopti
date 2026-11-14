@@ -329,7 +329,7 @@ if (macSitesSeen === 0) {
 // their path owners already probe. Resolved from the real _shared directory.
 const LUA_DISCOVERY_OWNERS = [
 	'static/ergopti_plus/macos/infra/extension_packs.lua',
-	'static/ergopti_plus/linux/infra/paths.lua'
+	'static/ergopti_plus/linux/core/fs/engine/paths.lua'
 ];
 for (const rel of LUA_DISCOVERY_OWNERS) {
 	const src = read(rel);

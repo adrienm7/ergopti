@@ -15,7 +15,7 @@ local M = {}
 function M.register(helpers, count)
 	local Json = require("core.text.engine.json")
 	local RowOrder = require("menu.engine.row_order")
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menu/row_order_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menu/row_order_vectors.json"), "rb"))
 	local corpus = assert(Json.decode(file:read("*a")))
 	file:close()
 	assert(#corpus.sorts + #corpus.lists + #corpus.refusals == count, "row_order_vectors.json holds another number of vectors")

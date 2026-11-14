@@ -272,7 +272,7 @@ end
 --- @return table deps
 function M.production_deps()
 	local Json = require("core.text.engine.json")
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	return {
 		storage = { read_exact = Storage.read_exact, set = Storage.set, delete = Storage.delete },
 		is_live = function(keyboard_name)
