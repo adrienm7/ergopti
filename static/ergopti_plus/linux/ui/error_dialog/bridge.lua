@@ -85,7 +85,7 @@ local function cancel_action(session)
 end
 
 -- Seconds on a monotonic clock, replaceable by tests
-M.clock = function() return require("infra.monotonic").now_ms() / 1000 end
+M.clock = function() return require("core.logger.engine.monotonic").now_ms() / 1000 end
 
 -- Runs a callback later on the daemon's loop, replaceable by tests
 M.defer = function(fn, delay_ms) return require("core.events.loop").defer(fn, delay_ms) end

@@ -33,7 +33,7 @@ local LOG = "bridge.healthcheck"
 local Version = require("infra.version")
 local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 local Actions = require("diagnostics.engine.healthcheck.actions")
-local LoggerSink = require("infra.logger_sink")
+local LoggerSink = require("core.logger.engine.sink")
 
 M.DRIVER = "linux"
 
@@ -457,7 +457,7 @@ function M.configuration_context(schema, overrides)
 		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
 		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
-		clock    = overrides.clock or function() return require("infra.monotonic").now_ms() end,
+		clock    = overrides.clock or function() return require("core.logger.engine.monotonic").now_ms() end,
 	}
 end
 
@@ -557,7 +557,7 @@ end
 --- Milliseconds, for the collection's duration.
 --- @return number
 local function now_ms()
-	return require("infra.monotonic").now_ms()
+	return require("core.logger.engine.monotonic").now_ms()
 end
 
 --- Builds the synchronous (phase A) snapshot.

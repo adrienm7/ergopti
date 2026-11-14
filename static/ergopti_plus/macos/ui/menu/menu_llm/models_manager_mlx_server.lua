@@ -26,7 +26,7 @@ local M = {}
 
 local hs            = hs
 local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
 local ConfigPaths   = require("infra.config_paths")
 local text_utils    = require("infra.text_utils")

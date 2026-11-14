@@ -22,7 +22,7 @@
 
 local M = {}
 
-local Logger   = require("infra.logger")
+local Logger   = require("core.logger.engine.logger")
 local Manifest = require("infra.manifest_reader")
 local Policy   = require("keyboard.engine.caps_word_auto_off")
 local TableUtil = require("core.text.engine.table_util")

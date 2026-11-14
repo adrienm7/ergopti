@@ -29,7 +29,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local LOG = "adapters.x11_focus"
 

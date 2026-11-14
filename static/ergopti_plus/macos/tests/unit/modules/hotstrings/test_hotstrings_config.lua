@@ -14,8 +14,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Build a unique writable temp path (the module itself creates the file).
 --- @param name string A short discriminator so concurrent cases never collide.
@@ -249,7 +249,7 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 		local mod = fresh_module(override_path, function(category)
 			return category == "ext:demo:phrases" and extension_path or nil
 		end)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local saved, errors = Logger.error, 0
 		Logger.error = function() errors = errors + 1 end

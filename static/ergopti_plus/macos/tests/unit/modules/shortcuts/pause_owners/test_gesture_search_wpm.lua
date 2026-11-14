@@ -69,7 +69,7 @@ local function load_real_wpm_surface(module_name)
 			return true
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm = 0 } end,
 	}
@@ -150,7 +150,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		return "selected words"
 	end
 	hs_stub.pasteboard.writeAllData = function() return true end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 	package.loaded["adapters.synthetic_input"] = setmetatable({
 		emit_key_stroke = function() return true end,

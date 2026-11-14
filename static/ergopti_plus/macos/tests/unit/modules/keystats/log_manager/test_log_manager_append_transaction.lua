@@ -22,7 +22,7 @@ local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 local MUTATED_PACKAGE_SLOTS = {
 	"core.fs.adapters.file_system", "core.events.timer_scheduler",
 	"hs", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer",
-	"infra.logger", "infra.timings", "metrics.engine.metrics",
+	"core.logger.engine.logger", "infra.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
@@ -78,7 +78,7 @@ local function load_rotation_fixture(options)
 	package.loaded["modules.keystats.timestamp"] = {
 		now_ts = function() return "2026-08-13 12:00:00.000" end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local durable_lines = {}
 	local open_failures = options.open_failures or 0
@@ -150,13 +150,13 @@ local function load_log_manager_fixture(sink_failures, initialize)
 	for _, name in ipairs({
 		"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 		"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
-		"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
+		"modules.keystats.export", "metrics.engine.metrics", "core.logger.engine.logger",
 		"infra.timings", "core.events.timer_scheduler",
 		"modules.keystats.physical_accounting_mode",
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local appended, attempts = {}, {}
 	local controls = {}

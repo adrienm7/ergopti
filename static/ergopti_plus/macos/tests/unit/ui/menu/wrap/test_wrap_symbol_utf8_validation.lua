@@ -17,7 +17,7 @@ local function run_action(responses)
 	local result
 	helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.deferred_work",
 		"core.fs.engine.dir",
 		"infra.dialog_util",
@@ -34,7 +34,7 @@ local function run_action(responses)
 		local alerts = 0
 		local saves = 0
 		local updates = 0
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.dialog_util"] = {

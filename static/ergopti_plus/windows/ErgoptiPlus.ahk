@@ -290,7 +290,7 @@ else
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
 #Include core/lifecycle/engine/bundle.ahk
 Bundle_Init()
-; First of the retroactive boot stamps (infra/boot_profiler.ahk). Everything from
+; First of the retroactive boot stamps (core/logger/engine/boot_profiler.ahk). Everything from
 ; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
 ; number, so a slow start could be attributed to "pre-boot" and no further. A
 ; stamp only records a tick — the logger does not exist yet — and BootProfile_Begin
@@ -375,10 +375,10 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; of the builds before the single folder name (run by core/lifecycle/engine/boot.ahk).
 #Include infra/app_folders.ahk
 #Include infra/legacy_folder_migration.ahk
-#Include infra/tick_count.ahk
-#Include infra/wall_clock.ahk
-#Include infra/logger.ahk
-#Include infra/boot_profiler.ahk
+#Include core/logger/engine/tick_count.ahk
+#Include core/logger/engine/wall_clock.ahk
+#Include core/logger/engine/logger.ahk
+#Include core/logger/engine/boot_profiler.ahk
 #Include infra/startup_smoke.ahk
 #Include infra/diagnostic_snapshot.ahk
 #Include infra/issue_link.ahk
@@ -387,7 +387,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include infra/error_policy.ahk
 #Include infra/error_report.ahk
 #Include infra/hotpath_profiler.ahk
-#Include infra/perf_budget.ahk
+#Include core/logger/engine/perf_budget.ahk
 #Include infra/registry.ahk
 #Include core/lifecycle/engine/app_state.ahk
 BootProfile_Stamp("Diagnostics and core state initialised")
@@ -856,7 +856,7 @@ try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", DriverPid, bootScriptName)
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
-; diagnosed from the log alone (see infra/boot_profiler.ahk).
+; diagnosed from the log alone (see core/logger/engine/boot_profiler.ahk).
 BootProfile_Begin()
 HotPath_StartStatistics()
 ; The environment is logged FIRST, not only in the post-ready snapshot: a boot

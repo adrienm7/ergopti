@@ -129,7 +129,7 @@ helpers.describe("M-8: HS prompt_builder shim threads context_window_chars", fun
 		-- Load the HS shim with the real shared module (not a stub)
 		package.loaded["modules.llm.prompt_builder"] = nil
 		-- The shim requires "ai.engine.prediction.prompt_builder_core" which is already in package.loaded from above
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local ok_shim, ShimPB = pcall(require, "modules.llm.prompt_builder")
 		helpers.assert_true(ok_shim, "modules.llm.prompt_builder shim must be loadable")
 		helpers.assert_eq(type(ShimPB), "table", "and must be a table — the cases below index it")

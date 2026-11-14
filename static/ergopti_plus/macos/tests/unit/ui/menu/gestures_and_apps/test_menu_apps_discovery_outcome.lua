@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths", "core.fs.engine.dir",
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths", "core.fs.engine.dir",
 			"core.i18n.engine.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
 			"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
@@ -20,7 +20,7 @@ local function with_apps(callback)
 			logger.warn = function(_, message, ...)
 				state.warnings[#state.warnings + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/locales" end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
@@ -280,7 +280,7 @@ local function with_native_apps_parent(language, body)
 			"adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
 		end
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname()); assert(os.remove(scratch)); assert(hs.fs.mkdir(scratch))
 		assert(hs.fs.mkdir(scratch .. "/metrics"))
 		local ledger = assert(io.open(scratch .. "/metrics/karabiner_kc.log", "wb")); assert(ledger:close())
@@ -521,7 +521,7 @@ helpers.describe("Apps final logger publication fence", function()
 			with_native_apps_parent("fr", function(_, renderer, state, ctx)
 				local root, get_root = renderer.get_root(), renderer.get_root
 				local top = root.top_level
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				local done, final_calls, getter_throws = logger.done, 0, 0
 				local throwing = false
 				if mode == "getter_throw" then

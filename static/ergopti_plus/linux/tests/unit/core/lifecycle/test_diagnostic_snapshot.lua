@@ -323,11 +323,11 @@ describe("snapshot preparation before capture (snapshot-prepared-ready)", functi
 	it("snapshot-prepared-ready emits cached discovery with frozen boot time and whitelisted metadata", function()
 		with_prepared_snapshot(function(Collector, lines)
 			local frozen, reads, clock = false, 0, 100
-			local previous_profiler = package.loaded["infra.boot_profiler"]
-			local Profiler = helpers.load_module_with_dependency("infra.boot_profiler", "infra.monotonic", {
+			local previous_profiler = package.loaded["core.logger.engine.boot_profiler"]
+			local Profiler = helpers.load_module_with_dependency("core.logger.engine.boot_profiler", "core.logger.engine.monotonic", {
 				now_ms = function() return clock end,
 			})
-			package.loaded["infra.boot_profiler"] = previous_profiler
+			package.loaded["core.logger.engine.boot_profiler"] = previous_profiler
 			Profiler.begin()
 			local env = { read = function(path)
 				assert_true(not frozen, "ready emission must not perform another discovery read")

@@ -98,7 +98,7 @@ local function build(locale, catalogue)
 	package.loaded["core.i18n.engine.locale"] = { catalogue = function() return catalogue end }
 	package.loaded["core.i18n.engine.i18n"] = { get_locale = function() return locale end }
 	local builder = require("ui.ui_builder")
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	local original = logger.error
 	local errors = {}

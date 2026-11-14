@@ -11,8 +11,8 @@
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.toml_output_fixture")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local writer = helpers.load_with_stubs("infra.toml.writer")
 local reader = helpers.load_with_stubs("infra.toml.reader")
 

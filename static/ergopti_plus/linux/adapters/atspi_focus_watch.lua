@@ -10,7 +10,7 @@
 
 local M = {}
 local Json = require("core.text.engine.json")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local Timings = require("infra.timings")
 local OwnedProcess = require("adapters.owned_process")
 local Paths = require("core.fs.engine.paths")

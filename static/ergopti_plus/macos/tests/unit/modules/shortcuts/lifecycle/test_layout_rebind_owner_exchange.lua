@@ -103,7 +103,7 @@ local function load_subject(controls)
 		set_delivery_guard = function() return true end,
 	}
 	package.loaded["core.lifecycle.engine.startup_transaction"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts"] = nil
 	package.loaded["modules.shortcuts.init"] = nil
 	return require("modules.shortcuts"), state

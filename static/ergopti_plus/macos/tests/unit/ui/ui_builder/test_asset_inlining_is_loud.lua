@@ -38,7 +38,7 @@ local helpers = require("tests.helpers")
 local function build(dir, name)
 	package.loaded["ui.ui_builder"] = nil
 	local builder = require("ui.ui_builder")
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	local original = logger.error
 	local errors = {}

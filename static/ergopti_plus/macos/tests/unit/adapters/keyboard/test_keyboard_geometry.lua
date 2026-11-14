@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local MODULES = { "adapters.keyboard_geometry", "core.fs.adapters.json_codec", "infra.logger" }
+local MODULES = { "adapters.keyboard_geometry", "core.fs.adapters.json_codec", "core.logger.engine.logger" }
 local ENVIRONMENT = "ERGOPTI_KEYBOARD_GEOMETRY_V1"
 local PROPERTY = 42
 
@@ -35,7 +35,7 @@ local function with_geometry(value, callback, missing_property)
 		end }, eventtap = { event = { properties = {
 			keyboardEventKeyboardType = not missing_property and PROPERTY or nil,
 		} } } }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		os.getenv = function(key)
 			helpers.assert_eq(key, ENVIRONMENT)
 			state.environment = state.environment + 1

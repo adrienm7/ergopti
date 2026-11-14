@@ -7,7 +7,7 @@ local Json = require("core.text.engine.json")
 local Quote = require("core.text.engine.utils_core").shell_quote
 local M = {}
 local OWNERS = {
-	"tests.stubs.hs", "infra.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "core.fs.adapters.ledger_append",
+	"tests.stubs.hs", "core.logger.engine.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "core.fs.adapters.ledger_append",
 	"core.events.timer_scheduler", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator", "modules.keystats.export",
 	"hs.fs", "hs.timer", "hs.json", "hs.sqlite3",
@@ -66,7 +66,7 @@ function M.run(callback)
 			for _, name in ipairs({ "timer", "fs", "json", "sqlite3" }) do package.loaded["hs." .. name] = hs[name] end
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, format, ...) context.errors[#context.errors + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			context.files = require("core.fs.adapters.file_system")
 			package.loaded["modules.keystats.sqlite_writer"] = { init = function(options)
 				context.cache_path = options.paths.sqlite_path

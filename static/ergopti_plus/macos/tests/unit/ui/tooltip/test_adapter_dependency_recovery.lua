@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param callback function Receives the adapter and observed acquisition state.
 local function with_fixture(failed_name, callback)
 	local dependencies = { "ui.tooltip.renderer", "ui.tooltip" }
-	helpers.with_fresh_modules({ "adapters.tooltip_renderer", "infra.logger",
+	helpers.with_fresh_modules({ "adapters.tooltip_renderer", "core.logger.engine.logger",
 		"ui.tooltip.renderer", "ui.tooltip" }, function()
 		local state = { attempts = 0, calls = 0, errors = {} }
 		local function accepted() state.calls = state.calls + 1; return true end
@@ -37,7 +37,7 @@ local function with_fixture(failed_name, callback)
 		local ok, err = xpcall(function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...) state.errors[#state.errors + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["adapters.tooltip_renderer"] = nil
 			callback(require("adapters.tooltip_renderer"), state)
 		end, debug.traceback)

@@ -18,7 +18,7 @@ local hs = hs
 local Provenance = require("adapters.event_provenance")
 local Timer = require("core.events.timer_scheduler")
 local Broker = require("adapters.input_source_broker")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "adapters.physical_shortcut_hook"
 local CONSUMER = "shortcuts.physical"

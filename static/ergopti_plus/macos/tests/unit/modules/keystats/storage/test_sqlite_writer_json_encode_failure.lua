@@ -12,8 +12,8 @@
 local helpers = require("tests.helpers")
 
 -- lib.logger must load first so every subsequent require can resolve it.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local DEVICE_ID = "deadbeef-cafe-1234-5678-aabbccddeeff"
 

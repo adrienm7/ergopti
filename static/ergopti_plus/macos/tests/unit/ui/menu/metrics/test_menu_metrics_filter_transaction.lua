@@ -15,7 +15,7 @@ local MODULES = {
 	"infra.app_picker",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.manifest_menu",
 	"infra.text_utils",
@@ -96,7 +96,7 @@ local function with_filter(filter, options, callback)
 	end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		error = function(_, message, ...)
 			observations.errors[#observations.errors + 1] = string.format(message, ...)
 		end,

@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.dialog_util",
 	"infra.notifications",
@@ -49,7 +49,7 @@ local function with_fixture(spec, body)
 			end
 			return table.unpack(results, 1, results.n)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function()

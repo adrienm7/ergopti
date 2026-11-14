@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.synthetic_input", "infra.field_run_selftest", "modules.keymap.selftest_gate",
+	"core.logger.engine.logger", "adapters.synthetic_input", "infra.field_run_selftest", "modules.keymap.selftest_gate",
 }
 
 local SCRATCH_WINDOW = 4242
@@ -27,7 +27,7 @@ local function with_gate(world, body)
 		local log = { warns = {}, deferred = {} }
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, message, ...) log.warns[#log.warns + 1] = string.format(message, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.synthetic_input"] = {
 			defer_after_callback = function(_, fn)
 				if world.refuse_defer == "raise" then error("scheduler failed") end

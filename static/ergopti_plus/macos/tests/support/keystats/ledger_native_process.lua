@@ -40,7 +40,7 @@ return function()
 		package.loaded["core.fs.adapters.file_system"] = native.make_adapter(nil, nil, nil, require("lfs").link)
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.timings"] = { sec = function() return 5 end, ms = function() return 5000 end }
 		package.loaded["metrics.engine.metrics"] = {}
 		local aggregator = { get_ngram_ctx = function() return {} end }

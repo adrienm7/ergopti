@@ -26,7 +26,7 @@ local M = {}
 
 local hs      = hs
 local Parser  = require("modules.llm.parser")
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local i18n    = require("core.i18n.engine.i18n")
 local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
 local TextUtils = require("core.text.engine.utils_core")

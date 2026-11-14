@@ -58,7 +58,7 @@ local OWNERS = {
 	"keyboard.engine.desktop_navigation",
 	"infra.config_paths",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
 	"core.fs.engine.paths",
@@ -146,7 +146,7 @@ local function fresh_actions(options)
 		"adapters.key_state",
 		"adapters.synthetic_input",
 		"core.lifecycle.engine.shutdown.termination_coordinator",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"core.fs.engine.paths",
 		"infra.config_paths",
 		"infra.timings",
@@ -740,7 +740,7 @@ local function fresh_actions(options)
 			message = ok and rendered or tostring(message),
 		}
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 
 	local event_types = { rightMouseDown = 1, rightMouseUp = 2 }

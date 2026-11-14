@@ -145,7 +145,7 @@ end)
 --- ======================================
 
 helpers.describe("mlx_deps_checker public API", function()
-	local original_logger = package.loaded["infra.logger"]
+	local original_logger = package.loaded["core.logger.engine.logger"]
 	local original_window = package.loaded["ui.download_window"]
 	local original_paths = package.loaded["core.fs.engine.paths"]
 	local original_checker = package.loaded["modules.llm.mlx_deps_checker"]
@@ -160,7 +160,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		done = 0,
 	}
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		today_log_path = function() return "/tmp/ergopti_test.log" end,
 		start = function() calls.start = calls.start + 1 end,
 		debug = function() calls.debug = calls.debug + 1 end,
@@ -217,7 +217,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		helpers.assert_eq(checker.get_state(), "pending")
 	end)
 
-	package.loaded["infra.logger"] = original_logger
+	package.loaded["core.logger.engine.logger"] = original_logger
 	package.loaded["ui.download_window"] = original_window
 	package.loaded["core.fs.engine.paths"] = original_paths
 	package.loaded["modules.llm.mlx_deps_checker"] = original_checker

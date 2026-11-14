@@ -15,7 +15,7 @@ helpers.describe("healthcheck-memory-page-size", function()
 	--- @param snapshot table What vmStat returns.
 	--- @return table hardware, table system
 	local function collect(snapshot)
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		hs.host.vmStat = function() return snapshot end
 		package.loaded["ui.healthcheck.helpers"] = nil
 		local H = require("ui.healthcheck.helpers")

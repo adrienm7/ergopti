@@ -12,8 +12,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub lib.keycodes: actions/system.lua calls Keycodes.to_name(F18_WAKE_OS)
 -- at module level. The real implementation iterates hs.keycodes.map, which
@@ -638,7 +638,7 @@ end)
 helpers.describe("bindings effective URL snapshot", function()
 	helpers.it("keeps the configured conversation URL out of diagnostics", function()
 		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		local original, logs = logger.debug, {}
 		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
 		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"

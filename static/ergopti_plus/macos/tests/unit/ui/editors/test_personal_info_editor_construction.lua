@@ -25,7 +25,7 @@ local function with_editor(scenario)
 	for key, value in pairs(package.loaded) do loaded[key] = value end
 	local records = { views = {}, bridges = {}, deferred = {}, errors = {}, focuses = 0, saves = 0 }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function()
 				if records.on_info then records.on_info() end
 			end, warn = function() end,

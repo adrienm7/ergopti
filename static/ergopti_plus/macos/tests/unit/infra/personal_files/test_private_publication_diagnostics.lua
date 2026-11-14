@@ -5,13 +5,13 @@ local helpers = require("tests.helpers")
 local PRIVATE = "PRIVATE_PUBLICATION_ARGUMENT"
 
 local function with_preferences(body)
-	helpers.with_fresh_modules({ "infra.preferences", "infra.logger", "core.text.engine.toml_codec.writer", "core.fs.adapters.file_system" }, function()
+	helpers.with_fresh_modules({ "infra.preferences", "core.logger.engine.logger", "core.text.engine.toml_codec.writer", "core.fs.adapters.file_system" }, function()
 		local logs, categories = {}, {}
 		local logger = helpers.make_logger_stub()
 		for _, level in ipairs({ "error", "warn", "info", "debug" }) do
 			logger[level] = function(_, message, ...) logs[#logs + 1] = string.format(message, ...) end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local content = '[gestures]\naction_parameters = { retained = "unrelated" }\n'
 		local files = {
 			read_with_status = function() return content, "ok" end,
@@ -78,7 +78,7 @@ helpers.describe("private publication diagnostic ownership", function()
 			for _, level in ipairs({ "error", "warn", "info", "debug" }) do
 				logger[level] = function(_, message, ...) logs[#logs + 1] = string.format(message, ...) end
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			local path = os.tmpname():gsub("\\", "/")
 			assert(os.remove(path))
 			local adapter = fixture.make_adapter()
@@ -117,13 +117,13 @@ helpers.describe("private publication diagnostic ownership", function()
 	for _, private in ipairs({ true, false }) do
 		helpers.it("private-publication actual keyboard setter exception " .. (private and "is redacted" or "keeps ordinary details"), function()
 			helpers.with_fresh_modules({ "modules.shortcuts.keyboard_shortcuts", "modules.gestures.actions", "infra.config_paths",
-				"core.fs.engine.paths", "infra.preferences", "infra.logger", "core.text.engine.toml_codec.writer", "core.fs.adapters.file_system" }, function()
+				"core.fs.engine.paths", "infra.preferences", "core.logger.engine.logger", "core.text.engine.toml_codec.writer", "core.fs.adapters.file_system" }, function()
 				local logs, categories, unavailable = {}, {}, false
 				local logger = helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do
 					logger[level] = function(_, message, ...) logs[#logs + 1] = string.format(message, ...) end
 				end
-				package.loaded["infra.logger"] = logger
+				package.loaded["core.logger.engine.logger"] = logger
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				package.loaded["infra.config_paths"] = { get = function() return "config" end }
 				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }

@@ -28,7 +28,7 @@ local SelftestGate = require("modules.keymap.selftest_gate")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local Keycodes   = require("infra.keycodes")
 local Manifest   = require("infra.manifest_reader")
 local HotstringCore = require("infra.hotstring_engine")
@@ -43,10 +43,10 @@ local TerminatorReplay = require("modules.keymap.terminator_replay")
 local MagicKeySource = require("modules.keymap.magic_key_source")
 local LayoutEmulation = require("modules.keymap.layout_emulation")
 local Terminators = require("layouts.engine.layers.terminators")
-local Perf       = require("infra.perf")
+local Perf       = require("core.logger.engine.perf")
 local HotPath    = require("infra.hotpath_profiler")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
-local KeyEventHealth = require("infra.key_event_health")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 local UnicodeCarrier = require("adapters.unicode_carrier")
 local EventClock = require("core.events.clock")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
@@ -1358,7 +1358,7 @@ end
 
 -- ── Perf telemetry proxies ───────────────────────────────────────────────────
 -- Exposed on M so the Hammerspoon console can toggle sampling and read the
--- per-bucket p50/p99/max stats without having to `require("infra.perf")` by
+-- per-bucket p50/p99/max stats without having to `require("core.logger.engine.perf")` by
 -- hand. Sampling defaults to disabled so production typing pays no cost;
 -- `M.perf_enable(true)` arms it, `M.perf_report_all()` emits the summary.
 
@@ -2224,7 +2224,7 @@ end
 local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 
 --- Feeds one physical key event to the session's pairing counters
---- (infra/key_event_health.lua) and to the held keys synthetic text avoids
+--- (core/logger/engine/key_event_health.lua) and to the held keys synthetic text avoids
 --- (adapters/unicode_carrier.lua). Never changes what the key does: every read
 --- is protected and both only write tables.
 --- @param e table Physical keyDown or keyUp event.

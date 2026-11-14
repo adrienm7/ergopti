@@ -28,8 +28,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must load first.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- lib.i18n is required at module load time by export.lua. We provide a minimal
 -- stub that returns the key itself so tests are locale-independent.

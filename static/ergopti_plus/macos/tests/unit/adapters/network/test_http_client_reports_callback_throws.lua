@@ -37,15 +37,15 @@ local helpers = require("tests.helpers")
 helpers.describe("http_client: a throwing completion callback is logged, not swallowed", function()
 	helpers.it("reports the throw and contains it", function()
 		local errors = {}
-		package.loaded["infra.logger"] = nil
-		local real_logger = require("infra.logger")
+		package.loaded["core.logger.engine.logger"] = nil
+		local real_logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(real_logger)
 		local spy = setmetatable({}, { __index = real_logger })
 		spy.error = function(_mod, fmt, ...)
 			local ok, formatted = pcall(string.format, fmt, ...)
 			errors[#errors + 1] = ok and formatted or tostring(fmt)
 		end
-		package.loaded["infra.logger"] = spy
+		package.loaded["core.logger.engine.logger"] = spy
 
 		package.loaded["adapters.http_client"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
@@ -93,7 +93,7 @@ helpers.describe("http_client: a throwing completion callback is logged, not swa
 				.. "that never completed — no prediction, no error, nothing to search for. "
 				.. "Errors seen: " .. (#errors > 0 and table.concat(errors, " | ") or "(none)"))
 
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["adapters.http_client"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 	end)

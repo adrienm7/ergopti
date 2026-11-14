@@ -14,7 +14,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local json = require("hs.json")
 local fs = require("hs.fs")
 local LOG = "core.fs.adapters.ledger_append"
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local busy, lock_debt, publication_debt = false, nil, nil
 local JOURNAL_SUFFIX = ".append-journal.json"
 

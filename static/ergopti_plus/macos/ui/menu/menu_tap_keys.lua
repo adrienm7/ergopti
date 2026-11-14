@@ -21,7 +21,7 @@ local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
 local i18n              = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
-local Logger            = require("infra.logger")
+local Logger            = require("core.logger.engine.logger")
 local DeferredWork      = require("infra.deferred_work")
 local InputSourceBroker = require("adapters.input_source_broker")
 local ActionPicker      = require("ui.action_picker")

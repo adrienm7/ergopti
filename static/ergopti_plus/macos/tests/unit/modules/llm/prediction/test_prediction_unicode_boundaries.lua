@@ -14,7 +14,7 @@ local ApplyPrediction = require("tests.support.apply_prediction_fixture")
 helpers.describe("prediction Unicode boundaries", function()
 	for _, prefix in ipairs({ "...", "…", "• " }) do
 		helpers.it("still removes model padding " .. prefix .. " (unicode-padding)", function()
-			helpers.load_with_stubs("infra.logger")
+			helpers.load_with_stubs("core.logger.engine.logger")
 			local result = require("ai.engine.api.parser_core").process_prediction("hello", "hello",
 				prefix .. "completion...", { min_words = 1, max_words = 0 })
 			helpers.assert_not_nil(result)
@@ -23,7 +23,7 @@ helpers.describe("prediction Unicode boundaries", function()
 	end
 
 	helpers.it("accepts parsed Unicode through the real overlap and injection pipeline (unicode-padding)", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local prediction = require("ai.engine.api.parser_core").process_prediction("hello", "hello",
 			"TAIL_CORRECTED: hello\nNEXT_WORDS: € completion", { min_words = 1, max_words = 0 })
 		helpers.assert_not_nil(prediction)
@@ -46,7 +46,7 @@ helpers.describe("prediction Unicode boundaries", function()
 	for _, format in ipairs({ "plain", "advanced" }) do
 		for _, text in ipairs({ "— completion", "€ completion", "completion æ", "completion …!" }) do
 			helpers.it("preserves " .. format .. " boundary " .. text .. " (unicode-padding)", function()
-				helpers.load_with_stubs("infra.logger")
+				helpers.load_with_stubs("core.logger.engine.logger")
 				local parser = require("ai.engine.api.parser_core")
 				local block = format == "advanced" and "TAIL_CORRECTED: hello\nNEXT_WORDS: " .. text or text
 				local result = parser.process_prediction("hello", "hello", block, { min_words = 1, max_words = 0 })

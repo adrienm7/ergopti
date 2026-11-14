@@ -19,7 +19,7 @@ local LOGINWINDOW_PID = 449
 --- @return boolean askable Whether later readers may still ask the application.
 local function classify(refusal)
 	return helpers.with_stub_scope({ "adapters.secure_field_detector", "adapters.accessibility_permission",
-		"infra.logger", "hs", "tests.stubs.hs" }, function()
+		"core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
 		package.loaded["adapters.accessibility_permission"] = nil
 		local field = {
 			attributeValue = function(_, attribute)

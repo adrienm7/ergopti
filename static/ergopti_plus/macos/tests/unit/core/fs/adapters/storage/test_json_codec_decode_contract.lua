@@ -16,8 +16,8 @@ logger.error = function(_, format_string, ...)
 	logs[#logs + 1] = string.format(format_string, ...)
 end
 
-local previous_logger = package.loaded["infra.logger"]
-package.loaded["infra.logger"] = logger
+local previous_logger = package.loaded["core.logger.engine.logger"]
+package.loaded["core.logger.engine.logger"] = logger
 local JsonCodec = helpers.load_with_stubs("core.fs.adapters.json_codec", {
 	json = {
 		encode = function() return "{}" end,
@@ -30,7 +30,7 @@ local JsonCodec = helpers.load_with_stubs("core.fs.adapters.json_codec", {
 		end,
 	},
 })
-package.loaded["infra.logger"] = previous_logger
+package.loaded["core.logger.engine.logger"] = previous_logger
 
 local function pack(...)
 	return { n = select("#", ...), ... }

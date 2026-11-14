@@ -27,7 +27,7 @@
 
 local M = {}
 
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Paths      = require("core.fs.engine.paths")

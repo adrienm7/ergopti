@@ -25,7 +25,7 @@ local AZURE = {
 local MODULES = {
 	"modules.llm",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.dialog_util",
 	"infra.notifications",
 	"infra.manifest_menu",
@@ -80,7 +80,7 @@ local function run_add_fixture(provider, prompt_result)
 			end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			info = function() end,
 			warn = function() end,

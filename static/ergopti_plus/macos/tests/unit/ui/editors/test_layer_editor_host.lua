@@ -78,7 +78,7 @@ end
 --- Loads a fresh editor with native doubles and runs one scenario.
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
-	local names = { "infra.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system",
+	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system",
 		"ui.ui_builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
 		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
 		"infra.notifications" }
@@ -95,7 +95,7 @@ local function with_editor(scenario)
 				world.logs[#world.logs + 1] = level .. ": " .. (ok_fmt and text or tostring(message))
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = {
 			shared_root = function() return helpers.shared() end,

@@ -158,7 +158,7 @@ end)
 --- @param body function Receives menu finder, observed native calls and declaration.
 local function with_native_key_menu(configured, body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"core.i18n.engine.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		"core.i18n.engine.i18n", "core.logger.engine.logger", "ui.menu.menu_utils" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { calls = {}, refreshes = 0, receipt = true }
 		local native = remap_double()
@@ -327,7 +327,7 @@ local SLOT_CATALOGUE = {
 --- @param body function Receives the key's rows, the observations and the rebuild.
 local function with_slot_picker(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "core.i18n.engine.i18n",
-		"infra.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
+		"core.logger.engine.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0,
 			receipt = true, open_result = true }
@@ -471,7 +471,7 @@ end)
 --- rereads the native values; captured callbacks keep their original owners.
 local function with_delay_native(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"core.i18n.engine.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		"core.i18n.engine.i18n", "core.logger.engine.logger", "ui.menu.menu_utils" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local native = remap_double()
 		local observed = { value = 1500, receipt = true, calls = {}, refreshes = 0, regenerations = 0,
@@ -671,7 +671,7 @@ local SHIFT_PAIR = { id = "shift_pair", label = "Shift pair", group = "Shift",
 --- @param body function Receives the pair's slot rows and the observations.
 local function with_pair_picker(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "core.i18n.engine.i18n",
-		"infra.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
+		"core.logger.engine.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0, receipt = true }
 		package.loaded["ui.action_picker"] = {

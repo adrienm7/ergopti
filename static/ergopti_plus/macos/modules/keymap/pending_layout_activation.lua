@@ -20,7 +20,7 @@
 ---    reload, a logout and a reboot.
 --- ==============================================================================
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local TableUtil = require("core.text.engine.table_util")
 
 local M = {}

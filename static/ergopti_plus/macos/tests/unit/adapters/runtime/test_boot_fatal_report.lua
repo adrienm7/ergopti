@@ -23,7 +23,7 @@
 local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
-helpers.admit_logger_privacy(require("infra.logger"))
+helpers.admit_logger_privacy(require("core.logger.engine.logger"))
 package.loaded["adapters.boot_fatal"] = nil
 local BootFatal = require("adapters.boot_fatal")
 
@@ -173,7 +173,7 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 	end)
 
 	helpers.it("defaults to the logger's fallback boot log", function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		-- The default logs folder, beside launcher.log, never the shared /tmp root.
 		helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, Logger.FALLBACK_LOG_DIR .. "ErgoptiPlus_boot.log")
@@ -237,7 +237,7 @@ helpers.describe("fatal report canonical privacy", function()
 	end)
 
 	helpers.it("mac-fatal-privacy: only the exact closed admission failure is writable before privacy initialization", function()
-		helpers.with_stub_scope({ "infra.logger", "core.logger.engine", "adapters.boot_journal", "adapters.boot_fatal" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "core.logger.engine", "core.logger.adapters.boot_journal", "adapters.boot_fatal" }, function()
 			local Fresh = require("adapters.boot_fatal")
 			local opens = 0
 			local deps = { fallback_path = "/owned/boot", getenv = function() return "/owned/report" end,

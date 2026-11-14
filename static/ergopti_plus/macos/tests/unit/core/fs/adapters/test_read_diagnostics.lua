@@ -11,11 +11,11 @@ local helpers = require("tests.helpers")
 helpers.describe("FileSystem read diagnostic ownership", function()
 	for _, mode in ipairs({ "invalid_owner", "owner_throws" }) do
 		helpers.it("(read-owned-diagnostic) rejects " .. mode .. " visibly", function()
-			helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger" }, function()
+			helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
 				local messages, calls = {}, 0
 				local logger = helpers.make_logger_stub()
 				logger.error = function(_, message) messages[#messages + 1] = message end
-				package.loaded["infra.logger"] = logger
+				package.loaded["core.logger.engine.logger"] = logger
 				local adapter = require("core.fs.adapters.file_system")
 				local owner = function(category)
 					calls = calls + 1
@@ -37,13 +37,13 @@ helpers.describe("FileSystem read diagnostic ownership", function()
 		helpers.it("(read-owned-diagnostic) reports " .. mode .. " without exposing native details", function()
 			local previous_open, previous_hs = io.open, _G.hs
 			local ok, err = xpcall(function()
-				helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger" }, function()
+				helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
 					local messages, categories = {}, {}
 					local logger = helpers.make_logger_stub()
 					logger.error = function(_, message, ...)
 						messages[#messages + 1] = string.format(message, ...)
 					end
-					package.loaded["infra.logger"] = logger
+					package.loaded["core.logger.engine.logger"] = logger
 					local changed, opens, reads, closes, shell_calls = false, 0, 0, 0, 0
 					local adapter = helpers.load_with_stubs("core.fs.adapters.file_system", {
 						fs = { symlinkAttributes = function(path)

@@ -3,8 +3,8 @@
 --- Protects ordinary cleanup callbacks and private opaque publication receipts.
 local helpers = require("tests.helpers")
 local function with_writer(body)
-	helpers.with_fresh_modules({ "core.text.engine.toml_codec.writer", "infra.logger" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.with_fresh_modules({ "core.text.engine.toml_codec.writer", "core.logger.engine.logger" }, function()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		body(require("core.text.engine.toml_codec.writer"))
 	end)
 end
@@ -174,8 +174,8 @@ end)
 --- Runs an actual current-schema native file inside a fresh constructor cohort.
 --- @param body function Callback receiving Writer, source image, path and byte reader.
 local function with_current_native_source(body)
-	helpers.with_fresh_modules({ "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "core.fs.adapters.file_system", "infra.logger" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.with_fresh_modules({ "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local writer, engine = require("core.text.engine.toml_codec.writer"), require("settings.engine.migration.migrate")
 		local registry = assert(engine.load_registry(helpers.shared("settings/data/config_schema/migrations.toml")))
 		local path = os.tmpname()

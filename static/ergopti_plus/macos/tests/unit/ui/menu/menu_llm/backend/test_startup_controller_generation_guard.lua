@@ -385,8 +385,8 @@ helpers.describe("startup_controller: a declined model download turns the AI off
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, fmt, ...) logged.error[#logged.error + 1] = string.format(fmt, ...) end
 			logger.warn = function(_, fmt, ...) logged.warn[#logged.warn + 1] = string.format(fmt, ...) end
-			local previous_logger = package.loaded["infra.logger"]
-			package.loaded["infra.logger"] = logger
+			local previous_logger = package.loaded["core.logger.engine.logger"]
+			package.loaded["core.logger.engine.logger"] = logger
 			local ok, err = pcall(function()
 				local StartupCtrl, captured_timers = load_fresh_startup_controller()
 				local keymap = make_keymap_stub()
@@ -435,7 +435,7 @@ helpers.describe("startup_controller: a declined model download turns the AI off
 				helpers.assert_eq(logged.error, {}, "the deferred settlement completes without an error")
 				helpers.assert_true(saves >= 1, "the off state is saved once the task retired")
 			end)
-			package.loaded["infra.logger"] = previous_logger
+			package.loaded["core.logger.engine.logger"] = previous_logger
 			if not ok then error(err, 0) end
 		end)
 	end

@@ -18,7 +18,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
-	"infra.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "adapters.http_client",
+	"core.logger.engine.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "adapters.http_client",
 	"adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
@@ -27,7 +27,7 @@ local FIXTURE_MODULES = {
 local function with_probes(body)
 	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { timers = {}, requests = {}, tasks = {}, cancelled_requests = 0, terminated = 0, llm_on = false,
 			samplers = {}, stopped_samplers = 0, errors = {} }
 		local logger = helpers.make_logger_stub()
@@ -35,7 +35,7 @@ local function with_probes(body)
 			local ok, text = pcall(string.format, tostring(message), ...)
 			world.errors[#world.errors + 1] = ok and text or tostring(message)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		-- The callback form, which samples on its own timer; the blocking form
 		-- (no callback) is never what a probe may call. Restored on the same
 		-- table, whichever runtime the scope installed. Shaped like hs.host's

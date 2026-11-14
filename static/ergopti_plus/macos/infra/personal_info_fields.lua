@@ -27,7 +27,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Codec  = require("infra.toml.codec")
 local Mask   = require("hotstrings.engine.personal_info.mask")
 local Paths  = require("core.fs.engine.paths")

@@ -181,7 +181,7 @@ end
 -- =============================
 -- =============================
 
-package.loaded["infra.logger"] = helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 local scratch = os.tmpname()
 os.remove(scratch)
 assert(os.execute("mkdir -p '" .. scratch .. "/toml_cache'"), "cannot create the scratch directory")

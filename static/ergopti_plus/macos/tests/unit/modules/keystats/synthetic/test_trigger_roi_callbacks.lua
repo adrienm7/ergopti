@@ -31,7 +31,7 @@ local function fixture()
 		control.builders[#control.builders + 1] = builder
 		return true
 	end
-	package.loaded["infra.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
+	package.loaded["core.logger.engine.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
 	local source_path = os.tmpname()
 	assert(os.remove(source_path))
 	local _, source_status = require("infra.preferences").load(source_path)

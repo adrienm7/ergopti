@@ -25,9 +25,9 @@ local M = {}
 -- macOS driver. The macOS driver logger (ring buffer + file, read by the
 -- healthcheck diagnostic) is preferred when present so on-macOS routing is
 -- unchanged; otherwise the platform-neutral print shim takes over. A hard
--- require("infra.logger") here was the impurity that forced the Linux driver to
+-- require("core.logger.engine.logger") here was the impurity that forced the Linux driver to
 -- fork its own TOML parser (audit SS-2).
-local _ok_log, Logger = pcall(require, "infra.logger")
+local _ok_log, Logger = pcall(require, "core.logger.engine.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("core.logger.engine.shim")
 end

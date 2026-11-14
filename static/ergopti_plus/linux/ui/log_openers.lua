@@ -20,7 +20,7 @@
 local M = {}
 
 local Logger     = require("core.logger.engine.shim")
-local LoggerSink = require("infra.logger_sink")
+local LoggerSink = require("core.logger.engine.sink")
 local RegularFileReader = require("core.fs.engine.regular_file_reader")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 

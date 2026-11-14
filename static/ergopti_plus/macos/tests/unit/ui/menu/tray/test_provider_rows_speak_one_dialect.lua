@@ -24,10 +24,10 @@ local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 --- Builds the actual packaged About provider over controlled native effect ports.
 --- Shared declarations, decoding, row rendering and update consent remain real.
 local function with_declared_about_provider(offer, body)
-	helpers.with_stub_scope({"infra.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.logger",
+	helpers.with_stub_scope({"infra.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths", "core.logger.engine.logger",
 		"ui.menu.menu_about", "modules.updater", "adapters.update_launcher", "ui.update_check",
 		"ui.menu.start_at_login", "ui.changelog"}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local manifest = helpers.load_with_stubs("infra.manifest_menu")
 		local session = { offer = offer, opens = {}, requests = {} }
 		package.loaded["modules.updater"] = {

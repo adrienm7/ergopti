@@ -34,7 +34,7 @@ local MODULE_NAMES = {
 	"hs",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"infra.text_utils",
 	"platform.remap.ke_paths",
@@ -90,7 +90,7 @@ local function with_fixture(scenario)
 		block_alert = function() return "karabiner.onboarding.btn_open_settings" end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.notifications"] = {
 		notify = function(message, _, kind)
 			notices[#notices + 1] = { message = message, kind = kind }

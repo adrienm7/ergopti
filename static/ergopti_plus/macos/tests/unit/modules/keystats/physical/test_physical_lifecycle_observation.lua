@@ -8,7 +8,7 @@ local describe, it = helpers.describe, helpers.it
 local MODULE_NAMES = {
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"modules.keystats.context_tracker",
 	"modules.keystats.log_manager",
@@ -160,7 +160,7 @@ local function with_fixture(options, scenario)
 	_G.hs = hs_stub
 
 	local function noop() end
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		error = function(_, format_string, ...)
 			fixture.error_lines[#fixture.error_lines + 1] = string.format(format_string, ...)
@@ -541,7 +541,7 @@ end)
 
 local root_fixture = require("tests.unit.modules.keystats.lifecycle.test_activation_callback_fail_closed")
 local function with_root(options, scenario)
-	local names={"adapters.event_provenance","adapters.input_source_broker","adapters.keyboard_hook","adapters.physical_observation_clock","adapters.process_lifecycle","adapters.synthetic_input","infra.config_paths","infra.dialog_util","infra.logger","infra.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
+	local names={"adapters.event_provenance","adapters.input_source_broker","adapters.keyboard_hook","adapters.physical_observation_clock","adapters.process_lifecycle","adapters.synthetic_input","infra.config_paths","infra.dialog_util","core.logger.engine.logger","infra.manifest_reader","metrics.engine.capture.physical_lifecycle_observation","modules.keystats.context_tracker","modules.keystats.init","modules.keystats.kc_bridge","modules.keystats.log_manager","modules.keystats.watchers","modules.keymap"}
 	helpers.with_stub_scope(names,function()
 		local original=helpers.load_with_stubs
 		local records,owner,token,clock= {},{},nil,0

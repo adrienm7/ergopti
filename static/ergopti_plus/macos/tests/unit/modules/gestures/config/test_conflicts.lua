@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Earlier test files (karabiner layout polling) install a shell_runner stub
 -- without exec(); purge it so conflicts.lua captures the real adapter — the
@@ -84,7 +84,7 @@ local function load_with_macos_preferences(defaults_output)
 	local infos = {}
 	local commands = {}
 	package.loaded["modules.gestures.conflicts"] = nil
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug   = function() end,
 		info    = function(_, message, ...) table.insert(infos, string.format(message, ...)) end,
 		warn    = function(_, message) table.insert(warnings, message) end,
@@ -106,7 +106,7 @@ local function load_with_macos_preferences(defaults_output)
 	conflicts.refresh()
 	local function cleanup()
 		package.loaded["modules.gestures.conflicts"] = nil
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["adapters.shell_runner"] = nil
 	end
 	return conflicts, warnings, commands, cleanup, infos
@@ -395,7 +395,7 @@ helpers.describe("Conflicts — the macOS settings read is started", function()
 	helpers.it("starts every prepared read and greys the four-finger swipe macOS uses", function()
 		local started, pending = 0, {}
 		package.loaded["modules.gestures.conflicts"] = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(_, _, callback)
 				local settled = false
@@ -420,7 +420,7 @@ helpers.describe("Conflicts — the macOS settings read is started", function()
 		for _, finish in ipairs(pending) do finish() end
 		helpers.assert_eq(conflicts.slot_system_state("swipe_4_up"), "taken")
 		package.loaded["modules.gestures.conflicts"] = nil
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["adapters.shell_runner"] = nil
 	end)
 end)

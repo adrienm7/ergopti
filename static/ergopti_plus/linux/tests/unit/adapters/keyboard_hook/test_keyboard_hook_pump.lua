@@ -135,7 +135,7 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 
 	helpers.it("measures admitted physical modifier and CapsLock holds without generating text", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
-		local clock = require("infra.monotonic")
+		local clock = require("core.logger.engine.monotonic")
 		local previous, now, holds, characters, token = clock.now_ms, 100, {}, {}, {}
 		clock.now_ms = function() return now end
 		local ok, err = pcall(function()

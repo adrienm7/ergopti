@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "core.i18n.engine.i18n", "infra.field_check", "infra.field_check_checks", "ui.field_check" }
+local MODULES = { "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.field_check", "infra.field_check_checks", "ui.field_check" }
 
 --- A composer environment that completes every step, recording what it was asked.
 --- @param calls table Receives "save" / "remove".
@@ -56,7 +56,7 @@ local function with_window(composer_env, body)
 		local world = { notes = {}, alerts = {}, evidence = {} }
 		local logger = helpers.make_logger_stub()
 		logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		-- The label-value join is the locale's own template (common.label_value).
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key == "common.label_value" then return "{1} : {2}" end

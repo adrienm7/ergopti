@@ -27,8 +27,8 @@ helpers.assert_true(
 )
 
 -- Test 2: The split's historical end is the real previous calendar day.
-helpers.with_fresh_modules({ "modules.keystats.sqlite_reader", "infra.logger" }, function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+helpers.with_fresh_modules({ "modules.keystats.sqlite_reader", "core.logger.engine.logger" }, function()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader")
 	for today, yesterday in pairs({
 		["2026-01-01"] = "2025-12-31", ["2026-03-01"] = "2026-02-28", ["2028-03-01"] = "2028-02-29",

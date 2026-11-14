@@ -17,7 +17,7 @@ local function child()
   local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
- package.loaded['infra.logger'] = logger
+ package.loaded['core.logger.engine.logger'] = logger
  local case = assert(os.getenv('ERGOPTI_REBUILD_CASE'))
  local writer = { get_db = function() return db end, acquire_backup_source = function(owner) return owner == db end,
   release_backup_source = function() return true end, quarantine_db = function() return true end }

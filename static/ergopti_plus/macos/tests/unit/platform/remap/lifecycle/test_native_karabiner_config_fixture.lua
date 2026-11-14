@@ -21,10 +21,10 @@ local function observe(options)
 	local result = { builds = 0, deployments = 0, restores = 0, variants = {} }
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"core.fs.adapters.json_codec", "infra.logger", "platform.remap.config",
+			"core.fs.adapters.json_codec", "core.logger.engine.logger", "platform.remap.config",
 			"platform.remap.generator", "core.fs.adapters.file_system", "platform.remap.lease_controller",
 		}, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local Codec = helpers.load_with_stubs("core.fs.adapters.json_codec", {
 				configdir = "/private/unrelated-hammerspoon-loader",
 				processInfo = { processID = 7001, executablePath = "/private/test/Hammerspoon",

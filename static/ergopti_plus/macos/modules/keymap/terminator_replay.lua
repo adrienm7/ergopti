@@ -38,7 +38,7 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local TextSender     = require("adapters.text_sender")
 local TimerScheduler = require("core.events.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")

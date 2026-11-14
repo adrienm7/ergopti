@@ -39,7 +39,7 @@ local function load_fixture()
 		show_loading = function() return true end,
 		dismiss_silent = function() return true end,
 	}
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		error = function(_log, format, ...)
 			fixture.errors[#fixture.errors + 1] = string.format(tostring(format), ...)
 		end,

@@ -24,7 +24,7 @@ local function build_fixture(dialog_choice)
 	}
 	local runtime_profile = "basic"
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function()

@@ -13,7 +13,7 @@ local ROUTES = { "standard", "stacked", "loading", "prediction" }
 --- @param callback function Receives the facade, surface and route dispatcher.
 local function with_fixture(callback)
 	local names = { "ui.tooltip", "ui.tooltip.config", "ui.tooltip.tooltip_llm",
-		"ui.tooltip.tooltip_hotstring", "infra.logger" }
+		"ui.tooltip.tooltip_hotstring", "core.logger.engine.logger" }
 	helpers.with_fresh_modules(names, function()
 		for _, name in ipairs(names) do package.loaded[name] = nil end
 		local state = { visible = false, content = nil, errors = 0, on_error = nil }
@@ -30,7 +30,7 @@ local function with_fixture(callback)
 			state.errors = state.errors + 1
 			if state.on_error then state.on_error() end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["ui.tooltip.config"] = {}
 		package.loaded["ui.tooltip.tooltip_llm"] = {
 			hide = hide, show_predictions = paint,

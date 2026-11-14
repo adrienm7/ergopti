@@ -22,7 +22,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"adapters.shell_runner",
 }
 
@@ -32,7 +32,7 @@ local function with_runner(callback)
 	local saved_hs = _G.hs
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local native = { tasks = {} }
 			_G.hs = {
 				execute = function() return "" end,

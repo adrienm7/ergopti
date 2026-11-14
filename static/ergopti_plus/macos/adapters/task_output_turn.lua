@@ -28,7 +28,7 @@
 local M = {}
 
 local ShellRunner = require("adapters.shell_runner")
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "task_output_turn"

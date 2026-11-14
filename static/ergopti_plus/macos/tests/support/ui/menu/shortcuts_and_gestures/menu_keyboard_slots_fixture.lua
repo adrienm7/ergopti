@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local MODULES = {
 	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "infra.config_paths",
-	"infra.preferences", "infra.deferred_work", "infra.dialog_util", "infra.logger",
+	"infra.preferences", "infra.deferred_work", "infra.dialog_util", "core.logger.engine.logger",
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",

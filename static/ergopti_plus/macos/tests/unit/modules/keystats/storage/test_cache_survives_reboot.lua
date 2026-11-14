@@ -86,8 +86,8 @@ local function start(root, prepare, revision)
 			end
 		end,
 	}
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1 end,
 		count = function() return 4096 end }
 	package.loaded["modules.keystats.sqlite_writer"] = {

@@ -73,7 +73,7 @@ helpers.with_fresh_modules({
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"infra.keycodes",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
@@ -82,7 +82,7 @@ helpers.with_fresh_modules({
 	"modules.keymap.control_sentinels",
 	"adapters.synthetic_input",
 }, function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}

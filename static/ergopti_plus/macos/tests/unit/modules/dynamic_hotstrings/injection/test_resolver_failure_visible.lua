@@ -27,7 +27,7 @@ local function run_scenario()
 	local dependency_names = {
 		"core.events.timer_scheduler",
 		"hotstrings.engine.dynamic.core",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"core.logger.engine.shim",
 		"modules.diagnostics.hid_diagnostic_mailbox",
 		"modules.dynamic_hotstrings.rules_engine",
@@ -50,7 +50,7 @@ local function run_scenario()
 	Logger.error = function(_log, format_string, ...)
 		errors[#errors + 1] = string.format(format_string, ...)
 	end
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["core.logger.engine.shim"] = Logger
 	-- The resolver test owns only the dynamic-rules consumer. Loading the full
 	-- keystats now arms its independent KC bridge poller during init, which would

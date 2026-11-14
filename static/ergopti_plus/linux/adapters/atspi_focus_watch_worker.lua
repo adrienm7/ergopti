@@ -67,7 +67,7 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 	local dbus = ffi.load("libdbus-1.so.3")
 	local Focus = require("adapters.atspi_focus")
 	local Json = require("core.text.engine.json")
-	local Monotonic = require("infra.monotonic")
+	local Monotonic = require("core.logger.engine.monotonic")
 	local timeout_ms = require("infra.timings").ms("privacy", "atspi_probe_timeout_ms")
 
 	-- PR_SET_PDEATHSIG closes the detached helper even after an unclean SIGKILL.

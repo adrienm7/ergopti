@@ -31,12 +31,12 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-			"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "core.i18n.engine.i18n",
+			"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
 			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
 		}, function()
 			local fixture = { tasks = {}, paused = false, nonce_index = 0 }
 			local nonces = { "0000000000000000000000000000f001", "0000000000000000000000000000f002" }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = { notify = function() return true end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["adapters.http_client"] = { new = function()
@@ -136,9 +136,9 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			package.loaded["core.events.timer_scheduler"].now = function() return 1 end
 			package.loaded["modules.llm.parser"].strip_thinking = require("ai.engine.api.parser_core").strip_thinking
 			package.loaded["modules.llm.api_common"].protected_call = function(fn, _, ...)
-				return package.loaded["infra.logger"].callback("fixture", "request callback", fn, ...)
+				return package.loaded["core.logger.engine.logger"].callback("fixture", "request callback", fn, ...)
 			end
-			fixture.logger = package.loaded["infra.logger"]
+			fixture.logger = package.loaded["core.logger.engine.logger"]
 			for _, kind in ipairs({ "info", "warn", "error" }) do
 				fixture.logger[kind] = function(_, text, ...)
 					fixture.logs[#fixture.logs + 1] = { kind = kind, text = string.format(text, ...) }

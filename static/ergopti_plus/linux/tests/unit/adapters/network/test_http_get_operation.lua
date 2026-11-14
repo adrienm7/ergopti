@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local function with_client(config, body)
  config = config or {}
  local names = { "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy",
-  "infra.proxy_policy", "infra.monotonic", "infra.managed_http_deadline" }
+  "infra.proxy_policy", "core.logger.engine.monotonic", "infra.managed_http_deadline" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local state = { now = 0.25, logical = 0, children = {}, timers = {} }
  local core = { HAS_ASYNC = true, default_timeout_ms = function() return 1000 end }
@@ -36,7 +36,7 @@ local function with_client(config, body)
    route = function() return { mode = "direct" } end,
    selection = function() return { { mode = "direct" } } end, can_retry = function() return false end,
   } end, environment = function() return {} end }
-  package.loaded["infra.monotonic"] = { now_ms = function() return state.now end }
+  package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return state.now end }
   package.loaded["infra.managed_http_deadline"] = { start = function(deadline, expired)
    local token = { started = true, closed = false, listeners = {}, deadline = deadline, expired = expired }
    function token:is_settled() return self.closed end

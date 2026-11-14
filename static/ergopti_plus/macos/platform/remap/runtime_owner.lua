@@ -32,7 +32,7 @@
 ---    retirement of the capture and may be called again to retry it.
 --- ==============================================================================
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
 local Vhid = require("platform.remap.runtime_vhid")
 

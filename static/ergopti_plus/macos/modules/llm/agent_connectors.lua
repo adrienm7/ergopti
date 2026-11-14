@@ -24,7 +24,7 @@
 local M = {}
 
 local Agent       = require("ai.engine.agent.agent")
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Errors      = require("diagnostics.engine.adapter_errors")
 local ShellRunner = require("adapters.shell_runner")
 local FileSystem  = require("core.fs.adapters.file_system")

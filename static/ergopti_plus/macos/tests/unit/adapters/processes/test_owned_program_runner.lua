@@ -17,7 +17,7 @@ local function with_runner(body, options)
 		for _, level in ipairs({ "error", "warn", "trace", "done" }) do
 			logger[level] = function(_, template, ...) native.logs[#native.logs + 1] = string.format(template, ...) end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.task_environment"] = nil
 		package.loaded["platform.remap.lease_helper"] = { resolve = function()
 			if options.missing_helper then return nil, "unavailable" end

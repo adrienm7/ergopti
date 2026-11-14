@@ -156,11 +156,11 @@ _FatalErrorHandler(e, mode) {
 OnError(_FatalErrorHandler)
 
 ; ── Production lib files in dependency order ──
-#Include ../infra/tick_count.ahk
+#Include ../core/logger/engine/tick_count.ahk
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_utils.ahk
 #Include ../ui/console_window.ahk
-#Include ../infra/wall_clock.ahk
+#Include ../core/logger/engine/wall_clock.ahk
 #Include ../infra/field_run.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
@@ -182,7 +182,7 @@ OnError(_FatalErrorHandler)
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
 #Include ../infra/legacy_folder_migration.ahk
-#Include ../infra/logger.ahk
+#Include ../core/logger/engine/logger.ahk
 ; The logs folder every logger test writes to: a private temp folder, never the
 ; user's real %LOCALAPPDATA%\Ergopti\logs\ (boot.ahk sets it in the driver). It
 ; ends in the application folder name, as a resolved LogsDirPath always does.
@@ -190,7 +190,7 @@ global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/ui/healthcheck/test_diagnostic_logging.ahk.
-#Include ../infra/boot_profiler.ahk
+#Include ../core/logger/engine/boot_profiler.ahk
 #Include ../infra/startup_smoke.ahk
 #Include ../infra/diagnostic_snapshot.ahk
 #Include ../infra/issue_link.ahk
@@ -458,23 +458,23 @@ InstallSendNoOps()
 #Include unit/ui/menu/test_active_layout_rows.ahk
 #Include unit/infra/dispatch/test_hook_dispatcher.ahk
 #Include unit/adapters/input/test_own_injection_is_not_activity.ahk
-#Include unit/infra/logger/test_logger.ahk
-#Include unit/infra/logger/test_logger_shutdown_sinks.ahk
+#Include unit/core/logger/test_logger.ahk
+#Include unit/core/logger/test_shutdown_sinks.ahk
 #Include unit/infra/dispatch/test_wall_clock_snapshot.ahk
 #Include unit/infra/dispatch/test_field_run_utc.ahk
 #Include unit/platform/network/test_promise_timeout_budget.ahk
-#Include unit/infra/logger/test_logger_format_failure_is_visible.ahk
-#Include unit/infra/logger/test_logger_contract.ahk
+#Include unit/core/logger/test_format_failure_is_visible.ahk
+#Include unit/core/logger/test_contract.ahk
 #Include unit/ui/healthcheck/test_diagnostic_logging.ahk
 #Include unit/core/lifecycle/engine/test_build_commit.ahk
 #Include unit/modules/updater/test_version_display_strips_build_metadata.ahk
-#Include unit/infra/logger/test_logger_daily_rotation.ahk
-#Include unit/infra/logger/test_logger_volume.ahk
+#Include unit/core/logger/test_daily_rotation.ahk
+#Include unit/core/logger/test_volume.ahk
 ; The logs-folder resolver and the Debug menu log openers built on it
 ; (logs-dir-resolver). log_openers.ahk is definitions only.
 #Include ../ui/log_openers.ahk
-#Include unit/infra/logger/test_logs_dir_resolver.ahk
-#Include meta/infra/logger/test_logs_dir_single_resolver.ahk
+#Include unit/core/logger/test_logs_dir_resolver.ahk
+#Include meta/core/logger/test_logs_dir_single_resolver.ahk
 ; The folders editor host: definitions only until a window is opened; its
 ; initData builder and logs-folder save are exercised headlessly.
 #Include ../ui/paths_editor/init.ahk
@@ -780,7 +780,7 @@ _LLM_Deps_State := "ready"
 #Include unit/adapters/test_filesystem_native_write.ahk
 #Include unit/adapters/test_filesystem_nul_paths.ahk
 #Include unit/adapters/test_process_lifecycle_app_events.ahk
-#Include unit/infra/logger/test_logger_native_write.ahk
+#Include unit/core/logger/test_native_write.ahk
 #Include unit/modules/keystats/test_keystats_sql_native_write.ahk
 #Include unit/modules/keystats/test_keystats_sql_write_compensation.ahk
 #Include unit/modules/keystats/test_keystats_journal_flush_retry.ahk
@@ -1409,8 +1409,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/suite/test_qualification_parser_owner.ahk
 #Include meta/suite/test_ahk_os_purity_ratchet.ahk
 #Include meta/suite/test_ahk_os_purity_inputs.ahk
-#Include meta/infra/logger/test_logger_pairing.ahk
-#Include meta/infra/logger/test_logger_private_label.ahk
+#Include meta/core/logger/test_pairing.ahk
+#Include meta/core/logger/test_private_label.ahk
 #Include meta/modules/llm/servers/test_remote_generate_curl_dispatch.ahk
 #Include unit/platform/network/test_network_dispatch_nonblocking.ahk
 #Include unit/platform/network/test_managed_network_failure.ahk
@@ -1540,7 +1540,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_agg_app_day_llm_suggested.ahk
 #Include meta/modules/keystats/reader/test_reader_preserves_walker_aggregates.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstring_check_constraint_widened.ahk
-#Include meta/infra/logger/test_logger_sync_warning.ahk
+#Include meta/core/logger/test_sync_warning.ahk
 #Include meta/modules/keystats/test_keystats_deferred_write.ahk
 #Include meta/platform/remap/layers/test_deadkey_timeout.ahk
 #Include meta/modules/shortcuts/test_sendinstant_deferred_clipboard.ahk
@@ -1572,7 +1572,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/lifecycle/engine/test_boot_error_fatal_before_ready.ahk
 #Include meta/core/lifecycle/engine/test_hotif_globals_boot_safe.ahk
 #Include meta/suite/test_hotif_directive_lexical_boundaries.ahk
-#Include meta/infra/logger/test_error_net_prelogger_safe.ahk
+#Include meta/core/logger/test_error_net_prelogger_safe.ahk
 #Include meta/core/lifecycle/engine/test_boot_paths_fail_soft.ahk
 #Include meta/ui/wpm/test_wpm_widget_native_render.ahk
 #Include meta/ui/wpm/test_wpm_widget_hidden_until_typed.ahk
@@ -1593,8 +1593,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/i18n/test_fallback_deferred.ahk
 #Include unit/modules/hotstrings/engine/test_hse_conform_double_fire.ahk
 #Include meta/modules/llm/menu/test_llm_menu_deferred_build.ahk
-#Include meta/infra/logger/test_logger_format_placeholders.ahk
-#Include meta/infra/logger/test_logger_sub_files_routing.ahk
+#Include meta/core/logger/test_format_placeholders.ahk
+#Include meta/core/logger/test_sub_files_routing.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_render_deferred.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_visible_suggestion_epoch.ahk
 #Include meta/adapters/input/test_input_serialization.ahk
@@ -1942,7 +1942,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/input/test_textsend_callback_wired.ahk
 #Include meta/infra/config/persistence/test_is_category_all_enabled_loop.ahk
 #Include meta/adapters/test_regread_no_type_arg.ahk
-#Include meta/infra/logger/test_logger_dedup_tick.ahk
+#Include meta/core/logger/test_dedup_tick.ahk
 #Include meta/modules/hotstrings/prefix/test_prefix_watcher_magic_suffix.ahk
 #Include meta/modules/hotstrings/magic_key/test_deadkey_uses_dynamic_magic_key.ahk
 #Include meta/infra/toml/test_parse_overrides_seen_sections.ahk
@@ -1996,11 +1996,11 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_gesture_toggle_ui_errors_logged.ahk
 #Include meta/ui/wpm/test_wpm_mousewatch_suspend_guard.ahk
 #Include meta/ui/tooltip/test_tooltip_resolve_pos_profiled.ahk
-#Include meta/infra/logger/test_error_net_guarded_send.ahk
-#Include meta/infra/logger/test_error_net_dedup_throttle.ahk
-#Include meta/infra/logger/test_error_net_smoke_fatal_stderr.ahk
-#Include unit/infra/logger/test_error_report_dedup_ownership.ahk
-#Include meta/infra/logger/test_error_net_uia_orphan_suppress.ahk
+#Include meta/core/logger/test_error_net_guarded_send.ahk
+#Include meta/core/logger/test_error_net_dedup_throttle.ahk
+#Include meta/core/logger/test_error_net_smoke_fatal_stderr.ahk
+#Include unit/core/logger/test_error_report_dedup_ownership.ahk
+#Include meta/core/logger/test_error_net_uia_orphan_suppress.ahk
 #Include meta/adapters/crash_report/test_deferred_crash_report_catch.ahk
 #Include meta/modules/keystats/test_keystats_webview_bridge_and_i18n.ahk
 #Include meta/modules/keystats/test_keystats_webview_range_bridge.ahk
@@ -2152,9 +2152,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_color_dropdown_recompute_index.ahk
 #Include meta/modules/gestures/test_color_picker_hotkey_nonblocking.ahk
 #Include meta/modules/hotstrings/magic_key/test_magic_key_no_regex_inject.ahk
-#Include meta/infra/logger/test_logger_fanout_batched.ahk
+#Include meta/core/logger/test_fanout_batched.ahk
 #Include meta/adapters/crash_report/test_crash_reporter_slash_precedence.ahk
-#Include meta/infra/logger/test_logger_flush_on_error.ahk
+#Include meta/core/logger/test_flush_on_error.ahk
 #Include meta/adapters/test_atomic_write_unique_scratch.ahk
 #Include unit/adapters/test_atomic_temp_owner.ahk
 #Include meta/suite/test_byref_call_sites.ahk
@@ -2212,8 +2212,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/input/test_key_state_dllcall_guards.ahk
 #Include meta/modules/updater/test_updater_loadchannel_try_wrap.ahk
 #Include meta/adapters/crash_report/test_crash_report_sysinfo_dedup.ahk
-#Include meta/infra/logger/test_logger_dedup_exit_flush.ahk
-#Include meta/infra/logger/test_logger_repeat_collapsing.ahk
+#Include meta/core/logger/test_dedup_exit_flush.ahk
+#Include meta/core/logger/test_repeat_collapsing.ahk
 #Include meta/adapters/shell_runner/test_shell_runner_boot_crash_and_quoting.ahk
 #Include meta/infra/dispatch/test_hotpath_priority_starvation.ahk
 #Include meta/suite/test_priority_baseline_single_source.ahk
@@ -2406,9 +2406,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/llm/prediction/test_llm_cache_hit_logs_suggested.ahk
 #Include unit/modules/llm/api/test_llm_keep_alive_from_shared_defaults.ahk
 #Include unit/modules/llm/prediction/test_llm_parser_refuses_uninjectable_deletes.ahk
-#Include unit/infra/logger/test_logger_preinit_level.ahk
-#Include unit/infra/logger/test_logger_set_level_transaction.ahk
-#Include unit/infra/logger/test_logger_sub_files_multiline_arrays.ahk
+#Include unit/core/logger/test_preinit_level.ahk
+#Include unit/core/logger/test_set_level_transaction.ahk
+#Include unit/core/logger/test_sub_files_multiline_arrays.ahk
 #Include unit/modules/hotstrings/engine/test_marker_substituted_in_replacement.ahk
 #Include unit/infra/config/persistence/test_master_gates_not_persisted.ahk
 #Include unit/infra/toml/test_parse_toml_file_sticky_unreadable.ahk

@@ -23,8 +23,8 @@ end
 
 helpers.describe("CapsWord native graph and shared control tags", function()
 	helpers.it("emits an activation edge for the actual AltGr plus CapsLock path", function()
-		helpers.with_stub_scope({ "platform.remap.generator", "infra.logger", "core.fs.adapters.file_system" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local Generator = helpers.load_with_stubs("platform.remap.generator")
 			local config, err = Generator.build_karabiner_json({
 				tap_hold_config = {}, mod_combos_config = {}, tap_hold_timeout_ms = 200,
@@ -66,8 +66,8 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 	end)
 
 	helpers.it("keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords", function()
-		helpers.with_stub_scope({ "modules.keymap.control_sentinels", "infra.logger" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "modules.keymap.control_sentinels", "core.logger.engine.logger" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local owner = require("modules.keymap.control_sentinels")
 			local signals = {}
 			owner.set_listener("capsword.test", function(signal) signals[#signals + 1] = signal end)

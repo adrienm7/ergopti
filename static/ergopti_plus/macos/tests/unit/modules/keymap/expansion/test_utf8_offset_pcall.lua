@@ -26,8 +26,8 @@ local helpers = require("tests.helpers")
 
 -- Isolate the hs stub before loading any production module so every
 -- require("hs.*") call shares the same stub instance.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 
 
@@ -414,7 +414,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.hotstrings.hotstrings_config",
 			"infra.text_utils",
 			"infra.keycodes",
-			"infra.perf",
+			"core.logger.engine.perf",
 			"infra.hotpath_profiler",
 			"ui.tooltip",
 		}
@@ -436,7 +436,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			utf8_sub             = function(s, i, j) return s:sub(i, j) end,
 			get_common_prefix_utf8 = function(_, _) return 0 end,
 		}
-		package.loaded["infra.perf"] = {
+		package.loaded["core.logger.engine.perf"] = {
 			is_enabled = function() return false end,
 			now        = function() return 0 end,
 			elapsed_ms = function(_) return 0 end,
@@ -552,9 +552,9 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			is_secure_field = function() return false end,
 		}
 
-		-- Reload lib.logger with the fresh hs stub so require("infra.logger") works.
-		package.loaded["infra.logger"] = nil
-		helpers.load_with_stubs("infra.logger")
+		-- Reload lib.logger with the fresh hs stub so require("core.logger.engine.logger") works.
+		package.loaded["core.logger.engine.logger"] = nil
+		helpers.load_with_stubs("core.logger.engine.logger")
 
 		local bridge = require("modules.keymap.llm_bridge")
 

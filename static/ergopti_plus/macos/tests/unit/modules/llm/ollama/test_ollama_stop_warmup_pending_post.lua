@@ -15,11 +15,11 @@ local helpers = require("tests.helpers")
 
 local function with_world(body)
 	return helpers.with_stub_scope({ "modules.llm.api_ollama", "modules.llm.ollama_endpoint",
-		"adapters.http_client", "core.fs.adapters.storage", "infra.logger", "infra.notifications",
+		"adapters.http_client", "core.fs.adapters.storage", "core.logger.engine.logger", "infra.notifications",
 		"core.events.timer_scheduler", "core.fs.adapters.json_codec" }, function()
 		local Api = helpers.load_with_stubs("modules.llm.api_ollama")
 		local Storage = require("core.fs.adapters.storage")
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		local world = { api = Api, posts = {}, errors = {} }
 		local original_error = Logger.error
 		Logger.error = function(_, fmt, ...)

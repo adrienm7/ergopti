@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger    = require("infra.logger")
+local Logger    = require("core.logger.engine.logger")
 local Storage   = require("core.fs.adapters.storage")
 local TomlCodec = require("infra.toml.codec")
 local Projection = require("settings.engine.scope.script_override_projection")

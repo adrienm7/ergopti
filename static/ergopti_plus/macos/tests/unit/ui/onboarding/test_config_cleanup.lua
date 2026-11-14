@@ -11,7 +11,7 @@ local function with_host(controls, run)
 	for _, name in ipairs({ "start", "success", "info", "warn" }) do logger[name] = function() end end
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
 	local stubs = {
-		["infra.logger"] = logger,
+		["core.logger.engine.logger"] = logger,
 		["core.i18n.engine.i18n"] = { get = function(key) return key end },
 		["core.fs.engine.paths"] = { shared = function(path) return "/shared/" .. path end },
 		["settings.engine.migration.cleanup_session"] = { new = function(options)

@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "core.fs.adapters.file_system", "infra.logger", "diagnostics.engine.operation_reporter",
+local OWNED = { "core.fs.adapters.file_system", "core.logger.engine.logger", "diagnostics.engine.operation_reporter",
 	"core.fs.engine.dir", "infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "lfs" }
 
 local function write(path, content)
@@ -46,7 +46,7 @@ local function fixture(callback)
 			logger.error = function(_, message, ...)
 				state.errors[#state.errors + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.fs.engine.dir"] = {}
 			package.loaded["diagnostics.engine.operation_reporter"] = {}
 			_G.hs = { fs = { attributes = fs.attributes, symlinkAttributes = fs.symlinkattributes } }

@@ -29,8 +29,8 @@ local function read_corpus()
 	return assert(json.decode(raw), "the wrap-pair corpus is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.shortcuts.actions.text"] = nil
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil

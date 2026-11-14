@@ -37,7 +37,7 @@ local Surface = require("adapters.wpm_surface")
 if not Surface.is_available() then abort("the widget surface cannot bind GTK") end
 
 require("core.i18n.engine.i18n").init()
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local Model = require("metrics.engine.wpm_widget_model")
 local Constants = require("infra.wpm_constants")
 local Timings = require("infra.timings")

@@ -27,7 +27,7 @@ local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 local Json = require("core.text.engine.json")
 local Calendar = require("modules.keystats.calendar")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local native_capture = Calendar.capture
 local checks, failures = 0, 0
 local function check(name, body)

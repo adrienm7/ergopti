@@ -106,7 +106,7 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			return true
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = nil
 		package.loaded["infra.timings"] = nil
 		package.loaded["adapters.synthetic_input"] = synthetic

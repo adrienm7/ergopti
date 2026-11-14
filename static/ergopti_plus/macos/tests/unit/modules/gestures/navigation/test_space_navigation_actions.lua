@@ -201,7 +201,7 @@ helpers.describe("gestures.actions: wrapping Space navigation", function()
 			local spaces = script_spaces(calls, { ["screen-A"] = { 11, 12, 13 } }, 13, true)
 			case.break_it(calls.hs.spaces)
 			local warnings = {}
-			package.loaded["infra.logger"].warn = function(_, message) warnings[#warnings + 1] = message end
+			package.loaded["core.logger.engine.logger"].warn = function(_, message) warnings[#warnings + 1] = message end
 			helpers.assert_true(actions.execute_single("space_next_wrap"), case.name)
 			fire_deferred(calls)
 			helpers.assert_eq(keys(calls), { "ctrl:" .. RIGHT }, case.name .. ": one plain step")

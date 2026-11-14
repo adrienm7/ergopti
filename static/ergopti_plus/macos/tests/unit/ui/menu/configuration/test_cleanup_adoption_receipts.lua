@@ -21,7 +21,7 @@ local PATH = "/synthetic/cleanup-adoption/config.toml"
 local function with_cleanup(callback)
 	helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "infra.preferences", "settings.engine.migration.cleanup_session",
-		"settings.engine.migration.unused_keys", "infra.logger", "ui.menu.unused_keys_cleanup",
+		"settings.engine.migration.unused_keys", "core.logger.engine.logger", "ui.menu.unused_keys_cleanup",
 		"infra.config_overrides", "ui.onboarding", "modules.shortcuts.tap_keys",
 		"modules.shortcuts.keyboard_shortcuts",
 		"adapters.hotkey_registrar", "core.fs.adapters.json_codec", "adapters.keyboard_geometry",
@@ -58,7 +58,7 @@ local function with_cleanup(callback)
 			errors[#errors + 1] = string.format(template, ...)
 		end
 		package.loaded["core.fs.adapters.file_system"] = adapter
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		helpers.assert_eq(select(2, preferences.load(PATH)), "ok")
 		callback({ files = files, errors = errors, writes = writes, adapter = adapter,

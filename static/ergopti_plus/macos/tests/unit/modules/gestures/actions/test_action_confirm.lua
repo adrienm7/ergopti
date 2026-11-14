@@ -30,7 +30,7 @@ local CONFIRM_OWNED = {
 	"adapters.window_info",
 	"adapters.window_manager",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 }
 
 --- Loads the confirmation module over a recording alert.
@@ -51,7 +51,7 @@ local function with_confirm(body, frame, focus)
 				return focus.activates
 			end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, value) return key .. ":" .. tostring(value) end,
@@ -170,8 +170,8 @@ end)
 -- =====================================================
 -- =====================================================
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil

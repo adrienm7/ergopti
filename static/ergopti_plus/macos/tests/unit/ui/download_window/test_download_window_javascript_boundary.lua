@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the module and captured errors.
 local function with_boundary(scenario)
 	local name = "ui.download_window.javascript"
-	local saved_module, saved_logger = package.loaded[name], package.loaded["infra.logger"]
+	local saved_module, saved_logger = package.loaded[name], package.loaded["core.logger.engine.logger"]
 	local errors = {}
 	package.loaded[name] = nil
-	package.loaded["infra.logger"] = { error = function(_, message, ...)
+	package.loaded["core.logger.engine.logger"] = { error = function(_, message, ...)
 		errors[#errors + 1] = string.format(message, ...)
 	end }
 	local ok, err = xpcall(function() scenario(require(name), errors) end, debug.traceback)
-	package.loaded[name], package.loaded["infra.logger"] = saved_module, saved_logger
+	package.loaded[name], package.loaded["core.logger.engine.logger"] = saved_module, saved_logger
 	if not ok then error(err, 0) end
 end
 

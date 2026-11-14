@@ -44,7 +44,7 @@ local function fixture(options)
 	local library_env = setmetatable({ hs = native_hs, require = function(name)
 		-- The scheduler describes caught failures and admits delays through pure shared owners.
 		if name == "diagnostics.engine.reports.error_description" or name == "core.text.engine.number_policy" then return require(name) end
-		assert(name == "infra.logger", "only actual library logger dependency is modeled")
+		assert(name == "core.logger.engine.logger", "only actual library logger dependency is modeled")
 		return logger
 	end }, { __index = _G })
 	local scheduler = assert(load(read("function M.after(delaySec, fn)"), "@actual-timer-scheduler", "t", library_env))()

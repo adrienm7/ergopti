@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 local PreferencesFixture = require("tests.support.metrics_preferences_fixture")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local ENTER = {
 	pause = function(k) k.suspend_collection() end,
