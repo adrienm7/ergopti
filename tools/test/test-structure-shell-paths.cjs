@@ -47,6 +47,23 @@ function run() {
 	const other = '[ -f "$HOME/.config/zz_probe/x.lua" ]\n';
 	const otherRows = Plan.scanFile(FILE, other, Plan.referenceContext(stepMap));
 	assert.equal(Apply.rewriteText(other, otherRows, new Map(), FILE), other);
+	// A tool's shell command joins a driver path onto a positional argument
+	// that holds the root of the driver the tool names.
+	const PROBE = 'linux/platform/network/runtime_probe.lua';
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus', PROBE))) {
+		const probeStep = Plan.steps(map).find((s) => s.moves.some(([o]) => o === PROBE));
+		const probeMap = new Map(
+			[...map].map(([o, t]) => [o, probeStep.moves.some(([so]) => so === o) ? t : o])
+		);
+		const tool = 'tools/build/zz_probe.py';
+		const command =
+			'driver = prefix / "lib/ergopti"  # static/ergopti_plus/linux\n' +
+			'cmd = \'exec "$2/bin/luajit" "$3/platform/network/runtime_probe.lua" "$3/_shared"\'\n';
+		const toolRows = Plan.scanFile(tool, command, Plan.referenceContext(probeMap));
+		const toolOut = Apply.rewriteText(command, toolRows, new Map(), tool);
+		const probe = map.get(PROBE).slice('linux/'.length);
+		assert.ok(toolOut.includes(`"$3/${probe}" "$3/_shared"`), toolOut);
+	}
 	console.log(`[OK] a shell path on an unbraced variable follows the file ${step.id} moves.`);
 }
 
