@@ -13,7 +13,7 @@ local MODULES = {
 	"infra.app_picker",
 	"adapters.shell_runner",
 	"core.fs.adapters.file_system",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.text_utils",
 	"infra.deferred_work",
@@ -46,7 +46,7 @@ local function with_picker(run, options)
 				return "absent"
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.text_utils"] = {
 			escape_gsub_replacement = function(value) return value end,

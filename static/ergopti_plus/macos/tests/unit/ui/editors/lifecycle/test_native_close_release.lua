@@ -24,7 +24,7 @@ local function with_native_editor(name, scenario)
 		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "keyboard.engine.chord",
 		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"core.fs.engine.app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+		"core.fs.engine.app_dirs", "infra.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"tests.support.native_webview_close_fixture", "core.text.engine.utils_core", "lfs", "core.fs.engine.module_source_identity",
 		"core.text.engine.toml_codec.writer", "core.text.engine.toml_codec.bom", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
 		"settings.engine.migration.migrate", "core.text.engine.toml_codec.leaf_rows", "core.fs.engine.module_source_directory", "core.text.engine.toml_codec.reader",

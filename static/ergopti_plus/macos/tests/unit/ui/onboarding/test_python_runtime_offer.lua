@@ -33,7 +33,7 @@ local function load(answer)
 		end,
 	}
 	-- The stub echoes a key; the format arguments are what the text shows.
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		format = function(key, ...)
 			local parts = {}
@@ -47,7 +47,7 @@ end
 
 -- Modules the doubles replace; every test restores them (suite order).
 local OWNED = {
-	"ui.python_runtime_offer", "infra.dialog_util", "infra.deferred_work", "adapters.shell_runner", "infra.i18n",
+	"ui.python_runtime_offer", "infra.dialog_util", "infra.deferred_work", "adapters.shell_runner", "core.i18n.engine.i18n",
 }
 
 --- Runs one case with the doubled modules restored afterwards.

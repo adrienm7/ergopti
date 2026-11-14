@@ -155,7 +155,7 @@ end
 --- @return table row
 local function stub_row(key)
 	return {
-		label = require("infra.i18n").get(key),
+		label = require("core.i18n.engine.i18n").get(key),
 		submenu = { { title = "row", fn = function() end } },
 	}
 end
@@ -165,12 +165,12 @@ end
 --- @return function The actual initialized language-row provider.
 local function native_language_provider()
 	return helpers.with_stub_scope({
-		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
 		"core.fs.adapters.storage", "core.events.timer_scheduler",
 	}, function()
-		helpers.load_with_stubs("infra.i18n")
-		rawset(package.loaded, "infra.i18n", nil)
-		local native = require("infra.i18n")
+		helpers.load_with_stubs("core.i18n.engine.i18n")
+		rawset(package.loaded, "core.i18n.engine.i18n", nil)
+		local native = require("core.i18n.engine.i18n")
 		native.init()
 		assert(type(native.build_language_menu_items) == "function", "actual native locale provider exists")
 		assert(#native.get_sorted_locales() == 21, "actual generated locale catalogue is complete")
@@ -190,9 +190,9 @@ local function render_root(manifest_text, paused, command_actions)
 	local rendered = ManifestFixture.with_manifest(manifest_text, recording_logger(lines), function()
 		-- The renderer retains this actual dependency table; the next native loader
 		-- replaces the public cache entry with another controlled i18n cohort.
-		local renderer_captions = require("infra.i18n")
+		local renderer_captions = require("core.i18n.engine.i18n")
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local captions = require("infra.i18n")
+		local captions = require("core.i18n.engine.i18n")
 		local previous_get, previous_language = captions.get, captions.build_language_menu_items
 		local previous_renderer_get = renderer_captions.get
 		-- The typed parent consumes its real translated base. Other controlled
@@ -270,7 +270,7 @@ end
 local function id_of(row)
 	if row.title == "-" then return SEPARATOR end
 	local title = without_symbol(tostring(row.title))
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	for id, key in pairs(TITLE_KEYS) do
 		local captions = {key, without_symbol(i18n.get(key))}
 		if id == "hotstrings" and type(native_hotstrings_caption) == "function" then
@@ -451,7 +451,7 @@ end)
 
 helpers.describe("topology fixture owns genuine native Language data", function()
 	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
-		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
 			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.logger" }
 		local saved, old_hs = {}, rawget(_G, "hs")
 		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
@@ -500,7 +500,7 @@ local function with_native_separator_root(body)
 	logger = recording_logger(lines)
 	return ManifestFixture.with_manifest(read_manifest_text(), logger, function(renderer)
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		require("infra.i18n").build_language_menu_items = language_provider
+		require("core.i18n.engine.i18n").build_language_menu_items = language_provider
 		local component = function(key) return {build = function() return stub_row(key) end} end
 		local mods = {
 			keyboard_layout = component("menu.layout.title"), hotstrings = {},

@@ -32,7 +32,7 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 	helpers.it("greys the profile parent with the newer cause and refuses its retained rows", function()
 		Preferences.with(function()
 			local Migrate = require("settings.engine.migration.migrate")
-			local I18n = require("infra.i18n")
+			local I18n = require("core.i18n.engine.i18n")
 			local old_reason, old_status = Migrate.read_only_reason, Migrate.read_only_status
 			local blocked = false
 			Migrate.read_only_reason = function() return blocked and "newer" or nil end

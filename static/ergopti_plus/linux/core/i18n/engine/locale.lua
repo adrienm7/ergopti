@@ -1,0 +1,64 @@
+--- core/i18n/engine/locale.lua
+
+--- ==============================================================================
+--- MODULE: Locale (Linux)
+--- DESCRIPTION:
+--- Thin wrapper around _shared/core/i18n/engine/core.lua. Injects Linux-specific
+--- dependencies (vendored JSON decoder, debug.getinfo-based path walker,
+--- logger shim) and re-exports the shared surface. All locale logic lives in
+--- the shared module — this file only wires the platform layer.
+---
+--- FEATURES & RATIONALE:
+--- 1. Shared source: the same JSON files are consumed by all 3 drivers.
+--- 2. Lazy load: the first successful read is cached; transient failures retry.
+--- 3. ★ substitution: the trigger-character placeholder is replaced at
+---    call time from an injectable provider.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("core.logger.engine.shim")
+
+-- Always start from a clean locale.core — tests may have left mock state
+-- in the module cache (Core.init is idempotent and won't overwrite it).
+package.loaded["core.i18n.engine.core"] = nil
+local Core   = require("core.i18n.engine.core")
+
+-- Locale files are JSON data, never executable Lua. A missing decoder is a
+-- broken installation and must be reported before any locale file is read.
+local ok_json, json = pcall(require, "core.text.engine.json")
+assert(ok_json and type(json) == "table" and type(json.decode) == "function", "locale: JSON decoder unavailable")
+
+-- Resolves _shared/core/i18n/data/locales/<code>.json through core/fs/engine/paths.lua, the one
+-- resolver that knows both shipped layouts. This used to cut three levels off
+-- this file's own chunk name, which is right only in the checkout and the
+-- tarball: on the .deb and .rpm (/usr/lib/ergopti/infra/locale.lua) it named
+-- /usr/lib/_shared, and from a relative launch ("./infra/locale.lua") it named
+-- nothing. Either way every lookup returned its raw key, so the tray menu and
+-- every notification read "menu.global.reload" instead of text.
+local function resolve_locale_path(code)
+	local ok, Paths = pcall(require, "core.fs.engine.paths")
+	if not ok or type(Paths.shared) ~= "function" then return "" end
+	return Paths.shared("core/i18n/data/locales/" .. code .. ".json") or ""
+end
+
+-- Wire the shared module at require-time.
+Core.init({
+	json_decode = json.decode,
+	resolve_locale_path = resolve_locale_path,
+	log_debug = function(section, fmt, ...) Logger.debug(section, fmt, ...) end,
+	log_warn  = function(section, fmt, ...) Logger.warn(section, fmt, ...) end,
+	log_error = function(section, fmt, ...) Logger.error(section, fmt, ...) end,
+})
+
+-- Re-export the shared surface.
+function M.get(key)                  return Core.get(key) end
+function M.set_trigger_provider(fn)  Core.set_trigger_provider(fn) end
+function M.set_locale(code)          Core.set_locale(code) end
+function M.has(key)                  return Core.has(key) end
+function M.missing(key)              return Core.missing(key) end
+function M.current_locale()          return Core.current_locale() end
+function M.all()                     return Core.all() end
+function M.catalogue()               return Core.catalogue() end
+
+return M

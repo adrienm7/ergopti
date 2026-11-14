@@ -31,7 +31,7 @@ package.loaded["infra.keycodes"] = {
 -- Stub lib.i18n: bindings.lua calls i18n.get() at module level for
 -- shortcut labels. The real module depends on locale JSON files unavailable
 -- in unit tests.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get = function(key) return key end,
 }
 

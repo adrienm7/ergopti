@@ -474,7 +474,7 @@ LLM_Engine_Init(opts) {
 			_LLM_Engine.Get("streaming", false))
 
 		; The prediction language follows the active UI locale (the i18n single source
-		; of truth, infra/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
+		; of truth, core/i18n/engine/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
 		; own language gets predictions in it. An explicit opts["language"] still wins.
 		if (!ValidatedOpts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
 			_LLM_Engine["language"] := _I18nLocale

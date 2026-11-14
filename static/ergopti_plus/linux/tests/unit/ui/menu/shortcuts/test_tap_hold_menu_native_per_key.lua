@@ -25,7 +25,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 			local section, Manager = build({}, {})
 			local TextPrompt = require("ui.text_prompt")
 			local original_ask, original_execute = TextPrompt.ask, os.execute
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local calls, notices = {}, 0
 			local current = receipt
 			local ok, err = pcall(function()
@@ -63,7 +63,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 		local ok, err = pcall(function()
 			TextPrompt.ask = function() return "<invalid & value>" end
 			os.execute = function(value) command = value; return 0 end
-			local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
+			local key = assert(find(key_rows(section), require("core.i18n.engine.i18n").get("key_name.left_shift")))
 			helpers.assert_eq(key.menu[6].fn(), false)
 			helpers.assert_contains(command, "&lt;invalid &amp; value&gt;")
 			helpers.assert_eq(#calls, 0)
@@ -85,7 +85,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 					if command:find("dialog_host.lua' --error", 1, true) then return 1 end
 					return original_execute(command)
 				end
-				local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
+				local key = assert(find(key_rows(section), require("core.i18n.engine.i18n").get("key_name.left_shift")))
 				helpers.assert_eq(key.menu[6].fn(), false)
 				helpers.assert_eq(#calls, 0, "invalid input reaches no mutation owner")
 			end)
@@ -120,7 +120,7 @@ helpers.describe("inert existing-provider status data", function()
 			helpers.assert_type(rows, "table")
 			helpers.assert_eq(#rows, 3)
 			helpers.assert_true(rows[1].separator)
-			local tr = require("infra.i18n").get
+			local tr = require("core.i18n.engine.i18n").get
 			-- The local servers heading is a section header, framed by the shared format.
 			local section = require("menu.engine.labels").decorate_section
 			helpers.assert_eq(rows[2].label, Mutate and tr("menu.llm.local_servers.rescan") or section(tr("menu.llm.local_servers.header")))

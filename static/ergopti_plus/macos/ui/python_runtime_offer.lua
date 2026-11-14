@@ -32,7 +32,7 @@ local OPEN_BIN = "/usr/bin/open"
 local PYTHON_DOWNLOAD_URL = "https://www.python.org/downloads/macos/"
 
 -- Stateful singletons are resolved at call time: tests and reloads replace them.
-local function i18n() return require("infra.i18n") end
+local function i18n() return require("core.i18n.engine.i18n") end
 local function dialogs() return require("infra.dialog_util") end
 local function deferred() return require("infra.deferred_work") end
 local function shell() return require("adapters.shell_runner") end

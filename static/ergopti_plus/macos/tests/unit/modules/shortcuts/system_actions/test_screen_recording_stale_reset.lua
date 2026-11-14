@@ -17,7 +17,7 @@ local BUNDLE_ID = "com.ergoptiplus.app.hammerspoon"
 local SUBJECT_MODULES = {
 	"adapters.screen_capture",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
@@ -56,7 +56,7 @@ local function with_gate(options, scenario)
 				return true
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		for _, level in ipairs({ "error", "warn" }) do
 			logger[level] = function(_, message, ...)

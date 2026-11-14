@@ -45,7 +45,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 				notifications[#notifications + 1] = { message = message, level = level }
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 		}
 		package.loaded["infra.logger"] = setmetatable({
@@ -90,7 +90,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 			start = function(task) return task.start() == true end,
 		}
 		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		install_temp_file_stub()
 

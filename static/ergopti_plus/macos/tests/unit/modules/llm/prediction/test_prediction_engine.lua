@@ -168,7 +168,7 @@ package.loaded["modules.llm.api_common"] = {
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
@@ -1170,7 +1170,7 @@ end)
 --- @param body function Assertions receiving the actual action and snapshots.
 local function with_backend_label_composition(target, refuse_menu, body)
 	local names = {
-		"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
+		"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.manifest_menu",
 		"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 		"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
@@ -1192,7 +1192,7 @@ local function with_backend_label_composition(target, refuse_menu, body)
 				set_backend = function(value) record.runtime = value; return true end,
 				load_api_entries = accepted,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message) record.errors[#record.errors + 1] = message end
 			package.loaded["infra.logger"] = logger

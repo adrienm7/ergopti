@@ -61,7 +61,7 @@ local function with_foreground(port, callback)
 		"modules.llm.ollama_endpoint", "core.fs.adapters.file_system", "adapters.task_lifecycle",
 		"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
+		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "core.i18n.engine.i18n",
 		"modules.shortcuts.script_control", "ui.menu.menu_llm.models_manager_ollama",
 		"ui.menu.menu_llm.requirement_operation_registry",
 	}, function()

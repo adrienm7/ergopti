@@ -134,9 +134,9 @@ end)
 --- @param body function fn(ShortcutUtils, seen)
 local function with_editor(answers, body)
 	helpers.with_fresh_modules({ "ui.menu.shortcut_utils", "infra.dialog_util", "adapters.apple_shortcuts_cli",
-		"infra.i18n" }, function()
+		"core.i18n.engine.i18n" }, function()
 		local seen = { choices = {}, alerts = {} }
-		package.loaded["infra.i18n"] = { get = function(key) return key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 			format = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(_, _, initial, save)

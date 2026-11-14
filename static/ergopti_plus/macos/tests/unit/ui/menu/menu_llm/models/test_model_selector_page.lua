@@ -65,7 +65,7 @@ local function with_page(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		local calls = { switch = {}, select = {}, pulls = {}, saves = 0, api = {} }
 		package.loaded["infra.dialog_util"] = { block_alert = function()
-			return opts.confirm_remove and require("infra.i18n").get("button.remove") or "OK"
+			return opts.confirm_remove and require("core.i18n.engine.i18n").get("button.remove") or "OK"
 		end,
 			text_prompt = function() return "OK", opts.typed_model or "" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
@@ -437,7 +437,7 @@ helpers.describe("model selector page owner", function()
 			local ids = {}
 			for _, action in ipairs(row.actions) do ids[#ids + 1] = action.id end
 			helpers.assert_eq(ids, { "set_key", "test", "remove" }, "no other model to pick; the active entry keeps Test and Remove")
-			helpers.assert_eq(row.actions[1].text, require("infra.i18n").get("menu.llm.local_servers.api_key"))
+			helpers.assert_eq(row.actions[1].text, require("core.i18n.engine.i18n").get("menu.llm.local_servers.api_key"))
 			helpers.assert_true(Page.handle_action(ctx, { action = "row_action", backend = "api", name = "Groq/llama",
 				id = "set_key" }, p, collected))
 			helpers.assert_eq(calls.api[1], "token:e3:gsk-new", "the typed key goes to the entry")

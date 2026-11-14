@@ -36,9 +36,9 @@ local function load_menu(start_result)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function(_, body) ctx.alerts[#ctx.alerts + 1] = body; return "button.activate" end,
 	}
-	package.loaded["infra.i18n"] = nil
-	local renderer_i18n = require("infra.i18n")
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = nil
+	local renderer_i18n = require("core.i18n.engine.i18n")
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	-- The switch is the command registered for the manifest's metrics_toggle
 	-- row, captured where the menu hands it to the renderer.
 	local renderer = assert(require("menu.engine.renderer").new({

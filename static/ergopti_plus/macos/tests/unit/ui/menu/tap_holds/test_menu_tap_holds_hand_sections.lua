@@ -158,7 +158,7 @@ end)
 --- @param body function Receives menu finder, observed native calls and declaration.
 local function with_native_key_menu(configured, body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"infra.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		"core.i18n.engine.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { calls = {}, refreshes = 0, receipt = true }
 		local native = remap_double()
@@ -173,7 +173,7 @@ local function with_native_key_menu(configured, body)
 				updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
 		end
 		local function first()
-			local prefix = require("infra.i18n").get("key_name.left_shift") .. "  :"
+			local prefix = require("core.i18n.engine.i18n").get("key_name.left_shift") .. "  :"
 			for _, row in ipairs(rows()) do
 				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then
 					return row.menu[1], row.menu
@@ -326,7 +326,7 @@ local SLOT_CATALOGUE = {
 --- recorder of what it was opened with and of its confirmation callback.
 --- @param body function Receives the key's rows, the observations and the rebuild.
 local function with_slot_picker(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "infra.i18n",
+	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "core.i18n.engine.i18n",
 		"infra.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0,
@@ -471,7 +471,7 @@ end)
 --- rereads the native values; captured callbacks keep their original owners.
 local function with_delay_native(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"infra.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		"core.i18n.engine.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local native = remap_double()
 		local observed = { value = 1500, receipt = true, calls = {}, refreshes = 0, regenerations = 0,
@@ -503,7 +503,7 @@ end
 helpers.describe("the complete macOS per-key delay declaration", function()
 	helpers.it("uses native effective and global values with inherited reset state (tap-hold-key-delay)", function()
 		with_delay_native(function(rows, observed)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local original_get = i18n.get
 			i18n.get = function(key)
 				if key == "menu.tapholds.key_tap_delay" then return "Delay: %s" end
@@ -670,7 +670,7 @@ local SHIFT_PAIR = { id = "shift_pair", label = "Shift pair", group = "Shift",
 --- window replaced by a recorder.
 --- @param body function Receives the pair's slot rows and the observations.
 local function with_pair_picker(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "infra.i18n",
+	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "core.i18n.engine.i18n",
 		"infra.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0, receipt = true }

@@ -62,7 +62,7 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
-	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "infra.logger", "infra.i18n",
+	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "infra.logger", "core.i18n.engine.i18n",
 	"infra.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
 	"adapters.synthetic_input", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
@@ -82,7 +82,7 @@ local function with_world(body)
 			end
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, ...)
 				local parts = { key }

@@ -49,7 +49,7 @@ local COLOR_PRESETS = require("core.ui.engine.native_theme_data").hotstring_pale
 --- @param key string
 --- @return string
 local function i18n_label(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	if not ok or type(i18n.get) ~= "function" then return key end
 	local value = i18n.get(key)
 	return (type(value) == "string" and value ~= "") and value or key
@@ -144,7 +144,7 @@ local function category_title(id, category)
 	local description = category and category.description or nil
 	if type(description) ~= "table" then return id end
 	local locale = "en"
-	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	local ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n and type(i18n.get_locale) == "function" then
 		local current = i18n.get_locale()
 		if type(current) == "string" and current ~= "" then locale = current end

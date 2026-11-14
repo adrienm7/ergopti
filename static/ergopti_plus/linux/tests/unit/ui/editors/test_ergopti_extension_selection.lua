@@ -81,7 +81,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				helpers.assert_eq(category.sections.replace.count, 0, "native replacement has no fabricated mapping")
 				helpers.assert_eq(category.sections.replace.extension.id, "ergopti")
 				helpers.assert_eq(Config.get_category("french_distancesreduction").count, 24)
-				local I18n = require("infra.i18n")
+				local I18n = require("core.i18n.engine.i18n")
 				local description = category.sections.replace.description
 				local label = description[I18n.get_locale()] or description.en
 				local Builder = require("ui.menu.builder")

@@ -350,7 +350,7 @@ end)
 -- =================================================================
 
 helpers.describe("word reset: the menu's choice and free entry", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local function row_for(current, calls)
 		local Menu = require("infra.manifest_menu")
 		return Menu.choice_row("hotstrings_params_group", "idle_reset", {

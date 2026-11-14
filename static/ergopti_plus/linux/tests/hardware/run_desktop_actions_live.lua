@@ -48,7 +48,7 @@ local function settle(predicate, seconds)
 	return predicate()
 end
 
-require("infra.i18n").init()
+require("core.i18n.engine.i18n").init()
 local Manager = require("modules.gestures.manager")
 local BackgroundCommands = require("modules.gestures.background_commands")
 -- The daemon defers the result collector through its own event-loop adapter;
@@ -73,7 +73,7 @@ check(trashed() > 0, "the trash folder holds them")
 -- empty_trash asks first (catalogue confirm): its question is the product's
 -- own GTK dialog host, answered here as a user would, from the keyboard.
 local WindowTitles = require("core.ui.engine.window_titles")
-local title = WindowTitles.compose(require("infra.i18n").get("dialog.confirm_action.title"))
+local title = WindowTitles.compose(require("core.i18n.engine.i18n").get("dialog.confirm_action.title"))
 -- xdotool search --name does not match this UTF-8 title: compare each
 -- visible window's name exactly.
 local function answer(keys)

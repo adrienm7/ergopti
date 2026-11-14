@@ -52,7 +52,7 @@ end)
 
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
-	"modules.gestures.user_actions", "core.logger.engine.shim", "infra.i18n", "adapters.shell_runner",
+	"modules.gestures.user_actions", "core.logger.engine.shim", "core.i18n.engine.i18n", "adapters.shell_runner",
 	"adapters.application_notifier", "adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
 }
 
@@ -69,7 +69,7 @@ local function with_world(body)
 			logger[level] = function(_, fmt, ...) world.logs[#world.logs + 1] = string.format(tostring(fmt), ...) end
 		end
 		package.loaded["core.logger.engine.shim"] = logger
-		package.loaded["infra.i18n"] = { get = function(key) return key .. "|{1}|{2}" end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key .. "|{1}|{2}" end }
 		package.loaded["adapters.application_notifier"] = { send = function(text)
 			world.notices[#world.notices + 1] = (text:gsub("|{%d}", ""))
 			return true
@@ -350,14 +350,14 @@ end)
 helpers.describe("private user-action notification fallback", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("does not log command stderr when notifier is " .. mode, function()
-			local names = { "core.logger.engine.shim", "infra.i18n", "adapters.shell_runner", "adapters.notifier",
+			local names = { "core.logger.engine.shim", "core.i18n.engine.i18n", "adapters.shell_runner", "adapters.notifier",
 				"adapters.application_notifier", "modules.gestures.user_actions" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
-			package.loaded["infra.i18n"] = { get = function() return "Command failed: {1}: {2}" end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function() return "Command failed: {1}: {2}" end }
 			package.loaded["adapters.shell_runner"] = {
 				has_command = function() return mode ~= "unavailable" end,
 				quote = function(value) return "'" .. value .. "'" end,

@@ -22,7 +22,7 @@
 local M = {}
 
 local Logger        = require("infra.logger")
-local i18n          = require("infra.i18n")
+local i18n          = require("core.i18n.engine.i18n")
 local Dialog        = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
 

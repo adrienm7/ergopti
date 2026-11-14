@@ -40,10 +40,10 @@ end)
 --- Replays the genuine Metrics owner without changing its completed child route.
 --- @param body function Structural source and parent assertions.
 local function metrics_parent_fixture(body)
-	local names = { "ui.menu.menu_metrics", "infra.manifest_menu", "infra.i18n", "infra.locale", "core.i18n.engine.core", "hs.fs" }
+	local names = { "ui.menu.menu_metrics", "infra.manifest_menu", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "hs.fs" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	package.loaded["hs.fs"] = hs.fs
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	locale.set_locale("en")
 	local native = require("ui.menu.menu_metrics")

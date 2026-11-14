@@ -346,11 +346,11 @@ TestQualificationRegisterParser(JsonParse)
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
 ; management) follows it and calls into the loaders/state it declares.
-#Include ../infra/locale.ahk
+#Include ../core/i18n/engine/locale.ahk
 #Include ../_generated/gesture_emit_actions.ahk
 #Include ../_generated/action_catalogue.ahk
 #Include ../_generated/locale_table.ahk
-#Include ../infra/i18n.ahk
+#Include ../core/i18n/engine/i18n.ahk
 _LogBootProgress("i18n included (t() available)")
 
 ; Install the hotstring hooks for the entire test process so neither real
@@ -568,7 +568,7 @@ InstallSendNoOps()
 #Include unit/ui/menu/test_manifest_menu_declared_groups.ahk
 #Include unit/ui/menu/test_manifest_menu_captions.ahk
 #Include unit/ui/menu/test_manifest_menu_parent_groups.ahk
-#Include unit/infra/i18n/test_language_deferred_declared_parent.ahk
+#Include unit/core/i18n/test_language_deferred_declared_parent.ahk
 #Include unit/ui/menu/test_manifest_menu_checked_when.ahk
 #Include unit/modules/keymap/test_layout_tables.ahk
 #Include unit/modules/shortcuts/test_uia_selection_worker_deadline.ahk
@@ -624,8 +624,8 @@ InstallSendNoOps()
 #Include unit/platform/remap/tap_hold/test_tap_hold_loader.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_migration.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk
-#Include unit/infra/i18n/test_i18n.ahk
-#Include unit/infra/i18n/test_locale_probe_is_silent.ahk
+#Include unit/core/i18n/test_i18n.ahk
+#Include unit/core/i18n/test_probe_is_silent.ahk
 #Include unit/adapters/test_window_utils.ahk
 #Include unit/infra/test_external_url_policy.ahk
 #Include unit/infra/test_text_utils.ahk
@@ -1590,7 +1590,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_ready_contract.ahk
 #Include meta/infra/config/migration/test_native_hotstrings_migrated.ahk
 #Include meta/modules/hotstrings/engine/test_hse_send_transaction_guard.ahk
-#Include meta/infra/i18n/test_i18n_fallback_deferred.ahk
+#Include meta/core/i18n/test_fallback_deferred.ahk
 #Include unit/modules/hotstrings/engine/test_hse_conform_double_fire.ahk
 #Include meta/modules/llm/menu/test_llm_menu_deferred_build.ahk
 #Include meta/infra/logger/test_logger_format_placeholders.ahk
@@ -1676,7 +1676,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/keystats/metrics/test_metrics_widget_menu_parity.ahk
 #Include meta/adapters/test_port_adapter_coverage.ahk
 #Include meta/suite/test_no_class_global_conflict.ahk
-#Include meta/infra/i18n/test_locale_json_valid.ahk
+#Include meta/core/i18n/test_json_valid.ahk
 #Include meta/modules/shortcuts/test_wrap_symbols_gate.ahk
 #Include meta/modules/shortcuts/test_wrap_symbols_catalogue.ahk
 #Include unit/modules/shortcuts/test_wrap_symbols_global_transaction.ahk
@@ -1958,7 +1958,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/input/test_keyboard_hook_vk_format.ahk
 #Include meta/adapters/shell_runner/test_plc_stop_clears_callbacks.ahk
 #Include meta/infra/toml/test_toml_coerce_quoted_commas.ahk
-#Include meta/infra/i18n/test_i18n_setlocale_resets_fallback.ahk
+#Include meta/core/i18n/test_setlocale_resets_fallback.ahk
 #Include meta/modules/shortcuts/test_ws_save_atomic.ahk
 #Include meta/platform/remap/tap_hold/test_tapholdwriter_int_before_bool.ahk
 #Include meta/modules/llm/menu/test_llm_menu_toggle_reentrancy.ahk
@@ -2359,7 +2359,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/llm/prediction/test_llm_finalize_guard_before_yield.ahk
 #Include meta/modules/llm/prediction/test_llm_indexed_callbacks_never_swallowed.ahk
 #Include meta/modules/llm/profiles/test_llm_profile_menu_unique_labels.ahk
-#Include meta/infra/i18n/test_locale_tsv_atomic_write.ahk
+#Include meta/core/i18n/test_tsv_atomic_write.ahk
 #Include meta/ui/menu/test_menu_manifest_single_decode.ahk
 #Include meta/ui/menu/test_menu_prune_keeps_detached_registrations.ahk
 #Include meta/modules/keystats/metrics/test_metrics_filter_secure_field_fails_closed.ahk

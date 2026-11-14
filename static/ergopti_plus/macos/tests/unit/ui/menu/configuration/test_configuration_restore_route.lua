@@ -99,7 +99,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 			local report = { scope = "global", mode = "clear", point = "rollback", kind = "rollback_pending",
 				failed = "llm", reverted = false }
 			-- Templates that show which key filled which placeholder.
-			package.loaded["infra.i18n"].get = function(key) return "[" .. key .. "|{1}|{2}]" end
+			package.loaded["core.i18n.engine.i18n"].get = function(key) return "[" .. key .. "|{1}|{2}]" end
 			requested.options.refresh(false, report)
 			helpers.assert_eq(#alerts, 1)
 			helpers.assert_eq(alerts[1], { "[dialog.reset_defaults.failed_title|{1}|{2}]",

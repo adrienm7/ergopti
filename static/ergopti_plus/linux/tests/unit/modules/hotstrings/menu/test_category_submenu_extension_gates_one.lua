@@ -35,8 +35,8 @@ local helpers, fake_config =
 helpers.describe("extension category gates: one acknowledged batch", function()
 	local function gate_action(config, enabled, changed)
 		local mb = helpers.load_module("ui.menu.builder")
-		local label = require("infra.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
-		local extension = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = require("core.i18n.engine.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
+		local extension = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -272,7 +272,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		local builder = helpers.load_module("ui.menu.builder")
 		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
 		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
-		local title = require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get(key), "")
+		local title = require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get(key), "")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -356,7 +356,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				helpers.assert_eq(releases, #notices)
 				if #notices > 0 then
 					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 				end
 			end)
 		end
@@ -426,7 +426,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				helpers.assert_eq(read(c.path), c.original)
 				helpers.assert_eq(read(c.config_path), c.config_original)
 				helpers.assert_eq(#notices, 1)
-				helpers.assert_not_nil(notices[1]:find(require("infra.i18n").get("menu.hotstrings.delay_invalid_body"), 1, true))
+				helpers.assert_not_nil(notices[1]:find(require("core.i18n.engine.i18n").get("menu.hotstrings.delay_invalid_body"), 1, true))
 			end)
 		end)
 		for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do

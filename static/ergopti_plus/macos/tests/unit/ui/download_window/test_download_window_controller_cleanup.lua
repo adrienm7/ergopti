@@ -17,12 +17,12 @@ local function with_window(scenario)
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.download_window", "ui.download_window.javascript",
 			"ui.download_window.pending_queue", "ui.ui_builder", "infra.logger", "core.fs.engine.paths", "infra.timings",
-			"infra.i18n", "infra.deferred_work", "adapters.shell_runner",
+			"core.i18n.engine.i18n", "infra.deferred_work", "adapters.shell_runner",
 			"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/assets" end }
 			helpers.provide_timings()
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
 			package.loaded["adapters.shell_runner"] = {}
 			_G.hs = {

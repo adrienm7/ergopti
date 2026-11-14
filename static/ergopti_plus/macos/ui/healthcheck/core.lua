@@ -1106,7 +1106,7 @@ local function perform_action(session, action, documents)
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
+				require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
 	elseif action.action == "day_log" then
 		-- Opt-in: ticking collects and redacts today's log; unticking drops it
 		local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
@@ -1199,7 +1199,7 @@ end
 --- an inline page.
 --- @param webview table
 local function inject_strings(webview)
-	local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
+	local ok_strings, strings = pcall(function() return require("core.i18n.engine.locale").catalogue() end)
 	if not ok_strings or type(strings) ~= "table" then
 		Logger.error(LOG, "The diagnostics page's strings could not be read: %s.", tostring(strings))
 		return
@@ -1253,7 +1253,7 @@ function M.show_window(opts)
 		return false
 	end
 
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local ui_builder = require("ui.ui_builder")
 	local title = ui_builder.window_title(i18n.get("menu.debug.healthcheck"))
 	local shared_ui_dir = (Paths.shared("ui/healthcheck") or "") .. "/"

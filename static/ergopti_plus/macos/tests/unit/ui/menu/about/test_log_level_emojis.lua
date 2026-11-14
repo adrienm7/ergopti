@@ -7,7 +7,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("Menu — log level emojis", function()
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n    = require("infra.i18n")
+	local i18n    = require("core.i18n.engine.i18n")
 	local Logger  = require("infra.logger")
 
 	helpers.admit_logger_privacy(Logger)
@@ -31,7 +31,7 @@ helpers.describe("Menu — log level emojis", function()
 		}
 		
 		-- Mock i18n.get to return keys for easier verification
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local old_get = i18n.get
 		i18n.get = function(k) return k end
 		-- Also need this for builder.lua line 488
@@ -114,7 +114,7 @@ local function log_row(value, setter)
 	helpers.admit_logger_privacy(logger)
 	logger.set_level(value)
 	local rows = helpers.load_with_stubs("ui.menu.builder").generate({}, {}, { set_log_level = setter })
-	local label = require("infra.i18n").get("menu.debug.log_level")
+	local label = require("core.i18n.engine.i18n").get("menu.debug.log_level")
 	for _, top in ipairs(rows) do
 		for _, row in ipairs(top.menu or {}) do
 			if row.title and row.title:find(label, 1, true) == 1 then return row end
@@ -135,7 +135,7 @@ helpers.describe("macOS shared Debug log choices", function()
 					helpers.assert_eq(row.menu[index].title, level.label)
 					helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 					if level.value == state.selected then
-						helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
+						helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get("menu.debug.log_level"), level.label))
 					end
 					helpers.assert_eq(row.menu[index].fn(), true)
 				end
@@ -241,11 +241,11 @@ end)
 --- @param body function Independent native row/source assertions.
 local function debug_parent_fixture(body)
 	local saved = {}
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
 	helpers.load_with_stubs("core.fs.engine.paths")
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
 	local native = require("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	local callbacks = {}
 	local function setter(value) callbacks[#callbacks + 1] = value; return false end
@@ -262,7 +262,7 @@ local function debug_parent_fixture(body)
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, logger) end, debug.traceback)
 	locale.set_locale(language)
 	logger.current_level = threshold
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
 	if not ok then error(detail, 0) end
 end
 

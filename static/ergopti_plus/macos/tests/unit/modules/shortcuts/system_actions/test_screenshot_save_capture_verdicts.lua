@@ -20,7 +20,7 @@ local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"modules.shortcuts.actions.screenshot_save",
@@ -113,7 +113,7 @@ local function with_screenshot(options, scenario)
 				return handle
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			return key
 		end }

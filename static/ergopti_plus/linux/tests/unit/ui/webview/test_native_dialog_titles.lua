@@ -17,7 +17,7 @@ local DIALOG = require("ui.native_dialog").command()
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
 	local names = { "ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
-		"modules.gestures.system_actions", "infra.i18n", "adapters.shell_runner", "ui.modal",
+		"modules.gestures.system_actions", "core.i18n.engine.i18n", "adapters.shell_runner", "ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "adapters.keyboard_hook",
 		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
@@ -32,7 +32,7 @@ local function scenario(body)
 		["menu.hotstrings.user_code.open_source"] = "Open source",
 		["common.close"] = "Keep closed",
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 		section = function(key) return labels[key] or key end }
 	package.loaded["ui.modal"] = { run = function(fn) observed.modals = observed.modals + 1; return fn() end }
 	package.loaded["core.fs.adapters.storage"] = {
@@ -111,7 +111,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/owned/chosen/", 0
 			local paths = { default_config_dir = function() return "/owned/default" end }
-			local value = require("ui.config_dir_picker").pick(shell, paths, require("infra.i18n"), "/owned/current")
+			local value = require("ui.config_dir_picker").pick(shell, paths, require("core.i18n.engine.i18n"), "/owned/current")
 			h.assert_eq(value, "/owned/chosen")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --directory"
 				.. " --title='ErgoptiPlus — Select configuration folder' --filename='/owned/current/' 2>/dev/null")
@@ -198,7 +198,7 @@ h.describe("native menu dialog captions", function()
 			return command:find("dialog_host.lua' --question", 1, true) and 256 or 0
 		end
 		local ok, err = xpcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local items = require("ui.menu.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
 			local found
 			for _, item in ipairs(items) do
@@ -494,7 +494,7 @@ h.describe("configuration filesystem root", function()
 				observed.answer, observed.status = "/\n", 0
 				local paths = { default_config_dir = function() return "/owned/default" end }
 				local picker = require("ui.config_dir_picker")
-				h.assert_eq(picker.pick(shell, paths, require("infra.i18n"), "/"), "/")
+				h.assert_eq(picker.pick(shell, paths, require("core.i18n.engine.i18n"), "/"), "/")
 				h.assert_eq(picker.normalize(paths, "///"), "/")
 				h.assert_eq(picker.normalize(paths, ""), "/owned/default")
 				h.assert_eq(picker.normalize(paths, nil), "/owned/default")

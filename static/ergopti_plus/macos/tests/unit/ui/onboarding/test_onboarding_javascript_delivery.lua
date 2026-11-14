@@ -16,7 +16,7 @@ helpers.describe("onboarding JavaScript delivery", function()
 		helpers.it("(onboarding-js-delivery) retained " .. action .. " retries cleanup without another commit", function()
 			with_delivery(function(_, state, pending, errors, evaluations, open)
 				local persists = 0
-				package.loaded["infra.i18n"].persist_locale = function() persists = persists + 1; return false end
+				package.loaded["core.i18n.engine.i18n"].persist_locale = function() persists = persists + 1; return false end
 				local old_receiver = state.receiver
 				state.refused = true
 				old_receiver({ body = { action = "finish", answers = { locale = "en", config_dir = "", operations = {} } } })

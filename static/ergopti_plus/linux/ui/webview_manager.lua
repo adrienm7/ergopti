@@ -59,7 +59,7 @@ function M.prepare_app_contextual_title(presentation_id, suffix, source_opts)
 		or rawget(source_opts, "presentation_suffix") ~= suffix
 		or rawget(source_opts, "title") ~= nil or rawget(source_opts, "label") ~= nil then return nil end
 	local Presentation = ContextPresentation
-	local I18n, Locale = require("infra.i18n"), require("infra.locale")
+	local I18n, Locale = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 	local Core = require("core.i18n.engine.core")
 	if type(I18n) ~= "table" or type(Locale) ~= "table" or type(Core) ~= "table" then return nil end
 	local prepare, translate = ContextPrepareOwner, rawget(I18n, "get")
@@ -73,8 +73,8 @@ function M.prepare_app_contextual_title(presentation_id, suffix, source_opts)
 			and getmetatable(M) == nil and rawget(package.loaded, "ui.webview_manager") == M
 			and getmetatable(WindowTitles) == nil and rawget(package.loaded, "core.ui.engine.window_titles") == WindowTitles
 			and getmetatable(Presentation) == nil and rawget(package.loaded, "core.ui.engine.webview.presentation") == Presentation
-			and getmetatable(I18n) == nil and rawget(package.loaded, "infra.i18n") == I18n
-			and getmetatable(Locale) == nil and rawget(package.loaded, "infra.locale") == Locale
+			and getmetatable(I18n) == nil and rawget(package.loaded, "core.i18n.engine.i18n") == I18n
+			and getmetatable(Locale) == nil and rawget(package.loaded, "core.i18n.engine.locale") == Locale
 			and getmetatable(Core) == nil and rawget(package.loaded, "core.i18n.engine.core") == Core
 			and rawget(WindowTitles, "presentation_for_app") == ContextLookupOwner
 			and rawget(WindowTitles, "compose") == ContextComposeOwner
@@ -183,7 +183,7 @@ local function notify_document_refusal(private_current)
 			and private_current() == true
 	end
 	local loaded, admitted = pcall(function()
-		local I18n, Notifier = require("infra.i18n"), require("adapters.application_notifier")
+		local I18n, Notifier = require("core.i18n.engine.i18n"), require("adapters.application_notifier")
 		if type(Notifier.send_owned) ~= "function" or not admit() then return false end
 		local title, message = I18n.get("error_dialog.heading"), I18n.get("error_dialog.intro")
 		if type(title) ~= "string" or title == "" or title == "error_dialog.heading"
@@ -455,7 +455,7 @@ function M.build_page_html(app_name, active_locale)
 		error("build_page_html(): active_locale must be a nonempty string", 2)
 	end
 	local root = _driver_root()
-	local ok_catalogue, catalogue = pcall(function() return require("infra.locale").catalogue() end)
+	local ok_catalogue, catalogue = pcall(function() return require("core.i18n.engine.locale").catalogue() end)
 	if not ok_catalogue or type(catalogue) ~= "table" or next(catalogue) == nil then
 		Logger.error(LOG, "build_page_html(): '%s' opens without its strings: the locale catalogue is unavailable (%s).",
 			app_name, tostring(catalogue))
@@ -479,7 +479,7 @@ function M.show(app_name, active_locale, contextual_receipt)
 	-- No caller passes a locale, and the page builder fell back to French: every
 	-- window was French whatever language the tray was set to.
 	if type(active_locale) ~= "string" or active_locale == "" then
-		local ok, I18n = pcall(require, "infra.i18n")
+		local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 		if type(active_locale) ~= "string" or active_locale == "" then
 			active_locale = require("infra.manifest_reader").default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
@@ -984,7 +984,7 @@ end
 
 local function _app_title(app_name)
 	local key = assert(WindowTitles.key_for_app(app_name), "Unknown shared UI app: " .. tostring(app_name))
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 M._app_title = _app_title
 

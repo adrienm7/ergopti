@@ -20,7 +20,7 @@ local BUNDLE_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspo
 local COPIES = { "/Users/me/ergopti/build/macos/ErgoptiPlus.app" }
 
 local MODULES = {
-	"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "infra.i18n", "infra.accessibility_wait",
+	"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "core.i18n.engine.i18n", "infra.accessibility_wait",
 	"adapters.accessibility_permission", "adapters.shell_runner",
 }
 
@@ -93,7 +93,7 @@ local function with_dialog(body)
 		-- load_with_stubs installs its key-echo i18n baseline; the dialog captures
 		-- i18n at require time, so the French fake goes in and the dialog reloads.
 		local active = { code = "fr", strings = fr }
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get_locale = function() return active.code end,
 			get = function(key) return active.strings[key] or key end,
 			format = function(key, ...)
@@ -133,7 +133,7 @@ end
 --- finds nothing, and every deferred focus retry is captured to be drained.
 --- @param body function Receives the harness.
 local function with_untrusted_factory(body)
-	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "infra.deferred_work", "infra.i18n" }
+	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "infra.deferred_work", "core.i18n.engine.i18n" }
 	helpers.with_stub_scope(owned, function()
 		local h = { deferred = {}, activations = 0, levels = {}, fronts = {}, shows = 0 }
 		package.loaded["infra.deferred_work"] = {

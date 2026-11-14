@@ -96,7 +96,7 @@ end)
 helpers.describe("custom delimiter Delete translations use the shared declaration", function()
 	helpers.it("the actual provider renders the canonical Delete label in every supported locale", function()
 		local locales = { "ar", "cs", "da", "de", "en", "es", "fr", "hi", "he", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local previous_get = i18n.get
 		local observed = {}
 		local passed, failure = pcall(function()
@@ -176,7 +176,7 @@ helpers.describe("declared delay configuration command: actual Linux provider", 
 			local _, _, observations = menu_controls(Settings, false, "config_shared_label")
 			local rows = assert(observations.delay_controls)
 			local expected = delay_settings_command_expected()
-			helpers.assert_eq(rows[expected.position].title, require("infra.i18n").get("button.ok"))
+			helpers.assert_eq(rows[expected.position].title, require("core.i18n.engine.i18n").get("button.ok"))
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_eq(#rows, 5, "the three existing variable-delay rows stay after the command")
 		end)

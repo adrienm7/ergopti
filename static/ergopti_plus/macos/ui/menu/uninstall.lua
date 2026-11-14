@@ -28,7 +28,7 @@ function M.run(deps)
 	end
 	local lifecycle = deps.lifecycle or require("infra.termination_coordinator")
 	if lifecycle.is_pending() then return false end
-	local i18n = deps.i18n or require("infra.i18n")
+	local i18n = deps.i18n or require("core.i18n.engine.i18n")
 	local dialog = deps.dialog or require("infra.dialog_util")
 	local resolver = deps.resolver or require("platform.remap.lease_helper")
 	local shell = deps.shell or require("adapters.shell_runner")

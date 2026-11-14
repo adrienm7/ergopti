@@ -885,7 +885,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 	now = function() return require("luv").hrtime() / 1e9 end,
 	timeout = Timings.ms("ui", "user_quit_deadline_ms") / 1000,
 	poll = 0.25,
-	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("infra.i18n").get) end,
+	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end,
 })
 
 --- A Quit from a shortcut, a gesture or the degraded tray row: the owner tells
@@ -893,7 +893,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 --- comes at once, as the tray row (ui/menu/menu_quit.lua) and Windows' quit
 --- admission do (NUI-001).
 privacy_owners.user_quit = require("infra.quit_request").notifying(privacy_owners.tray_quit,
-	function() require("ui.menu.feature_notice").quit_refused(require("infra.i18n").get) end)
+	function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end)
 
 
 -- =========================================
@@ -1030,7 +1030,7 @@ local function main()
 		-- A newer file stays read-only for the session: tell the user why their
 		-- changes do not stick. Block-local, as main() is near the upvalue limit.
 		local notice = require("settings.engine.migration.migrate").read_only_notice_key(migration)
-		local notice_i18n = notice and RuntimeGuard.optional_require("infra.i18n")
+		local notice_i18n = notice and RuntimeGuard.optional_require("core.i18n.engine.i18n")
 		if notice and notifier and notice_i18n then
 			notifier.send(notice_i18n.get(notice), { level = "warning" })
 		elseif notice then
@@ -1132,7 +1132,7 @@ local function main()
 	-- Its background tasks (ledger export, text migration) wait for the loop.
 	local metrics_initialized = keystats.init({ defer = event_loop.defer })
 	if metrics_initialized == false and notifier then
-		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
+		local notice_i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n")
 		if notice_i18n then
 			pcall(function() notifier.send(notice_i18n.get("dialog.metrics.storage_unavailable"), { level = "warning" }) end)
 		end
@@ -1151,7 +1151,7 @@ local function main()
 	local missing_program = InputAccess.missing_program()
 	if missing_program then
 		Logger.error(LOG, "Input permission setup needs %s, which is not installed.", missing_program)
-		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil, program = missing_program,
 			body_key = InputAccess.MISSING_PROGRAM_BODY_KEY },
 			"missing program " .. missing_program))
@@ -1162,7 +1162,7 @@ local function main()
 		-- A sandbox that hides /dev/input looks like this: with --tray the icon
 		-- still names the problem instead of the app vanishing.
 		if opts.tray and tray_menu then
-			InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+			InputAccess.report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"), notifier = notifier,
 				tray = tray_menu, body_key = InputAccess.NO_DEVICE_BODY_KEY }, "no keyboard device detected")
 		end
 		os.exit(1)
@@ -1173,7 +1173,7 @@ local function main()
 	-- the unit does not retry, since only a new session can fix it.
 	if InputAccess.is_denied(device) then
 		Logger.error(LOG, "Keyboard device %s exists but this session may not read it.", device)
-		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"), notifier = notifier,
 			tray = opts.tray and tray_menu or nil },
 			device .. " is not readable (the input group applies from the next session)"))
 	end
@@ -1334,7 +1334,7 @@ local function main()
 			and function() prediction_engine.cancel() end or nil,
 		-- A pause and a resume are announced, as on macOS (shared keys and levels).
 		notify = notifier and function(key, level)
-			return notifier.send(require("infra.i18n").get(key), { level = level })
+			return notifier.send(require("core.i18n.engine.i18n").get(key), { level = level })
 		end or nil,
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
@@ -2631,7 +2631,7 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+		require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil },
 			"/dev/uinput cannot be opened for writing (uinput group or module missing)")
 		error("Fast output unavailable; refusing input capture", 0)
@@ -2767,7 +2767,7 @@ local function main()
 	-- is French. Running it after section 8.9 meant the first tray a non-French
 	-- user ever saw was drawn entirely in French, and stayed that way until
 	-- something happened to rebuild the menu.
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n and i18n_mod then
 		i18n_mod.init()
 		-- From the manifest, like every other reader of this value. This was the

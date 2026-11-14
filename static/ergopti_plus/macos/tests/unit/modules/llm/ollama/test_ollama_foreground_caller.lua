@@ -12,7 +12,7 @@ local function with_api(kind, callback)
 		"adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 		"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
+		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "core.i18n.engine.i18n",
 		"modules.shortcuts.script_control" }, function()
 		local shell = { tasks = {}, mode = "true", clients = {} }
 		function shell.spawn(executable, args, done, chunk, environment, private, owned)
@@ -43,7 +43,7 @@ local function with_api(kind, callback)
 		package.loaded["adapters.shell_runner"] = shell
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["adapters.http_client"] = { new = function()
 			local client = { settled = true, cancel_calls = 0 }
 			function client.cancel() client.cancel_calls = client.cancel_calls + 1; return true end

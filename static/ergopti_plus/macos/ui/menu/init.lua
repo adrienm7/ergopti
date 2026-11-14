@@ -20,7 +20,7 @@ local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("infra.logger")
 local PhaseStats       = require("infra.phase_stats")
 local text_utils = require("infra.text_utils")
-local i18n             = require("infra.i18n")
+local i18n             = require("core.i18n.engine.i18n")
 local ui_restore       = require("infra.ui_restore")
 local Manifest         = require("infra.manifest_reader")
 

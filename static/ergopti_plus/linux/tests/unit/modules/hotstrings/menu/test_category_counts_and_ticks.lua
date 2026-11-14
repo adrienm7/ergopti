@@ -204,7 +204,7 @@ helpers.describe("category row: its bulk rows", function()
 		helpers.assert_eq(declarations, 1, "one canonical enable-all declaration must own the row")
 		helpers.assert_true(type(declaration.i18n) == "string" and declaration.i18n ~= "",
 			"the shared enable-all declaration must supply its translated label")
-		local label = require("infra.i18n").get(declaration.i18n)
+		local label = require("core.i18n.engine.i18n").get(declaration.i18n)
 		local enable_row, matches = nil, 0
 		for _, item in ipairs(row.menu or {}) do
 			if item.title == label then enable_row, matches = item, matches + 1 end

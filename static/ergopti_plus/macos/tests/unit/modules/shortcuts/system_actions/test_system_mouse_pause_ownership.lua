@@ -43,7 +43,7 @@ local function fresh_mouse_owner()
 		"adapters.synthetic_input",
 		"infra.logger",
 		"infra.notifications",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
 	local fixture = {
@@ -354,7 +354,7 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["adapters.mouse_control"] = {
 		setPos = function()
 			if type(fixture.boundary_hook) == "function" then

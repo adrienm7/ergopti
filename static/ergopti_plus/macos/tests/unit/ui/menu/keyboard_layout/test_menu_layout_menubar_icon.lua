@@ -19,7 +19,7 @@ local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 --- @return table rendered submenu rows
 local function tray_rows(ctx)
 	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-	local ManifestMenu = LayoutFixture.install(require("infra.i18n"))
+	local ManifestMenu = LayoutFixture.install(require("core.i18n.engine.i18n"))
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
 	local row = ManifestMenu.render_rows({ item }, "top_level")[1]
@@ -78,7 +78,7 @@ helpers.describe("layout submenu: the menubar icon is one choice row", LayoutFix
 
 	helpers.it("is the last row of the custom-layout section", function()
 		local rows = tray_rows(make_ctx("v1"))
-		local header = index_of(rows, require("infra.i18n").section("menu.layout.header_custom"))
+		local header = index_of(rows, require("core.i18n.engine.i18n").section("menu.layout.header_custom"))
 		local at = index_of(rows, "menu.layout.menubar_icon")
 		helpers.assert_true(header ~= nil and at ~= nil and header < at,
 			"the icon row belongs to the custom-layout section")

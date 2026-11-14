@@ -254,10 +254,10 @@ helpers.describe("LLM API persistence transaction", function()
 				end
 				remote.check_availability = function(_, callback) callback(); return true end
 				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "infra.dialog_util",
-					"infra.i18n", "infra.manifest_menu", "infra.notifications" }, function()
+					"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications" }, function()
 					local prompts, updates, warmups = 0, 0, 0
 					local notices = {}
-					package.loaded["infra.i18n"] = { get = function(key) return key end }
+					package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 					package.loaded["infra.dialog_util"] = {
 						text_prompt = function()
 							prompts = prompts + 1
@@ -273,7 +273,7 @@ helpers.describe("LLM API persistence transaction", function()
 						platform = "hs",
 						manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 						json_decode = require("core.fs.adapters.json_codec").decode,
-						i18n = { get = package.loaded["infra.i18n"].get, section = function() return {} end },
+						i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = function() return {} end },
 						logger = helpers.make_logger_stub(),
 					}))
 					package.loaded["infra.manifest_menu"] = {

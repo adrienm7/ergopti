@@ -21,7 +21,7 @@
 local M = {}
 
 local ChoicePrompt = require("ui.choice_prompt")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local TextPrompt = require("ui.text_prompt")
 local Vision = require("ai.engine.prediction.vision")
 
