@@ -30,7 +30,9 @@
  * `tools/lint/locale-identical-to-english-allowlist.json` lists each legitimate
  * (key, locale) pair with a reason, and the gate is shrink-only: a new identical
  * value fails until it is translated or listed, and a listed value that has been
- * translated fails until its entry is removed.
+ * translated fails until its entry is removed. The « pending-translation »
+ * reason covers Studio and editor labels written in English and French first
+ * (maintainer rule, 2026-11-14); it never covers French.
  *
  * WHAT THIS DELIBERATELY DOES NOT CHECK — FORMAT PLACEHOLDERS:
  * A "translations must carry the same %s / {n} as English" rule was measured and
@@ -71,6 +73,10 @@ const REFERENCE = 'en'; // The canonical key set every other catalogue mirrors.
 
 const ALLOWLIST = path.join(ROOT, 'tools', 'lint', 'locale-identical-to-english-allowlist.json');
 const ALL_LOCALES = '*'; // Allowlist shorthand: identical in every locale except the reference.
+// The reason of a Studio or editor label written in English and French first
+// (maintainer rule, 2026-11-14), and the locale such a label is always written in.
+const PENDING_TRANSLATION = 'pending-translation';
+const PENDING_TRANSLATION_REQUIRED = 'fr';
 
 const errors = [];
 
@@ -295,6 +301,18 @@ function loadAllowlist() {
 					);
 				}
 			}
+		}
+		// English and French first: a label waiting for its other translations is
+		// always written in French, so this reason never covers French.
+		if (
+			entry.reason === PENDING_TRANSLATION &&
+			(locales === ALL_LOCALES || locales.has(PENDING_TRANSLATION_REQUIRED))
+		) {
+			errors.push(
+				`allowlist key "${key}" is pending translation, so it must already be translated ` +
+					`into ${PENDING_TRANSLATION_REQUIRED} and list the other locales one by one`
+			);
+			continue;
 		}
 		entries.set(key, { reason: entry.reason, locales });
 	}

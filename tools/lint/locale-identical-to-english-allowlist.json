@@ -6,7 +6,8 @@
 		"unit-or-abbreviation": "Unit or technical abbreviation (s, km, RAM, CPM, WPM).",
 		"file-name-or-token": "File name, URL or placeholder token that must not be translated.",
 		"symbol-or-placeholder-only": "Glyphs, key sequences or placeholders without translatable words.",
-		"loanword-or-cognate": "Word that is spelled the same in this locale (cognate or established loanword), checked per key."
+		"loanword-or-cognate": "Word that is spelled the same in this locale (cognate or established loanword), checked per key.",
+		"pending-translation": "Studio, layout editor or analyser label written in English and French first (maintainer rule, 2026-11-14): the other locales carry the English value until the labels settle, then the entry is translated and deleted. Never for French."
 	},
 	"entries": {
 		"app_category.finance": {
