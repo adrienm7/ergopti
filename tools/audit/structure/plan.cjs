@@ -102,6 +102,11 @@ function isCodeFolder(treeRelFolder) {
  * @param {Map<string, string|null>} map Tree-relative old path to target.
  * @param {Map<string, number>} existing The folders of the index today and their entry counts.
  */
+/** True for a Convention P README marker a step writes (edits.cjs PLATFORM_MARKERS). */
+function isPlatformMarker(treeRel) {
+	return Edits.PLATFORM_MARKERS.some((m) => m.file === treeRel);
+}
+
 function foldSingletons(map, existing) {
 	for (let pass = 0; pass < 8; pass++) {
 		const targets = [...map.values()].filter(Boolean);
@@ -138,6 +143,11 @@ function foldSingletons(map, existing) {
 			const only = [...entries][0];
 			// A Convention S marker is retired even where a counterpart is real:
 			// the absence is declared in _shared/core/features.json instead.
+			// A Convention P marker is the reverse: every driver ships every
+			// platform domain, and the README is that domain's declared absence
+			// (edits.cjs PLATFORM_MARKERS). S13 wrote two, and retiring them made
+			// the next step unnumbered.
+			if (only === 'README.md' && isPlatformMarker(`${folder}/${only}`)) continue;
 			if (only === 'README.md' && isCodeFolder(folder)) {
 				for (const [old, t] of map) if (t === `${folder}/${only}`) map.set(old, null);
 				changed = true;
@@ -3899,6 +3909,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	foldSingletons,
 	committedSteps,
 	SPLIT,
 	neverRewritten,

@@ -65,6 +65,18 @@ function run() {
 				.sort(),
 			['macos/platform/desktop_focus/README.md', 'windows/platform/desktop_focus/README.md']
 		);
+	// Once written, a marker stays where it is: the singleton pass, which
+	// retires a code folder holding only a README, leaves a Convention P
+	// marker in place. S13 wrote two and retiring them left S14 unnumbered.
+	const written = new Map(Edits.PLATFORM_MARKERS.map((m) => [m.file, m.file]));
+	written.set('macos/platform/zz_probe_only/README.md', 'macos/platform/zz_probe_only/README.md');
+	Plan.foldSingletons(written, new Map());
+	for (const m of Edits.PLATFORM_MARKERS) assert.equal(written.get(m.file), m.file, m.file);
+	assert.equal(
+		written.get('macos/platform/zz_probe_only/README.md'),
+		null,
+		'an unlisted README-only folder retires'
+	);
 	console.log(
 		'[OK] every platform domain the plan fills is on every driver, by files or a marker.'
 	);
