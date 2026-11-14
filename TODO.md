@@ -250,6 +250,9 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
       keep a backup ref of the old dev, rewrite author and committer to the maintainer with git filter-repo, update
       the commit ids cited in TODO.md, docs and pins, force-push dev once with --force-with-lease (authorized for
       this rewrite only), then rebase any open branch.
+      Scope (maintainer, 2026-11-14 night): remove EVERY mention of Claude from the history, not only the author and
+      committer: Co-Authored-By and Claude-Session trailers, session links, and any other reference to Claude or
+      Anthropic in commit messages, on every branch that keeps history (dev, and main if any appears there).
 
 ## Ergopti Studio inside Ergopti+ (maintainer request, 2026-11-14)
 
@@ -417,6 +420,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       the user's mapping; the profile is saved with the user's layouts, exportable, importable and resettable.
 - [ ] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
       /studio/comparer; /editeur redirects to /studio; menus, links and docs point to /studio.
+
+- [ ] **Redesign the layout editor (maintainer, 2026-11-14 night).** Today it is cluttered: buttons everywhere,
+      everything packed together. Rework « Éditer » (site and app, one shared page) into a clean, responsive, well
+      designed UI: tabs or collapsible sections for the secondary tools (stickers, navigation layer import, export,
+      metadata), more horizontal space, clear hierarchy, works from phone width to wide screens, light and dark.
+      Add a visible layer selector to show and edit the Base, Shift, AltGr and Shift+AltGr layers (and other layers
+      the layout defines); the maintainer could not find how to display them.
 
 ## Windows CI reliability (2026-11-07)
 
