@@ -51,9 +51,10 @@ local function module_source(module_name)
 	return module_name:gsub("%.", "/") .. ".lua"
 end
 
---- Lists every UI Lua source recursively, wherever its feature keeps it.
+--- Lists every production Lua file of the driver, driver-relative (tests/
+--- excluded): the inventory the UI sources are selected from.
 --- @return table paths
-local function ui_sources()
+local function lua_inventory()
 	local ok_lfs, lfs = pcall(require, "lfs")
 	local paths = {}
 	if ok_lfs then
@@ -64,7 +65,7 @@ local function ui_sources()
 					local attr = lfs.attributes(DRIVER_ROOT .. path)
 					if attr and attr.mode == "directory" then
 						if path ~= "tests" then walk(path .. "/") end
-					elseif entry:match("%.lua$") and helpers.is_ui_source(path) then
+					elseif entry:match("%.lua$") then
 						paths[#paths + 1] = path
 					end
 				end
@@ -82,13 +83,21 @@ local function ui_sources()
 		for _, line in ipairs(inventory) do
 			local normalized = line:gsub("\\", "/"):gsub("%s+$", "")
 			local relative = normalized:gsub("^.*/macos/", "")
-			if not relative:match("^tests/") and helpers.is_ui_source(relative) then
-				paths[#paths + 1] = relative
-			end
+			if not relative:match("^tests/") then paths[#paths + 1] = relative end
 		end
 		assert(#paths > source_count, "source inventory contains no matching files")
 	end
 	table.sort(paths)
+	return paths
+end
+
+--- Lists every UI Lua source, wherever its feature keeps it.
+--- @return table paths
+local function ui_sources()
+	local paths = {}
+	for _, path in ipairs(lua_inventory()) do
+		if helpers.is_ui_source(path) then paths[#paths + 1] = path end
+	end
 	return paths
 end
 
