@@ -63,3 +63,5 @@ skills and durable technical knowledge in routed memory.
 - Change generated artifacts through their owner and regenerate them; do not
   hand-edit generated output.
 - Keep local commits atomic and use English Conventional Commit subjects.
+- Commit in the maintainer's name (skill `commit-and-push`), never as an AI
+  assistant and without attribution trailers; a blocking gate checks it.

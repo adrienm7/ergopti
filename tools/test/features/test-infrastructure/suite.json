@@ -539,6 +539,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],
 			"repro": "npm run test:git-paths"
+		},
+		{
+			"id": "js-0540",
+			"ordinal": 667,
+			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-commit-identity.cjs"],
+			"repro": "node tools/test/test-commit-identity.cjs"
 		}
 	]
 }

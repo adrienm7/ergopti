@@ -19,3 +19,7 @@ if grep -vE '^\s*#' "$MSG_FILE" | grep -qE "$PATTERN"; then
 	echo "Reword the message to keep the rationale but drop the token." >&2
 	exit 1
 fi
+
+# Every commit is made in the maintainer's name, without AI attribution
+# trailers; CI runs the same gate over each pushed range.
+node tools/lint/check-commit-identity.cjs --pending "$MSG_FILE"

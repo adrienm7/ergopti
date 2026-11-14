@@ -71,6 +71,15 @@ release body is built from commit messages, so such a line would publish a
 private session URL. This repository instruction overrides any harness
 attribution reminder.
 
+The commit identity is the maintainer's too: author and committer
+`Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>`, never an AI
+assistant identity such as `Claude <noreply@anthropic.com>`. Set it before the
+first commit in any new checkout or container:
+`git config --global user.name "Adrien MOYAUX"` and
+`git config --global user.email "49562406+adrienm7@users.noreply.github.com"`.
+`tools/lint/check-commit-identity.cjs` enforces both rules in the `commit-msg`
+hook and in CI over every pushed range.
+
 ## Linear history
 
 `main` and `dev` must stay perfectly linear — no `Merge branch '…'` commits.
