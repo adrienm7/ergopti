@@ -171,6 +171,10 @@ _CMJ_CurrentSchemaAiAdmission(Path) {
 	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
 	Suspend(true)
 	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")
+	; A pause stops typing, not configuration (EDD-1): an AI that is on can be switched off.
+	_LLM_Menu["enabled"] := true
+	AssertTrue(Getters["llm_toggle_ready"].Call(), "an enabled AI can be switched off while paused")
+	_LLM_Menu["enabled"] := false
 	Suspend(false)
 	AssertTrue(Getters["llm_toggle_ready"].Call())
 	Messages := []

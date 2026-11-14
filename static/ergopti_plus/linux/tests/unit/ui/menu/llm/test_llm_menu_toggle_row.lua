@@ -58,11 +58,13 @@ end
 --- @param llm table
 --- @param changed table|nil Receives a `count` of on_menu_changed calls.
 --- @return table items
-local function build(llm, changed)
+local function build(llm, changed, paused)
 	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		_version = "0.0.0-dev.12",
 		llm = llm,
+		paused = paused == true,
+		is_paused = function() return paused == true end,
 		on_quit = function() end,
 		on_menu_changed = function() if changed then changed.count = changed.count + 1 end end,
 	})
@@ -96,6 +98,23 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		rows[1].fn()
 		helpers.assert_eq(calls.toggle, 1, "the row must reach llm.toggle")
 		helpers.assert_eq(changed.count, 1, "the tray must be rebuilt so the label follows the state")
+	end)
+
+	-- A pause stops typing, not configuration (EDD-1): an AI that is on can be
+	-- switched off while paused; turning it on waits for resume.
+	helpers.it("turns an enabled AI off while paused (edd1-paused-writes)", function()
+		local llm, calls = fake_llm(true)
+		local rows = submenu_of(build(llm, nil, true), "menu.llm.title")
+		helpers.assert_true(rows[1].disabled ~= true, "the switch stays live")
+		rows[1].fn()
+		helpers.assert_eq(calls.toggle, 1, "the paused click reaches llm.toggle")
+	end)
+
+	helpers.it("keeps an off AI off while paused (edd1-paused-writes)", function()
+		local llm, calls = fake_llm(false)
+		local rows = submenu_of(build(llm, nil, true), "menu.llm.title")
+		if type(rows[1].fn) == "function" then rows[1].fn() end
+		helpers.assert_eq(calls.toggle, 0, "turning the AI on waits for resume")
 	end)
 
 	-- ai-menu-no-clear: « Tout effacer (comportement du système) » sat under the
