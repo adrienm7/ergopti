@@ -173,6 +173,13 @@
 			"restore_dead_key_pairs": false,
 			"format": "tsv",
 			"tsv_text_column": 1
+		},
+		{
+			"id": "fr_wikipedia",
+			"title": "Wikipédia — 20 articles",
+			"language": "fr",
+			"file": "static/corpus/original/fr/wikipedia_fr_20_articles.txt",
+			"restore_dead_key_pairs": false
 		}
 	]
 }

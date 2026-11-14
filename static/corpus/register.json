@@ -201,6 +201,15 @@
 			"status": "ship",
 			"note": "Jules Verne died in 1905. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		},
+		"original/fr/wikipedia_fr_20_articles.txt": {
+			"title": "Wikipédia en français — 20 articles",
+			"source": "Wikipédia en français, plain-text extracts of 20 articles through the MediaWiki API (2026-11-14), section headings removed",
+			"url": "https://fr.wikipedia.org/",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Wikipédia en français contributors; the articles and revisions are listed in the note",
+			"status": "ship",
+			"note": "Wikipedia's text is licensed CC BY-SA 4.0; each article's authors are in its history at https://fr.wikipedia.org/. Articles: France (revision 241340124); Paris (revision 241315985); Français (revision 241066198); Révolution française (revision 240610460); Victor Hugo (revision 240809344); Informatique (revision 240779412); Mathématiques (revision 240596364); Musique classique (revision 240100957); Cuisine française (revision 240239713); Football (revision 240704136); Changement climatique (revision 241147632); Union européenne (revision 241323769); Histoire de l'art (revision 240677724); Chimie (revision 241100540); Biologie (revision 240275686); Astronomie (revision 241063209); Internet (revision 241104224); Littérature française (revision 241142243); Cinéma français (revision 241337914); Philosophie (revision 241274565)."
+		},
 		"original/fr/zola_germinal.txt": {
 			"title": "Germinal (Émile Zola, 1885)",
 			"source": "Project Gutenberg ebook 5711",
