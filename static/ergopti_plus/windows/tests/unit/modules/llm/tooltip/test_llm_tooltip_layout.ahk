@@ -449,7 +449,9 @@ Test("llm tooltip layout: waiting shares no hotstring row (llm-hotstring-tooltip
 ; arms its repaint at the first row deadline still ahead, and none without one.
 _TLL_SharedHeaderExpiryIsArmed() {
 	global _TooltipActiveSurface
-	Now := 1000000
+	; Rows built from the live tick: a fixed tick can lie ahead of a freshly
+	; booted machine's clock, which the surface checks must never read.
+	Now := A_TickCount + 1000
 	Rows := [{ Text: "btw", FireDecision: {}, ExpireOriginTick: Now - 500, ExpireDurationMs: 2000 },
 		{ Text: "afaik", FireDecision: {}, ExpireOriginTick: Now - 100, ExpireDurationMs: 800 },
 		{ Text: "gone", FireDecision: {}, ExpireOriginTick: Now - 900, ExpireDurationMs: 300 }]
