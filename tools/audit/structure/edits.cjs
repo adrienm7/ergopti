@@ -142,6 +142,22 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\tfs.mkdirSync(path.join(packaged, 'core/ui/ui'), { recursive: true });"
 	},
 	{
+		// The network runtime's actual-native phase stages the probe and the
+		// native proxy runtime in an installed-shaped tree built on a variable
+		// driver root; S08 moves both to core/network/adapters, where the
+		// respelled probe path now runs from.
+		file: 'tools/test/test-linux-network-runtime.cjs',
+		moves: 'linux/platform/network/runtime_probe.lua',
+		from: "\t\tfs.mkdirSync(path.join(driver, 'platform/network'), { recursive: true });",
+		to: "\t\tfs.mkdirSync(path.join(driver, 'core/network/adapters'), { recursive: true });"
+	},
+	{
+		file: 'tools/test/test-linux-network-runtime.cjs',
+		moves: 'linux/platform/network/runtime_probe.lua',
+		from: "\t\t\t\tpath.join(driver, 'platform/network', name)\n",
+		to: "\t\t\t\tpath.join(driver, 'core/network/adapters', name)\n"
+	},
+	{
 		// The literal AppDir contract runs workers from the driver root as its
 		// working directory (./adapters/x.lua); the plan reads ./ from the
 		// fixture's own folder. S09 moves the SQLite worker under core/process.
