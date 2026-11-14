@@ -33,7 +33,12 @@ function run() {
 	const steps = Plan.steps(map);
 	// Each marker is triggered by a real move and authored once.
 	for (const marker of Edits.PLATFORM_MARKERS) {
-		assert.ok(map.has(marker.moves), `${marker.file}: ${marker.moves} is no planned move`);
+		// Once its step has landed, the trigger is no move and the marker is there.
+		const landed = fs.existsSync(path.join(REPO, 'static/ergopti_plus', marker.file));
+		assert.ok(
+			map.has(marker.moves) || landed,
+			`${marker.file}: ${marker.moves} is no planned move`
+		);
 		const source = path.join(REPO, 'tools/audit/structure/markers', marker.file);
 		assert.ok(fs.existsSync(source), `${marker.file}: no authored source`);
 		assert.match(fs.readFileSync(source, 'utf8'), /^# \S+ \((Linux|macOS|Windows)\)\n/);
