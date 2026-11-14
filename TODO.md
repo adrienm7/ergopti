@@ -60,12 +60,11 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
 3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
    or a release stay for the maintainer; say so on the item and move on.
 
-State of the parity queue (worker H, 2026-11-14 18:13 Paris): the pause fourth pass is on `dev` (CI run
-43574300302), then the AI switch turning the AI off while paused and the AI profile rows (choose, create, clone,
-edit, delete) on the three OS (CI run 43614764011). Next: the rest of « Parity audit pause and resumption » (the
-AI model and API rows, the macOS legacy shortcut and slot rows, the magic key capture, the typing-inertness
-audit; see docs/plans/parity-pause-resume.md), then « Sequential WPM, wrap and personal-info parity
-follow-up », whose rows are mostly CI and hardware.
+State of the parity queue (worker H, 2026-11-14 21:32 Paris): on `dev`, the pause fourth pass (CI run 43574300302),
+the AI switch and profile rows (CI run 43614764011), then the AI model and API rows on macOS and Linux with the macOS
+warmup replayed on resume (CI run 43628135718). Next: the macOS slot and legacy shortcut rows, the magic key capture
+and the typing-inertness audit, with the notes in docs/plans/parity-pause-resume.md; then « Sequential WPM, wrap and
+personal-info parity follow-up », whose rows are mostly CI and hardware.
 
 ### Reds `dev` already has (2026-11-14 morning), the baseline a change is compared with
 

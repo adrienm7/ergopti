@@ -99,6 +99,13 @@ paused; the macOS profile shortcut waits for resume because it binds a hotkey
 on macOS and Linux, `test_config_journal_ai_admission.ahk`, the profile
 suites (`edd1-paused-writes`).
 
+Later on 2026-11-14 (worker H): the macOS model page opens while paused and
+its choices, downloads and API entry changes run; a key test, a server rescan,
+an MLX port change and a runtime install wait for resume, and a model chosen
+while paused is warmed on resume (`warmup_controller.defer_to_resume`). Linux
+removes an installed model while paused. Windows keeps both refused: its pause
+retires every AI operation and its tray greys the AI submenu (EDD-1 on AHK).
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -110,10 +117,9 @@ source proofs reworked first:
   slots' rebinding under `KeyboardShortcuts`' lifecycle pause is not yet
   traced; each shortcut's own row, the wrap rows, the ChatGPT URL editor and
   the tap-key rows run while paused.
-- AI menus, all three drivers: turning the AI on (it starts a model warmup,
-  which is not pause-aware on macOS), the model rows, model deletion, the API
-  entry rows, the whole-scope restore and clear on Windows, and the Windows
-  tray's greying of the AI submenu.
+- AI menus: turning the AI on (it starts model warmups and may offer an
+  install), and on Windows the model and API entry rows, the whole-scope
+  restore and clear, and the tray's greying of the AI submenu.
 - macOS hotstrings submenus: the personal legacy shortcut row (it binds a
   hotkey).
 - macOS magic key source capture: it listens to a physical key press.
