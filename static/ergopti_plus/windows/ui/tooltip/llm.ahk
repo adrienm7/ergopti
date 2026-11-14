@@ -1469,8 +1469,10 @@ _LLM_TooltipSharedHeaderNextExpiryMs(Items, NowTick) {
 ; @param {Array} HeaderItems - The rows the panel just drew.
 _LLM_TooltipArmSharedHeaderExpiry(HeaderItems) {
 	global _TooltipActiveSurface
+	if !IsObject(_TooltipActiveSurface)
+		return false
 	DelayMs := _LLM_TooltipSharedHeaderNextExpiryMs(HeaderItems, A_TickCount)
-	if (DelayMs <= 0 || !IsObject(_TooltipActiveSurface))
+	if (DelayMs <= 0)
 		return false
 	SetTimer(_LLM_TooltipExpireSharedHeader.Bind(_TooltipActiveSurface), -(DelayMs + 1))
 	return true
