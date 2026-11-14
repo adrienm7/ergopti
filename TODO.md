@@ -439,6 +439,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       of Studio, the layout editor and the analyser goes through the i18n system, written in English and French only
       for now; improve the labels first, translate into the other locales afterwards.
 
+- [ ] **Site keyboard display from a layout file, later (maintainer, 2026-11-14 night; not now).** The site's
+      Ergopti keyboard display is hand-coded today. Make it render from a layout source instead (the Ergopti TOML
+      source or a .keylayout), so the site can display and emulate any layout. The maintainer's display tweaks on top
+      of the raw layout (labels, visual adjustments) become code: a documented display patch applied after loading
+      the TOML or keylayout, reproducing today's Ergopti display exactly (pixel or DOM comparison test against the
+      current hand-coded rendering). Not started: queued after the current Studio work.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
