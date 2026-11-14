@@ -63,15 +63,26 @@ OS; CI run 43574300302). Next: the rest of « Parity audit pause and resumption 
 profile and API rows, the macOS legacy shortcut and slot rows, the magic key capture, the typing-inertness
 audit), then « Sequential WPM, wrap and personal-info parity follow-up », whose rows are mostly CI and hardware.
 
-### Reds `dev` already has (2026-11-12 evening), the baseline a change is compared with
+### Reds `dev` already has (2026-11-14 morning), the baseline a change is compared with
 
-Linux E2E desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
-Packaging and boot (Linux uninstall EX_UNAVAILABLE, Arch desktop entry); macOS release Darwin receiver. Known
-flakes: macOS Intel Managed Ollama Go test `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (passes on
-rerun); a macOS cold-bootstrap job whose runner is lost (no log); Windows Unit tests in the native step « Native
+From run [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (worker G's landing, dispatched
+10:15 Paris): Windows Integration Driver startup (`toml.flat_values` over its ceiling on the realistic fixture; worker
+I's fix landed on `dev` after this run's base); Linux E2E updater (the temporary native Lua 5.4 provider preparation refuses at
+`prepare-linux-lua54-native-provider.cjs:99`: a cffi-lua vendor test does not return OK on Ubuntu 26.04; worker G;
+the live step also needs a post-move dev prerelease); Linux E2E desktop-webview (AT-SPI first-focus race, worker J,
+`claude/ergopti-todo-linux-flakes`); Common Packaging and boot (`test:windows-bundle-manifest`:
+`windows/_generated/value_schema.ahk` names the Lua `max_from` provenance of `llm.generation.context_length`, from
+a1b7b4ff9f; owner to be named by the coordinator). Not run because an earlier stage was red, so not yet proven green:
+Windows E2E, Build and Install; Linux Build and Install; Common Shared UI rendering, Build and Install (Shared UI now
+runs on `ubuntu-24.04`, the newest release the locked Playwright 1.58.2 supports). Known flakes: Windows Unit core
+`plain-native-cas-owner` (worker A, c400dfd2 on `claude/ergopti-todo-cas-flake`); Windows Unit tests in the native step « Native
 editor receiver matrix failed » (`editor_replace_test.c`, 45/48, one shard of 14 on the same tree in run 43509959681;
 probably the worker's 100 ms message or 250 ms visibility window on a loaded runner, case not named; naming it changes
-the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_owner.dll`).
+the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_owner.dll`). Green again since the 2026-11-12
+list: Windows Unit meta, Linux E2E platform-metrics and input-display, Linux unit rows on every distribution, Common
+App Cloner literals, the Linux uninstall and Arch desktop entry fixtures, the macOS release Darwin receiver and the
+macOS Intel Managed Ollama Go race (`TestCancellationAndConcurrentClosePhysicallyRetirePeer`, fixed with its
+`slow-start` case).
 
 ### Maintainer decisions of 2026-11-13, to implement
 
@@ -767,10 +778,11 @@ between workers) green alone. All live checks pass, typed by the harness.
       `tools/build/add-linux-legacy-update-probes.sh` adds both to the release tarball (decided by the coordinator on
       2026-11-13, to review by the maintainer; proved locally by the real v1.0.9 installer applying a post-move
       tarball). Remove that step, its call and `test-linux-legacy-update-probes.cjs` once the first release whose
-      updater finds a staged shared root by `build_stamp.txt` (5d0b2fc481) has been out for one full release cycle.
+      updater finds a staged shared root by `build_stamp.txt` (835136bba0) has been out for one full release cycle.
       The structure step that moves `linux/infra/version.lua` (also required by v1.0.9) fails this build until it
       adds that probe too. macOS only loses the boot-health probation if `macos/infra/updater_boot_ready.lua` moves;
-      Windows replaces one exe and probes nothing.
+      Windows replaces one exe and probes nothing. Landed by worker G on 2026-11-14; its check passed in CI run
+      [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (Common Packaging and boot, 25/26).
 - [x] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
@@ -948,11 +960,13 @@ Each closes on a named green hosted or native run, recorded here.
       (runs 42438031643, 42480689370, `[Errno 1] Operation not permitted`), is fixed at its cause in bce01f27: XNU
       answers `killpg(group, 0)` with EPERM while the last members are unreaped zombies.
       Worker G, 2026-11-13 (Paris): the baseline flake `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (macOS
-      Intel Managed Ollama) is fixed at its cause in 927912e33b: a 120 ms deadline and a 200 ms idle clock could end
+      Intel Managed Ollama) is fixed at its cause in 9496d32980: a 120 ms deadline and a 200 ms idle clock could end
       the request before a slow runner had started the peer, so the retirement check found no receipt. Each case now
       cancels once the peer has recorded itself; a slow-start case (peer delayed 300 ms) fails with the old timing and
-      passes now. `TestClientErrorPrivacyRetainsContextCause` had the same 100 ms race (999d111fb2). Keep it listed until
-      the Intel cell stays green.
+      passes now. `TestClientErrorPrivacyRetainsContextCause` had the same 100 ms race (4e58a4f0ea). Keep it listed until
+      the Intel cell stays green. Landed on 2026-11-14; both Managed Ollama and Managed Ollama build cells, Intel and Apple
+      silicon, passed with the `slow-start` case in CI run
+      [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369).
       New 2026-11-11: Install-and-launch `symlink_logs_dir` failed once in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482167) with "Quit did
       not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
       0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
