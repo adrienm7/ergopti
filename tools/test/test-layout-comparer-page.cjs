@@ -17,6 +17,10 @@
  *    21 locales, the page draws an « i » button for each, and the placeholders
  *    of each explanation match English.
  * 4. Corpora: every built-in corpus of the generated data has its tables file.
+ * 5. Globals: no page script reads `window.X` for an X a loaded script
+ *    declares with a top-level const or let, which is a page global but not
+ *    a window property (the .keylayout import once read window.LAYOUT_COMPOSER_DATA
+ *    and got undefined).
  * ==============================================================================
  */
 
@@ -127,6 +131,20 @@ for (const corpus of DATA.corpora)
 		fs.existsSync(path.join(PAGE_DIR, corpus.script)),
 		`corpus ${corpus.id}: no ${corpus.script}`
 	);
+
+// 5/ Globals
+const lexical = new Set();
+for (const src of SCRIPTS)
+	for (const m of fs
+		.readFileSync(path.join(PAGE_DIR, src), 'utf8')
+		.matchAll(/^(?:const|let|class)\s+([A-Za-z_$][\w$]*)/gm))
+		lexical.add(m[1]);
+check(lexical.has('LAYOUT_COMPOSER_DATA'), 'globals: composer_data.js no longer seen');
+for (const file of ['comparer_page.js', 'corpus_files.js'])
+	for (const m of fs
+		.readFileSync(path.join(PAGE_DIR, file), 'utf8')
+		.matchAll(/window\.([A-Za-z_$][\w$]*)/g))
+		check(!lexical.has(m[1]), `${file}: window.${m[1]} is undefined (a top-level const)`);
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);

@@ -806,7 +806,8 @@
 				parseToml: window.exports && window.exports.parse,
 				scancodes: DATA.scancodes,
 				composer: window.LayoutComposer,
-				table: window.LAYOUT_COMPOSER_DATA,
+				// A top-level const of composer_data.js: a page global, not a window property.
+				table: LAYOUT_COMPOSER_DATA,
 				analysis: E
 			});
 			const layout = E.layoutFromRows(
