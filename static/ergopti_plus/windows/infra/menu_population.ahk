@@ -87,6 +87,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 	if Entry.Busy
 		throw MenuPopulationReentryError("Deferred submenu build reentered")
 	Entry.Busy := true
+	HotPath_SpanTrace("tray.fill")
 	StartedAt := HotPath_Now()
 	PreviousBuilding := _MenuPopulationBuilding
 	; Nested pickers stay deferred under the published owner, finished at their open.
@@ -112,6 +113,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		PerfCount("menu.deferred_open_us." . Entry.ListId, PerfElapsedUs(StartedAt))
 		PerfCount("menu.deferred_open_runs." . Entry.ListId)
 		HotPath_LogIfSlow("Menu.deferred_build", StartedAt, Format("{1}; list={2}", Reason, Entry.ListId))
+		HotPath_SpanDone("tray.fill", StartedAt, "list=" . Entry.ListId)
 	}
 	return true
 }
