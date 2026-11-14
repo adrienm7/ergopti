@@ -111,6 +111,15 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The terminal output custody check pins the receiving test's include
+		// climb, whose start the plan cannot see from the tool; S12 moves the
+		// sender adapter to core/ui/adapters.
+		file: 'tools/test/test-windows-terminal-output-custody-adapter.cjs',
+		moves: 'windows/adapters/terminal_output_sendinput.ahk',
+		from: 'String.raw`#Include %A_LineFile%\\..\\..\\..\\..\\..\\..\\adapters\\terminal_output_sendinput.ahk`',
+		to: 'String.raw`#Include %A_LineFile%\\..\\..\\..\\..\\..\\..\\core\\ui\\adapters\\terminal_output_sendinput.ahk`'
+	},
+	{
 		// The source-run owner check names the Linux owner by joined pieces in a
 		// tool that names every driver; S06 moves it to core/lifecycle/engine.
 		file: 'tools/test/test-source-run-single-owner.cjs',
