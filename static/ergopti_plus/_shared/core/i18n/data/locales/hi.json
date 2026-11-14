@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "एक ही उँगली के द्विवर्ण (SFB)",
 	"layout_analysis.heat.sfs": "एक ही उँगली के स्किपग्राम (SFS)",
 	"layout_analysis.heat.lsb": "पार्श्व खिंचाव (LSB)",
-	"layout_analysis.heat.redirect": "दिशा परिवर्तन"
+	"layout_analysis.heat.redirect": "दिशा परिवर्तन",
+	"layout_analysis.layouts.import": "फ़ाइल से लेआउट जोड़ें:",
+	"layout_analysis.layouts.imported": "{name} जोड़ा गया ({format})।",
+	"layout_analysis.layouts.import_partial": "{name} जोड़ा गया ({format}); {count} आइटम पढ़े नहीं जा सके: {list}",
+	"layout_analysis.layouts.import_failed": "इस फ़ाइल को लेआउट के रूप में पढ़ा नहीं जा सका ({reason})।"
 }

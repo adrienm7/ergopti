@@ -10,6 +10,11 @@
 		<script src="../i18n.js"></script>
 		<script src="_generated/analysis_data.js"></script>
 		<script src="analysis_engine.js"></script>
+		<script src="../layout_composer/_generated/composer_data.js"></script>
+		<script src="../layout_composer/composer_model.js"></script>
+		<script src="../layout_editor/toml_prelude.js"></script>
+		<script src="../vendor/smol-toml.js"></script>
+		<script src="layout_formats.js"></script>
 		<script src="corpus_files.js"></script>
 		<script src="comparer_page.js"></script>
 	</head>
@@ -63,7 +68,16 @@
 					/>
 					<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
 					<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
+					<label class="la-file">
+						<span data-i18n="layout_analysis.layouts.import"></span>
+						<input
+							id="la-import"
+							type="file"
+							accept=".json,.toml,.klc,.keylayout,.xkb,.xkb_symbols,.txt,.dof"
+						/>
+					</label>
 				</div>
+				<p id="la-import-report" class="la-muted" hidden></p>
 				<div id="la-layout-list" class="la-layout-list"></div>
 			</section>
 

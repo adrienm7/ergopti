@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigramy stejným prstem (SFB)",
 	"layout_analysis.heat.sfs": "Skipgramy stejným prstem (SFS)",
 	"layout_analysis.heat.lsb": "Boční natažení (LSB)",
-	"layout_analysis.heat.redirect": "Změny směru"
+	"layout_analysis.heat.redirect": "Změny směru",
+	"layout_analysis.layouts.import": "Přidat rozložení ze souboru:",
+	"layout_analysis.layouts.imported": "{name} přidáno ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} přidáno ({format}); nepodařilo se přečíst položek: {count}: {list}",
+	"layout_analysis.layouts.import_failed": "Tento soubor nelze přečíst jako rozložení ({reason})."
 }

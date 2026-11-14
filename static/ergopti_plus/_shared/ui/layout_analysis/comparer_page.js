@@ -20,8 +20,10 @@
  *    user's own from « Éditer »). The site defines none.
  * 3. Every visible string is a locale key (21 locales).
  * 4. Per-viewer conveniences (weights, selection, corpus, keyboard, the last
- *    pasted text's tables) are kept in localStorage when it is available;
- *    the page works the same without it.
+ *    pasted text's tables, the layouts imported from files) are kept in
+ *    localStorage when it is available; the page works the same without it.
+ * 5. A layout file of any common format (layout_formats.js) joins the
+ *    comparison; what it could not read is listed.
  * ==============================================================================
  */
 
@@ -110,7 +112,8 @@
 					keyboard: state.keyboard,
 					selected: Array.from(state.selected),
 					weights: state.weights,
-					custom: state.custom
+					custom: state.custom,
+					imported
 				})
 			);
 		} catch {
@@ -122,13 +125,17 @@
 	// ======= 2/ State =========
 	// ==========================
 
-	const layouts = E.libraryLayouts().concat((HOST.layouts || []).map(E.layoutFromRows));
+	const saved = loadSaved();
+	// Layouts the user imported from files, kept with the other conveniences.
+	const imported = Array.isArray(saved.imported) ? saved.imported.filter(isLayout) : [];
+	const layouts = E.libraryLayouts()
+		.concat((HOST.layouts || []).map(E.layoutFromRows))
+		.concat(imported.map(E.layoutFromRows));
 	const byId = new Map(layouts.map((layout) => [layout.id, layout]));
 	const corpora = (HOST.corpora || [])
 		.map((corpus) => ({ id: corpus.id, title: corpus.title, host: corpus }))
 		.concat(DATA.corpora.map((corpus) => ({ id: corpus.id, title: corpus.title, builtin: corpus })))
 		.concat([{ id: CUSTOM_ID }]);
-	const saved = loadSaved();
 	const state = {
 		corpus: corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id,
 		keyboard: DATA.model.keyboards[saved.keyboard] ? saved.keyboard : 'iso',
@@ -149,6 +156,16 @@
 	};
 	if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined)
 		state.corpus = HOST.corpora[0].id;
+
+	/** Whether a saved value still reads as a layout. */
+	function isLayout(value) {
+		try {
+			E.layoutFromRows(value);
+			return true;
+		} catch {
+			return false;
+		}
+	}
 
 	/** Keeps only the saved weights the engine still scores. */
 	function validWeights(weights) {
@@ -533,6 +550,58 @@
 		}
 	}
 
+	/** Decodes a picked layout file: UTF-16 with its byte-order mark (KLC) or UTF-8. */
+	async function fileText(file) {
+		const bytes = new Uint8Array(await file.arrayBuffer());
+		if (bytes[0] === 0xff && bytes[1] === 0xfe)
+			return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+		if (bytes[0] === 0xfe && bytes[1] === 0xff)
+			return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+		return new TextDecoder().decode(bytes).replace(/^\uFEFF/, '');
+	}
+
+	/** Reads a layout file into the comparison, and says what could not be read. */
+	async function importLayout(file) {
+		const report = $('la-import-report');
+		report.hidden = false;
+		try {
+			const result = window.LAYOUT_FORMATS.read(file.name, await fileText(file), {
+				parseToml: window.exports && window.exports.parse,
+				scancodes: DATA.scancodes,
+				composer: window.LayoutComposer,
+				table: window.LAYOUT_COMPOSER_DATA,
+				analysis: E
+			});
+			const layout = E.layoutFromRows(
+				Object.assign({}, result.layout, { origin: 'user', source: file.name })
+			);
+			let id = `user_${layout.id}`;
+			for (let n = 2; byId.has(id); n++) id = `user_${layout.id}_${n}`;
+			layout.id = id;
+			layouts.push(layout);
+			byId.set(id, layout);
+			imported.push(layout);
+			state.selected.add(id);
+			report.textContent =
+				result.unmapped.length === 0
+					? t('layouts.imported', { name: layout.name, format: result.format })
+					: t('layouts.import_partial', {
+							name: layout.name,
+							format: result.format,
+							count: result.unmapped.length,
+							list: result.unmapped
+								.slice(0, 8)
+								.map((u) => u.detail)
+								.join(', ')
+						});
+			save();
+			fillLayouts();
+			analyse();
+		} catch (error) {
+			report.textContent = t('layouts.import_failed', { reason: error.code || error.message });
+		}
+	}
+
 	function visibleLayoutIds() {
 		const filter = $('la-filter').value.trim().toLowerCase();
 		return layouts
@@ -576,6 +645,11 @@
 			}
 		});
 		$('la-filter').addEventListener('input', fillLayouts);
+		$('la-import').addEventListener('change', (event) => {
+			const file = event.target.files && event.target.files[0];
+			if (file) importLayout(file);
+			event.target.value = '';
+		});
 		$('la-heat-metric').addEventListener('change', (event) => {
 			state.heat = event.target.value;
 			renderDetails();

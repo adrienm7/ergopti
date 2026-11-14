@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigrammen met dezelfde vinger (SFB)",
 	"layout_analysis.heat.sfs": "Skipgrammen met dezelfde vinger (SFS)",
 	"layout_analysis.heat.lsb": "Zijwaartse strekkingen (LSB)",
-	"layout_analysis.heat.redirect": "Richtingswissels"
+	"layout_analysis.heat.redirect": "Richtingswissels",
+	"layout_analysis.layouts.import": "Indeling uit een bestand toevoegen:",
+	"layout_analysis.layouts.imported": "{name} toegevoegd ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} toegevoegd ({format}); {count} onderdeel/onderdelen kon(den) niet worden gelezen: {list}",
+	"layout_analysis.layouts.import_failed": "Dit bestand kon niet als indeling worden gelezen ({reason})."
 }

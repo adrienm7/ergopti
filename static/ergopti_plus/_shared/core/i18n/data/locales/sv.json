@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigram med samma finger (SFB)",
 	"layout_analysis.heat.sfs": "Skipgram med samma finger (SFS)",
 	"layout_analysis.heat.lsb": "Sidledes sträckningar (LSB)",
-	"layout_analysis.heat.redirect": "Riktningsbyten"
+	"layout_analysis.heat.redirect": "Riktningsbyten",
+	"layout_analysis.layouts.import": "Lägg till en layout från en fil:",
+	"layout_analysis.layouts.imported": "{name} tillagd ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} tillagd ({format}); {count} del(ar) kunde inte läsas: {list}",
+	"layout_analysis.layouts.import_failed": "Filen kunde inte läsas som en layout ({reason})."
 }

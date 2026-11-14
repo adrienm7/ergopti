@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigrammi con lo stesso dito (SFB)",
 	"layout_analysis.heat.sfs": "Skipgrammi con lo stesso dito (SFS)",
 	"layout_analysis.heat.lsb": "Allungamenti laterali (LSB)",
-	"layout_analysis.heat.redirect": "Reindirizzamenti"
+	"layout_analysis.heat.redirect": "Reindirizzamenti",
+	"layout_analysis.layouts.import": "Aggiungi un layout da un file:",
+	"layout_analysis.layouts.imported": "{name} aggiunto ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} aggiunto ({format}); impossibile leggere {count} elemento/i: {list}",
+	"layout_analysis.layouts.import_failed": "Impossibile leggere questo file come layout ({reason})."
 }

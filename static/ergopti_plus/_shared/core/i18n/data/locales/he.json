@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "ביגרמות באותה אצבע (SFB)",
 	"layout_analysis.heat.sfs": "סקיפגרמות באותה אצבע (SFS)",
 	"layout_analysis.heat.lsb": "מתיחות צידיות (LSB)",
-	"layout_analysis.heat.redirect": "שינויי כיוון"
+	"layout_analysis.heat.redirect": "שינויי כיוון",
+	"layout_analysis.layouts.import": "הוספת פריסה מקובץ:",
+	"layout_analysis.layouts.imported": "{name} נוספה ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} נוספה ({format}); לא ניתן היה לקרוא {count} פריטים: {list}",
+	"layout_analysis.layouts.import_failed": "לא ניתן היה לקרוא את הקובץ כפריסה ({reason})."
 }

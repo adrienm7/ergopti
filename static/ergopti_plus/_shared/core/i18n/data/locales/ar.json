@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "ثنائيات بالإصبع نفسه (SFB)",
 	"layout_analysis.heat.sfs": "ثنائيات متخطية بالإصبع نفسه (SFS)",
 	"layout_analysis.heat.lsb": "تمدّدات جانبية (LSB)",
-	"layout_analysis.heat.redirect": "تغييرات الاتجاه"
+	"layout_analysis.heat.redirect": "تغييرات الاتجاه",
+	"layout_analysis.layouts.import": "إضافة تخطيط من ملف:",
+	"layout_analysis.layouts.imported": "أُضيف {name} ({format}).",
+	"layout_analysis.layouts.import_partial": "أُضيف {name} ({format})؛ تعذّرت قراءة {count} عنصرًا: {list}",
+	"layout_analysis.layouts.import_failed": "تعذّرت قراءة هذا الملف كتخطيط ({reason})."
 }

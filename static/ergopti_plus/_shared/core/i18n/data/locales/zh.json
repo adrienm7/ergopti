@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "同指连击（SFB）",
 	"layout_analysis.heat.sfs": "同指隔字（SFS）",
 	"layout_analysis.heat.lsb": "横向伸展（LSB）",
-	"layout_analysis.heat.redirect": "方向变换"
+	"layout_analysis.heat.redirect": "方向变换",
+	"layout_analysis.layouts.import": "从文件添加布局：",
+	"layout_analysis.layouts.imported": "已添加 {name}（{format}）。",
+	"layout_analysis.layouts.import_partial": "已添加 {name}（{format}）；有 {count} 项无法读取：{list}",
+	"layout_analysis.layouts.import_failed": "无法将此文件读取为布局（{reason}）。"
 }

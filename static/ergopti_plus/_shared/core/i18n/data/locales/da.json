@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigrammer med samme finger (SFB)",
 	"layout_analysis.heat.sfs": "Skipgrammer med samme finger (SFS)",
 	"layout_analysis.heat.lsb": "Sidelæns stræk (LSB)",
-	"layout_analysis.heat.redirect": "Retningsskift"
+	"layout_analysis.heat.redirect": "Retningsskift",
+	"layout_analysis.layouts.import": "Tilføj et layout fra en fil:",
+	"layout_analysis.layouts.imported": "{name} tilføjet ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} tilføjet ({format}); {count} element(er) kunne ikke læses: {list}",
+	"layout_analysis.layouts.import_failed": "Filen kunne ikke læses som et layout ({reason})."
 }

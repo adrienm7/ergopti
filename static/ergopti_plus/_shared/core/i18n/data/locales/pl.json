@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigramy tym samym palcem (SFB)",
 	"layout_analysis.heat.sfs": "Skipgramy tym samym palcem (SFS)",
 	"layout_analysis.heat.lsb": "Rozciągnięcia boczne (LSB)",
-	"layout_analysis.heat.redirect": "Zmiany kierunku"
+	"layout_analysis.heat.redirect": "Zmiany kierunku",
+	"layout_analysis.layouts.import": "Dodaj układ z pliku:",
+	"layout_analysis.layouts.imported": "Dodano {name} ({format}).",
+	"layout_analysis.layouts.import_partial": "Dodano {name} ({format}); nie udało się odczytać elementów: {count}: {list}",
+	"layout_analysis.layouts.import_failed": "Nie udało się odczytać tego pliku jako układu ({reason})."
 }

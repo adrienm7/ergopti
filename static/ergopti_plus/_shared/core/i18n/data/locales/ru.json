@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Биграммы одним пальцем (SFB)",
 	"layout_analysis.heat.sfs": "Скипграммы одним пальцем (SFS)",
 	"layout_analysis.heat.lsb": "Боковые растяжки (LSB)",
-	"layout_analysis.heat.redirect": "Смены направления"
+	"layout_analysis.heat.redirect": "Смены направления",
+	"layout_analysis.layouts.import": "Добавить раскладку из файла:",
+	"layout_analysis.layouts.imported": "{name} добавлена ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} добавлена ({format}); не удалось прочитать элементов: {count}: {list}",
+	"layout_analysis.layouts.import_failed": "Не удалось прочитать этот файл как раскладку ({reason})."
 }

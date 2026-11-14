@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "같은 손가락 연타(SFB)",
 	"layout_analysis.heat.sfs": "같은 손가락 건너뛰기(SFS)",
 	"layout_analysis.heat.lsb": "옆으로 뻗기(LSB)",
-	"layout_analysis.heat.redirect": "방향 전환"
+	"layout_analysis.heat.redirect": "방향 전환",
+	"layout_analysis.layouts.import": "파일에서 배열 추가:",
+	"layout_analysis.layouts.imported": "{name} 추가됨({format}).",
+	"layout_analysis.layouts.import_partial": "{name} 추가됨({format}). 읽지 못한 항목 {count}개: {list}",
+	"layout_analysis.layouts.import_failed": "이 파일을 배열로 읽을 수 없습니다({reason})."
 }

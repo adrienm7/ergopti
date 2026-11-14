@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Біграми одним пальцем (SFB)",
 	"layout_analysis.heat.sfs": "Скіпграми одним пальцем (SFS)",
 	"layout_analysis.heat.lsb": "Бічні розтяжки (LSB)",
-	"layout_analysis.heat.redirect": "Зміни напрямку"
+	"layout_analysis.heat.redirect": "Зміни напрямку",
+	"layout_analysis.layouts.import": "Додати розкладку з файлу:",
+	"layout_analysis.layouts.imported": "{name} додано ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} додано ({format}); не вдалося прочитати елементів: {count}: {list}",
+	"layout_analysis.layouts.import_failed": "Не вдалося прочитати цей файл як розкладку ({reason})."
 }

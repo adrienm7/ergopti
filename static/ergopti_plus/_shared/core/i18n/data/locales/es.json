@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Bigramas del mismo dedo (SFB)",
 	"layout_analysis.heat.sfs": "Skipgramas del mismo dedo (SFS)",
 	"layout_analysis.heat.lsb": "Estiramientos laterales (LSB)",
-	"layout_analysis.heat.redirect": "Redirecciones"
+	"layout_analysis.heat.redirect": "Redirecciones",
+	"layout_analysis.layouts.import": "Añadir una distribución desde un archivo:",
+	"layout_analysis.layouts.imported": "{name} añadida ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} añadida ({format}); no se pudieron leer {count} elemento(s): {list}",
+	"layout_analysis.layouts.import_failed": "No se pudo leer este archivo como distribución ({reason})."
 }

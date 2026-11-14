@@ -31,6 +31,11 @@ const SCRIPTS = [
 	'../i18n.js',
 	'_generated/analysis_data.js',
 	'analysis_engine.js',
+	'../layout_composer/_generated/composer_data.js',
+	'../layout_composer/composer_model.js',
+	'../layout_editor/toml_prelude.js',
+	'../vendor/smol-toml.js',
+	'layout_formats.js',
 	'corpus_files.js',
 	'comparer_page.js'
 ];

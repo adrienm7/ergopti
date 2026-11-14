@@ -4453,5 +4453,9 @@
 	"layout_analysis.heat.sfb": "Same-finger bigrams (SFB)",
 	"layout_analysis.heat.sfs": "Same-finger skipgrams (SFS)",
 	"layout_analysis.heat.lsb": "Lateral stretches (LSB)",
-	"layout_analysis.heat.redirect": "Redirects"
+	"layout_analysis.heat.redirect": "Redirects",
+	"layout_analysis.layouts.import": "Add a layout from a file:",
+	"layout_analysis.layouts.imported": "{name} added ({format}).",
+	"layout_analysis.layouts.import_partial": "{name} added ({format}); {count} item(s) could not be read: {list}",
+	"layout_analysis.layouts.import_failed": "This file could not be read as a layout ({reason})."
 }
