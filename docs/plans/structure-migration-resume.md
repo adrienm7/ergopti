@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 07:05)
+## Where things stand (2026-11-14, 08:30)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -90,12 +90,21 @@ same commit as each step or checkpoint. Times are Paris time.
   are never rewritten (`1e0244e6`, worker I's v1.0.9 class), unbraced shell
   paths follow (`4312b039`), the updater cohort pin of test_framework.ahk is
   requalified (`a52d1ecc`).
-- **Proof 23 (current): S03–S12, `…-proof-23` at `4bd75248` (night
-  `a52d1ecc` plus ten steps on dev `95764817`), run 43564272171, dispatched
-  07:01.** Locally on the same steps: JS 26 baseline reds with unchanged
-  error tails (managed Ollama now stops on root permissions; the encryptor
-  check flakes under parallel load only, 0/6 alone), Lua macOS 18 and Linux
-  35 = baseline by name.
+- Proof 23 (S03–S12, run 43564272171, cancelled 08:25 as not landable).
+  New failing names, all fixed on the night branch:
+  - Windows core, hotstrings, meta: the UIA worker entry's `A_ScriptDir`
+    includes (`58009acd`), AutoHotkey regexes over a driver path
+    (`e4dfd923`), the TOML lot pattern (`1eb8ec4d`), suite-root climbs
+    (`47fb5641`, `c57816e1`), OS-purity ratchets partitioned by role
+    (`8f874d51`), whole-file reads by symbol (`21cabe84`), base-name
+    shadowing refused (`51eba5b5`);
+  - Linux E2E: the field-run collector and linux/install.sh still spelled
+    the retired `$shared/lua` root, a latent S01 leftover on dev
+    (`a7046bfa`); the AppImage staging ran the runtime probe at
+    `$3/platform/network/` (`e94990ce`).
+    The four Linux E2E jobs share their tests differently from run to run:
+    compare the union of their failing names with the baseline union.
+- **Proof 24 (current): S03–S12 rebuilt from night `e94990ce`.**
 - Proof rule: for every red job, compare its failing names with the same job
   of baseline run 43309556011 (scratchpad `basefail/`, `fail-names.py`), not
   only the conclusion.
