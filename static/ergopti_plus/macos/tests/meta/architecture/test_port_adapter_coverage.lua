@@ -386,7 +386,13 @@ local function count_lua_pattern(files, pattern, adapters_prefix)
 	local count = 0
 	local details = {}
 	for _, file_path in ipairs(files) do
-		if file_path:find(adapters_prefix, 1, true) then goto continue end
+		-- Every adapters/ folder is the isolation layer, the driver's own and a
+		-- feature's (core/ui/adapters): a structure move must not turn an
+		-- adapter's OS calls into a regression of the tree it lands in.
+		if file_path:find(adapters_prefix, 1, true)
+			or file_path:find("/adapters/", #DRIVER_ROOT, true) then
+			goto continue
+		end
 		local body = SourceFile.read(file_path)
 		local line_num = 0
 		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
@@ -476,7 +482,10 @@ helpers.describe("meta: lua module OS-API purity baseline", function()
 	local all_lua_files = {}
 	for _, dir in ipairs({ "modules", "infra", "platform" }) do
 		for _, f in ipairs(list_files(macos_root .. dir, "lua")) do
-			all_lua_files[#all_lua_files + 1] = f
+			-- A UI source counts in the ui pair below, wherever it lives.
+			if not helpers.is_ui_source(f:sub(#DRIVER_ROOT + 1)) then
+				all_lua_files[#all_lua_files + 1] = f
+			end
 		end
 	end
 
@@ -486,7 +495,15 @@ end)
 -- The menus and windows. Every hs.* line here is a call the UI makes without
 -- going through a port, and the tree is two thirds the size of modules+lib.
 helpers.describe("meta: lua ui OS-API purity baseline", function()
-	purity_ratchet("ui", list_files(DRIVER_ROOT .. "ui", "lua"), LUA_HS_BASELINE_UI, LUA_IO_OS_BASELINE_UI)
+	-- Every UI source of the driver, wherever its feature keeps it.
+	local ui_files = {}
+	for _, f in ipairs(list_files(DRIVER_ROOT, "lua")) do
+		local relative = f:sub(#DRIVER_ROOT + 1)
+		if not relative:match("^tests/") and helpers.is_ui_source(relative) then
+			ui_files[#ui_files + 1] = f
+		end
+	end
+	purity_ratchet("ui", ui_files, LUA_HS_BASELINE_UI, LUA_IO_OS_BASELINE_UI)
 end)
 
 -- The entry point. list_files is recursive, so it is named directly rather than

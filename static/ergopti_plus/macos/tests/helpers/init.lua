@@ -100,6 +100,17 @@ function M.driver_root()
 	return helper_dir:gsub("[/\\]tests$", "") .. "/"
 end
 
+--- True for a UI source: a file under a ui/ folder of any feature. The core/ui
+--- feature's own name is no such folder: its adapters and engine are not UI
+--- sources, its ui/ role folder is. A source ratchet partitioned by this keeps
+--- a file in its tree whichever feature folder the structure plan moves it to.
+--- @param relative string Driver-relative path, separated by "/".
+--- @return boolean
+function M.is_ui_source(relative)
+	local rest = relative:gsub("^core/ui/", "")
+	return ("/" .. rest):find("/ui/", 1, true) ~= nil
+end
+
 -- Top-level folders of the driver's production Lua, read once per process.
 local _production_heads = nil
 
