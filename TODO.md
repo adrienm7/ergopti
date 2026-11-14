@@ -42,7 +42,10 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
    traps, maintainer decisions. One step per commit with `tools/audit/structure/apply-step.cjs`. State at 21:00
    Paris (2026-11-13): S01 and S02 are on `dev` (landed 16:50, 42f8c1327, CI run 43430776650). S03–S05 proof 16
    (run 43481259457) failed and is being triaged. 33 steps remain; the approved shared module predicate handles
-   the Lua module-prefix sweeps. Land in blocks of a few steps.
+   the Lua module-prefix sweeps. Land in blocks of a few steps. Paths that describe a published artifact (a prior
+   release's payload, a historical pin) must keep their old spelling: 8b38ac9ec7 respelled the v1.0.9 upgrade fixture.
+   Windows lane state (worker I, 2026-11-14): the whole Windows verdict is green on run 43549510667 (Build,
+   Install and launch, Driver startup included).
 2. **The maintainer decisions of 2026-11-13 below** (section « Maintainer decisions of 2026-11-13, to implement »).
 3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
    or a release stay for the maintainer; say so on the item and move on.
@@ -389,9 +392,13 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       `test-macos-tsm-refusal.cjs` against the tap-hold series, rebase them), the TODO receipts 8886f2ba and
       ec54b45e, and the MLC-005 relocation rows (4ae1131a, faa1ade6, 13af8690, b74741e8, 14d21718, 365dae29),
       held until the macOS 26 Install-and-launch rows of run 43292636135 or a later one pass.
-- [ ] **Windows compiled upgrade exit 1 (closed 2026-11-12 on its credible cause).** ed11665a is the credible cause,
+- [x] **Windows compiled upgrade exit 1 (closed 2026-11-12 on its credible cause).** ed11665a is the credible cause,
       unproven: the upgrade step was never reached afterwards. Watch for a `startup-smoke: uncaught` line on the
       next failure of Windows Install and launch.
+      Reached again on 2026-11-14 (run 43536962831), with another cause: the structure step 8b38ac9ec7 had respelled
+      the v1.0.9 prior release's extracted asset paths to the new layout, while the published package still ships
+      `_shared/core/config_schema/migrations.toml` and `_shared/data/locales/en.json`. Fixed by worker I in
+      46536e589d; Install and launch green on run 43549510667.
 
 ### Windows (the PC agent's)
 
