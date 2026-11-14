@@ -284,7 +284,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 					get = function() return "/tmp/personal_shortcuts.lua" end,
 				},
 				["core.logger.engine.logger"] = helpers.make_logger_stub(),
-				["infra.text_utils"] = {
+				["core.text.engine.utils"] = {
 					shell_quote = function(value) return value end,
 				},
 				}, function()
@@ -331,7 +331,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				["core.process.adapters.shell_runner"] = {},
 				["core.i18n.engine.i18n"] = { get = function(key) return key end },
 				["core.logger.engine.logger"] = helpers.make_logger_stub(),
-				["infra.text_utils"] = {
+				["core.text.engine.utils"] = {
 					escape_gsub_replacement = function(value) return value end,
 				},
 				}, function()

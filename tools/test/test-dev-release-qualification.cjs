@@ -236,7 +236,7 @@ const principal = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/windows/tests/run_all.ahk'),
 	'utf8'
 );
-const parserInclude = principal.indexOf('#Include ../infra/json.ahk');
+const parserInclude = principal.indexOf('#Include ../core/text/engine/json.ahk');
 const parserRegistration = principal.indexOf('TestQualificationRegisterParser(JsonParse)');
 assert(parserInclude >= 0 && parserRegistration > parserInclude);
 assert.equal((principal.match(/^TestQualificationRegisterParser\(JsonParse\)$/gm) || []).length, 1);

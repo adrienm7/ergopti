@@ -41,7 +41,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("core.logger.engine.shim")
-local Reader = require("infra.toml.reader")
+local Reader = require("core.text.engine.toml.reader")
 local Priority = require("hotstrings.engine.priority")
 local Paths  = require("core.fs.engine.paths")
 local NativeDirectory = require("core.fs.engine.native_directory")

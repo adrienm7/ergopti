@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 --- Replays the actual property module in an isolated, bounded child process.
 --- @param mode string Success, false property or backend exception.

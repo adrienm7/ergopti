@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 -- the source of truth, not to a copied literal. The reader wraps named TOML
 -- sections under `.sections`, mirroring how config.lua's require_key indexes them.
 local function shared_constants()
-	local toml_reader = require("infra.toml.reader")
+	local toml_reader = require("core.text.engine.toml.reader")
 	local path = helpers.shared("core/ui/data/tooltip/constants.toml")
 	local ok, data = pcall(toml_reader.parse, path)
 	helpers.assert_true(ok and type(data) == "table" and type(data.sections) == "table",

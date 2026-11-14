@@ -50,7 +50,7 @@ local function fresh_engine(entries, depth)
 			package.loaded[name] = nil
 		end
 	end
-	package.loaded["infra.text_utils"] = nil
+	package.loaded["core.text.engine.utils"] = nil
 	package.loaded["core.text.engine.utils_core"]       = nil
 
 	local R = require("modules.keymap.registry")
@@ -78,7 +78,7 @@ local function fresh_engine(entries, depth)
 	local utils = require("modules.keymap.utils")
 	utils.emit_text = function(text)
 		typed = text
-		return require("infra.text_utils").utf8_len(text), text, text
+		return require("core.text.engine.utils").utf8_len(text), text, text
 	end
 	E.perform_text_replacement = function(deletes, emit_action, buffer_action, is_final,
 		_ignored, _source, _variant, is_private, terminator_spec)

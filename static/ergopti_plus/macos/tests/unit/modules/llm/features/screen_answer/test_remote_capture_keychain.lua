@@ -31,7 +31,7 @@ local MODULES = {
 	"infra.manifest_reader", "ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats",
 	"ai.engine.settings.profile_selector", "ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth",
 	"ai.engine.local_servers.discovery", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
-	"hotstrings.engine.catalogue.personal_files", "core.fs.engine.dir", "infra.toml.reader", "lfs", "core.logger.engine.shim",
+	"hotstrings.engine.catalogue.personal_files", "core.fs.engine.dir", "core.text.engine.toml.reader", "lfs", "core.logger.engine.shim",
 	"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
 	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 }

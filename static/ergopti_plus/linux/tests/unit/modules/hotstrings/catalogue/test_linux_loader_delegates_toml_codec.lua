@@ -64,20 +64,20 @@ describe("Linux TOML loader delegation to core.text.engine.toml_codec.reader", f
 	it("loader.lua parses through the shared codec (directly, or through the timed wrapper that delegates to it)", function()
 		assert_true(
 			loader_src:find('require%("core%.text%.engine%.toml_codec%.reader"%)', 1, false) ~= nil
-				or loader_src:find('require%("infra%.toml%.reader"%)', 1, false) ~= nil,
+				or loader_src:find('require%("core%.text%.engine%.toml%.reader"%)', 1, false) ~= nil,
 			"loader.lua must delegate to core.text.engine.toml_codec.reader — no local parser fork allowed."
 		)
 		-- The timed wrapper hands every parse to the shared reader: a recording
 		-- shared reader receives the call and its answer comes back unchanged.
-		local saved_shared, saved_wrapper = package.loaded["core.text.engine.toml_codec.reader"], package.loaded["infra.toml.reader"]
+		local saved_shared, saved_wrapper = package.loaded["core.text.engine.toml_codec.reader"], package.loaded["core.text.engine.toml.reader"]
 		local seen = {}
 		package.loaded["core.text.engine.toml_codec.reader"] = { parse = function(path)
 			seen[#seen + 1] = path
 			return { from_shared = true }, true
 		end }
-		package.loaded["infra.toml.reader"] = nil
-		local ok, document, committed = pcall(function() return require("infra.toml.reader").parse("/fixture.toml") end)
-		package.loaded["core.text.engine.toml_codec.reader"], package.loaded["infra.toml.reader"] = saved_shared, saved_wrapper
+		package.loaded["core.text.engine.toml.reader"] = nil
+		local ok, document, committed = pcall(function() return require("core.text.engine.toml.reader").parse("/fixture.toml") end)
+		package.loaded["core.text.engine.toml_codec.reader"], package.loaded["core.text.engine.toml.reader"] = saved_shared, saved_wrapper
 		assert_true(ok, tostring(document))
 		helpers.assert_eq(seen, { "/fixture.toml" }, "the timed wrapper must delegate to core.text.engine.toml_codec.reader")
 		helpers.assert_eq(document, { from_shared = true })

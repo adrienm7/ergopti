@@ -638,7 +638,7 @@ _WHR_Script() {
 	; The admitted async-selection branch needs TapHoldNewOwner, absent here, so
 	; its helpers stay unreferenced at run time; unset load warnings are off.
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn VarUnset, Off`n"
-	Code .= '#Include ' . _DriverDir . '\infra\text_utils.ahk' . "`n"
+	Code .= '#Include ' . _DriverDir . '\core\text\engine\utils.ahk' . "`n"
 	for Name in ["WrapTextIfSelected", "UpdateLastSentCharacter", "_LSCPush", "_LSCResetFrom", "GetLastSentCharacterAt"] {
 		Definition := _DriverFuncBody(Name)
 		Assert(Definition != "", "the native wrap fixture needs the real production definition: " . Name)

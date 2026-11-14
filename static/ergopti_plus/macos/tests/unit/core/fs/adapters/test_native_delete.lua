@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = { "core.fs.adapters.file_system", "core.logger.engine.logger", "diagnostics.engine.operation_reporter",
-	"core.fs.engine.dir", "infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "lfs" }
+	"core.fs.engine.dir", "core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "lfs" }
 
 local function write(path, content)
 	local handle = assert(io.open(path, "wb"))

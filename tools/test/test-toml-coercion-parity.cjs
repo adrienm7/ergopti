@@ -101,7 +101,7 @@ if (fs.existsSync(csPath)) {
 }
 
 // AHK: toml_loader.ahk defines TomlCoerceValue
-const tlPath = path.join(WINDOWS, 'infra', 'toml', 'toml_loader.ahk');
+const tlPath = path.join(WINDOWS, 'core', 'text', 'engine', 'toml', 'loader.ahk');
 assert(fs.existsSync(tlPath), 'AHK toml_loader.ahk exists');
 if (fs.existsSync(tlPath)) {
 	const src = fs.readFileSync(tlPath, 'utf8');
@@ -109,7 +109,7 @@ if (fs.existsSync(tlPath)) {
 }
 
 // AHK: toml_config_loader.ahk defines TomlCoerceValueExt
-const tclPath = path.join(WINDOWS, 'infra', 'toml', 'toml_config_loader.ahk');
+const tclPath = path.join(WINDOWS, 'core', 'text', 'engine', 'toml', 'config_loader.ahk');
 assert(fs.existsSync(tclPath), 'AHK toml_config_loader.ahk exists');
 if (fs.existsSync(tclPath)) {
 	const src = fs.readFileSync(tclPath, 'utf8');

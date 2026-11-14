@@ -31,7 +31,7 @@
 
 local M = {}
 local hs        = hs
-local TomlCodec = require("infra.toml.codec")
+local TomlCodec = require("core.text.engine.toml.codec")
 local NativePath = require("core.fs.engine.native_path")
 local TomlWriter = require("core.text.engine.toml_codec.writer")
 -- Use the constructor's captured checker, never a replaceable public getter.

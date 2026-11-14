@@ -145,7 +145,7 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 				expected, expected_disk = nil, nil
 			end
 			fixture.with_roundtrip({ [hs.flat_key] = hs.sample }, function(flat, _, tmp)
-				local codec = helpers.load_with_stubs("infra.toml.codec")
+				local codec = helpers.load_with_stubs("core.text.engine.toml.codec")
 				local got = flat[hs.flat_key]
 				local flat_ok = values_equal(expected, got, hs)
 				helpers.assert_true(

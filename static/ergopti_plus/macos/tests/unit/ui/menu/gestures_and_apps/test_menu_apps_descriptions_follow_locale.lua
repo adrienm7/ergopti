@@ -18,7 +18,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths",
-				"core.i18n.engine.i18n", "infra.manifest_menu", "core.process.adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
+				"core.i18n.engine.i18n", "infra.manifest_menu", "core.process.adapters.task_lifecycle", "core.text.engine.utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },

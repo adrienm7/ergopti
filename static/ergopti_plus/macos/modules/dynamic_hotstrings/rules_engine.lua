@@ -29,7 +29,7 @@ local SyntheticInput = require("adapters.synthetic_input")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
 local Logger = require("core.logger.engine.logger")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local LOG    = "dynamic_hotstrings.rules"
 
 local ok_locale, locale = pcall(require, "core.i18n.engine.locale")

@@ -32,7 +32,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 					"symbol": "function M.try_repeat_feature",
-					"sha256": "59dbad534a7843d0f29ffdcd3fa6dc24053310fc061a1149cb231ebe498b8d69"
+					"sha256": "de6d1a9d2cfc78aef5defe2fe1e1383a0563cbba7a6a620ab7c27159086be336"
 				}
 			],
 			"linux": [
@@ -87,12 +87,12 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "1f7ba7059896a3d4e9b3782cee89466c2095bd42a493377786b5e3ebabe62369"
+					"sha256": "4cc9265a2834a463a3dfdebd77b8d7481d96f171d953bc1508d44caca60b9baf"
 				},
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 					"symbol": "function M.undo_on_backspace",
-					"sha256": "59dbad534a7843d0f29ffdcd3fa6dc24053310fc061a1149cb231ebe498b8d69"
+					"sha256": "de6d1a9d2cfc78aef5defe2fe1e1383a0563cbba7a6a620ab7c27159086be336"
 				}
 			],
 			"linux": [
@@ -137,12 +137,12 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 					"symbol": "function M.try_repeat_feature",
-					"sha256": "59dbad534a7843d0f29ffdcd3fa6dc24053310fc061a1149cb231ebe498b8d69"
+					"sha256": "de6d1a9d2cfc78aef5defe2fe1e1383a0563cbba7a6a620ab7c27159086be336"
 				},
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "1f7ba7059896a3d4e9b3782cee89466c2095bd42a493377786b5e3ebabe62369"
+					"sha256": "4cc9265a2834a463a3dfdebd77b8d7481d96f171d953bc1508d44caca60b9baf"
 				}
 			],
 			"linux": [
@@ -194,7 +194,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "1f7ba7059896a3d4e9b3782cee89466c2095bd42a493377786b5e3ebabe62369"
+					"sha256": "4cc9265a2834a463a3dfdebd77b8d7481d96f171d953bc1508d44caca60b9baf"
 				}
 			],
 			"linux": [
@@ -249,7 +249,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "1f7ba7059896a3d4e9b3782cee89466c2095bd42a493377786b5e3ebabe62369"
+					"sha256": "4cc9265a2834a463a3dfdebd77b8d7481d96f171d953bc1508d44caca60b9baf"
 				}
 			],
 			"linux": [
@@ -296,7 +296,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "1f7ba7059896a3d4e9b3782cee89466c2095bd42a493377786b5e3ebabe62369"
+					"sha256": "4cc9265a2834a463a3dfdebd77b8d7481d96f171d953bc1508d44caca60b9baf"
 				}
 			],
 			"linux": [
@@ -348,7 +348,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "1f7ba7059896a3d4e9b3782cee89466c2095bd42a493377786b5e3ebabe62369"
+					"sha256": "4cc9265a2834a463a3dfdebd77b8d7481d96f171d953bc1508d44caca60b9baf"
 				}
 			],
 			"linux": [
