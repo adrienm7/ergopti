@@ -280,7 +280,7 @@ DiagSnapshot_GitCommit(StartDir, Full := false) {
 }
 
 ; The commit a compiled release was stamped with (CI replaces the placeholder in
-; infra/bundle.ahk), abbreviated like every other commit in the diagnostics.
+; core/lifecycle/engine/bundle.ahk), abbreviated like every other commit in the diagnostics.
 ; @param Stamp {String} Raw BUNDLE_COMMIT value; defaults to the global.
 ; @returns {Map} { commit, error }: commit is "" when there is no valid stamp,
 ;   error explains a present stamp that is not a full commit id.

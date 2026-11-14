@@ -62,7 +62,7 @@ local function build(quits, source_run, startup, paused)
 	local previous = package.loaded["ui.menu.uninstall"]
 	package.loaded["ui.menu.uninstall"] = { run = function(opts) runs[#runs + 1] = opts end }
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return source_run == true end
 	local function restore()
@@ -218,7 +218,7 @@ end
 local function with_about_parent(code, options, body)
 	options = options or {}
 	local names = { "ui.menu.builder", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.version",
-		"infra.installation", "ui.menu.start_at_login", "ui.menu.uninstall" }
+		"core.lifecycle.engine.installation", "ui.menu.start_at_login", "ui.menu.uninstall" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, detail = xpcall(function()
@@ -259,7 +259,7 @@ local function with_about_parent(code, options, body)
 			if options.reenter then options.reenter(root, parent, state) end
 			return { kind = "release", version = "9.9.9", commit = "frozen123" }
 		end }
-		package.loaded["infra.installation"] = { is_source_run = function() return options.source_run == true end }
+		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return options.source_run == true end }
 		package.loaded["ui.menu.start_at_login"] = {
 			command_available = function() return options.startup_available ~= false end,
 			enabled = function() state.startup_reads = state.startup_reads + 1; return state.enabled end,

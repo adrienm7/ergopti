@@ -16,7 +16,7 @@ local ARGUMENTS = { "-I", "/fixture/managed_ollama_pull.py", "--maximum-bytes", 
 local function with_activation(options, callback)
 	options = options or {}
 	local names = { "adapters.managed_ollama_pull", "modules.llm.managed_native_python", "modules.llm.ollama_endpoint",
-		"adapters.task_environment", "infra.launcher_environment" }
+		"adapters.task_environment", "core.lifecycle.engine.launcher_environment" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local handle, bound, attempted, removed, fixture = nil, nil, false, false, nil

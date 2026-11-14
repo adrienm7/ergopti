@@ -397,7 +397,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       and the F-25 class loop in `test_webview_bridge_suspend_guard.ahk` that requires every message handler to read
       `A_IsSuspended` (`_UpdateCheck_OnWebMessage`). Installs while paused stay a separate follow-up: the self-update
       transaction stops at a pause in four places, the `updater-self-update` suspend step
-      (`_Updater_QuiesceSelfUpdateForSuspend`, `infra/lifecycle.ahk`), the staging monitor
+      (`_Updater_QuiesceSelfUpdateForSuspend`, `core/lifecycle/engine/lifecycle.ahk`), the staging monitor
       (`_Updater_CancelSelfUpdateForSuspend`), the staging completion (« Update staging completion discarded while
       suspended ») and the swap handshake (« the driver was suspended before the swap handshake completed »).
 - [ ] **ILD-2, SCD-2 and SCD-3 on AHK (decided by the maintainer on 2026-11-11).** Ctrl+AltGr+key sends Ctrl and the

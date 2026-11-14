@@ -6,7 +6,7 @@
 --- Measures a Reload from its request to the successor's boot completion and
 --- judges it against [budgets] driver_reload_ms, as the macOS driver does
 --- after hs.reload(). On Linux a Reload is a daemon restart
---- (infra/reload_restart.lua), so the request and the end of the boot run in
+--- (core/lifecycle/engine/reload/restart.lua), so the request and the end of the boot run in
 --- two processes: the requesting daemon stamps the request time in a file
 --- beside the store, and the successor reads and retires it at boot
 --- completion.

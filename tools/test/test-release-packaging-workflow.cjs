@@ -725,8 +725,10 @@ const stampStep = releaseStep(
 	WINDOWS_BOX
 );
 if (stampStep !== null) {
-	if (!/windows\\infra\\bundle\.ahk/.test(stampStep)) {
-		errors.push('the Windows release must stamp the live infra/bundle.ahk implementation');
+	if (!/windows\\core\\lifecycle\\engine\\bundle\.ahk/.test(stampStep)) {
+		errors.push(
+			'the Windows release must stamp the live core/lifecycle/engine/bundle.ahk implementation'
+		);
 	}
 	if (/windows\\lib\\bundle\.ahk/.test(stampStep)) {
 		errors.push('the Windows release still stamps the removed lib/bundle.ahk path');
@@ -836,7 +838,7 @@ try {
 	}
 	const testsDir = path.join(root, 'static', 'ergopti_plus', 'windows', 'tests');
 	const runtimeTest = fs.readFileSync(
-		path.join(testsDir, 'unit', 'infra', 'lifecycle', 'test_runtime_contract_version.ahk'),
+		path.join(testsDir, 'unit', 'core', 'lifecycle', 'engine', 'test_runtime_contract_version.ahk'),
 		'utf8'
 	);
 	if (
@@ -850,7 +852,7 @@ try {
 		);
 	}
 	if (
-		!/^#Include unit\/infra\/lifecycle\/test_runtime_contract_version\.ahk$/m.test(
+		!/^#Include unit\/core\/lifecycle\/engine\/test_runtime_contract_version\.ahk$/m.test(
 			fs.readFileSync(path.join(testsDir, 'run_all.ahk'), 'utf8')
 		)
 	) {

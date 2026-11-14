@@ -205,7 +205,7 @@ function M.boot(opts)
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_exit = function() return true end,
 		is_pending = function() return fixture.terminal_pending == true end,
 	}

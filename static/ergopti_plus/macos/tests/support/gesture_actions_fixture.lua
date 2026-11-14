@@ -62,8 +62,8 @@ local OWNERS = {
 	"infra.manifest_reader",
 	"infra.notifications",
 	"core.fs.engine.paths",
-	"infra.startup_transaction",
-	"infra.termination_coordinator",
+	"core.lifecycle.engine.startup_transaction",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"infra.text_utils",
 	"infra.timings",
 	-- The driver bindings of the manifest reader and the timings registry build on these.
@@ -145,7 +145,7 @@ local function fresh_actions(options)
 		"adapters.clipboard",
 		"adapters.key_state",
 		"adapters.synthetic_input",
-		"infra.termination_coordinator",
+		"core.lifecycle.engine.shutdown.termination_coordinator",
 		"infra.logger",
 		"core.fs.engine.paths",
 		"infra.config_paths",
@@ -718,7 +718,7 @@ local function fresh_actions(options)
 			return result
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 	package.loaded["core.fs.engine.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
 	-- The user's files the open_* actions name live in the configuration folder,
 	-- never in hs.configdir (the script folder, the bundle once installed).
@@ -921,7 +921,7 @@ local function with_feature_lifecycles(actions, calls, body)
 		"modules.shortcuts.script_control",
 		"modules.shortcuts.keyboard_shortcuts",
 		"adapters.hotkey_registrar",
-		"infra.startup_transaction",
+		"core.lifecycle.engine.startup_transaction",
 		"modules.gestures",
 		"modules.gestures.engine",
 		"modules.gestures.conflicts",
@@ -961,7 +961,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	package.loaded["adapters.hotkey_registrar"] = {
 		set_delivery_guard = function() return true end,
 	}
-	package.loaded["infra.startup_transaction"] = {
+	package.loaded["core.lifecycle.engine.startup_transaction"] = {
 		run = function(steps)
 			local applied = {}
 			for _, step in ipairs(steps) do

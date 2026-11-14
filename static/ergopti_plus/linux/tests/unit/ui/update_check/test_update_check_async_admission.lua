@@ -4,12 +4,12 @@
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(dispatch, body)
- local names = { "ui.update_check.bridge", "ui.download_window.bridge", "infra.installation" }
+ local names = { "ui.update_check.bridge", "ui.download_window.bridge", "core.lifecycle.engine.installation" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { completed = {}, finished = {}, installs = 0, paused = false }
  local ok, err = xpcall(function()
   package.loaded["ui.update_check.bridge"] = nil
-  package.loaded["infra.installation"] = { is_source_run = function() return false end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return false end }
   package.loaded["ui.download_window.bridge"] = {
    show = function(options) h.window = options; return 7 end,
    install_admission_current = function(id) return id == 7 and not h.paused end,

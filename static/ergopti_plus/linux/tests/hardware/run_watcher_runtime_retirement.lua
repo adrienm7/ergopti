@@ -10,7 +10,7 @@ local root, mode = assert(arg[1]), assert(arg[2])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 require("core.lifecycle.engine.compat.utf8").install()
-local Guard = require("infra.runtime_guard")
+local Guard = require("core.lifecycle.engine.runtime_guard")
 local file = assert(io.open(root .. "/ergopti_hotstrings.lua", "rb"))
 local source = assert(file:read("*a")); assert(file:close())
 local pump_source = assert(source:match('(if file_watchers then%s+local owner = file_watchers.-)%s+%-%- One bounded batch per tick'), "actual Main periodic watcher binding required")

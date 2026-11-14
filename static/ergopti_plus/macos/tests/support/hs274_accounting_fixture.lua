@@ -29,7 +29,7 @@ local OWNED_MODULES = {
 	"modules.llm.ollama_endpoint", "modules.llm.ollama_server_command",
 	"modules.llm.opaque_network_admission", "modules.llm.progressive_reveal",
 	"hs", "tests.stubs.hs", "infra.logger", "infra.manifest_reader", "infra.config_paths",
-	"infra.dialog_util", "infra.teardown_transaction", "modules.keystats.init",
+	"infra.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",

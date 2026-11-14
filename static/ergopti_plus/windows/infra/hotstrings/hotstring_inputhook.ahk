@@ -679,7 +679,7 @@ _PrefixInvalidateDeferredEffects() {
 	return _PrefixDeferredGeneration
 }
 
-; Lifecycle hooks called by infra/lifecycle.ahk. Suspend retains the fire batch;
+; Lifecycle hooks called by core/lifecycle/engine/lifecycle.ahk. Suspend retains the fire batch;
 ; resume re-arms it exactly once; shutdown drains it before KL_Stop closes the
 ; durable keystats sinks and then invalidates every remaining timer owner.
 HotstringPrefixWatcherOnSuspend() {

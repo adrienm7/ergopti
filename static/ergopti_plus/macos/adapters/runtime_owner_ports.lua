@@ -253,7 +253,7 @@ function M.automatic_observer(notify)
 	-- A field run drives the install itself (infra/field_check_owned_activation.lua
 	-- install): a modal offer would hold the run, and the watch's reload would cut it.
 	local field_run = os.getenv(require("core.text.engine.identifiers").field_report.environment) ~= nil
-		or require("infra.dev_source").is_active()
+		or require("core.lifecycle.engine.dev_source").is_active()
 	return function(state, reason)
 		if field_run then return notice(state, reason) end
 		if state == "unavailable" and not offered

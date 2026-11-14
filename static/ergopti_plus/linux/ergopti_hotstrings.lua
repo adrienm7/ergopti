@@ -113,7 +113,7 @@ if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
 end
 if literal_driver and literal_driver ~= "" then
 	local shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
-	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), literal_direct and "direct" or "daemon")
+	assert(loadfile(literal_driver .. "/core/lifecycle/engine/literal_module_loader.lua"))().install(literal_driver, shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), literal_direct and "direct" or "daemon")
 	local ffi = require("ffi")
 	ffi.cdef[[int setenv(const char *, const char *, int);]]
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DAEMON", "1", 1) == 0, "cannot export daemon search order")
@@ -126,15 +126,15 @@ else
 	-- An installed tree's modules load from the bytecode its installer compiled
 	-- (compile time was most of the boot's first 200 ms); a checkout never
 	-- reads one. Decided here, before the first application module loads.
-	local BytecodePackage = assert(loadfile(SCRIPT_DIR .. "/infra/bytecode_package.lua"))()
-	package.loaded["infra.bytecode_package"] = BytecodePackage
+	local BytecodePackage = assert(loadfile(SCRIPT_DIR .. "/core/lifecycle/engine/bytecode_package.lua"))()
+	package.loaded["core.lifecycle.engine.bytecode_package"] = BytecodePackage
 	BytecodePackage.install(SCRIPT_DIR)
 end
 
 -- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
 -- the reload request's signal, and a reload with a WebView open crashed us.
 do
-	local reserved, reserve_error = require("infra.signal_handlers").reserve_webkit_gc_signal()
+	local reserved, reserve_error = require("core.lifecycle.engine.shutdown.signal_handlers").reserve_webkit_gc_signal()
 	if not reserved then error(reserve_error, 0) end
 end
 
@@ -170,7 +170,7 @@ end
 -- The fatal outcomes that precede the logger sink leave one closed-vocabulary
 -- record in bootstrap.log (the Windows file of the same name), besides stderr.
 local BootstrapLog = require("infra.bootstrap_log")
-local lock_protected, lock_error = require("infra.session_lock").protect()
+local lock_protected, lock_error = require("core.lifecycle.engine.shutdown.session_lock").protect()
 if not lock_protected then
 	io.stderr:write("[session_lock] " .. lock_error .. "\n")
 	BootstrapLog.append("session_lock_refused")
@@ -210,7 +210,7 @@ if utf8_compat.install() then
 end
 
 local Logger = require("core.logger.engine.shim")
-local RuntimeGuard = require("infra.runtime_guard")
+local RuntimeGuard = require("core.lifecycle.engine.runtime_guard")
 
 -- The shared logger core only writes to an injected sink, so install ours before
 -- the first Logger.* call. Without this every log line on Linux — including the
@@ -344,7 +344,7 @@ local file_watchers = RuntimeGuard.optional_require("core.fs.engine.file_watcher
 -- event_loop.stop(), otherwise luv.run() waits for the very cleanup that the
 -- daemon used to perform only after run() returned.
 local TimerScheduler = require("core.events.timer_scheduler")
-local ShutdownCoordinator = require("infra.shutdown_coordinator")
+local ShutdownCoordinator = require("core.lifecycle.engine.shutdown.coordinator")
 local shutdown_runtime = prediction_engine and prediction_engine.shutdown_runtime
 local shutdown_webviews = webview_manager and webview_manager.shutdown
 local runtime_shutdown_ack = not prediction_engine
@@ -783,7 +783,7 @@ local function reload_hotstrings(trigger)
 	end
 	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Catalogue reload requested by %s — reloading hotstring config…", trigger)
-	local reloaded, why = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
+	local reloaded, why = require("core.lifecycle.engine.reload.outcome").run(function() return hotstrings_config.reload() end)
 	if reloaded then
 		-- A Reload click on an older tray tree now joins this reload.
 		local rebuild = privacy_owners.menu_rebuild
@@ -820,20 +820,20 @@ end
 local function restart_daemon(reason, paused)
 	local launch_args = {}
 	for index = 1, #arg do launch_args[index] = arg[index] end
-	local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args, paused = paused })
+	local how = require("core.lifecycle.engine.reload.daemon_restart").restart({ reason = reason, args = launch_args, paused = paused })
 	if how == "relay" then shutdown.request(reason) end
 	return how ~= nil
 end
 
 --- The Reload command, as on the other drivers: the daemon restarts, so every
---- module reads config.toml again (infra/reload_restart.lua). The restart
+--- module reads config.toml again (core/lifecycle/engine/reload/restart.lua). The restart
 --- cannot name its successor, so the local control writes a pending record
---- that the successor claims (infra/driver_control.lua). The successor also
---- inherits the live pause (infra/restart_pause.lua): main() installs its
+--- that the successor claims (core/lifecycle/engine/driver_control.lua). The successor also
+--- inherits the live pause (core/lifecycle/engine/reload/restart_pause.lua): main() installs its
 --- script controller before any Reload trigger can fire.
-local perform_reload, reload_in_flight, abandon_reload = require("infra.reload_restart").new({ gestures = gestures,
+local perform_reload, reload_in_flight, abandon_reload = require("core.lifecycle.engine.reload.restart").new({ gestures = gestures,
 	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end,
-	cancel = function() return require("infra.daemon_restart").cancel() end })
+	cancel = function() return require("core.lifecycle.engine.reload.daemon_restart").cancel() end })
 privacy_owners.reload_in_flight = reload_in_flight
 
 
@@ -869,9 +869,9 @@ end
 
 
 --- The user's Quit (tray row, shortcut, gesture): refused for the same causes as on
---- macOS (infra/quit_request.lua).
+--- macOS (core/lifecycle/engine/shutdown/quit_request.lua).
 --- Held in privacy_owners: main() already sits at LuaJIT's 60-upvalue limit.
-privacy_owners.tray_quit = require("infra.quit_request").new({
+privacy_owners.tray_quit = require("core.lifecycle.engine.shutdown.quit_request").new({
 	shutdown = shutdown,
 	reload_in_flight = reload_in_flight,
 	abandon_reload = abandon_reload,
@@ -892,7 +892,7 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 --- the user of a refusal that comes after the call returned, this of one that
 --- comes at once, as the tray row (ui/menu/menu_quit.lua) and Windows' quit
 --- admission do (NUI-001).
-privacy_owners.user_quit = require("infra.quit_request").notifying(privacy_owners.tray_quit,
+privacy_owners.user_quit = require("core.lifecycle.engine.shutdown.quit_request").notifying(privacy_owners.tray_quit,
 	function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end)
 
 
@@ -903,7 +903,7 @@ privacy_owners.user_quit = require("infra.quit_request").notifying(privacy_owner
 -- =========================================
 
 local function install_signal_handlers()
-	local signals = require("infra.signal_handlers")
+	local signals = require("core.lifecycle.engine.shutdown.signal_handlers")
 	privacy_owners.signals_stop = signals.stop
 	local function on_term(sig)
 		pcall(Logger.info, LOG, "Signal %d received — shutting down…", sig)
@@ -959,7 +959,7 @@ local function main()
 
 	-- A start outside launch.sh (AppRun, Nix wrapper, manual luajit) holds no lock
 	-- yet; a second keyboard grab next to a running daemon is refused here.
-	local lock_acquired, lock_refusal, lock_contended = require("infra.session_lock").acquire()
+	local lock_acquired, lock_refusal, lock_contended = require("core.lifecycle.engine.shutdown.session_lock").acquire()
 	if not lock_acquired then
 		io.stderr:write("[session_lock] " .. lock_refusal .. "\n")
 		BootstrapLog.append(lock_contended and "second_instance_yielded" or "session_lock_refused")
@@ -973,7 +973,7 @@ local function main()
 	Logger.start(LOG, "Ergopti hotstrings daemon starting (version %s, pid %s)…",
 		Version.VERSION, DiagnosticSnapshot.pid() or "unknown")
 	BootProfiler.begin()
-	require("infra.bytecode_package").report(function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+	require("core.lifecycle.engine.bytecode_package").report(function(fmt, ...) Logger.info(LOG, fmt, ...) end,
 		function(fmt, ...) Logger.warn(LOG, fmt, ...) end)
 	-- The options decide half of what follows (grab, tray, device pinning), and a
 	-- user log has no other record of how the unit was launched.
@@ -982,9 +982,9 @@ local function main()
 		opts.device and "pinned" or "auto", tostring(opts.layout),
 		opts.keymap and "override" or "server", opts.config and "custom" or "default")
 	-- Resolved here so a launcher root naming another clone stops the boot
-	-- (infra/dev_source.lua) before any watcher or restart relies on it.
+	-- (core/lifecycle/engine/dev_source.lua) before any watcher or restart relies on it.
 	do
-		local DevSource = require("infra.dev_source")
+		local DevSource = require("core.lifecycle.engine.dev_source")
 		local dev_root = DevSource.root()
 		if dev_root then
 			Logger.info(LOG, "Developer source mode; Lua runs from %s%s.", dev_root, DevSource.DRIVER_SUBPATH)
@@ -1008,8 +1008,8 @@ local function main()
 	end)
 	-- 7.9) Stages a killed or crashed Ergopti process left beside the settings
 	-- (storage.json and the TOML files) are removed before anything writes
-	-- there; a foreign file is never touched (CFD-1, infra/stage_owner.lua).
-	require("infra.stage_owner").reap_settings()
+	-- there; a foreign file is never touched (CFD-1, core/lifecycle/engine/stage_owner.lua).
+	require("core.lifecycle.engine.stage_owner").reap_settings()
 	-- 8.0) Version config.toml before anything reads or writes it: the gesture
 	-- and shortcut managers below load the migrated file, and a file the wizard
 	-- creates carries this build's version. A file this build cannot version (a
@@ -1047,7 +1047,7 @@ local function main()
 	})
 	-- The exclusion lists name applications by WM class now, not by the X11
 	-- process name (ADD-3): converted once, before any list owner reads them.
-	require("infra.app_identity_migration").run()
+	require("core.lifecycle.engine.app_identity_migration").run()
 
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
@@ -1366,7 +1366,7 @@ local function main()
 	-- Every Reload trigger restarts with this live pause (perform_reload).
 	privacy_owners.script_actions = script_actions
 
-	local pause_restored, pause_detail = require("infra.restart_pause").restore(script_actions)
+	local pause_restored, pause_detail = require("core.lifecycle.engine.reload.restart_pause").restore(script_actions)
 	if not pause_restored then
 		Logger.error(LOG, "Startup refused: %s.", tostring(pause_detail))
 		return
@@ -3325,14 +3325,14 @@ local function main()
 	if file_watchers then
 		-- A developer run (tools/dev/run-linux-dev.sh) also restarts on a saved
 		-- .lua of the clone, as the macOS developer app reloads on one.
-		local DevSource = require("infra.dev_source")
+		local DevSource = require("core.lifecycle.engine.dev_source")
 		file_watchers.start({
 			hotstrings_dir = config_path,
 			base_dir       = SCRIPT_DIR,
 			personal_dir   = config_path,  -- personal TOMLs live alongside bundled ones
 			on_reload      = function()
 				Logger.info(LOG, "Config change detected — reloading hotstrings…")
-				local reloaded = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
+				local reloaded = require("core.lifecycle.engine.reload.outcome").run(function() return hotstrings_config.reload() end)
 				if reloaded and privacy_owners.menu_rebuild then privacy_owners.menu_rebuild.note_reload() end
 			end,
 			source_dirs      = DevSource.source_dirs(),
@@ -3678,7 +3678,7 @@ local function main()
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil
 	-- Optional: a control that cannot start is logged and the daemon runs on.
-	privacy_owners.driver_control = require("infra.driver_control").start({
+	privacy_owners.driver_control = require("core.lifecycle.engine.driver_control").start({
 		pid = require("luv").os_getpid(), reload = perform_reload,
 		boot_outcome = function()
 			if boot_catalogue_complete then return true end

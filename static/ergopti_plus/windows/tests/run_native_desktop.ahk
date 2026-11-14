@@ -42,7 +42,7 @@ OnError(_NativeDesktopStartupError)
 
 #Include test_framework.ahk
 _TestResultsBeginRun()
-#Include ../infra/app_state.ahk
+#Include ../core/lifecycle/engine/app_state.ahk
 #Include test_stubs.ahk
 #Include ../infra/hotpath_profiler.ahk
 #Include ../infra/json.ahk
