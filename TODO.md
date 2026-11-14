@@ -248,7 +248,8 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 - [ ] **Ergopti Studio tab in Ergopti+.** On Windows, macOS and Linux, the app menu gets an « Ergopti Studio » entry
       next to the layout and tap-hold sections; it opens the layout editor's WebView window
       (`_shared/ui/layout_editor_window`, already its own window) so a user edits a layout and installs it on the
-      machine from there. Name the in-app window and its menu row « Ergopti Studio » (21 locales, i18n skill).
+      machine from there. Name the in-app window and its menu row « Ergopti Studio » (21 locales, i18n skill); the window title is
+      exactly « Ergopti Studio », without the « ErgoptiPlus — » prefix (maintainer, 2026-11-14).
 - [ ] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
       sent anywhere) and shows, for the layout being edited, the metrics computed on what this user really types:
       SFBs (same-finger bigrams), hand alternation, rolls, redirects, finger and row load. The numbers update as keys
@@ -364,6 +365,40 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
       defaults to a built-in corpus).
 
+- [ ] **Analysis review decisions (maintainer, 2026-11-14 evening).** Digit6 typed by the right index; the space
+      bar by the LEFT thumb; the default global-score weights kept as justified in the study. Ideal finger load: the
+      pinky below 8 % (about 6-7 %), with index >= middle >= ring >= pinky enforced (worker R proposed 6.5 / 11.5 /
+      15.5 / 16.5 % per hand, editable). Every sourced value, metric, weight, fingering, load and table gets a small
+      « i » button opening a popover that names its source with a link (site and app, 21 locales).
+- [ ] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
+      for rarely used shortcut letters; add the text-editing shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+U
+      (underline), Ctrl+K (link / command palette), Ctrl+Y (redo) and other very common ones; the maintainer would
+      like B, I and U on the left hand. Justified in the study behind an « i » popover.
+- [ ] **Layout library credits (maintainer, 2026-11-14 evening).** Keep the 35 cmini-sourced layouts, credited; show
+      credits known « from knowledge » now and verify each against the author's own page in a later pass.
+- [ ] **Scores of the other analysers (maintainer, 2026-11-14 evening).** Besides Ergopti's own global score, show
+      each layout's score as every major analyser computes it (KLAnext, Oxeylyzer, Genkey, cmini, the Ergo-L
+      analyser / Kalamine, KLA, a200, dariogoetz's optimizer and any other widely used one), reproduced from their
+      published source, docs and default weights (reverse-engineered from published results only where nothing else
+      exists), each documented with its formula, corpus, version, licence and fidelity, and a test vector. A column
+      per analyser in « Comparer » and in the « Éditer » side panel, each with an « i » popover (worker Q).
+- [ ] **Corpora: only what we can rely on (maintainer, 2026-11-14 evening).** Delete from the repository every corpus
+      without a clearly compatible, recorded licence, or that could expose the project to a claim; starting from zero
+      is acceptable. Deleted by decision: romans.txt, Python for Everybody, Projet GLM, Auxlang_X, the unverified
+      KLAnext-style texts, and Johnix mail unless its source page and licence are confirmed. Kept: the public-domain
+      books, Autonomie (CC BY-SA), the Hello World files (MIT), Leipzig (shipped as CC BY 4.0 by the maintainer's
+      choice; its licence page could not be read from the container). Every shipped corpus is in
+      static/corpus/register.json with source, licence and attribution, shown in the UI.
+- [ ] **More corpora from the internet (maintainer, 2026-11-14 evening).** Rebuild a rich set of built-in corpora under
+      compatible licences (public domain, CC0, CC BY, CC BY-SA): French first, then English and the other languages
+      Ergopti users type; prose, e-mail and chat-like text, code. Candidates: Wikisource, Project Gutenberg, Wikipedia
+      extracts, Tatoeba, permissively licensed code.
+- [ ] **Large published frequency tables (maintainer, 2026-11-14 evening).** Use existing large-scale language
+      analyses as built-in corpora: char, bigram and trigram counts from huge corpora (Google Books Ngram and Peter
+      Norvig's counts, Wikipedia-derived frequency data per language, the Leipzig frequency lists, Lexique for French,
+      FrequencyWords, Tatoeba), imported as count tables through a generator with source, version, licence and
+      attribution; word-level lists miss cross-word bigrams, said in their popover.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
@@ -420,6 +455,14 @@ The [coverage and remaining-work register](docs/platform-parity-audit.md#review-
 records the focused campaigns already completed, broader reviews, exact limits
 and the next module candidates. The audit is paused at the maintainer's request.
 
+- [ ] **What a pause must stop (maintainer, 2026-11-14 evening), on Windows, macOS and Linux.** Keystroke metrics
+      (keystats), application usage metrics, the Ctrl+M action that moves the mouse (and every other mouse-moving
+      action), and any other background behaviour driven by keys or by the active app; the census lists each feature
+      × OS with whether it stops at pause, and every gap gets a fix and a regression test (worker P). Decided the same
+      evening: a shortcut slot changed while paused is saved at once and applies on resume, the resume chord staying
+      the one active when the pause started (Windows too, across a suspended reload); the magic key capture runs
+      while paused on all three OS, the key inert until resume; the Windows tray stops greying the rows the pause
+      allows; macOS ends CapsWord at pause like Windows and Linux.
 - [ ] **[CODE] Parity audit continuation** (claimed by worker H, 2026-11-13)**:** on resumption, reconcile current source areas with the linked coverage register, then deepen tap-holds/chords/layers as one bounded module across Windows/macOS/Linux/shared before moving to another. Keep native receiving and implementation of existing finding IDs separate; do not restart completed focused campaigns without source drift or a new hypothesis.
       Progress (10 November 2026, [tap-hold campaign](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): census reconciled (375 areas, 12 new and 206 changed since the last pinned census, still to review outside tap-holds). Fixed on Linux/shared: LAlt's Tab tap with no hold is tap-only (THL-001), the Alt-Tab and RCtrl Tab taps keep their strict threshold (THL-002), a pair starts from the earliest held first key (THL-003), a pair's release tap respects the decided tap minimum (THL-004), chord defaults pinned across drivers (THS-001). Decisions pending: THD-1, THD-3, THD-4 (pair tap and the layer, layer-hold pair activity, macOS thumb Backspace under modifiers) and THD-2's lone window. Minimum tap (decided 2026-11-10): Linux complete; macOS needs a Karabiner mechanism qualified on a Mac (`to_if_alone` has no minimum); Windows is the maintainer's change. Left: the report's Linux and macOS remaining rows; native receiving unqualified. Next module after this one: hotstring cascade.
       Progress (12 November 2026, [tap-hold follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/report.md)): register reconciled with the 24 campaigns since the pause (381 areas). Drift since `637c017a` reviewed: fixed a single foreign chord action turning every Linux key combination off (TCL-003). Open for the shared tap-hold file series (`wt/taphold-landed`): TCL-001 (manifest rows still in `tap_hold.toml`), TCL-002 (action ids not translated between macOS and Linux), TCL-004 (Mac thumb-key ids, a decision), TCL-005 to 007; the two 2026-11-10 macOS rows are fixed in the generator, proven on the model (Left Command's one-shot Shift holds Shift and stands down under modifiers; a pair takes the first key held earliest), with field points `lalt_one_shot` and `pair_press_order`.
