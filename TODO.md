@@ -240,6 +240,28 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
 - **Hardware checks** are in [TODO-tests-macos.md](TODO-tests-macos.md),
   [TODO-tests-windows.md](TODO-tests-windows.md) and [TODO-tests-linux.md](TODO-tests-linux.md).
 
+## Ergopti Studio inside Ergopti+ (maintainer request, 2026-11-14)
+
+Naming (maintainer, 2026-11-14): « Ergopti » is the project; « Disposition Ergopti » the layout; « Ergopti+ » the
+software (name kept everywhere); « Ergopti Studio » the layout editor.
+
+- [ ] **Ergopti Studio tab in Ergopti+.** On Windows, macOS and Linux, the app menu gets an « Ergopti Studio » entry
+      next to the layout and tap-hold sections; it opens the layout editor's WebView window
+      (`_shared/ui/layout_editor_window`, already its own window) so a user edits a layout and installs it on the
+      machine from there. Name the in-app window and its menu row « Ergopti Studio » (21 locales, i18n skill).
+- [ ] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
+      sent anywhere) and shows, for the layout being edited, the metrics computed on what this user really types:
+      SFBs (same-finger bigrams), hand alternation, rolls, redirects, finger and row load. The numbers update as keys
+      are moved. Reuse one shared metrics engine (the site's benchmark computation, `src/routes/benchmarks`, and
+      `_shared/metrics`), not a second implementation; keystats keeps its privacy rules (local only, the user's own
+      data, documented in the Studio).
+- [ ] **Corpus analysis.** Load a text corpus (file picker, local) and analyse the edited layout on it with the same
+      metrics; keep the corpora the site already uses as built-in choices.
+- [ ] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
+      (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
+      charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
+      read by the site's benchmarks and by the Studio.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
