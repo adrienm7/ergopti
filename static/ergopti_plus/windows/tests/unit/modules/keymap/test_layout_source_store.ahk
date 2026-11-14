@@ -207,7 +207,7 @@ _LSS_DownloadRefusalsCase() {
 	AssertContains(Result["detail"], "every name for mine.zip is taken")
 	Message := ""
 	Defaults := Map("source", Map("folder", "f", "last_file", "l", "nav_file", "n", "max_file_bytes", 1,
-		"max_name_length", 1, "export_extensions", ["ZIP"], "failures", Map("invalid", "a", "write", "b")))
+		"max_name_length", 1, "max_export_suffix", 2, "export_extensions", ["ZIP"], "failures", Map("invalid", "a", "write", "b")))
 	try SourceStore_Settings(Defaults)
 	catch as Err
 		Message := Err.Message

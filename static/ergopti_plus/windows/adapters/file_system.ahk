@@ -1038,6 +1038,24 @@ FSOpenWrite(Path) {
 	}
 }
 
+; Writes raw bytes to a file, creating or truncating it, and throws on any
+; failure or short write. Like FSHandleSnapshot it stays outside the canonical
+; ADAPTER_FILE_SYSTEM port map: the layout editor's downloads (ui/layout_manager/
+; source_store.ahk) are the one Buffer writer outside the installers.
+; @param Path {String} Absolute path to the file.
+; @param Bytes {Buffer} The bytes to write.
+FSWriteBytesStrict(Path, Bytes) {
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A byte write requires a non-empty path without NUL.")
+	Handle := FileOpen(Path, "w")
+	if !IsObject(Handle)
+		throw OSError(A_LastError, A_ThisFunc, "Cannot open '" . Path . "' for writing.")
+	try {
+		if Handle.RawWrite(Bytes, Bytes.Size) != Bytes.Size
+			throw OSError(A_LastError, A_ThisFunc, "Short write to '" . Path . "'.")
+	} finally Handle.Close()
+}
+
 ; Returns stable identity, size and write-time metadata for an already-open file
 ; handle. This Windows-specific helper deliberately stays outside the canonical
 ; ADAPTER_FILE_SYSTEM port map; it is an implementation boundary used by the
