@@ -379,7 +379,7 @@ _LMT_StreamingCorpus() {
 _LMT_StreamingPolicyContract() {
 	Corpus := _LMT_StreamingCorpus()
 	AssertEqual(9, Corpus["capabilities"].Length)
-	AssertEqual(15, Corpus["cases"].Length)
+	AssertEqual(16, Corpus["cases"].Length)
 	for Vector in Corpus["capabilities"] {
 		AssertEqual(Vector["capable"], LLM_DisplayStreamingCapable(Vector["platform"], Vector["backend"]),
 			"actual shared capability matches the independent native transport inventory")
