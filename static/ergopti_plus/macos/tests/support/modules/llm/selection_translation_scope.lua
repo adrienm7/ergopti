@@ -145,6 +145,9 @@ local OWNED = {
 	"infra.gesture_frame_evidence",
 	"modules.gestures.geometry",
 	"gestures.engine.sensitivity",
+	-- The sensitivity owner checks a step against the shared value schema.
+	"settings.engine.value_check",
+	"settings.engine.value_schema_data",
 	"modules.gestures.sticky_modifiers",
 	"modules.keystats",
 	"modules.keymap",

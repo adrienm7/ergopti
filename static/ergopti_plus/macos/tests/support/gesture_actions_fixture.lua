@@ -94,6 +94,9 @@ local OWNERS = {
 	"modules.gestures.sticky_modifiers",
 	-- The engine bounds incremental tab steps through the sensitivity owner.
 	"gestures.engine.sensitivity",
+	-- The sensitivity owner checks a step against the shared value schema.
+	"settings.engine.value_check",
+	"settings.engine.value_schema_data",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",
