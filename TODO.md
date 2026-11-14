@@ -334,7 +334,14 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       what it could not map, and is tested on real files from those tools. Saving stays in the Ergopti TOML source
       (one format of record, already compiled to XKB, KLC and keylayout); export to KLA JSON and Kalamine TOML is
       offered for interoperability (decided by the coordinator on 2026-11-14, to review by the maintainer). The
-      hundred-layout library is built from those imports, with each layout's source and licence recorded.
+      layout library starts from the layouts listed by KLAnext and the other analysers and online lists. Maintainer's
+      position (2026-11-14): a key arrangement itself is not copyrightable, only its implementation; so the library
+      re-encodes each arrangement as our own TOML (what each key types), never copies another tool's files verbatim,
+      and credits each layout's author and source.
+- [ ] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
+      two keys in one gesture, see the score change, and generate the installable layout for Windows, macOS and Linux
+      (the existing compilers and offline downloads, and in the app the one-click install): the feature analysers such
+      as KLAnext lack, since they only produce JSON.
 
 - [ ] **« Comparer » is a full analyser on its own (maintainer, 2026-11-14), like KLAnext.** Most visitors only run
       battles, so the tab stands alone: select a list of layouts to analyse or analyse all of them at once; pick a
