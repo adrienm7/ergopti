@@ -10,7 +10,9 @@
  * climb from the test's own folder, found nothing there and left it: after
  * S04 the keystats reaper child included an adapter that no longer existed
  * and never finished. The climb now starts at windows/tests for included
- * tests; a standalone fixture keeps reading from its own folder.
+ * tests; a standalone fixture keeps reading from its own folder. A production
+ * entry script launched on its own (#Include %A_ScriptDir%\..\x.ahk) climbs
+ * from its own folder too: S09 broke the UIA worker's includes that way.
  * ==============================================================================
  */
 
@@ -50,6 +52,14 @@ function run() {
 	const fixture = 'static/ergopti_plus/windows/tests/fixtures/zz_probe_fixture.ahk';
 	const fixtureRows = Plan.scanFile(fixture, text, Plan.referenceContext(stepMap));
 	assert.equal(Apply.rewriteText(text, fixtureRows, new Map(), fixture), text);
+	// An entry script launched on its own (the UIA worker, the bundled app
+	// entry) includes from %A_ScriptDir%, its own folder: the climb follows.
+	const entry = 'static/ergopti_plus/windows/modules/zz_probe/zz_probe_entry.ahk';
+	const include = '#Include %A_ScriptDir%\\..\\..\\adapters\\file_system.ahk\n';
+	const entryRows = Plan.scanFile(entry, include, Plan.referenceContext(stepMap));
+	assert.ok(!entryRows.some((r) => Plan.REFUSED_KINDS.has(r.kind)), JSON.stringify(entryRows));
+	const entryOut = Apply.rewriteText(include, entryRows, new Map(), entry);
+	assert.ok(entryOut.includes(`%A_ScriptDir%\\..\\..\\${fresh}`), entryOut);
 	// A scattered folder: kept while it holds files, refused once emptied.
 	const folder = '\tRoot := A_ScriptDir . "\\..\\zz_probe_dir\\"\n';
 	const keeps = new Map([
