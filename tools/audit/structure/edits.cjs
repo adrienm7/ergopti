@@ -263,6 +263,27 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "[owner + '/core/network/adapters/native_http.py']"
 	},
 	{
+		// The literal AppDir contract runs the AT-SPI workers from the driver
+		// root (cwd), so "./adapters/x.lua" is relative to the process, not to
+		// the fixture; S14 moves both workers into platform/focus.
+		file: 'static/ergopti_plus/linux/tests/fixtures/literal_appdir_contract.py',
+		moves: 'linux/adapters/atspi_context_worker.lua',
+		from: "io.popen('luajit ./adapters/atspi_context_worker.lua bus / 0 '",
+		to: "io.popen('luajit ./platform/focus/atspi_context_worker.lua bus / 0 '"
+	},
+	{
+		file: 'static/ergopti_plus/linux/tests/fixtures/literal_appdir_contract.py',
+		moves: 'linux/adapters/atspi_context_worker.lua',
+		from: '"./adapters/atspi_context_worker.lua",',
+		to: '"./platform/focus/atspi_context_worker.lua",'
+	},
+	{
+		file: 'static/ergopti_plus/linux/tests/fixtures/literal_appdir_contract.py',
+		moves: 'linux/adapters/atspi_focus_watch_worker.lua',
+		from: '"./adapters/atspi_focus_watch_worker.lua",',
+		to: '"./platform/focus/atspi_focus_watch_worker.lua",'
+	},
+	{
 		// The OS-purity ratchets exempt adapters/ by folder; S02 and S03 put three
 		// adapters in core/ without one, S06 folds the driver control adapter into
 		// core/lifecycle (the singleton pass), and S03 adds core/ to the scan.
