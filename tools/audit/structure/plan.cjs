@@ -2571,6 +2571,33 @@ function scanFile(file, text, ctx) {
 				if (hit && hit[2] && hit[2] !== name)
 					add('path-regex', m[0], hit[2].replace(/\./g, '\\.'), { oldRepo: PREFIX + hit[0] });
 			}
+	// The feature requirements' content patterns: a quoted, regex-escaped Lua
+	// module name ('"adapters\.uinput_writer"') under [detection.<driver>.…]
+	// names that driver's module. S15 moved the uinput writer and the gestures
+	// owner, which requires it by its new name, no longer reached uinput.
+	if (/\/features\/requirements\.toml$/.test(file)) {
+		// The step rewrites a token across the file: one spelled under two
+		// drivers' sections, which may move apart, is refused.
+		const sections = new Map();
+		let driver = null;
+		for (const line of text.split('\n')) {
+			const header = line.match(/^\[detection\.(\w+)\./);
+			if (header) driver = Census.DRIVERS.includes(header[1]) ? header[1] : null;
+			if (!driver) continue;
+			for (const m of line.matchAll(/"([A-Za-z_]\w*(?:\\\.[A-Za-z_]\w*)+)"/g))
+				sections.set(m[1], new Set([...(sections.get(m[1]) || []), driver]));
+		}
+		for (const [token, drivers] of sections) {
+			const name = token.replace(/\\\./g, '.');
+			const hits = [...drivers].map(
+				(d) => byLuaName.get(`${d}|${name}`) || byLuaName.get(`_shared|${name}`)
+			);
+			const hit = hits[0];
+			if (!hit || !hit[2] || hit[2] === name) continue;
+			if (drivers.size > 1) add('dir-split', token, '(split)', { oldRepo: PREFIX + hit[0] });
+			else add('path-regex', token, hit[2].replace(/\./g, '\\.'), { oldRepo: PREFIX + hit[0] });
+		}
+	}
 	// A path in a regular expression: /static\/ergopti_plus\/_shared\/x\.json/.
 	if (/\.(c?js|mjs)$/.test(file))
 		for (const found of text.matchAll(/(?<![\w-])[\w-]+(?:\\\/[\w-]+)+(?:\\\.[A-Za-z0-9]+)?/g)) {

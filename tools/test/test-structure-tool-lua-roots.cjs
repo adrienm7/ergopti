@@ -142,6 +142,26 @@ function run() {
 		assert.ok(stubOut.includes("package.loaded['core.logger.engine.logger'] = logger"), stubOut);
 	}
 
+	// The feature requirements' content patterns name a driver's module,
+	// regex-escaped, under that driver's detection section.
+	const REQ = 'static/ergopti_plus/_shared/settings/data/features/requirements.toml';
+	const req =
+		"[detection.linux.uinput]\ncontent = ['/dev/uinput', '\"adapters\\.uinput_writer\"']\n" +
+		'[detection.macos.zz]\ncontent = [\'"adapters\\.uinput_writer"\']\n';
+	const reqMap = new Map([
+		['linux/adapters/uinput_writer.lua', 'linux/platform/input/uinput_writer.lua']
+	]);
+	// Spelled under two drivers' sections, the token is refused, not guessed.
+	const reqRows = Plan.scanFile(REQ, req, Plan.referenceContext(reqMap));
+	assert.ok(
+		reqRows.some((r) => Plan.REFUSED_KINDS.has(r.kind)),
+		JSON.stringify(reqRows)
+	);
+	const one = req.slice(0, req.indexOf('[detection.macos'));
+	const oneRows = Plan.scanFile(REQ, one, Plan.referenceContext(reqMap));
+	const oneOut = Apply.rewriteText(one, oneRows, new Map(), REQ);
+	assert.ok(oneOut.includes('\'"platform\\.input\\.uinput_writer"\']'), oneOut);
+
 	console.log('[OK] a Lua tool that requires a module only one driver has loads that driver.');
 }
 
