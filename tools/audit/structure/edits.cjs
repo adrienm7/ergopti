@@ -712,6 +712,40 @@ const SYNTHETIC_PATHS = [
  * require sites they parse (a menu delegation map keyed by module name):
  * every quoted name of a moved module in them is a module name.
  */
+/**
+ * Text that describes something already published or already run: a
+ * released package's payload, a receipt of a past proof. Its paths name the
+ * layout of that artifact, not of the tree, so no step rewrites them (v1.0.9
+ * still extracts _shared/core/config_schema/migrations.toml; S01 respelled it
+ * and Windows Install and launch failed). An entry names a whole file, every
+ * file under a prefix, or the regions of a file a pattern matches.
+ */
+const PUBLISHED_RECORDS = [
+	{
+		file: 'tools/test/fixtures/windows-upgrade-prior.json',
+		why: 'the v1.0.9 release, its asset and the paths its bundle extracts'
+	},
+	{
+		file: 'tools/test/test-compiled-save-upgrade.cjs',
+		region: /extracted_assets: \[[\s\S]*?\n\t+\]/g,
+		why: 'the released payload the compiled upgrade pins'
+	},
+	{
+		file: 'tools/test/test-release-packaging-workflow.cjs',
+		region: /extracted_assets: \[[\s\S]*?\n\t+\]/g,
+		why: 'the released payload the packaging workflow pins'
+	},
+	{
+		file: 'tools/test/run-compiled-save-upgrade.ps1',
+		region: /^.*\$bundleRoot 'static\/ergopti_plus\/[^'\n]*'.*$/gm,
+		why: 'reads of the prior release bundle, at the paths it ships'
+	},
+	{
+		prefix: 'static/ergopti_plus/linux/tests/hardware/desktop/receipts/',
+		why: 'receipts of past hardware runs at a named base commit'
+	}
+];
+
 const MODULE_NAME_FILES = [
 	{
 		file: 'tools/test/test-linux-portable-commands.cjs',
@@ -903,6 +937,7 @@ module.exports = {
 	FOLDER_EDITS,
 	SYNTHETIC_PATHS,
 	MODULE_NAME_FILES,
+	PUBLISHED_RECORDS,
 	MODULE_MEMBER_FILES,
 	DERIVED_PINS
 };
