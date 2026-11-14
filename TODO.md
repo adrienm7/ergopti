@@ -421,6 +421,10 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       home key can be any of those 12 keys); no global home-row setting, metrics use each finger's own home key. Defaults stay the
       current model (Digit6 right index, space bar left thumb). Every metric and every other analyser's scorer follows
       the user's mapping; the profile is saved with the user's layouts, exportable, importable and resettable.
+      Geometry (maintainer, 2026-11-14 night): the analyser works on every keyboard geometry the user picks: ISO,
+      ANSI, ortholinear/matrix, column-staggered ergonomic splits (Ergodox, Corne, Moonlander, Kinesis-like thumb
+      clusters), with real key positions and thumb keys, a default fingering and home keys per geometry; keys a
+      geometry lacks are reported per layout, never dropped silently.
 - [ ] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
       /studio/comparer; /editeur redirects to /studio; menus, links and docs point to /studio.
 
