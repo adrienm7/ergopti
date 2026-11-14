@@ -334,8 +334,11 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       what it could not map, and is tested on real files from those tools. Saving stays in the Ergopti TOML source
       (one format of record, already compiled to XKB, KLC and keylayout); export to KLA JSON and Kalamine TOML is
       offered for interoperability (decided by the coordinator on 2026-11-14, to review by the maintainer). The
-      layout library starts from the layouts listed by KLAnext and the other analysers and online lists. Maintainer's
-      position (2026-11-14): a key arrangement itself is not copyrightable, only its implementation; so the library
+      layout library starts from the layouts listed by KLAnext and the other analysers and online lists. Basis
+      (2026-11-14): a public discussion the maintainer recalls (a Linux forum) and the precedent of SAS Institute v
+      World Programming (CJEU C-406/10, 2012: a program's functionality, language and data formats are not protected
+      by copyright, only its implementation) suggest a key arrangement is not copyrightable; the study confirms the
+      sources and states the limits (not legal advice). So the library
       re-encodes each arrangement as our own TOML (what each key types), never copies another tool's files verbatim,
       and credits each layout's author and source.
 - [ ] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
