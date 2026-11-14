@@ -274,8 +274,8 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		// The same exemption, in the ratchets' file walk.
 		file: 'static/ergopti_plus/windows/tests/meta/suite/test_ahk_os_purity_ratchet.ahk',
 		moves: 'windows/adapters/boot_clock.ahk',
-		from: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\")\n\t\t\t\tcontinue',
-		to: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\")\n\t\t\t\t|| RegExMatch(A_LoopFilePath, "\\\\core\\\\(?:crypto\\\\crypto|events\\\\(?:boot_clock|timer_scheduler))\\.ahk$")\n\t\t\t\tcontinue'
+		from: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\") || _AOPR_IsUiSource(A_LoopFilePath)\n\t\t\t\tcontinue',
+		to: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\") || _AOPR_IsUiSource(A_LoopFilePath)\n\t\t\t\t|| RegExMatch(A_LoopFilePath, "\\\\core\\\\(?:crypto\\\\crypto|events\\\\(?:boot_clock|timer_scheduler))\\.ahk$")\n\t\t\t\tcontinue'
 	},
 	{
 		// The input probe's child drops the probe's relative includes, which named
