@@ -1657,9 +1657,14 @@ function scanFile(file, text, ctx) {
 	// A tool that names no driver but requires a module only one driver has
 	// (tools/diagnostics/hs_karabiner_config_native.lua: adapters.json_codec)
 	// runs on that driver's package.path.
-	const required = [...text.matchAll(/\brequire\s*\(?\s*["']([A-Za-z_][\w.]*)["']/g)].map(
-		(m) => m[1]
-	);
+	// The modules a file loads: required, or stubbed by their package.loaded /
+	// package.preload key (tools/test/metrics-histogram-native.lua stubs the
+	// macOS logger as package.loaded['infra.logger'] while its path names
+	// only linux/, and S07 left the stub on the old name).
+	const required = [
+		...text.matchAll(/\brequire\s*\(?\s*["']([A-Za-z_][\w.]*)["']/g),
+		...text.matchAll(/\bpackage\.(?:loaded|preload)\[\s*["']([A-Za-z_][\w.]*)["']\s*\]/g)
+	].map((m) => m[1]);
 	const ownsAlone = (d) =>
 		required.some(
 			(n) =>
