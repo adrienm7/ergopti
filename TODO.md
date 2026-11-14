@@ -257,6 +257,20 @@ and the next module candidates. The audit is paused at the maintainer's request.
       `NativeInputSourceSelectionTests` passed, then six more "unavailable". With 43108782369 that is three macOS 26
       refusals without the line. The full-suite step carries no text-input snapshot or `tsm-refusal.json`, so the
       next step is to bracket it as the number-row step is.
+      2026-11-14, worker B: both steps are bracketed (the full-suite step since 2026-11-12 evening). Scan of the 377
+      completed ci.yml runs of 2026-11-11 to 2026-11-14 00:30 UTC: the number-row step ran in 163 macOS 15 jobs (4
+      failed), the macOS 26 full suite in 83 (17 failed). Two refusals carry a receipt, both
+      `fixture_refusal_unclassified` and without a `tsm.uiserver` line: [43276494558](https://github.com/adrienm7/ergopti/actions/runs/43276494558) (job 131404916213,
+      Apple silicon, number-row step, 19:23 UTC on 11-12, first case
+      `testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI`, 9 of 12 cases refused) and
+      [43277967473](https://github.com/adrienm7/ergopti/actions/runs/43277967473) (job 131406033005, macOS 26 full suite, 19:11 UTC, first case
+      `testFreshKeyboardEventsFollowLayoutAndShiftFlags`; the French selection succeeded at +219 ms, the restore
+      answered `sourceUnavailable` at +6356 ms and +11390 ms). No refusal since 2026-11-13 11:21 UTC; the four
+      later full-suite failures are `CatalogUpdateUserDriverTests` (NSCocoaErrorDomain Code=2) with
+      `no_fixture_refusal`. The agent snapshot is written to the receipt file, not the log, so the pid and run-count
+      question needs the artifacts `swift-launcher-failure-43277967473-1` and the `number-row-carbon-arm64-…` artifact of
+      43276494558 before they expire; this session's network could not reach the artifact store.
+      Cause still unproven, no code changed.
 
 ## Native runtime, editor and diagnostics parity follow-up
 
