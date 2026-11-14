@@ -9,7 +9,7 @@
 #Requires AutoHotkey v2.0
 
 _THR_Check() {
-	Src := _DriverDirsConcat("infra", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(Src != "", "Source file logger.ahk must exist")
 	Assert(InStr(Src, "HealthCheck_RecordWarn()") > 0, "logger.ahk must call HealthCheck_RecordWarn")
 	Assert(InStr(Src, "HealthCheck_RecordError(Line)") > 0, "logger.ahk must record the full ERROR line")

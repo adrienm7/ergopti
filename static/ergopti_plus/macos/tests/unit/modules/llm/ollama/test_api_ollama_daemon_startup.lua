@@ -29,7 +29,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
 			"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
+			"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 			"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
 			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
@@ -39,7 +39,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = { notify = function() return true end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["adapters.http_client"] = { new = function()
+			package.loaded["core.network.adapters.http_client"] = { new = function()
 				return { cancel = function() return true end, isActive = function() return false end,
 					isSettled = function() return true end }
 			end }

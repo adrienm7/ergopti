@@ -575,7 +575,7 @@ function Resolve-ErgoptiNativeNetworkRoutes {
         }
         if ($null -eq $ReadEnvironment) { $ReadEnvironment = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') } }
         # The user's proxy override: the driver sets it on this worker's own environment
-        # (adapters/proxy_override.ahk). It wins over an exported relay and the PAC or
+        # (core/network/adapters/proxy_override.ahk). It wins over an exported relay and the PAC or
         # WPAD lookup never runs.
         $Override = & $ReadEnvironment 'ERGOPTI_PROXY_OVERRIDE'
         if ($Override -is [string] -and $Override -ne '') {

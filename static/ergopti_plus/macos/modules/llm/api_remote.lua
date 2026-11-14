@@ -47,7 +47,7 @@ local Ports = require("ai.engine.request_plan.ports")
 local TokenBudget = require("ai.engine.request_plan.token_budget")
 local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
-local _http_adapter  = require("adapters.http_client")
+local _http_adapter  = require("core.network.adapters.http_client")
 local REQUEST_TIMEOUT_MS = Timings.ms("llm", "request_timeout_ms")
 local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
 local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests

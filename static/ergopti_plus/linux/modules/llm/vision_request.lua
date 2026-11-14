@@ -239,7 +239,7 @@ function M.send(target, body, on_done)
 		_active_request = nil
 		on_done(text, err)
 	end
-	local HttpClient = require("adapters.http_client")
+	local HttpClient = require("core.network.adapters.http_client")
 	local Timings = require("infra.timings")
 	-- Image and transcription never enter the logs; only the encoded size does.
 	Logger.info(LOG, "Vision request → %s (format=%s, %d byte(s)).",
@@ -291,7 +291,7 @@ end
 --- Withdraws the vision request in flight; its callback is not called.
 --- @return boolean cancelled
 function M.cancel()
-	if require("adapters.http_client").cancel(OWNER) ~= true then return false end
+	if require("core.network.adapters.http_client").cancel(OWNER) ~= true then return false end
 	_request_epoch = _request_epoch + 1
 	if _active_request then _active_request.terminal = true end
 	_active_request = nil

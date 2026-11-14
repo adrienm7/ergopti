@@ -21,10 +21,10 @@ local ffi = require("ffi")
 ffi.cdef("unsigned int ergopti_archive_publication_abi_version(void);")
 local backend = ffi.load(out .. "/lib/ergopti/bin/libergopti_archive_publication.so")
 assert(backend.ergopti_archive_publication_abi_version() == 1, "Actual installed C ABI required")
-local native = require("platform.network.native_proxy_runtime").inspect()
+local native = require("core.network.adapters.native_proxy_runtime").inspect()
 assert(native.ok == true and native.acknowledgement == "native-runtime" and native.schema_available == true,
  "Actual supported native GIO schema/backend required")
-local digest = require("infra.openssl_digest")
+local digest = require("core.network.engine.openssl_digest")
 assert(digest.available == true, "Actual native libcrypto required")
 assert(digest.sha256("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "Independent NIST digest required")
 -- A library in LD_LIBRARY_PATH does not provide its CLI. Require the first

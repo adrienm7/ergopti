@@ -52,8 +52,8 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, Publis
 #Include ..\..\core\fs\adapters\file_system.ahk
 #Include ..\..\adapters\process_lifecycle.ahk
 #Include ..\..\adapters\shell_runner.ahk
-#Include ..\..\adapters\http_client.ahk
-#Include ..\..\ui\proxy_override.ahk
+#Include ..\..\core\network\adapters\http_client.ahk
+#Include ..\..\core\network\proxy_override.ahk
 
 _OwnerMain(A_Args[1])
 

@@ -19,7 +19,7 @@ import threading
 
 PROXY_REQUEST = r"""
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 local result, callbacks = nil, 0
 assert(HTTP.get("http://ergopti-native-proxy.invalid/native", {},
 	{ owner = "native-curlrc-proxy", timeout_ms = 2000 },

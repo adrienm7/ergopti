@@ -201,7 +201,7 @@ end
 --- @return table client, table state
 local function fresh_client(config)
 	local fake, state = fake_luv(config)
-	return load_against_fake("adapters.curl_http_client", fake), state
+	return load_against_fake("core.network.adapters.curl_http_client", fake), state
 end
 
 --- Loads a fresh file digest adapter against one fake libuv instance.

@@ -48,18 +48,15 @@ graph TD
         LINUX_compositor_focus["CompositorFocus.lua"]
         LINUX_compositor_focus_worker["CompositorFocusWorker.lua"]
         LINUX_cosmic_toplevel_worker["CosmicToplevelWorker.lua"]
-        LINUX_curl_http_client["CurlHttpClient.lua"]
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_graphics_renderer["GraphicsRenderer.lua"]
-        LINUX_http_client["HttpClient.lua"]
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
         LINUX_input_source_switch["InputSourceSwitch.lua"]
         LINUX_keyboard_hook["KeyboardHook.lua"]
         LINUX_keyboard_layout["KeyboardLayout.lua"]
         LINUX_modifier_broker["ModifierBroker.lua"]
-        LINUX_network_check_ports["NetworkCheckPorts.lua"]
         LINUX_notifier["Notifier.lua"]
         LINUX_owned_process["OwnedProcess.lua"]
         LINUX_process_lifecycle["ProcessLifecycle.lua"]
@@ -72,9 +69,7 @@ graph TD
         LINUX_shell_runner["ShellRunner.lua"]
         LINUX_spotlight_overlay["SpotlightOverlay.lua"]
         LINUX_sqlite_process_worker["SqliteProcessWorker.lua"]
-        LINUX_system_proxy["SystemProxy.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
-        LINUX_tcp_probe["TcpProbe.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
@@ -106,7 +101,6 @@ graph TD
         MACOS_foreign_ledger_snapshot["ForeignLedgerSnapshot.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
         MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
-        MACOS_http_client["HttpClient.lua"]
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_input_source_selector["InputSourceSelector.lua"]
         MACOS_installed_physical_source["InstalledPhysicalSource.lua"]
@@ -125,7 +119,6 @@ graph TD
         MACOS_mouse_control["MouseControl.lua"]
         MACOS_native_bootstrap_pty["NativeBootstrapPty.lua"]
         MACOS_native_python_probe["NativePythonProbe.lua"]
-        MACOS_network_info["NetworkInfo.lua"]
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_own_window["OwnWindow.lua"]
@@ -150,7 +143,6 @@ graph TD
         MACOS_shell_runner["ShellRunner.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
         MACOS_synthetic_input_loopback_owner["SyntheticInputLoopbackOwner.lua"]
-        MACOS_system_curl["SystemCurl.lua"]
         MACOS_system_info["SystemInfo.lua"]
         MACOS_system_switcher_input["SystemSwitcherInput.lua"]
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
@@ -179,7 +171,6 @@ graph TD
         WINDOWS_editor_replace["EditorReplace.ahk"]
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
         WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
-        WINDOWS_http_client["HttpClient.ahk"]
         WINDOWS_input_probe_native["InputProbeNative.ahk"]
         WINDOWS_key_state["KeyState.ahk"]
         WINDOWS_keyboard_hook["KeyboardHook.ahk"]
@@ -191,14 +182,11 @@ graph TD
         WINDOWS_native_folder_picker["NativeFolderPicker.ahk"]
         WINDOWS_native_number["NativeNumber.ahk"]
         WINDOWS_native_text["NativeText.ahk"]
-        WINDOWS_network_failure_host["NetworkFailureHost.ahk"]
-        WINDOWS_network_info["NetworkInfo.ahk"]
         WINDOWS_notifier["Notifier.ahk"]
         WINDOWS_notify_icon["NotifyIcon.ahk"]
         WINDOWS_ollama_identity["OllamaIdentity.ahk"]
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
         WINDOWS_program_providers["ProgramProviders.ahk"]
-        WINDOWS_proxy_override["ProxyOverride.ahk"]
         WINDOWS_raw_input["RawInput.ahk"]
         WINDOWS_registry_notify["RegistryNotify.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
@@ -235,7 +223,6 @@ graph TD
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
     P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
-    P_HttpClient -->|implements| LINUX_http_client
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_Notifier -->|implements| LINUX_notifier
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
@@ -248,11 +235,9 @@ graph TD
     P_Clipboard -->|implements| MACOS_clipboard
     P_GraphicsRenderer -->|implements| MACOS_graphics_renderer
     P_HotkeyRegistrar -->|implements| MACOS_hotkey_registrar
-    P_HttpClient -->|implements| MACOS_http_client
     P_KeyState -->|implements| MACOS_key_state
     P_KeyboardHook -->|implements| MACOS_keyboard_hook
     P_MouseControl -->|implements| MACOS_mouse_control
-    P_NetworkInfo -->|implements| MACOS_network_info
     P_Notifier -->|implements| MACOS_notifier
     P_ProcessLifecycle -->|implements| MACOS_process_lifecycle
     P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
@@ -267,11 +252,9 @@ graph TD
     P_Clipboard -->|implements| WINDOWS_clipboard
     P_GraphicsRenderer -->|implements| WINDOWS_graphics_renderer
     P_HotkeyRegistrar -->|implements| WINDOWS_hotkey_registrar
-    P_HttpClient -->|implements| WINDOWS_http_client
     P_KeyState -->|implements| WINDOWS_key_state
     P_KeyboardHook -->|implements| WINDOWS_keyboard_hook
     P_MouseControl -->|implements| WINDOWS_mouse_control
-    P_NetworkInfo -->|implements| WINDOWS_network_info
     P_Notifier -->|implements| WINDOWS_notifier
     P_ProcessLifecycle -->|implements| WINDOWS_process_lifecycle
     P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector

@@ -54,14 +54,14 @@ end
 local function load_remote()
 	local before = {}
 	for name in pairs(package.loaded) do before[name] = true end
-	local saved_client = package.loaded["adapters.http_client"]
-	package.loaded["adapters.http_client"] = {
+	local saved_client = package.loaded["core.network.adapters.http_client"]
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function() error("the parser corpus must not reach the network") end,
 		post = function() error("the parser corpus must not reach the network") end,
 		cancel = function() return true end,
 	}
 	local remote = helpers.load_module("modules.llm.api_remote")
-	package.loaded["adapters.http_client"] = saved_client
+	package.loaded["core.network.adapters.http_client"] = saved_client
 	for name in pairs(package.loaded) do
 		if not before[name] then package.loaded[name] = nil end
 	end

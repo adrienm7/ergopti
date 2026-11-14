@@ -204,7 +204,7 @@ if as_user "${LAUNCHER} --help" >/dev/null 2>&1; then
 else
 	fail "the launcher does not run: $(as_user "${LAUNCHER} --help" 2>&1 | tail -3)"
 fi
-if as_user "luajit ${LIB_ROOT}/linux/platform/network/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
+if as_user "luajit ${LIB_ROOT}/linux/core/network/adapters/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
 	ok "installed networking admits actual LuaJIT luv, GIO and resolver/schema prerequisites"
 else
 	fail "installed native networking prerequisites are unavailable"

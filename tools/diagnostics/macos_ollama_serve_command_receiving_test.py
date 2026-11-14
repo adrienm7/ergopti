@@ -63,7 +63,7 @@ class EmittedServeCommand(unittest.TestCase):
                 "static/ergopti_plus/_shared/core/network/adapters",
                 "static/ergopti_plus/macos/modules/llm",
                 "static/ergopti_plus/macos/platform",
-                "static/ergopti_plus/macos/platform/network",
+                "static/ergopti_plus/macos/core/network/adapters",
             ):
                 for source in (ROOT / relative).glob("*.py"):
                     target = copied / relative / source.name

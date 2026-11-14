@@ -29,7 +29,7 @@ local MESSAGES = { { role = "system", content = "S" }, { role = "user", content 
 --- Runs body against the real api_remote over a scripted HTTP client and clock.
 --- @param body function body(remote, calls, clock)
 local function with_remote(body)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.monotonic", "core.logger.engine.shim",
+	local names = { "core.network.adapters.http_client", "modules.llm.api_remote", "core.logger.engine.monotonic", "core.logger.engine.shim",
 		"core.events.timer_scheduler" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -41,7 +41,7 @@ local function with_remote(body)
 			return { armed = true }
 		end,
 	}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, request_body, callback)
 			calls[#calls + 1] = { url = url, headers = headers, body = request_body, callback = callback }
 			if clock.sync_refusal then callback({ ok = false, status = 401 }); return false end
@@ -456,7 +456,7 @@ helpers.describe("Access-token providers: the first request waits for the token 
 		with_remote(function(remote, calls)
 			local listed
 			local get_url, get_headers
-			package.loaded["adapters.http_client"].get = function(url, headers, _, callback)
+			package.loaded["core.network.adapters.http_client"].get = function(url, headers, _, callback)
 				get_url, get_headers = url, headers
 				callback({ ok = true, status = 200, body = Json.encode({ data = { { id = "ibm/granite-4-h-small" } } }) })
 				return true

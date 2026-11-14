@@ -154,7 +154,7 @@ copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor
 bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/bin"
 
 # The local NTLM/Negotiate relay (docs/design/proxy-auth-relay.md) lives beside
-# the archive backend, where infra/proxy_auth_relay.lua resolves it. Every
+# the archive backend, where core/network/engine/proxy_auth_relay.lua resolves it. Every
 # package made from this bundle carries it; the Flatpak rebuilds it in its SDK.
 bash "${SCRIPT_DIR}/build-proxy-relay.sh" --output "${BUILD_DIR}/linux/bin/ergopti-proxy-relay"
 
@@ -234,7 +234,7 @@ REQUIRED_FILES=(
 	"linux/modules/hotstrings/input_reader.lua"
 	"linux/modules/hotstrings/device_finder.lua"
 	"linux/modules/keystats/metrics_collector.lua"
-	"linux/adapters/http_client.lua"
+	"linux/core/network/adapters/http_client.lua"
 	"linux/adapters/tray_menu.lua"
 	"linux/core/i18n/engine/locale.lua"
 	"linux/install/config_home.sh"

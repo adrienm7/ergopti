@@ -339,7 +339,7 @@ function M.auto_detect_backend(callback)
 	-- discarded failure left ollama_done/mlx_done stuck at false forever —
 	-- on_both_done() never completes and auto_detect_backend()'s callback is
 	-- silently dropped. Mark the leg done+failed instead, mirroring the
-	-- pattern already used in adapters/http_client.lua's post()/get() (F-MED-5).
+	-- pattern already used in core/network/adapters/http_client.lua's post()/get() (F-MED-5).
 	local ollama_probe_ok = pcall(hs.http.asyncGet, ollama_origin .. EnableAdmission.VERSION_PATH, {}, function(status, body)
 		ollama_ok = EnableAdmission.receipt({ ok = status == 200, status = status, body = body }) == true
 		ollama_done = true

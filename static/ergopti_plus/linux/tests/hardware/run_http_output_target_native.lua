@@ -11,8 +11,8 @@
 --- No proxy/TLS/updater/digest/installer qualification follows from loopback.
 local uv, ffi = require("luv"), require("ffi")
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
-local Core = require("adapters.curl_http_client")
+local Target = require("core.network.engine.http_output_target")
+local Core = require("core.network.adapters.curl_http_client")
 local Clock = require("core.logger.engine.monotonic")
 ffi.cdef("int fcntl(int fd, int command, ...);")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-http-output-XXXXXX"))

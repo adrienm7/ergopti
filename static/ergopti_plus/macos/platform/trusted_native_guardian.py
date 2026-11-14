@@ -9,7 +9,7 @@ import stat
 
 
 def load_engine():
-    path = Path(__file__).parent / "network/native_http.py"
+    path = Path(__file__).parent.parent / "core/network/adapters/native_http.py"
     specification = importlib.util.spec_from_file_location("ergopti_trusted_guardian_engine", path)
     engine = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(engine)

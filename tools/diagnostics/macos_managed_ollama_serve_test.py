@@ -104,8 +104,8 @@ class ProductionServeControls(unittest.TestCase):
             shutil.copy2(DEPENDENCY / "static/ergopti_plus" / relative, target)
         for relative in (
             "macos/platform/source_alias_owner.py",
-            "macos/platform/network/native_http.py",
-            "macos/platform/network/native_ollama_api.py",
+            "macos/core/network/adapters/native_http.py",
+            "macos/core/network/adapters/native_ollama_api.py",
             "macos/modules/llm/managed_ollama_runtime.py",
             "macos/modules/llm/managed_bootstrap_http.py",
         ):

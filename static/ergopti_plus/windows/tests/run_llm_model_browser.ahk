@@ -102,7 +102,7 @@ class WebView2 {
 	}
 }
 
-#Include ../infra/external_url_policy.ahk
+#Include ../core/network/engine/external_url_policy.ahk
 #Include ../ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.

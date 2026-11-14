@@ -19,7 +19,7 @@ local function probed(servers)
 end
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "core.events.loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
+		"core.network.adapters.http_client", "core.events.loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
 		"modules.llm.local_server_ports" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -36,7 +36,7 @@ local function isolated(body)
 	package.loaded["core.events.loop"] = { defer = function(fn) fn(); return true end }
 	local path = os.tmpname(); os.remove(path)
 	local calls = {}
-	package.loaded["adapters.http_client"] = { get_owned = function(url, headers, options, callback)
+	package.loaded["core.network.adapters.http_client"] = { get_owned = function(url, headers, options, callback)
 		local call = { url = url, headers = headers, options = options, callback = callback, cancelled = 0, listeners = {} }
 		local operation = { started = true }
 		function operation:is_settled()
@@ -1224,7 +1224,7 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 	for _, failure in ipairs({"throw","unsupported","dead_start","observation_false","observation_throw"}) do
 		helpers.it("reports native "..failure.." as unavailable while retaining cleanup ownership (local-probe-unavailable)",function()
 			isolated(function(servers,_,calls)
-				local http=package.loaded["adapters.http_client"]
+				local http=package.loaded["core.network.adapters.http_client"]
 				local original=http.get_owned
 				http.get_owned=function(url,headers,options,callback)
 					if failure=="throw" then error("actual native construction refused") end
@@ -1278,7 +1278,7 @@ end)
 helpers.describe("Native synchronous discovery ownership (local-probe-unavailable)",function()
 	helpers.it("acknowledges a zero-resource dead-start refusal without replaying its body (local-probe-unavailable)",function()
 		isolated(function(servers)
-			package.loaded["adapters.http_client"].get_owned=function(_,_,_,callback)
+			package.loaded["core.network.adapters.http_client"].get_owned=function(_,_,_,callback)
 				local operation={started=false}
 				function operation:is_settled() return true end
 				function operation:cancel() return true end
@@ -1447,7 +1447,7 @@ end)
 helpers.describe("Scripted startup discovery transport custody (startup-local-http-edge)",function()
 	helpers.it("models absent default listeners through acknowledged operations rather than disabling dispatch (startup-local-http-edge)",function()
 		isolated(function(servers,_,calls)
-			local port=package.loaded["adapters.http_client"]
+			local port=package.loaded["core.network.adapters.http_client"]
 			local _,probes=require("tests.support.owned_http_fixture").local_discovery(port)
 			local logger=require("core.logger.engine.shim")
 			local previous,errors=logger.error,{}
@@ -1470,7 +1470,7 @@ helpers.describe("Scripted startup discovery transport custody (startup-local-ht
 	end)
 	helpers.it("forwards every unrelated owner with its original arguments and operation identity (startup-local-http-edge)",function()
 		isolated(function(_,_,calls)
-			local port=package.loaded["adapters.http_client"]
+			local port=package.loaded["core.network.adapters.http_client"]
 			require("tests.support.owned_http_fixture").local_discovery(port)
 			local headers,options,callback={Authorization="inert"},{owner="original-updater"},function() end
 			local operation=port.get_owned("https://example.invalid/owned",headers,options,callback)

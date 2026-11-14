@@ -35,11 +35,11 @@ end
 --- @param test function Receives the provider, queued requests and logger records.
 local function isolated(test, real_logger)
 	local saved = {}
-	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }) do
+	for _, name in ipairs({ "core.network.adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }) do
 		saved[name] = package.loaded[name]
 	end
 	local calls, logs = {}, {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, body, callback, options)
 			calls[#calls + 1] = { url = url, callback = callback, options = options }
 			return true
@@ -63,7 +63,7 @@ local function isolated(test, real_logger)
 		test(remote, calls, logs)
 	end)
 	for name, value in pairs(saved) do package.loaded[name] = value end
-	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }) do
+	for _, name in ipairs({ "core.network.adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }) do
 		if saved[name] == nil then package.loaded[name] = nil end
 	end
 	if not ok then error(err, 0) end

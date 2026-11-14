@@ -353,7 +353,7 @@ function M.stage(asset, done)
 	for _, name in ipairs(policy.environment_names()) do environment[name] = M._getenv(name) or "" end
 	local route = policy.route(asset.url, environment)
 	if not route then Logger.error(LOG, "The release proxy route is invalid."); return false end
-	if route.mode == "environment" and not require("adapters.system_curl").check("the release download") then return false end
+	if route.mode == "environment" and not require("core.network.adapters.system_curl").check("the release download") then return false end
 	environment.ERGOPTI_RELEASE_STAGE_REQUEST = request
 	environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS = string.format("%d", limits.absolute_ms)
 	environment.ERGOPTI_RELEASE_STAGE_IDLE_MS = string.format("%d", limits.idle_ms)

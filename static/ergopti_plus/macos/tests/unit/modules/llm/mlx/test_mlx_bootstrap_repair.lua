@@ -1442,7 +1442,7 @@ helpers.describe("MLX native bootstrap admission", function()
 		local FileSystem = package.loaded["core.fs.adapters.file_system"]
 		local exists = FileSystem.exists
 		FileSystem.exists = function(path)
-			if path:sub(-#"/platform/network/native_http.py") == "/platform/network/native_http.py" then return false end
+			if path:sub(-#"/core/network/adapters/native_http.py") == "/core/network/adapters/native_http.py" then return false end
 			return exists(path)
 		end
 		local prelude = Network.bootstrap_prelude("TEST", "/owned/python")

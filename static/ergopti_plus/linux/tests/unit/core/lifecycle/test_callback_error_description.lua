@@ -113,10 +113,10 @@ helpers.describe("linux-http-callback-error-description", function()
 		local logs = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) logs[#logs + 1] = string.format(message, ...) end
-		local previous_logger, previous_client = package.loaded["core.logger.engine.shim"], package.loaded["adapters.curl_http_client"]
-		package.loaded["core.logger.engine.shim"], package.loaded["adapters.curl_http_client"] = logger, nil
-		local loaded, client = pcall(require, "adapters.curl_http_client")
-		package.loaded["core.logger.engine.shim"], package.loaded["adapters.curl_http_client"] = previous_logger, previous_client
+		local previous_logger, previous_client = package.loaded["core.logger.engine.shim"], package.loaded["core.network.adapters.curl_http_client"]
+		package.loaded["core.logger.engine.shim"], package.loaded["core.network.adapters.curl_http_client"] = logger, nil
+		local loaded, client = pcall(require, "core.network.adapters.curl_http_client")
+		package.loaded["core.logger.engine.shim"], package.loaded["core.network.adapters.curl_http_client"] = previous_logger, previous_client
 		if not loaded then error(client, 0) end
 		return client, logs
 	end

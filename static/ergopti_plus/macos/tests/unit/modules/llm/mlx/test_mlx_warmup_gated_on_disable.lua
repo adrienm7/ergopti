@@ -310,7 +310,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		-- Save every module we are about to replace so the suite is left clean
 		local saved = {}
 		for _, name in ipairs({
-			"adapters.http_client", "core.events.timer_scheduler", "modules.llm.api_mlx",
+			"core.network.adapters.http_client", "core.events.timer_scheduler", "modules.llm.api_mlx",
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
@@ -339,7 +339,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 
 		-- Counting HTTP client: always non-200 so warmup always self-reschedules
 		local post_count = 0
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					post = function(_url, _headers, _payload, cb)

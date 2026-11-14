@@ -45,7 +45,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.hotstrings.injector", "modules.hotstrings.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -105,7 +105,7 @@ local function scenario(opts, body)
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
 				world.wire[#world.wire + 1] = "post"

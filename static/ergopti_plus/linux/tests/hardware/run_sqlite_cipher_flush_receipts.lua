@@ -18,7 +18,7 @@ assert(uv.fs_mkdir(root .. "/config", 448)); assert(uv.fs_mkdir(root .. "/config
 local file = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(file:write("[metrics]\nenabled=true\nencrypt=true\n") and file:close())
 local Cipher = require("modules.keystats.text_cipher")
-local AES = require("infra.openssl_cipher")
+local AES = require("core.network.engine.openssl_cipher")
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local Drain = require("tests.support.sqlite_flush_native")

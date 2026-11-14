@@ -9,10 +9,10 @@
 --- ==============================================================================
 
 local uv=require('luv')
-local Http=require('adapters.http_client')
-local Curl=require('adapters.curl_http_client')
+local Http=require('core.network.adapters.http_client')
+local Curl=require('core.network.adapters.curl_http_client')
 assert(uv.getuid()~=0)
-local BodyPipe=require('infra.http_body_pipe')
+local BodyPipe=require('core.network.engine.http_body_pipe')
 local pipe_backend=type(uv.pipe)=='function' and uv or BodyPipe
 local pipe_field=type(uv.pipe)=='function' and 'pipe' or 'allocate'
 local original_pipe, original_open, original_close, original_handle_close = pipe_backend[pipe_field], uv.pipe_open, uv.fs_close, uv.close

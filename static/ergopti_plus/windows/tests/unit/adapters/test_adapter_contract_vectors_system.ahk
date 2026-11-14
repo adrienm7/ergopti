@@ -678,4 +678,4 @@ _RunKeyboardHookContractVectors() {
 _RunKeyboardHookContractVectors()
 
 
-#Include network/test_network_info_native64_cache.ahk
+#Include ../core/network/adapters/test_info_native64_cache.ahk

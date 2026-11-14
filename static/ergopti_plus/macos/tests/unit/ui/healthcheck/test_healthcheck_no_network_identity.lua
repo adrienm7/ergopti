@@ -35,7 +35,7 @@ end
 helpers.describe("healthcheck: no network identity (no-network-identity)", function()
 	helpers.it("the whole snapshot carries no Wi-Fi name and no host name (no-network-identity)", function()
 		helpers.with_stub_scope({
-			"core.logger.engine.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
+			"core.logger.engine.logger", "core.network.adapters.info", "ui.healthcheck.core", "ui.healthcheck.helpers",
 		}, function()
 			local asked = {}
 			helpers.load_with_stubs("core.logger.engine.logger", {
@@ -43,7 +43,7 @@ helpers.describe("healthcheck: no network identity (no-network-identity)", funct
 			})
 			hs.host.localizedName = function() asked[#asked + 1] = "localizedName"; return HOST_NAME end
 			hs.host.names = function() asked[#asked + 1] = "names"; return { HOST_NAME } end
-			package.loaded["adapters.network_info"] = {
+			package.loaded["core.network.adapters.info"] = {
 				getSsidHash = function() asked[#asked + 1] = "ssid"; return SSID_DIGEST end,
 				getSignalStrength = function() return 70 end,
 				isInternetReachable = function() return true end,

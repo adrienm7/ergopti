@@ -87,7 +87,7 @@ helpers.describe("Ollama model warmup chain", function()
 	end)
 	helpers.it("linux-warmup-refusal-debt: retains a real rejected native deadline until its close callback", function()
 		local native = require("luv")
-		local Deadline = require("infra.managed_http_deadline")
+		local Deadline = require("core.network.engine.managed_http_deadline")
 		local Monotonic = require("core.logger.engine.monotonic")
 		local NumberPolicy = require("core.text.engine.number_policy")
 		local ok, err = xpcall(function()
@@ -273,7 +273,7 @@ end)
 
 helpers.describe("Ollama model warmup request", function()
 	helpers.it("linux-model-warmup: asks Ollama to load the model with no message and its keep-alive", function()
-		local names = { "adapters.http_client", "modules.llm.api_ollama", "modules.llm.prediction_engine" }
+		local names = { "core.network.adapters.http_client", "modules.llm.api_ollama", "modules.llm.prediction_engine" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = xpcall(function()
@@ -282,7 +282,7 @@ helpers.describe("Ollama model warmup request", function()
 				capture_runtime_response = function() return {} end,
 				runtime_response_current = function() return current end,
 			}
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				post_stream_owned = function(url, headers, body, options, _, on_done)
 					sent[#sent + 1] = { url = url, headers = headers, body = body, options = options, on_done = on_done }
 					return { started = true }

@@ -200,7 +200,7 @@ end
 --- @param timeout_ms number
 --- @param callback function Receives status, body, err.
 local function default_http_get(url, headers, timeout_ms, callback)
-	local HttpClient = require("adapters.http_client")
+	local HttpClient = require("core.network.adapters.http_client")
 	local completed = false
 	local function finish(status, body, err)
 		if completed then return end

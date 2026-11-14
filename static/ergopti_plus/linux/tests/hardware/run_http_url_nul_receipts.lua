@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 assert(uv.getuid() ~= 0, "native URL checks require an ordinary user")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-http-url-nul-XXXXXX"))
 local checks, failures, requests, last_path = 0, 0, 0, nil

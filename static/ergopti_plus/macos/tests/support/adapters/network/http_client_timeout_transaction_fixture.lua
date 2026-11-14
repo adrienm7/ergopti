@@ -27,9 +27,9 @@ local helpers = require("tests.helpers")
 --- @return table client A fresh HttpClient instance.
 --- @return table scheduler The freshly loaded TimerScheduler adapter.
 local function load_client(timer_stub, http_stub, options)
-	package.loaded["adapters.http_client"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	local HttpClient = helpers.load_with_stubs("adapters.http_client", {
+	local HttpClient = helpers.load_with_stubs("core.network.adapters.http_client", {
 		timer = timer_stub,
 		http = http_stub,
 	})

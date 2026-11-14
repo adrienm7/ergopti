@@ -428,7 +428,7 @@ end)
 -- handle is a fixture-owned pipe, independently closed on every exit path.
 local function feeder_options(mode, cap)
  local actual_uv = require("luv")
- local names = { "luv", "infra.managed_http_deadline", "adapters.owned_process" }
+ local names = { "luv", "core.network.engine.managed_http_deadline", "adapters.owned_process" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local pipe, close_ack, captured, starts, reads = nil, false, nil, 0, 0
  local ok, err = xpcall(function()
@@ -453,7 +453,7 @@ local function feeder_options(mode, cap)
    return actor -- Modeled unresolved child; never a physical ACK assertion.
   end
   package.loaded.luv = uv
-  package.loaded["infra.managed_http_deadline"] = { start = function() return timer end }
+  package.loaded["core.network.engine.managed_http_deadline"] = { start = function() return timer end }
   package.loaded["adapters.owned_process"] = process
   local construct = require("infra.archive_tar_feeder").new
   local start = assert(construct({ ffi = { new = function() return { [0] = -1 } end },

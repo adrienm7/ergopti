@@ -28,7 +28,7 @@ os.remove(REFUSED_FILE)
 --- @return table remote, table calls
 local function load_remote()
 	local calls = {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function() return true end,
 		post = function(url, headers, body, callback, options)
 			calls[#calls + 1] = { url = url, body = body, callback = callback }
@@ -43,7 +43,7 @@ local function load_remote()
 end
 
 local function unload()
-	package.loaded["adapters.http_client"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 	package.loaded["modules.llm.vision_request"] = nil
 	os.remove(REFUSED_FILE)

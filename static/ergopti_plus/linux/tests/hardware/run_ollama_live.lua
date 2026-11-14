@@ -126,7 +126,7 @@ check(pulled == true, "Ollama confirms the model through /api/pull")
 
 print("=== 3/ local model admission before inference ===")
 local Ollama = require("modules.llm.api_ollama")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local native_post = Http.postStream
 local inference_posts = 0
 Http.postStream = function(...)

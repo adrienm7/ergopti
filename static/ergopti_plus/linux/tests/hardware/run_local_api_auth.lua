@@ -16,7 +16,7 @@ require("core.lifecycle.engine.compat.utf8").install()
 -- API keys live in the desktop secret service: give this process the in-memory
 -- one the unit runner uses, never the developer's keyring or a missing tool.
 require("tests.support.secret_service_fake").isolate()
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local EventLoop = require("core.events.loop")
 local Remote = require("modules.llm.api_remote")
 local Json = require("core.text.engine.json")

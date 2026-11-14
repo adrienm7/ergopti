@@ -18,7 +18,7 @@ import threading
 
 LUA_REQUEST = r"""
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 assert(uv.getuid() ~= 0, "native TLS checks require an ordinary user")
 local url = assert(os.getenv("ERGOPTI_NATIVE_TLS_URL"))
 local method = assert(os.getenv("ERGOPTI_NATIVE_TLS_METHOD"))

@@ -64,7 +64,7 @@ def load(name, path):
 
 class NativeFailureStages(unittest.TestCase):
     def setUp(self):
-        self.engine = load("failure_stage_engine", MACOS / "platform/network/native_http.py")
+        self.engine = load("failure_stage_engine", MACOS / "core/network/adapters/native_http.py")
         self.reporter = load(
             "failure_stage_reporter", MACOS / "modules/llm/managed_bootstrap_http.py"
         )
@@ -319,7 +319,7 @@ class NativeRouteFallback(unittest.TestCase):
     """The worker's direct-fallback marker reaches the log as a closed stage only."""
 
     def setUp(self):
-        self.engine = load("route_fallback_engine", MACOS / "platform/network/native_http.py")
+        self.engine = load("route_fallback_engine", MACOS / "core/network/adapters/native_http.py")
         self.reporter = load(
             "route_fallback_reporter", MACOS / "modules/llm/managed_bootstrap_http.py"
         )

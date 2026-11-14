@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Ports = require("tests.support.prepared_native_ports")
-local target = "adapters.curl_http_client"
+local target = "core.network.adapters.curl_http_client"
 local names = { "luv", target, "adapters.shell_runner", "core.logger.engine.monotonic" }
 
 local function fixture(values, callback)

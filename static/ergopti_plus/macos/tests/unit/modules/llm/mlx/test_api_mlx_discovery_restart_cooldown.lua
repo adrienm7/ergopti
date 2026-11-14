@@ -67,7 +67,7 @@ local function make_env()
 	}
 
 	-- Every probe fails, which is the path that retries.
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			return {
 				post = function(_, _, _, _, cb)
@@ -116,7 +116,7 @@ local function make_env()
 
 	-- Loaded by a plain require AFTER the stubs are installed, not through
 	-- load_with_stubs: the module captures its HTTP client at require time
-	-- (`local _probe_client = require("adapters.http_client").new()`), and
+	-- (`local _probe_client = require("core.network.adapters.http_client").new()`), and
 	-- load_with_stubs resets the stub table it would have to capture.
 	package.loaded["modules.llm.api_mlx_discovery"] = nil
 	env.discovery = require("modules.llm.api_mlx_discovery")

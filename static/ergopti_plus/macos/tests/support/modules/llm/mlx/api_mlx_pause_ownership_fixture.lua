@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local MODULE_NAMES = {
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"core.fs.adapters.json_codec",
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",

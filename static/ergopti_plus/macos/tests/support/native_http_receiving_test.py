@@ -19,7 +19,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).absolute().parents[2]
-NETWORK = ROOT / "platform/network"
+NETWORK = ROOT / "core/network/adapters"
 
 
 def load(name, path):

@@ -14,7 +14,7 @@ helpers.describe("HS-098 remote request timeout wiring", function()
 	helpers.it("passes the shared millisecond value to all four HTTP owners", function()
 		local module_names = {
 			"modules.llm.api_remote",
-			"adapters.http_client",
+			"core.network.adapters.http_client",
 			"infra.timings",
 		}
 		local saved = {}
@@ -31,7 +31,7 @@ helpers.describe("HS-098 remote request timeout wiring", function()
 				return 60000
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function(options)
 				local client = {
 					timeout_ms = type(options) == "table" and options.timeout_ms or nil,

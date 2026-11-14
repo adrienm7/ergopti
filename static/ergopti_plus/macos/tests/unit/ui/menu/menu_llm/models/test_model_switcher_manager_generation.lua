@@ -335,7 +335,7 @@ helpers.describe("model manager generation fences", function()
 			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
-			"adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
+			"core.network.adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
 			"infra.dialog_util", "ui.download_window",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
 			"ui.menu.menu_llm.models_manager_ollama",
@@ -380,7 +380,7 @@ helpers.describe("model manager generation fences", function()
 				after = function() error("healthy readiness must not schedule a retry") end,
 				cancel = function() return true end,
 			}
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {} }
 					function client.post(_, _, _, done)
@@ -830,7 +830,7 @@ helpers.describe("model manager generation fences", function()
 				local emitted_network_prelude = assert(network.managed_http_prelude("MLX"))
 				-- Preserve the admitted bundled receiver when the virtual filesystem
 				-- takes over below; this test controls publication, not native identity.
-				fake_files[helpers.driver_root() .. "platform/network/native_http.py"] = ""
+				fake_files[helpers.driver_root() .. "core/network/adapters/native_http.py"] = ""
 				local notifications = 0
 				local completions = 0
 				package.loaded["infra.notifications"] = {

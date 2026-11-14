@@ -308,7 +308,7 @@ end
 
 -- Regression: bind_wrap_text_if_selected's eventtap callback called text_acts.read_ax_selection()
 -- (two synchronous cross-process AX calls) on every keystroke matching a wrap symbol, with zero
--- caching. infra/vscode_bridge.lua documents this exact failure mode and mitigates it with a
+-- caching. core/network/engine/vscode_bridge.lua documents this exact failure mode and mitigates it with a
 -- short-lived TTL cache; this call site had none — a slow AX call risks
 -- kCGEventTapDisabledByTimeout, killing the tap. The fix mirrors vscode_bridge's cache pattern.
 

@@ -25,7 +25,7 @@ local MODULES = {
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
 	"adapters.mouse_control", "core.logger.engine.logger", "infra.timings", "infra.keycodes",
 	"ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
-	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "modules.llm.api_token_crypto", "adapters.http_client",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "modules.llm.api_token_crypto", "core.network.adapters.http_client",
 	"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 	"modules.llm.provider_uses", "modules.llm.progressive_reveal", "modules.llm.parser",
 	"infra.manifest_reader", "ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats",
@@ -106,7 +106,7 @@ local function with_capture(callback)
 				return { cancel = function() return true end }
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					cancel = function() return true end,

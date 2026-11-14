@@ -34,7 +34,7 @@ end
 --- Isolates only the scripted HTTP and logging seams, restoring them on failure.
 --- @param test function Receives the remote module, requests and diagnostics.
 local function isolated(test)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }
+	local names = { "core.network.adapters.http_client", "modules.llm.api_remote", "core.logger.engine.shim" }
 	local saved, calls, logs = {}, {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local function queue(method, url, headers, body, callback, options)
@@ -42,7 +42,7 @@ local function isolated(test)
 			body = body, callback = callback, options = options }
 		return true
 	end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function(url, headers, options, callback)
 			return queue("GET", url, headers, nil, callback, options)
 		end,
@@ -166,7 +166,7 @@ end
 helpers.describe("api_remote_callback_siblings: protected public wrappers", function()
 	helpers.it("settles model listing once when HTTP refuses synchronously", function()
 		isolated(function(remote)
-			local http = require("adapters.http_client")
+			local http = require("core.network.adapters.http_client")
 			http.get = function(_, _, _, callback)
 				callback({ ok = false, status = 0, error = "preflight refused" })
 				return false

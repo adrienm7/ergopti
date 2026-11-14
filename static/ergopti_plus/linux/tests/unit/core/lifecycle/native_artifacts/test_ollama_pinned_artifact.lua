@@ -14,7 +14,7 @@ local make_fixture = require("tests.support.ollama_pinned_artifact_fixture")
 local DIGEST = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
 local function controlled(options, body)
-	local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "infra.managed_http_deadline", "infra.fd_sha256", "adapters.owned_process" }
+	local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256", "adapters.owned_process" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, reason = xpcall(function() body(make_fixture(options)) end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end

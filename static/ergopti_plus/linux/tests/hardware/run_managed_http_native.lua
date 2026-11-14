@@ -56,15 +56,15 @@ local function observe_owner(module, name)
         return unpack_values(values, 1, values.n)
     end
 end
-observe_owner(require("adapters.curl_http_client"), "dispatch_owned")
-observe_owner(require("adapters.system_proxy"), "lookup_owned")
-observe_owner(require("infra.managed_http_deadline"), "start")
-local client = require("adapters.http_client")
+observe_owner(require("core.network.adapters.curl_http_client"), "dispatch_owned")
+observe_owner(require("core.network.adapters.system_proxy"), "lookup_owned")
+observe_owner(require("core.network.engine.managed_http_deadline"), "start")
+local client = require("core.network.adapters.http_client")
 local hop_trace = { lookups = 0, curls = 0, physical_retirements = 0, full_urls_match = true }
 local prior_curls, per_hop_operation = {}, nil
 if input.method == "per_hop" then
     -- Transparent observations only: native callbacks/return values are unchanged.
-    local proxy = require("adapters.system_proxy")
+    local proxy = require("core.network.adapters.system_proxy")
     local lookup = proxy.lookup_owned
     proxy.lookup_owned = function(...)
         hop_trace.lookups = hop_trace.lookups + 1
@@ -86,7 +86,7 @@ if input.method == "per_hop" then
         end
         return unpack_values(values, 1, values.n)
     end
-    local curl = require("adapters.curl_http_client")
+    local curl = require("core.network.adapters.curl_http_client")
     local dispatch = curl.dispatch_owned
     curl.dispatch_owned = function(...)
         hop_trace.curls = hop_trace.curls + 1

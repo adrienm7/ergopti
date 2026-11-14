@@ -3,7 +3,7 @@
 --- Actual Lua registry/lease/target calls with explicitly controlled native ports.
 --- These fixed causal controls do not qualify the C backend, kernel or installer.
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
+local Target = require("core.network.engine.http_output_target")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local ABC_SHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
@@ -13,7 +13,7 @@ local function fixture(options)
   stages = 0, commits = 0, cleanups = 0, disposes = 0, hashes = 0, writes = {}, bytes = "",
   timer_settled = false, timer_listeners = {}, hash_settled = false, hash_listeners = {}, callbacks = {} }
  local saved = {}
- local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "infra.managed_http_deadline", "infra.fd_sha256" }
+ local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256" }
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local function restore()
   for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -133,12 +133,12 @@ local function fixture(options)
  package.loaded["core.fs.engine.paths"] = { driver_root = function() return "/actual-driver" end }
  package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return h.now end,
   has_hires = function() return options.coarse ~= true end, backend = function() return "luv.hrtime" end }
- package.loaded["infra.managed_http_deadline"] = { start = function(_, callback)
+ package.loaded["core.network.engine.managed_http_deadline"] = { start = function(_, callback)
   h.expire = callback
   if options.timer_throw then error("unknown timer construction") end
   return timer
  end }
- package.loaded["infra.fd_sha256"] = { native = function() return { start = function(fd, bytes, current, deadline, callback)
+ package.loaded["core.network.engine.fd_sha256"] = { native = function() return { start = function(fd, bytes, current, deadline, callback)
   assert(fd == 97 and bytes == 3 and deadline == 50.5 and current() == true)
   h.hashes = h.hashes + 1; h.hash_callback = callback; return hash
  end } end }
@@ -189,7 +189,7 @@ local function fixture(options)
 end
 local function controlled(options, body)
  local saved = {}
- local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "infra.managed_http_deadline", "infra.fd_sha256" }
+ local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256" }
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local ok, err = xpcall(function() body(fixture(options)) end, debug.traceback)
  for _, name in ipairs(names) do package.loaded[name] = saved[name] end

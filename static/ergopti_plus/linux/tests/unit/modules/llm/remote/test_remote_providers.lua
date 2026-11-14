@@ -42,11 +42,11 @@ end
 --- logger that keeps every line with its level.
 --- @param body function body(remote, calls, logs)
 local function with_remote(body)
-	local names = { "adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
+	local names = { "core.network.adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local calls, logs = {}, {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, request_body, callback, options)
 			calls[#calls + 1] = { url = url, headers = headers, body = Json.decode(request_body), callback = callback,
 				options = options }

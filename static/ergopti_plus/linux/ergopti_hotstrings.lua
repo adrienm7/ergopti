@@ -634,7 +634,7 @@ local shutdown = ShutdownCoordinator.new({
 				return function()
 					if not resolved then
 						resolved = true
-						client = package.loaded["adapters.http_client"]
+						client = package.loaded["core.network.adapters.http_client"]
 						stop = client and client.shutdown
 					end
 					return not client or stop() == true

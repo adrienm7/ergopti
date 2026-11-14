@@ -35,14 +35,15 @@ class TrustedGuardianControls(unittest.TestCase):
         self.platform = (
             self.root / "Native.app/Contents/Resources/static/ergopti_plus/macos/platform"
         )
-        (self.platform / "network").mkdir(parents=True)
+        self.platform.mkdir(parents=True)
+        (self.platform.parent / "core/network/adapters").mkdir(parents=True)
         for name in ("trusted_native_guardian.py", "suspended_image_owner.py"):
             shutil.copyfile(
                 ROOT / "static/ergopti_plus/macos/platform" / name, self.platform / name
             )
         shutil.copyfile(
-            SOURCE / "static/ergopti_plus/macos/platform/network/native_http.py",
-            self.platform / "network/native_http.py",
+            SOURCE / "static/ergopti_plus/macos/core/network/adapters/native_http.py",
+            self.platform.parent / "core/network/adapters/native_http.py",
         )
         self.guardian = load(
             "trusted_native_guardian", self.platform / "trusted_native_guardian.py"

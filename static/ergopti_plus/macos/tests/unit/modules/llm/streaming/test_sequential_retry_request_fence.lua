@@ -97,7 +97,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 		helpers.it(case.name .. " drops a retry after the request is superseded", function()
 			helpers.with_stub_scope({
 				case.module_name, "modules.llm.api_common", "modules.llm.profiles",
-				"modules.llm.progressive_reveal", "adapters.http_client",
+				"modules.llm.progressive_reveal", "core.network.adapters.http_client",
 				"core.events.timer_scheduler", "adapters.shell_runner",
 			}, function()
 				local module = helpers.load_with_stubs(case.module_name)
@@ -152,7 +152,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 		helpers.it(case.name .. " never retries a refused credential (HTTP 401) but still retries other failures", function()
 			helpers.with_stub_scope({
 				case.module_name, "modules.llm.api_common", "modules.llm.profiles",
-				"modules.llm.progressive_reveal", "adapters.http_client",
+				"modules.llm.progressive_reveal", "core.network.adapters.http_client",
 				"core.events.timer_scheduler", "adapters.shell_runner",
 			}, function()
 				local module = helpers.load_with_stubs(case.module_name)
@@ -186,7 +186,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 				.. " prediction(s) when every attempt fails", function()
 				helpers.with_stub_scope({
 					case.module_name, "modules.llm.api_common", "modules.llm.profiles",
-					"modules.llm.progressive_reveal", "adapters.http_client",
+					"modules.llm.progressive_reveal", "core.network.adapters.http_client",
 					"core.events.timer_scheduler", "adapters.shell_runner",
 				}, function()
 					local module = helpers.load_with_stubs(case.module_name)
@@ -218,7 +218,7 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 				.. " (sequential-result-fence)", function()
 				helpers.with_stub_scope({
 					case.module_name, "modules.llm.api_common", "modules.llm.profiles",
-					"modules.llm.progressive_reveal", "adapters.http_client",
+					"modules.llm.progressive_reveal", "core.network.adapters.http_client",
 					"core.events.timer_scheduler", "adapters.shell_runner",
 				}, function()
 					local module = helpers.load_with_stubs(case.module_name)

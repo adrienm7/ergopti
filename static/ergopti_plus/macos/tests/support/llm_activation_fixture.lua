@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"ui.menu.menu_llm.ollama_enable_probe",
 	"ai.engine.settings.enable_admission_core",
 	"core.logger.engine.logger",
@@ -659,7 +659,7 @@ local function build_fixture(backend, save_results, options)
 	end
 
 	package.loaded["modules.llm"].configuration_idle = function() return true end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			local active = false
 			local observers = {}

@@ -13,9 +13,9 @@ end
 helpers.describe("LLM scope native acknowledgements", function()
 	for _, kind in ipairs({ "api_ollama", "api_remote" }) do
 		helpers.it("retains " .. kind .. " ownership when transport cancellation refuses", function()
-			isolated({ "adapters.http_client", "modules.llm." .. kind }, function()
+			isolated({ "core.network.adapters.http_client", "modules.llm." .. kind }, function()
 				local refused, cancellations, completions = true, 0, 0
-				package.loaded["adapters.http_client"] = {
+				package.loaded["core.network.adapters.http_client"] = {
 					post = function() return true end,
 					postStream = function() return true end,
 					cancel = function() cancellations = cancellations + 1; return not refused end,

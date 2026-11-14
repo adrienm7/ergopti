@@ -79,28 +79,28 @@ Each `.spec.js` file exports:
 
 ## 3. Driver Compliance Table
 
-| Port                | AHK Adapter                          | HS Adapter                           |
-| ------------------- | ------------------------------------ | ------------------------------------ |
-| KeyboardHook        | `adapters/keyboard_hook.ahk`         | `adapters/keyboard_hook.lua`         |
-| TextSender          | `adapters/text_sender.ahk`           | `adapters/text_sender.lua`           |
-| TooltipRenderer     | `adapters/tooltip_renderer.ahk`      | `adapters/tooltip_renderer.lua`      |
-| HttpClient          | `adapters/http_client.ahk`           | `adapters/http_client.lua`           |
-| TimerScheduler      | `core/events/timer_scheduler.ahk`    | `core/events/timer_scheduler.lua`    |
-| Notifier            | `adapters/notifier.ahk`              | `adapters/notifier.lua`              |
-| TrayMenu            | `adapters/tray_menu.ahk`             | `adapters/tray_menu.lua`             |
-| FileSystem          | `core/fs/adapters/file_system.ahk`   | `core/fs/adapters/file_system.lua`   |
-| SecureFieldDetector | `adapters/secure_field_detector.ahk` | `adapters/secure_field_detector.lua` |
-| Clipboard           | `adapters/clipboard.ahk`             | `adapters/clipboard.lua`             |
-| Storage             | `core/fs/adapters/storage.ahk`       | `core/fs/adapters/storage.lua`       |
-| ProcessLifecycle    | `adapters/process_lifecycle.ahk`     | `adapters/process_lifecycle.lua`     |
-| KeyState            | `adapters/key_state.ahk`             | `adapters/key_state.lua`             |
-| MouseControl        | `adapters/mouse_control.ahk`         | `adapters/mouse_control.lua`         |
-| NetworkInfo         | `adapters/network_info.ahk`          | `adapters/network_info.lua`          |
-| WindowInfo          | `adapters/window_info.ahk`           | `adapters/window_info.lua`           |
-| WindowManager       | `adapters/window_manager.ahk`        | `adapters/window_manager.lua`        |
-| AppLauncher         | `adapters/app_launcher.ahk`          | `adapters/app_launcher.lua`          |
-| Crypto              | `adapters/crypto.ahk`                | `adapters/crypto.lua`                |
-| GraphicsRenderer    | `adapters/graphics_renderer.ahk`     | `adapters/graphics_renderer.lua`     |
+| Port                | AHK Adapter                             | HS Adapter                              |
+| ------------------- | --------------------------------------- | --------------------------------------- |
+| KeyboardHook        | `adapters/keyboard_hook.ahk`            | `adapters/keyboard_hook.lua`            |
+| TextSender          | `adapters/text_sender.ahk`              | `adapters/text_sender.lua`              |
+| TooltipRenderer     | `adapters/tooltip_renderer.ahk`         | `adapters/tooltip_renderer.lua`         |
+| HttpClient          | `core/network/adapters/http_client.ahk` | `core/network/adapters/http_client.lua` |
+| TimerScheduler      | `core/events/timer_scheduler.ahk`       | `core/events/timer_scheduler.lua`       |
+| Notifier            | `adapters/notifier.ahk`                 | `adapters/notifier.lua`                 |
+| TrayMenu            | `adapters/tray_menu.ahk`                | `adapters/tray_menu.lua`                |
+| FileSystem          | `core/fs/adapters/file_system.ahk`      | `core/fs/adapters/file_system.lua`      |
+| SecureFieldDetector | `adapters/secure_field_detector.ahk`    | `adapters/secure_field_detector.lua`    |
+| Clipboard           | `adapters/clipboard.ahk`                | `adapters/clipboard.lua`                |
+| Storage             | `core/fs/adapters/storage.ahk`          | `core/fs/adapters/storage.lua`          |
+| ProcessLifecycle    | `adapters/process_lifecycle.ahk`        | `adapters/process_lifecycle.lua`        |
+| KeyState            | `adapters/key_state.ahk`                | `adapters/key_state.lua`                |
+| MouseControl        | `adapters/mouse_control.ahk`            | `adapters/mouse_control.lua`            |
+| NetworkInfo         | `core/network/adapters/info.ahk`        | `core/network/adapters/info.lua`        |
+| WindowInfo          | `adapters/window_info.ahk`              | `adapters/window_info.lua`              |
+| WindowManager       | `adapters/window_manager.ahk`           | `adapters/window_manager.lua`           |
+| AppLauncher         | `adapters/app_launcher.ahk`             | `adapters/app_launcher.lua`             |
+| Crypto              | `adapters/crypto.ahk`                   | `adapters/crypto.lua`                   |
+| GraphicsRenderer    | `adapters/graphics_renderer.ahk`        | `adapters/graphics_renderer.lua`        |
 
 ---
 

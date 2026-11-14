@@ -34,7 +34,7 @@ elseif kind == "cpu" then
     local schema = bridge.config().schema
     package.loaded["core.events.timer_scheduler"] = { HAS_ASYNC = true,
         after = function() return { armed = true } end, cancel = function() return true end }
-    package.loaded["adapters.http_client"] = { HAS_ASYNC = false }
+    package.loaded["core.network.adapters.http_client"] = { HAS_ASYNC = false }
     package.loaded["adapters.shell_runner"] = { HAS_ASYNC = false, has_command = function() return false end }
     local results = {}
     local run = require("ui.healthcheck.probes").start(schema, {}, {}, function(id, result) results[id] = result end)

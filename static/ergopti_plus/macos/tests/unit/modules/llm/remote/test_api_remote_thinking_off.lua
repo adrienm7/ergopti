@@ -26,7 +26,7 @@ require("core.logger.engine")
 local function with_remote(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
-		"modules.shortcuts.script_control", "adapters.http_client",
+		"modules.shortcuts.script_control", "core.network.adapters.http_client",
 		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
@@ -60,7 +60,7 @@ local function with_remote(callback)
 				return { cancel = function() return true end }
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					cancel = function() return true end,

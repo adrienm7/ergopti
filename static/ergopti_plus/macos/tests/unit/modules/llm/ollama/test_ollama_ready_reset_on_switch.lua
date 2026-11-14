@@ -95,7 +95,7 @@ end)
 
 helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness", function()
 	helpers.it("a warmup response that lands after reset_ready() is discarded", function()
-		local saved_http   = package.loaded["adapters.http_client"]
+		local saved_http   = package.loaded["core.network.adapters.http_client"]
 		local saved_notify = package.loaded["infra.notifications"]
 		local saved_api    = package.loaded["modules.llm.api_ollama"]
 
@@ -103,7 +103,7 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 		-- is still in flight when the backend round-trip happens.
 		local captured_cb = nil
 		local post_count  = 0
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					post = function(_url, _headers, _payload, cb)
@@ -138,7 +138,7 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 		local observed_notify = notify_count
 		local observed_posts  = post_count
 
-		package.loaded["adapters.http_client"]   = saved_http
+		package.loaded["core.network.adapters.http_client"]   = saved_http
 		package.loaded["infra.notifications"]      = saved_notify
 		package.loaded["modules.llm.api_ollama"] = saved_api
 

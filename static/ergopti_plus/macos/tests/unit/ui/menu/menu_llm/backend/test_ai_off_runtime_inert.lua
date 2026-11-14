@@ -427,7 +427,7 @@ local OLLAMA_MODULES = {
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -464,7 +464,7 @@ local function with_ollama_manager(enabled, body)
 			get_base_url = function() return "http://127.0.0.1:11435" end,
 		}
 		package.loaded["adapters.shell_runner"] = {}
-		package.loaded["adapters.http_client"] = {}
+		package.loaded["core.network.adapters.http_client"] = {}
 		package.loaded["ui.download_window"] = {}
 		package.loaded["core.events.timer_scheduler"] = scheduler
 		package.loaded["adapters.task_lifecycle"] = {

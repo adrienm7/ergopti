@@ -20,7 +20,7 @@ local OWNED_MODULES = {
 	"core.events.clock",
 	"adapters.event_provenance",
 	"core.fs.adapters.file_system",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"adapters.input_source_broker",
 	"core.fs.adapters.json_codec",
 	"adapters.keyboard_hook",

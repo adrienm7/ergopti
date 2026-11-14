@@ -50,9 +50,9 @@ assert.ok(
 const planner = require('./verify-change.cjs');
 const sources = [
 	'static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json',
-	'static/ergopti_plus/linux/platform/network/native_proxy_runtime.lua',
-	'static/ergopti_plus/linux/platform/network/runtime_probe.lua',
-	'static/ergopti_plus/linux/platform/network/system_proxy_probe.lua',
+	'static/ergopti_plus/linux/core/network/adapters/native_proxy_runtime.lua',
+	'static/ergopti_plus/linux/core/network/adapters/runtime_probe.lua',
+	'static/ergopti_plus/linux/core/network/adapters/system_proxy_probe.lua',
 	'tools/test/run-linux-network-runtime.cjs',
 	'tools/test/test-linux-network-runtime.cjs',
 	'tools/test/fixtures/linux-network-runtime-factory.lua'

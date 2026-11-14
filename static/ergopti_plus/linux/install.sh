@@ -487,7 +487,7 @@ _available_apt_runtime_package() {
 }
 
 _archive_digest_runtime_available() {
-	luajit "${SRC_DRIVER}/platform/network/digest_probe.lua" "$SRC_DRIVER" >/dev/null 2>&1
+	luajit "${SRC_DRIVER}/core/network/adapters/digest_probe.lua" "$SRC_DRIVER" >/dev/null 2>&1
 }
 
 _ensure_archive_digest_runtime() {
@@ -801,7 +801,7 @@ _prepare_source_network_runtime() {
 # Read-only native admission shares the lookup child's ABI and resolver factory.
 # A loadable GLib alone cannot replace an installed proxy module or LuaJIT luv.
 _network_runtime_available() {
-	luajit "${SRC_DRIVER}/platform/network/runtime_probe.lua" "${SRC_SHARED}" >/dev/null 2>&1
+	luajit "${SRC_DRIVER}/core/network/adapters/runtime_probe.lua" "${SRC_SHARED}" >/dev/null 2>&1
 }
 
 _ensure_network_runtime() {

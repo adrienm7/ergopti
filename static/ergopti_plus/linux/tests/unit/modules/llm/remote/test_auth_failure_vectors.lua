@@ -42,10 +42,10 @@ end)
 -- backboard-creation-refusal).
 helpers.describe("Backboard creation refusal stays a refused credential (backboard-creation-refusal)", function()
 	helpers.it("a 401 or 403 creation fails as a refused credential, a 500 does not (backboard-creation-refusal)", function()
-		local names = { "modules.llm.api_remote", "adapters.http_client", "core.logger.engine.shim" }
+		local names = { "modules.llm.api_remote", "core.network.adapters.http_client", "core.logger.engine.shim" }
 		local saved, calls = {}, {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, _, _, callback) calls[#calls + 1] = { url = url, callback = callback }; return true end,
 			cancel = function() return true end,
 		}

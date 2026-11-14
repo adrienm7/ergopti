@@ -894,7 +894,7 @@ client instead (opaque prelude, no `install_huggingface_transport`). macOS
 `hs.http` requests (update checks) still follow the system settings. Windows
 keeps the key in `config.toml`, holds the choice in the driver's memory and sets
 `ERGOPTI_PROXY_OVERRIDE` only on the private environment of a network worker
-(`ProxyOverride_SpawnWorker`, `adapters/proxy_override.ahk`), where
+(`ProxyOverride_SpawnWorker`, `core/network/adapters/proxy_override.ahk`), where
 `Resolve-ErgoptiNativeNetworkRoutes` applies it. It never enters the driver's own
 environment: `run_command`, `Run` and opened programs would inherit it. WinHTTP and
 HttpWebRequest reach a plain http relay only, so an https relay, a socks5 relay or

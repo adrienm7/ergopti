@@ -750,7 +750,7 @@ class BootstrapFailureObservationTests(unittest.TestCase):
     """Actual transport/error producer with recording process/descriptor ports."""
 
     def engine(self):
-        source = ROOT / "static/ergopti_plus/macos/platform/network/native_http.py"
+        source = ROOT / "static/ergopti_plus/macos/core/network/adapters/native_http.py"
         spec = importlib.util.spec_from_file_location("bootstrap_recording_engine", source)
         engine = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(engine)

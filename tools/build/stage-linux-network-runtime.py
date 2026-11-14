@@ -919,7 +919,7 @@ def stage(appdir, catalogue, template):
     with owned_root(appdir) as appdir:
         prefix = destination_directory(appdir / "usr")
         driver = prefix / "lib/ergopti"
-        if not (driver / "platform/network/runtime_probe.lua").is_file():
+        if not (driver / "core/network/adapters/runtime_probe.lua").is_file():
             raise RuntimeRefused("Installed runtime probe absent.")
         catalogue_data = json.loads(Path(catalogue).read_text())
         policy = catalogue_data["network_runtime"]["portable"]
@@ -989,7 +989,7 @@ def inspect_installed(prefix, driver):
         [
             bash_executable(),
             "-c",
-            'set -euo pipefail; source "$1" "$2" "$3"; export XDG_DATA_DIRS="$2/share" XDG_DATA_HOME="$2/share"; exec "$2/bin/luajit" "$3/platform/network/runtime_probe.lua" "$3/_shared"',
+            'set -euo pipefail; source "$1" "$2" "$3"; export XDG_DATA_DIRS="$2/share" XDG_DATA_HOME="$2/share"; exec "$2/bin/luajit" "$3/core/network/adapters/runtime_probe.lua" "$3/_shared"',
             "ergopti-owned-runtime",
             str(driver / "network-runtime-env.sh"),
             str(prefix),

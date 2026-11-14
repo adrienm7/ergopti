@@ -742,7 +742,7 @@ LedgerSetup.start_import = function(identity, metrics_dir)
 	local Paths = require("core.fs.engine.paths")
 	local schema_path = Paths.shared("metrics/data/db/schema.sql")
 	local schema = schema_path and require("core.fs.adapters.file_system").read(schema_path)
-	local Digest = require("infra.openssl_digest")
+	local Digest = require("core.network.engine.openssl_digest")
 	if type(schema) ~= "string" or not Digest.streaming then
 		Logger.error(LOG, "Foreign metrics import refused (%s); other devices' metrics are not shown.",
 			type(schema) ~= "string" and "schema.sql is unreadable" or "no streaming SHA-256")

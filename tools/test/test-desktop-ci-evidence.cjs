@@ -301,7 +301,7 @@ function coldBootstrapRecord() {
 			'macos/modules/llm/managed-python-downloads.json',
 			'macos/adapters/native_bootstrap_pty.lua',
 			'macos/adapters/python_interpreter.lua',
-			'macos/platform/network/native_http.py',
+			'macos/core/network/adapters/native_http.py',
 			'_shared/core/network/adapters/python_network_proxy_policy.py',
 			'_shared/core/lifecycle/engine/core/native_pty_receipt.lua',
 			'_shared/core/network/data/proxy_policy.json',

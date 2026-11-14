@@ -19,8 +19,8 @@ helpers.describe("Linux [limits] byte caps", function()
 		helpers.assert_eq(Timings.count("limits", "network_check_body_bytes"), 1048577)
 		helpers.assert_eq(Timings.count("limits", "network_check_body_bytes"),
 			require("core.network.engine.pac_check").MAX_BYTES + 1)
-		package.loaded["adapters.network_check_ports"] = nil
-		helpers.assert_eq(require("adapters.network_check_ports").MAX_BODY_BYTES,
+		package.loaded["core.network.adapters.check_ports"] = nil
+		helpers.assert_eq(require("core.network.adapters.check_ports").MAX_BODY_BYTES,
 			Timings.count("limits", "network_check_body_bytes"))
 	end)
 end)

@@ -36,7 +36,7 @@ function M.new(root, production, options)
 	modules["core.fs.adapters.file_system"] = { create_secure_temp_file = function()
 		error("Streaming payload allocation is not admitted by this foreground fixture")
 	end }
-	modules["adapters.http_client"] = { new = function()
+	modules["core.network.adapters.http_client"] = { new = function()
 		return { cancel = function() return true end, isActive = function() return false end,
 			isSettled = function() return true end, onSettled = function(callback) callback(); return true end }
 	end }

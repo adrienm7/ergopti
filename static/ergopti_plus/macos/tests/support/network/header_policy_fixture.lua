@@ -19,8 +19,8 @@ function M.load()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
 			assert(#text <= maximum); return text, "ok"
 		end }
-		package.loaded["infra.http_header_policy"] = nil
-		local actual = require("infra.http_header_policy")
+		package.loaded["core.network.engine.http_header_policy"] = nil
+		local actual = require("core.network.engine.http_header_policy")
 		assert(actual.validate("Accept", "text/plain"))
 		return actual
 	end, debug.traceback)

@@ -287,7 +287,7 @@ end
 --- @param root string Canonical bundled driver root.
 --- @return string prelude
 local function managed_receiver_prelude(tag, root)
-	local directory = root .. "/platform/network"
+	local directory = root .. "/core/network/adapters"
 	-- The canonical receiver validates the exact bundle path and executable
 	-- device/inode. This probe performs no network lookup or request and keeps
 	-- inherited environment selectors intact, including no_proxy precedence.
@@ -316,7 +316,7 @@ function M.managed_http_prelude(tag)
 	if override ~= "" then return M.opaque_prelude(tag) end
 	local root = driver_root()
 	if not root or not M.policy_path() then return nil, "the bundled managed network policy is missing" end
-	local directory = root .. "/platform/network"
+	local directory = root .. "/core/network/adapters"
 	if not FileSystem.exists(directory .. "/native_http.py") then
 		return nil, "the bundled managed network receiver is missing"
 	end

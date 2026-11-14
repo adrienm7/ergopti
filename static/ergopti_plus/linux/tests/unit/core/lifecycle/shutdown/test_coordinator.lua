@@ -1518,7 +1518,7 @@ helpers.describe("actual Main HTTP transport retirement", function()
 			dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
 			prediction_engine = false,
-			package = { loaded = { ["adapters.http_client"] = loaded and http or nil } },
+			package = { loaded = { ["core.network.adapters.http_client"] = loaded and http or nil } },
 			require = function(name)
 				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
 					"cold shutdown must not import " .. tostring(name))
@@ -1575,9 +1575,9 @@ helpers.describe("actual Main HTTP transport retirement", function()
 			helpers.assert_true(coordinator.is_pending())
 			local foreign_calls = 0
 			local function foreign_stop() foreign_calls = foreign_calls + 1; return true end
-			if replacement == "module" then env.package.loaded["adapters.http_client"] = { shutdown = foreign_stop }
+			if replacement == "module" then env.package.loaded["core.network.adapters.http_client"] = { shutdown = foreign_stop }
 			elseif replacement == "method" then http.shutdown = foreign_stop
-			else env.package.loaded["adapters.http_client"] = nil end
+			else env.package.loaded["core.network.adapters.http_client"] = nil end
 			helpers.assert_eq(coordinator.poll(), false, "foreign public exports cannot acknowledge the captured transport")
 			helpers.assert_eq(state.calls, 2)
 			helpers.assert_eq(foreign_calls, 0)

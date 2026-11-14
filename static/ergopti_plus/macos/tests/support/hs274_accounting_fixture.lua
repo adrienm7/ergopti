@@ -20,7 +20,7 @@ local M = {}
 -- keystats, aggregator or accounting state leaks into a sibling test.
 local OWNED_MODULES = {
 	"lfs", "core.fs.engine.native_path", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.text.engine.toml_codec.source_open",
-	"adapters.http_client", "adapters.managed_ollama_daemon",
+	"core.network.adapters.http_client", "adapters.managed_ollama_daemon",
 	"adapters.owned_program_runner", "adapters.running_application",
 	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "infra.notifications",
 	"ai.engine.ollama.local_model_policy", "modules.llm.api_mlx_fetch",

@@ -271,7 +271,7 @@ function checkSharedBudgets() {
 		'utf8'
 	);
 	const ahkHttp = fs.readFileSync(
-		path.join(PLUS, 'windows', 'adapters', 'http_client.ahk'),
+		path.join(PLUS, 'windows', 'core', 'network', 'adapters', 'http_client.ahk'),
 		'utf8'
 	);
 	// A URL template is built from the generated host constants: resolve them

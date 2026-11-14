@@ -275,7 +275,7 @@ if (require.main === module) {
 		if (mode === '--count' && args.length === 3 && ['output', 'public'].includes(args[0])) {
 			const native = path.resolve(
 				__dirname,
-				'../../static/ergopti_plus/linux/adapters/curl_http_client.lua'
+				'../../static/ergopti_plus/linux/core/network/adapters/curl_http_client.lua'
 			);
 			const counts = readNativeCounts(
 				readRegular(args[1], 4096).toString('utf8'),

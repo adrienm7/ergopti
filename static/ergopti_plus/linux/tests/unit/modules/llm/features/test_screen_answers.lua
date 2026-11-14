@@ -48,7 +48,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.llm.vision_request", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -95,7 +95,7 @@ local function scenario(opts, body)
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, headers, options, callback)
 				world.probes[#world.probes + 1] = { url = url, owner = options.owner, callback = callback }
 				return true
@@ -281,11 +281,11 @@ end)
 
 helpers.describe("screen answers: native preflight refusal ownership", function()
 	helpers.it("a refused cancellation cannot replace the existing vision request or its model", function()
-		local names = { "adapters.http_client", "modules.llm.local_model_probe", "modules.llm.vision_request" }
+		local names = { "core.network.adapters.http_client", "modules.llm.local_model_probe", "modules.llm.vision_request" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local probes, posts, refused = {}, {}, true
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, _, options, callback)
 				probes[#probes + 1] = { url = url, owner = options.owner, callback = callback }
 				return true

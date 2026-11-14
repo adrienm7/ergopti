@@ -50,7 +50,7 @@ local OWNED_MODULES = {
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.keystats",
@@ -279,7 +279,7 @@ local function with_fixture(callback)
 				end,
 			}
 
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {}, cancel_calls = 0 }
 					function client.post(url, headers, body, on_done)
