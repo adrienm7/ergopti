@@ -1401,7 +1401,8 @@
 					"’": "'",
 					"–": "-",
 					"—": "-"
-				}
+				},
+				"dead_rule_prefix": "dead:"
 			}
 		},
 		"dariogoetz": {

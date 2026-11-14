@@ -136,12 +136,12 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * from the layout file.
 	 * @returns {{board: object, finger: Map<string, number>}} Board and code → finger.
 	 */
-	function ourFingers(layout, keyboardId) {
+	function ourFingers(layout, keyboardId, profile) {
 		const E = engine();
 		const board =
 			keyboardId === 'iso' && layout.fingering === 'angle'
-				? E.keyboard('iso_angle')
-				: E.keyboard(keyboardId);
+				? E.keyboard('iso_angle', profile)
+				: E.keyboard(keyboardId, profile);
 		const finger = new Map();
 		board.codes.forEach((code, k) => finger.set(code, board.finger[k]));
 		return { board, finger };
@@ -517,7 +517,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	function charFingers(ctx, layers) {
 		const key = `fingers:${layers.join('')}`;
 		if (ctx.cache.has(key)) return ctx.cache.get(key);
-		const { board, finger } = ourFingers(ctx.layout, ctx.keyboard);
+		const { board, finger } = ourFingers(ctx.layout, ctx.keyboard, ctx.profile);
 		const map = keyOfChar(ctx.layout, board.codes, layers);
 		const out = new Map();
 		const row = new Map();
@@ -1437,12 +1437,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			if (depth > model.max_dead_depth) return;
 			for (const [base, out] of Object.entries(layout.dead[state] || {})) {
 				// A dead key can follow a dead key: Kalamine names the
-				// one-dead-key "**" (ë = 1dk, 1dk, d), other dead keys by state.
-				const tail =
-					chars.get(base) ||
-					(base === model.one_dead_key_token
-						? model.one_dead_key_states.map((s) => deads.get(s)).find(Boolean)
-						: deads.get(base));
+				// one-dead-key "**" (ë = 1dk, 1dk, d), the engine "dead:<state>",
+				// other dead keys by state.
+				let tail = chars.get(base);
+				if (!tail && base === model.one_dead_key_token)
+					tail = model.one_dead_key_states.map((s) => deads.get(s)).find(Boolean);
+				else if (!tail && base.startsWith(model.dead_rule_prefix))
+					tail = deads.get(base.slice(model.dead_rule_prefix.length));
+				else if (!tail) tail = deads.get(base);
 				if (!tail) continue;
 				const s = seq.concat(tail);
 				if (typeof out === 'string') {
@@ -1928,11 +1930,15 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	function context(layout, ngrams, options) {
 		const E = engine();
 		const keyboardId = (options && options.keyboard) || 'iso';
-		E.keyboard(keyboardId);
+		// The user's fingering profile (the engine's keyboard(id, profile)); the
+		// scorers that read the fingering from the layout follow it.
+		const profile = options ? options.profile : undefined;
+		E.keyboard(keyboardId, profile);
 		return {
 			layout: E.layoutFromRows(layout),
 			table: E.prepareNgrams(ngrams),
 			keyboard: keyboardId,
+			profile,
 			cache: new Map()
 		};
 	}
@@ -1968,7 +1974,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * @param {string} id - An analyser id (see analysers()).
 	 * @param {object} layout - Library shape.
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string}} [options] - Board (iso, iso_angle, ansi, ortho).
+	 * @param {{keyboard?: string, profile?: object}} [options] - Board (iso, iso_angle,
+	 *   ansi, ortho) and the engine's fingering profile.
 	 * @returns {{id, value: number|null, better, fidelity, unit, parts: object}}
 	 *   value is null for an analyser without a score (its parts are its statistics).
 	 * @throws {Error} On an unknown analyser, keyboard or malformed input.

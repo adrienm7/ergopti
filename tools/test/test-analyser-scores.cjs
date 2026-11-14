@@ -155,6 +155,25 @@ for (const a of analysers) {
 	if (a.better === 'none')
 		check(a.headline.length > 0, `${a.id}: a score-less analyser needs headline parts`);
 }
+// Ergo-L follows a dead key typed after a dead key, in the engine's « dead:<state> »
+// form as in Kalamine's « ** » form: ë = 1dk, 1dk, d.
+for (const self of ['dead:1dk', '**']) {
+	const chained = E.layoutFromRows({
+		id: `chain_${self}`,
+		rows: { KeyO: [{ dead: '1dk' }, null, null, null], KeyD: ['d', null, null, null] },
+		dead: { '1dk': { [self]: { dead: 'diaeresis' } }, diaeresis: { d: 'ë' } }
+	});
+	const parts = S.score(
+		'ergol',
+		chained,
+		{ chars: { ë: 1, d: 1 }, bigrams: {}, trigrams: {} },
+		{}
+	).parts;
+	check(
+		parts.unsupported === 0,
+		`ergol: ë not typed through « ${self} » (${parts.unsupported} % unsupported)`
+	);
+}
 let threw = false;
 try {
 	S.score('no_such_analyser', library.get('qwerty'), E.ngramsFromText('the'), {});
