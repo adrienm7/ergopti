@@ -1087,7 +1087,10 @@ local function create_menu(deps)
 		local function build_item()
 				Logger.debug(LOG, "Building LLM menu item (build_item)…")
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
-				local is_disabled = (not state.llm_enabled) or paused
+				-- A pause stops typing, not configuration (EDD-1): the settings rows
+				-- grey only when the AI is off; the model, profile and switch rows
+				-- still read the pause.
+				local is_disabled = not state.llm_enabled
 				Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
 				-- Rows are supplied as DATA under the `list` id the manifest declares
 				-- them with, and the SHARED renderer places and draws them. The order

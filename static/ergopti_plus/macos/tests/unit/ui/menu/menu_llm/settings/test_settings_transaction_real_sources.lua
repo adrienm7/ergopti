@@ -121,7 +121,17 @@ helpers.describe("macOS real-source indentation compensation", function()
 end)
 
 helpers.describe("macOS retained Info Bar source admission", function()
-	for _, condition in ipairs({"paused", "master", "runtime value", "retired owner"}) do
+	helpers.it("commits a retained checkbox while paused, read on resume (shared-info-bar)", function()
+		local options = {prediction_count = 1, progressive_state = false}
+		with_fixture(options, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), info_bar_corpus().row.i18n))
+			options.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(fixture.state.llm_show_info_bar, false)
+			helpers.assert_eq(fixture.persisted().llm_show_info_bar, false)
+		end)
+	end)
+	for _, condition in ipairs({"master", "runtime value", "retired owner"}) do
 		helpers.it("refuses a retained actual checkbox after " .. condition .. " (shared-info-bar)", function()
 			local options = {prediction_count = 1, progressive_state = false}
 			with_fixture(options, function(fixture)
@@ -284,7 +294,20 @@ helpers.describe("Shared privacy trigger checks", function()
 		end
 	end)
 
-	for _, condition in ipairs({"paused", "master withdrawn", "runtime disagreement", "retired runtime"}) do
+	helpers.it("commits a held privacy callback while paused, read on resume (shared-privacy-triggers)", function()
+		for _, expected in ipairs(privacy_corpus().rows) do
+			local options = {}
+			with_fixture(options, function(fixture)
+				local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+				local before = fixture.state[expected.hs]
+				options.paused = true
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(fixture.calls.save, 1)
+				helpers.assert_eq(fixture.persisted()[expected.hs], not before)
+			end)
+		end
+	end)
+	for _, condition in ipairs({"master withdrawn", "runtime disagreement", "retired runtime"}) do
 		helpers.it("refuses a held privacy callback after " .. condition .. " (shared-privacy-triggers)", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
 				local options = {}
@@ -594,16 +617,18 @@ helpers.describe("LLM fixed parents: actual shared group topology", function()
 		end)
 	end)
 	for _, condition in ipairs({{enabled = false}, {paused = true}}) do
-		helpers.it("retains all three native parent gates while " .. (condition.paused and "paused" or "off"), function()
+		helpers.it("parent gates follow the master, not the pause: " .. (condition.paused and "paused" or "off"), function()
 			condition.parent_only = true
 			with_fixture(condition, function(fixture)
 				local rows = fixture.top_level_callbacks().rebuild()
 				for _, parent in ipairs(parents) do
 					local row = assert(find_item(rows, parent.key))
-					helpers.assert_eq(row.disabled, true)
 					if condition.paused then
+						-- A pause stops typing, not configuration (EDD-1).
+						helpers.assert_nil(row.disabled, "a pause leaves the settings group live")
 						helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
 					else
+						helpers.assert_eq(row.disabled, true)
 						-- Category-off rule: a greyed group of an off category opens nothing.
 						helpers.assert_nil(row.menu, "an off category's group opens nothing")
 					end

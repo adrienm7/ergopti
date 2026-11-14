@@ -25,7 +25,7 @@ LLM_TriggerPrivacyReady(Snapshot) {
 	return Snapshot["owner"] is Object && Snapshot["generation"] is Integer
 		&& Snapshot["generation"] >= 0 && Snapshot["backend"] is String
 		&& Snapshot["backend"] != "" && Snapshot["enabled"]
-		&& !Snapshot["paused"] && !Snapshot["blocked"]
+		&& !Snapshot["blocked"]
 }
 
 /** Resolves a retained check without borrowing a newer owner's privacy intent. */

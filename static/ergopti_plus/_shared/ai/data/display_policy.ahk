@@ -81,7 +81,7 @@ LLM_DisplayStreamingReady(Snapshot) {
 	}
 	return (Snapshot["owner"] is Object || (Snapshot["owner"] is String && Snapshot["owner"] != ""))
 		&& Snapshot["generation"] is Integer && Snapshot["generation"] >= 0
-		&& Snapshot["enabled"] && !Snapshot["paused"] && !Snapshot["blocked"]
+		&& Snapshot["enabled"] && !Snapshot["blocked"]
 		&& Snapshot["progressive"]
 		&& LLM_DisplayStreamingCapable(Snapshot["platform"], Snapshot["backend"])
 }
@@ -140,7 +140,7 @@ LLM_DisplayIndentReady(Snapshot) {
 	}
 	return Snapshot["owner"] is Object && Snapshot["generation"] is Integer
 		&& Snapshot["generation"] >= 0 && Snapshot["indentation"] is Integer
-		&& Snapshot["enabled"] && !Snapshot["paused"]
+		&& Snapshot["enabled"]
 		&& LLM_DisplayShowAllReady(Snapshot["count"], Snapshot["blocked"])
 }
 
@@ -186,7 +186,7 @@ LLM_DisplayInfoBarReady(Snapshot) {
 	return Snapshot["owner"] is Object && Snapshot["generation"] is Integer
 		&& Snapshot["generation"] >= 0 && Snapshot["backend"] is String
 		&& Snapshot["backend"] != "" && Snapshot["enabled"]
-		&& !Snapshot["paused"] && !Snapshot["blocked"]
+		&& !Snapshot["blocked"]
 }
 
 /**

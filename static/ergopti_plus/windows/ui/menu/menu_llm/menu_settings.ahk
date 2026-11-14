@@ -115,11 +115,13 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 
 /**
  * Reads the live trigger menu admission without coupling it to variant count.
+ * A pause stops typing, not configuration (EDD-1): the rows commit while
+ * suspended and the engine reads them when typing resumes.
  * @returns {Boolean} Whether a native setting command may be delivered.
  */
 _LLM_Menu_TriggerReady(*) {
 	global _LLM_Menu
-	return _LLM_Menu["enabled"] && !A_IsSuspended
+	return _LLM_Menu["enabled"]
 }
 
 /** Captures actual privacy runtime and exact canonical file without publication. */
@@ -553,7 +555,7 @@ _LLM_Menu_StreamingCommand(Expected, Command) {
  */
 _LLM_Menu_ShowAllReady() {
 	global _LLM_Menu
-	return LLM_DisplayShowAllReady(_LLM_Menu["n_predictions"], !_LLM_Menu["enabled"] || A_IsSuspended ? true : false)
+	return LLM_DisplayShowAllReady(_LLM_Menu["n_predictions"], !_LLM_Menu["enabled"])
 }
 
 _LLM_Menu_DisplayRows(Position := "all") {

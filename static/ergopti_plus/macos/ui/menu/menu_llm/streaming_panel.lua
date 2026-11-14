@@ -126,8 +126,7 @@ function M.build(ctx)
 
 	local function show_all_ready()
 		return DisplayPolicy.ready(state.llm_num_predictions,
-			ctx.is_disabled == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
-				or state.llm_enabled ~= true)
+			ctx.is_disabled == true or state.llm_enabled ~= true)
 	end
 
 	local display_ctx = {
@@ -147,8 +146,8 @@ function M.build(ctx)
 			[require("settings.engine.keys").COMMAND.LLM_SHOW_ALL] = function()
 				if not show_all_ready() then return false end
 				local current = streaming_snapshot()
-				if streaming_source.blocked ~= false or streaming_source.paused ~= false
-					or current.blocked ~= false or current.paused ~= false
+				if streaming_source.blocked ~= false or type(streaming_source.paused) ~= "boolean"
+					or current.blocked ~= false or type(current.paused) ~= "boolean"
 					or not Preferences.source_matches(streaming_source.source, current.source) then return false end
 				for _, field in ipairs({ "owner", "generation", "backend", "enabled", "progressive" }) do
 					if streaming_source[field] ~= current[field] then return false end

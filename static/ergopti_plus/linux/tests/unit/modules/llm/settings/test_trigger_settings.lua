@@ -645,7 +645,7 @@ helpers.describe("LLM shared automatic trigger controls", function()
 		end)
 	end)
 
-	helpers.it("reads current values and refuses stale commands after pause or master withdrawal (shared-automatic-triggers)", function()
+	helpers.it("reads current values, commits while paused and refuses stale commands after master withdrawal (shared-automatic-triggers)", function()
 		for _, expected in ipairs(trigger_corpus().rows) do
 			local options = {states = {false, false}, count = 2}
 			with_trigger_menu(options, function(parent, settings, storage, observed, profiles)
@@ -654,10 +654,11 @@ helpers.describe("LLM shared automatic trigger controls", function()
 				helpers.assert_eq(profiles.set("num_predictions", 1), true)
 				helpers.assert_eq(row.fn(), true)
 				helpers.assert_eq(settings.get(expected.native), false, "held callback toggles the effective current bool")
-				local writes, redraws = observed.writes, observed.redraws
 				options.paused = true
-				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(row.fn(), true, "a pause stops typing, not configuration (EDD-1)")
+				helpers.assert_eq(settings.get(expected.native), true)
 				options.paused = false
+				local writes, redraws = observed.writes, observed.redraws
 				options.enabled = false
 				helpers.assert_eq(row.fn(), false)
 				helpers.assert_eq(observed.writes, writes)
@@ -722,13 +723,24 @@ helpers.describe("Shared privacy trigger native owners", function()
 		end
 	end)
 
-	for _, condition in ipairs({"pause", "master withdrawn", "foreign source", "runtime disagreement"}) do
+	helpers.it("commits held privacy commands while paused, read on resume (shared-privacy-triggers)", function()
+		for _, expected in ipairs(privacy_corpus().rows) do
+			local options = {states = {false, false}, privacy_states = {false, false}}
+			with_trigger_menu(options, function(parent, settings)
+				local row = trigger_row(parent, expected.i18n)
+				options.paused = true
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(settings.get(expected.linux), true)
+			end)
+		end
+	end)
+
+	for _, condition in ipairs({"master withdrawn", "foreign source", "runtime disagreement"}) do
 		helpers.it("refuses held privacy commands after " .. condition .. " (shared-privacy-triggers)", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
 				local options = {states = {false, false}, privacy_states = {false, false}}
 				with_trigger_menu(options, function(parent, settings, storage, observed)
 					local row = trigger_row(parent, expected.i18n)
-					if condition == "pause" then options.paused = true end
 					if condition == "master withdrawn" then options.enabled = false end
 					if condition == "foreign source" then
 						storage.values["llm.future_trigger_parameter"] = 73

@@ -147,10 +147,18 @@
 			"admitted": false
 		},
 		{
-			"id": "changed_paused",
+			"id": "paused_keeps_configuration_editable",
 			"value": 2,
 			"current": {
 				"paused": true
+			},
+			"admitted": true
+		},
+		{
+			"id": "unknown_paused",
+			"value": 2,
+			"current": {
+				"paused": "true"
 			},
 			"admitted": false
 		},

@@ -18,7 +18,7 @@ function M.ready(snapshot)
 		and snapshot.generation < math.huge and snapshot.generation == math.floor(snapshot.generation)
 		and type(snapshot.backend) == "string" and snapshot.backend ~= ""
 		and type(snapshot.value) == "boolean" and snapshot.enabled == true
-		and snapshot.paused == false and snapshot.blocked == false
+		and type(snapshot.paused) == "boolean" and snapshot.blocked == false
 end
 
 --- Resolves a click without borrowing a newer owner's privacy intent.

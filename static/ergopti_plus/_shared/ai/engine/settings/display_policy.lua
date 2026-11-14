@@ -62,7 +62,7 @@ function M.streaming_ready(snapshot)
 		and type(snapshot.generation) == "number" and snapshot.generation >= 0
 		and snapshot.generation == math.floor(snapshot.generation)
 		and type(snapshot.streaming) == "boolean"
-		and snapshot.enabled == true and snapshot.paused == false
+		and snapshot.enabled == true and type(snapshot.paused) == "boolean"
 		and snapshot.blocked == false and snapshot.progressive == true
 		and M.streaming_capable(snapshot.platform, snapshot.backend)
 end
@@ -108,7 +108,7 @@ function M.indentation_ready(snapshot)
 		and snapshot.generation == math.floor(snapshot.generation)
 		and type(snapshot.indentation) == "number" and snapshot.indentation == math.floor(snapshot.indentation)
 		and type(snapshot.progressive) == "boolean"
-		and snapshot.enabled == true and snapshot.paused == false
+		and snapshot.enabled == true and type(snapshot.paused) == "boolean"
 		and M.ready(snapshot.count, snapshot.blocked)
 end
 
@@ -141,7 +141,7 @@ function M.info_bar_ready(snapshot)
 		and snapshot.generation == math.floor(snapshot.generation)
 		and type(snapshot.backend) == "string" and snapshot.backend ~= ""
 		and type(snapshot.info_bar) == "boolean" and snapshot.enabled == true
-		and snapshot.paused == false and snapshot.blocked == false
+		and type(snapshot.paused) == "boolean" and snapshot.blocked == false
 end
 
 --- Resolves one held checkbox against the same acknowledged native source.

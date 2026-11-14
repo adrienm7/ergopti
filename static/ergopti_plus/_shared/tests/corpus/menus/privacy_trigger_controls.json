@@ -28,7 +28,6 @@
 	"prediction_counts": [1, 2],
 	"alternate_i18n": "fixture.privacy.declaration_label",
 	"refusals": [
-		"paused",
 		"master_withdrawn",
 		"foreign_source",
 		"runtime_disagreement",
@@ -142,11 +141,12 @@
 			"admitted": false
 		},
 		{
-			"name": "paused",
+			"name": "paused configuration stays editable",
 			"current": {
 				"paused": true
 			},
-			"admitted": false
+			"admitted": true,
+			"value": true
 		},
 		{
 			"name": "unknown pause",
