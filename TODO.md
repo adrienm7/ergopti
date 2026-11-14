@@ -279,6 +279,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       direction changes), lateral stretches and scissors, trigram classes, and any other one the study shows to be
       useful. Every metric is shown per layout and compared across layouts, in the app's Studio and on the site.
 
+- [ ] **One global score with editable weights.** Aggregate the metrics (SFB %, roll %, alternation, redirects,
+      finger load balance, home-row usage, travel distance, skipgrams…) into one global score per layout. Default
+      weights chosen and justified in the analyser study (cite what each source tool weighs and why), stored in one
+      shared data file; the Studio (app and site) shows the score, the contribution of each metric, and lets the user
+      change every weight (and restore the defaults), the ranking updating live. Score and weights tested on the
+      reference corpus.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
