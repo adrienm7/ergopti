@@ -1007,7 +1007,7 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ss`, `setsid`, `tr`, `lsblk`",
+			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ss`, `setsid`, `tr`, `od`, `lsblk`",
 			"programs": [
 				"cat",
 				"grep",
@@ -1022,9 +1022,10 @@
 				"ss",
 				"setsid",
 				"tr",
+				"od",
 				"lsblk"
 			],
-			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach (`linux/modules/keystats/system_metrics.lua`, `linux/infra/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
+			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach, the screenshot resize's whole-PNG check (`linux/adapters/screen_capture.lua`, `linux/modules/keystats/system_metrics.lua`, `linux/infra/file_watchers.lua`, `linux/modules/llm/local_server_ports.lua`, `linux/modules/updater/restarter.lua`, `linux/ui/menu/uninstall.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/gestures/manager.lua`)",
 			"today": "System (coreutils, iproute2, util-linux)",
 			"current_class": "SYS",
 			"version_needed": "POSIX",
