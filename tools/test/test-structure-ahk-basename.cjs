@@ -83,6 +83,22 @@ function run() {
 		const moved = map.get(BUNDLE).slice('windows/'.length).replace(/\./g, '\\.');
 		assert.ok(regexOut.includes(`#Include\\s+${moved}\\s*$`), regexOut);
 	}
+	// A regular expression over a suite entry's #Include climbs out of
+	// windows/tests: \.\./infra/app_state\.ahk names the driver's file.
+	const APP_STATE = 'windows/infra/app_state.ahk';
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus', APP_STATE))) {
+		const stateStep = Plan.steps(map).find((s) => s.moves.some(([o]) => o === APP_STATE));
+		const stateMap = new Map(
+			[...map].map(([o, t]) => [o, stateStep.moves.some(([so]) => so === o) ? t : o])
+		);
+		const meta = 'static/ergopti_plus/windows/tests/meta/zz_probe/test_zz_probe_entry.ahk';
+		const pattern =
+			'"shared", "(?im)^#Include[ \\t]+\\.\\./infra/app_state\\.ahk(?=[ \\t]*\\r?$)",\n';
+		const patternRows = Plan.scanFile(meta, pattern, Plan.referenceContext(stateMap));
+		const patternOut = Apply.rewriteText(pattern, patternRows, new Map(), meta);
+		const fresh = map.get(APP_STATE).slice('windows/'.length).replace(/\./g, '\\.');
+		assert.ok(patternOut.includes(`\\.\\./${fresh}(?=`), patternOut);
+	}
 	console.log(`[OK] a Windows base-name lookup follows the file ${step.id} renames.`);
 }
 
