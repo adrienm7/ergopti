@@ -7,10 +7,13 @@
  * step, and a frozen port of those updaters' staged-tree checks reads the
  * unpacked result. A packer without the probe step is refused by the same
  * port, so the check can fail. The port is frozen on purpose: it describes
- * shipped code that never changes.
+ * shipped code that never changes. The ownership step is also run for real:
+ * each release's own ownership.sh, frozen from its tag in
+ * fixtures/linux-pre-move-ownership, records the tarball or refuses it.
  */
 'use strict';
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -113,6 +116,49 @@ function packAndUnpack(scratch, withProbes) {
 	return work;
 }
 
+/**
+ * The ownership helper each pre-move release installed, frozen byte for byte from
+ * its tag (static/ergopti_plus/linux/install/ownership.sh and ownership_schema.sh).
+ * The updater runs the installed copy against the new payload, so these are the
+ * scripts that read every tarball this checkout publishes.
+ */
+const FROZEN_OWNERSHIP = path.join(__dirname, 'fixtures/linux-pre-move-ownership');
+const FROZEN_SHA256 = Object.freeze({
+	'v1.0.9': {
+		'ownership.sh': 'ea644772b7596c9ce90c83538ef71a71e0d6e60cb077f4494cd75f4ffbd2eb09',
+		'ownership_schema.sh': '0c2d5c1d0982ec0cf2f124686d07d052ec4f79b37d24a6a6bdff697ea431d23e'
+	},
+	'v1.0.10-dev.175': {
+		'ownership.sh': '9b957c6b815a0b1d974239a5bd7debcce4cc2244c306c391ac23e1b08d67a9cf',
+		'ownership_schema.sh': '0c2d5c1d0982ec0cf2f124686d07d052ec4f79b37d24a6a6bdff697ea431d23e'
+	}
+});
+
+/**
+ * Runs a released pre-move ownership helper over an unpacked tarball, as that
+ * release's updater does (installer.lua record_ownership).
+ * @param {string} scratch Private folder.
+ * @param {string} release Frozen release tag.
+ * @param {string} work Unpacked tarball root.
+ * @returns {{status: number, stderr: string}}
+ */
+function releasedOwnership(scratch, release, work) {
+	const owner = path.join(scratch, 'owner-' + release);
+	fs.mkdirSync(owner);
+	for (const [name, expected] of Object.entries(FROZEN_SHA256[release])) {
+		const bytes = fs.readFileSync(path.join(FROZEN_OWNERSHIP, release, name + '.frozen'));
+		const actual = crypto.createHash('sha256').update(bytes).digest('hex');
+		assert.equal(actual, expected, `${release} ${name} is the published record`);
+		fs.writeFileSync(path.join(owner, name), bytes);
+	}
+	const run = spawnSync(
+		'/bin/bash',
+		[path.join(owner, 'ownership.sh'), path.join(work, 'linux'), path.join(work, '_shared'), work],
+		{ encoding: 'utf8', timeout: 30000 }
+	);
+	return { status: run.status, stderr: run.stderr };
+}
+
 let checks = 0;
 function check(name, body) {
 	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-legacy-probes-'));
@@ -141,6 +187,22 @@ check('without the probe step the same updater refuses it', (scratch) => {
 	);
 });
 
+for (const release of Object.keys(FROZEN_SHA256)) {
+	check(`the released ${release} ownership helper records the published tarball`, (scratch) => {
+		const work = packAndUnpack(scratch, true);
+		const run = releasedOwnership(scratch, release, work);
+		assert.equal(run.status, 0, run.stderr);
+		const manifest = fs.readFileSync(path.join(work, '.ergopti-owned-files'), 'utf8');
+		assert.match(manifest, /\t_shared\/data\/locales\/en\.json\n/);
+		assert.match(manifest, /\t_shared\/core\/i18n\/data\/locales\/en\.json\n/);
+	});
+	check(`the released ${release} ownership helper refuses it without the probe step`, (scratch) => {
+		const run = releasedOwnership(scratch, release, packAndUnpack(scratch, false));
+		assert.equal(run.status, 1);
+		assert.equal(run.stderr, '[ownership] code=invalid_source\n');
+	});
+}
+
 check('the probe step refuses a layout that already holds a probe path', (scratch) => {
 	fs.mkdirSync(path.join(scratch, 'linux/infra'), { recursive: true });
 	fs.writeFileSync(path.join(scratch, 'linux/infra/version.lua'), '-- version\n');
@@ -167,5 +229,5 @@ check('the probe step fails a build that moved the driver version file', (scratc
 	assert.match(result.stderr, /require .*linux\/infra\/version\.lua/);
 });
 
-assert.equal(checks, 5, 'legacy updater probe check floor changed');
-console.log('[OK] Linux legacy updater probes: 5 checks passed.');
+assert.equal(checks, 9, 'legacy updater probe check floor changed');
+console.log('[OK] Linux legacy updater probes: 9 checks passed.');
