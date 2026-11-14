@@ -261,7 +261,9 @@ helpers.describe("input_access: the service does not loop on it", function()
 
 	helpers.it("is what the daemon reports at every access check", function()
 		local src = read("ergopti_hotstrings.lua")
-		local _, sites = src:gsub('input_access"%)%.report%(', "")
+		-- The whole module name, quoted, so a move that renames it renames it here.
+		local access = ("infra.input_access"):gsub("%p", "%%%0")
+		local _, sites = src:gsub('require%("' .. access .. '"%)%.report%(', "")
 		local _, named = src:gsub("InputAccess%.report%(", "")
 		helpers.assert_eq(sites + named, 4,
 			"the absent keyboard, the unreadable keyboard, the unwritable /dev/uinput and the missing setup program must all report through input_access")
