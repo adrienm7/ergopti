@@ -512,7 +512,7 @@ const DERIVED_PINS = [
 			const { expandConfigKeys } = lib('tools/lib/config-key-tokens.cjs');
 			const source = expandConfigKeys(raw);
 			const row = holder.match(/const ORIGINAL_SECTION_ROW = `([^`]*)`;/)[1];
-			const start = '\n\t\t\t\tlocal ready = group_enabled and not paused';
+			const start = '\n\t\t\t\tlocal ready = group_enabled';
 			const end = '\n\t\t\t\ttarget[#target + 1] = row';
 			const at = source.indexOf(start);
 			const last = source.indexOf(end, at);
