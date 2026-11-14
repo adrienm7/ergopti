@@ -308,6 +308,15 @@ function M.new(ports, policy)
 				model_installed=false, direct_fallback=entry.direct_fallback, relay_refusal=entry.relay_refusal}
 			entry.stage='done'; complete(); announce_result()
 		end
+		-- Arms the owned timer that separates two readiness probes.
+		local function arm_retry(delay_ms)
+			entry.stage='retry'
+			entry.retry=nil
+			entry.retry=acquire('retry', function(done)
+				return P.after(delay_ms, function() done(true) end)
+			end)
+			if entry.retry.unknown then fail('runtime_timer_acquisition_unknown') end
+		end
 		local function start_probe()
 			if not current() or not service_live() then fail('runtime_source_changed'); return end
 			entry.stage='probe'
@@ -405,21 +414,25 @@ function M.new(ports, policy)
 							local remaining=budget.remaining_ms()
 							if not remaining or remaining<=0 then fail('runtime_timeout')
 							else
-								entry.stage='retry'
 								entry.retry_expected=remaining - math.min(poll_ms, remaining)
-								entry.retry=nil
-								entry.retry=acquire('retry', function(done)
-									return P.after(math.min(poll_ms, remaining), function() done(true) end)
-								end)
-								if entry.retry.unknown then fail('runtime_timer_acquisition_unknown') end
+								arm_retry(math.min(poll_ms, remaining))
 							end
 						end
 					end
 				elseif entry.stage=='retry' then
 					if op_settled(entry.retry) then
 						local left=budget.remaining_ms()
-						if entry.retry.delivered and left and left<=entry.retry_expected then start_probe()
-						else fail('runtime_retry_refused') end
+						if not entry.retry.delivered or not left then fail('runtime_retry_refused')
+						elseif left<=entry.retry_expected then start_probe()
+						else
+							-- The owned timer runs on the event loop's clock, which libuv
+							-- reads from the coarse monotonic clock on Linux, while the
+							-- budget reads the precise one: a delivered timer can end a few
+							-- milliseconds before its delay on the budget's clock. Wait out
+							-- that shortfall instead of probing early or refusing a daemon
+							-- that is still starting; the master budget bounds every wait.
+							arm_retry(left - entry.retry_expected)
+						end
 					end
 				elseif entry.stage=='retire_budget' then
 					if budget_owner:retire() then publish() end
