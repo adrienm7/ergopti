@@ -443,8 +443,11 @@ function M.build_custom(ctx, counts)
 		local chord_input = raw:find("+", 1, true) and raw or ("ctrl+" .. raw)
 		local parsed = Chord.parse(chord_input)
 		if not parsed then
-			return KeymapLifecycle.commit_mutation(ctx,
-				"validate personal hotstring editor shortcut", function() return false end)
+			-- The refusal names the accepted form, as every other shortcut prompt does.
+			Logger.warn("menu_hotstrings_custom", "Typed editor shortcut refused: it is not a chord.")
+			pcall(dialog.block_alert, i18n.get("shortcut_utils.format_invalid"),
+				i18n.get("shortcut_utils.format_hint"), ok_label)
+			return false
 		end
 		return apply_shortcut(parsed.mods, parsed.key)
 	end
