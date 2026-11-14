@@ -21,12 +21,19 @@ helpers.describe("hardware scope calls take one source (edd1-scope-source)", fun
 		local file = assert(io.open(RUNNER, "r"))
 		local source = file:read("*a")
 		file:close()
-		helpers.assert_true(source:find("Scope.copy_taps_to_chords(", 1, true) ~= nil, "the runner still copies taps")
+		local matched, scanned = {}, 0
 		for _, operation in ipairs(OPERATIONS) do
+			matched[operation] = 0
 			for call in source:gmatch("Scope%." .. operation .. "(%b())") do
+				scanned = scanned + 1
+				matched[operation] = matched[operation] + 1
 				helpers.assert_nil(call:find("is_paused", 1, true),
 					"Scope." .. operation .. " takes no pause argument since EDD-1: " .. call)
 			end
 		end
+		-- The scan must reach the calls it guards: an edit and two copies.
+		helpers.assert_eq(scanned, 3, "the runner's three scope calls are scanned")
+		helpers.assert_eq(matched.edit, 1, "the runner's one Scope.edit call is scanned")
+		helpers.assert_eq(matched.copy_taps_to_chords, 2, "the runner's two copies are scanned")
 	end)
 end)
