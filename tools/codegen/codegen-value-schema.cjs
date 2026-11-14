@@ -49,10 +49,14 @@ function ahkStr(value) {
 	return '"' + String(value).replace(/`/g, '``').replace(/"/g, '`"') + '"';
 }
 
+// Declaration fields whose value is a flag, read only for its truth.
+const FLAG_FIELDS = ['allow_empty'];
+
 /**
  * One JSON value as an AHK v2 expression: objects become Maps, arrays Arrays.
  * A boolean has no type of its own in AHK, so it is refused: a declaration
- * whose enum holds true or false needs a string spelling first.
+ * whose enum holds true or false needs a string spelling first. A flag field
+ * (FLAG_FIELDS) is read only for its truth and is spelt 1 or 0.
  * @param {*} value - JSON value.
  * @param {string} where - Path for the error message.
  * @param {number} depth - Indentation depth.
@@ -65,6 +69,10 @@ function ahkValue(value, where, depth) {
 		return String(value);
 	}
 	if (typeof value === 'boolean') {
+		// A flag field is read for its truth (the port tests allow_empty), so 1
+		// and 0 spell it; a boolean anywhere else (an enum value) would be
+		// indistinguishable from the numbers 1 and 0 and is refused.
+		if (FLAG_FIELDS.includes(where.split('.').pop())) return value ? '1' : '0';
 		throw new Error(`${where}: a boolean has no AHK spelling distinct from 1 and 0`);
 	}
 	if (Array.isArray(value)) {

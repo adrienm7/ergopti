@@ -199,4 +199,44 @@ helpers.describe("dynamic expansion failure-log privacy", function()
 
 end)
 
+
+helpers.describe("personal_info.toml value check (value-validation-contract)", function()
+
+	-- Regression: a number typed without quotes was read as an empty value
+	-- without a word. The load now reports the field by its path, never its
+	-- value, as its shared value schema declaration requires.
+	helpers.it("reports a field that is not text by its path, never its value", function()
+		with_recording_logger(function(lines)
+			local unquoted = "33612345678"
+			local path = os.tmpname()
+			local file = assert(io.open(path, "w"))
+			file:write(table.concat({
+				"[info]",
+				"phone_number_value_check = " .. unquoted,
+				'iban = "' .. SECRET .. '"',
+				"",
+				"[letters]",
+				'i = "iban"',
+				"",
+			}, "\n"))
+			file:close()
+			local ok, err = pcall(function()
+				local Manager = require("modules.dynamic_hotstrings.manager")
+				assert(Manager.init({ trigger_char = "★", personal_info_path = path }))
+			end)
+			os.remove(path)
+			if not ok then error(err, 0) end
+			local report = nil
+			for _, line in ipairs(lines) do
+				if line:find("phone_number_value_check", 1, true) then report = line end
+			end
+			helpers.assert_not_nil(report, "the refused field must be reported")
+			helpers.assert_contains(report, "wrong_type")
+			helpers.assert_true(not joined(lines):find(unquoted, 1, true), "the refused value must never be logged")
+			helpers.assert_true(not joined(lines):find(SECRET, 1, true), "an admitted value must never be logged")
+		end)
+	end)
+
+end)
+
 restore_family_preferences()

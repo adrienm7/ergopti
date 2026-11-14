@@ -25,6 +25,8 @@ return {
 		["LLM_TRIGGER_DEBOUNCE_MS"] = "llm.trigger.debounce_ms",
 		["LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS"] = "llm.trigger.min_request_interval_ms",
 		["MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS"] = "mod_combos.simultaneous_threshold_ms",
+		["PERSONAL_INFO_INFO_ANY"] = "personal_info.info.*",
+		["PERSONAL_INFO_LETTERS_ANY"] = "personal_info.letters.*",
 		["SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS"] = "shortcuts.caps_word.idle_timeout_seconds",
 		["SHORTCUTS_CHATGPT_URL"] = "shortcuts.chatgpt_url",
 		["SHORTCUTS_SEARCH_SEARCH_ENGINE"] = "shortcuts.search.search_engine",
@@ -216,6 +218,15 @@ return {
 			["min"] = 1,
 			["type"] = "integer",
 			["unit"] = "ms",
+		},
+		["personal_info.info.*"] = {
+			["allow_empty"] = true,
+			["file"] = "personal_info.toml",
+			["type"] = "string",
+		},
+		["personal_info.letters.*"] = {
+			["file"] = "personal_info.toml",
+			["type"] = "string",
 		},
 		["shortcuts.caps_word.idle_timeout_seconds"] = {
 			["default_from"] = {
