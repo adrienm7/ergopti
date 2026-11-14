@@ -31,7 +31,7 @@ field_run_layout() {
 	local driver_root="$1/static/ergopti_plus/linux" shared="$1/static/ergopti_plus/_shared"
 	# luajit -e takes no script arguments: the roots travel in the environment.
 	FIELD_RUN_CLONE_ROOT="$1" FIELD_RUN_DRIVER_ROOT="$driver_root" FIELD_RUN_SHARED_ROOT="$shared" \
-	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/lua/?.lua;$shared/lua/?/init.lua;;" luajit -e '
+	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/?.lua;$shared/?/init.lua;;" luajit -e '
 		local FieldRun = require("infra.field_run")
 		local spec = FieldRun.load(os.getenv("FIELD_RUN_SHARED_ROOT"), os.getenv("FIELD_RUN_DRIVER_ROOT"))
 		print(FieldRun.folder(spec, os.getenv, os.getenv("FIELD_RUN_CLONE_ROOT")))
@@ -55,7 +55,7 @@ field_run_ready_pid() {
 # $1 the clone root. Prints field_python=installed or field_python=<code>.
 field_linux_ensure_python() {
 	local driver_root="$1/static/ergopti_plus/linux" shared="$1/static/ergopti_plus/_shared"
-	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/lua/?.lua;$shared/lua/?/init.lua;;" luajit -e '
+	LUA_PATH="$driver_root/?.lua;$driver_root/?/init.lua;$shared/?.lua;$shared/?/init.lua;;" luajit -e '
 		local uv = require("luv")
 		local Pins = require("_generated.native_runtime").managed_python
 		local outcome
