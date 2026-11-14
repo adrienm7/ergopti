@@ -47,7 +47,7 @@ function M.with_configuration(body)
 		end
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "infra.config_paths"
-				or name == "core.fs.adapters.storage" or name == "core.text.engine.toml_codec.writer" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
+				or name == "core.fs.adapters.storage" or name == "core.text.engine.toml_codec.writer" or name == "ui.menu.builder" or name == "core.ui.ui.numeric_prompt"
 				or name == "ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end
 		local Json, Codec = require("core.text.engine.json"), require("core.text.engine.toml_codec")
@@ -80,10 +80,10 @@ function M.with_configuration(body)
 			if encoded then received[#received + 1] = assert(Json.decode(encoded)) end
 			return true
 		end
-		package.loaded["ui.webview_manager"] = host
+		package.loaded["core.ui.ui.webview_manager"] = host
 		package.loaded["adapters.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
 		local i18n = require("core.i18n.engine.i18n"); i18n.init()
-		local prompt = require("ui.numeric_prompt.bridge")
+		local prompt = require("core.ui.ui.numeric_prompt")
 		local builder = require("ui.menu.builder")
 		local function find(rows, predicate)
 			for _, row in ipairs(rows or {}) do

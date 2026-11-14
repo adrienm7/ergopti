@@ -13,7 +13,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 
 local function with_stage(body, options)
 	options = options or {}
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "infra.display_server", "core.logger.engine.shim",
+	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "core.logger.engine.shim",
 		"adapters.keyboard_layout" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -55,7 +55,7 @@ local function with_stage(body, options)
 		return true
 	end
 	package.loaded["core.process.adapters.shell_runner"] = shell
-	package.loaded["infra.display_server"] = { is_wayland = function() return false end,
+	package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end,
 		is_x11 = function() return true end, kind = function() return "x11" end }
 	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function()

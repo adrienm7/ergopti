@@ -47,7 +47,7 @@ end
 --- Restores the exact previous page owner even when acquisition or the callback raises.
 --- @param body function Receives the actual webview manager.
 local function with_unavailable_webview(body)
-	local name = "ui.webview_manager"
+	local name = "core.ui.ui.webview_manager"
 	local previous_webview = package.loaded[name]
 	local ok, err = pcall(function()
 		local Webview = helpers.load_module_with_dependency(name, "lgi", false)
@@ -76,7 +76,7 @@ local function run_every_action(Gestures, ids, configure)
 		emitter = package.loaded["modules.gestures.combo_emitter"],
 		manager = package.loaded["modules.gestures.manager"],
 		shortcuts = package.loaded["modules.shortcuts.manager"],
-		webview = package.loaded["ui.webview_manager"], popen = io.popen,
+		webview = package.loaded["core.ui.ui.webview_manager"], popen = io.popen,
 	}
 	-- Loaded again under the recording emitter below, since it keeps its own.
 	package.loaded["modules.shortcuts.manager"] = nil
@@ -89,7 +89,7 @@ local function run_every_action(Gestures, ids, configure)
 	package.loaded["modules.gestures.combo_emitter"] = {
 		press = function(combo) pressed[current] = combo; return true end,
 	}
-	package.loaded["ui.webview_manager"] = { show = function() return true end }
+	package.loaded["core.ui.ui.webview_manager"] = { show = function() return true end }
 	io.popen = function()
 		return { read = function() return "selection" end, close = function() return true end }
 	end
@@ -105,7 +105,7 @@ local function run_every_action(Gestures, ids, configure)
 	package.loaded["modules.gestures.combo_emitter"] = saved.emitter
 	package.loaded["modules.gestures.manager"] = saved.manager
 	package.loaded["modules.shortcuts.manager"] = saved.shortcuts
-	package.loaded["ui.webview_manager"] = saved.webview
+	package.loaded["core.ui.ui.webview_manager"] = saved.webview
 	io.popen = saved.popen
 	if not ok then error(err, 0) end
 	return unknown, pressed

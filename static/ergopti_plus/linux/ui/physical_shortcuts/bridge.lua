@@ -15,7 +15,7 @@ local APP = "physical_shortcuts"
 --- Reads the existing manager's acknowledged native initialization state.
 --- @return boolean available
 function M.native_available()
-	local Manager = require("ui.webview_manager")
+	local Manager = require("core.ui.ui.webview_manager")
 	return type(Manager.native_available) == "function" and Manager.native_available() == true
 end
 
@@ -43,7 +43,7 @@ end
 function M.open(options)
 	if type(options) ~= "table" or not M.available(options.scope) then return false end
 	if session ~= nil and M.close() ~= true then return false end
-	local Manager = require("ui.webview_manager")
+	local Manager = require("core.ui.ui.webview_manager")
 	local Gestures = require("modules.gestures.manager")
 	local Hook = require("adapters.keyboard_hook")
 	local capture_position, cancel_position, position_available = rawget(Hook, "capture_position"),
@@ -68,7 +68,7 @@ function M.open(options)
 		manager = Manager, current_epoch = current_epoch, page_current = page_current }
 	session = candidate
 	local function page_owner()
-		return rawequal(package.loaded["ui.webview_manager"], Manager)
+		return rawequal(package.loaded["core.ui.ui.webview_manager"], Manager)
 			and rawget(Manager, "current_epoch") == current_epoch and rawget(Manager, "page_current") == page_current
 			and type(eval_js) == "function" and rawget(Manager, "eval_js") == eval_js
 			and session == candidate and not candidate.cancelled and candidate.epoch ~= nil
@@ -171,7 +171,7 @@ function M.open(options)
 							parameter = require("ui.vision_parameter_prompt").ask(I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter(binding,id))
 						else
-							parameter = require("ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),
+							parameter = require("core.ui.ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))
 						end
 						-- Dismissing the native parameter prompt is an ordinary cancellation.
@@ -226,7 +226,7 @@ end
 function M.on_message(payload,state,context)
 	local candidate = session
 	if not candidate or candidate.cancelled or type(context) ~= "table" or context.app_name ~= APP then return false end
-	local Manager = package.loaded["ui.webview_manager"]
+	local Manager = package.loaded["core.ui.ui.webview_manager"]
 	if not rawequal(Manager, candidate.manager) or rawget(Manager, "current_epoch") ~= candidate.current_epoch
 		or rawget(Manager, "page_current") ~= candidate.page_current then return false end
 	if context.epoch == nil or context.epoch ~= candidate.current_epoch(APP) then return false end
@@ -250,7 +250,7 @@ function M.close()
 	-- Only the original Manager's exact closed notification settles this phase.
 	-- A missing page or a refused hide cannot manufacture native retirement.
 	if candidate.closed_epoch ~= candidate.epoch then
-		local Manager = require("ui.webview_manager")
+		local Manager = require("core.ui.ui.webview_manager")
 		local called, accepted = pcall(Manager.hide, APP, candidate.epoch)
 		if not called or accepted ~= true then return false end
 	end
@@ -265,7 +265,7 @@ end
 --- @return boolean acquired
 function M.on_window_acquiring(epoch)
 	local candidate = session
-	local Manager = require("ui.webview_manager")
+	local Manager = require("core.ui.ui.webview_manager")
 	if not candidate or not candidate.constructing or candidate.epoch ~= nil
 		or epoch ~= Manager.current_epoch(APP) then return false end
 	candidate.epoch = epoch
@@ -277,11 +277,11 @@ end
 function M.on_window_closed(epoch)
 	local candidate = session
 	if not candidate or candidate.epoch ~= epoch or candidate.close_observing then return end
-	local Manager = package.loaded["ui.webview_manager"]
+	local Manager = package.loaded["core.ui.ui.webview_manager"]
 	local current_epoch, page_current = candidate.current_epoch, candidate.page_current
 	local function same_owner()
 		return session == candidate and candidate.epoch == epoch
-			and rawequal(Manager, candidate.manager) and rawequal(package.loaded["ui.webview_manager"], Manager)
+			and rawequal(Manager, candidate.manager) and rawequal(package.loaded["core.ui.ui.webview_manager"], Manager)
 			and rawequal(rawget(Manager, "current_epoch"), current_epoch)
 			and rawequal(rawget(Manager, "page_current"), page_current)
 			and rawequal(candidate.current_epoch, current_epoch) and rawequal(candidate.page_current, page_current)

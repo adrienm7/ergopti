@@ -47,7 +47,7 @@ local function load_menu_quit_action()
 		return true
 	end
 
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message)
 			stock_calls.notifications[#stock_calls.notifications + 1] = message
 		end,

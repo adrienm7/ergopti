@@ -28,7 +28,7 @@ local function run_scenario()
 		"modules.llm",
 		"modules.llm.prediction_engine",
 		"modules.diagnostics.hid_diagnostic_mailbox",
-		"ui.tooltip",
+		"core.ui.ui.tooltip",
 		"modules.keymap.llm_bridge",
 	}
 	local previous = {}
@@ -102,7 +102,7 @@ local function run_scenario()
 		get_llm_enabled = function() return false end,
 		reset = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,

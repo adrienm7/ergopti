@@ -18,7 +18,7 @@ package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
   .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
 require('core.lifecycle.engine.compat.utf8').install()
 assert(require('ffi').os == 'Linux' and jit ~= nil)
-local display = require('infra.display_server')
+local display = require('core.ui.engine.display_server')
 display._set_for_test('wayland', '')
 local capture = require('adapters.xkb_capture')
 local layout = require('adapters.keyboard_layout')

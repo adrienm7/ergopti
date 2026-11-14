@@ -3,7 +3,7 @@
 --- Resolves a desktop-file ID in a fresh, bounded Gio process.
 local M = {}
 local Shell = require("core.process.adapters.shell_runner")
-local Modal = require("ui.modal")
+local Modal = require("core.ui.ui.modal")
 
 -- Gio may read arbitrary XDG desktop entries. A blocked native read must not
 -- keep the keyboard grab or the daemon indefinitely.

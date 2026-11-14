@@ -38,7 +38,7 @@
 --- 1. Fail-safe returns: getFocused() always returns a WindowInfo table, never
 ---    nil — every field defaults to "" when the session cannot be queried.
 --- 2. One detection, shared: which server is running comes from
----    infra/display_server.lua rather than from a local getenv, because this
+---    core/ui/engine/display_server.lua rather than from a local getenv, because this
 ---    adapter was one of two files that each carried their own X11-only answer.
 --- 3. Every shell-out goes through adapters/shell_runner: window titles are
 ---    attacker-influenced strings that end up in a command line, and quoting
@@ -52,7 +52,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Shell = require("core.process.adapters.shell_runner")
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 local X11Focus = require("adapters.x11_focus")
 
 local LOG = "adapters.window_info"

@@ -33,14 +33,14 @@ const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
 // Files allowed to create frameless windows, per driver, with the reason.
 const FRAMELESS_BY_DESIGN = {
 	windows: {
-		'ui/tooltip/helpers.ahk': 'typing tooltip and its border overlay',
-		'ui/tooltip/llm.ahk': 'LLM suggestion tooltip',
+		'core/ui/ui/tooltip/helpers.ahk': 'typing tooltip and its border overlay',
+		'core/ui/ui/tooltip/llm.ahk': 'LLM suggestion tooltip',
 		'ui/wpm/wpm_widget.ahk': 'floating WPM widget and graph'
 	},
 	linux: {
-		'adapters/graphics_renderer.lua': 'preview tooltip',
+		'core/ui/adapters/graphics_renderer.lua': 'preview tooltip',
 		'adapters/wpm_surface.lua': 'floating WPM widget and graph',
-		'adapters/spotlight_overlay.lua': 'pointer spotlight ring and crosses'
+		'core/ui/adapters/spotlight_overlay.lua': 'pointer spotlight ring and crosses'
 	}
 };
 

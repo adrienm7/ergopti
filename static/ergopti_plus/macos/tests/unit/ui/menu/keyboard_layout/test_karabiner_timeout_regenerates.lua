@@ -218,7 +218,7 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		helpers.it("refuses a typed tap/hold delay '" .. typed .. "' with the range (value-validation)", function()
 			local karabiner = make_karabiner()
 			local alerts = {}
-			local DialogUtil = require("infra.dialog_util")
+			local DialogUtil = require("core.ui.engine.dialog_util")
 			local original = DialogUtil.block_alert
 			DialogUtil.block_alert = function(title, message) alerts[#alerts + 1] = { title, message } end
 			local ok, err = pcall(function()

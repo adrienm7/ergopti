@@ -12,11 +12,11 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.events.timer_scheduler",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"infra.manifest_menu",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -48,7 +48,7 @@ local function with_profiles_fixture(options, body)
 		local error_count = 0
 		local editor_calls = 0
 		local timers = {}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = {
@@ -81,7 +81,7 @@ local function with_profiles_fixture(options, body)
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 		}
-		package.loaded["infra.notifications"] = {notify = function()
+		package.loaded["core.ui.engine.notifications"] = {notify = function()
 			notification_count = notification_count + 1
 			return true
 		end}

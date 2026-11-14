@@ -25,13 +25,13 @@
  *            BUILT from the manifest at test time, so if the manifest changes the
  *            Windows literal must follow or this test fails.
  *
- *   Linux  — ui/webview_manager.lua reads the manifest generically for
+ *   Linux  — core/ui/ui/webview_manager.lua reads the manifest generically for
  *            every app id, so the check is that it keeps doing so and hardcodes
  *            no per-app size of its own.
  *
  * The update-check hosts consume WebViewHost.AppGeometry directly. Further
  * Windows migration to the manifest-reading WebViewHost factory
- * (infra/webview_utils.ahk) is the intended end state; until then this value gate
+ * (core/ui/engine/webview/utils.ahk) is the intended end state; until then this value gate
  * keeps the hardcoded Windows sizes honest.
  *
  * COVERAGE IS DERIVED FROM THE MANIFEST, NOT FROM A HAND-WRITTEN LIST:
@@ -530,7 +530,7 @@ for (const name of localeFiles) {
 // ── Linux: the manager must resolve geometry generically, for every app ───────
 // Linux is the one driver that already reads the manifest for all 14 ids, so the
 // check is that it keeps doing so rather than growing per-app literals.
-const LINUX_MANAGER = 'ui/webview_manager.lua';
+const LINUX_MANAGER = 'core/ui/ui/webview_manager.lua';
 
 const errors = [];
 const apps = readManifest();

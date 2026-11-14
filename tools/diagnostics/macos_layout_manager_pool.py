@@ -22,9 +22,9 @@ IDENTITY_SCOPE = "private read-only dispatch stack; raw native name and exact we
 WEAK_SCOPE = "per-window lease receiver and domain; pooled dispatcher retained"
 DEPENDENCIES = (
     "static/ergopti_plus/macos/ui/layout_manager/init.lua",
-    "static/ergopti_plus/macos/ui/webview_controller_pool.lua",
-    "static/ergopti_plus/macos/ui/ui_builder.lua",
-    "static/ergopti_plus/macos/ui/webview_close_owner.lua",
+    "static/ergopti_plus/macos/core/ui/ui/webview_controller_pool.lua",
+    "static/ergopti_plus/macos/core/ui/ui/builder.lua",
+    "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
     "static/ergopti_plus/macos/core/timing/engine/deferred_work.lua",
     "static/ergopti_plus/_shared/layouts/engine/manager_bridge.lua",

@@ -854,9 +854,9 @@ callback; keep this live step green for any hook, injector or tray change.
 Two boundaries silently broke every tray UI on Linux while unit tests stayed
 green. (1) A native dialog runs inside a menu callback and blocks the event
 loop that forwards the grabbed keyboard, so nothing could be typed into it:
-every blocking dialog must go through `ui/modal.lua`
+every blocking dialog must go through `core/ui/ui/modal.lua`
 (`keyboard_hook.while_released`). The dialog is Ergopti's own GTK 3 child
-process (`ui/dialog_host.lua`, LuaJIT FFI, started by `ui/native_dialog.lua`
+process (`core/ui/ui/dialog_host.lua`, LuaJIT FFI, started by `core/ui/ui/native_dialog.lua`
 with the daemon's interpreter), never zenity or kdialog: its command line is
 the zenity subset the sites wrote, exit 0 accepted, 1 cancelled, 69 no display
 or no GTK 3 (never read as a No). It stays a separate process so the modal

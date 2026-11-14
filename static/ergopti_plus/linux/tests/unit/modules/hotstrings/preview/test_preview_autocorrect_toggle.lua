@@ -12,12 +12,12 @@ local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
 local saved = {}
-local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "infra.hotstring_preferences",
-	"modules.hotstrings.preview_settings", "ui.tooltip.preview" }
+local names = { "core.ui.adapters.graphics_renderer", "core.events.timer_scheduler", "infra.hotstring_preferences",
+	"modules.hotstrings.preview_settings", "core.ui.ui.tooltip.preview" }
 for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 
 local shown = 0
-package.loaded["adapters.graphics_renderer"] = {
+package.loaded["core.ui.adapters.graphics_renderer"] = {
 	is_available = function() return true end,
 	show = function() shown = shown + 1; return true end,
 	hide = function() return true end,
@@ -35,9 +35,9 @@ package.loaded["infra.hotstring_preferences"] = {
 	is_explicit = function(path) return stored[path] ~= nil end,
 }
 package.loaded["modules.hotstrings.preview_settings"] = nil
-package.loaded["ui.tooltip.preview"] = nil
+package.loaded["core.ui.ui.tooltip.preview"] = nil
 local Settings = require("modules.hotstrings.preview_settings")
-local Preview = require("ui.tooltip.preview")
+local Preview = require("core.ui.ui.tooltip.preview")
 
 local CANDIDATES = { { trigger = "btw", replacement = "by the way", group = "rolls", fires = true } }
 Preview.init({

@@ -44,11 +44,11 @@ end
 local function confirm(title, text, opts)
 	local Shell = require("core.process.adapters.shell_runner")
 	title = require("core.ui.engine.window_titles").compose(title)
-	local command = require("ui.native_dialog").command() .. " --question --no-markup --default-cancel --title="
+	local command = require("core.ui.ui.native_dialog").command() .. " --question --no-markup --default-cancel --title="
 		.. Shell.quote(title) .. " --text=" .. Shell.quote(text)
 		.. " --ok-label=" .. Shell.quote(I18n.get("menu.llm.btn_download"))
 		.. " --cancel-label=" .. Shell.quote(I18n.get("common.cancel"))
-	local ok, _, _, reason, status = require("ui.modal").run(function() return Shell.exec_checked(command) end, { observer = type(opts) == "table" and opts.modal_observer or nil })
+	local ok, _, _, reason, status = require("core.ui.ui.modal").run(function() return Shell.exec_checked(command) end, { observer = type(opts) == "table" and opts.modal_observer or nil })
 	if ok == true then return true end
 	if reason == Errors.COMMAND_EXITED_NONZERO and status == 1 then return false end
 	return nil

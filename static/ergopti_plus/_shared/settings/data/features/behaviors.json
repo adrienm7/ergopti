@@ -29,21 +29,21 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "09ed7c3c1ce45f9450d36b79955777d639b40b968201a5627427b4dbe48e0eb9"
+			"sha256": "3625e7bf4d652b4038cd49184880a322a4315a425789ef0c18071751ff38abe2"
 		},
 		{
 			"id": "macos-control",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "a3b897a223428fcdc8dc7152f95712c676a0e878209b6d7ee531363efe217135"
+			"sha256": "ea9eceb6ffd8f5b890987078874b9aa98ec386f63661d20f0971bf36abfc852b"
 		},
 		{
 			"id": "macos-undo",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
 			"symbol": "function M.undo_on_backspace",
-			"sha256": "09ed7c3c1ce45f9450d36b79955777d639b40b968201a5627427b4dbe48e0eb9"
+			"sha256": "3625e7bf4d652b4038cd49184880a322a4315a425789ef0c18071751ff38abe2"
 		},
 		{
 			"id": "linux-repeat",
@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "a14104f80476e803d78a0eabdd871ba7a641886b318ae830b5c6fec5d2014ec2"
+			"sha256": "a49ae69e7e59c7e8328b03167e5bfe8d4591cd0d6524db7073220f98fc416908"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -78,7 +78,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "a3b897a223428fcdc8dc7152f95712c676a0e878209b6d7ee531363efe217135"
+			"sha256": "ea9eceb6ffd8f5b890987078874b9aa98ec386f63661d20f0971bf36abfc852b"
 		},
 		{
 			"id": "linux-dead-capture",

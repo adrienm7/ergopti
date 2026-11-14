@@ -99,7 +99,7 @@ end)
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"modules.shortcuts.script_control",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"adapters.event_provenance",
@@ -115,7 +115,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 }
 
@@ -141,7 +141,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 		local idle_callback = nil
 		local admission_fence = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["infra.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
@@ -219,7 +219,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			resume_after_pause = function() return true end,
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["modules.keystats"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
@@ -314,7 +314,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
-			"ui.tooltip", "modules.keystats", "infra.notifications", "infra.keycodes",
+			"core.ui.ui.tooltip", "modules.keystats", "core.ui.engine.notifications", "infra.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
@@ -377,7 +377,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		}
 
 		-- Silence the "server ready" notification path
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 
 		-- Load the REAL api_mlx against those adapters
 		package.loaded["modules.llm.api_mlx"] = nil
@@ -420,7 +420,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			get_retry_policy = function() return 2, 0.18, 5 end,
 		}
 		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			set_navigate_callback = function(_) end, set_enter_validates = function(_) end,
 			set_chain_start = function(_) return true end, mark_chain_complete = function() return true end,
 			get_current_index = function() return nil end, navigate = function(_) end,

@@ -71,7 +71,7 @@ local function logger() return require("core.logger.engine.logger") end
 --- @param on_click function|nil What a click on the notification does.
 local function notify(title, body, kind, on_click)
 	local ok, err = pcall(function()
-		return require("infra.notifications").notify(title, body, kind, on_click)
+		return require("core.ui.engine.notifications").notify(title, body, kind, on_click)
 	end)
 	if not ok then
 		logger().error(LOG, "Screen capture notification failed: %s.", tostring(err))

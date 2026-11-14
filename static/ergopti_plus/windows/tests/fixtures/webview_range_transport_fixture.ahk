@@ -12,7 +12,7 @@
 #Include ../../vendor/WebView2.ahk
 #Include ../../core/text/engine/json.ahk
 #Include ../../core/text/engine/utils.ahk
-#Include ../../adapters/webview_profiles.ahk
+#Include ../../core/ui/adapters/webview_profiles.ahk
 #Include ../../modules/keystats/keystats_webview_range_script.ahk
 #Include ../../modules/keystats/keystats_webview_range_mount.ahk
 

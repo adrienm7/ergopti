@@ -33,7 +33,7 @@ local function load_menu(start_result)
 		set_disabled_apps = function() end,
 	}, { __index = function() return function() end end })
 	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(_, body) ctx.alerts[#ctx.alerts + 1] = body; return "button.activate" end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = nil

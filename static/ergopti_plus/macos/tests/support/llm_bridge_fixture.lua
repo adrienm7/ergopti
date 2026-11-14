@@ -147,7 +147,7 @@ local function with_bridge_fixture(callback, options)
 	local baseline_hs = rawget(_G, "hs")
 
 	if options.preloaded_tooltip ~= nil then
-		package.loaded["ui.tooltip"] = options.preloaded_tooltip
+		package.loaded["core.ui.ui.tooltip"] = options.preloaded_tooltip
 	end
 	local pre_fixture_loaded = snapshot_package_loaded()
 	local pre_fixture_hs = rawget(_G, "hs")
@@ -156,7 +156,7 @@ local function with_bridge_fixture(callback, options)
 		local fixture = {}
 		fixture.tooltip = make_tooltip(fixture)
 		fixture.engine = make_prediction_engine(fixture)
-		package.loaded["ui.tooltip"] = fixture.tooltip
+		package.loaded["core.ui.ui.tooltip"] = fixture.tooltip
 		package.loaded["modules.llm.prediction_engine"] = fixture.engine
 		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["adapters.event_provenance"] = options.event_provenance
@@ -169,7 +169,7 @@ local function with_bridge_fixture(callback, options)
 	restore_package_loaded(pre_fixture_loaded)
 	_G.hs = pre_fixture_hs
 	local preloaded_restored = options.preloaded_tooltip == nil
-		or package.loaded["ui.tooltip"] == options.preloaded_tooltip
+		or package.loaded["core.ui.ui.tooltip"] == options.preloaded_tooltip
 	restore_package_loaded(baseline_loaded)
 	_G.hs = baseline_hs
 

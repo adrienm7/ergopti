@@ -645,7 +645,7 @@ InstallSendNoOps() {
 ; =====================================================================
 
 ; These functions are called by modules/llm/prediction_engine.ahk at
-; runtime. In production they live in ui/tooltip/tooltip_llm.ahk and
+; runtime. In production they live in core/ui/ui/tooltip/tooltip_llm.ahk and
 ; modules/keystats/keystats.ahk (which register hotkeys or OS hooks
 ; and therefore cannot be #Included by the test runner). The stubs
 ; below record calls so individual tests can assert on them.

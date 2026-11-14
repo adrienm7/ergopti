@@ -30,7 +30,7 @@ local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local i18n     = require("core.i18n.engine.i18n")
-local dialog   = require("infra.dialog_util")
+local dialog   = require("core.ui.engine.dialog_util")
 local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
 local InputSourceBroker = require("adapters.input_source_broker")
 

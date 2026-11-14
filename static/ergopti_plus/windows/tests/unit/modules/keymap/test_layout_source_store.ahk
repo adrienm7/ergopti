@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The layout editor saves its files from the layout manager window through
 ; ui/layout_manager/source_store.ahk. These tests replay the cases of the Lua
-; store's tests (linux/tests/unit/ui/editors/test_layout_editor_source_store.lua)
+; store's tests (linux/tests/unit/core/ui/editors/test_layout_editor_source_store.lua)
 ; over an in-memory disk: the bounds (plain names, allowed types, UTF-8, size),
 ; reopening the last saved source, and a failed write reported as such.
 ; ==============================================================================

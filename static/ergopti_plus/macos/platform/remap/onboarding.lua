@@ -49,7 +49,7 @@ local TimerScheduler = require("core.events.timer_scheduler")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
-local ok_notif, Notifications = pcall(require, "infra.notifications")
+local ok_notif, Notifications = pcall(require, "core.ui.engine.notifications")
 if not ok_notif then Notifications = nil end
 
 local LOG = "karabiner.onboarding"
@@ -1523,7 +1523,7 @@ run_wizard_step = function(epoch)
 
 	-- Decide which step to run based on the first missing dependency in order
 	-- of the install pipeline (app → sysext → daemon running).
-	local dialog_util = require("infra.dialog_util")
+	local dialog_util = require("core.ui.engine.dialog_util")
 	if not report.ke_installed or not report.grabber_present then
 		local choice = dialog_util.block_alert(
 			i18n.get("karabiner.onboarding.required_title"),

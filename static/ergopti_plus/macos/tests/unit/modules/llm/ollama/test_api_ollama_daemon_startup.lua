@@ -31,13 +31,13 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-			"modules.llm.progressive_reveal", "core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n",
+			"modules.llm.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
 			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
 		}, function()
 			local fixture = { tasks = {}, paused = false, nonce_index = 0 }
 			local nonces = { "0000000000000000000000000000f001", "0000000000000000000000000000f002" }
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.notifications"] = { notify = function() return true end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.network.adapters.http_client"] = { new = function()
 				return { cancel = function() return true end, isActive = function() return false end,
@@ -176,15 +176,15 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	-- Only endpoint reads and the requester callback are instrumented here.
 	local function with_reentrant_requester(boundary, outcome, scenario)
 		with_owned_responses(function(api, fixture)
-			helpers.with_fresh_modules({ "modules.llm.local_model_offer", "infra.dialog_util",
-				"infra.notifications", "core.i18n.engine.i18n" }, function()
+			helpers.with_fresh_modules({ "modules.llm.local_model_offer", "core.ui.engine.dialog_util",
+				"core.ui.engine.notifications", "core.i18n.engine.i18n" }, function()
 				local world = { dialogs = 0, notices = 0, installs = 0, replaced = false }
 				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 					format = function(key) return key end }
-				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, first)
+				package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, _, first)
 					world.dialogs = world.dialogs + 1; return first
 				end }
-				package.loaded["infra.notifications"] = { notify = function()
+				package.loaded["core.ui.engine.notifications"] = { notify = function()
 					world.notices = world.notices + 1; return true
 				end }
 				local offer = require("modules.llm.local_model_offer")
@@ -584,14 +584,14 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 
 	helpers.it("(local-model-service-consent) refuses same-origin daemon replacement during held model consent", function()
 		with_startup({}, function(api, fixture)
-			helpers.with_stub_scope({ "modules.llm.local_model_offer", "infra.dialog_util" }, function()
+			helpers.with_stub_scope({ "modules.llm.local_model_offer", "core.ui.engine.dialog_util" }, function()
 				helpers.assert_true(api.ensure_running())
 				local original = fixture.tasks[1]
 				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
 				local origin = api.get_base_url()
 				local installs, answered = 0, false
 				package.loaded["core.i18n.engine.i18n"].format = function(key) return key end
-				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, download)
+				package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, _, download)
 					if not answered then
 						answered = true
 						helpers.assert_eq(api.stop_owned_server(), false)

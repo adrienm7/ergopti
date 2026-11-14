@@ -10,12 +10,12 @@
 
 local M = {}
 
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
-local dialog        = require("infra.dialog_util")
+local dialog        = require("core.ui.engine.dialog_util")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local ManifestMenu  = require("infra.manifest_menu")
 local AppProfileOverrides = require("ai.engine.policy.app_profile_overrides")

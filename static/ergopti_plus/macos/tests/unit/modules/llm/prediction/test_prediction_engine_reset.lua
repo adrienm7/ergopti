@@ -127,7 +127,7 @@ package.loaded["infra.keycodes"] = {
 
 -- Stub ui.tooltip — set_navigate_callback/set_enter_validates are called at
 -- module load time; mark_chain_complete is called unconditionally by reset().
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,

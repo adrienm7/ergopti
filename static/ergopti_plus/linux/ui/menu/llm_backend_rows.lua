@@ -16,7 +16,7 @@
 ---    private entries file, selects it, then tests it at once so a wrong key is
 ---    reported while the user is still looking, with the provider's own reason.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
----    window the keyboard grab would starve (ui/modal.lua).
+---    window the keyboard grab would starve (core/ui/ui/modal.lua).
 --- 4. A provider that is no chat model (Jev, for the agent's System 1 only) is
 ---    offered for its key like any other, but its entry never becomes the
 ---    predictions' one: it is listed with its own test and removal, and adding

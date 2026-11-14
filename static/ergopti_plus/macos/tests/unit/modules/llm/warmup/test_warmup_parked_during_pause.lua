@@ -37,7 +37,7 @@ local helpers = require("tests.helpers")
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"modules.shortcuts.script_control",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"adapters.event_provenance",
@@ -53,7 +53,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 }
 
@@ -74,7 +74,7 @@ local function exercise_committed_backend_pause()
 		local idle_callback = nil
 		local admission_fence = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["infra.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
@@ -146,7 +146,7 @@ local function exercise_committed_backend_pause()
 			resume_after_pause = function() return true end,
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["modules.keystats"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")

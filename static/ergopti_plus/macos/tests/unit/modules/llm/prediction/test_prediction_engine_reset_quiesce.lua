@@ -74,7 +74,7 @@ local function load_fixture(cancel_result)
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
+	package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		mark_chain_complete = function() return true end,

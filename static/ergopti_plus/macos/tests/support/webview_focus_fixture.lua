@@ -15,7 +15,7 @@ local M = {}
 --- @param retire function Public close or native closing callback.
 --- @param factory_lifecycle table|nil Exact options passed to the native factory.
 function M.check(view, activate, retire, factory_lifecycle)
-	local builder = package.loaded["ui.ui_builder"]
+	local builder = package.loaded["core.ui.ui.builder"]
 	local previous_deferred = package.loaded["core.timing.engine.deferred_work"]
 	local previous_focus, previous_hs_focus = builder.force_focus, hs.focus
 	local previous_window, previous_show = view.hswindow, view.show
@@ -25,7 +25,7 @@ function M.check(view, activate, retire, factory_lifecycle)
 			if label == "webview focus retry" then pending[#pending + 1] = callback end
 			return true
 		end }
-		builder.force_focus = assert(loadfile(helpers.driver_root() .. "ui/ui_builder.lua"))().force_focus
+		builder.force_focus = assert(loadfile(helpers.driver_root() .. "core/ui/ui/builder.lua"))().force_focus
 		view.hswindow = function()
 			if invalid then reads = reads + 1; error("native window deleted") end
 			return nil

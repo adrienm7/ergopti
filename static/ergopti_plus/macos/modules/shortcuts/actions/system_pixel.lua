@@ -23,7 +23,7 @@ local M = {}
 
 local hs            = hs
 local pasteboard    = hs.pasteboard
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
 local FileSystem    = require("core.fs.adapters.file_system")

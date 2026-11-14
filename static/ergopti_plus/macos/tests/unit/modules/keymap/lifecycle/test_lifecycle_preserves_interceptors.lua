@@ -61,7 +61,7 @@ local function load_keymap_capturing_taps()
 	-- interceptor survival — which is what makes such a failure so expensive to
 	-- diagnose. Running this file alone would pass; the suite would not.
 	local to_wipe = {
-		"ui.tooltip",
+		"core.ui.ui.tooltip",
 		"core.text.engine.utils",
 		"core.logger.engine.logger",
 		"modules.keystats",

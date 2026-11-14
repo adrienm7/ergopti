@@ -546,7 +546,7 @@ try {
 			'python'
 		])
 			assert.ok(!dependencies.includes(name), `the host ${name} must not be required`);
-		// Every dialog is Ergopti's own GTK window (linux/ui/dialog_host.lua).
+		// Every dialog is Ergopti's own GTK window (linux/core/ui/ui/dialog_host.lua).
 		for (const name of ['zenity', 'kdialog'])
 			assert.ok(
 				!dependencies.includes(name),

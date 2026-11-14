@@ -42,7 +42,7 @@ local function load_lifecycle()
 		end
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function()
 			if ctx.fail_notification_once then
 				ctx.fail_notification_once = false

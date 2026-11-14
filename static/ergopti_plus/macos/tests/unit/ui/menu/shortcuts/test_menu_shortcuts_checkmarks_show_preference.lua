@@ -23,7 +23,7 @@ local DISABLED_ID = "cmd_star"
 local function build_cmd_rows(bindings, state_shortcuts)
 	return helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts", "core.timing.engine.deferred_work", "core.fs.engine.dir",
-		"infra.dialog_util", "modules.shortcuts", "ui.menu.menu_utils",
+		"core.ui.engine.dialog_util", "modules.shortcuts", "ui.menu.menu_utils",
 		"infra.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
 		"infra.manifest_reader", "core.i18n.engine.i18n",
 	}, function()
@@ -32,7 +32,7 @@ local function build_cmd_rows(bindings, state_shortcuts)
 		text.build_active_wrap_pairs = function() return {} end
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}

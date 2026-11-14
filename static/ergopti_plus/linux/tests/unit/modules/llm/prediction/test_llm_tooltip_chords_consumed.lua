@@ -65,7 +65,7 @@ local FAKED = {
 	"modules.llm.api_ollama", "modules.llm.profiles",
 }
 local RELOADED = {
-	"modules.llm.navigation_settings", "modules.llm.display_settings", "modules.llm.prediction_engine", "ui.tooltip.llm",
+	"modules.llm.navigation_settings", "modules.llm.display_settings", "modules.llm.prediction_engine", "core.ui.ui.tooltip.llm",
 	"adapters.keyboard_hook",
 }
 
@@ -175,7 +175,7 @@ local function with_offer(options, body)
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
-		local overlay = helpers.load_module("ui.tooltip.llm")
+		local overlay = helpers.load_module("core.ui.ui.tooltip.llm")
 		helpers.assert_true(overlay.init({ style = {}, renderer = {
 				show = function(rows)
 					local count = 0

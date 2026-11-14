@@ -34,7 +34,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				"core.logger.engine.logger",
 				"core.text.engine.utils",
 				"core.i18n.engine.i18n",
-				"infra.notifications",
+				"core.ui.engine.notifications",
 				"core.fs.adapters.storage",
 				"core.timing.engine.deferred_work",
 				"core.timing.engine.timings",
@@ -65,7 +65,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					get = function(key) return labels[key] or key end,
 					section = function(key) return key end,
 				}
-				package.loaded["infra.notifications"] = { notify = function() return true end }
+				package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 
 				local bundles_dir = "/fixture/driver/../../ergopti/macos/bundles/"
 				local user_dir = (os.getenv("HOME") or "~") .. "/Library/Keyboard Layouts/"

@@ -51,8 +51,8 @@ end
 --- @param outcome string Runtime setter outcome.
 --- @return table fixture Observed state, calls, and callback result.
 local function run_menu_action(raw, outcome)
-	local saved_dialog = package.loaded["infra.dialog_util"]
-	local saved_notifications = package.loaded["infra.notifications"]
+	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
+	local saved_notifications = package.loaded["core.ui.engine.notifications"]
 	local saved_lifecycle = package.loaded["ui.menu.keymap_lifecycle"]
 	local saved_custom = package.loaded["ui.menu.menu_hotstrings_custom"]
 	local calls = { sets = 0, clears = 0, saves = 0, updates = 0, notices = 0 }
@@ -65,10 +65,10 @@ local function run_menu_action(raw, outcome)
 		custom_close_on_add = false,
 	}
 
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() return "OK", raw end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(_title, _body, kind)
 			helpers.assert_eq(kind, "error")
 			calls.notices = calls.notices + 1
@@ -110,8 +110,8 @@ local function run_menu_action(raw, outcome)
 		return { result = row.fn(), state = state, calls = calls }
 	end, debug.traceback)
 
-	package.loaded["infra.dialog_util"] = saved_dialog
-	package.loaded["infra.notifications"] = saved_notifications
+	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
+	package.loaded["core.ui.engine.notifications"] = saved_notifications
 	package.loaded["ui.menu.keymap_lifecycle"] = saved_lifecycle
 	package.loaded["ui.menu.menu_hotstrings_custom"] = saved_custom
 	if not ok then error(fixture_or_err, 0) end

@@ -14,7 +14,7 @@ _MKC_CaptureCommitsScalarAndStopsOnClose() {
     Body := _DriverFuncBody("MagicKeyEditor")
     CloseBody := _DriverFuncBody("_MagicKeyEditorClose")
 
-    Assert(Body != "", "MagicKeyEditor() must exist in ui/editors.ahk")
+    Assert(Body != "", "MagicKeyEditor() must exist in core/ui/ui/editors.ahk")
     Assert(CloseBody != "", "MagicKeyEditor Close handler must exist")
     Assert(InStr(Body, 'InputHook("L2 E C I", ScalarEndKeys)') > 0,
         "MagicKeyEditor must use its single-key suppressive capture hook")

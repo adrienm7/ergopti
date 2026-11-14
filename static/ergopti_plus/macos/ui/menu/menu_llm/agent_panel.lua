@@ -36,7 +36,7 @@ local Logger       = require("core.logger.engine.logger")
 local i18n         = require("core.i18n.engine.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local AppPickerLib = require("infra.app_picker")
-local dialog       = require("infra.dialog_util")
+local dialog       = require("core.ui.engine.dialog_util")
 local Vision       = require("ai.engine.prediction.vision")
 local Agent        = require("ai.engine.agent.agent")
 local ProviderUses = require("modules.llm.provider_uses")
@@ -209,7 +209,7 @@ local function set_mode(ctx, id)
 	local Runner = require("modules.llm.agent_runner")
 	if id == "auto" and not Runner.is_configured(ctx.state.llm_agent_system1) then
 		Logger.info(LOG, "Automatic mode refused from the menu: System 1 is not chosen.")
-		local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+		local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 		if ok_tooltip and type(tooltip.show) == "function" then
 			pcall(tooltip.show, i18n.get("llm.agent.no_system1"), true, true)
 		end

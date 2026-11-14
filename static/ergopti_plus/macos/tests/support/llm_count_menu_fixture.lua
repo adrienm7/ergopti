@@ -35,7 +35,7 @@ return function(callback, options)
 		local function unobserved_command() command_deliveries = command_deliveries + 1 end
 		local outcome = true
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local real_strings = hs.json.decode(locale_file:read("*a")); locale_file:close()
 		local function real_caption(key)
@@ -138,7 +138,7 @@ return function(callback, options)
 				return calls.page_open_result
 			end
 		end
-		if options.window_toggle then package.loaded["ui.window_toggle"] = options.window_toggle end
+		if options.window_toggle then package.loaded["core.ui.ui.window_toggle"] = options.window_toggle end
 		local menu = require("ui.menu.menu_llm").create({ state = state,
 			keymap = { set_llm_model = accept }, script_control = options.script_control,
 			save_prefs = accept, update_menu = accept, active_tasks = {} })

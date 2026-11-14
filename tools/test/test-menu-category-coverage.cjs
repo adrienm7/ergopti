@@ -1040,7 +1040,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 	])
 		assert.equal(nativeTemplateBinding(linux.replace(from, to), '.lua', section, key, port), false);
 	const win = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_hotstrings.ahk'), 'utf8'),
-		editor = fs.readFileSync(path.join(SP, 'windows/ui/editors.ahk'), 'utf8');
+		editor = fs.readFileSync(path.join(SP, 'windows/core/ui/ui/editors.ahk'), 'utf8');
 	assert.equal(
 		nativeTemplateBinding(win, '.ahk', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1, [
 			{ src: win },

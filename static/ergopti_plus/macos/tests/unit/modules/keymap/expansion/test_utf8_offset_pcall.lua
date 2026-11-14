@@ -416,7 +416,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"infra.keycodes",
 			"core.logger.engine.perf",
 			"infra.hotpath_profiler",
-			"ui.tooltip",
+			"core.ui.ui.tooltip",
 		}
 		for _, mod in ipairs(to_clear) do package.loaded[mod] = nil end
 
@@ -457,7 +457,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = nil,  -- Not called in the paths we exercise
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide              = function() end,
 			hide_forced       = function() end,
 			show_stacked      = function() end,

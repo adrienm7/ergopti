@@ -17,16 +17,16 @@ local CATEGORY_OWNERS = {
 	"hs.fs",
 	"hs.json",
 	"ui.metrics_apps",
-	"ui.ui_builder",
+	"core.ui.ui.builder",
 	"core.logger.engine.logger",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
-	"adapters.webview_result",
+	"core.ui.adapters.webview_result",
 	"adapters.running_application",
-	"adapters.own_window",
+	"core.ui.adapters.own_window",
 	"core.fs.engine.native_path",
 }
 
@@ -116,14 +116,14 @@ local function with_category_store_owned(spec, callback)
 			logs[#logs + 1] = string.format(format_string, ...)
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function(_title, _prompt, _prior, confirm, _cancel)
 			if spec.during_prompt then spec.during_prompt(state) end
 			return confirm, spec.score_input or "1"
 		end,
 		alert = noop,
 	}
-	state.warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
+	state.warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 	local previous_modules = {}
 	for _, name in ipairs({ "hs.fs", "core.events.timer_scheduler", "modules.keystats.log_manager",
 			"infra.config_paths" }) do
@@ -136,7 +136,7 @@ local function with_category_store_owned(spec, callback)
 		cancel = function(handle) handle.timer = nil; return true end,
 	}
 	package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		show_webview = function()
 			return {
 				show = function(self) return self end,
@@ -176,8 +176,8 @@ local function with_category_store_owned(spec, callback)
 
 	io.open = original_open
 	package.loaded["ui.metrics_apps"] = nil
-	package.loaded["ui.ui_builder"] = nil
-	package.loaded["infra.dialog_util"] = nil
+	package.loaded["core.ui.ui.builder"] = nil
+	package.loaded["core.ui.engine.dialog_util"] = nil
 	package.loaded["core.logger.engine.logger"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	for name, prior in pairs(previous_modules) do package.loaded[name] = prior.value end

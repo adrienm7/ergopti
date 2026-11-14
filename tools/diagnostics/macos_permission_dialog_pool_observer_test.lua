@@ -14,7 +14,7 @@ local function fixture()
 	local lease = { token = token, view = view, receiver = receiver, entry = entry, committed = true }
 	leases[token], entry.routes[view] = lease, lease
 	local bind = assert(load([[local leases=...; return function() return leases end]],
-		"@" .. root .. "/macos/ui/webview_controller_pool.lua"))(leases)
+		"@" .. root .. "/macos/core/ui/ui/webview_controller_pool.lua"))(leases)
 	local pool = { bind = bind }
 	local session = { webview = view, usercontent = controller, controller_lease = token, open_settings = domain }
 	local open = assert(load([[
@@ -65,7 +65,7 @@ local cases = {
 -- These cases execute the actual Pool dispatcher and its xpcall path. File
 -- userdata and setCallback are explicit controlled ports, never native evidence.
 local function dispatch_control(kind)
-	local source_path = production .. "/macos/ui/webview_controller_pool.lua"
+	local source_path = production .. "/macos/core/ui/ui/webview_controller_pool.lua"
 	local file = assert(io.open(source_path, "rb")); local code = assert(file:read("*a")); assert(file:close())
 	if kind == "renamed" then code = code:gsub("%f[%w]message%f[%W]", "packet") end
 	local Pool = assert(load(code, "@" .. source_path))()

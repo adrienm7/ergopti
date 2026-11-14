@@ -796,7 +796,7 @@ function M.init(opts)
 	_tap_copy = build_tap_copy(opts.execute_action, opts.capture_copy_owner)
 	-- Wayland's copy check counts the selection changes a watcher sees; it
 	-- lives as long as the copy owner (adapters/wayland_selection_counter.lua).
-	if not _dry_run and require("infra.display_server").is_wayland() then
+	if not _dry_run and require("core.ui.engine.display_server").is_wayland() then
 		require("adapters.wayland_selection_counter").start()
 	end
 	_defaults_path = opts.defaults_path

@@ -44,7 +44,7 @@ end
 --- A preview module initialised with a style stub and the config above.
 --- @return table
 local function preview()
-	local P = helpers.load_module("ui.tooltip.preview")
+	local P = helpers.load_module("core.ui.ui.tooltip.preview")
 	P.init({ style = { positioning = { window_bottom_inset = 0 } }, config = fake_config() })
 	return P
 end

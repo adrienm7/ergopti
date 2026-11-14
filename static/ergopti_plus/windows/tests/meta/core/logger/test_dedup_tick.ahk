@@ -40,7 +40,7 @@ _TLDT_StripLineComments(Src) {
 _TLDT_DedupTickTime() {
 	; Move-resilient: scan the lib dir via the framework helper. "_LastErrTime"
 	; and "A_TickCount - _LastErrTime" are unique to logger.ahk within lib.
-	Src := _TLDT_StripLineComments(_DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine"))
+	Src := _TLDT_StripLineComments(_DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine"))
 
 	; The static must be declared
 	Assert(InStr(Src, "_LastErrTime") > 0,

@@ -123,21 +123,21 @@ module de `_shared/` avant de supposer qu'une modification y atteint les deux dr
 d'identité d'arborescence**. Voici donc le tableau de correspondance dont vous avez besoin
 pour naviguer aujourd'hui :
 
-| Concept                  | `windows/`                                                 | `macos/`                                                                | `linux/`                                                 |
-| ------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------- |
-| Point d'entrée           | `ErgoptiPlus.ahk`                                          | `init.lua`                                                              | `ergopti_hotstrings.lua`                                 |
-| Adaptateurs OS           | `adapters/` (21)                                           | `adapters/` (24)                                                        | `adapters/` (22)                                         |
-| Infra transverse         | `lib/` (39 fichiers plats + 6 dossiers, 24 017 l)          | `lib/` (27 + `toml/`)                                                   | `lib/` (6 fichiers)                                      |
-| **Moteur de hotstrings** | `lib/hotstrings/` (17 fichiers)                            | **`modules/keymap/`**                                                   | `modules/hotstrings/`                                    |
-| **Remappage clavier**    | **`modules/keymap/`**                                      | `platform/remap/` + `modules/keymap/{layout_install,input_sources}.lua` | `platform/remap/`                                        |
-| Tap-hold                 | `platform/remap/`                                          | `platform/remap/`                                                       | `platform/remap/`                                        |
-| Menu tray                | `ui/menu/` (+ barrel `ui/tray_menu.ahk`, **hors dossier**) | `ui/menu/` (barrel `init.lua` **dans** le dossier)                      | **`modules/menu/`**                                      |
-| Fenêtres webview         | `ui/<fenêtre>/` (+ 5 fichiers plats à la racine de `ui/`)  | `ui/<fenêtre>/`                                                         | **`modules/ui/bridge_handlers/`** + `ui/webkit_host.lua` |
-| Métriques (hôtes)        | `modules/keystats/keystats_{ui,webview,prefetch}.ahk`      | `ui/metrics_{typing,apps}/`                                             | `modules/ui/bridge_handlers/`                            |
-| Updater                  | `lib/updater/`                                             | `lib/updater.lua`                                                       | `modules/updater/`                                       |
-| Crash reporter           | `lib/crash_reporter.ahk`                                   | `lib/crash_reporter.lua`                                                | `modules/diagnostics/`                                   |
-| Chemins de config        | `lib/boot.ahk`                                             | **`ui/menu/menu_paths.lua`**                                            | _(aucun résolveur)_                                      |
-| Généré                   | `_generated/` (8 fichiers)                                 | `_generated/` (3)                                                       | `_generated/` (1, vide)                                  |
+| Concept                  | `windows/`                                                 | `macos/`                                                                | `linux/`                                                         |
+| ------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Point d'entrée           | `ErgoptiPlus.ahk`                                          | `init.lua`                                                              | `ergopti_hotstrings.lua`                                         |
+| Adaptateurs OS           | `adapters/` (21)                                           | `adapters/` (24)                                                        | `adapters/` (22)                                                 |
+| Infra transverse         | `lib/` (39 fichiers plats + 6 dossiers, 24 017 l)          | `lib/` (27 + `toml/`)                                                   | `lib/` (6 fichiers)                                              |
+| **Moteur de hotstrings** | `lib/hotstrings/` (17 fichiers)                            | **`modules/keymap/`**                                                   | `modules/hotstrings/`                                            |
+| **Remappage clavier**    | **`modules/keymap/`**                                      | `platform/remap/` + `modules/keymap/{layout_install,input_sources}.lua` | `platform/remap/`                                                |
+| Tap-hold                 | `platform/remap/`                                          | `platform/remap/`                                                       | `platform/remap/`                                                |
+| Menu tray                | `ui/menu/` (+ barrel `ui/tray_menu.ahk`, **hors dossier**) | `ui/menu/` (barrel `init.lua` **dans** le dossier)                      | **`modules/menu/`**                                              |
+| Fenêtres webview         | `ui/<fenêtre>/` (+ 5 fichiers plats à la racine de `ui/`)  | `ui/<fenêtre>/`                                                         | **`modules/ui/bridge_handlers/`** + `core/ui/ui/webkit_host.lua` |
+| Métriques (hôtes)        | `modules/keystats/keystats_{ui,webview,prefetch}.ahk`      | `ui/metrics_{typing,apps}/`                                             | `modules/ui/bridge_handlers/`                                    |
+| Updater                  | `lib/updater/`                                             | `lib/updater.lua`                                                       | `modules/updater/`                                               |
+| Crash reporter           | `lib/crash_reporter.ahk`                                   | `lib/crash_reporter.lua`                                                | `modules/diagnostics/`                                           |
+| Chemins de config        | `lib/boot.ahk`                                             | **`ui/menu/menu_paths.lua`**                                            | _(aucun résolveur)_                                              |
+| Généré                   | `_generated/` (8 fichiers)                                 | `_generated/` (3)                                                       | `_generated/` (1, vide)                                          |
 
 **Les deux pièges de nommage à mémoriser tout de suite :**
 

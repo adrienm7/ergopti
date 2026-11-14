@@ -33,7 +33,7 @@ local PYTHON_DOWNLOAD_URL = "https://www.python.org/downloads/macos/"
 
 -- Stateful singletons are resolved at call time: tests and reloads replace them.
 local function i18n() return require("core.i18n.engine.i18n") end
-local function dialogs() return require("infra.dialog_util") end
+local function dialogs() return require("core.ui.engine.dialog_util") end
 local function deferred() return require("core.timing.engine.deferred_work") end
 local function shell() return require("core.process.adapters.shell_runner") end
 

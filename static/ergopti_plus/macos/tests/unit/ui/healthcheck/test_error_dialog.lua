@@ -38,7 +38,7 @@ local function load_dialog(controls)
 	local sharing_schema = require("diagnostics.engine.healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
-		"core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
+		"core.i18n.engine.locale", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
 		"core.lifecycle.engine.shutdown.termination_coordinator",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -84,7 +84,7 @@ local function load_dialog(controls)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
@@ -227,7 +227,7 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 	for _, failure in ipairs({ "frame", "chrome" }) do
 		helpers.it("presentation failure releases resources and admits the next error: " .. failure .. " (error-dialog-exception)", function()
 			local dialog, context = load_dialog()
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local saved_screen, saved_chrome = hs.screen.mainScreen, builder.window_chrome_steps
 			if failure == "frame" then
 				hs.screen.mainScreen = function() return { frame = function() error("frame refused") end } end

@@ -72,7 +72,7 @@ PE comparison of v1.0.0, v1.0.3 and v1.0.4 (7-Zip PE resource listing):
 
 1. **Acquire the region image in-process instead of through a hidden PowerShell P/Invoke stage.**
    The driver already owns the clipboard natively (the `CB_*` code in screenshots.ahk) and already
-   uses GDI+ in-process (`adapters/graphics_renderer.ahk`, `ui/wpm/wpm_gdiplus_ownership.ahk`). Do
+   uses GDI+ in-process (`core/ui/adapters/graphics_renderer.ahk`, `ui/wpm/wpm_gdiplus_ownership.ahk`). Do
    `CopyImage` + `GdipCreateBitmapFromHBITMAP` + downscale + `GdipSaveImageToFile` under the same
    clipboard lock and sequence check, from AHK. This is justified on its own engineering merits:
    `Add-Type -TypeDefinition` runs the C# compiler on every region capture (hundreds of ms to
