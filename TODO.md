@@ -314,6 +314,12 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       frequency) still reachable on each form factor without extra keys, and fold it into the global score. Weights
       and form factors editable.
 
+- [ ] **Live key heatmap in the Studio (maintainer, 2026-11-14).** While editing, each key is coloured in real
+      time from green to red by how much the character placed on it costs (its share of SFBs, same-finger skipgrams,
+      redirects, finger overload, distance…), with a selectable metric (or the global score) and a tooltip naming the
+      worst pairs it causes; moving or swapping a key updates the colours and the score at once. Same view in the
+      app's Studio and on the site.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
