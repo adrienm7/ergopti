@@ -440,7 +440,7 @@
 		},
 		{
 			"id": "layout-analysis-engine",
-			"ordinal": 662,
+			"ordinal": 663,
 			"name": "layout analysis engine gives the hand-computed metrics, rebuilds the exact key n-grams, scores with editable weights and ranks the whole library in well under a second",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-analysis-engine.cjs"],
@@ -448,7 +448,7 @@
 		},
 		{
 			"id": "layout-comparer-page",
-			"ordinal": 663,
+			"ordinal": 665,
 			"name": "the Studio's layout comparer page loads the engine in order, finds every string it shows in all 21 locales and has the tables of every built-in corpus",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-comparer-page.cjs"],
@@ -456,7 +456,7 @@
 		},
 		{
 			"id": "layout-formats",
-			"ordinal": 664,
+			"ordinal": 666,
 			"name": "layout file readers give the same keys for one layout's Kalamine TOML, JSON, KLC and XKB files, read KLA and .keylayout files, and write sources, KLA JSON and Kalamine TOML that read back",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-formats.cjs"],
