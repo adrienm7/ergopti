@@ -744,6 +744,12 @@ Each closes on a named green hosted or native run, recorded here.
       `[WATCHDOG] run_llm_model_browser timed out` on test 23/29 (`model-browser-native-json`); single occurrence, not
       reproduced, kept listed. The macOS Intel `TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header`
       failure (43430776650 job 131906822890) belongs to worker G's fix. Nothing reproduced, so no code changed.
+      New 2026-11-14 (worker L), fixed at its cause: the Linux fedora Integration job of run 43514634523 failed
+      `system-event-capture-policy` and `system-capture-integer-origin` (`run_system_event_capture.lua`: sleep
+      86000 instead of 120000 ms). The fixture anchored its fake wall clock at the real now and advanced it by
+      minutes; the job ran at 23:59:26 UTC, a gap crossed midnight and the day read back held only its share. Any
+      branch, `dev` included, failed it in the last minutes before local midnight. The wall origin is held at
+      23:00 today at the latest; regression `system-capture-before-midnight` starts the fixture at 23:59:26.
 
 ## Maintainer decisions pending
 
