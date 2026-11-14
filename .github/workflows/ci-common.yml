@@ -224,7 +224,11 @@ jobs:
   common-e2e:
     name: 'E2E tests (Shared UI rendering)'
     needs: [common-integration]
-    runs-on: ubuntu-latest
+    # Pinned: the locked Playwright (1.58.2) supports Ubuntu up to 24.04, and
+    # ubuntu-latest moved to 26.04 (2026-11), where its browser install refuses
+    # the host. Return to ubuntu-latest with the Playwright upgrade that supports
+    # 26.04 (tools/test/test-ubuntu-ci-acquisition.cjs reads its host check).
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       actions: read
@@ -410,7 +414,11 @@ jobs:
   common-testbuild:
     name: 'Install and launch'
     needs: [common-build]
-    runs-on: ubuntu-latest
+    # Pinned: the locked Playwright (1.58.2) supports Ubuntu up to 24.04, and
+    # ubuntu-latest moved to 26.04 (2026-11), where its browser install refuses
+    # the host. Return to ubuntu-latest with the Playwright upgrade that supports
+    # 26.04 (tools/test/test-ubuntu-ci-acquisition.cjs reads its host check).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
