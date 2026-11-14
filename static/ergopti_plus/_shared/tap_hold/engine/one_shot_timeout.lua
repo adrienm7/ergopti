@@ -21,6 +21,7 @@
 local M = {}
 
 local NumberPolicy = require("core.text.engine.number_policy")
+local TextUtils = require("core.text.engine.utils_core")
 
 -- The value that disables the auto-cancel.
 M.NO_LIMIT_MS = 0
@@ -49,7 +50,7 @@ end
 --- @return number|nil ms The admitted value, nil when refused.
 function M.parse(text)
 	if type(text) ~= "string" then return nil end
-	local trimmed = text:match("^%s*(.-)%s*$")
+	local trimmed = TextUtils.trim(text)
 	if not trimmed:match("^%d+$") then return nil end
 	local ms = tonumber(trimmed)
 	if not M.is_valid(ms) then return nil end

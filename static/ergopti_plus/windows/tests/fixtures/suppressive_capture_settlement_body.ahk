@@ -5,6 +5,8 @@
 ; completed reason, matching native InputHook; a live capture ends as Stopped.
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", "★")
+; The one-shot capture reads its timeout from the remap owner; no fallback exists.
+global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 global OneShotShiftEnabled := false, InDeadKeySequence := false
 global _TH_SyntheticEpoch := 0
 global _SIC_Mode := A_Args[2], _SIC_Emits := [], _SIC_Activations := 0, _SIC_Warnings := 0
