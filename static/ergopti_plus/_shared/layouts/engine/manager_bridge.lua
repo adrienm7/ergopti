@@ -34,7 +34,12 @@
 ---    deps.open_editor_window answers by opening it. A controller made with
 ---    deps.editor_window serves that window: its ready answers with the last
 ---    saved source (sourceData) at once and fetches no catalogue.
---- 7. PURE Lua: the driver injects the layout registry client, the push to the
+--- 7. The editor's downloads (XKB archive, KLC, DLL images, macOS bundle) are
+---    built in the page with the export data the app ships; source_export
+---    {filename, data} hands their bytes (base64) to the registry's
+---    source_export, which writes them to the Downloads folder
+---    (composer/source_store.lua) and answers exportResult {ok, code, detail, path}.
+--- 8. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -57,6 +62,7 @@ M.ACTIONS = {
 	source_open = true,
 	source_save = true,
 	source_pick = true,
+	source_export = true,
 	nav_save = true,
 	open_editor = true,
 }
@@ -260,6 +266,32 @@ local function offers_source(registry)
 	return type(registry.source_open) == "function" and type(registry.source_save) == "function"
 end
 
+--- Whether the registry writes the layout editor's downloads.
+--- @param registry table
+--- @return boolean
+local function offers_export(registry)
+	return type(registry.source_export) == "function"
+end
+
+--- Hands one download of the layout editor to the registry.
+--- @param deps table The controller's collaborators.
+--- @param payload table { filename, data }
+--- @return boolean handled
+function M.handle_export(deps, payload)
+	if not offers_export(deps.registry) then
+		deps.log("warn", "Refused a layout editor download: the registry writes no downloads.")
+		return false
+	end
+	if type(payload.filename) ~= "string" or type(payload.data) ~= "string" then
+		deps.log("warn", "Refused a layout editor download without its file name and bytes.")
+		return false
+	end
+	deps.registry.source_export({ filename = payload.filename, data = payload.data }, function(ok, code, detail, path)
+		deps.push("exportResult", { ok = ok == true, code = code, detail = detail and tostring(detail), path = path })
+	end)
+	return true
+end
+
 --- Handles the layout editor's two file messages.
 --- @param deps table The controller's collaborators.
 --- @param action string "source_open" or "source_save".
@@ -295,7 +327,9 @@ end
 ---   without them refuses the three composer messages.
 --- deps.registry may offer the layout editor's source_open(on_done) and
 ---   source_save(payload, on_done) (_shared/layouts/engine/composer/source_store.lua); a
----   registry without them refuses source_open and source_save.
+---   registry without them refuses source_open and source_save; its optional
+---   source_export(payload, on_done) writes the editor's downloads, and a
+---   registry without it refuses source_export.
 --- deps.pick_source(on_done) optionally opens a native file panel for the
 ---   layout editor and answers {filename, text} or {} when cancelled, or
 ---   {code, detail} on a refusal (macOS); without it source_pick is refused.
@@ -375,6 +409,7 @@ function M.new(deps)
 				state = M.page_state(deps.registry.snapshot(), nil),
 				source_editor = offers_source(deps.registry),
 				source_pick = type(deps.pick_source) == "function",
+				source_export = offers_export(deps.registry),
 				nav_apply = type(deps.apply_nav) == "function",
 				emulate = offers_emulate(deps) })
 			-- The editor window lists no catalogue: it needs the platform alone.
@@ -406,6 +441,9 @@ function M.new(deps)
 		end
 		if action == "source_open" or action == "source_save" then
 			return M.handle_source(deps, action, payload)
+		end
+		if action == "source_export" then
+			return M.handle_export(deps, payload)
 		end
 		if action == "source_pick" then
 			if type(deps.pick_source) ~= "function" then

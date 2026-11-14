@@ -7,7 +7,8 @@
 ; ui/layout_manager/source_store.ahk. These tests replay the cases of the Lua
 ; store's tests (linux/tests/unit/ui/editors/test_layout_editor_source_store.lua)
 ; over an in-memory disk: the bounds (plain names, allowed types, UTF-8, size),
-; reopening the last saved source, and a failed write reported as such.
+; reopening the last saved source, a failed write reported as such, and the
+; editor's downloads written to the Downloads folder, never over a file there.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -137,6 +138,80 @@ _LSS_WriteFailureCase() {
 	AssertFalse(Result["ok"])
 	AssertEqual("write_failed", Result["code"])
 	AssertEqual("disk full", Result["detail"])
+}
+
+; The export ports over an in-memory disk: Disk maps a path to its bytes, Folders lists the folders.
+_LSS_ExportPorts(Disk, Downloads := "C:\Users\u\Downloads", WriteFn := 0) {
+	return Map(
+		"downloads_dir", () => Downloads,
+		"dir_exists", (Path) => Path == "C:\Users\u\Downloads",
+		"exists", (Path) => Disk.Has(Path),
+		"write_bytes", WriteFn ? WriteFn : (Path, Bytes) => Disk[Path] := Bytes
+	)
+}
+
+Test("layout source store: writes a download to the Downloads folder under a free name, never over a file (layout-source-store)",
+	_LSS_DownloadCase)
+
+_LSS_DownloadCase() {
+	Disk := Map("C:\Users\u\Downloads\mine_xkb.zip", "the user's file")
+	Settings := SourceStore_SharedSettings()
+	AssertTrue(Settings["export_extensions"].Has("zip") && Settings["export_extensions"].Has("klc"))
+	Paths := []
+	loop 2 {
+		Result := SourceStore_Export(Settings, Map("filename", "mine_xkb.zip", "data", "UEsDBAD/AQ=="),
+			_LSS_ExportPorts(Disk))
+		AssertTrue(Result["ok"], Result["detail"])
+		Paths.Push(Result["path"])
+	}
+	AssertEqual("C:\Users\u\Downloads\mine_xkb (2).zip", Paths[1])
+	AssertEqual("C:\Users\u\Downloads\mine_xkb (3).zip", Paths[2])
+	Bytes := Disk[Paths[1]]
+	AssertEqual(7, Bytes.Size)
+	for Index, Value in [0x50, 0x4B, 0x03, 0x04, 0x00, 0xFF, 0x01]
+		AssertEqual(Value, NumGet(Bytes, Index - 1, "UChar"), "byte " . Index)
+	AssertEqual("the user's file", Disk["C:\Users\u\Downloads\mine_xkb.zip"], "never replaced")
+	Result := SourceStore_Export(Settings, Map("filename", "KBDERGO.klc", "data", "//5r"), _LSS_ExportPorts(Disk))
+	AssertEqual("C:\Users\u\Downloads\KBDERGO.klc", Result["path"])
+}
+
+Test("layout source store: refuses a download with a path, another type, bad base64, too many bytes or no Downloads folder (layout-source-store)",
+	_LSS_DownloadRefusalsCase)
+
+_LSS_DownloadRefusalsCase() {
+	Disk := Map()
+	Settings := SourceStore_SharedSettings()
+	Big := Format("{:" . (Ceil(Settings["max_file_bytes"] / 3) * 4 + 4) . "}", "")
+	Samples := [["../evil.zip", "UEs="], ["sub\dir.zip", "UEs="], [".hidden.zip", "UEs="], ["a..zip", "UEs="],
+		["script.sh", "UEs="], ["mine.toml", "UEs="], ["mine.zip", ""], ["mine.zip", "not base64!"],
+		["mine.zip", "QQ"], ["mine.zip", "UE s="], ["mine.zip", StrReplace(Big, " ", "A")]]
+	for Sample in Samples {
+		Result := SourceStore_Export(Settings, Map("filename", Sample[1], "data", Sample[2]), _LSS_ExportPorts(Disk))
+		AssertFalse(Result["ok"], Sample[1] . " " . Sample[2])
+		AssertEqual(Settings["failures"]["invalid"], Result["code"], Sample[1])
+	}
+	AssertEqual(0, Disk.Count, "nothing was written")
+	Result := SourceStore_Export(Settings, Map("filename", "mine.zip", "data", "UEs="), _LSS_ExportPorts(Disk, "D:\nowhere"))
+	AssertEqual("write_failed", Result["code"])
+	AssertContains(Result["detail"], "D:\nowhere does not exist")
+	Failing(Path, Bytes) {
+		throw Error("disk full")
+	}
+	Result := SourceStore_Export(Settings, Map("filename", "mine.zip", "data", "UEs="),
+		_LSS_ExportPorts(Disk, , Failing))
+	AssertFalse(Result["ok"])
+	AssertEqual("disk full", Result["detail"])
+	Taken := _LSS_ExportPorts(Disk)
+	Taken["exists"] := (Path) => true
+	Result := SourceStore_Export(Settings, Map("filename", "mine.zip", "data", "UEs="), Taken)
+	AssertContains(Result["detail"], "every name for mine.zip is taken")
+	Message := ""
+	Defaults := Map("source", Map("folder", "f", "last_file", "l", "nav_file", "n", "max_file_bytes", 1,
+		"max_name_length", 1, "export_extensions", ["ZIP"], "failures", Map("invalid", "a", "write", "b")))
+	try SourceStore_Settings(Defaults)
+	catch as Err
+		Message := Err.Message
+	AssertContains(Message, "export_extensions")
 }
 
 Test("layout source store: opens nothing when the pointer names a missing or foreign file (layout-source-store)",

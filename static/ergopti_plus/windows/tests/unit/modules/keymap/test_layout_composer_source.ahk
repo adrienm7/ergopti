@@ -330,7 +330,7 @@ _LCS_OwnWindowCase() {
 		AssertContains(Init, '"source_editor":true')
 		AssertTrue(LayoutManager_HandleMessage(Map("action", "open_editor"), Deps))
 		AssertEqual("open editor", _LMH_Calls(Log)[_LMH_Calls(Log).Length], "the manager's button opens the editor window")
-		for Action in ["source_open", "source_save", "source_pick", "nav_save", "composer_emulate"]
+		for Action in ["source_open", "source_save", "source_pick", "source_export", "nav_save", "composer_emulate"]
 			AssertFalse(LayoutManager_HandleMessage(Map("action", Action), Deps),
 				"the manager page no longer carries the editor: " . Action)
 		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "install", "id", "ergol"), Deps),
@@ -359,7 +359,7 @@ _LCS_ManagerCase() {
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "ready"), Deps))
 		Init := _LayMgrWeb_Json(_LCH_Pushed(Log, "initData"))
 		for Flag in ['"source_editor":true', '"emulate":true', '"nav_apply":true', '"source_pick":false',
-				'"layout_editor.title":']
+				'"source_export":true', '"layout_editor.title":']
 			AssertContains(Init, Flag)
 		Opened := _LayMgrWeb_Json(_LCH_Pushed(Log, "sourceData"))
 		AssertContains(Opened, '"text":null')
@@ -377,6 +377,21 @@ _LCS_ManagerCase() {
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "nav_save", "text", "[_meta]`n"), Deps))
 		AssertContains(_LayMgrWeb_Json(_LCH_Pushed(Log, "navResult")), '"applied":false,"errors":[],"saved":true')
 		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "nav_save"), Deps))
+		; A download lands in the Downloads folder (here the test folder), never over a file there.
+		DirCreate(Dir . "downloads")
+		Deps["export_ports"] := Map("downloads_dir", () => Dir . "downloads")
+		FileAppend("kept", Dir . "downloads\mine_xkb.zip", "UTF-8-RAW")
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "source_export", "filename", "mine_xkb.zip",
+			"data", "UEs="), Deps))
+		Written := _LayMgrWeb_Json(_LCH_Pushed(Log, "exportResult"))
+		AssertContains(Written, '"ok":true')
+		AssertContains(Written, "mine_xkb (2).zip")
+		AssertEqual("PK", FileRead(Dir . "downloads\mine_xkb (2).zip", "UTF-8-RAW"))
+		AssertEqual("kept", FileRead(Dir . "downloads\mine_xkb.zip", "UTF-8-RAW"))
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "source_export", "filename", "../x.zip",
+			"data", "UEs="), Deps))
+		AssertContains(_LayMgrWeb_Json(_LCH_Pushed(Log, "exportResult")), '"code":"source_invalid_file"')
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "source_export", "filename", "a.zip"), Deps))
 	} finally {
 		_LayoutCatalogueLast := SavedCatalogue
 		DirDelete(Dir, true)

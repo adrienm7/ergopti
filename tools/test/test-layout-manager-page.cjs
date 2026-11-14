@@ -166,7 +166,8 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		console,
 		setTimeout: (fn) => fn(),
 		TextDecoder,
-		atob: (text) => Buffer.from(text, 'base64').toString('binary')
+		atob: (text) => Buffer.from(text, 'base64').toString('binary'),
+		btoa: (text) => Buffer.from(text, 'binary').toString('base64')
 	});
 	vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });
 	vm.runInContext(page.source, context, { filename: 'script.js' });
@@ -254,14 +255,24 @@ const strings = locale('en');
 let failures = 0;
 let passes = 0;
 
+// The checks that settle a page promise; the summary waits for them.
+const pending = [];
+
 function check(name, fn) {
-	try {
-		fn();
-		passes += 1;
-		console.log(`  ok   ${name}`);
-	} catch (err) {
+	const fail = (err) => {
 		failures += 1;
 		console.error(`  FAIL ${name}\n       ${String(err.message).split('\n').join('\n       ')}`);
+	};
+	const pass = () => {
+		passes += 1;
+		console.log(`  ok   ${name}`);
+	};
+	try {
+		const result = fn();
+		if (result && typeof result.then === 'function') pending.push(result.then(pass, fail));
+		else pass();
+	} catch (err) {
+		fail(err);
 	}
 }
 
@@ -838,6 +849,63 @@ check(
 	}
 );
 
+check(
+	'the editor window offers the downloads only when its host writes them (source_export)',
+	() => {
+		const mounted = (exports) => {
+			const page = loadEditorPage();
+			page.window.initData({ strings: {}, state: { platform: 'linux' }, source_export: exports });
+			let host = null;
+			page.context.LayoutEditorPage = {
+				mount: (root, options) => {
+					host = options;
+					return { open: () => {} };
+				}
+			};
+			page.window.sourceData({ text: null });
+			return { ...page, host };
+		};
+		const without = mounted(undefined);
+		assert.equal(without.host.saveBinary, null, 'no download without source_export');
+		assert.equal(without.host.exportAssets, null, 'no XKB or KLC build without source_export');
+		const { context, window, messages, host } = mounted(true);
+		const calls = [];
+		context.LayoutExportAssetData = { sources: {} };
+		context.LayoutKlcGenerator = { generator: true };
+		context.LayoutLuaRunner = {
+			assets: (scope, data, generator) => {
+				calls.push([scope === window, data === context.LayoutExportAssetData, generator]);
+				return { built: calls.length };
+			}
+		};
+		assert.equal(host.exportAssets().built, 1, 'the shipped data builds the export assets');
+		assert.equal(host.exportAssets().built, 1, 'once per window');
+		assert.equal(calls.length, 1);
+		assert.deepEqual(plain(calls[0]), [true, true, { generator: true }]);
+		const bytes = new Uint8Array(0x8000 + 3).map((_, i) => i % 256);
+		let saved = null;
+		host.saveBinary('mine_xkb.zip', bytes, 'application/zip').then((path) => (saved = path));
+		const sent = plain(messages[messages.length - 1]);
+		assert.equal(sent.action, 'source_export');
+		assert.equal(sent.filename, 'mine_xkb.zip');
+		assert(
+			Buffer.from(sent.data, 'base64').equals(Buffer.from(bytes)),
+			'the bytes cross as base64, unchanged'
+		);
+		let busy = null;
+		host.saveBinary('other.zip', bytes).catch((error) => (busy = error.code));
+		window.exportResult({ ok: true, path: '/home/u/Downloads/mine_xkb.zip' });
+		let refused = null;
+		host.saveBinary('x.zip', bytes).catch((error) => (refused = error));
+		window.exportResult({ ok: false, code: 'write_failed', detail: 'disk full' });
+		return Promise.resolve().then(() => {
+			assert.equal(saved, '/home/u/Downloads/mine_xkb.zip', 'settles with the written path');
+			assert.equal(busy, 'save_busy', 'one download at a time');
+			assert.deepEqual(plain(refused), { code: 'write_failed', path: 'disk full' });
+		});
+	}
+);
+
 check('« Install and use » forwards the Windows layout DLL images the page wrote', () => {
 	const { context, window, messages } = loadEditorPage();
 	window.initData({
@@ -894,5 +962,7 @@ check('every host names the shortcut menu file the page counts', () => {
 	);
 });
 
-console.log(`\n${passes} passed, ${failures} failed`);
-if (failures > 0) process.exit(1);
+Promise.all(pending).then(() => {
+	console.log(`\n${passes} passed, ${failures} failed`);
+	if (failures > 0) process.exit(1);
+});
