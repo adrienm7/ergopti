@@ -98,7 +98,7 @@ const WINDOWS_MECHANICS = {
 	'core/lifecycle/engine/bundle.ahk': 'only the exe carries an embedded bundle',
 	'infra/config_registry_cache.ahk': 'fingerprint the executable when parser sources are embedded',
 	'core/lifecycle/engine/lifecycle.ahk': 'which executable a reload relaunches',
-	'infra/toml/toml_helpers.ahk': "the compiled exe's former paths.toml location",
+	'core/text/engine/toml/helpers.ahk': "the compiled exe's former paths.toml location",
 	'infra/diagnostic_snapshot.ahk': 'the snapshot reports the flag itself',
 	'infra/startup_smoke.ahk':
 		'the startup receipt identity owner reports its executable and compiled flag',

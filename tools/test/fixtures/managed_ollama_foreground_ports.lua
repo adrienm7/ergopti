@@ -14,7 +14,7 @@ function M.new(root, production, options)
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	local body = assert(source:match("\t\tstart_restart = function%(%)\n(.-)\n\t\tend\n\n\t\tstart_probe"),
 		"The canonical manager must delegate restart through its owned foreground callback")
-	local text_utils = assert(loadfile(production .. "/static/ergopti_plus/macos/infra/text_utils.lua"))()
+	local text_utils = assert(loadfile(production .. "/static/ergopti_plus/macos/core/text/engine/utils.lua"))()
 	local BINARY, LOG, PORT, LAUNCH = M.BINARY, M.LOG, M.PORT, M.LAUNCH
 	local state = { calls = {}, tasks = {}, errors = {}, retries = 0, pull_calls = 0,
 		operation = {}, live = true, notices = {} }
@@ -23,7 +23,7 @@ function M.new(root, production, options)
 		error = function(_, _, ...) state.errors[#state.errors + 1] = table.pack(...) end }
 	for _, name in ipairs({ "debug", "warn", "info", "success" }) do logger[name] = function() end end
 	modules["core.logger.engine.logger"] = logger
-	modules["infra.text_utils"] = text_utils
+	modules["core.text.engine.utils"] = text_utils
 	modules["infra.notifications"] = { notify = function() return true end }
 	modules["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	modules["modules.llm.parser"], modules["modules.llm.profiles"] = {}, {}

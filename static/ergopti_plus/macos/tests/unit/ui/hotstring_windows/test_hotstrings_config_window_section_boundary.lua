@@ -147,7 +147,7 @@ helpers.describe("Hotstrings configuration section boundary", function()
 				for _, operation in ipairs({ "set", "clear" }) do
 					body.action = operation .. "_" .. field.action
 					helpers.assert_eq(window._on_message({ body = body }), true)
-					local decoded = require("infra.toml.codec").decode(content)
+					local decoded = require("core.text.engine.toml.codec").decode(content)
 					if operation == "set" then
 						helpers.assert_eq(decoded._meta[field.field], field.value)
 					else

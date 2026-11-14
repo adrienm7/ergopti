@@ -203,7 +203,7 @@ helpers.describe("hotstrings base delay corpus (macOS): every vector stores and 
 			local reread = io.open(override_path, "r")
 			local content = reread and reread:read("*a") or ""
 			if reread then reread:close() end
-			local decoded = require("infra.toml.codec").decode(content)
+			local decoded = require("core.text.engine.toml.codec").decode(content)
 			for key, leaves in pairs(vector.stored) do
 				local category, section = key:match("^([^.]+)%.?(.*)$")
 				local record = section ~= "" and decoded[category][section] or decoded[category]

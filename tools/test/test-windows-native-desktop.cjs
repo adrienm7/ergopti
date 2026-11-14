@@ -156,7 +156,7 @@ for (const [before, after] of [
 	['#Include ../platform/remap/altgr_criteria.ahk', '; omitted AltGr criteria owner'],
 	[
 		'#Include unit/adapters/test_console_window.ahk',
-		'#Include unit/adapters/test_console_window.ahk\n#Include unit/infra/toml/test_toml_numeric_strings.ahk'
+		'#Include unit/adapters/test_console_window.ahk\n#Include unit/core/text/toml/test_numeric_strings.ahk'
 	],
 	[
 		'#Include unit/platform/remap/key_combinations/test_key_combinations.ahk',

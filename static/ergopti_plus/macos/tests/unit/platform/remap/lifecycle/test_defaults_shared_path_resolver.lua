@@ -63,7 +63,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			end,
 		}
 		local parsed_path = nil
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(p)
 				parsed_path = p
 				-- Minimal shape so module load completes: the sections defaults.lua
@@ -87,7 +87,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		package.loaded["infra.timings"] = nil
 		package.loaded["tap_hold.engine.key_catalog"] = saved_catalog
 		package.loaded["core.fs.engine.paths"] = nil
-		package.loaded["infra.toml.reader"] = nil
+		package.loaded["core.text.engine.toml.reader"] = nil
 		package.loaded["platform.remap.defaults"] = nil
 
 		-- The load error is carried into the messages below rather than asserted on
@@ -112,7 +112,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			shared_root = function() return nil end,
 		}
 		local parsed_path = nil
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(p)
 				parsed_path = p
 				return { sections = {
@@ -127,7 +127,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		local ok, err = pcall(require, "platform.remap.defaults")
 
 		package.loaded["core.fs.engine.paths"] = nil
-		package.loaded["infra.toml.reader"] = nil
+		package.loaded["core.text.engine.toml.reader"] = nil
 		package.loaded["platform.remap.defaults"] = nil
 
 		local ctx = ok and "" or (" — load raised: " .. tostring(err))

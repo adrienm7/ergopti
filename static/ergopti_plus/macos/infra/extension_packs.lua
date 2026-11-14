@@ -302,7 +302,7 @@ end
 --- @return table|nil
 local function sections_left_by(section_sources, path)
 	if section_sources == nil then return nil end
-	local ok, data, committed = pcall(require("infra.toml.reader").parse, path)
+	local ok, data, committed = pcall(require("core.text.engine.toml.reader").parse, path)
 	local declared = (ok and committed == true and type(data) == "table" and type(data.sections) == "table")
 		and data.sections or {}
 	local left = {}

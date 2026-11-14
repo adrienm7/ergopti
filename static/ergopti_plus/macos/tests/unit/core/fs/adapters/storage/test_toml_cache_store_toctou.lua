@@ -71,8 +71,8 @@ helpers.describe("toml_cache: parse-to-store source identity", function()
 		write_source(OLD_BODY)
 		os.remove(snapshot_path(SRC))
 		local cache = fresh_cache()
-		package.loaded["infra.toml.reader"] = nil
-		local reader = helpers.load_with_stubs("infra.toml.reader")
+		package.loaded["core.text.engine.toml.reader"] = nil
+		local reader = helpers.load_with_stubs("core.text.engine.toml.reader")
 		local rewritten = false
 		local original_open = io.open
 

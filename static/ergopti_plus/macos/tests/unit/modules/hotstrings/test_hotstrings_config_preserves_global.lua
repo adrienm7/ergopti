@@ -78,7 +78,7 @@ helpers.describe("hotstrings_config: a save preserves the [__global__] block", f
 				"the round trip must preserve the complete raw multiline record and its comments, "
 				.. "not only the first key/value line")
 
-			local codec = require("infra.toml.codec")
+			local codec = require("core.text.engine.toml.codec")
 			local decode_ok, decoded = pcall(codec.decode, content)
 			helpers.assert_true(decode_ok and type(decoded) == "table",
 				"preserving raw continuations must still produce valid TOML")

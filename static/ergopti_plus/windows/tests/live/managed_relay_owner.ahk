@@ -30,7 +30,7 @@ LoggerInfo(*) => 0
 LoggerDebug(*) => 0
 LoggerError(Tag, Message, Values*) => _RelayOwnerErrors.Push(Tag . ": " . Message)
 
-#Include ..\..\infra\json.ahk
+#Include ..\..\core\text\engine\json.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk
 #Include ..\..\core\process\adapters\lifecycle.ahk

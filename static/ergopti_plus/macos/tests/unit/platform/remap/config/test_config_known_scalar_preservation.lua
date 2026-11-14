@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param original string Independent TOML fixture.
 --- @param body function Assertions receiving actual owners and recorded ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end

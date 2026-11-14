@@ -269,7 +269,7 @@ helpers.describe("Ergopti extension distance reduction", function()
 		helpers.with_stub_scope({
 			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
-			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 		}, function()
 			local State = helpers.load_with_stubs("modules.keymap.state")
 			local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -330,7 +330,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 		helpers.with_stub_scope({
 			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
-			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			"modules.hotstrings.hotstrings_config", "core.text.engine.toml.reader",
 		}, function()
 			package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
 			local State = helpers.load_with_stubs("modules.keymap.state")

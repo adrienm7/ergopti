@@ -58,7 +58,7 @@ Test("hotstrings: every personal-info combo producer escapes its field values (F
 
 ; The delegation itself. EscapeSpecialChars keeping its own copy of the
 ; transform is how the two producers would drift apart again — one fixed, one
-; not — which is the whole reason the body moved to infra/text_utils.ahk.
+; not — which is the whole reason the body moved to core/text/engine/utils.ahk.
 _HSCAEscapeIsSingleSourced() {
 	FnBody := _DriverFuncBody("EscapeSpecialChars")
 	Assert(FnBody != "",
@@ -68,5 +68,5 @@ _HSCAEscapeIsSingleSourced() {
 	Assert(!InStr(FnBody, "{Asc 94}"),
 		"and it must not keep the old inline transform alongside the delegation: a second copy that is never called is a second copy someone will edit")
 }
-Test("hotstrings: the combo escaper is single-sourced in infra/text_utils.ahk",
+Test("hotstrings: the combo escaper is single-sourced in core/text/engine/utils.ahk",
 	_HSCAEscapeIsSingleSourced)

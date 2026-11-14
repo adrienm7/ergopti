@@ -31,10 +31,10 @@ local function with_editor(test)
 			state.notifications = state.notifications + 1
 		end }
 		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() return { sections_order = {}, sections = {} }, true end,
 		}
-		package.loaded["infra.toml.writer"] = { write_if_unchanged = function(_, document, snapshot)
+		package.loaded["core.text.engine.toml.writer"] = { write_if_unchanged = function(_, document, snapshot)
 			state.last_written = document
 			state.last_snapshot = snapshot
 			state.writes = state.writes + 1

@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"modules.keymap.terminators",
 	"modules.keymap.state",
 	"modules.keymap.utils",
-	"infra.toml.reader",
+	"core.text.engine.toml.reader",
 	"infra.timings",
 	"modules.hotstrings.hotstrings_config",
 	"infra.config_paths",
@@ -35,7 +35,7 @@ end
 
 local function with_registry(data_by_path, callback)
 	return helpers.with_fresh_modules(OWNED_MODULES, function()
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(path) return data_by_path[path], true end,
 		}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {

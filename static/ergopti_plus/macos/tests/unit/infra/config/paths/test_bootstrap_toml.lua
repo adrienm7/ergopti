@@ -11,8 +11,8 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"infra.config_paths", "core.logger.engine.logger", "core.fs.adapters.file_system", "infra.text_utils",
-	"core.text.engine.utils_core", "core.fs.engine.app_dirs", "core.logger.engine.log_folders", "lfs", "infra.toml.codec",
+	"infra.config_paths", "core.logger.engine.logger", "core.fs.adapters.file_system", "core.text.engine.utils",
+	"core.text.engine.utils_core", "core.fs.engine.app_dirs", "core.logger.engine.log_folders", "lfs", "core.text.engine.toml.codec",
 	"core.text.engine.toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path",
 	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.basic_string", "core.lifecycle.engine.compat.utf8",
 }
@@ -54,7 +54,7 @@ local function fixture(callback)
 			assert(os.remove(root))
 			assert(fs.mkdir(root))
 			local state = { root = root, file = root .. "/paths.toml", writes = 0 }
-			state.codec = require("infra.toml.codec")
+			state.codec = require("core.text.engine.toml.codec")
 			state.config = root .. "/config/"
 			-- Named after the application, so the resolver keeps it as is.
 			state.logs = root .. "/logs/" .. require("core.fs.engine.app_dirs").macos.folder_name .. "/"

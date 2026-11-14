@@ -22,7 +22,7 @@ local OWNED_MODULES = {
 	"infra.notifications",
 	"core.logger.engine.key_event_health",
 	"core.logger.engine.logger",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"infra.timings",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
@@ -128,7 +128,7 @@ local function with_awake(callback)
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 				"modules.gestures", "infra.notifications", "core.logger.engine.key_event_health",
-				"infra.text_utils", "modules.keymap.control_sentinels", "adapters.key_state",
+				"core.text.engine.utils", "modules.keymap.control_sentinels", "adapters.key_state",
 				"adapters.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
 			local System = require("modules.shortcuts.actions.system")
