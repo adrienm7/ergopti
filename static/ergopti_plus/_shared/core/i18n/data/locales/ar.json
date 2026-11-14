@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "تخطيط macOS",
 	"layout_editor.target.web": "محاكاة الموقع",
 	"layout_editor.target.windows": "Windows KLC",
-	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.title": "Studio",
 	"layout_editor.toolbar.label": "File and history",
 	"layout_editor.toolbar.saved": "No unsaved changes",
 	"layout_editor.toolbar.unsaved": "Unsaved changes",

@@ -573,7 +573,7 @@
 	"layout_editor.target.macos": "Layout macOS",
 	"layout_editor.target.web": "Emulazione sul sito web",
 	"layout_editor.target.windows": "KLC per Windows",
-	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.title": "Studio",
 	"layout_editor.toolbar.label": "File and history",
 	"layout_editor.toolbar.saved": "No unsaved changes",
 	"layout_editor.toolbar.unsaved": "Unsaved changes",
