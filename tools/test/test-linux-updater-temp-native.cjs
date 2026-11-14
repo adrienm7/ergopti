@@ -338,9 +338,17 @@ control('refusal site names the tool frame', () => {
 	} catch (reason) {
 		caught = reason;
 	}
-	assert.match(
+	// The site is the check that refused (the pinned meson.build digest), not
+	// the shared refused() thrower.
+	const providerLines = require('node:fs')
+		.readFileSync(require.resolve('./prepare-linux-lua54-native-provider.cjs'), 'utf8')
+		.split('\n');
+	const check = providerLines.findIndex((line) => line.includes('!== MESON_BEFORE) refused()')) + 1;
+	assert.ok(check > 0, 'the meson digest check is present');
+	assert.equal(
 		runner.refusalSite(caught),
-		/^Pinned native Lua54 provider prerequisite refused\. at prepare-linux-lua54-native-provider\.cjs:\d+$/
+		'Pinned native Lua54 provider prerequisite refused. at prepare-linux-lua54-native-provider.cjs:' +
+			check
 	);
 	assert.equal(runner.refusalSite('text'), 'non-Error refusal');
 	assert.match(
