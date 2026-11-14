@@ -29,7 +29,7 @@ LoggerDebug(*) => 0
 t(Key) => Key
 
 #Include ..\..\core\logger\engine\tick_count.ahk
-#Include ..\..\infra\json.ahk
+#Include ..\..\core\text\engine\json.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk
 #Include ..\..\core\process\adapters\lifecycle.ahk

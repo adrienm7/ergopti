@@ -138,7 +138,7 @@ local function with_foreground(port, callback)
 end
 
 local function assert_native_context(fixture, task, port)
-	local text_utils = require("infra.text_utils")
+	local text_utils = require("core.text.engine.utils")
 	helpers.assert_eq(#fixture.builds, 1, "only the API may build the foreground daemon command")
 	local input = fixture.builds[1]
 	helpers.assert_eq(input.n, 5)
@@ -165,7 +165,7 @@ end
 helpers.describe("Ollama daemon log rollover", function()
 	helpers.it("POSIX-quotes the executable and stable configured directory", function()
 		local Builder = require("modules.llm.ollama_server_command")
-		local text_utils = require("infra.text_utils")
+		local text_utils = require("core.text.engine.utils")
 		local ollama_bin = "/Applications/Ollama O'Brien/$bin/ollama"
 		local log_dir = "/Users/O'Brien/$logs/Ergopti Logs"
 		local command, command_err = Builder.build(

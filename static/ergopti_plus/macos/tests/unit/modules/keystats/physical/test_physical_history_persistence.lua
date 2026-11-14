@@ -102,7 +102,7 @@ local function ports()
 	package.loaded["core.logger.engine.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
 	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value)
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}
@@ -449,7 +449,7 @@ local function ports()
 	package.loaded["core.logger.engine.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
 	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value)
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}

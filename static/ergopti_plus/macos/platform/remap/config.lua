@@ -52,7 +52,7 @@ local TapHoldFile = require("platform.remap.tap_hold_file")
 -- Resolved at use, as before: the shared writer binds its native admission when loaded.
 local function writer() return require("core.text.engine.toml_codec.writer") end
 -- Declared here, above the readers below: section 1 declares its own TomlCodec later.
-local ConfigCodec = require("infra.toml.codec")
+local ConfigCodec = require("core.text.engine.toml.codec")
 
 local LOG = "karabiner"
 
@@ -305,7 +305,7 @@ end
 --- Loads and parses a JSON file. Logs an error and returns nil on any failure.
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
-local TomlCodec = require("infra.toml.codec")
+local TomlCodec = require("core.text.engine.toml.codec")
 
 --- Load a TOML user-config file.
 --- Returns the decoded table on success, nil when the file is genuinely absent,

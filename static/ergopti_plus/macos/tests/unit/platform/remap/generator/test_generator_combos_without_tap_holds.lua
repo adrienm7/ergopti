@@ -159,7 +159,7 @@ helpers.with_fresh_modules({
 	"infra.config_paths",
 	"infra.keycodes",
 	"core.logger.engine.logger",
-	"infra.toml.codec",
+	"core.text.engine.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
@@ -179,7 +179,7 @@ helpers.with_fresh_modules({
 	}
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 	package.loaded["core.text.engine.toml_codec"] = toml_stub
-	package.loaded["infra.toml.codec"] = toml_stub
+	package.loaded["core.text.engine.toml.codec"] = toml_stub
 	package.loaded["core.fs.adapters.file_system"] = {
 		read = SourceFile.read,
 		read_with_status = function(path) return SourceFile.read(path), "ok" end,

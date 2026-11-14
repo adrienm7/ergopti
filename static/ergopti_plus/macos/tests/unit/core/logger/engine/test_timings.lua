@@ -188,13 +188,13 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- of its failure exits, so the earlier type-only test could never fire.
 	--- @return boolean ok, string err
 	local function reload_timings_with_empty_registry()
-		local saved_reader  = package.loaded["infra.toml.reader"]
+		local saved_reader  = package.loaded["core.text.engine.toml.reader"]
 		local saved_timings = package.loaded["infra.timings"]
 
 		-- Exactly what the real reader returns when the file is absent or malformed:
 		-- a well-formed table whose sections map is empty. Returning nil instead
 		-- would test a shape the production reader never produces.
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(_path) return { sections = {} } end,
 		}
 		package.loaded["infra.timings"] = nil
@@ -202,7 +202,7 @@ helpers.describe("timings: registry load fail-fast", function()
 		local ok, err = pcall(require, "infra.timings")
 
 		package.loaded["infra.timings"]     = saved_timings
-		package.loaded["infra.toml.reader"] = saved_reader
+		package.loaded["core.text.engine.toml.reader"] = saved_reader
 
 		return ok, tostring(err)
 	end

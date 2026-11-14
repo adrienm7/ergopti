@@ -15,7 +15,7 @@ local function with_window(scenario)
 	local names = {
 		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
 		"core.logger.engine.logger", "infra.deferred_work", "core.fs.engine.paths", "infra.timings", "core.i18n.engine.i18n",
-		"infra.text_utils",
+		"core.text.engine.utils",
 		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}
 	local saved, saved_hs = {}, _G.hs
@@ -35,7 +35,7 @@ local function with_window(scenario)
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/assets" end }
 	helpers.provide_timings()
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = {}
+	package.loaded["core.text.engine.utils"] = {}
 	package.loaded["core.process.adapters.shell_runner"] = {}
 	local view = {
 		evaluateJavaScript = function(self, _, callback)

@@ -576,4 +576,4 @@ GetKnownFolderDownloads(CallFn := DllCall) {
 		}
 }
 
-; UriDecode is defined in infra/text_utils.ahk and visible globally.
+; UriDecode is defined in core/text/engine/utils.ahk and visible globally.

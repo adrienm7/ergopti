@@ -20,7 +20,7 @@
 
 local M = {}
 
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local AppDirs    = require("core.fs.engine.app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
 local NativePath = require("core.fs.engine.native_path")

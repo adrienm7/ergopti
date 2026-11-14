@@ -112,7 +112,7 @@ local function with_remap(files, run)
 		"infra.config_paths",
 		"infra.keycodes",
 		"core.logger.engine.logger",
-		"infra.toml.codec",
+		"core.text.engine.toml.codec",
 		"platform.remap.config",
 		"platform.remap.generator",
 		"modules.keymap.layout_registry",
@@ -133,7 +133,7 @@ local function with_remap(files, run)
 		}
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 		package.loaded["core.text.engine.toml_codec"] = toml_stub
-		package.loaded["infra.toml.codec"] = toml_stub
+		package.loaded["core.text.engine.toml.codec"] = toml_stub
 		local fs = memory_file_system(files)
 		package.loaded["core.fs.adapters.file_system"] = fs
 

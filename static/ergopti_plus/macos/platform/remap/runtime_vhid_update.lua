@@ -34,7 +34,7 @@ local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
 local Fetch = require("platform.remap.runtime_artifact_fetch")
 local NativePath = require("core.fs.engine.native_path")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 local LOG = "remap.runtime_vhid_update"
 

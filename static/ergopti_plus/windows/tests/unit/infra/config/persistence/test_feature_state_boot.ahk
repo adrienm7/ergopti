@@ -102,7 +102,7 @@ Test("feature-state startup: category gates preserve schema booleans (AHK-099)",
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
     Source := FileRead(SourcePath, "UTF-8")
-    HelpersPos := InStr(Source, "#Include infra/toml/toml_helpers.ahk")
+    HelpersPos := InStr(Source, "#Include core/text/engine/toml/helpers.ahk")
     StatePos := InStr(Source, "#Include infra/feature_state.ahk")
     ConfigIoPos := InStr(Source, "#Include infra/config_io.ahk")
     AssertTrue(HelpersPos > 0 && StatePos > 0 && ConfigIoPos > 0,

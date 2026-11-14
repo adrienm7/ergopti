@@ -188,8 +188,8 @@ helpers.describe("resolve_prediction_overlap: normalized matches count physical 
 			local u = utils()
 			local deletes, to_type =
 				u.resolve_prediction_overlap(case.buffer, 0, case.prediction)
-			local prefix = require("infra.text_utils").utf8_sub(
-				case.buffer, 1, require("infra.text_utils").utf8_len(case.buffer) - deletes)
+			local prefix = require("core.text.engine.utils").utf8_sub(
+				case.buffer, 1, require("core.text.engine.utils").utf8_len(case.buffer) - deletes)
 
 			helpers.assert_eq(deletes, case.expected_deletes,
 				"comparison-only normalization must preserve one Backspace per physical buffer codepoint")

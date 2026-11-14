@@ -34,7 +34,7 @@
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\ai_action_gate.ahk
-#Include %A_LineFile%\..\number.ahk
+#Include %A_LineFile%\..\..\core\text\engine\number.ahk
 
 
 

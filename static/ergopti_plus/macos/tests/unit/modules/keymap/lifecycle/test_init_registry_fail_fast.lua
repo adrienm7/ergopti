@@ -23,7 +23,7 @@ local function load_keymap_with_results(results)
 	}
 	local saved = {}
 	local stubs = {
-		["infra.text_utils"] = {},
+		["core.text.engine.utils"] = {},
 		["adapters.event_provenance"] = {},
 		["adapters.synthetic_input"] = {
 			current_action_epoch = function() return 0 end,

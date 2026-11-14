@@ -231,7 +231,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				function() cancel_one = cancel_one + 1 end)
 			helpers.assert_not_nil(server_task)
 			helpers.assert_true(type(server_args) == "table" and type(server_args[2]) == "string")
-			local quoted_path = require("infra.text_utils").shell_quote(active_model_path)
+			local quoted_path = require("core.text.engine.utils").shell_quote(active_model_path)
 			helpers.assert_true(server_args[2]:find(quoted_path, 1, true) ~= nil,
 				"the launcher must publish the model id only under the private config tree")
 			helpers.assert_true(server_args[2]:find("/tmp/mlx_active_model.txt", 1, true) == nil,

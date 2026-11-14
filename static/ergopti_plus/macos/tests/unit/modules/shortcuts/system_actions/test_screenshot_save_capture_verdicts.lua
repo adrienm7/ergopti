@@ -450,7 +450,7 @@ end)
 
 helpers.describe("shared screenshot owner retains temporary cleanup debt", function()
 	helpers.it("retains a physical permission-denied capture until recovery (screenshot-physical-unlink-debt)", function()
-		local quote = require("infra.text_utils").shell_quote
+		local quote = require("core.text.engine.utils").shell_quote
 		local command = "/usr/bin/mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-capture-cleanup.XXXXXX")
 		local process = assert(io.popen(command, "r"))
 		local output = process:read("a")

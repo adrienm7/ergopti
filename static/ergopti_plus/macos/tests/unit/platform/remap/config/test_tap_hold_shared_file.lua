@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger",
-	"core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }
+	"core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }
 local CORPUS = helpers.shared() .. "/tests/corpus/tap_hold_shared_file/"
 -- The pairs of the corpus, each <name>.toml and <name>.config.toml.
 local PAIRS = { "macos_written", "linux_written", "windows_written" }
