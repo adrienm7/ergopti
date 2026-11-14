@@ -222,10 +222,10 @@ _ValueCheckTest_UserCodeDelay() {
 	global Features
 	Saved := Features
 	try {
-		for Case in [[0.5, 0.5], [0, 0], [3600, 3600], ["0.5", ""], [-1, ""], [3601, ""]] {
+		for Row in [[0.5, 0.5], [0, 0], [3600, 3600], ["0.5", ""], [-1, ""], [3601, ""]] {
 			Features := Map("hotstrings", Map("dynamic", Map(ConfigLeaf.USER_CODE,
-				Map(ConfigLeaf.TIME_ACTIVATION_SECONDS, Case[1]))))
-			AssertEqual(Case[2], _UserHotstringsDelay(), "user-code delay " . String(Case[1]))
+				Map(ConfigLeaf.TIME_ACTIVATION_SECONDS, Row[1]))))
+			AssertEqual(Row[2], _UserHotstringsDelay(), "user-code delay " . String(Row[1]))
 		}
 	} finally Features := Saved
 }
