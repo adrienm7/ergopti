@@ -59,7 +59,7 @@
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "66c92861df74c9452ede5da5170b3d9729b6129d562c0c5859150af0627b8712",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "3d24c004fbc90a5b78e51cda901611390271b57da285dac77f1014285630f961",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "f468682b865c57a6a3eaf0a82d558988679c013ec8ad30bb7e028db3cb48666f",
-		"static/ergopti_plus/windows/tests/run_all.ahk": "7d066d130a5fda75f371711d601b8353efad223c38d61e5c32798e4ce102e1c6",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "fb583d48f4bef12ab885d33c69d4514cff93c51a31c6b80bb6ea841f0116da05",
 		"static/ergopti_plus/windows/tests/test_framework.ahk": "7b0d6644c62e5bddba42b34795ecca122c46c796d77507ff3cdebaa3203b6a65",
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "d11efb9edf441202fdd9a375c12ffede5085fb8f2e4221c0d4cafa63099bf587",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
