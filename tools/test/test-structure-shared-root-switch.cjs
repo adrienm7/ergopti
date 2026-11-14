@@ -14,12 +14,19 @@
  * require. The step that empties _shared/lua now carries the switch: every
  * spelling of the old root is rewritten in the same commit, and the plan
  * refuses a map that leaves a file under _shared/lua.
+ * The collector tools/dev/linux-field-run.sh still added "$shared/lua/?.lua"
+ * after S01 landed, so its Lua probes died on their first shared require: a
+ * bare shell variable is a spelling too, and once _shared/lua is gone no
+ * tracked source may spell it.
  * ==============================================================================
  */
 
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const Plan = require('../audit/structure/plan.cjs');
 const Apply = require('../audit/structure/apply-step.cjs');
 
@@ -47,6 +54,15 @@ function run() {
 			'"LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/lua/?.lua;{SHARED}/lua/?/init.lua;;",',
 			'"LUA_PATH": f"{DRIVER}/?.lua;{SHARED}/?.lua;{SHARED}/?/init.lua;;",'
 		],
+		// A bare shell variable (tools/dev/linux-field-run.sh, linux/install.sh).
+		[
+			'LUA_PATH="$driver/?.lua;$shared/lua/?.lua;$shared/lua/?/init.lua;;" luajit -e',
+			'LUA_PATH="$driver/?.lua;$shared/?.lua;$shared/?/init.lua;;" luajit -e'
+		],
+		[
+			'export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED/lua" ;;',
+			'export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED" ;;'
+		],
 		['local root = Paths.shared("lua")', 'local root = Paths.shared_root()'],
 		['package.path = arg[1] .. "/lua/?.lua;" .. p', 'package.path = arg[1] .. "/?.lua;" .. p'],
 		["read(shared('lua', page.Lua.modulePath(name)))", 'read(shared(page.Lua.modulePath(name)))'],
@@ -64,7 +80,9 @@ function run() {
 		'shared .. "/luac"',
 		"SHARED_ROOT + '/lua_extra'",
 		'`${shared}/luac`',
-		'f"{SHARED}/luac"'
+		'f"{SHARED}/luac"',
+		'"$shared/luac"',
+		'"$SHARED_ROOT/lua_extra"'
 	])
 		assert.equal(Plan.sharedRootRewrite(keep), keep, `not the root: ${keep}`);
 
@@ -148,9 +166,35 @@ function run() {
 	} finally {
 		if (!had) Plan.EXISTING.delete(root);
 	}
+	leftoverRootSpellings();
 	console.log(
 		'[OK] the step that empties _shared/lua switches every spelling of the shared Lua root.'
 	);
+}
+
+/**
+ * Once no tracked file is left under _shared/lua, no source spells that root.
+ * Records (docs, data tables) and the structure tooling with its tests, which
+ * name the old root on purpose, are not sources.
+ */
+function leftoverRootSpellings() {
+	const repo = path.resolve(__dirname, '../..');
+	const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: repo, maxBuffer: 1 << 30 })
+		.toString()
+		.split('\0')
+		.filter(Boolean);
+	if (tracked.some((f) => f.startsWith('static/ergopti_plus/_shared/lua/'))) return;
+	const leftovers = [];
+	for (const file of tracked) {
+		if (/^(docs|tools\/audit\/structure)\//.test(file)) continue;
+		if (/\/test-structure-[\w-]+\.cjs$/.test(file) || /\.(md|json|tsv)$/.test(file)) continue;
+		const text = fs.readFileSync(path.join(repo, file), 'utf8');
+		if (text.includes('\0')) continue;
+		text.split('\n').forEach((line, i) => {
+			if (Plan.sharedRootRewrite(line) !== line) leftovers.push(`${file}:${i + 1}`);
+		});
+	}
+	assert.deepEqual(leftovers, [], 'a source still spells the retired _shared/lua root');
 }
 
 run();
