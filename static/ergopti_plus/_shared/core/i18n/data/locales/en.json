@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Add a layout from a file:",
 	"layout_analysis.layouts.imported": "{name} added ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} added ({format}); {count} item(s) could not be read: {list}",
-	"layout_analysis.layouts.import_failed": "This file could not be read as a layout ({reason})."
+	"layout_analysis.layouts.import_failed": "This file could not be read as a layout ({reason}).",
+	"layout_analysis.details.by": "By {authors}.",
+	"layout_analysis.details.from": "From the {source} collection."
 }

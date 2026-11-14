@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "फ़ाइल से लेआउट जोड़ें:",
 	"layout_analysis.layouts.imported": "{name} जोड़ा गया ({format})।",
 	"layout_analysis.layouts.import_partial": "{name} जोड़ा गया ({format}); {count} आइटम पढ़े नहीं जा सके: {list}",
-	"layout_analysis.layouts.import_failed": "इस फ़ाइल को लेआउट के रूप में पढ़ा नहीं जा सका ({reason})।"
+	"layout_analysis.layouts.import_failed": "इस फ़ाइल को लेआउट के रूप में पढ़ा नहीं जा सका ({reason})।",
+	"layout_analysis.details.by": "रचनाकार: {authors}।",
+	"layout_analysis.details.from": "{source} संग्रह से।"
 }

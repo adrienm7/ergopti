@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Tilføj et layout fra en fil:",
 	"layout_analysis.layouts.imported": "{name} tilføjet ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} tilføjet ({format}); {count} element(er) kunne ikke læses: {list}",
-	"layout_analysis.layouts.import_failed": "Filen kunne ikke læses som et layout ({reason})."
+	"layout_analysis.layouts.import_failed": "Filen kunne ikke læses som et layout ({reason}).",
+	"layout_analysis.details.by": "Af {authors}.",
+	"layout_analysis.details.from": "Fra samlingen {source}."
 }

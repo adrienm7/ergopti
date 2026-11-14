@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "从文件添加布局：",
 	"layout_analysis.layouts.imported": "已添加 {name}（{format}）。",
 	"layout_analysis.layouts.import_partial": "已添加 {name}（{format}）；有 {count} 项无法读取：{list}",
-	"layout_analysis.layouts.import_failed": "无法将此文件读取为布局（{reason}）。"
+	"layout_analysis.layouts.import_failed": "无法将此文件读取为布局（{reason}）。",
+	"layout_analysis.details.by": "作者：{authors}。",
+	"layout_analysis.details.from": "来自 {source} 合集。"
 }

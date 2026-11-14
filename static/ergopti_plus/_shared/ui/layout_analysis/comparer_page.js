@@ -439,6 +439,18 @@
 			layout: result.layout.name,
 			rank: result.rank
 		});
+		const layout = byId.get(result.layout.id);
+		const credit = $('la-details-credit');
+		credit.textContent =
+			layout.authors.length > 0
+				? t('details.by', { authors: layout.authors.join(', ') })
+				: layout.source
+					? t('details.from', { source: layout.source })
+					: '';
+		const link = $('la-details-link');
+		link.hidden = !layout.url;
+		link.href = layout.url || '#';
+		link.textContent = layout.url;
 		renderHeatmap(result);
 		const contributions = Object.entries(result.score.contributions)
 			.filter(([, v]) => v !== 0)

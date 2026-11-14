@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "ファイルから配列を追加:",
 	"layout_analysis.layouts.imported": "{name} を追加しました（{format}）。",
 	"layout_analysis.layouts.import_partial": "{name} を追加しました（{format}）。読み取れなかった項目 {count} 件: {list}",
-	"layout_analysis.layouts.import_failed": "このファイルは配列として読み込めませんでした（{reason}）。"
+	"layout_analysis.layouts.import_failed": "このファイルは配列として読み込めませんでした（{reason}）。",
+	"layout_analysis.details.by": "作者: {authors}。",
+	"layout_analysis.details.from": "{source} コレクションより。"
 }

@@ -229,6 +229,16 @@ for (const entry of registry) {
 }
 check(Object.keys(byId.get('bepo').dead).length > 0, 'library: Bépo keeps its dead keys');
 check(byId.get('qwerty').rows.KeyQ[0] === 'q', 'library: QWERTY types q on KeyQ');
+// Credits: a registry layout from its meta.toml, another from layout_credits.json.
+check(
+	byId.get('bepo').authors[0] === 'bépo community (bepo.fr)',
+	'library: bépo is not credited from its meta.toml'
+);
+check(byId.get('dvorak').authors.includes('August Dvorak'), 'library: Dvorak is not credited');
+check(
+	library.every((layout) => layout.authors.length > 0 || layout.source !== ''),
+	'library: a layout has neither an author nor a source'
+);
 check(byId.get('azerty').rows.KeyQ[0] === 'a', 'library: AZERTY types a on KeyQ');
 for (const layout of library) {
 	const r = E.analyse(layout, ngrams, {});

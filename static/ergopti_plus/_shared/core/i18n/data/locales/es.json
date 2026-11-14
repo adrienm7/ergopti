@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Añadir una distribución desde un archivo:",
 	"layout_analysis.layouts.imported": "{name} añadida ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} añadida ({format}); no se pudieron leer {count} elemento(s): {list}",
-	"layout_analysis.layouts.import_failed": "No se pudo leer este archivo como distribución ({reason})."
+	"layout_analysis.layouts.import_failed": "No se pudo leer este archivo como distribución ({reason}).",
+	"layout_analysis.details.by": "Por {authors}.",
+	"layout_analysis.details.from": "De la colección {source}."
 }

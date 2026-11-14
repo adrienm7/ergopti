@@ -29,13 +29,15 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
-const { loadComposer } = require('../lib/layout-composer.cjs');
+const { loadComposer, REGISTRY_DIR } = require('../lib/layout-composer.cjs');
+const { parse: parseToml } = require('smol-toml');
 
 const OUT_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const MODEL_PATH = shared('layouts', 'data', 'analysis', 'analysis_model.json');
 const WEIGHTS_PATH = shared('layouts', 'data', 'analysis', 'score_weights.json');
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
 const CORPORA_PATH = shared('layouts', 'data', 'analysis', 'corpora.json');
+const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
@@ -44,6 +46,7 @@ const SOURCES = [
 	'layouts/data/analysis/score_weights.json',
 	'layouts/data/analysis/layout_library.json',
 	'layouts/data/analysis/corpora.json',
+	'layouts/data/analysis/layout_credits.json',
 	'layouts/data/keycodes/physical_keys.json',
 	'../../layouts/registry (through layout_composer)'
 ];
@@ -236,6 +239,7 @@ function buildLibrary(model) {
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
 	for (const entry of library.layouts)
 		out.push(fromAlphaBlock(entry, composer.REFERENCE.qwerty.rows));
+	credit(out);
 	const seen = new Set();
 	for (const layout of out) {
 		if (seen.has(layout.id)) throw new Error(`duplicate layout id ${layout.id}`);
@@ -243,6 +247,37 @@ function buildLibrary(model) {
 		if (!layout.fingering) layout.fingering = 'standard';
 	}
 	return out;
+}
+
+/**
+ * Credits each layout: a registry layout from its meta.toml, another from
+ * layout_credits.json, else the collection it was taken from.
+ * @param {object[]} layouts - The library entries, completed in place.
+ * @throws {Error} On a credit for a layout the library does not hold.
+ */
+function credit(layouts) {
+	const credits = JSON.parse(fs.readFileSync(CREDITS_PATH, 'utf8')).credits;
+	const ids = new Set(layouts.map((layout) => layout.id));
+	for (const id of Object.keys(credits))
+		if (!ids.has(id))
+			throw new Error(`layout_credits.json credits ${id}, which the library does not hold`);
+	for (const layout of layouts) {
+		if (layout.origin === REGISTRY_ORIGIN) {
+			const meta = parseToml(
+				fs.readFileSync(path.join(REGISTRY_DIR, layout.id, 'meta.toml'), 'utf8')
+			);
+			layout.authors = [meta.author];
+			if (meta.homepage) layout.url = meta.homepage;
+			if (meta.licence) layout.licence = meta.licence;
+			layout.credit_basis = 'source';
+			continue;
+		}
+		const entry = credits[layout.id];
+		layout.authors = entry ? entry.authors : [];
+		if (entry && entry.year) layout.year = entry.year;
+		if (entry && entry.url) layout.url = entry.url;
+		if (entry) layout.credit_basis = entry.basis;
+	}
 }
 
 // =========================

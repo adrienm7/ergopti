@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Přidat rozložení ze souboru:",
 	"layout_analysis.layouts.imported": "{name} přidáno ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} přidáno ({format}); nepodařilo se přečíst položek: {count}: {list}",
-	"layout_analysis.layouts.import_failed": "Tento soubor nelze přečíst jako rozložení ({reason})."
+	"layout_analysis.layouts.import_failed": "Tento soubor nelze přečíst jako rozložení ({reason}).",
+	"layout_analysis.details.by": "Autor: {authors}.",
+	"layout_analysis.details.from": "Ze sbírky {source}."
 }

@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Додати розкладку з файлу:",
 	"layout_analysis.layouts.imported": "{name} додано ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} додано ({format}); не вдалося прочитати елементів: {count}: {list}",
-	"layout_analysis.layouts.import_failed": "Не вдалося прочитати цей файл як розкладку ({reason})."
+	"layout_analysis.layouts.import_failed": "Не вдалося прочитати цей файл як розкладку ({reason}).",
+	"layout_analysis.details.by": "Автор: {authors}.",
+	"layout_analysis.details.from": "З колекції {source}."
 }

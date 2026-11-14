@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Dosyadan düzen ekle:",
 	"layout_analysis.layouts.imported": "{name} eklendi ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} eklendi ({format}); {count} öğe okunamadı: {list}",
-	"layout_analysis.layouts.import_failed": "Bu dosya düzen olarak okunamadı ({reason})."
+	"layout_analysis.layouts.import_failed": "Bu dosya düzen olarak okunamadı ({reason}).",
+	"layout_analysis.details.by": "Yazan: {authors}.",
+	"layout_analysis.details.from": "{source} koleksiyonundan."
 }

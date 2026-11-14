@@ -1,0 +1,123 @@
+{
+	"_description": "Authors of the layouts of the analysis library, shown with each layout. The registry layouts take theirs from static/layouts/registry/<id>/meta.toml. « basis » says where a credit comes from: « source » when the layout's own file or site states it, « knowledge » when it is the generally known author not yet checked against the author's own page (to verify by the maintainer). A layout without an entry is credited to the collection it was taken from.",
+	"schema_version": 1,
+	"credits": {
+		"qwerty": {
+			"authors": ["Christopher Latham Sholes"],
+			"year": 1873,
+			"basis": "knowledge"
+		},
+		"dvorak": {
+			"authors": ["August Dvorak", "William Dealey"],
+			"year": 1936,
+			"url": "https://patents.google.com/patent/US2040248",
+			"basis": "source"
+		},
+		"colemak": {
+			"authors": ["Shai Coleman"],
+			"year": 2006,
+			"url": "https://colemak.com",
+			"basis": "knowledge"
+		},
+		"colemak_dh": {
+			"authors": ["SteveP (Colemak Mod-DH)"],
+			"url": "https://colemakmods.github.io/mod-dh/",
+			"basis": "source"
+		},
+		"colemak_dh_angle": {
+			"authors": ["SteveP (Colemak Mod-DH)"],
+			"url": "https://colemakmods.github.io/mod-dh/",
+			"basis": "source"
+		},
+		"workman": {
+			"authors": ["OJ Bucao"],
+			"year": 2010,
+			"url": "https://workmanlayout.org",
+			"basis": "knowledge"
+		},
+		"norman": {
+			"authors": ["David Norman"],
+			"year": 2012,
+			"basis": "knowledge"
+		},
+		"halmak": {
+			"authors": ["Nikolay Nemshilov"],
+			"year": 2016,
+			"basis": "knowledge"
+		},
+		"mtgap30": {
+			"authors": ["Michael Dickens"],
+			"basis": "knowledge"
+		},
+		"qgmlwy": {
+			"authors": ["Martin Krzywinski (carpalx)"],
+			"url": "http://mkweb.bcgsc.ca/carpalx/",
+			"basis": "knowledge"
+		},
+		"engram": {
+			"authors": ["Arno Klein"],
+			"year": 2021,
+			"basis": "knowledge"
+		},
+		"semimak": {
+			"authors": ["semi (semilin)"],
+			"url": "https://semilin.github.io/blog/2021/semimak.html",
+			"basis": "source"
+		},
+		"semimak_jq": {
+			"authors": ["semi (semilin)"],
+			"basis": "knowledge"
+		},
+		"hands_down": {
+			"authors": ["Alan Reiser"],
+			"basis": "knowledge"
+		},
+		"hands_down_neu": {
+			"authors": ["Alan Reiser"],
+			"basis": "knowledge"
+		},
+		"hands_down_reference": {
+			"authors": ["Alan Reiser"],
+			"basis": "knowledge"
+		},
+		"capewell": {
+			"authors": ["Michael Capewell"],
+			"basis": "knowledge"
+		},
+		"capewell_dvorak": {
+			"authors": ["Michael Capewell"],
+			"basis": "knowledge"
+		},
+		"arensito": {
+			"authors": ["Håkon Hallingstad"],
+			"basis": "knowledge"
+		},
+		"sturdy": {
+			"authors": ["Oxey (O_X_E_Y)"],
+			"basis": "knowledge"
+		},
+		"gallium_v2": {
+			"authors": ["GalileoBlues"],
+			"year": 2023,
+			"url": "https://github.com/O-X-E-Y/oxeylyzer/blob/data-files/static/layouts/english/gallium_v2.dof",
+			"basis": "source"
+		},
+		"noted": {
+			"authors": ["Dario Götz"],
+			"url": "https://github.com/dariogoetz/keyboard_layout_optimizer",
+			"basis": "source"
+		},
+		"adnw": {
+			"authors": ["Neo community (Aus der Neo-Welt)"],
+			"basis": "knowledge"
+		},
+		"bone": {
+			"authors": ["Neo community"],
+			"basis": "knowledge"
+		},
+		"koy": {
+			"authors": ["Neo community"],
+			"basis": "knowledge"
+		}
+	}
+}

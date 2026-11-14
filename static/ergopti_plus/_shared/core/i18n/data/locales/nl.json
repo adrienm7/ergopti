@@ -4457,5 +4457,7 @@
 	"layout_analysis.layouts.import": "Indeling uit een bestand toevoegen:",
 	"layout_analysis.layouts.imported": "{name} toegevoegd ({format}).",
 	"layout_analysis.layouts.import_partial": "{name} toegevoegd ({format}); {count} onderdeel/onderdelen kon(den) niet worden gelezen: {list}",
-	"layout_analysis.layouts.import_failed": "Dit bestand kon niet als indeling worden gelezen ({reason})."
+	"layout_analysis.layouts.import_failed": "Dit bestand kon niet als indeling worden gelezen ({reason}).",
+	"layout_analysis.details.by": "Door {authors}.",
+	"layout_analysis.details.from": "Uit de verzameling {source}."
 }
