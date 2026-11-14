@@ -85,6 +85,38 @@ var LayoutEditorPage = (function () {
 	}
 	const tl = (key, values) => t(PREFIX + key, values);
 
+	/**
+	 * A declaration of the shared value schema, by its generated key name.
+	 * @param {string} name - Its KEY constant, e.g. LAYOUT_SOURCE_KEYS_VIRTUAL_KEY.
+	 * @returns {object} The declaration (type, min, max).
+	 */
+	function declared(name) {
+		const V = window.ErgoptiValueCheck;
+		return V.entryFor(V.SCHEMA, V.KEY[name]);
+	}
+
+	/**
+	 * Reads a typed number through the shared value check (_shared/ui/
+	 * value_check.js, generated from the one schema the three drivers read).
+	 * A refusal shows the localized text naming the accepted range in the
+	 * message line and yields undefined, so nothing is applied.
+	 * @param {HTMLInputElement} input - The field.
+	 * @param {string} key - Its declaration in the shared value schema.
+	 * @param {function} notify - Shows an error message.
+	 * @returns {number|undefined} The admitted value.
+	 */
+	function checkedNumber(input, key, notify) {
+		const V = window.ErgoptiValueCheck;
+		const entry = V.entryFor(V.SCHEMA, key);
+		const typed = V.parseEntry(entry, input.value);
+		if (typed.ok) return typed.value;
+		notify(
+			'error',
+			V.renderMessage(V.messageParts(entry, typed), (k) => t(k))
+		);
+		return undefined;
+	}
+
 	/** Creates an element; attributes starting with "on" bind listeners. */
 	function el(tag, attributes, children) {
 		const node = document.createElement(tag);
@@ -1340,11 +1372,12 @@ var LayoutEditorPage = (function () {
 				{ id: 'le-caps' }
 			);
 			const nameInput = el('input', { type: 'text', id: 'le-key-name', value: entry.name || '' });
+			const virtualKeyBounds = declared('LAYOUT_SOURCE_KEYS_VIRTUAL_KEY');
 			const virtualKey = el('input', {
 				type: 'number',
 				id: 'le-virtual-key',
-				min: 0,
-				max: 255,
+				min: virtualKeyBounds.min,
+				max: virtualKeyBounds.max,
 				value: entry.virtual_key === undefined ? '' : entry.virtual_key
 			});
 			const capsAltgr = el('input', {
@@ -1379,7 +1412,15 @@ var LayoutEditorPage = (function () {
 						if (capsAltgr.checked) properties.caps_altgr = true;
 						else delete properties.caps_altgr;
 						if (virtualKey.value === '') delete properties.virtual_key;
-						else properties.virtual_key = Number(virtualKey.value);
+						else {
+							const typed = checkedNumber(
+								virtualKey,
+								window.ErgoptiValueCheck.KEY.LAYOUT_SOURCE_KEYS_VIRTUAL_KEY,
+								notify
+							);
+							if (typed === undefined) return;
+							properties.virtual_key = typed;
+						}
 						apply((d) => LayoutEditorModel.setKeyProperties(d, code, properties));
 					}
 				})
@@ -1492,10 +1533,12 @@ var LayoutEditorPage = (function () {
 				id: 'le-tap-text',
 				value: entry && entry.tap.text !== undefined ? entry.tap.text : ''
 			});
+			const thresholdBounds = declared('LAYOUT_SOURCE_TAP_HOLDS_THRESHOLD_MS');
 			const threshold = el('input', {
 				type: 'number',
 				id: 'le-threshold',
-				min: 1,
+				min: thresholdBounds.min,
+				max: thresholdBounds.max,
 				step: TAP_HOLD_THRESHOLD_STEP,
 				value: entry ? entry.threshold_ms : ''
 			});
@@ -1510,10 +1553,16 @@ var LayoutEditorPage = (function () {
 					text: tl('btn.apply'),
 					onclick: () => {
 						const [kind, id] = hold.value.split(':');
+						const thresholdMs = checkedNumber(
+							threshold,
+							window.ErgoptiValueCheck.KEY.LAYOUT_SOURCE_TAP_HOLDS_THRESHOLD_MS,
+							notify
+						);
+						if (thresholdMs === undefined) return;
 						const next = {
 							key: code,
 							tap: tapText.value === '' ? { key: code } : { text: tapText.value },
-							threshold_ms: Number(threshold.value)
+							threshold_ms: thresholdMs
 						};
 						next[kind === 'layer' ? 'hold_layer' : 'hold_modifier'] = id;
 						apply((d) => LayoutEditorModel.setTapHold(d, next));

@@ -615,6 +615,23 @@ function requireValue(schema, key, value) {
 					"file": "layouts/data/layer_actions.toml",
 					"pattern": "\\[parameters\\.repeat_count\\]\\n(?:[^\\n]*\\n)*?max = (\\d+)"
 				}
+			},
+			"layout_source.tap_holds.threshold_ms": {
+				"file": "layout_source.toml",
+				"type": "integer",
+				"unit": "ms",
+				"min": 1,
+				"max": 10000,
+				"max_from": {
+					"timing": "tap_hold.max_activation_ms",
+					"scale": 1
+				}
+			},
+			"layout_source.keys.virtual_key": {
+				"file": "layout_source.toml",
+				"type": "integer",
+				"min": 0,
+				"max": 255
 			}
 		}
 	};
@@ -647,7 +664,9 @@ function requireValue(schema, key, value) {
 		"PERSONAL_INFO_LETTERS_ANY": "personal_info.letters.*",
 		"UPDATER_CHECK_INTERVAL_SECONDS": "updater.check_interval_seconds",
 		"METRICS_APPS_ANY_SCORE": "metrics_apps.*.score",
-		"LAYERS_REPEAT_COUNT": "layers.repeat_count"
+		"LAYERS_REPEAT_COUNT": "layers.repeat_count",
+		"LAYOUT_SOURCE_TAP_HOLDS_THRESHOLD_MS": "layout_source.tap_holds.threshold_ms",
+		"LAYOUT_SOURCE_KEYS_VIRTUAL_KEY": "layout_source.keys.virtual_key"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

@@ -59,7 +59,8 @@ const FILES = [
 	'hotstrings_config.toml',
 	'personal_info.toml',
 	'app_categories.json',
-	'layers.toml'
+	'layers.toml',
+	'layout_source.toml'
 ];
 const UNITS = ['ms', 's', 'mm', 'characters', 'words'];
 const FIELDS = {

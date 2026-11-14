@@ -111,6 +111,11 @@ function M.register(helpers, shared)
 				hold_layer = function(t) t.tap_holds[1].hold_layer = "missing" end,
 				two_holds = function(t) t.tap_holds[1].hold_modifier = "shift" end,
 				threshold = function(t) t.tap_holds[1].threshold_ms = 0 end,
+				-- The shared value schema's declaration (value-validation).
+				threshold_past_maximum = function(t) t.tap_holds[1].threshold_ms = 10001 end,
+				threshold_fraction = function(t) t.tap_holds[1].threshold_ms = 150.5 end,
+				threshold_string = function(t) t.tap_holds[1].threshold_ms = "150" end,
+				threshold_nan = function(t) t.tap_holds[1].threshold_ms = 0 / 0 end,
 				mapping = function(t) t.layers[1].keys.KeyX = { dead_key = "acute" } end,
 				shared_key = function(t) table.insert(t.modifiers[2].keys, "IntlBackslash") end,
 			}) do
