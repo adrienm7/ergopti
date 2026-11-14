@@ -398,9 +398,19 @@ _LEA_NativeServerCase(State, Status, Body, Expected) {
 }
 
 _LEA_NativeServerCases() {
-	_LEA_WithFixture(_LEA_NativeServerCase.Bind(, 200, '{"version":"0.12.3"}', true))
-	_LEA_WithFixture(_LEA_NativeServerCase.Bind(, 200, '{}', false))
-	_LEA_WithFixture(_LEA_NativeServerCase.Bind(, 302, '{"version":"redirect"}', false))
+	global _TimingsCache
+	; The fixture holds the version answer until the test has seen the request
+	; with the toggle still off. Curl's ceiling counts from its launch, so on a
+	; loaded runner that deliberate hold timed the probe out and the valid case
+	; read as a refusal; the probe gets a ceiling the hold cannot reach.
+	Timings := _TimingsCache["llm"]
+	Saved := Timings["local_server_probe_timeout_ms"]
+	Timings["local_server_probe_timeout_ms"] := 30000
+	try {
+		_LEA_WithFixture(_LEA_NativeServerCase.Bind(, 200, '{"version":"0.12.3"}', true))
+		_LEA_WithFixture(_LEA_NativeServerCase.Bind(, 200, '{}', false))
+		_LEA_WithFixture(_LEA_NativeServerCase.Bind(, 302, '{"version":"redirect"}', false))
+	} finally Timings["local_server_probe_timeout_ms"] := Saved
 }
 Test("AI enable admission: genuine native curl holds OFF until exact version and refuses malformed/redirect origins",
 	_LEA_NativeServerCases)
