@@ -1807,7 +1807,10 @@ _HOUP_PublicBaseKeepsEffectiveDuration(Mode) {
 		AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", InitialDelay), "the real public section writer must produce the initial offset")
 		Source := FSReadUtf8Exact(Path)
 		Before := FSReadUtf8Exact(ConfigurationFile)
-		Maximum := TICK_MAX_DURATION_MS / 1000
+		; The overflow case aims at the engine's tick ceiling; the controls sit at the
+		; base delay's declared maximum (the shared value schema), which is far below it.
+		Maximum := Mode == "overflow" ? TICK_MAX_DURATION_MS / 1000
+			: ValueCheckEntryFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY)["max"]
 		Base := Mode == "below-cap-control" ? Maximum - 1.0 : Maximum
 		AssertTrue(TickTryDurationMsFromSeconds(Base, &BaseMs), "the exact UI-bound public setter input must be valid")
 		Committed := HotstringsSetBaseDelay(Base)
