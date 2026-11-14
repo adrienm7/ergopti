@@ -204,15 +204,21 @@ function M.handle_composer(deps, controller, action, payload, push_state)
 		deps.log("warn", "Refused a layout composer save without exactly one of a declaration or a source, and its layout.")
 		return false
 	end
-	-- A source may come with the emulation table the shared compiler built from it.
+	-- A source may come with the emulation table the shared compiler built from it
+	-- and, on Linux, with the source compiled straight to XKB (its target).
 	if payload.emulation ~= nil and (not source or type(payload.emulation) ~= "string") then
 		deps.log("warn", "Refused a layout composer save whose emulation table is not text beside a source.")
+		return false
+	end
+	if payload.target ~= nil and (not source or type(payload.target) ~= "string") then
+		deps.log("warn", "Refused a layout composer save whose converter target is not text beside a source.")
 		return false
 	end
 	operation({
 		declaration = declaration and payload.declaration or nil,
 		source = source and payload.source or nil,
 		emulation = source and payload.emulation or nil,
+		target = source and payload.target or nil,
 		keylayout = payload.keylayout,
 		use = payload.use == true,
 	}, report)
