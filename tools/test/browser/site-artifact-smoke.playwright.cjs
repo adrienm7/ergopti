@@ -223,8 +223,42 @@ async function exerciseDownloads(page, origin, basePath, route) {
 	}
 }
 
+/**
+ * Let every embedded window a page has started loading finish before the next
+ * route replaces the page: a driver frame cut off mid-load reports an aborted
+ * request, which is the test leaving, not a missing resource. Frames that never
+ * started (lazy, off screen) are already settled.
+ */
+async function settleFrames(page) {
+	const main = page.mainFrame();
+	for (const frame of page.frames()) {
+		// A lazy frame that never started has no address and never loads.
+		if (frame === main || frame.url() === '' || frame.url() === 'about:blank') continue;
+		await frame.waitForLoadState('load');
+	}
+}
+
+/**
+ * Wait until no local request has been in flight for a short quiet period, so
+ * the scripts a frame loads after its load event finish before the page is left.
+ * @param {Set<Object>} inflight Local requests started and not yet settled.
+ */
+async function settleNetwork(inflight, { quietMs = 300, timeoutMs = 15000 } = {}) {
+	const deadline = Date.now() + timeoutMs;
+	let quietSince = Date.now();
+	for (;;) {
+		if (inflight.size) quietSince = Date.now();
+		else if (Date.now() - quietSince >= quietMs) return;
+		if (Date.now() > deadline)
+			throw new Error(
+				'Local requests never settled: ' + [...inflight].map((request) => request.url()).join(', ')
+			);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+}
+
 /** Assert actual hydrated event handling through the shared layout on the declared smoke routes. */
-async function exercisePage(page, origin, basePath, errors) {
+async function exercisePage(page, origin, basePath, errors, settle = settleFrames) {
 	for (const route of SITE_ROUTES) {
 		const response = await page.goto(origin + basePath + route, { waitUntil: 'networkidle' });
 		assert.ok(response?.ok(), 'Authored artifact route refused: ' + route);
@@ -242,6 +276,7 @@ async function exercisePage(page, origin, basePath, errors) {
 		}
 		await exerciseDownloads(page, origin, basePath, route);
 		if (route === NAVIGATION_FROM) await exerciseNavigation(page, origin, basePath);
+		await settle(page);
 		assert.equal(errors.local.length, 0, 'Local resource failures: ' + errors.local.join('; '));
 		assert.equal(errors.page.length, 0, 'Browser failures: ' + errors.page.join('; '));
 	}
@@ -311,7 +346,14 @@ async function runBrowsers(site, basePath, engines) {
 						if (new URL(response.url()).origin === origin && response.status() >= 400)
 							errors.local.push(response.url() + ' HTTP ' + response.status());
 					});
+					// Local requests in flight, so a page is only left once they settle.
+					const inflight = new Set();
+					page.on('request', (request) => {
+						if (new URL(request.url()).origin === origin) inflight.add(request);
+					});
+					page.on('requestfinished', (request) => inflight.delete(request));
 					page.on('requestfailed', (request) => {
+						inflight.delete(request);
 						if (new URL(request.url()).origin === origin)
 							errors.local.push(
 								request.url() + ' transport: ' + (request.failure()?.errorText || 'unknown failure')
@@ -333,7 +375,10 @@ async function runBrowsers(site, basePath, engines) {
 						errors.page.push('Unexpected remote request: ' + url);
 						return route.abort();
 					});
-					await exercisePage(page, origin, basePath, errors);
+					await exercisePage(page, origin, basePath, errors, async () => {
+						await settleFrames(page);
+						await settleNetwork(inflight);
+					});
 				} finally {
 					await context.close();
 				}
@@ -411,6 +456,8 @@ module.exports = {
 	exerciseEmulationReadiness,
 	exerciseDownloads,
 	exercisePage,
+	settleFrames,
+	settleNetwork,
 	withBrowser,
 	runBrowsers,
 	main

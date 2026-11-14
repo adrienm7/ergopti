@@ -164,6 +164,9 @@ async function run() {
 				return disposed;
 			},
 			url: () => url,
+			// The fake page embeds no frame: settleFrames has nothing to wait for.
+			mainFrame: () => null,
+			frames: () => [],
 			async evaluate() {
 				return reload && navigated ? 18 : 17;
 			},
@@ -371,6 +374,64 @@ async function run() {
 					page: ['hydration error']
 				}),
 			/Browser failures/
+		);
+	});
+	await check('embedded frames finish loading before the page is left', async () => {
+		const waited = [];
+		const frame = (name, url = 'http://127.0.0.1:1/' + name) => ({
+			url: () => url,
+			async waitForLoadState(state) {
+				waited.push([name, state]);
+			}
+		});
+		const main = frame('main');
+		await smoke.settleFrames({
+			mainFrame: () => main,
+			frames: () => [
+				main,
+				frame('changelog'),
+				frame('lazy-unstarted', ''),
+				frame('blank', 'about:blank'),
+				frame('hotstring_editor')
+			]
+		});
+		assert.deepEqual(waited, [
+			['changelog', 'load'],
+			['hotstring_editor', 'load']
+		]);
+		const sentinel = new Error('frame never loaded');
+		await assert.rejects(
+			() =>
+				smoke.settleFrames({
+					mainFrame: () => main,
+					frames: () => [
+						main,
+						{
+							url: () => 'http://127.0.0.1:1/stalled',
+							async waitForLoadState() {
+								throw sentinel;
+							}
+						}
+					]
+				}),
+			(error) => error === sentinel
+		);
+	});
+	await check('local requests settle before the page is left', async () => {
+		const request = { url: () => 'http://127.0.0.1:1/ergopti_plus/_shared/ui/markdown.js' };
+		const inflight = new Set([request]);
+		let settled = false;
+		const settle = smoke.settleNetwork(inflight, { quietMs: 40, timeoutMs: 2000 }).then(() => {
+			settled = true;
+		});
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		assert.equal(settled, false, 'a request in flight holds the page');
+		inflight.delete(request);
+		await settle;
+		assert.equal(settled, true);
+		await assert.rejects(
+			() => smoke.settleNetwork(new Set([request]), { quietMs: 40, timeoutMs: 120 }),
+			/never settled: .*markdown\.js/
 		);
 	});
 	await check('owned browser retirement runs on success and assertion failure', async () => {
