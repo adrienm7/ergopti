@@ -419,7 +419,9 @@ check(
 	"the request plan must receive live mode's debounce while live mode is on"
 );
 check(
-	bodyOf(read('infra/lifecycle.ahk'), 'Ergopti_OnSuspendEnter').includes('"llm-live-mode"'),
+	bodyOf(read('core/lifecycle/engine/lifecycle.ahk'), 'Ergopti_OnSuspendEnter').includes(
+		'"llm-live-mode"'
+	),
 	'pausing must turn live mode off'
 );
 const menuSettings = read('ui/menu/menu_llm/menu_settings.ahk');

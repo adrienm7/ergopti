@@ -111,9 +111,9 @@ local RecordScanner = require("core.text.engine.toml_codec.record_scanner")
 local Bom = require("core.text.engine.toml_codec.bom")
 local SourceOpen = require("core.text.engine.toml_codec.source_open")
 local NATIVE_WRITER = "core.fs.engine.regular_file_writer"
-local has_native_writer = (package.loaded["infra.literal_module_loader"] or package).searchpath(NATIVE_WRITER, package.path) ~= nil
+local has_native_writer = (package.loaded["core.lifecycle.engine.literal_module_loader"] or package).searchpath(NATIVE_WRITER, package.path) ~= nil
 -- The Linux stage namer, bound with the native writer it serves (CFD-1).
-local StageOwner = has_native_writer and require("infra.stage_owner") or nil
+local StageOwner = has_native_writer and require("core.lifecycle.engine.stage_owner") or nil
 local KeyPath = require("core.text.engine.toml_codec.key_path")
 local Codec = require("core.text.engine.toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans
@@ -254,7 +254,7 @@ local function publish(path, content, expected_source, admission)
 	end
 	-- Linux names each stage after its process (pid and kernel start tick), so a
 	-- stage a killed process left never blocks the exclusive creation of the
-	-- next one, and infra/stage_owner.lua reaps it at start (CFD-1). macOS
+	-- next one, and core/lifecycle/engine/stage_owner.lua reaps it at start (CFD-1). macOS
 	-- stages through stdio "w", which overwrites a leftover `.tmp` instead.
 	local tmp_path = StageOwner and StageOwner.stage_path(path) or path .. ".tmp"
 	local open_ok, fh, open_err, _, remove_owned, current_image = pcall(open_staging, tmp_path)

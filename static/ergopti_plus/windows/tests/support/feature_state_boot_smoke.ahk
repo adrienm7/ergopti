@@ -67,7 +67,7 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 ; Canonical classification also consults the real language/category ownership
 ; registry, even when the authored file contains only script preferences.
 #Include ..\..\infra\toml\toml_loader.ahk
-#Include ..\..\infra\master_gates.ahk
+#Include ..\..\core\lifecycle\engine\master_gates.ahk
 #Include ..\..\infra\hotstrings\hotstrings_cache.ahk
 
 try {

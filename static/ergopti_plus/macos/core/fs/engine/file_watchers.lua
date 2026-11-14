@@ -44,7 +44,7 @@ local LOG = "file_watchers"
 --- Required lazily: the coordinator is initialized after this module loads.
 --- @return boolean terminating
 local function reload_already_terminating()
-	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	local loaded, coordinator = pcall(require, "core.lifecycle.engine.shutdown.termination_coordinator")
 	if not loaded or type(coordinator) ~= "table" then return false end
 	local checked, in_progress = pcall(coordinator.terminal_in_progress)
 	return checked and in_progress == true
@@ -706,7 +706,7 @@ function M.start(ctx)
 	if not acquire_watcher(base_dir, project_changed, "Project source watcher", false) then
 		return rollback_startup()
 	end
-	-- Only a developer app passes its clone's shared Lua tree (infra/dev_source.lua).
+	-- Only a developer app passes its clone's shared Lua tree (core/lifecycle/engine/dev_source.lua).
 	if ctx.shared_source_dir ~= nil
 		and not acquire_watcher(ctx.shared_source_dir, project_changed, "Shared source watcher", false) then
 		return rollback_startup()

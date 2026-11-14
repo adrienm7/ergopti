@@ -127,7 +127,7 @@ global _MENU_RETRY_DELAY_MS := 60
 
 ; A command clicked while a configuration write is in progress waits for that
 ; write: the delay between two looks and how many are made, ten seconds in
-; all, as for a reload asked during a write (infra/reload_deferral.ahk).
+; all, as for a reload asked during a write (core/lifecycle/engine/reload/deferral.ahk).
 global MENU_COMMAND_DEFERRAL_RETRY_MS := 100
 global MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS := 100
 

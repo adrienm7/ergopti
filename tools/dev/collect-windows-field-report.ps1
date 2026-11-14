@@ -327,7 +327,7 @@ function Resolve-LogsDir {
 	return Join-AppDir $LogsBase $LogsSegments
 }
 
-# The configuration folder, resolved like infra/boot.ahk: -ConfigDir, else the
+# The configuration folder, resolved like core/lifecycle/engine/boot.ahk: -ConfigDir, else the
 # ConfigDirPath of the installed paths.toml or of the source run's, else the default.
 function Resolve-ConfigDir {
 	if ($ConfigDir) { return $ConfigDir }

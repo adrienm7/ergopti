@@ -287,11 +287,11 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	; Historical gotcha [[feedback-ahk-suspend-prefix-latch]]: SC138 (AltGr) prefix
 	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
 	; the custom-combination prefix layer is disarmed. The fix drains the prefix
-	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (infra/lifecycle.ahk).
+	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (core/lifecycle/engine/lifecycle.ahk).
 	Src := _DriverDirConcat("infra")
 	Assert(Src != "", "lib must be readable")
 	Body := _DriverFuncBody("ToggleSuspend")
-	Assert(Body != "", "ToggleSuspend must exist in infra/lifecycle.ahk")
+	Assert(Body != "", "ToggleSuspend must exist in core/lifecycle/engine/lifecycle.ahk")
 
 	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
 	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,

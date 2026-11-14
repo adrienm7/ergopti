@@ -80,7 +80,7 @@ const INVENTORY = {
 		'lost, and observes fail-open native delivery faults. 100 ms bounds how long a ' +
 		'physically suppressed key or suspended native owner can wait for exact recovery; the ' +
 		'timer is disarmed whenever the native owner stops.',
-	'infra/lifecycle.ahk:_SuspendPendingPoll':
+	'core/lifecycle/engine/lifecycle.ahk:_SuspendPendingPoll':
 		'Runs ONLY while a suspend is deferred waiting for held prefix keys to be released, ' +
 		'and stops as soon as they are. 25 ms because the user is mid-chord and any visible ' +
 		'lag between releasing the keys and the driver suspending reads as a stuck modifier.',
@@ -372,8 +372,8 @@ for (const key of Object.keys(INVENTORY)) {
 // bounded by the canonical shared policy, including while retirement is pending.
 const brightnessFiles = {
 	adapter: 'adapters/screen_brightness.ahk',
-	registry: 'infra/lifecycle_transition.ahk',
-	lifecycle: 'infra/lifecycle.ahk',
+	registry: 'core/lifecycle/engine/transition.ahk',
+	lifecycle: 'core/lifecycle/engine/lifecycle.ahk',
 	meta: 'tests/meta/suite/test_fast_timer_inventory.ahk'
 };
 const brightnessSources = Object.fromEntries(

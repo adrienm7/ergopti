@@ -22,7 +22,7 @@
 ;
 ; This test asserts both paths are present.
 ;
-; SCOPE: source introspection of modules/gestures/click.ahk and infra/lifecycle.ahk.
+; SCOPE: source introspection of modules/gestures/click.ahk and core/lifecycle/engine/lifecycle.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -103,7 +103,7 @@ _GCHRS_SuspendEnterReleasesClickHolds() {
 	Assert(Src != "", "infra/ source must be readable")
 
 	Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
-	Assert(Body != "", "Ergopti_OnSuspendEnter must be defined in infra/lifecycle.ahk")
+	Assert(Body != "", "Ergopti_OnSuspendEnter must be defined in core/lifecycle/engine/lifecycle.ahk")
 
 	Assert(InStr(Body, "GestureReleaseLeftClick()") > 0,
 		"Ergopti_OnSuspendEnter must call GestureReleaseLeftClick() — the click-hold must be released at the moment of suspend, not only when the InputHook fires next (AHK-12)")

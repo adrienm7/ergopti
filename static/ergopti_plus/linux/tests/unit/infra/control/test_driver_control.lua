@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local APP_FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local Json = require("core.text.engine.json")
 local Policy = require("diagnostics.engine.control_driver_control")
-local DriverControl = require("infra.driver_control")
+local DriverControl = require("core.lifecycle.engine.driver_control")
 
 local shared = helpers.driver_root() .. "/../_shared"
 require("tests.lua.core_lifecycle.driver_control_contract").run(helpers, shared)
@@ -445,7 +445,7 @@ local getenv = os.getenv
 os.getenv = function(name) if name == "XDG_RUNTIME_DIR" then return %q end; return getenv(name) end
 local options = { pid = uv.os_getpid(), reload = function() return true end }
 if %s then options.declaration = %q end
-local session, detail = require("infra.driver_control").start(options)
+local session, detail = require("core.lifecycle.engine.driver_control").start(options)
 assert((session ~= nil) == %s, "control declaration admission: " .. tostring(detail))
 if session then assert(session:stop()) end
 ]], package.path, source, root, tostring(variant:find("explicit-", 1, true) == 1), source, tostring(admitted))

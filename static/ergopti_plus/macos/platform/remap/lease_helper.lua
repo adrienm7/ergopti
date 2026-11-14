@@ -23,7 +23,7 @@ local M = {}
 
 local hs = hs
 local NativePath = require("core.fs.engine.native_path")
-local DevSource = require("infra.dev_source")
+local DevSource = require("core.lifecycle.engine.dev_source")
 local HELPER_ENV = "ERGOPTI_LAUNCHER_EXECUTABLE"
 local HELPER_DEVICE_ENV = "ERGOPTI_LAUNCHER_DEVICE"
 local HELPER_INODE_ENV = "ERGOPTI_LAUNCHER_INODE"
@@ -120,7 +120,7 @@ end
 --- @return table|nil environment Exact identity to copy into this helper process.
 function M.resolve(driver_root_override)
 	local bundled
-	-- A developer app runs a clone (infra/dev_source.lua): its helper is derived
+	-- A developer app runs a clone (core/lifecycle/engine/dev_source.lua): its helper is derived
 	-- from the native runtime bundle instead, then proved exactly as below.
 	local dev_ok, dev_root = pcall(DevSource.root)
 	if not dev_ok then return nil, "developer source root refused: " .. tostring(dev_root) end

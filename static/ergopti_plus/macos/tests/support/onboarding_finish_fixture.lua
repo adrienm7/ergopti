@@ -28,7 +28,7 @@ local MODULE_NAMES = {
 	"infra.toml.codec",
 	"infra.toml.writer",
 	"infra.config_paths",
-	"infra.termination_coordinator",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"platform.remap",
 	"platform.remap.defaults",
 	"platform.remap.nav_layer",
@@ -199,7 +199,7 @@ function M.with_finish(opts, scenario)
 		end,
 	}
 	-- The owned reload: it records the request and its abort callback.
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		is_initialized = function() return true end,
 		request_reload_owned = function(reason, on_aborted)
 			state.reloads[#state.reloads + 1] = { reason = reason, on_aborted = on_aborted }

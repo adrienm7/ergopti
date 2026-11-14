@@ -176,7 +176,7 @@ check "the first daemon still runs" "[ \"\$(daemon_pid)\" = '${FIRST}' ]"
 
 echo "a saved .lua"
 panel saved --expect-label "${RELOAD_LABEL}"
-SAVED="${DRIVER}/infra/dev_source.lua"
+SAVED="${DRIVER}/core/lifecycle/engine/dev_source.lua"
 cp -p "${SAVED}" "${S}/saved.lua"
 cat "${S}/saved.lua" > "${SAVED}"
 check "the daemon restarted (new pid)" "wait_for 40 '[ -n \"\$(daemon_pid)\" ] && [ \"\$(daemon_pid)\" != ${FIRST} ]'"

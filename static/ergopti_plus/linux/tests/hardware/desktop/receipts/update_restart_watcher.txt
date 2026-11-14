@@ -1,10 +1,10 @@
 # Receipt: update restart watcher, real systemd user manager and terminal relay (2026-11-10)
 # Proof: tests/hardware/desktop/run_update_restart_watcher.sh, as root on Ubuntu 24.04 (kernel 6.18.44), base
 # 6e36ba7249 with the Quit and $-escaping fixes. Real: modules/updater/restarter.lua,
-# infra/updater_boot_ready.lua, infra/quit_request.lua, the watcher shell, systemd --user 255 with the
+# infra/updater_boot_ready.lua, core/lifecycle/engine/shutdown/quit_request.lua, the watcher shell, systemd --user 255 with the
 # repository unit; the trees and launchers are scratch files.
 #
-# Before the fixes, on 6e36ba7249, the same quit scenario (a Quit admitted by infra/quit_request.lua in
+# Before the fixes, on 6e36ba7249, the same quit scenario (a Quit admitted by core/lifecycle/engine/shutdown/quit_request.lua in
 # the updated daemon before its ready report) ended in a rollback in both modes about 61 s later:
 #   relay:   "The updated daemon did not start (no boot report): the previous installation is back and
 #            the new one is at <root>.failed-8065." and the previous daemon was started again;
@@ -29,7 +29,7 @@ relay broken
 relay quit
   ok   the restarter took the relay route
   ok   the updated daemon started under the watcher
-  ok   its tray Quit was admitted by infra/quit_request.lua
+  ok   its tray Quit was admitted by core/lifecycle/engine/shutdown/quit_request.lua
   ok   the watch log reads « quit before it reported ready »
   info watcher settled 1 s after the restart
   ok   no daemon was started again
@@ -56,7 +56,7 @@ systemd quit
   ok   the daemon runs inside the unit's cgroup
   ok   the restarter took the systemd route
   ok   the updated daemon started under the watcher
-  ok   its tray Quit was admitted by infra/quit_request.lua
+  ok   its tray Quit was admitted by core/lifecycle/engine/shutdown/quit_request.lua
   ok   the watch log reads « quit before it reported ready »
   info watcher settled 2 s after the restart
   ok   no daemon was started again

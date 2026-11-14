@@ -3,7 +3,7 @@
 #Include %A_LineFile%\..\_generated\config_keys.ahk
 ; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
 ; the interpreter): without it the exe carries only the runtime's defaults. The
-; version comes from BUNDLE_VERSION in infra/bundle.ahk.
+; version comes from BUNDLE_VERSION in core/lifecycle/engine/bundle.ahk.
 ;@Ahk2Exe-SetProductName Ergopti+
 ;@Ahk2Exe-SetCompanyName Ergopti
 ;@Ahk2Exe-SetDescription Ergopti+: hotstrings and shortcuts to type faster and more ergonomically
@@ -124,7 +124,7 @@ if A_IsCompiled {
 ; live driver's mutex, timed out and ExitApp(0)'d before reaching its main —
 ; the projection could never publish. _DriverIsDetachedWorker, resolved at the
 ; top of this file, is the single definition of a worker invocation.
-#Include infra/single_instance_gate.ahk
+#Include core/lifecycle/engine/reload/single_instance_gate.ahk
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
 global _DriverMutexHandle := 0
@@ -230,7 +230,7 @@ if !_DriverIsDetachedWorker
 ; a keystroke during early init causes a #HotIf expression to be evaluated.
 ;
 ; ``Bundle_Init()`` below shells out to PowerShell via ``RunWait`` (see
-; ``infra/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
+; ``core/lifecycle/engine/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
 ; ~250ms unzip would otherwise trigger #HotIf evaluation on hotkeys like
 ; ``#HotIf CapsWordEnabled`` or ``#HotIf LayerEnabled`` while those globals
 ; are still unset — assigning them here keeps the very first message pump
@@ -288,7 +288,7 @@ else
 ; bootstrapper extracts it next to the .exe on first launch so the rest of
 ; the driver can keep reading from _StaticDir without caring whether it runs
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
-#Include infra/bundle.ahk
+#Include core/lifecycle/engine/bundle.ahk
 Bundle_Init()
 ; First of the retroactive boot stamps (infra/boot_profiler.ahk). Everything from
 ; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
@@ -372,7 +372,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; _shared/core/fs/data/paths/app_dirs.toml; functions too, read by the logger.
 #Include _generated/app_dirs.ahk
 ; The Ergopti root and its purpose folders, and the one-time move of the folders
-; of the builds before the single folder name (run by infra/boot.ahk).
+; of the builds before the single folder name (run by core/lifecycle/engine/boot.ahk).
 #Include infra/app_folders.ahk
 #Include infra/legacy_folder_migration.ahk
 #Include infra/tick_count.ahk
@@ -389,7 +389,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include infra/hotpath_profiler.ahk
 #Include infra/perf_budget.ahk
 #Include infra/registry.ahk
-#Include infra/app_state.ahk
+#Include core/lifecycle/engine/app_state.ahk
 BootProfile_Stamp("Diagnostics and core state initialised")
 
 ; The chord notation the HotkeyRegistrar adapter parses with, loaded before the
@@ -509,7 +509,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include ../_shared/settings/data/outdated.ahk
 #Include platform/remap/tap_hold_loader.ahk
 #Include platform/remap/tap_hold_writer.ahk
-; Tap-hold timing constants must load HERE, before infra/boot.ahk calls
+; Tap-hold timing constants must load HERE, before core/lifecycle/engine/boot.ahk calls
 ; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
 ; assignments at its #Include position, so if constants.ahk loaded at its natural
 ; spot (inside platform/remap.ahk, far below boot.ahk) the sentinel 0s would
@@ -517,7 +517,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; so the later include via platform/remap.ahk is a no-op (mirrors the
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
 #Include platform/remap/constants.ahk
-#Include infra/master_gates.ahk
+#Include core/lifecycle/engine/master_gates.ahk
 #Include infra/manifest_descriptions.ahk
 #Include infra/menu_dispatcher.ahk
 #Include infra/hook_dispatcher.ahk
@@ -525,12 +525,12 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/manifest_menu.ahk
 #Include infra/llm_defaults.ahk
 #Include modules/updater.ahk
-#Include infra/uninstall.ahk
+#Include core/lifecycle/engine/shutdown/uninstall.ahk
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include infra/input_probe.ahk
-#Include infra/driver_control.ahk
+#Include core/lifecycle/engine/driver_control.ahk
 #Include ui/error_dialog/init.ahk
 #Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
@@ -718,11 +718,11 @@ BootProfile_Stamp("Module includes initialised")
 ; ======= 1.1) Variables initialization =======
 ; =============================================
 
-#Include infra/suspend_handoff.ahk
+#Include core/lifecycle/engine/reload/suspend_handoff.ahk
 ; Before boot.ahk: a developer run reads the installed build's paths.toml.
-#Include infra/dev_source.ahk
+#Include core/lifecycle/engine/dev_source.ahk
 #Include infra/field_run.ahk
-#Include infra/boot.ahk
+#Include core/lifecycle/engine/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
 ; Settle parse-time personal includes before any process reveals the tray icon.
@@ -1286,8 +1286,8 @@ TapKeysReadConfig(_IniCache)
 KeyCombinationsReadConfig(_IniCache)
 TapHoldLoneTapReadConfig(_IniCache)
 TapHoldOneShotTimeoutReadConfig(_IniCache)
-#Include infra/quit_admission.ahk
-#Include infra/lifecycle.ahk
+#Include core/lifecycle/engine/shutdown/quit_admission.ahk
+#Include core/lifecycle/engine/lifecycle.ahk
 ; Cleanup must own windows before the configured menu admits diagnostic clicks.
 ; Empty, uninitialized metrics now pass the reversible persistence preflight.
 OnExit(Ergopti_OnShutdown, -1)
@@ -1486,7 +1486,7 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; Clear any phantom modifier carried across a Reload BEFORE the input hook starts
 ; observing keystrokes, so a Reload that landed mid-AltGr cannot leave this fresh
 ; process stuck on the AltGr layer for the first keystrokes (transient
-; « AltGr bloqué »). See _ReleasePhantomModifiers in infra/lifecycle.ahk.
+; « AltGr bloqué »). See _ReleasePhantomModifiers in core/lifecycle/engine/lifecycle.ahk.
 _ReleasePhantomModifiers()
 ; Every trigger registers before ready except the emoji and symbol sections (about
 ; 1,600 rows, 400 ms): their sequence block is reserved at their inline

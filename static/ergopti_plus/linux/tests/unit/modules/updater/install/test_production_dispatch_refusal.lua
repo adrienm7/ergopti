@@ -7,7 +7,7 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(options, body)
  options = options or {}
  local names = { "modules.updater.manager", "modules.updater.archive_transfer", "infra.archive_output",
-  "infra.monotonic", "infra.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "core.fs.adapters.storage" }
+  "infra.monotonic", "core.lifecycle.engine.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "core.fs.adapters.storage" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
@@ -78,7 +78,7 @@ local function scenario(options, body)
   end }
   package.loaded["infra.monotonic"] = { has_hires = function() return true end,
    backend = function() return "luv.hrtime" end, now_ms = function() return 1.25 end }
-  package.loaded["infra.installation"] = { is_source_run = function() return true end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
   package.loaded["modules.updater.archive_transfer"] = { new = function(ports)
    h.source = function() return ports.current(transaction) end
    local flow = {}

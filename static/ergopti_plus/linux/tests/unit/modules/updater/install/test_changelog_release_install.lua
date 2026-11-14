@@ -238,7 +238,7 @@ local function harness(opts)
 	package.loaded["infra.version"] = setmetatable({ VERSION = opts.version or "0.0.0-dev.140" },
 		{ __index = RealVersion })
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local manager = helpers.load_module("modules.updater.manager")
@@ -567,7 +567,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 		local config_path = os.tmpname()
 		pcall(os.remove, config_path)
 		-- An installed build: the checkout the suite runs from checks for nothing.
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local ok, err = pcall(function()

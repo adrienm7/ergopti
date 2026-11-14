@@ -264,7 +264,7 @@ end
 
 --- The marker a Quit creates to stop the relay of this process from starting the launcher.
 --- It sits beside the bootstrap storage file, the per-user private location the driver
---- already owns for its restart handoffs (infra/restart_pause.lua), so it never depends on
+--- already owns for its restart handoffs (core/lifecycle/engine/reload/restart_pause.lua), so it never depends on
 --- XDG_RUNTIME_DIR.
 --- @param pid integer The relay's target process.
 --- @param start_tick string|nil Captured process start tick, read when absent.
@@ -338,7 +338,7 @@ function M.restart(opts)
 	end
 	local lease, Pause
 	if opts.paused ~= nil then
-		Pause = require("infra.restart_pause")
+		Pause = require("core.lifecycle.engine.reload.restart_pause")
 		local detail
 		lease, detail = Pause.prepare(opts.paused)
 		if not lease then

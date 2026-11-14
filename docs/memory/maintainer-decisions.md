@@ -179,7 +179,7 @@ Decided by the maintainer on 2026-11-11 (CFD-1): the Linux TOML writer
 (`_shared/core/text/engine/toml_codec/writer.lua`, native writer only) and `storage.json`
 stage as `<file>.ergopti-<pid>-<start>.tmp`, `<start>` being the kernel start
 tick of `/proc/<pid>/stat` (field 22) so a reused pid is never the owner
-(`infra/stage_owner.lua`). A stage a kill or a power cut left therefore never
+(`core/lifecycle/engine/stage_owner.lua`). A stage a kill or a power cut left therefore never
 blocks a later write, and at start the daemon removes, in the folders of
 `config.toml` and `storage.json` (`reap_settings`), every stage of this pattern whose owner is
 gone (no process, a zombie, another start tick) and older than
@@ -204,7 +204,7 @@ xdotool route without the native transport); the kernel cuts it to 15 bytes
 (`TASK_COMM_LEN` 16 with its NUL), so `gnome-terminal-server` reads
 `gnome-terminal-`. Saved lists (`metrics.disabled_apps`,
 `llm.trigger.disabled_apps`, `llm.agent_disabled_apps`) are converted once at
-boot by `infra/app_identity_migration.lua` through
+boot by `core/lifecycle/engine/app_identity_migration.lua` through
 `_shared/data/linux_app_identities.json` (`aliases` comm to class, `same`
 for names that do not change); an unknown entry is kept and logged at INFO,
 never dropped, and the `migrations.linux_app_identity` marker in

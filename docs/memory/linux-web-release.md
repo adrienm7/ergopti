@@ -28,7 +28,7 @@ not watched. Moves are `mv -T -n` plus an existence check, not renameat2.
 The watcher's wait is the updated daemon's boot, so a user's Quit lands in
 that daemon, not the old one (a relay restart has already requested the old
 one's shutdown; under the unit systemd TERMs it at once). Every user Quit
-(`infra/quit_request.lua`, both degraded trays) first writes `quit` to the
+(`core/lifecycle/engine/shutdown/quit_request.lua`, both degraded trays) first writes `quit` to the
 token (`report_quit`), and the watcher then keeps the update and starts
 nothing. macOS does the same (`infra/updater_boot_ready.lua` `report_quit`, called
 by `TerminationCoordinator.request_user_exit` and the non-reload
@@ -472,7 +472,7 @@ process group means already gone.
 WebKitGTK's JavaScriptCore suspends threads for its collector with SIGUSR1 and
 installs its handler over the daemon's ("Overriding existing handler for
 signal 10"), so the reload request (SIGUSR1) killed a daemon with a WebView
-open, SIGSEGV. `infra/signal_handlers.lua` `reserve_webkit_gc_signal()` sets
+open, SIGSEGV. `core/lifecycle/engine/shutdown/signal_handlers.lua` `reserve_webkit_gc_signal()` sets
 `JSC_SIGNAL_FOR_GC=12` (SIGUSR2) at the top of `ergopti_hotstrings.lua`, before
 anything loads WebKit; verify with the process `SigCgt` mask
 (`tests/hardware/run_webkit_gc_signal.lua`). JSC still prints "invalid option:
@@ -532,7 +532,7 @@ desktop, and the largest (the HTTP engine behind `adapters/http_client`,
 `unicode_case.data`, `llm.parser`) carry identity or test-seam contracts.
 Action: measure with the probe before proposing lazy requires. The lever that
 moves the start is the precompiled-bytecode package, decided and implemented on
-2026-11-11 (`infra/bytecode_package.lua`, `install/compile_bytecode.lua`,
+2026-11-11 (`core/lifecycle/engine/bytecode_package.lua`, `install/compile_bytecode.lua`,
 maintainer-decisions): in an installed tree the load phase went 200 → 90 ms
 and spawn to ready 488 → 355 ms (`tests/hardware/run_bytecode_installed_tree.py`).
 A dev checkout still compiles from source.
@@ -609,7 +609,7 @@ depends on.
 The Linux JSON store requires an object root, creates its per-process stage
 `storage.json.ergopti-<pid>-<start>.tmp` exclusively (a foreign file under that
 name blocks the mutation and is never removed; a dead Ergopti process's stage
-is reaped at start, CFD-1, `infra/stage_owner.lua`) and publishes backups by no-replace rename on LuaJIT or checked
+is reaped at start, CFD-1, `core/lifecycle/engine/stage_owner.lua`) and publishes backups by no-replace rename on LuaJIT or checked
 link and unlink on stock Lua. The updater downloads into the inode reserved by
 `os.tmpname`, publishes with no-replace, and reuses its cache on a 304 only
 after a completed-response receipt.

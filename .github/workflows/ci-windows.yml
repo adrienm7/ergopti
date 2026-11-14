@@ -1067,7 +1067,7 @@ jobs:
           $owner   = "${{ github.repository_owner }}"
           $repo    = "${{ github.event.repository.name }}"
           $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
-          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\infra\bundle.ahk"
+          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\core\lifecycle\engine\bundle.ahk"
           $text = Get-Content -Raw -Path $bundlePath
           $text = $text.Replace("__BUNDLE_VERSION__",     $version)
           $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)

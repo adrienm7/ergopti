@@ -691,7 +691,7 @@ helpers.describe("gesture click retirement", function()
 			if setfenv then chunk = assert(loadstring("return " .. entry)); setfenv(chunk, env)
 			else chunk = assert(load("return " .. entry, "gesture-shutdown", "t", env)) end
 			local stops = 0
-			local coordinator = require("infra.shutdown_coordinator").new({ pre_wait = { chunk() },
+			local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({ pre_wait = { chunk() },
 				keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 				event_loop = { stop = function() stops = stops + 1 end } })
 			helpers.assert_eq(coordinator.request("owned-button"), true)

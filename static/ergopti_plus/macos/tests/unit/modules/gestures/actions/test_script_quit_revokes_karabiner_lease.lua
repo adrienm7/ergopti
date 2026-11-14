@@ -18,7 +18,7 @@ package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
 local quit_spy = { count = 0, result = true }
-package.loaded["infra.termination_coordinator"] = {
+package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 	request_user_exit = function(reason)
 		quit_spy.count = quit_spy.count + 1
 		quit_spy.reason = reason

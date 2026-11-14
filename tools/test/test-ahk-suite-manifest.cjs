@@ -1057,10 +1057,10 @@ const SNAPSHOT16_RUNNER = 'static/ergopti_plus/windows/tests/run_all.ahk';
 const SNAPSHOT16_OWNER =
 	'static/ergopti_plus/_shared/tap_hold/engine/buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_TEST =
-	'static/ergopti_plus/windows/tests/unit/infra/test_buffered_data_snapshot_owner.ahk';
+	'static/ergopti_plus/windows/tests/unit/core/lifecycle/engine/test_buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_FIXED_IMAGES = {
 	[SNAPSHOT16_OWNER]: '624b5eb2956eda1e622785c8c1e6175a6fbc6e2bf027ec6b13197314226d9b1a',
-	[SNAPSHOT16_TEST]: 'e660b8b031b7f3e4597dae0db279097bfae225a70abb39d274d6306a3ac0edbb'
+	[SNAPSHOT16_TEST]: '4076431f6496afc8eb7a2e5c4086d99534b98f22d7817b3de830fec711fdf693'
 };
 const SNAPSHOT16_NAMES = [
 	'windows91 snapshots: source prototype stays image data (snapshot-base-data)',

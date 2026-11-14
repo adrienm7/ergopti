@@ -13,7 +13,7 @@
 ; ==============================================================================
 
 ; feature_state.ahk is syntax-validated on its own as well as included after
-; boot.ahk.  Do not dereference boot-owned path globals while constructing the
+; ../core/lifecycle/engine/boot.ahk.  Do not dereference boot-owned path globals while constructing the
 ; declaration: their empty standalone values are harmless and the real driver
 ; has assigned both before this file executes.
 ; The preview-switch readers the loader publishes to. The engine includes the same
@@ -149,7 +149,7 @@ global KeyboardShortcutAssignments := Map()
 ; user's per-feature choices on every master click. The new design
 ; separates the master gate (this Map) from the per-feature .Enabled
 ; flags: toggling the master flips ``CategoryEnabled[Category]`` only,
-; and ``ApplyMasterGatesToFeatures`` in infra/master_gates.ahk forces
+; and ``ApplyMasterGatesToFeatures`` in core/lifecycle/engine/master_gates.ahk forces
 ; the corresponding Features entries to false at boot — a disabled
 ; category propagates as all Features entries reading false at the HotIf
 ; level, but the underlying per-feature choices persisted on disk are

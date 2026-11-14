@@ -20,7 +20,7 @@
 		{
 			"source": "static/img/logo",
 			"dest": "static/img/logo",
-			"why": "Tray icons (infra/boot.ahk IconPath and IconPathDisabled)."
+			"why": "Tray icons (core/lifecycle/engine/boot.ahk IconPath and IconPathDisabled)."
 		},
 		{
 			"source": "static/img/flags",

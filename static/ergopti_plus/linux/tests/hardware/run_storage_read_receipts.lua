@@ -88,7 +88,7 @@ for _, operation in ipairs(operations) do
 				"native read refusal was followed by data loss")
 			assert(accepted == false, "mutation accepted an unclassified store")
 			assert(recovery and recovery.reason == "read_failed" and recovery.preserved == true)
-			assert(uv.fs_lstat(require("infra.stage_owner").stage_path(store)) == nil, "refused mutation wrote a temporary store")
+			assert(uv.fs_lstat(require("core.lifecycle.engine.stage_owner").stage_path(store)) == nil, "refused mutation wrote a temporary store")
 		end)
 	end
 	check(operation.name .. " accepts a genuinely missing store", function()

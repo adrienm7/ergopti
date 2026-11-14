@@ -7,7 +7,7 @@
 --- ==============================================================================
 local M = {}
 local helpers = require("tests.helpers")
-local Coordinator = require("infra.shutdown_coordinator")
+local Coordinator = require("core.lifecycle.engine.shutdown.coordinator")
 local Gate = require("infra.input_capture_gate")
 local Onboarding = require("ui.onboarding.startup")
 
@@ -182,7 +182,7 @@ function M.run(options)
 		ui("watchers"); observed.services = true
 	end, stop = function() record("watchers.stop") end, has_inotify = function() return true end }
 	env.require = function(name)
-		if name == "infra.signal_handlers" then
+		if name == "core.lifecycle.engine.shutdown.signal_handlers" then
 			return { start = function(callbacks)
 				observed.callbacks = callbacks; observed.signals_active = true; record("signals.start")
 				return not options.signal_refused, "controlled signal admission refusal"
@@ -192,9 +192,9 @@ function M.run(options)
 			end }
 		elseif name == "infra.gui_stack" then
 			-- The desktop toolkit is present: its refusal has its own cases
-			-- (tests/unit/infra/lifecycle/test_gui_stack.lua).
+			-- (tests/unit/core/lifecycle/test_gui_stack.lua).
 			return { check_at_start = function() record("gui_stack"); return nil end }
-		elseif name == "infra.driver_control" then
+		elseif name == "core.lifecycle.engine.driver_control" then
 			-- The local reload control starts once the daemon is ready.
 			return { start = function(control_options)
 				observed.driver_control = control_options
@@ -245,7 +245,7 @@ function M.run(options)
 		elseif name == "infra.perf_counters" then
 			-- The real counters: the exit path flushes their last interval.
 			return require(name)
-		elseif name == "infra.dev_source" then
+		elseif name == "core.lifecycle.engine.dev_source" then
 			-- An installed daemon: no developer root, no source watchers.
 			return { root = function() return nil end, is_active = function() return false end,
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * tools/dev/run-windows-dev.ps1 starts ErgoptiPlus.ahk from this clone with
  * AutoHotkey v2 and names the clone in the shared developer variable, which
- * infra/dev_source.ahk checks. Actual PowerShell AST selection runs against real
+ * core/lifecycle/engine/dev_source.ahk checks. Actual PowerShell AST selection runs against real
  * private files on every host. Entry-body controls observe only process effects;
  * non-Windows hosts omit the unique platform guard in a private copy. Windows
  * executes the complete unmodified entry with Windows PowerShell 5.1. No installed
@@ -63,7 +63,7 @@ check('asks a running ErgoptiPlus to close and never forces it', () => {
 
 check('the driver reads the same variable name it is handed', () => {
 	const driver = fs.readFileSync(
-		path.join(ROOT, 'static/ergopti_plus/windows/infra/dev_source.ahk'),
+		path.join(ROOT, 'static/ergopti_plus/windows/core/lifecycle/engine/dev_source.ahk'),
 		'utf8'
 	);
 	assert.match(driver, /Data\["dev_source"\]\["environment"\]/);

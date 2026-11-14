@@ -27,7 +27,7 @@
 #Include ../../infra/webview_utils.ahk
 #Include ../../infra/config_transition.ahk
 #Include ../../infra/config_transition_runtime.ahk
-#Include ../../infra/reload_terminal_handoff.ahk
+#Include ../../core/lifecycle/engine/reload/terminal_handoff.ahk
 #Include ../../modules/keystats/keystats_json.ahk
 #Include ../../modules/keystats/keystats_walker_core.ahk
 #Include ../../modules/keystats/keystats_prefetch.ahk

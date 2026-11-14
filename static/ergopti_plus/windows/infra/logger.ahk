@@ -511,7 +511,7 @@ _LoggerResolveDatedPaths() {
 
 ; Reassign the retention window from the shared registry ([logger] retention_days).
 ; AHK v2 runs global initializers before the auto-execute body, so the sentinel
-; above cannot call TimingsGet itself; infra/boot.ahk calls this right after
+; above cannot call TimingsGet itself; core/lifecycle/engine/boot.ahk calls this right after
 ; TimingsLoadShared(), before LoggerInit purges. Fail-fast: TimingsGet throws on
 ; a missing key, and a window under one day would purge today's own files.
 LoggerLoadTimings() {
