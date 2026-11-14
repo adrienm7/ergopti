@@ -15,14 +15,14 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 			"symbol": "_OnPrefixKeyDown",
-			"sha256": "1bdc460b3476fa360ac2f64a0662287dce4fb8ffb634b310684847121a4f63d3"
+			"sha256": "46a5709625ca658a2987dcbca5af6378eabbee309dd8cacd9fed97228e5fb00f"
 		},
 		{
 			"id": "windows-undo",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
 			"symbol": "HSE_UndoExpansion(Undo",
-			"sha256": "247ab39752f6c1aa72058ea4736a31e3fc71d0d7e1351b3c363477abe50bca96"
+			"sha256": "412214f21cc2bbcfa0ec98fc468e3a9a7f5bd1151ab784e67f77b9e7c216eebe"
 		},
 		{
 			"id": "macos-repeat",
