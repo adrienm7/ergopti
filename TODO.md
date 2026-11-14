@@ -1205,6 +1205,11 @@ Each closes on a named green hosted or native run, recorded here.
       Ollama (Intel) failed « The managed Ollama build handoff never arrived » because its build job waited for a
       runner from 03:24 to 04:10 Paris and finished at 04:18:45, after the consumer's wait ended at 04:17:20 (CI
       capacity, not code).
+      Worker C 2026-11-14 (Paris), not mine, left open: desktop-webview « The privacy owner follows real GTK fields
+      on the accessibility bus » failed in [43611736406](https://github.com/adrienm7/ergopti/actions/runs/43611736406)
+      (branch `claude/ergopti-todo-nix-late-term`, whose commits touch only the managed phase worker and the native
+      theme data), the same AT-SPI family as worker J's secure-field probe below; its own fixture may need the same
+      ready-file wait.
       Worker J 2026-11-14, two Linux intermittents fixed at their cause (keep listed until they stay green):
       (1) desktop-webview « The secure-field probe on a real accessibility bus » failed once in 16 runs
       ([43549510667](https://github.com/adrienm7/ergopti/actions/runs/43549510667), job 132327549143):
