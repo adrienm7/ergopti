@@ -588,6 +588,14 @@ coordinator on 2026-11-11, to review by the maintainer.
 
 - [ ] macOS boot: `migrations.toml` (74 KB) is parsed and validated at every boot (about 30 ms of Lua 5.4); a
       generated, hash-checked Lua mirror would remove it (maintainer decision, numbers in the report).
+      Other OS, measured or read 2026-11-14 (worker L): Windows already skips the parse with a typed cache keyed by
+      the registry's SHA-256 and the parser files' identity (`infra/config_registry_cache.ahk`, validation still runs
+      on a hit; its parse cost about 0.5 s); Linux parses the same file under LuaJIT in about 7 ms cold and under 1 ms
+      warm (`settings.engine.migration.migrate.load_registry`, 21 runs), not worth a cache. Decided by the agent on
+      2026-11-14, to review by the maintainer: not built tonight. The parity path is a port of the Windows cache to
+      Lua (native `hs.hash.SHA256` of the source, a typed codec that evaluates no cached code, validation kept on a
+      hit) rather than a generated mirror, whose staleness only a gate would catch; it needs a Mac to measure the
+      30 ms it would save, and config migration is the place a wrong cache would rewrite a user's settings.
 - [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
       `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
