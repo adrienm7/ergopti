@@ -93,6 +93,14 @@ ValueSchemaData() {
 			"type", "integer",
 			"min", 0,
 			"max", 100),
+		"layers.repeat_count", Map(
+			"file", "layers.toml",
+			"type", "integer",
+			"min", 1,
+			"max", 99,
+			"max_from", Map(
+				"file", "layouts/data/layer_actions.toml",
+				"pattern", "\[parameters\.repeat_count\]\n(?:[^\n]*\n)*?max = (\d+)")),
 		"llm.generation.context_length", Map(
 			"file", "config.toml",
 			"type", "integer",

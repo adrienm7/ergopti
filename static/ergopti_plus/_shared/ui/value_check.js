@@ -605,6 +605,16 @@ function requireValue(schema, key, value) {
 				"type": "decimal",
 				"min": -2,
 				"max": 2
+			},
+			"layers.repeat_count": {
+				"file": "layers.toml",
+				"type": "integer",
+				"min": 1,
+				"max": 99,
+				"max_from": {
+					"file": "layouts/data/layer_actions.toml",
+					"pattern": "\\[parameters\\.repeat_count\\]\\n(?:[^\\n]*\\n)*?max = (\\d+)"
+				}
 			}
 		}
 	};
@@ -636,7 +646,8 @@ function requireValue(schema, key, value) {
 		"PERSONAL_INFO_INFO_ANY": "personal_info.info.*",
 		"PERSONAL_INFO_LETTERS_ANY": "personal_info.letters.*",
 		"UPDATER_CHECK_INTERVAL_SECONDS": "updater.check_interval_seconds",
-		"METRICS_APPS_ANY_SCORE": "metrics_apps.*.score"
+		"METRICS_APPS_ANY_SCORE": "metrics_apps.*.score",
+		"LAYERS_REPEAT_COUNT": "layers.repeat_count"
 	};
 
 	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });

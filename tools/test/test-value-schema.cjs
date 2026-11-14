@@ -58,7 +58,8 @@ const FILES = [
 	'tap_hold.toml',
 	'hotstrings_config.toml',
 	'personal_info.toml',
-	'app_categories.json'
+	'app_categories.json',
+	'layers.toml'
 ];
 const UNITS = ['ms', 's', 'mm', 'characters', 'words'];
 const FIELDS = {
