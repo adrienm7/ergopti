@@ -113,6 +113,12 @@ export const ERGOPTI_PLUS_PAGES = Object.freeze([
 	})
 ]);
 
+/** Tabs of Ergopti Studio: the editor and the layout comparison. */
+export const STUDIO_PAGES = Object.freeze([
+	Object.freeze({ route: '/studio', label: 'Éditer' }),
+	Object.freeze({ route: '/studio/comparer', label: 'Comparer' })
+]);
+
 /**
  * Former Ergopti+ anchors and the sub-page that now holds each of them. The
  * overview keeps #ep-demo and #ep-promesses.

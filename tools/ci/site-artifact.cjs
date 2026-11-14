@@ -48,7 +48,8 @@ const SITE_ROUTES = Object.freeze([
 	'/ergopti-plus/installation',
 	'/ergopti-plus/faq',
 	'/ergopti-plus-old',
-	'/studio'
+	'/studio',
+	'/studio/comparer'
 ]);
 const SITE_BROWSERS = Object.freeze(['chromium', 'webkit']);
 

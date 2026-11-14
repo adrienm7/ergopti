@@ -36,6 +36,11 @@ const HOME_CARDS = Object.freeze([
 	['ergopti-plus', 'Ergopti+', '/ergopti-plus'],
 	['studio', 'Ergopti Studio', '/studio']
 ]);
+// Ergopti Studio tabs: the editor and the layout comparison.
+const STUDIO_TABS = Object.freeze([
+	['/studio', 'Éditer'],
+	['/studio/comparer', 'Comparer']
+]);
 // Where the layout version selector must and must not be.
 const VERSION_SELECTOR = Object.freeze({
 	present: ['/ergopti', '/ergopti/benchmarks'],
@@ -204,6 +209,20 @@ async function exerciseSections(page, origin, basePath) {
 	await expectMenu(page, 'studio');
 	assert.equal((await page.locator('h1').first().textContent()).trim(), 'Ergopti Studio');
 	assert.equal(await page.title(), 'Ergopti Studio');
+	for (const [route, current] of STUDIO_TABS) {
+		await visit(page, origin, basePath, route);
+		await expectMenu(page, 'studio');
+		const tabs = await page
+			.locator('nav.subnav a')
+			.evaluateAll((links) =>
+				links.map((link) => [link.textContent.trim(), link.getAttribute('aria-current') === 'page'])
+			);
+		assert.deepEqual(
+			tabs,
+			STUDIO_TABS.map(([, label]) => [label, label === current]),
+			'Studio tabs on ' + route
+		);
+	}
 }
 
 /** Every former address lands on its new page, anchors included. */
@@ -383,6 +402,7 @@ module.exports = {
 	VERSION_SELECTOR,
 	ERGOPTI_PLUS_SECTIONS,
 	REDIRECTS,
+	STUDIO_TABS,
 	exerciseSiteStructure,
 	runEngine,
 	main
