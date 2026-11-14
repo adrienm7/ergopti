@@ -9,8 +9,9 @@
  * _VpnRet_ReadSource("network_info.ahk"). S08 renamed that file to
  * core/network/adapters/info.ahk and left the lookups on the old name, so
  * four network info cases failed on CI. A quoted base name of a production
- * file the step renames now follows it; a new name another production file
- * shares would find neither, so the step is refused.
+ * file the step renames now follows it; a name another production file
+ * shares after the step (a new name, or an unmoved file's name another file
+ * takes) would find neither, so the step is refused.
  * ==============================================================================
  */
 
@@ -50,6 +51,22 @@ function run() {
 		refused.some((r) => r.kind === 'dir-split'),
 		JSON.stringify(refused)
 	);
+	// A file that stays is shadowed when another takes its name: S10 renames
+	// infra/text_utils.ahk to core/text/engine/utils.ahk, beside the unmoved
+	// modules/shortcuts/utils.ahk.
+	const SHADOWER = 'windows/infra/text_utils.ahk';
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus', SHADOWER))) {
+		const shadowStep = Plan.steps(map).find((s) => s.moves.some(([o]) => o === SHADOWER));
+		const shadowMap = new Map(
+			[...map].map(([o, t]) => [o, shadowStep.moves.some(([so]) => so === o) ? t : o])
+		);
+		const lookup = '\tShortcutSrc := _AOPS_ReadSource("utils.ahk")\n';
+		const shadowed = Plan.scanFile(FILE, lookup, Plan.referenceContext(shadowMap));
+		assert.ok(
+			shadowed.some((r) => r.kind === 'dir-split' && r.old === '"utils.ahk"'),
+			JSON.stringify(shadowed)
+		);
+	}
 	console.log(`[OK] a Windows base-name lookup follows the file ${step.id} renames.`);
 }
 
