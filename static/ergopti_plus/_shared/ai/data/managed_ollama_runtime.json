@@ -170,7 +170,8 @@
 			"TestAlignRangeSkipsAFullResponseToThePartOffset",
 			"TestAlignRangeKeepsTheBodyOfTheAskedRange",
 			"TestAlignRangeRefusesWhatWouldCorruptTheFile",
-			"TestNotModifiedRepresentationLengthDoesNotRequireBody"
+			"TestNotModifiedRepresentationLengthDoesNotRequireBody",
+			"TestCancellationAndConcurrentClosePhysicallyRetirePeer/slow-start"
 		]
 	}
 }
