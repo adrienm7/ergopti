@@ -746,6 +746,33 @@ const SYNTHETIC_PATHS = [
  * and Windows Install and launch failed). An entry names a whole file, every
  * file under a prefix, or the regions of a file a pattern matches.
  */
+/**
+ * The README markers a step writes (Convention P: every driver ships every
+ * platform/ sub-folder; one with nothing to put there explains the mechanism
+ * it uses instead). A step that moves `moves` into a platform domain writes
+ * each listed marker of the drivers without that domain, from its authored
+ * source under tools/audit/structure/markers/.
+ * @type {{moves: string, file: string}[]}
+ */
+const PLATFORM_MARKERS = [
+	{
+		moves: 'linux/desktop_focus/gnome/metadata.json',
+		file: 'macos/platform/desktop_focus/README.md'
+	},
+	{
+		moves: 'linux/desktop_focus/gnome/metadata.json',
+		file: 'windows/platform/desktop_focus/README.md'
+	},
+	{
+		moves: 'windows/native/nav_event_owner/nav_event_owner.c',
+		file: 'macos/platform/native/README.md'
+	},
+	{
+		moves: 'windows/native/nav_event_owner/nav_event_owner.c',
+		file: 'linux/platform/native/README.md'
+	}
+];
+
 const PUBLISHED_RECORDS = [
 	{
 		file: 'tools/test/fixtures/windows-upgrade-prior.json',
@@ -966,6 +993,7 @@ const DRIVER_SECTION_FILES = [
 ];
 
 module.exports = {
+	PLATFORM_MARKERS,
 	DRIVER_SECTION_FILES,
 	REQUALIFIED_PINS,
 	FOLDER_EDITS,

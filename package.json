@@ -177,6 +177,7 @@
 		"test:structure-ahk-fixture-paths": "node ./tools/test/test-structure-ahk-fixture-paths.cjs",
 		"test:structure-published-records": "node ./tools/test/test-structure-published-records.cjs",
 		"test:structure-shell-paths": "node ./tools/test/test-structure-shell-paths.cjs",
+		"test:structure-platform-markers": "node ./tools/test/test-structure-platform-markers.cjs",
 		"test:ahk-os-purity-platform": "node ./tools/test/test-ahk-os-purity-platform.cjs",
 		"test:structure-guard-needles": "node ./tools/test/test-structure-guard-needles.cjs",
 		"test:structure-optional-includes": "node ./tools/test/test-structure-optional-includes.cjs",

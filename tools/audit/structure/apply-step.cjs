@@ -38,6 +38,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 const Plan = require('./plan.cjs');
+const Edits = require('./edits.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const PREFIX = 'static/ergopti_plus/';
@@ -529,6 +530,37 @@ function followGuardNeedles(guardText, readerTexts) {
 	);
 }
 
+/**
+ * The README markers `step` writes (edits.cjs PLATFORM_MARKERS), as tree-relative
+ * paths, each with its authored source.
+ * @returns {{file: string, source: string}[]}
+ */
+function platformMarkers(step) {
+	const moved = new Set(step.moves.map(([o]) => o));
+	return Edits.PLATFORM_MARKERS.filter((m) => moved.has(m.moves)).map((m) => ({
+		file: m.file,
+		source: path.join(__dirname, 'markers', m.file)
+	}));
+}
+
+/**
+ * Writes the step's README markers into the tree; refuses one whose source is
+ * missing or whose target already exists.
+ * @returns {string[]} The repository paths written.
+ */
+function writePlatformMarkers(step) {
+	const written = [];
+	for (const { file, source } of platformMarkers(step)) {
+		const target = path.join(ROOT, PREFIX, file);
+		if (!fs.existsSync(source)) throw new Error(`platform marker source missing: ${source}`);
+		if (fs.existsSync(target)) throw new Error(`platform marker would overwrite ${PREFIX}${file}`);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(source, target);
+		written.push(`${PREFIX}${file}`);
+	}
+	return written;
+}
+
 function pruneEmptyFolders(oldRepoPaths) {
 	const folders = new Set();
 	for (const f of oldRepoPaths) {
@@ -775,6 +807,7 @@ function main() {
 		git('mv', '--', oldRepo, newRepo);
 	}
 	for (const r of retiredRepo) git('rm', '-q', '--', r);
+	const markers = writePlatformMarkers(step);
 	pruneEmptyFolders([...movedRepo.keys(), ...retiredRepo]);
 	// The follow-ups (repin.cjs) pair each moved file with its new path from
 	// this list rather than from Git's similarity guess.
@@ -787,7 +820,11 @@ function main() {
 	git(
 		'add',
 		'--',
-		...new Set([...[...edits.keys()].map((f) => movedRepo.get(f) || f), ...movedRepo.values()])
+		...new Set([
+			...[...edits.keys()].map((f) => movedRepo.get(f) || f),
+			...movedRepo.values(),
+			...markers
+		])
 	);
 	console.log(
 		'applied and staged; run the step gates of docs/design/structure-plan.md before committing.'
@@ -797,6 +834,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	platformMarkers,
 	followGuardNeedles,
 	newPathToken,
 	rewriteOwnIncludes,
