@@ -8,9 +8,9 @@
 # same entry point the packages start, install/launch.sh, with the tray: the
 # same input-permission request, session lock, native archive backend, luv,
 # config folder (~/.config/ergopti, paths.toml) and AI runtimes. A saved .lua of
-# the driver or of _shared restarts the daemon (infra/dev_source.lua); the
+# the driver or of _shared restarts the daemon (core/lifecycle/engine/dev_source.lua); the
 # tray's Reload does it on demand. The updater is off: a checkout is a source
-# run (infra/installation.lua).
+# run (core/lifecycle/engine/installation.lua).
 #
 # USAGE:
 #   bash tools/dev/run-linux-dev.sh [daemon options]   e.g. --verbose

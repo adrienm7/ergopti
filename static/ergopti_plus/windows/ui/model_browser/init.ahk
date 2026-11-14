@@ -24,7 +24,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
-#Include %A_LineFile%\..\..\..\infra\lifecycle_transition.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\transition.ahk
 
 #Requires AutoHotkey v2.0
 

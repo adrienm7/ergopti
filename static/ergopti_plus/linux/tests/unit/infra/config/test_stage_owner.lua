@@ -26,14 +26,14 @@ end
 
 helpers.describe("CFD-1: per-process stages and their reaping (cfd1-stage-owner)", function()
 	helpers.it("names the stage after the pid and the kernel start tick (cfd1-stage-owner)", function()
-		local Owner = require("infra.stage_owner")
+		local Owner = require("core.lifecycle.engine.stage_owner")
 		Owner._set_reader_for_test(reader({ ["/proc/self/stat"] = SELF_STAT }))
 		helpers.assert_eq(Owner.stage_path("/cfg/config.toml"), "/cfg/config.toml.ergopti-4242-987654.tmp")
 		Owner._set_reader_for_test(nil)
 	end)
 
 	helpers.it("tells a dead or reused owner from a live one (cfd1-stage-owner)", function()
-		local Owner = require("infra.stage_owner")
+		local Owner = require("core.lifecycle.engine.stage_owner")
 		Owner._set_reader_for_test(reader({
 			["/proc/self/stat"] = SELF_STAT,
 			["/proc/100/stat"] = stat_of(100, "S", 555),
@@ -48,7 +48,7 @@ helpers.describe("CFD-1: per-process stages and their reaping (cfd1-stage-owner)
 	end)
 
 	helpers.it("reaps only old stages of a dead Ergopti process (cfd1-stage-owner)", function()
-		local Owner = require("infra.stage_owner")
+		local Owner = require("core.lifecycle.engine.stage_owner")
 		Owner._set_reader_for_test(reader({
 			["/proc/self/stat"] = SELF_STAT,
 			["/proc/100/stat"] = stat_of(100, "S", 555),

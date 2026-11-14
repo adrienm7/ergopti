@@ -54,7 +54,7 @@ const GROUPS = [
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
 // AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone, and
-// so is the name its atomic-write stages carry (linux/infra/stage_owner.lua). The
+// so is the name its atomic-write stages carry (linux/core/lifecycle/engine/stage_owner.lua). The
 // catalogue shown for a system language without one also reaches AutoHotkey.
 const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'locales']);
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
@@ -72,7 +72,7 @@ const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // separated plain segments, with an optional final slash for a prefix.
 const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
 // The bytecode package's file names, wire markers and the compiler's root-relative
-// path (linux/infra/bytecode_package.lua, modules/updater/installer.lua).
+// path (linux/core/lifecycle/engine/bytecode_package.lua, modules/updater/installer.lua).
 const GROUP_SHAPE = { field_report: PATH_SHAPE, bytecode_package: PATH_SHAPE };
 
 /** Stops generation with one exact reason. */

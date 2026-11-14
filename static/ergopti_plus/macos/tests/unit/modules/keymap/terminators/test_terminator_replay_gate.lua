@@ -255,8 +255,8 @@ helpers.describe("terminator replay: real transaction ordering", function()
 					helpers.assert_eq(control.is_paused(), false)
 					helpers.assert_true(control.is_pause_transition_pending())
 				else
-					package.loaded["infra.termination_coordinator"] = nil
-					control = require("infra.termination_coordinator")
+					package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = nil
+					control = require("core.lifecycle.engine.shutdown.termination_coordinator")
 					helpers.assert_true(control.init({
 						request_lease = function(_, callback) callback(true); return true end,
 						drain_input = fixture.synthetic.when_idle,
@@ -297,7 +297,7 @@ helpers.describe("terminator replay: real transaction ordering", function()
 				else
 					helpers.assert_true(committed)
 					helpers.assert_true(deadline.stopped, "a completed reload retires its deadline")
-					package.loaded["infra.termination_coordinator"] = nil
+					package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = nil
 				end
 			end, debug.traceback)
 			local added = {}

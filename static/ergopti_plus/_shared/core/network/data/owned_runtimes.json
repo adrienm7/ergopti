@@ -1399,7 +1399,7 @@
 			"os": "windows",
 			"tool": "`tar.exe`",
 			"programs": ["tar.exe"],
-			"used_for": "Unpacks bundles (`windows/infra/bundle.ahk:272`)",
+			"used_for": "Unpacks bundles (`windows/core/lifecycle/engine/bundle.ahk:272`)",
 			"today": "System component",
 			"current_class": "SYS",
 			"version_needed": "bsdtar",

@@ -2452,7 +2452,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	; Respect the per-section enabled flag before registering anything live.
 	; ApplyMasterGatesToFeatures already folds the Hotstrings master gate (and
 	; any per-file sub-category gate) into this same "enabled" flag (see
-	; infra/master_gates.ahk), so checking it here mirrors exactly what
+	; core/lifecycle/engine/master_gates.ahk), so checking it here mirrors exactly what
 	; _HS_RegisterPersonal already does at boot/full-rebuild time. Without this,
 	; saving an edit in a section the tray checkbox still shows as disabled
 	; silently activated it live (personal-hotstring-live-reload-ignores-gate).

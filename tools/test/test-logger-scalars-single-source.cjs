@@ -196,28 +196,28 @@ mustNotDeclare(
 				'unguarded purge before LoggerLoadTimings deletes every dated log file.'
 		);
 	}
-	const boot = read('windows/infra/boot.ahk');
+	const boot = read('windows/core/lifecycle/engine/boot.ahk');
 	const loadAt = boot.indexOf('\nTimingsLoadShared()\n');
 	const loaderAt = boot.indexOf('\nLoggerLoadTimings()\n');
 	if (loadAt < 0 || loaderAt < 0 || loaderAt < loadAt) {
 		errors.push(
-			'windows/infra/boot.ahk: LoggerLoadTimings() must be called after TimingsLoadShared(), ' +
+			'windows/core/lifecycle/engine/boot.ahk: LoggerLoadTimings() must be called after TimingsLoadShared(), ' +
 				'before LoggerInit purges.'
 		);
 	}
 	const entry = read('windows/ErgoptiPlus.ahk');
 	const loggerInclude = entry.indexOf('#Include infra/logger.ahk');
-	const bootInclude = entry.indexOf('#Include infra/boot.ahk');
+	const bootInclude = entry.indexOf('#Include core/lifecycle/engine/boot.ahk');
 	const init = entry.indexOf('\nLoggerInit()\n');
 	if (loggerInclude < 0 || bootInclude < 0 || loggerInclude > bootInclude) {
 		errors.push(
-			'windows/ErgoptiPlus.ahk: infra/logger.ahk must be included before infra/boot.ahk, or its ' +
+			'windows/ErgoptiPlus.ahk: infra/logger.ahk must be included before core/lifecycle/engine/boot.ahk, or its ' +
 				'sentinel re-zeroes the retention LoggerLoadTimings just loaded.'
 		);
 	}
 	if (init < 0 || init < bootInclude) {
 		errors.push(
-			'windows/ErgoptiPlus.ahk: the boot LoggerInit() must run after infra/boot.ahk has loaded the ' +
+			'windows/ErgoptiPlus.ahk: the boot LoggerInit() must run after core/lifecycle/engine/boot.ahk has loaded the ' +
 				'retention window.'
 		);
 	}

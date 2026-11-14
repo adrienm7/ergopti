@@ -99,9 +99,9 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 	-- Field run 2026-10-27 19:47:04 (ledger L45): a burst refused while the reload
 	-- it triggered was terminating logged a WARNING; it is expected, so INFO.
 	helpers.it("logs a refusal during a reload or quit at INFO and still retains the burst", function()
-		local previous = package.loaded["infra.termination_coordinator"]
+		local previous = package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"]
 		local terminating = true
-		package.loaded["infra.termination_coordinator"] = {
+		package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 			terminal_in_progress = function() return terminating end,
 		}
 		local levels = {}
@@ -120,7 +120,7 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 			terminating = false
 			w.poll()
 		end, { reload = function() return false end, logger = logger })
-		package.loaded["infra.termination_coordinator"] = previous
+		package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = previous
 		if not ok then error(err, 0) end
 		helpers.assert_eq(levels[1], "info:Menu reload request deferred: a reload or quit is in progress.")
 		-- The value used to follow "remains pending for retry:", so a refused

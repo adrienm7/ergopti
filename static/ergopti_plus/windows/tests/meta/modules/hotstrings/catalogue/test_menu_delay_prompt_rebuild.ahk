@@ -57,7 +57,7 @@ _MDPN_Source() {
  AssertTrue(NumberOwner != "", "The canonical integer parser must have its genuine owner")
  Source .= "#Include " . NumberOwner . "`n"
  ; The prompts read the shared value schema through the genuine value check.
- Source .= "#Include " . _DriverDir . "\infra\value_check.ahk`n"
+ Source .= "#Include " . _DriverDir . "\core\lifecycle\engine\value_check.ahk`n"
  ; ...and the generated key constants the prompt bodies name.
  Source .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
  for Symbol in ["_HS_PromptDefaultDelay", "_HS_PromptCategoryDelay", "_HS_PromptPersonalFileField"] {

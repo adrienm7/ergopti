@@ -562,7 +562,7 @@ helpers.describe("installer-backup-ownership native receipts", function()
 		if not ok then error(failure, 0) end
 	end)
 
-	-- The bytecode package is compiled after the receipt (infra/bytecode_package.lua):
+	-- The bytecode package is compiled after the receipt (core/lifecycle/engine/bytecode_package.lua):
 	-- an update must still rotate a backup that carries one.
 	helpers.it("(installer-backup-ownership) admits the derived bytecode tree by name, never as a link", function()
 		local installer = helpers.load_module("modules.updater.installer")

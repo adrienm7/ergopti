@@ -49,7 +49,7 @@ _HDCS_FuncBody(Src, FnDecl) {
 ; ===================================================
 
 _HDCS_CheckRegisterSaveRestore() {
-	Src := _DriverDirsConcat("infra", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 
 	RegBody := _HDCS_FuncBody(Src, "static Register(")
 	Assert(RegBody != "", "HookDispatcher.Register must be present")
@@ -61,7 +61,7 @@ _HDCS_CheckRegisterSaveRestore() {
 }
 
 _HDCS_CheckUnregisterSaveRestore() {
-	Src := _DriverDirsConcat("infra", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 
 	UnregBody := _HDCS_FuncBody(Src, "static Unregister(")
 	Assert(UnregBody != "", "HookDispatcher.Unregister must be present")

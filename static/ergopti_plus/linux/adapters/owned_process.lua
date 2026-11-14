@@ -11,8 +11,8 @@
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local Logger = require("core.logger.engine.shim")
-local Exit = require("infra.libuv_exit")
-local Group = require("infra.libuv_process_group")
+local Exit = require("core.lifecycle.engine.shutdown.libuv_exit")
+local Group = require("core.lifecycle.engine.libuv_process_group")
 local NativeTimer = require("infra.native_timer")
 local Defaults = require("ai.engine.policy.process_limits").defaults()
 local available, native = pcall(require, "luv")

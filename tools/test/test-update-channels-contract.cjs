@@ -528,7 +528,7 @@ function checkSparkleFeedNames(registry) {
 // registry; a quoted channel id or alias in code means a site spelled the
 // channel by hand again.
 const CHANNEL_CONSUMERS = [
-	'windows/infra/bundle.ahk',
+	'windows/core/lifecycle/engine/bundle.ahk',
 	'windows/modules/updater.ahk',
 	'windows/modules/updater/channels.ahk',
 	'windows/modules/updater/core.ahk',

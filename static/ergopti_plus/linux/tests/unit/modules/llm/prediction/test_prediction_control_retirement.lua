@@ -683,7 +683,7 @@ do
 			local logger = assert(dofile(root .. "/../_shared/core/logger/engine/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
 			put("core.logger.engine.shim", logger)
 			put("infra.logger_sink", { install = yes })
-			put("infra.session_lock", { protect = yes, acquire = yes })
+			put("core.lifecycle.engine.shutdown.session_lock", { protect = yes, acquire = yes })
 			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
 			put("infra.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
 			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
@@ -693,8 +693,8 @@ do
 			  return ok, result
 			end })
 			put("infra.input_access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
-			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
-			put("infra.restart_pause", { restore = yes })
+			put("core.lifecycle.engine.shutdown.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
+			put("core.lifecycle.engine.reload.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
@@ -781,7 +781,7 @@ do
 			hook.isRunning, hook.get_mode = yes, function() return "intercept" end
 			local optional = { ["modules.llm.prediction_engine"] = prediction, ["ui.tooltip.llm"] = overlay,
 			  ["adapters.window_info"] = window, ["adapters.secure_field_detector"] = require("adapters.secure_field_detector") }
-			put("infra.runtime_guard", { optional_require = function(name) return optional[name] end,
+			put("core.lifecycle.engine.runtime_guard", { optional_require = function(name) return optional[name] end,
 			  call = function(_, callback) return true, callback() end })
 			put("core.events.loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
 			-- Selected keyboard bindings are absent; the classifier itself is the production module.

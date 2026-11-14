@@ -665,7 +665,7 @@ package.preload["core.events.loop"] = function()
 		final_screen = string.format("SCREEN %q", table.concat(screen))
 	end
 	adapter.run = function(loop)
-		local uv, signals = require("luv"), require("infra.signal_handlers")
+		local uv, signals = require("luv"), require("core.lifecycle.engine.shutdown.signal_handlers")
 		local active_signals = 0
 		uv.walk(function(handle)
 			if uv.handle_get_type(handle) == "signal" and uv.is_active(handle) then
@@ -710,7 +710,7 @@ local function publish_expected_failure()
 		failure_published = true
 		print(final_screen)
 		print("E2E_EXPECTED_FAILURE injection output_debt=true signals_settled="
-			.. tostring(require("infra.signal_handlers").is_settled()))
+			.. tostring(require("core.lifecycle.engine.shutdown.signal_handlers").is_settled()))
 		io.stdout:flush()
 	end
 	return true

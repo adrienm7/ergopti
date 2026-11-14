@@ -14,7 +14,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(

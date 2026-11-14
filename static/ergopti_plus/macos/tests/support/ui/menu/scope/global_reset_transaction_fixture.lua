@@ -37,7 +37,7 @@ local MODULE_KEYS = {
 	"adapters.tray_menu",
 	"keyboard.engine.chord",
 	"adapters.hotkey_registrar",
-	"infra.termination_coordinator",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"infra.factory_reset_journal",
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.global_actions_transaction",
@@ -399,7 +399,7 @@ local function with_menu_fixture(options, callback)
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_user_exit = function()
 			observations.calls.exit = (observations.calls.exit or 0) + 1
 			local descriptor = observations.armed and observations.failures.exit or nil
