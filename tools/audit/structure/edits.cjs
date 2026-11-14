@@ -134,6 +134,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: '            self.platform.parent / "core/network/adapters/native_http.py",'
 	},
 	{
+		// The uninstall sandbox builds a package tree holding the dialog host
+		// and creates its folder by name; S12 moves the host to core/ui/ui.
+		file: 'tools/test/test-linux-uninstall-sandbox.cjs',
+		moves: 'linux/ui/dialog_host.lua',
+		from: "\tfs.mkdirSync(path.join(packaged, 'ui'), { recursive: true });",
+		to: "\tfs.mkdirSync(path.join(packaged, 'core/ui/ui'), { recursive: true });"
+	},
+	{
 		// The literal AppDir contract runs workers from the driver root as its
 		// working directory (./adapters/x.lua); the plan reads ./ from the
 		// fixture's own folder. S09 moves the SQLite worker under core/process.
