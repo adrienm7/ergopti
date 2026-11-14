@@ -683,9 +683,12 @@ var LAYOUT_FORMATS = (function () {
 		for (const [id, table] of Object.entries(json.deadkeys || {})) {
 			const state = deadState(id);
 			const rules = result.layout.dead[state] || (result.layout.dead[state] = {});
-			for (const [typed, made] of Object.entries(table))
-				if (typeof made === 'string')
-					rules[typed] = made.length > 1 && made[0] === '*' ? { dead: deadState(made) } : made;
+			for (const [typed, made] of Object.entries(table)) {
+				if (typeof made !== 'string') continue;
+				// A dead key typed in a dead state (Ergo-L's ** then **) is « dead:<state> ».
+				const key = typed.length > 1 && typed[0] === '*' ? `dead:${deadState(typed)}` : typed;
+				rules[key] = made.length > 1 && made[0] === '*' ? { dead: deadState(made) } : made;
+			}
 		}
 		finishAccents(result, Array.from(accents));
 		return result;

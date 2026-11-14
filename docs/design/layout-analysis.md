@@ -49,7 +49,8 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   layout. `rows` maps a KeyboardEvent.code to four cells
   `[base, shift, altgr, shift_altgr]`; a cell is a string, `null` or
   `{dead: "<state>"}`. `dead` maps a state to `{typed: output}`, where output is
-  a string or `{dead: "<next state>"}` (chains). `command` maps a code to the
+  a string or `{dead: "<next state>"}` (chains). A key `dead:<state>` stands for the
+  dead key that enters `<state>` pressed in this state (Ergo-L's 1dk twice). `command` maps a code to the
   letter its Ctrl/Cmd shortcut uses when it differs from the base layer.
   `fingering` is `standard` or `angle`.
 - `layoutFromComposerSource(source, codes)` → the same shape from a layout

@@ -298,6 +298,13 @@ for (const entry of registry) {
 	check(layout && layout.origin === 'registry', `library: registry layout ${entry.id} is missing`);
 }
 check(Object.keys(byId.get('bepo').dead).length > 0, 'library: Bépo keeps its dead keys');
+// A dead key pressed in a dead state chains: Ergo-L's 1dk twice is the diaeresis.
+check(
+	JSON.stringify(
+		E.analyse(byId.get('ergol'), E.ngramsFromText('ëË'), {}).coverage.unsupportedChars
+	) === '{}',
+	'library: Ergo-L types ë and Ë through 1dk 1dk'
+);
 check(byId.get('qwerty').rows.KeyQ[0] === 'q', 'library: QWERTY types q on KeyQ');
 // An alphabetic block keeps or regains what QWERTY types outside it (Colemak's
 // Quote key, the / and ? Dvorak's block displaces).

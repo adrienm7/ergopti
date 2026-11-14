@@ -55,6 +55,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const DEFAULT_KEYBOARD = 'iso';
 	// An edited ideal finger load may miss 100 % by this much (rounding of inputs).
 	const LOAD_SUM_TOLERANCE = 0.05;
+	// A dead-key rule typed by another dead key: « dead:<state> » names the dead
+	// key that enters <state> (Ergo-L's 1dk pressed twice gives the diaeresis).
+	const DEAD_TYPED = 'dead:';
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
 
@@ -212,7 +215,8 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * Checks and returns a layout in the library shape.
 	 * @param {object} layout - {id, name, rows: code → [base, shift, altgr,
-	 *   shift_altgr], dead?: state → {typed: output | {dead: state}},
+	 *   shift_altgr], dead?: state → {typed: output | {dead: state}} (typed is
+	 *   a character, or « dead:<state> » for the dead key entering <state>),
 	 *   command?: code → letter, fingering?: 'standard' | 'angle'}. A cell is a
 	 *   string, null, or {dead: state}.
 	 * @returns {object} The same layout, with empty dead/command maps filled in.
@@ -276,6 +280,24 @@ var LAYOUT_ANALYSIS = (function () {
 			if (typeof shortcut === 'string' && shortcut !== row[0]) command[code] = shortcut;
 		}
 		const dead = {};
+		// A dead key pressed in another dead state: its action's other states.
+		const chained = {};
+		for (const code of codes) {
+			const cells = source.cells[code];
+			if (!cells) continue;
+			for (const layer of LAYER_IDS) {
+				const cell = cells[layer];
+				if (!cell || cell.text !== undefined) continue;
+				const action = source.actions[cell.dead.action];
+				// The state the key enters from none names it; without one it is not a dead key.
+				if (!action || !action.none || !action.none.next) continue;
+				for (const [state, when] of Object.entries(action)) {
+					if (state === 'none') continue;
+					const rule = when.output ? when.output : when.next ? { dead: when.next } : null;
+					if (rule) (chained[state] || (chained[state] = {}))[DEAD_TYPED + action.none.next] = rule;
+				}
+			}
+		}
 		for (const state of Object.keys(source.compositions).sort()) {
 			dead[state] = {};
 			for (const [typed, result] of Object.entries(source.compositions[state])) {
@@ -284,6 +306,8 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			if (source.terminators[state]) dead[state][' '] = source.terminators[state];
 		}
+		for (const [state, rules] of Object.entries(chained))
+			dead[state] = Object.assign(dead[state] || {}, rules);
 		return layoutFromRows({ id: source.id, name: source.name, rows, command, dead });
 	}
 
@@ -361,7 +385,9 @@ var LAYOUT_ANALYSIS = (function () {
 				const rules = layout.dead[state];
 				if (!rules) continue;
 				for (const [typed, result] of Object.entries(rules)) {
-					const tail = best.get(typed);
+					const tail = typed.startsWith(DEAD_TYPED)
+						? deadSeq.get(typed.slice(DEAD_TYPED.length))
+						: best.get(typed);
 					if (!tail) continue;
 					const candidate = join(prefix, tail, true);
 					const map = typeof result === 'string' ? best : deadSeq;
