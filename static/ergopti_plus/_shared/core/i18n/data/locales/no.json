@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "Nytt navn for kategorien «%s»:",
 	"metrics_apps.rename_subtext": "Alle apper i denne kategorien vil få nytt navn",
 	"metrics_apps.rename_title": "Gi nytt navn",
-	"metrics_apps.score_error": "Poengsum må være mellom -2 og 2.",
 	"metrics_apps.score_prompt": "Produktivitetspoengsum for %s\n(-2 veldig distraherende til 2 veldig produktiv):",
 	"metrics_apps.score_title": "Poengsum",
 	"metrics_apps.title": "Skrivemetrikk",

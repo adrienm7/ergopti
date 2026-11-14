@@ -24,6 +24,7 @@ return {
 		["LLM_PROFILES_NUM_PREDICTIONS"] = "llm.profiles.num_predictions",
 		["LLM_TRIGGER_DEBOUNCE_MS"] = "llm.trigger.debounce_ms",
 		["LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS"] = "llm.trigger.min_request_interval_ms",
+		["METRICS_APPS_ANY_SCORE"] = "metrics_apps.*.score",
 		["MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS"] = "mod_combos.simultaneous_threshold_ms",
 		["PERSONAL_INFO_INFO_ANY"] = "personal_info.info.*",
 		["PERSONAL_INFO_LETTERS_ANY"] = "personal_info.letters.*",
@@ -209,6 +210,12 @@ return {
 			["min"] = 0,
 			["type"] = "integer",
 			["unit"] = "ms",
+		},
+		["metrics_apps.*.score"] = {
+			["file"] = "app_categories.json",
+			["max"] = 2,
+			["min"] = -2,
+			["type"] = "decimal",
 		},
 		["mod_combos.simultaneous_threshold_ms"] = {
 			["default_from"] = {

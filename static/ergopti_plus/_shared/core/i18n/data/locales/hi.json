@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "श्रेणी \"%s\" के लिए नया नाम:",
 	"metrics_apps.rename_subtext": "इस श्रेणी में सभी ऐप्स का नाम बदला जाएगा",
 	"metrics_apps.rename_title": "नाम बदलें",
-	"metrics_apps.score_error": "स्कोर -2 से 2 के बीच होना चाहिए।",
 	"metrics_apps.score_prompt": "%s के लिए उत्पादकता स्कोर\n(-2 बहुत विचलित करने वाला से 2 बहुत उत्पादक):",
 	"metrics_apps.score_title": "स्कोर",
 	"metrics_apps.title": "टाइपिंग मेट्रिक्स",

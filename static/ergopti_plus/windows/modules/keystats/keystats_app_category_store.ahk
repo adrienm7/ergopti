@@ -19,9 +19,9 @@ _KL_AppCat_JsonSource(Content) {
 	return SubStr(Content, 1, 1) == Chr(0xFEFF) ? SubStr(Content, 2) : Content
 }
 
+; A finite score within its shared value schema declaration (metrics_apps.*.score).
 _KL_AppCat_ScoreValid(Score) {
-	return (Score is Integer || Score is Float)
-		&& Score >= KLAppCatConst.MIN_SCORE && Score <= KLAppCatConst.MAX_SCORE
+	return ValueCheckValue(ValueCheckEntryFor("metrics_apps.*.score"), Score)["ok"]
 }
 
 _KL_AppCat_LabelValid(Label) {

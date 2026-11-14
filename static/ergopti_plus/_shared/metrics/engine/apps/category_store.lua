@@ -30,8 +30,13 @@ local M = {}
 M.FILE_NAME = "app_categories.json"
 M.SCHEMA = "ergopti.app_categories"
 M.VERSION = 1
-M.MIN_SCORE = -2
-M.MAX_SCORE = 2
+-- The score's declaration in the shared value schema owns its range.
+local SCORE_KEY = "metrics_apps.*.score"
+local function score_declaration()
+	return require("settings.engine.value_check").declaration(SCORE_KEY)
+end
+M.MIN_SCORE = score_declaration().min
+M.MAX_SCORE = score_declaration().max
 
 -- The `meta` key prefix of the scores the previous Linux store kept in SQLite
 M.LEGACY_SCORE_PREFIX = "app_score."
@@ -48,12 +53,27 @@ M.DEFAULT_CATEGORY = "Unknown"
 -- ===============================
 -- ===============================
 
---- Reports whether a score is one the dashboard can store.
+--- Reports whether a score is one the dashboard can store: a finite number
+--- within its shared value schema declaration.
 --- @param score any
 --- @return boolean
+--- @return string|nil reason The value check's refusal reason.
 function M.score_valid(score)
-	return type(score) == "number" and score == score
-		and score >= M.MIN_SCORE and score <= M.MAX_SCORE
+	local checked = require("settings.engine.value_check").check_value(score_declaration(), score)
+	return checked.ok, checked.reason
+end
+
+--- Reads a score typed in an editor prompt through the shared value check (a
+--- decimal point or comma, surrounding blanks ignored).
+--- @param text any The prompt's answer.
+--- @param translate function i18n accessor, for the localized refusal naming the range.
+--- @return number|nil score
+--- @return string|nil refusal The localized refusal text when the entry is refused.
+function M.parse_score_entry(text, translate)
+	local ValueCheck = require("settings.engine.value_check")
+	local typed = ValueCheck.parse_entry(score_declaration(), text)
+	if typed.ok then return typed.value end
+	return nil, ValueCheck.refusal_text(SCORE_KEY, typed, translate)
 end
 
 --- Reports whether a category label is storable.

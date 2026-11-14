@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "\"%s\" kategorisi için yeni ad:",
 	"metrics_apps.rename_subtext": "Bu kategorideki tüm uygulamalar yeniden adlandırılacak",
 	"metrics_apps.rename_title": "Yeniden adlandır",
-	"metrics_apps.score_error": "Puan -2 ile 2 arasında olmalıdır.",
 	"metrics_apps.score_prompt": "%s için verimlilik puanı\n(-2 çok dikkat dağıtıcı ile 2 çok verimli):",
 	"metrics_apps.score_title": "Puan",
 	"metrics_apps.title": "Yazma istatistikleri",

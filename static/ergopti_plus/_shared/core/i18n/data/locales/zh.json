@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "分类「%s」的新名称:",
 	"metrics_apps.rename_subtext": "此分类中的所有应用将被重命名",
 	"metrics_apps.rename_title": "重命名",
-	"metrics_apps.score_error": "评分必须在 -2 到 2 之间。",
 	"metrics_apps.score_prompt": "%s 的生产力评分\n(-2 非常分散注意力至 2 非常高效):",
 	"metrics_apps.score_title": "分数",
 	"metrics_apps.title": "打字指标",

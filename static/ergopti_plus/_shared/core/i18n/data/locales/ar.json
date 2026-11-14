@@ -2462,7 +2462,6 @@
 	"metrics_apps.rename_prompt": "الاسم الجديد للفئة \"%s\":",
 	"metrics_apps.rename_subtext": "ستُعاد تسمية جميع التطبيقات في هذه الفئة",
 	"metrics_apps.rename_title": "إعادة التسمية",
-	"metrics_apps.score_error": "يجب أن تكون الدرجة بين -2 و 2.",
 	"metrics_apps.score_prompt": "درجة الإنتاجية لـ %s\n(-2 مشتِّت جداً إلى 2 منتج جداً):",
 	"metrics_apps.score_title": "Score",
 	"metrics_apps.title": "مقاييس الكتابة",
