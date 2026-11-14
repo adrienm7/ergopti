@@ -185,7 +185,7 @@ helpers.describe("linux test runner: UTF-8 timing frames", function()
 					helpers.assert_eq(row.timing_error, "")
 					if row.kind == "case" then
 						case_count = case_count + 1
-						helpers.assert_eq(row.module, "tests.unit.ui.editors.test_ui_bridge_handlers_onboarding")
+						helpers.assert_eq(row.module, "tests.unit.core.ui.editors.test_bridge_handlers_onboarding")
 						if row.name:find("refuses unsafe answer", 1, true) then
 							unsafe_names[row.name] = (unsafe_names[row.name] or 0) + 1
 						end

@@ -22,8 +22,8 @@ local function fresh_onboarding()
 	package.loaded["core.logger.engine.logger"] = nil
 	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
-	package.loaded["infra.notifications"] = { notify = function() end }
-	package.loaded["infra.dialog_util"] = { block_alert = function() return "later" end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return "later" end }
 	package.loaded["platform.remap.onboarding"] = nil
 	return helpers.load_with_stubs("platform.remap.onboarding")
 end

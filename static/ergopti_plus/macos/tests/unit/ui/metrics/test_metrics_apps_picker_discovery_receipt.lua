@@ -15,16 +15,16 @@ local PICKER_OWNERS = {
 	"hs.fs",
 	"hs.json",
 	"ui.metrics_apps",
-	"ui.ui_builder",
+	"core.ui.ui.builder",
 	"core.logger.engine.logger",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
-	"adapters.webview_result",
+	"core.ui.adapters.webview_result",
 	"adapters.running_application",
-	"adapters.own_window",
+	"core.ui.adapters.own_window",
 	"core.fs.engine.native_path",
 	"core.text.engine.utils",
 	"core.text.engine.utils_core",
@@ -58,7 +58,7 @@ helpers.describe("metrics_apps: discovery outcome", function()
 					local pending, logs = {}, {}
 					local complete
 					package.loaded["infra.app_picker"] = { discover_apps = function(callback) complete = callback end }
-					local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
+					local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 					package.loaded["core.logger.engine.logger"].debug = function(_, message, ...)
 						logs[#logs + 1] = string.format(message, ...)
 					end

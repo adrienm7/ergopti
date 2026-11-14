@@ -139,7 +139,7 @@ local helpers = require('tests.helpers')
 local bridge, created, calls, opened = nil, 0, 0, 0
 local payloads = {}
 package.loaded['core.timing.engine.deferred_work'] = { after = function() return true end }
-package.loaded['ui.ui_builder'] = {
+package.loaded['core.ui.ui.builder'] = {
 	get_app_geometry = function() return { width = 880, height = 560 } end,
 	get_centered_frame = function() return {} end,
 	build_injected_html = function() return '' end,

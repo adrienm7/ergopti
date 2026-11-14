@@ -204,7 +204,7 @@ end
 --- @param ... any Values of its {1}, {2}, … placeholders.
 local function show_notice(key, ...)
 	local text = i18n.format(key, ...)
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local ok_show, shown = false, nil
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.show) == "function" then
 		ok_show, shown = pcall(tooltip.show, text, true, true)
@@ -866,7 +866,7 @@ function M.run_command()
 	-- A modal dialog must not open inside the event tap that dispatched the action.
 	local called, handle, committed = pcall(TimerScheduler.after, 0, function()
 		if not published or not is_current(generation, "command") then return end
-		local dialog = dependency("infra.dialog_util", "text_prompt")
+		local dialog = dependency("core.ui.engine.dialog_util", "text_prompt")
 		if not dialog then return end
 		local ok_label = i18n.get("button.ok")
 		local ok, button, typed = pcall(dialog.text_prompt, i18n.get("dialog.agent.command_title"),
@@ -970,7 +970,7 @@ local function auto_blocker()
 	-- asked for (an explicit prediction, an answer, the agent's own offer) does.
 	local activity = engine.ai_activity()
 	facts.ai_busy = activity == "explicit" or (engine.is_visible() and activity ~= "automatic")
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	facts.hotstring_preview = ok_tooltip and type(tooltip) == "table"
 		and type(tooltip.is_hotstring_visible) == "function" and tooltip.is_hotstring_visible() == true
 	facts.focus_blocked = not (facts.live or facts.ai_busy or facts.hotstring_preview)

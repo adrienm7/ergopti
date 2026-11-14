@@ -28,9 +28,9 @@ local REAL_STALL_MS = 1500
 --- @param body function Receives (Logger, clock, captured).
 local function with_capture(body)
 	local saved_logger = package.loaded["core.logger.engine.logger"]
-	local saved_dialog = package.loaded["infra.dialog_util"]
+	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
 	package.loaded["core.logger.engine.logger"] = nil
-	package.loaded["infra.dialog_util"] = nil
+	package.loaded["core.ui.engine.dialog_util"] = nil
 	local Fresh = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Fresh)
 	local hs = _G.hs
@@ -55,7 +55,7 @@ local function with_capture(body)
 	hs.dialog, hs.osascript = saved.dialog, saved.osascript
 	_G.print = saved.print
 	package.loaded["core.logger.engine.logger"] = saved_logger
-	package.loaded["infra.dialog_util"] = saved_dialog
+	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
 	if not ok then error(err, 0) end
 end
 
@@ -120,7 +120,7 @@ helpers.describe("slow-callback report: modal dialog wait (issue-101-modal-wait)
 			hs.dialog.textPrompt = function() wait(); return "OK", "text" end
 			hs.osascript = hs.osascript or {}
 			hs.osascript.applescript = function() wait(); return true, "", "" end
-			local DialogUtil = require("infra.dialog_util")
+			local DialogUtil = require("core.ui.engine.dialog_util")
 			local callers = {
 				block_alert = function() DialogUtil.block_alert("t", "m") end,
 				text_prompt = function() DialogUtil.text_prompt("t", "m") end,

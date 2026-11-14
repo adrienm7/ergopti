@@ -1101,8 +1101,8 @@ requires_linux = ["session:x11", "tool:xdotool", "tool:xprop", "tool:gdbus", "fi
 #   - open but behind a window    -> bring it to the front (never close it:
 #                                    the user may not be able to see it);
 #   - open and frontmost          -> close it through the page's own close.
-# Each driver owns the three-state rule once: macOS ui/window_toggle.lua,
-# Linux ui/webview_manager.lua toggle(), Windows GestureToggleOrFocusUI in
+# Each driver owns the three-state rule once: macOS core/ui/ui/window_toggle.lua,
+# Linux core/ui/ui/webview_manager.lua toggle(), Windows GestureToggleOrFocusUI in
 # modules/gestures/actions.ahk. Every page listed here exists on all three
 # drivers, so none is greyed; a page one OS lacks would keep its row with
 # the menu's reason text rather than disappear (AGENTS.md).

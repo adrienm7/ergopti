@@ -42,11 +42,11 @@ end
 --- @param answer function (script) -> ok, result, raw
 --- @param callback function Receives (Dialog, scripts).
 local function with_dialog(answer, callback)
-	helpers.with_fresh_modules({ "infra.dialog_util", "core.logger.engine.logger", "core.process.adapters.shell_runner",
+	helpers.with_fresh_modules({ "core.ui.engine.dialog_util", "core.logger.engine.logger", "core.process.adapters.shell_runner",
 		"core.events.timer_scheduler" }, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local scripts = {}
-		local Dialog = helpers.load_with_stubs("infra.dialog_util", {
+		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util", {
 			osascript = {
 				applescript = function(script)
 					scripts[#scripts + 1] = script
@@ -144,7 +144,7 @@ end)
 local function with_offer(scenario)
 	helpers.with_fresh_modules({
 		"modules.llm.local_servers", "modules.llm.api_remote", "modules.llm",
-		"modules.llm.ollama_endpoint", "infra.dialog_util", "infra.notifications",
+		"modules.llm.ollama_endpoint", "core.ui.engine.dialog_util", "core.ui.engine.notifications",
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.unreachable_backend_offer",
 		"core.i18n.engine.i18n",
 	}, function()
@@ -208,14 +208,14 @@ local function with_offer(scenario)
 		package.loaded["ui.menu.menu_llm.runtime_install_offer"] = {
 			is_installed = function() return world.installed end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			choose = function(title, message, choices, cancel)
 				world.dialogs[#world.dialogs + 1] = { title = title, message = message, choices = choices, cancel = cancel }
 				if world.dialog_error then error(world.dialog_error) end
 				return world.pick
 			end,
 		}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		-- format keeps its arguments visible: "key|arg1|arg2"
 		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,

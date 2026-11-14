@@ -24,7 +24,7 @@ local function with_editor(body, options)
 		write(path, INITIAL)
 		write(config_path, "[tap_holds]\nenabled = " .. tostring(not options.file_off) .. "\n")
 	end
-	local Prompt = require("ui.text_prompt")
+	local Prompt = require("core.ui.ui.text_prompt")
 	local ask, execute, open = Prompt.ask, os.execute, io.open
 	local FileWriter = require("core.fs.engine.regular_file_writer")
 	local writer_open = FileWriter.open

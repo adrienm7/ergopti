@@ -35,7 +35,7 @@ local function with_env(vars, body)
 	local real_getenv = os.getenv
 	os.getenv = function(name) return vars[name] end
 	local ok, err = pcall(function()
-		local ds = helpers.load_module("infra.display_server")
+		local ds = helpers.load_module("core.ui.engine.display_server")
 		ds._set_for_test(nil, nil)
 		body(ds)
 	end)
@@ -163,7 +163,7 @@ helpers.describe("display_server: caching", function()
 			return ({ WAYLAND_DISPLAY = "wayland-0" })[name]
 		end
 		local ok, err = pcall(function()
-			local ds = helpers.load_module("infra.display_server")
+			local ds = helpers.load_module("core.ui.engine.display_server")
 			ds._set_for_test(nil, nil)
 			ds.kind()
 			local after_first = reads
@@ -181,7 +181,7 @@ helpers.describe("display_server: caching", function()
 		local real_getenv = os.getenv
 		os.getenv = function(name) return vars[name] end
 		local ok, err = pcall(function()
-			local ds = helpers.load_module("infra.display_server")
+			local ds = helpers.load_module("core.ui.engine.display_server")
 			ds._set_for_test(nil, nil)
 			helpers.assert_eq(ds.kind(), ds.X11, "starts on X11")
 

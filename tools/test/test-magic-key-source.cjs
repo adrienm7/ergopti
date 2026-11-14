@@ -131,7 +131,7 @@ for (const test of claims.cases) {
 }
 const luaPolicy = fs.readFileSync(shared('layouts/engine/layers/magic_key_source.lua'), 'utf8');
 const windowsChoice = fs.readFileSync(
-	path.join(REPO_ROOT, 'static/ergopti_plus/windows/ui/editors.ahk'),
+	path.join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/ui/editors.ahk'),
 	'utf8'
 );
 assert.ok(luaPolicy.includes(claims.reason_key), 'shared source policy owns the translated reason');

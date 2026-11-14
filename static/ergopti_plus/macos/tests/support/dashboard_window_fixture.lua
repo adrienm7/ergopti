@@ -12,9 +12,9 @@ local function with_window(module_name, callback)
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
-			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "ui.ui_builder",
+			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "core.ui.ui.builder",
 			"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.timing.engine.deferred_work",
-			"infra.dialog_util", "core.events.timer_scheduler", "modules.keystats.log_manager",
+			"core.ui.engine.dialog_util", "core.events.timer_scheduler", "modules.keystats.log_manager",
 		}, function()
 			local native = require("tests.stubs.hs")
 			native.__reset()
@@ -33,7 +33,7 @@ local function with_window(module_name, callback)
 				set_locale_no_reload = function() return true end,
 				persist_locale = function() return false end,
 			}
-			package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return true end }
 			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 			package.loaded["core.events.timer_scheduler"] = {
@@ -43,7 +43,7 @@ local function with_window(module_name, callback)
 			native.webview.usercontent.new = function()
 				return { setCallback = function(self, receiver) state.receiver = receiver; return self end }
 			end
-			package.loaded["ui.ui_builder"] = {
+			package.loaded["core.ui.ui.builder"] = {
 				get_app_geometry = function() return { width = 640, height = 480 } end,
 				get_centered_frame = function() return {} end,
 				show_webview = function(options)

@@ -7,7 +7,7 @@
 --- * add: with the login keyring of a real gnome-keyring-daemon locked,
 ---   modules/llm/api_entries.lua add() stores a key through the real
 ---   secret-tool. GNOME's unlock prompt (gcr-prompter) must open while the
----   store runs inside ui/modal.lua, i.e. inside keyboard_hook.while_released,
+---   store runs inside core/ui/ui/modal.lua, i.e. inside keyboard_hook.while_released,
 ---   the call that hands the grabbed keyboard to the desktop; a watcher types
 ---   the keyring password into that prompt on the session keyboard. The file
 ---   must then hold a reference, the service the key.
@@ -102,7 +102,7 @@ if phase == "add" then
 	check(entry ~= nil, "the entry is saved: " .. tostring(err))
 	local title, released = prompt_seen(report)
 	check(title ~= nil, "GNOME's unlock prompt opens: " .. tostring(title))
-	check(released, "the prompt opens while the keyboard is handed to the desktop (ui/modal.lua)")
+	check(released, "the prompt opens while the keyboard is handed to the desktop (core/ui/ui/modal.lua)")
 	local source = read_file(Entries.path()) or ""
 	local stored = Json.decode(source)
 	local reference = stored and stored.entries and stored.entries[1] and stored.entries[1].token
@@ -128,7 +128,7 @@ elseif phase == "migrate" then
 	check(Entries.migrate_plaintext() == true, "migrate_plaintext moves the plaintext key")
 	local title, released = prompt_seen(report)
 	check(title ~= nil, "GNOME's unlock prompt opens again: " .. tostring(title))
-	check(released, "the prompt opens while the keyboard is handed to the desktop (ui/modal.lua)")
+	check(released, "the prompt opens while the keyboard is handed to the desktop (core/ui/ui/modal.lua)")
 	local source = read_file(Entries.path()) or ""
 	check(not source:find(SECOND_KEY, 1, true) and not source:find(FIRST_KEY, 1, true),
 		"api_keys.json no longer holds either key in plaintext")

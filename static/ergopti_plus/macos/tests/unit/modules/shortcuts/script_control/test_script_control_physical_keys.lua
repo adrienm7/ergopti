@@ -255,7 +255,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		end
 		-- pause now treats tooltip teardown as required. Keep this unit test
 		-- behavioral and deterministic instead of loading the real TOML-backed UI.
-		package.loaded["ui.tooltip"] = { hide_forced = rec("tt_hide") }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = rec("tt_hide") }
 		local keymap_spy = {
 			pause_processing  = rec("km_pause"),
 			resume_processing = rec("km_resume"),
@@ -313,7 +313,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.k_resume or 0) >= 1, "resume must call karabiner.resume")
 
 		SC.stop()
-		package.loaded["ui.tooltip"] = nil
+		package.loaded["core.ui.ui.tooltip"] = nil
 	end)
 end)
 

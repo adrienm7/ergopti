@@ -16,7 +16,7 @@ local function with_window(scenario)
 	local records = { bridges = {}, views = {}, deletes = 0, releases = 0 }
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.download_window", "ui.download_window.javascript",
-			"ui.download_window.pending_queue", "ui.ui_builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
+			"ui.download_window.pending_queue", "core.ui.ui.builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 			"core.i18n.engine.i18n", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner",
 			"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
@@ -46,7 +46,7 @@ local function with_window(scenario)
 					return bridge
 				end } },
 			}
-			package.loaded["ui.ui_builder"] = {
+			package.loaded["core.ui.ui.builder"] = {
 				get_app_geometry = function() return { width = 460, height = 380 } end,
 				show_webview = function(options)
 					local view = { options = options, deleted = false }

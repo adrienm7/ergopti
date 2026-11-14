@@ -18,7 +18,7 @@
 require("core.lifecycle.engine.compat.utf8").install()
 local ffi = require("ffi")
 local luv = require("luv")
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 assert(DisplayServer.is_x11(), "the focus receipt needs an X11 display")
 local Focus = require("adapters.x11_focus")
 local bound, reason = Focus.use_xcb()

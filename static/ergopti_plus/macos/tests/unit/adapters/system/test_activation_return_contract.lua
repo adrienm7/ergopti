@@ -117,7 +117,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			"core.events.timer_scheduler",
 			"adapters.clipboard",
 			"infra.config_paths",
-			"infra.dialog_util",
+			"core.ui.engine.dialog_util",
 			"modules.shortcuts.actions.apps",
 		}
 		local saved = {}
@@ -142,7 +142,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["infra.config_paths"] = {
 				get_config_dir = function() return "/tmp/ergopti" end,
 			}
-			package.loaded["infra.dialog_util"] = { alert = function() end }
+			package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
 			local actions = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
 				application = {

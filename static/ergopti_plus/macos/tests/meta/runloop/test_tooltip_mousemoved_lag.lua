@@ -53,7 +53,7 @@ end
 helpers.describe("tooltip_llm.lua: mouseMoved excluded from dismiss watcher (lag fix)", function()
 
 	helpers.it("start_watchers() does not include event_types.mouseMoved", function()
-		local src  = read_source("local function refresh_chain_timing") -- ui/tooltip/tooltip_llm.lua
+		local src  = read_source("local function refresh_chain_timing") -- core/ui/ui/tooltip/llm.lua
 		local body = start_watchers_body(src)
 		helpers.assert_true(body ~= "",
 			"start_watchers must exist in tooltip_llm.lua")
@@ -63,7 +63,7 @@ helpers.describe("tooltip_llm.lua: mouseMoved excluded from dismiss watcher (lag
 	end)
 
 	helpers.it("dismiss watcher still watches leftMouseDown", function()
-		local src  = read_source("local function refresh_chain_timing") -- ui/tooltip/tooltip_llm.lua
+		local src  = read_source("local function refresh_chain_timing") -- core/ui/ui/tooltip/llm.lua
 		local body = start_watchers_body(src)
 		helpers.assert_true(
 			body:find("leftMouseDown", 1, true) ~= nil,
@@ -71,7 +71,7 @@ helpers.describe("tooltip_llm.lua: mouseMoved excluded from dismiss watcher (lag
 	end)
 
 	helpers.it("dismiss watcher still watches scrollWheel", function()
-		local src  = read_source("local function refresh_chain_timing") -- ui/tooltip/tooltip_llm.lua
+		local src  = read_source("local function refresh_chain_timing") -- core/ui/ui/tooltip/llm.lua
 		local body = start_watchers_body(src)
 		helpers.assert_true(
 			body:find("scrollWheel", 1, true) ~= nil,
@@ -93,7 +93,7 @@ end)
 helpers.describe("tooltip_hotstring.lua: mouseMoved excluded from dismiss watcher (lag fix)", function()
 
 	helpers.it("start_watchers() does not include event_types.mouseMoved", function()
-		local src  = read_source("local function stop_watchers_only") -- ui/tooltip/tooltip_hotstring.lua
+		local src  = read_source("local function stop_watchers_only") -- core/ui/ui/tooltip/hotstring.lua
 		local body = start_watchers_body(src)
 		helpers.assert_true(body ~= "",
 			"start_watchers must exist in tooltip_hotstring.lua")
@@ -103,7 +103,7 @@ helpers.describe("tooltip_hotstring.lua: mouseMoved excluded from dismiss watche
 	end)
 
 	helpers.it("dismiss watcher still watches leftMouseDown", function()
-		local src  = read_source("local function stop_watchers_only") -- ui/tooltip/tooltip_hotstring.lua
+		local src  = read_source("local function stop_watchers_only") -- core/ui/ui/tooltip/hotstring.lua
 		local body = start_watchers_body(src)
 		helpers.assert_true(
 			body:find("leftMouseDown", 1, true) ~= nil,
@@ -111,7 +111,7 @@ helpers.describe("tooltip_hotstring.lua: mouseMoved excluded from dismiss watche
 	end)
 
 	helpers.it("dismiss watcher still watches scrollWheel", function()
-		local src  = read_source("local function stop_watchers_only") -- ui/tooltip/tooltip_hotstring.lua
+		local src  = read_source("local function stop_watchers_only") -- core/ui/ui/tooltip/hotstring.lua
 		local body = start_watchers_body(src)
 		helpers.assert_true(
 			body:find("scrollWheel", 1, true) ~= nil,

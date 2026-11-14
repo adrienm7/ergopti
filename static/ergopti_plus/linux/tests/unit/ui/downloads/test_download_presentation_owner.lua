@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function with_session(run)
 	local names = { "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
-		"core.events.loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
+		"core.events.loop", "adapters.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
 		"ui.download_window.bridge", "infra.manifest_reader", "core.logger.engine.shim", "core.i18n.engine.i18n" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end

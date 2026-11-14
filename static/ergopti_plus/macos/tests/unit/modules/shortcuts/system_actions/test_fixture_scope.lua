@@ -11,7 +11,7 @@ local support = require("tests.support.system_actions_fixture")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-	"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "infra.notifications",
+	"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
 	"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 	"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
@@ -96,7 +96,7 @@ helpers.describe("System action fixture isolation", function()
 					local first = mount()
 					configure(first.hs, 11)
 					local previous_key_state = require("adapters.key_state")
-					local previous_notifications = require("infra.notifications")
+					local previous_notifications = require("core.ui.engine.notifications")
 					local second = mount()
 					configure(second.hs, 22)
 					calls[11], calls[22] = 0, 0
@@ -126,7 +126,7 @@ helpers.describe("System action fixture isolation", function()
 						helpers.assert_eq(delivered, 1)
 					end
 					helpers.assert_true(require("adapters.key_state") ~= previous_key_state)
-					helpers.assert_true(require("infra.notifications") ~= previous_notifications)
+					helpers.assert_true(require("core.ui.engine.notifications") ~= previous_notifications)
 				end)
 				for _, name in ipairs(OWNERS) do helpers.assert_nil(package.loaded[name], name) end
 			end)

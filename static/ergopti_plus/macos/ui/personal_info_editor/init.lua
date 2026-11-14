@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
@@ -183,7 +183,7 @@ end
 local function report_save_failure()
 	local scheduled = DeferredWork.after(0, function()
 		local shown, err = pcall(function()
-			require("infra.dialog_util").block_alert(i18n.get("dialog.personal_info.save_failed_title"),
+			require("core.ui.engine.dialog_util").block_alert(i18n.get("dialog.personal_info.save_failed_title"),
 				i18n.get("dialog.personal_info.save_failed"), i18n.get("button.ok"), nil, "critical")
 		end)
 		if not shown then Logger.error(LOG, "The save failure could not be shown: %s.", tostring(err)) end
@@ -250,7 +250,7 @@ function M.open(current_info, save_callback)
 	-- Singleton — focus the existing window instead of opening a second one.
 	if _webview then
 		local owner, view = _owner, _webview
-		local ui_builder = require("ui.ui_builder")
+		local ui_builder = require("core.ui.ui.builder")
 		if not owner_is_current(owner) then return false end
 		ui_builder.force_focus(view, false, {
 			is_current = function() return owner_is_current(owner) end,
@@ -275,7 +275,7 @@ function M.open(current_info, save_callback)
 			end
 		end)
 
-		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 		if not ok_ui or not ui_builder then return nil end
 
 		local masks       = hs.webview.windowMasks

@@ -37,7 +37,7 @@ local Json           = require("core.text.engine.json")
 local CheckSession   = require("updater.engine.check_session")
 local Updater        = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local WebviewResult  = require("adapters.webview_result")
+local WebviewResult  = require("core.ui.adapters.webview_result")
 
 local LOG = "update_check"
 
@@ -213,7 +213,7 @@ local function session_for(view, ctx)
 		end,
 		-- The notes pane's links: the session checked them against the repository
 		repository = function() return { owner = Updater.GH_OWNER, repo = Updater.GH_REPO } end,
-		open_url = function(url) return require("ui.ui_builder").open_http_url(url) == true end,
+		open_url = function(url) return require("core.ui.ui.builder").open_http_url(url) == true end,
 		open_log = open_today_log,
 		close = function() if view == _webview then close_window() end end,
 		log_path = Logger.today_log_path,
@@ -246,7 +246,7 @@ function M.open(ctx)
 		Logger.error(LOG, "The update-check window needs the menu session's channel owner.")
 		return false
 	end
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui then
 		Logger.error(LOG, "The update-check window cannot open: ui_builder is unavailable.")
 		return false

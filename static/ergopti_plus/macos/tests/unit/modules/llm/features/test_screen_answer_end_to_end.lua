@@ -242,7 +242,7 @@ helpers.describe("screen answers end to end (llm-vision)", function()
 	helpers.it("(local-model-requester) refuses a vision Download after screen reading is reset or superseded in its modal", function()
 		for _, change in ipairs({ "reset", "supersede", "disabled" }) do
 			local world = build_world()
-			local dialog = require("infra.dialog_util")
+			local dialog = require("core.ui.engine.dialog_util")
 			local previous = dialog.block_alert
 			dialog.block_alert = function(...)
 				if change == "reset" then world.flow.reset()

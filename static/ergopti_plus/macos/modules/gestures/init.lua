@@ -16,7 +16,7 @@ local M = {}
 local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local hs            = hs
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local Logger        = require("core.logger.engine.logger")
 local Manifest      = require("infra.manifest_reader")
 local Timings       = require("core.timing.engine.timings")

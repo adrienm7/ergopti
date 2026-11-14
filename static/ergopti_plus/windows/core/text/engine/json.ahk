@@ -26,7 +26,7 @@
 #Requires AutoHotkey v2.0
 
 #Include number.ahk
-#Include ../../../adapters/native_text.ahk
+#Include ../../ui/adapters/native_text.ahk
 
 
 

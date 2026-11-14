@@ -28,8 +28,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -66,8 +66,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -109,8 +109,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -145,8 +145,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -183,8 +183,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -222,8 +222,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -261,8 +261,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -302,8 +302,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -348,8 +348,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -385,8 +385,8 @@ helpers.describe("API panel test request", function()
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -426,8 +426,8 @@ helpers.describe("API panel test request", function()
 end)
 
 helpers.describe("Active API commands: canonical labels and retained owner", function()
-	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, locale in ipairs({ "ar", "da", "de", "en", "es", "cs", "fr", "he", "hi", "it",
 		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("uses the actual shared active commands in " .. locale, function()
@@ -474,8 +474,8 @@ helpers.describe("Active API commands: canonical labels and retained owner", fun
 end)
 
 helpers.describe("Active API commands: strict native pause receipt", function()
-	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, fault in ipairs({ "missing", "nil", "number", "table", "throw" }) do
 		helpers.it("refuses a retained request after the native pause reader becomes " .. fault, function()
 			helpers.with_fresh_modules(owned, function()
@@ -507,7 +507,7 @@ helpers.describe("Active API commands: strict native pause receipt", function()
 			ctx.is_paused = function() return paused end
 			ctx.keymap.reset_predictions_for_configuration = function() resets = resets + 1; return true end
 			package.loaded["modules.llm"].persist_api_entries = function() writes = writes + 1 end
-			package.loaded["infra.dialog_util"].block_alert = function(_, _, affirmative)
+			package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, _, affirmative)
 				paused = true
 				return affirmative
 			end

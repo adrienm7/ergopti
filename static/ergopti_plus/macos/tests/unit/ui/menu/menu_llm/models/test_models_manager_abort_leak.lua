@@ -24,7 +24,7 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 	helpers.it("(models-manager-abort-leak) clears abort before invoking the approved download", function()
 		local modules = {
 			"hs", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger", "core.i18n.engine.i18n",
-			"infra.dialog_util", "core.fs.engine.paths", "core.timing.engine.timings",
+			"core.ui.engine.dialog_util", "core.fs.engine.paths", "core.timing.engine.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -69,7 +69,7 @@ helpers.describe("models manager: aborted downloads are reset before retry", fun
 				require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
 				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-				package.loaded["infra.dialog_util"] = {
+				package.loaded["core.ui.engine.dialog_util"] = {
 					block_alert = function() return "menu.llm.btn_download" end,
 				}
 				helpers.provide_timings()

@@ -19,7 +19,7 @@ local KEYCODE_SPACE = 49
 local KEYCODE_ESCAPE = 53
 
 local MODULES = {
-	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "infra.notifications",
+	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
 	"adapters.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
 }
@@ -58,7 +58,7 @@ local function with_menu(body, faults)
 				return true
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind)
 				world.notices[#world.notices + 1] = { title = title, body = body, kind = kind }
 				return true

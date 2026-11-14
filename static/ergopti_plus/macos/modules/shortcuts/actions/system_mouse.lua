@@ -21,7 +21,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("core.logger.engine.logger")
-local notifications  = require("infra.notifications")
+local notifications  = require("core.ui.engine.notifications")
 local i18n           = require("core.i18n.engine.i18n")
 local MouseControl   = require("adapters.mouse_control")
 local ShellRunner    = require("core.process.adapters.shell_runner")

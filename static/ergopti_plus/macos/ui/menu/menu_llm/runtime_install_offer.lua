@@ -44,8 +44,8 @@ local function ollama_deps() return require("modules.llm.ollama_deps_checker") e
 local function mlx_deps() return require("modules.llm.mlx_deps_checker") end
 local function mlx_repair_offer() return require("ui.menu.menu_llm.mlx_repair_offer") end
 local function backend_detector() return require("modules.llm.backend_detector") end
-local function dialogs() return require("infra.dialog_util") end
-local function notifications() return require("infra.notifications") end
+local function dialogs() return require("core.ui.engine.dialog_util") end
+local function notifications() return require("core.ui.engine.notifications") end
 
 
 

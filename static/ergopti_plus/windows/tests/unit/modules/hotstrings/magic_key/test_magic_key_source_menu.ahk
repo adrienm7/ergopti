@@ -196,7 +196,7 @@ _MKS_CapturePollCase() {
 	AssertEqual("", State.Scan)
 
 	Body := _DriverFuncBody("MagicKeySourceCapture")
-	Assert(Body != "", "MagicKeySourceCapture must exist in ui/editors.ahk")
+	Assert(Body != "", "MagicKeySourceCapture must exist in core/ui/ui/editors.ahk")
 	Assert(InStr(Body, "_MagicKeyEditorInputHook := IH") > 0,
 		"the capture shares the magic-key editor's owner, stopped by Suspend and Close")
 	Assert(InStr(Body, 'GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))') > 0,
@@ -421,6 +421,6 @@ _MKS_AssertDeclaredData(Expected, Actual) {
 	}
 }
 
-#Include ../../../ui/editors/test_magic_key_capture_settlement.ahk
+#Include ../../../core/ui/editors/test_magic_key_capture_settlement.ahk
 
-#Include ../../../ui/editors/test_magic_key_startup_close.ahk
+#Include ../../../core/ui/editors/test_magic_key_startup_close.ahk

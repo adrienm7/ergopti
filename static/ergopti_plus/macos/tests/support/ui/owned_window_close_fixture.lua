@@ -18,19 +18,19 @@ local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
 		"ui.config_cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
 		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
-		"ui.metrics_apps", "infra.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "infra.manifest_reader",
+		"ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "infra.manifest_reader",
 		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
 		"core.text.engine.toml_codec.writer", "settings.engine.migration.unused_keys", "diagnostics.engine.operation_reporter", "core.text.engine.toml_codec.record_list",
 		"settings.engine.migration.outdated", "core.fs.engine.module_source_identity", "core.text.engine.toml_codec.leaf_rows", "lfs", "core.fs.engine.module_source_directory",
 		"settings.engine.migration.migrate", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
 		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.cleanup_roots", "settings.engine.publication.user_models",
-		"infra.notifications", "settings.engine.publication.defaults", "core.text.engine.utils_core", "hotstrings.engine.catalogue.personal_files", "core.lifecycle.engine.compat.utf8",
-		"core.fs.engine.dir", "adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "infra.config_paths",
+		"core.ui.engine.notifications", "settings.engine.publication.defaults", "core.text.engine.utils_core", "hotstrings.engine.catalogue.personal_files", "core.lifecycle.engine.compat.utf8",
+		"core.fs.engine.dir", "core.ui.adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "infra.config_paths",
 		"ai.engine.local_servers.model_catalogue", "core.process.adapters.shell_runner", "core.ui.engine.webview.document_csp", "diagnostics.engine.runtime_log",
 		"core.process.adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
 		"ui.model_browser", "ui.changelog",
-		"ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
+		"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
@@ -49,7 +49,7 @@ local function run_window(module_name, scenario)
 		end
 		package.loaded["modules.updater"] = { current_version = function() return "v1.0.0" end }
 		package.loaded["adapters.update_launcher"] = {}
-		package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return true end }
 		package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 		local window = helpers.load_with_stubs(module_name, {
 			spaces = { activeSpaceOnScreen = function() return 1 end, moveWindowToSpace = function() return true end },

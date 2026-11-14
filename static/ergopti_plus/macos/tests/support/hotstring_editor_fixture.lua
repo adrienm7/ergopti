@@ -27,7 +27,7 @@ local function with_editor(test)
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = { notify = function()
+		package.loaded["core.ui.engine.notifications"] = { notify = function()
 			state.notifications = state.notifications + 1
 		end }
 		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
@@ -54,7 +54,7 @@ local function with_editor(test)
 				end }
 			end },
 		} }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 10, height = 10 } end,
 			get_centered_frame = function() return {} end, force_focus = function() end,
 			show_webview = function(options)

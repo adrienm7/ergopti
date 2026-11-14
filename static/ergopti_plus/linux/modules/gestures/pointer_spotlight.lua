@@ -42,7 +42,7 @@ M.ARM_DELAY_S = 0.05
 M.POLL_S = 0.05
 
 local _deps = {
-	overlay = function() return require("adapters.spotlight_overlay") end,
+	overlay = function() return require("core.ui.adapters.spotlight_overlay") end,
 	scheduler = function() return require("core.events.timer_scheduler") end,
 }
 local _active = nil
@@ -146,7 +146,7 @@ end
 function M._set_deps_for_test(overrides)
 	M.dismiss()
 	_deps = {
-		overlay = overrides and overrides.overlay or function() return require("adapters.spotlight_overlay") end,
+		overlay = overrides and overrides.overlay or function() return require("core.ui.adapters.spotlight_overlay") end,
 		scheduler = overrides and overrides.scheduler or function() return require("core.events.timer_scheduler") end,
 	}
 end

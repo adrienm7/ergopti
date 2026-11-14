@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 
 local DISPLACED = {
 	"core.timing.engine.deferred_work",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"modules.shortcuts.input_source_conflict",
 	"ui.menu.menu_keyboard_slots",
 }
@@ -31,7 +31,7 @@ local function with_menu(ids, answer, body)
 	local prior_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local seen = { dialogs = {}, opened = {} }
 	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn() return true end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, message, first)
 			seen.dialogs[#seen.dialogs + 1] = { title = title, message = message }
 			return answer == "open" and first or "OK"

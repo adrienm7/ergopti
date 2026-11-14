@@ -59,7 +59,7 @@ local function read_typed(key, text)
 	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
-	require("infra.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
+	require("core.ui.engine.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
 		ValueCheck.refusal_text(key, result, i18n.get), i18n.get("button.ok"))
 	return nil
 end
@@ -174,7 +174,7 @@ local SAVED_UNTIL_HELPER_KEY = "menu.tapholds.saved_until_helper"
 local function report_login_items_opened(opened, detail)
 	if opened == true then return end
 	Logger.warn(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
-	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+	local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
 		i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
 	if not ok or sent_or_err ~= true then
 		Logger.error(LOG, "Login Items failure notice was not delivered: %s.", tostring(sent_or_err))
@@ -200,7 +200,7 @@ local function announce_saved_until_guardian(karabiner, method_name, reason)
 			return karabiner.open_login_items(report_login_items_opened) == true
 		end
 	end
-	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+	local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
 		i18n.get(key), nil, "info", on_click)
 	if not ok or sent_or_err ~= true then
 		Logger.error(LOG, "Saved-until-guardian notice was not delivered: %s.", tostring(sent_or_err))

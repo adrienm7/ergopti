@@ -225,7 +225,7 @@ local Fixture = require("tests.support.keystats_provenance_fixture")
 local NAMES = {
 	"adapters.event_provenance", "adapters.input_source_broker", "adapters.keyboard_hook",
 	"adapters.physical_observation_clock", "core.process.adapters.lifecycle", "adapters.synthetic_input",
-	"infra.config_paths", "infra.dialog_util", "core.logger.engine.logger", "infra.manifest_reader",
+	"infra.config_paths", "core.ui.engine.dialog_util", "core.logger.engine.logger", "infra.manifest_reader",
 	"metrics.engine.capture.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",
 	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "modules.keymap",
 }

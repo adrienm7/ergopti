@@ -113,7 +113,7 @@ function M.boot(opts)
 
 	for _, name in ipairs(REAL_MODULES) do package.loaded[name] = nil end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["core.text.engine.utils"] = {

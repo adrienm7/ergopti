@@ -270,9 +270,9 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 			config._set_categories_for_test({ rolls = { sections_order = { "fast" } } })
 			helpers.assert_true(config.set_override("rolls", nil, "delay", 0))
 			helpers.assert_true(config.set_override("rolls", "fast", "delay", 0))
-			local previous = package.loaded["ui.webview_manager"]
+			local previous = package.loaded["core.ui.ui.webview_manager"]
 			local script
-			package.loaded["ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
+			package.loaded["core.ui.ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
 			local ok, err = xpcall(function()
 				require("ui.hotstrings_config_window.bridge").on_message("ready", { config = config })
 				local payload = require("core.text.engine.json").decode(assert(script:match("setData%((.*)%)$")))
@@ -281,7 +281,7 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 				helpers.assert_eq(payload.categories[1].delay_overridden, true)
 				helpers.assert_eq(payload.categories[1].sections[1].delay_overridden, true)
 			end, debug.traceback)
-			package.loaded["ui.webview_manager"] = previous
+			package.loaded["core.ui.ui.webview_manager"] = previous
 			if not ok then error(err) end
 		end)
 	end)
@@ -291,9 +291,9 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 			config._set_categories_for_test({ rolls = { sections_order = { "fast" } } })
 			helpers.assert_true(config.set_base_delay(0))
 			helpers.assert_eq(config.get_base_delay(), 0)
-			local previous = package.loaded["ui.webview_manager"]
+			local previous = package.loaded["core.ui.ui.webview_manager"]
 			local script
-			package.loaded["ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
+			package.loaded["core.ui.ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
 			local ok, err = xpcall(function()
 				require("ui.hotstrings_config_window.bridge").on_message("ready", { config = config })
 				local payload = require("core.text.engine.json").decode(assert(script:match("setData%((.*)%)$")))
@@ -302,7 +302,7 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 				helpers.assert_nil(payload.categories[1].delay_default_ms)
 				helpers.assert_nil(payload.categories[1].sections[1].delay_default_ms)
 			end, debug.traceback)
-			package.loaded["ui.webview_manager"] = previous
+			package.loaded["core.ui.ui.webview_manager"] = previous
 			if not ok then error(err) end
 		end)
 	end)

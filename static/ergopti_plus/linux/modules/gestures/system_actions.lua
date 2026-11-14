@@ -21,7 +21,7 @@
 ---    runner (modules/gestures/background_commands.lua) still logs a command
 ---    that fails, with its exit status.
 --- 3. A catalogue action with `confirm = true` gets its question from
----    confirmed_command(): Ergopti's own dialog (ui/native_dialog.lua) in the
+---    confirmed_command(): Ergopti's own dialog (core/ui/ui/native_dialog.lua) in the
 ---    same background shell, chained to the command with &&, so Cancel (or a
 ---    dialog that cannot open) runs nothing. The window an action targets (TARGETS) is read before the
 ---    question, so a confirmed force quit kills the application the user acted
@@ -43,7 +43,7 @@ local WindowTitles = require("core.ui.engine.window_titles")
 local Logger = require("core.logger.engine.shim")
 local i18n = require("core.i18n.engine.i18n")
 local ShellRunner = require("core.process.adapters.shell_runner")
-local NativeDialog = require("ui.native_dialog")
+local NativeDialog = require("core.ui.ui.native_dialog")
 local FileSelection = require("core.fs.engine.file_selection")
 local Timings = require("core.timing.engine.timings")
 

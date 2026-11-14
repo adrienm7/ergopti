@@ -198,7 +198,7 @@ end
 --- Tells the user that Ergopti closed their Karabiner and when it comes back.
 local function announce_closed()
 	local i18n = require("core.i18n.engine.i18n")
-	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
+	require("core.ui.engine.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
 end
 
 --- Builds the owner's state observer: the first block of a launch the user can
@@ -323,7 +323,7 @@ function M.new()
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("core.events.timer_scheduler"),
 		observer = M.automatic_observer(function(text)
-			require("infra.notifications").notify(text, nil, "warning")
+			require("core.ui.engine.notifications").notify(text, nil, "warning")
 		end),
 	}
 end

@@ -4,7 +4,7 @@
 --- MODULE: Native Application Chooser
 --- DESCRIPTION:
 --- Lets the user pick the application an open_app binding launches: Ergopti's
---- own file dialog (ui/native_dialog.lua) over the system's desktop entries, answered with the
+--- own file dialog (core/ui/ui/native_dialog.lua) over the system's desktop entries, answered with the
 --- desktop-file id gtk-launch takes (firefox, org.gnome.Nautilus). The same
 --- dialogs pick the file or folder an open_path binding opens (pick_path).
 ---
@@ -86,10 +86,10 @@ function M.pick(shell, title, opts)
 		return nil, "shell runner is unavailable"
 	end
 	title = WindowTitles.compose(title)
-	local command = require("ui.native_dialog").command() .. " --file-selection --title=" .. shell.quote(title)
+	local command = require("core.ui.ui.native_dialog").command() .. " --file-selection --title=" .. shell.quote(title)
 		.. " --filename=" .. shell.quote(M.APPLICATIONS_DIR)
 		.. " --file-filter=" .. shell.quote("*" .. DESKTOP_SUFFIX) .. " 2>/dev/null"
-	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
+	local completed, output = require("core.ui.ui.modal").run(function() return shell.exec_checked(command) end)
 	-- Native cancellation or failure can leave partial stdout; only a confirmed
 	-- dialog result may become a stored application binding.
 	if completed ~= true or type(output) ~= "string" then
@@ -111,9 +111,9 @@ function M.pick(shell, title, opts)
 	if not called or status ~= "found" or absolute_path(resolved) ~= absolute_path(chosen) then
 		local notify = type(opts) == "table" and opts.notify or function()
 			local message = require("core.i18n.engine.i18n").get("dialog.app_picker.selection_unverified")
-			local command = require("ui.native_dialog").command() .. " --error --no-markup --title="
+			local command = require("core.ui.ui.native_dialog").command() .. " --error --no-markup --title="
 				.. shell.quote(title) .. " --text=" .. shell.quote(message) .. " 2>/dev/null"
-			return require("ui.modal").run(function() return shell.exec_checked(command) end) == true
+			return require("core.ui.ui.modal").run(function() return shell.exec_checked(command) end) == true
 		end
 		local delivered, accepted = pcall(notify)
 		if not delivered or accepted ~= true then
@@ -131,7 +131,7 @@ end
 --- @param start string The folder the picker opens on.
 --- @return string command
 function M.path_picker_command(shell, title, folder, start)
-	return require("ui.native_dialog").command() .. " --file-selection" .. (folder and " --directory" or "")
+	return require("core.ui.ui.native_dialog").command() .. " --file-selection" .. (folder and " --directory" or "")
 		.. " --title=" .. shell.quote(title) .. " --filename=" .. shell.quote(start) .. " 2>/dev/null"
 end
 
@@ -148,7 +148,7 @@ function M.pick_path(shell, title, folder, start, modal)
 		return nil, "shell runner is unavailable"
 	end
 	local command = M.path_picker_command(shell, WindowTitles.compose(title), folder == true, start)
-	local completed, output = (modal or require("ui.modal").run)(function() return shell.exec_checked(command) end)
+	local completed, output = (modal or require("core.ui.ui.modal").run)(function() return shell.exec_checked(command) end)
 	if completed ~= true or type(output) ~= "string" then return nil, "path selection was cancelled or refused" end
 	-- Remove the picker's single LF delimiter; a line break inside a chosen
 	-- name stays and the open_path validator refuses it.

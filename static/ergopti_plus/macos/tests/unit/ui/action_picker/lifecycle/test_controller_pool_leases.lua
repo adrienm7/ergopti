@@ -14,7 +14,7 @@ local with_picker = require("tests.support.ui.usercontent_reference_fixture")
 --- @param callback function Receives a fresh pool and native observations.
 local function with_pool(callback)
 	return with_picker(function(_, h)
-		local pool = require("ui.webview_controller_pool").new(h.native_new, require("core.logger.engine.logger"))
+		local pool = require("core.ui.ui.webview_controller_pool").new(h.native_new, require("core.logger.engine.logger"))
 		function h.activate(view, receive)
 			local token, controller = pool.reserve("action_picker")
 			helpers.assert_not_nil(token)

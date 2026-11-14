@@ -15,7 +15,7 @@ local function with_clipboard(read_ok, read_value, body)
 	local names = {
 		clipboard = "adapters.clipboard",
 		shell = "core.process.adapters.shell_runner",
-		display = "infra.display_server",
+		display = "core.ui.engine.display_server",
 	}
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end

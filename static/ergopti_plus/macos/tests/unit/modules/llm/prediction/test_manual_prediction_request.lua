@@ -27,7 +27,7 @@ local function load_fixture(options)
 	options.render_success = true
 	local fixture = Pipeline.load(options)
 	fixture.notices = {}
-	package.loaded["ui.tooltip"].show = function(content)
+	package.loaded["core.ui.ui.tooltip"].show = function(content)
 		fixture.notices[#fixture.notices + 1] = content
 		return true
 	end

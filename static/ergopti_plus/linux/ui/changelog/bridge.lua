@@ -224,7 +224,7 @@ end
 --- @param payload table
 --- @return boolean pushed
 local function default_push(payload, document_owner)
-	local ok_manager, Manager = pcall(require, "ui.webview_manager")
+	local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_manager or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push releases: webview_manager.eval_js is unavailable.")
 		return false
@@ -247,7 +247,7 @@ M._push = default_push
 --- @param channel string Registry channel id.
 --- @return number generation
 function M.start_fetch(channel)
-	local loaded, host = pcall(require, "ui.webview_manager")
+	local loaded, host = pcall(require, "core.ui.ui.webview_manager")
 	local document, epoch = _page_document, _page_epoch
 	_fetch_generation = _fetch_generation + 1
 	local generation = _fetch_generation
@@ -257,7 +257,7 @@ function M.start_fetch(channel)
 			or type(host.document_owner_retained) ~= "function" then return false end
 		local function identity()
 			return generation == _fetch_generation and document == _page_document and epoch == _page_epoch
-				and package.loaded["ui.webview_manager"] == host
+				and package.loaded["core.ui.ui.webview_manager"] == host
 		end
 		if not identity() then return false end
 		local ok, current = pcall(host.document_owner_current, document)
@@ -437,7 +437,7 @@ end
 --- @return table session
 local function trusted_page_epoch(context)
 	if type(context) ~= "table" or context.app_name ~= APP_NAME or type(context.epoch) ~= "number" then return nil end
-	local ok, host = pcall(require, "ui.webview_manager")
+	local ok, host = pcall(require, "core.ui.ui.webview_manager")
 	if not ok or type(host.current_epoch) ~= "function" or type(host.is_visible) ~= "function" then return nil end
 	if context.document_owner == nil or type(host.document_owner_current) ~= "function"
 		or host.document_owner_current(context.document_owner) ~= true then return nil end
@@ -455,7 +455,7 @@ end
 
 --- Captures actual admitted document and pause owners, privately.
 local function failure_owner()
-	local ok, host = pcall(require, "ui.webview_manager")
+	local ok, host = pcall(require, "core.ui.ui.webview_manager")
 	local state, epoch, document = _daemon_state, _page_epoch, _page_document
 	if not ok or type(state) ~= "table" then return nil end
 	return { list = _last_list, generation = _fetch_generation, state = state, epoch = epoch,
@@ -473,7 +473,7 @@ local function failure_current(owner)
 		local state, epoch = host.get_daemon_state(), host.current_epoch(APP_NAME)
 		local visible = host.is_visible(APP_NAME)
 		return state == owner.state and epoch == owner.epoch and visible == true
-			and package.loaded["ui.webview_manager"] == host and owner.document == _page_document
+			and package.loaded["core.ui.ui.webview_manager"] == host and owner.document == _page_document
 			and owner.list ~= nil and owner.list == _last_list and owner.generation == _fetch_generation
 			and owner.state == _daemon_state and owner.state.is_paused == owner.pause
 	end

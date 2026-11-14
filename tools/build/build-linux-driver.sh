@@ -245,7 +245,7 @@ REQUIRED_FILES=(
 	"linux/modules/updater/ownership_receipt.lua"
 	"linux/core/i18n/engine/i18n.lua"
 	"linux/core/timing/engine/timings.lua"
-	"linux/ui/webkit_host.lua"
+	"linux/core/ui/ui/webkit_host.lua"
 	"linux/tests/run.lua"
 	"linux/tests/helpers.lua"
 	# Every tracked file under _generated/. The daemon refuses to start without

@@ -174,10 +174,10 @@ helpers.describe("keymap selftest gate", function()
 		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			Gate._ports = nil
 			local saved_run, saved_window, saved_dev = package.loaded["infra.field_run"],
-				package.loaded["adapters.own_window"], package.loaded["core.lifecycle.engine.dev_source"]
+				package.loaded["core.ui.adapters.own_window"], package.loaded["core.lifecycle.engine.dev_source"]
 			local running = true
 			package.loaded["infra.field_run"] = { holds_reload = function() return running end }
-			package.loaded["adapters.own_window"] = { focused_window_id = function() return SCRATCH_WINDOW end }
+			package.loaded["core.ui.adapters.own_window"] = { focused_window_id = function() return SCRATCH_WINDOW end }
 			package.loaded["core.lifecycle.engine.dev_source"] = { is_active = function() return false end }
 			local ok, err = pcall(function()
 				Publisher.publish(SCRATCH_WINDOW)
@@ -187,7 +187,7 @@ helpers.describe("keymap selftest gate", function()
 				helpers.assert_true(admitted == false)
 				helpers.assert_eq(reason, "no_field_run")
 			end)
-			package.loaded["infra.field_run"], package.loaded["adapters.own_window"],
+			package.loaded["infra.field_run"], package.loaded["core.ui.adapters.own_window"],
 				package.loaded["core.lifecycle.engine.dev_source"] = saved_run, saved_window, saved_dev
 			assert(ok, err)
 		end)

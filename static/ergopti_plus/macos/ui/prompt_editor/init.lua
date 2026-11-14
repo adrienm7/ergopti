@@ -16,10 +16,10 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 
 local hs         = hs
-local ui_builder = require("ui.ui_builder")
+local ui_builder = require("core.ui.ui.builder")
 local Logger     = require("core.logger.engine.logger")
 local i18n       = require("core.i18n.engine.i18n")
 local Paths      = require("core.fs.engine.paths")
@@ -197,7 +197,7 @@ end
 local function report_save_failure()
 	local scheduled = require("core.timing.engine.deferred_work").after(0, function()
 		local shown, err = pcall(function()
-			require("infra.dialog_util").block_alert(i18n.get("common.error_title"),
+			require("core.ui.engine.dialog_util").block_alert(i18n.get("common.error_title"),
 				i18n.get("prompt_editor.save_failed"), i18n.get("button.ok"), nil, "critical")
 		end)
 		if not shown then Logger.error(LOG, "The save failure could not be shown: %s.", tostring(err)) end
