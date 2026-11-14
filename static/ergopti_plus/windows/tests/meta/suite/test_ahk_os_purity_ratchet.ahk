@@ -98,8 +98,20 @@ _AOPR_WholeIdentifiers() {
 
 Test("OS purity counter: whole native identifiers and captured built-ins (os-purity-token-boundaries)", _AOPR_WholeIdentifiers)
 
+; True for a UI source: a file under a ui\ folder of any feature. The core\ui
+; feature's own name is no such folder: its adapters and engine are not UI
+; sources, its ui\ role folder is. The ratchets partition by this role, so a
+; structure move keeps a file in its tree whichever feature folder it lands in.
+_AOPR_IsUiSource(Path) {
+	Relative := SubStr(Path, StrLen(_AOPR_DriverRoot()) + 2)
+	if SubStr(Relative, 1, 8) = "core\ui\"
+		Relative := SubStr(Relative, 9)
+	return InStr("\" . Relative, "\ui\") > 0
+}
+
 ; Every .ahk file under the given driver subdirectories, recursively, with
 ; adapters/ excluded — OS calls there are the legitimate isolation layer.
+; The UI sources are left to the ui pair, which counts them wherever they live.
 _AOPR_FilesIn(SubDirs) {
 	Files := []
 	Root := _AOPR_DriverRoot()
@@ -108,11 +120,29 @@ _AOPR_FilesIn(SubDirs) {
 		if !DirExist(Base)
 			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
-			if InStr(A_LoopFilePath, "\adapters\")
+			if InStr(A_LoopFilePath, "\adapters\") || _AOPR_IsUiSource(A_LoopFilePath)
 				continue
 			Files.Push(A_LoopFilePath)
 		}
 	}
+	return Files
+}
+
+; Every UI source of the driver, adapters/ excluded, wherever its feature keeps
+; it; the suite and vendored code are no driver source.
+_AOPR_UiFiles() {
+	Files := []
+	Root := _AOPR_DriverRoot()
+	Loop Files, Root . "\*.ahk", "R" {
+		Relative := SubStr(A_LoopFilePath, StrLen(Root) + 2)
+		if SubStr(Relative, 1, 6) = "tests\" || SubStr(Relative, 1, 7) = "vendor\"
+			continue
+		if InStr(A_LoopFilePath, "\adapters\") || !_AOPR_IsUiSource(A_LoopFilePath)
+			continue
+		Files.Push(A_LoopFilePath)
+	}
+	if Files.Length == 0
+		throw Error("OS-purity UI source inventory is empty under " . Root)
 	return Files
 }
 
@@ -188,7 +218,7 @@ Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCor
 ; tree the ratchet did not look at.
 _AOPR_RatchetUi() {
 	global _AOPR_BASELINE_UI
-	_AOPR_AssertTree("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_BASELINE_UI)
+	_AOPR_AssertTree("windows/ui", _AOPR_UiFiles(), _AOPR_BASELINE_UI)
 }
 Test("meta: windows/ OS-call purity ratchet — ui", _AOPR_RatchetUi)
 
@@ -329,7 +359,7 @@ Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_Famil
 
 _AOPR_FamilyRatchetUi() {
 	global _AOPR_FAMILY_BASELINE_UI
-	_AOPR_AssertFamilies("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_FAMILY_BASELINE_UI)
+	_AOPR_AssertFamilies("windows/ui", _AOPR_UiFiles(), _AOPR_FAMILY_BASELINE_UI)
 }
 Test("meta: windows/ platform-API family ratchet — ui", _AOPR_FamilyRatchetUi)
 
