@@ -41,8 +41,6 @@ local EXTENSIONS = { toml = true, keylayout = true }
 local CODE = "^[a-z_]+$"
 -- A download's plain name: no folder, no leading dot.
 local EXPORT_NAME = "^[A-Za-z0-9][A-Za-z0-9_.-]*%.([a-z]+)$"
--- How many « name (n).ext » a download tries before it is refused.
-local MAX_EXPORT_SUFFIX = 99
 
 
 
@@ -57,7 +55,7 @@ local MAX_EXPORT_SUFFIX = 99
 --- Validates the [source] table of the shared layout defaults.
 --- @param layout_defaults table Decoded _shared/layouts/data/defaults.json.
 --- @return table|nil settings { folder, last_file, nav_file, max_file_bytes,
----   max_name_length, export_extensions = { [extension] = true },
+---   max_name_length, export_extensions = { [extension] = true }, max_export_suffix,
 ---   failures = { invalid, write } }
 --- @return string|nil error
 function M.settings(layout_defaults)
@@ -68,7 +66,7 @@ function M.settings(layout_defaults)
 			return nil, "the source " .. field .. " is not a plain name"
 		end
 	end
-	for _, field in ipairs({ "max_file_bytes", "max_name_length" }) do
+	for _, field in ipairs({ "max_file_bytes", "max_name_length", "max_export_suffix" }) do
 		local value = source[field]
 		if type(value) ~= "number" or value <= 0 or value % 1 ~= 0 then
 			return nil, "the source " .. field .. " is not a positive integer"
@@ -98,6 +96,7 @@ function M.settings(layout_defaults)
 		max_file_bytes = source.max_file_bytes,
 		max_name_length = source.max_name_length,
 		export_extensions = extensions,
+		max_export_suffix = source.max_export_suffix,
 		failures = { invalid = failures.invalid, write = failures.write },
 	}, nil
 end
@@ -204,15 +203,16 @@ function M.check_export(settings, payload)
 end
 
 --- The first free path of a download in a folder: the name itself, then
---- « stem (2).ext » up to MAX_EXPORT_SUFFIX.
+--- « stem (2).ext » up to max_suffix.
 --- @param folder string With a trailing separator.
 --- @param name string A name M.check_export accepted.
 --- @param exists function exists(path) -> boolean
+--- @param max_suffix integer The settings' max_export_suffix.
 --- @return string|nil path
-function M.free_export_path(folder, name, exists)
+function M.free_export_path(folder, name, exists, max_suffix)
 	if not exists(folder .. name) then return folder .. name end
 	local stem, extension = name:match("^(.-)(%.[a-z]+)$")
-	for n = 2, MAX_EXPORT_SUFFIX do
+	for n = 2, max_suffix do
 		local candidate = folder .. stem .. " (" .. n .. ")" .. extension
 		if not exists(candidate) then return candidate end
 	end
@@ -324,7 +324,8 @@ function M.new(env)
 			on_done(false, settings.failures.write, detail, nil)
 			return
 		end
-		local path = M.free_export_path(downloads:gsub("/+$", "") .. "/", payload.filename, env.exists)
+		local path = M.free_export_path(downloads:gsub("/+$", "") .. "/", payload.filename, env.exists,
+			settings.max_export_suffix)
 		if not path then
 			detail = "every name for " .. payload.filename .. " is taken in " .. downloads
 			env.log("error", "The layout editor download was not written: %s.", detail)

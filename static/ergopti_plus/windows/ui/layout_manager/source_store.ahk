@@ -41,8 +41,6 @@ global SOURCE_STORE_FILE_NAME := "^[a-z][a-z0-9_]*\.[a-z]+$"
 global SOURCE_STORE_EXTENSIONS := Map("toml", true, "keylayout", true)
 ; A download's plain name: no folder, no leading dot.
 global SOURCE_STORE_EXPORT_NAME := "^[A-Za-z0-9][A-Za-z0-9_.-]*\.([a-z]+)$"
-; How many « name (n).ext » a download tries before it is refused.
-global SOURCE_STORE_MAX_EXPORT_SUFFIX := 99
 
 
 
@@ -58,7 +56,8 @@ global SOURCE_STORE_MAX_EXPORT_SUFFIX := 99
  * Validates the [source] table of the shared layout defaults.
  * @param {Map} LayoutDefaults - Decoded _shared/layouts/data/defaults.json.
  * @returns {Map} folder, last_file, max_file_bytes, max_name_length, nav_file (the navigation export,
- *   never reopened as a source), export_extensions (a set of the downloads' file types) and
+ *   never reopened as a source), export_extensions (a set of the downloads' file types),
+ *   max_export_suffix (the last « name (n).ext » a download tries) and
  *   failures (the codes of source_store.lua: invalid, write).
  * @throws {Error} When the table is missing or one of its fields is not valid.
  */
@@ -69,7 +68,7 @@ SourceStore_Settings(LayoutDefaults) {
 	for Field in ["folder", "last_file", "nav_file"]
 		if !(Source.Get(Field, 0) is String) || !RegExMatch(Source[Field], "^[A-Za-z0-9._-]+$")
 			throw Error("The source " . Field . " is not a plain name.")
-	for Field in ["max_file_bytes", "max_name_length"]
+	for Field in ["max_file_bytes", "max_name_length", "max_export_suffix"]
 		if !(Source.Get(Field, 0) is Integer) || Source[Field] <= 0
 			throw Error("The source " . Field . " is not a positive integer.")
 	Extensions := Map()
@@ -86,7 +85,8 @@ SourceStore_Settings(LayoutDefaults) {
 			throw Error("The source failures name no " . Code . " code.")
 	return Map("folder", Source["folder"], "last_file", Source["last_file"],
 		"max_file_bytes", Source["max_file_bytes"], "max_name_length", Source["max_name_length"],
-		"nav_file", Source["nav_file"], "export_extensions", Extensions, "failures", Map("invalid", Failures["invalid"], "write", Failures["write"]))
+		"nav_file", Source["nav_file"], "export_extensions", Extensions,
+		"max_export_suffix", Source["max_export_suffix"], "failures", Map("invalid", Failures["invalid"], "write", Failures["write"]))
 }
 
 /**
@@ -226,18 +226,18 @@ SourceStore_CheckExport(Settings, Payload, &Bytes) {
 
 /**
  * The first free path of a download in a folder: the name itself, then
- * « stem (2).ext » up to SOURCE_STORE_MAX_EXPORT_SUFFIX.
+ * « stem (2).ext » up to MaxSuffix.
  * @param {String} Folder - With its trailing backslash.
  * @param {String} Name - A name SourceStore_CheckExport accepted.
  * @param {Func} Exists - Exists(Path) -> Boolean.
+ * @param {Integer} MaxSuffix - The settings' max_export_suffix.
  * @returns {String} The path, "" when every name is taken.
  */
-SourceStore_FreeExportPath(Folder, Name, Exists) {
-	global SOURCE_STORE_MAX_EXPORT_SUFFIX
+SourceStore_FreeExportPath(Folder, Name, Exists, MaxSuffix) {
 	if !Exists.Call(Folder . Name)
 		return Folder . Name
 	RegExMatch(Name, "^(.*)(\.[a-z]+)$", &Parts)
-	loop SOURCE_STORE_MAX_EXPORT_SUFFIX - 1 {
+	loop MaxSuffix - 1 {
 		Candidate := Folder . Parts[1] . " (" . (A_Index + 1) . ")" . Parts[2]
 		if !Exists.Call(Candidate)
 			return Candidate
@@ -285,28 +285,18 @@ _SourceStore_DiskPorts() {
 }
 
 ; The production ports of a download: the Downloads known folder, which is
-; never created, and a raw byte write.
+; never created, and the adapter's raw byte write.
 _SourceStore_ExportPorts(Ports) {
 	Defaults := Map(
 		"downloads_dir", () => GetKnownFolderDownloads(),
 		"dir_exists", (Path) => InStr(FileExist(Path), "D") > 0,
-		"exists", (Path) => FileExist(Path) != "",
-		"write_bytes", _SourceStore_WriteBytes
+		"exists", FSExists,
+		"write_bytes", FSWriteBytesStrict
 	)
 	if Ports is Map
 		for Name, Port in Ports
 			Defaults[Name] := Port
 	return Defaults
-}
-
-_SourceStore_WriteBytes(Path, Bytes) {
-	Handle := FileOpen(Path, "w")
-	if !Handle
-		throw OSError(A_LastError, -1, "FileOpen " . Path)
-	try {
-		if Handle.RawWrite(Bytes, Bytes.Size) != Bytes.Size
-			throw Error("Short write to " . Path)
-	} finally Handle.Close()
 }
 
 _SourceStore_Write(Path, Text) {
@@ -411,7 +401,8 @@ SourceStore_Export(Settings, Payload, Ports := 0) {
 		LoggerError("LayoutSource", "The layout editor download has no destination: {1}.", Detail)
 		return Map("ok", false, "code", Settings["failures"]["write"], "detail", Detail, "path", "")
 	}
-	Path := SourceStore_FreeExportPath(RTrim(Downloads, "\") . "\", Payload["filename"], Ports["exists"])
+	Path := SourceStore_FreeExportPath(RTrim(Downloads, "\") . "\", Payload["filename"], Ports["exists"],
+		Settings["max_export_suffix"])
 	if Path == "" {
 		Detail := "every name for " . Payload["filename"] . " is taken in " . Downloads
 		LoggerError("LayoutSource", "The layout editor download was not written: {1}.", Detail)
