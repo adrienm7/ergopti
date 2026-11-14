@@ -119,6 +119,23 @@ function buildGeometry(model) {
 	return out;
 }
 
+/**
+ * The physical key of each Windows scan code (KLC files number keys by it),
+ * for the keys the engine measures.
+ * @param {object} model - analysis_model.json.
+ * @returns {object} lower-case hex scan code → KeyboardEvent.code.
+ */
+function buildScancodes(model) {
+	const physical = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8')).keys;
+	const out = {};
+	for (const code of Object.keys(model.fingerings.standard)) {
+		const match = /^SC([0-9A-F]{3})$/.exec(physical[code].ahk);
+		if (!match) throw new Error(`${code} has no scan code in physical_keys.json`);
+		out[parseInt(match[1], 16).toString(16).padStart(2, '0')] = code;
+	}
+	return out;
+}
+
 // =========================
 // ======= 2/ Layouts ======
 // =========================
@@ -327,6 +344,7 @@ function buildData() {
 		schema_version: 1,
 		model,
 		geometry: buildGeometry(model),
+		scancodes: buildScancodes(model),
 		weights: weights.weights,
 		library_sources: library.sources,
 		layouts: buildLibrary(model),
@@ -358,6 +376,7 @@ function buildSource(data) {
 		`\t"schema_version": ${data.schema_version},`,
 		`\t"model": ${JSON.stringify(data.model)},`,
 		`\t"geometry": ${JSON.stringify(data.geometry)},`,
+		`\t"scancodes": ${JSON.stringify(data.scancodes)},`,
 		`\t"weights": ${JSON.stringify(data.weights)},`,
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,
 		`\t"corpora": ${JSON.stringify(data.corpora)},`,

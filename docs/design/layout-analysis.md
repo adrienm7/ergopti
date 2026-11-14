@@ -189,6 +189,37 @@ chosen); `LAYOUT_ANALYSIS_DATA.corpora` lists them with their source, licence
 and size. The other texts of `static/corpus` are not offered until their
 licence is known.
 
+## Layout file formats
+
+`_shared/ui/layout_analysis/layout_formats.js` (global `LAYOUT_FORMATS`) reads a
+layout file into the engine's shape and reports, item by item, what it could not
+map (`{format, layout, unmapped: [{what, detail}]}`); a file it cannot read at
+all is refused with a stable code (`format_unknown`, `format_invalid`,
+`format_unsupported_board`).
+
+| Reader                                       | Format                                                 | Notes                                                                                                                                           |
+| -------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fromKla(json)`                              | Keyboard Layout Analyzer JSON (KLA, KLAnext and forks) | `standard` (ANSI), `european` (ISO) and `ergodox` boards, key indexes from KLA's QWERTY key sets; no dead keys exist in the format.             |
+| `fromKalamineToml(doc)`                      | Kalamine TOML (parsed)                                 | ISO, ANSI and ERGO drawings; `full`, or `base` (with the 1dk column) and `altgr`; `[spacebar]`; a blank level takes the case Kalamine gives it. |
+| `fromKalamineJson(json)`                     | Kalamine / x-keyboard JSON                             | `keymap` and `deadkeys`.                                                                                                                        |
+| `fromXkb(text, variant?)`                    | XKB symbols                                            | four levels; `dead_*` keysyms; `include` lines and levels beyond four are reported.                                                             |
+| `fromKlc(text, scancodes)`                   | Windows KLC                                            | SHIFTSTATE columns 0, 1, 6, 7; `DEADKEY` tables; ligatures reported.                                                                            |
+| `fromKeylayout(text, id, convention, tools)` | macOS .keylayout                                       | through the layout composer's reader; its refusals become `format_invalid`.                                                                     |
+| `fromRows(input)`                            | Oxeylyzer DOF, cmini JSON, plain rows                  | base layer, upper case on Shift.                                                                                                                |
+| `read(name, text, tools)`                    | any of the above                                       | recognised by content and extension.                                                                                                            |
+
+The standard accents (grave, acute, circumflex, tilde, diaeresis, cedilla…) a
+format names without a table compose by Unicode normalisation: the letter
+followed by the accent's combining mark, normalised to one character. Writers:
+`toSource(layout)` gives an Ergopti layout source the source model validates;
+`toKla(layout, fingering)` a KLA JSON on the european board; `toKalamineToml`
+a Kalamine ISO `full` drawing, listing what Kalamine cannot hold (another dead
+key, several characters on one key). `tools/test/test-layout-formats.cjs` holds
+the readers to the repository's own files of Ergopti 1DK v2.1.2 (its Kalamine
+TOML, JSON, KLC, XKB and .keylayout) and Ergopti's published KLA files. The
+« Comparer » page adds an imported layout to the comparison and shows that
+report.
+
 ## Comparer page
 
 `_shared/ui/layout_analysis/index.html` is the « Comparer » tab: corpus

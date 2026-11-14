@@ -453,6 +453,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-comparer-page.cjs"],
 			"repro": "npm run test:layout-comparer-page"
+		},
+		{
+			"id": "layout-formats",
+			"ordinal": 664,
+			"name": "layout file readers give the same keys for one layout's Kalamine TOML, JSON, KLC and XKB files, read KLA and .keylayout files, and write sources, KLA JSON and Kalamine TOML that read back",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-formats.cjs"],
+			"repro": "npm run test:layout-formats"
 		}
 	]
 }

@@ -60,6 +60,7 @@
 		"test:layout-composer-model": "node ./tools/test/test-layout-composer-model.cjs",
 		"test:layout-analysis-engine": "node ./tools/test/test-layout-analysis-engine.cjs",
 		"test:layout-comparer-page": "node ./tools/test/test-layout-comparer-page.cjs",
+		"test:layout-formats": "node ./tools/test/test-layout-formats.cjs",
 		"test:nav-layer-recommended-golden": "node ./tools/test/test-nav-layer-recommended-golden.cjs",
 		"test:keymap-layers-corpus": "node ./tools/test/test-keymap-layers-corpus.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
