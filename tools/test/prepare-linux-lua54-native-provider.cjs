@@ -9,6 +9,8 @@ const COMMIT = '2621884230c9072ad77f7379609b74c9d6dbeb86';
 const TREE = '016c13e960e1776898fd49322f70e2e849339ad1';
 const MESON_BEFORE = '011b150827402869c5f2d742868510644f92c6abdafd0dfd1fa87e350601241c';
 const MESON_AFTER = '7172cb0c5e29f0ac3469ea4cbdc7b4c64f2ca87017b7ddfb0cb33ff83121d0dc';
+/** The pinned meson.build's project() name, which Meson 1.10 and later put before each test. */
+const MESON_PROJECT = 'cffi-lua';
 const TEST_NAMES = Object.freeze([
 	'simple example',
 	'abi example',
@@ -94,19 +96,20 @@ function vendorReceipt(rows, unionSupported) {
 	)
 		refused();
 	const names = new Set();
+	const forms = new Set();
 	for (const row of rows) {
-		if (
-			!row ||
-			typeof row !== 'object' ||
-			Array.isArray(row) ||
-			!TEST_NAMES.includes(row.name) ||
-			names.has(row.name)
-		)
-			refused();
-		names.add(row.name);
+		if (!row || typeof row !== 'object' || Array.isArray(row)) refused();
+		// Meson 1.10 and later log a test as « project:test »; earlier releases log the bare
+		// name. Both are read, but one log never mixes them.
+		const prefixed = typeof row.name === 'string' && row.name.startsWith(MESON_PROJECT + ':');
+		const name = prefixed ? row.name.slice(MESON_PROJECT.length + 1) : row.name;
+		forms.add(prefixed);
+		if (!TEST_NAMES.includes(name) || names.has(name) || forms.size !== 1)
+			refused(`vendor test name ${JSON.stringify(row.name)}`);
+		names.add(name);
 		// The vendor row is named so a CI refusal says which test changed.
-		const seen = `vendor test "${row.name}" ${row.result}/${row.returncode}, union ABI ${unionSupported}`;
-		if (row.name === 'unions by value' && !unionSupported) {
+		const seen = `vendor test "${name}" ${row.result}/${row.returncode}, union ABI ${unionSupported}`;
+		if (name === 'unions by value' && !unionSupported) {
 			if (row.result !== 'SKIP' || row.returncode !== 77) refused(seen);
 		} else if (row.result !== 'OK' || row.returncode !== 0) refused(seen);
 	}
