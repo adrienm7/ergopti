@@ -49,9 +49,6 @@ return {
 			["unit"] = "mm",
 		},
 		["hotstrings.cascade_max_arrows"] = {
-			["default_from"] = {
-				["manifest"] = "hotstrings.cascade_max_arrows",
-			},
 			["file"] = "config.toml",
 			["max"] = 10,
 			["min"] = 1,
@@ -68,9 +65,6 @@ return {
 			["unit"] = "s",
 		},
 		["hotstrings.expansion_delay"] = {
-			["default_from"] = {
-				["manifest"] = "hotstrings.expansion_delay",
-			},
 			["entry_scale"] = 1000,
 			["entry_type"] = "integer",
 			["entry_unit"] = "ms",
@@ -85,9 +79,6 @@ return {
 			["unit"] = "s",
 		},
 		["hotstrings.idle_reset_seconds"] = {
-			["default_from"] = {
-				["manifest"] = "hotstrings.idle_reset_seconds",
-			},
 			["file"] = "config.toml",
 			["max"] = 3600,
 			["min"] = 0,
@@ -133,10 +124,6 @@ return {
 		["layers.repeat_count"] = {
 			["file"] = "layers.toml",
 			["max"] = 99,
-			["max_from"] = {
-				["file"] = "layouts/data/layer_actions.toml",
-				["pattern"] = "\\[parameters\\.repeat_count\\]\\n(?:[^\\n]*\\n)*?max = (\\d+)",
-			},
 			["min"] = 1,
 			["type"] = "integer",
 		},
@@ -149,32 +136,18 @@ return {
 		["layout_source.tap_holds.threshold_ms"] = {
 			["file"] = "layout_source.toml",
 			["max"] = 10000,
-			["max_from"] = {
-				["scale"] = 1,
-				["timing"] = "tap_hold.max_activation_ms",
-			},
 			["min"] = 1,
 			["type"] = "integer",
 			["unit"] = "ms",
 		},
 		["llm.generation.context_length"] = {
-			["default_from"] = {
-				["manifest"] = "llm.generation.context_length",
-			},
 			["file"] = "config.toml",
 			["max"] = 4000,
-			["max_from"] = {
-				["file"] = "ai/engine/policy/context_buffer.lua",
-				["pattern"] = "M\\.MAX_CONTEXT_LENGTH = ([0-9]+)",
-			},
 			["min"] = 80,
 			["type"] = "integer",
 			["unit"] = "characters",
 		},
 		["llm.generation.max_words"] = {
-			["default_from"] = {
-				["manifest"] = "llm.generation.max_words",
-			},
 			["file"] = "config.toml",
 			["max"] = 10000,
 			["min"] = 0,
@@ -186,9 +159,6 @@ return {
 			["unit"] = "words",
 		},
 		["llm.generation.min_words"] = {
-			["default_from"] = {
-				["manifest"] = "llm.generation.min_words",
-			},
 			["file"] = "config.toml",
 			["max"] = 20,
 			["min"] = 1,
@@ -196,31 +166,18 @@ return {
 			["unit"] = "words",
 		},
 		["llm.generation.temperature"] = {
-			["default_from"] = {
-				["manifest"] = "llm.generation.temperature",
-			},
 			["file"] = "config.toml",
 			["max"] = 1.3,
-			["max_from"] = {
-				["file"] = "ai/data/inference.json",
-				["pattern"] = "\"max_temperature\": ([0-9.]+)",
-			},
 			["min"] = 0,
 			["type"] = "decimal",
 		},
 		["llm.profiles.num_predictions"] = {
-			["default_from"] = {
-				["manifest"] = "llm.profiles.num_predictions",
-			},
 			["file"] = "config.toml",
 			["max"] = 10,
 			["min"] = 1,
 			["type"] = "integer",
 		},
 		["llm.trigger.debounce_ms"] = {
-			["default_from"] = {
-				["manifest"] = "llm.trigger.debounce_ms",
-			},
 			["file"] = "config.toml",
 			["max"] = 10000,
 			["min"] = 50,
@@ -232,9 +189,6 @@ return {
 			["unit"] = "ms",
 		},
 		["llm.trigger.min_request_interval_ms"] = {
-			["default_from"] = {
-				["manifest"] = "llm.trigger.min_request_interval_ms",
-			},
 			["file"] = "config.toml",
 			["max"] = 10000,
 			["min"] = 0,
@@ -248,9 +202,6 @@ return {
 			["type"] = "decimal",
 		},
 		["mod_combos.simultaneous_threshold_ms"] = {
-			["default_from"] = {
-				["manifest"] = "mod_combos.simultaneous_threshold_ms",
-			},
 			["file"] = "config.toml",
 			["max"] = 1000,
 			["min"] = 1,
@@ -267,9 +218,6 @@ return {
 			["type"] = "string",
 		},
 		["shortcuts.caps_word.idle_timeout_seconds"] = {
-			["default_from"] = {
-				["manifest"] = "shortcuts.caps_word.idle_timeout_seconds",
-			},
 			["file"] = "config.toml",
 			["max"] = 3600,
 			["min"] = 0,
@@ -281,25 +229,16 @@ return {
 			["unit"] = "s",
 		},
 		["shortcuts.chatgpt_url"] = {
-			["default_from"] = {
-				["manifest"] = "shortcuts.chatgpt_url",
-			},
 			["file"] = "config.toml",
 			["max_length"] = 2048,
 			["type"] = "url",
 		},
 		["shortcuts.search.search_engine"] = {
-			["default_from"] = {
-				["manifest"] = "shortcuts.search.search_engine",
-			},
 			["file"] = "config.toml",
 			["max_length"] = 2048,
 			["type"] = "url",
 		},
 		["shortcuts.search.search_engine_url_query"] = {
-			["default_from"] = {
-				["manifest"] = "shortcuts.search.search_engine_url_query",
-			},
 			["file"] = "config.toml",
 			["max_length"] = 2048,
 			["type"] = "url",
@@ -310,36 +249,21 @@ return {
 			["entry_unit"] = "ms",
 			["file"] = "tap_hold.toml",
 			["max"] = 10,
-			["max_from"] = {
-				["scale"] = 0.001,
-				["timing"] = "tap_hold.max_activation_ms",
-			},
 			["min"] = 0.001,
 			["type"] = "decimal",
 			["unit"] = "s",
 		},
 		["tap_hold.time_activation_seconds"] = {
-			["default_from"] = {
-				["scale"] = 0.001,
-				["timing"] = "tap_hold.default_activation_ms",
-			},
 			["entry_scale"] = 1000,
 			["entry_type"] = "integer",
 			["entry_unit"] = "ms",
 			["file"] = "tap_hold.toml",
 			["max"] = 10,
-			["max_from"] = {
-				["scale"] = 0.001,
-				["timing"] = "tap_hold.max_activation_ms",
-			},
 			["min"] = 0.001,
 			["type"] = "decimal",
 			["unit"] = "s",
 		},
 		["tap_holds.lone_modifier_tap_max_ms"] = {
-			["default_from"] = {
-				["manifest"] = "tap_holds.lone_modifier_tap_max_ms",
-			},
 			["file"] = "config.toml",
 			["max"] = 10000,
 			["min"] = 0,

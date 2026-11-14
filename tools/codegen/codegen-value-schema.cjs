@@ -147,12 +147,29 @@ function keyConstants(schema) {
 	return constants;
 }
 
+// Where a default or a maximum comes from (another shared file, the timing
+// registry): checked by tools/test/test-value-schema.cjs against the source
+// schema, read by no runtime. A runtime projection carries only the resolved
+// values, so the Windows exe never names a Lua or JSON path it does not ship.
+const PROVENANCE_FIELDS = ['default_from', 'max_from'];
+
+/**
+ * Reads the schema on disk without its provenance fields.
+ * @return {Object}
+ */
+function runtimeSchema() {
+	const schema = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
+	for (const entry of Object.values(schema.settings))
+		for (const field of PROVENANCE_FIELDS) delete entry[field];
+	return schema;
+}
+
 /**
  * Renders the generated Lua module from the schema on disk.
  * @return {string}
  */
 function renderLua() {
-	const schema = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
+	const schema = runtimeSchema();
 	return (
 		'--- _shared/settings/engine/value_schema_data.lua\n' +
 		'--- AUTO-GENERATED from _shared/settings/data/value_schema/value_schema.json.\n' +
@@ -171,7 +188,7 @@ function renderLua() {
  * @return {string}
  */
 function renderBrowser() {
-	const schema = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
+	const schema = runtimeSchema();
 	const source = fs.readFileSync(CHECK_SOURCE, 'utf8');
 	const exportAt = source.lastIndexOf('export {');
 	if (exportAt < 0) throw new Error('value_check.js lost its export list');
@@ -210,7 +227,7 @@ function renderBrowser() {
  * @return {string}
  */
 function render() {
-	const schema = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
+	const schema = runtimeSchema();
 	const settings = {};
 	for (const name of Object.keys(schema.settings).sort()) settings[name] = schema.settings[name];
 	return (

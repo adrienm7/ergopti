@@ -307,15 +307,7 @@ function requireValue(schema, key, value) {
 				"max": 10,
 				"entry_scale": 1000,
 				"entry_type": "integer",
-				"entry_unit": "ms",
-				"default_from": {
-					"timing": "tap_hold.default_activation_ms",
-					"scale": 0.001
-				},
-				"max_from": {
-					"timing": "tap_hold.max_activation_ms",
-					"scale": 0.001
-				}
+				"entry_unit": "ms"
 			},
 			"tap_hold.keys.*.time_activation_seconds": {
 				"file": "tap_hold.toml",
@@ -325,11 +317,7 @@ function requireValue(schema, key, value) {
 				"max": 10,
 				"entry_scale": 1000,
 				"entry_type": "integer",
-				"entry_unit": "ms",
-				"max_from": {
-					"timing": "tap_hold.max_activation_ms",
-					"scale": 0.001
-				}
+				"entry_unit": "ms"
 			},
 			"tap_holds.lone_modifier_tap_max_ms": {
 				"file": "config.toml",
@@ -342,20 +330,14 @@ function requireValue(schema, key, value) {
 						"value": 0,
 						"label_key": "value_check.special.off"
 					}
-				],
-				"default_from": {
-					"manifest": "tap_holds.lone_modifier_tap_max_ms"
-				}
+				]
 			},
 			"mod_combos.simultaneous_threshold_ms": {
 				"file": "config.toml",
 				"type": "integer",
 				"unit": "ms",
 				"min": 1,
-				"max": 1000,
-				"default_from": {
-					"manifest": "mod_combos.simultaneous_threshold_ms"
-				}
+				"max": 1000
 			},
 			"hotstrings.expansion_delay": {
 				"file": "config.toml",
@@ -371,10 +353,7 @@ function requireValue(schema, key, value) {
 						"value": 0,
 						"label_key": "value_check.special.no_time_limit"
 					}
-				],
-				"default_from": {
-					"manifest": "hotstrings.expansion_delay"
-				}
+				]
 			},
 			"hotstrings.idle_reset_seconds": {
 				"file": "config.toml",
@@ -387,19 +366,13 @@ function requireValue(schema, key, value) {
 						"value": 0,
 						"label_key": "value_check.special.never"
 					}
-				],
-				"default_from": {
-					"manifest": "hotstrings.idle_reset_seconds"
-				}
+				]
 			},
 			"hotstrings.cascade_max_arrows": {
 				"file": "config.toml",
 				"type": "integer",
 				"min": 1,
-				"max": 10,
-				"default_from": {
-					"manifest": "hotstrings.cascade_max_arrows"
-				}
+				"max": 10
 			},
 			"hotstrings.dynamic.user_code.time_activation_seconds": {
 				"file": "config.toml",
@@ -447,38 +420,21 @@ function requireValue(schema, key, value) {
 				"file": "config.toml",
 				"type": "decimal",
 				"min": 0,
-				"max": 1.3,
-				"default_from": {
-					"manifest": "llm.generation.temperature"
-				},
-				"max_from": {
-					"file": "ai/data/inference.json",
-					"pattern": "\"max_temperature\": ([0-9.]+)"
-				}
+				"max": 1.3
 			},
 			"llm.generation.context_length": {
 				"file": "config.toml",
 				"type": "integer",
 				"unit": "characters",
 				"min": 80,
-				"max": 4000,
-				"default_from": {
-					"manifest": "llm.generation.context_length"
-				},
-				"max_from": {
-					"file": "ai/engine/policy/context_buffer.lua",
-					"pattern": "M\\.MAX_CONTEXT_LENGTH = ([0-9]+)"
-				}
+				"max": 4000
 			},
 			"llm.generation.min_words": {
 				"file": "config.toml",
 				"type": "integer",
 				"unit": "words",
 				"min": 1,
-				"max": 20,
-				"default_from": {
-					"manifest": "llm.generation.min_words"
-				}
+				"max": 20
 			},
 			"llm.generation.max_words": {
 				"file": "config.toml",
@@ -491,19 +447,13 @@ function requireValue(schema, key, value) {
 						"value": 0,
 						"label_key": "value_check.special.unlimited"
 					}
-				],
-				"default_from": {
-					"manifest": "llm.generation.max_words"
-				}
+				]
 			},
 			"llm.profiles.num_predictions": {
 				"file": "config.toml",
 				"type": "integer",
 				"min": 1,
-				"max": 10,
-				"default_from": {
-					"manifest": "llm.profiles.num_predictions"
-				}
+				"max": 10
 			},
 			"llm.trigger.debounce_ms": {
 				"file": "config.toml",
@@ -516,20 +466,14 @@ function requireValue(schema, key, value) {
 						"value": -1,
 						"label_key": "value_check.special.never"
 					}
-				],
-				"default_from": {
-					"manifest": "llm.trigger.debounce_ms"
-				}
+				]
 			},
 			"llm.trigger.min_request_interval_ms": {
 				"file": "config.toml",
 				"type": "integer",
 				"unit": "ms",
 				"min": 0,
-				"max": 10000,
-				"default_from": {
-					"manifest": "llm.trigger.min_request_interval_ms"
-				}
+				"max": 10000
 			},
 			"shortcuts.caps_word.idle_timeout_seconds": {
 				"file": "config.toml",
@@ -542,10 +486,7 @@ function requireValue(schema, key, value) {
 						"value": 0,
 						"label_key": "value_check.special.never"
 					}
-				],
-				"default_from": {
-					"manifest": "shortcuts.caps_word.idle_timeout_seconds"
-				}
+				]
 			},
 			"gestures.sensitivities.*": {
 				"file": "config.toml",
@@ -557,26 +498,17 @@ function requireValue(schema, key, value) {
 			"shortcuts.chatgpt_url": {
 				"file": "config.toml",
 				"type": "url",
-				"max_length": 2048,
-				"default_from": {
-					"manifest": "shortcuts.chatgpt_url"
-				}
+				"max_length": 2048
 			},
 			"shortcuts.search.search_engine": {
 				"file": "config.toml",
 				"type": "url",
-				"max_length": 2048,
-				"default_from": {
-					"manifest": "shortcuts.search.search_engine"
-				}
+				"max_length": 2048
 			},
 			"shortcuts.search.search_engine_url_query": {
 				"file": "config.toml",
 				"type": "url",
-				"max_length": 2048,
-				"default_from": {
-					"manifest": "shortcuts.search.search_engine_url_query"
-				}
+				"max_length": 2048
 			},
 			"personal_info.info.*": {
 				"file": "personal_info.toml",
@@ -610,22 +542,14 @@ function requireValue(schema, key, value) {
 				"file": "layers.toml",
 				"type": "integer",
 				"min": 1,
-				"max": 99,
-				"max_from": {
-					"file": "layouts/data/layer_actions.toml",
-					"pattern": "\\[parameters\\.repeat_count\\]\\n(?:[^\\n]*\\n)*?max = (\\d+)"
-				}
+				"max": 99
 			},
 			"layout_source.tap_holds.threshold_ms": {
 				"file": "layout_source.toml",
 				"type": "integer",
 				"unit": "ms",
 				"min": 1,
-				"max": 10000,
-				"max_from": {
-					"timing": "tap_hold.max_activation_ms",
-					"scale": 1
-				}
+				"max": 10000
 			},
 			"layout_source.keys.virtual_key": {
 				"file": "layout_source.toml",

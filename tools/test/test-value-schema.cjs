@@ -425,6 +425,16 @@ function checkPorts() {
 			fs.readFileSync(file, 'utf8') === content,
 			`${path.relative(ROOT, file)} is stale: run npm run codegen:value-schema`
 		);
+		// Regression (dev run 43579693369): the Windows data named the Lua file
+		// a maximum came from, a path the Windows exe never ships. A runtime
+		// projection carries resolved values only, never their provenance.
+		const where = path.relative(ROOT, file);
+		for (const field of ['default_from', 'max_from'])
+			check(!content.includes(field), `${where} carries no ${field} provenance`);
+		for (const entry of Object.values(readJson(SCHEMA_PATH).settings)) {
+			const source = entry.max_from && entry.max_from.file;
+			if (source) check(!content.includes(source), `${where} names no source file (${source})`);
+		}
 	}
 }
 
