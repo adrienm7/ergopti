@@ -25,7 +25,33 @@ const REPO = path.resolve(__dirname, '..', '..');
 const HOST = 'linux/ui/dialog_host.lua';
 const FILE = 'static/ergopti_plus/linux/zz_probe.sh';
 
+/** A folder joined onto an unbraced variable that holds the driver root. */
+function folderCase() {
+	const { map } = Plan.moveMap();
+	// It follows the folder; a scratch folder's name is no driver folder.
+	const FOCUS = 'linux/desktop_focus/gnome/metadata.json';
+	if (fs.existsSync(path.join(REPO, 'static/ergopti_plus', FOCUS))) {
+		const focusStep = Plan.steps(map).find((s) => s.moves.some(([o]) => o === FOCUS));
+		const focusMap = new Map(
+			[...map].map(([o, t]) => [o, focusStep.moves.some(([so]) => so === o) ? t : o])
+		);
+		const sh = 'static/ergopti_plus/linux/install/zz_probe_focus.sh';
+		const body =
+			'[ -d "$driver_root/desktop_focus" ] || exit 2\n' +
+			'local source="$1/desktop_focus/gnome"\n' +
+			'dir=$(mktemp -d)\nmkdir "$dir/desktop_focus"\n';
+		const shRows = Plan.scanFile(sh, body, Plan.referenceContext(focusMap));
+		const shOut = Apply.rewriteText(body, shRows, new Map(), sh);
+		const home = path.posix.dirname(map.get('linux/desktop_focus/gnome/metadata.json'));
+		const folder = path.posix.dirname(home).slice('linux/'.length);
+		assert.ok(shOut.includes(`"$driver_root/${folder}"`), shOut);
+		assert.ok(shOut.includes(`"$1/${folder}/gnome"`), shOut);
+		assert.ok(shOut.includes('mkdir "$dir/desktop_focus"'), shOut);
+	}
+}
+
 function run() {
+	folderCase();
 	if (!fs.existsSync(path.join(REPO, 'static/ergopti_plus', HOST))) {
 		console.log('[OK] shell paths on an unbraced variable: the step has landed.');
 		return;

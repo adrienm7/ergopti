@@ -2355,6 +2355,33 @@ function scanFile(file, text, ctx) {
 			if (fresh !== m[2] && !fresh.startsWith('/..'))
 				add('lua-module-quoted', m[0], `$${m[1]}${fresh}`, hit);
 		}
+	// "$driver_root/desktop_focus" and "$1/desktop_focus/gnome" in a driver's
+	// shell script: a folder joined onto an unbraced variable that holds the
+	// driver root (or the script's own folder). S13 moved linux/desktop_focus
+	// into platform/ and the compositor focus installer found no source.
+	if (/\.(sh|bash)$/.test(file) && inTree && Census.DRIVERS.includes(inTree))
+		for (const m of text.matchAll(/\$([A-Za-z_]\w*|\d)(\/(?:[\w-]+\/)*[\w-]+)(?![\w./-])/g)) {
+			// A bare folder name says less than a file name: only a variable
+			// that names a driver or script folder holds one, never a scratch
+			// folder (dir=$(mktemp -d) and its "$dir/bin").
+			const holdsRoot =
+				/^\d$/.test(m[1]) ||
+				['root', 'driver', 'script', 'src', 'source', 'self', 'here'].some((w) =>
+					m[1].toLowerCase().includes(w)
+				);
+			const scratch = new RegExp(`(?:^|[\\s;])${m[1]}=\\$\\(\\s*mktemp\\b`, 'm').test(text);
+			if (!holdsRoot || scratch) continue;
+			for (const base of [`${PREFIX}${inTree}`, path.posix.dirname(file)]) {
+				const old = path.posix.normalize(`${base}${m[2]}`);
+				const moved = byRepoDir.get(old);
+				if (!moved || moved === SPLIT || moved === old || !moved.startsWith(`${base}/`)) continue;
+				add('lua-module-quoted', m[0], `$${m[1]}/${moved.slice(base.length + 1)}`, {
+					oldRepo: old,
+					newRepo: moved
+				});
+				break;
+			}
+		}
 
 	// TestsRoot . "/../infra/reload_terminal_handoff.ahk" in a Windows test: a
 	// climb from the suite folder (windows/tests) joined onto a variable that
