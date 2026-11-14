@@ -1240,6 +1240,8 @@ const SHARED_ROOT_REWRITES = [
 	[/(["'])_shared\1(\s*\.\.\s*[A-Za-z_]\w*\s*\.\.\s*)(["'])lua\3/g, '$1_shared$1'],
 	// A template: `${shared}/lua/?.lua;`.
 	[new RegExp(`(\\$\\{\\s*${SHARED_IDENT}\\s*\\})\\/lua(?=[/'"\`;])`, 'g'), '$1'],
+	// A bare shell variable: LUA_PATH="$shared/lua/?.lua;" and "$SRC_SHARED/lua".
+	[/(\$[A-Za-z_]*[Ss][Hh][Aa][Rr][Ee][Dd]\w*)\/lua(?=[/'"`;\s]|$)/gm, '$1'],
 	// A Python f-string: f"{DRIVER}/?.lua;{SHARED}/lua/?.lua;".
 	[new RegExp(`(?<!\\$)(\\{\\s*${SHARED_IDENT}\\s*\\})\\/lua(?=[/'"\`;])`, 'g'), '$1'],
 	// JavaScript: SHARED_ROOT + '/lua'.
