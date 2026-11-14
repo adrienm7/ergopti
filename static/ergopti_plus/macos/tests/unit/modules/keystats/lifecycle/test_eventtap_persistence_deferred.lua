@@ -37,7 +37,7 @@ local RESET_MODULES = {
 	"adapters.event_provenance", "adapters.file_system",
 	"adapters.input_source_broker", "adapters.keyboard_hook",
 	"adapters.process_lifecycle", "adapters.synthetic_input",
-	"adapters.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
+	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "infra.config_paths", "infra.dialog_util", "infra.i18n",
 	"infra.logger", "infra.manifest_reader", "infra.timings",
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",

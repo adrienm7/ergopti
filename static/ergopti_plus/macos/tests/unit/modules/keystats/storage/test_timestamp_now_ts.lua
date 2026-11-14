@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("keystats timestamp.now_ts derives s and .mmm from one clock", function()
 	local function load_with_clock(epoch)
-		package.loaded["adapters.timer_scheduler"] = { now = function() return epoch end }
+		package.loaded["core.events.timer_scheduler"] = { now = function() return epoch end }
 		package.loaded["modules.keystats.timestamp"] = nil
 		return require("modules.keystats.timestamp")
 	end
@@ -37,13 +37,13 @@ helpers.describe("keystats timestamp.now_ts derives s and .mmm from one clock", 
 		local b = load_with_clock(1700000000.750).now_ts()
 		helpers.assert_eq(a:sub(1, 19), b:sub(1, 19))  -- same second
 		helpers.assert_true(a < b, "the later same-second reading must sort later: " .. a .. " vs " .. b)
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.keystats.timestamp"] = nil
 	end)
 
 	helpers.it("formats a captured epoch without reading the wall clock again", function()
 		local calls = 0
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			now = function()
 				calls = calls + 1
 				return calls == 1 and 1700000000.250 or 1800000000.750
@@ -57,7 +57,7 @@ helpers.describe("keystats timestamp.now_ts derives s and .mmm from one clock", 
 			"formatting must not move a captured typing row to a later clock reading")
 		helpers.assert_eq(formatted:sub(1, 19),
 			os.date("%Y-%m-%d %H:%M:%S", 1700000000))
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.keystats.timestamp"] = nil
 	end)
 end)

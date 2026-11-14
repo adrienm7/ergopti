@@ -158,7 +158,7 @@ end)
 -- and floor, as on Windows and macOS (preview-expiry-decrement).
 helpers.describe("preview expiry follows the shared decrement and floor", function()
 	helpers.it("(preview-expiry-decrement) arms the trigger delay minus the decrement", function()
-		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview" }
+		local names = { "adapters.graphics_renderer", "core.events.timer_scheduler", "ui.tooltip.preview" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local delays = {}
@@ -168,7 +168,7 @@ helpers.describe("preview expiry follows the shared decrement and floor", functi
 				show = function() return true end,
 				hide = function() return true end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(delay) delays[#delays + 1] = delay; return { armed = true } end,
 				cancel = function() return true end,
 			}

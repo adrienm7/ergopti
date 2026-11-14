@@ -9,7 +9,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "menu_llm.activation_pause_owner"
 

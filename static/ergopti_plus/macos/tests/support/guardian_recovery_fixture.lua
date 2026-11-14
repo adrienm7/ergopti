@@ -36,7 +36,7 @@ local STUB_MODULES = {
 	"platform.remap.onboarding",
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.system_info",
 	"platform.remap.deploy_pacing",
 	"infra.notifications",
@@ -714,7 +714,7 @@ local function with_remap(options, body)
 		timer.timer = nil
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 	-- Unknown input idle never delays a deploy; a case sets calls.input_idle_seconds.
 	calls.input_idle_seconds = options.input_idle_seconds
 	package.loaded["adapters.system_info"] = {

@@ -35,7 +35,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 			end,
 			_active_tasks = {},
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() return { fired = false }, true end,
 			cancel = function() return true end,
 		}
@@ -87,7 +87,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 		watchers.stop_input_source_watcher()
 		package.loaded["adapters.system_info"] = nil
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["adapters.input_source_broker"] = nil
 		package.loaded["platform.remap.watchers"] = nil
 		if not ok then error(err, 0) end

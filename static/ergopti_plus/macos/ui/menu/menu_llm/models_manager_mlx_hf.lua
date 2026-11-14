@@ -30,7 +30,7 @@ local ui_builder    = require("ui.ui_builder")
 local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Logger        = require("infra.logger")
 local TextUtils = require("core.text.engine.utils_core")
 

@@ -144,7 +144,7 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		BUILTIN_PROFILES = {},
 		get_current_model = function() return state.llm_model end,
 	}
-	reset_module("adapters.timer_scheduler")
+	reset_module("core.events.timer_scheduler")
 	reset_module("adapters.json_codec")
 	reset_module("ui.menu.menu_llm.startup_controller")
 	local StartupController = require("ui.menu.menu_llm.startup_controller")

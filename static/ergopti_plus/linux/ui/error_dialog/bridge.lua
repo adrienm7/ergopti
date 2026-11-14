@@ -88,7 +88,7 @@ end
 M.clock = function() return require("infra.monotonic").now_ms() / 1000 end
 
 -- Runs a callback later on the daemon's loop, replaceable by tests
-M.defer = function(fn, delay_ms) return require("adapters.event_loop").defer(fn, delay_ms) end
+M.defer = function(fn, delay_ms) return require("core.events.loop").defer(fn, delay_ms) end
 
 
 

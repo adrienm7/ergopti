@@ -28,7 +28,7 @@ local function fresh(options)
 	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, source_sha256 = string.rep("a", 64) }
 	-- A refused hint is logged with the check the script names.
 	package.loaded["infra.logger"] = { warn = function() end }
-	package.loaded["adapters.timer_scheduler"] = { awake_time = function()
+	package.loaded["core.events.timer_scheduler"] = { awake_time = function()
 			if configuration.clock_throw then error("controlled native clock refusal") end
 			if configuration.clock_missing then return nil end
 			return configuration.clock_value or now
@@ -230,7 +230,7 @@ case(function()
 	for _, options in ipairs({ { clock_missing = true }, { clock_throw = true }, { clock_value = false },
 		{ clock_value = "invalid" }, { clock_value = -1 }, { clock_value = 0 / 0 }, { clock_value = math.huge } }) do
 		fresh(options)
-		if options.clock_value == false then package.loaded["adapters.timer_scheduler"].awake_time = false end
+		if options.clock_value == false then package.loaded["core.events.timer_scheduler"].awake_time = false end
 		check(adapter.get(directory, driver), nil); check(created, 0); check(next(adapter._active_tasks), nil)
 	end
 end)

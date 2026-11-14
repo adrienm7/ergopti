@@ -249,7 +249,7 @@ local function load_healthcheck(view)
 		context.window_callback = callback
 		return self
 	end
-	package.loaded["adapters.timer_scheduler"] = { cancel = function() return true end }
+	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
@@ -310,7 +310,7 @@ end)
 local function load_error_dialog(view, app)
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+		"infra.locale", "ui.ui_builder", "core.events.timer_scheduler", "adapters.storage", "infra.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -338,7 +338,7 @@ local function load_error_dialog(view, app)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
 	package.loaded["infra.locale"] = { all = function() return {} end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, fn) timers[#timers + 1] = fn; return { timer = {} }, true end,
 		now_ns = function() return 0 end,
 		cancel = function() return true end,

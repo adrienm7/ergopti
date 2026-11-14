@@ -103,7 +103,7 @@ end)
 local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	local previous_logger = package.loaded["infra.logger"]
 	local previous_shell_runner = package.loaded["adapters.shell_runner"]
-	local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+	local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 	local previous_dialog = package.loaded["infra.dialog_util"]
 	local previous_hs_module = package.loaded["hs"]
 	local previous_hs_stub = package.loaded["tests.stubs.hs"]
@@ -119,7 +119,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 			return { start = function() calls.starts = calls.starts + 1; return true end }
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, callback)
 			if timer_mode == "throw" then error("focus timer exploded") end
 			candidate = { callback = callback, timer = {}, committed = timer_mode ~= "uncommitted" }
@@ -154,7 +154,7 @@ local function with_dialog_fixture(timer_mode, cancel_result, scenario)
 	end, debug.traceback)
 	package.loaded["infra.logger"] = previous_logger
 	package.loaded["adapters.shell_runner"] = previous_shell_runner
-	package.loaded["adapters.timer_scheduler"] = previous_scheduler
+	package.loaded["core.events.timer_scheduler"] = previous_scheduler
 	package.loaded["infra.dialog_util"] = previous_dialog
 	package.loaded["hs"] = previous_hs_module
 	package.loaded["tests.stubs.hs"] = previous_hs_stub

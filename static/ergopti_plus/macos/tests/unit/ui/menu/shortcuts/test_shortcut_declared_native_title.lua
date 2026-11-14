@@ -28,13 +28,13 @@ local function fixture(body, secondary)
 		helpers.with_stub_scope({
 			"infra.native_presentation", "menu.engine.native_presentation_core", "core.ui.engine.window_titles", "infra.i18n",
 			"infra.locale", "core.i18n.engine.core", "infra.paths", "infra.logger", "adapters.json_codec",
-			"adapters.storage", "adapters.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
+			"adapters.storage", "core.events.timer_scheduler", "adapters.shell_runner", "infra.dialog_util",
 			"ui.menu.shortcut_utils", "infra.text_utils", "platform.input.send_input", "hs", "tests.stubs.hs",
 		}, function()
 			local policy, lookup, dialog, prompt, scheduler
 			local state = { calls = {}, applies = {}, raw = "ctrl+k", focus_calls = 0 }
 			local completed, failure = xpcall(function()
-				scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+				scheduler = helpers.load_with_stubs("core.events.timer_scheduler", {
 					focus = function() state.focus_calls = state.focus_calls + 1; return true end,
 					dialog = { textPrompt = function(...)
 						state.calls[#state.calls + 1] = { ... }

@@ -186,14 +186,14 @@ local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
 local function with_stubs(replacement, timers, body)
 	local saved = {
 		configuration = package.loaded["diagnostics.engine.healthcheck.configuration"],
-		timers = package.loaded["adapters.timer_scheduler"],
+		timers = package.loaded["core.events.timer_scheduler"],
 		probes = package.loaded["ui.healthcheck.probes"],
 	}
 	if replacement then package.loaded["diagnostics.engine.healthcheck.configuration"] = replacement end
-	if timers then package.loaded["adapters.timer_scheduler"] = timers; package.loaded["ui.healthcheck.probes"] = nil end
+	if timers then package.loaded["core.events.timer_scheduler"] = timers; package.loaded["ui.healthcheck.probes"] = nil end
 	local ok, err = pcall(body)
 	package.loaded["diagnostics.engine.healthcheck.configuration"] = saved.configuration
-	package.loaded["adapters.timer_scheduler"] = saved.timers
+	package.loaded["core.events.timer_scheduler"] = saved.timers
 	package.loaded["ui.healthcheck.probes"] = saved.probes
 	if not ok then error(err, 0) end
 end

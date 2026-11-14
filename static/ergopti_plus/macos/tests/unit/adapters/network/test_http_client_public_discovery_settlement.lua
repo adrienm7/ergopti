@@ -11,7 +11,7 @@ local SourceFile = require("tests.support.source_file")
 
 local OWNED_MODULES = {
 	"modules.llm.api_remote", "modules.llm.local_servers", "adapters.http_client",
-	"adapters.timer_scheduler", "infra.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"core.events.timer_scheduler", "infra.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
 	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
 	"infra.timings", "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
@@ -78,7 +78,7 @@ local function isolated(scenario)
 		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
 		local servers = require("modules.llm.local_servers")
 		local clients = upvalue(api._probe_local_target, "_local_probe_clients")
-		local scheduler = package.loaded["adapters.timer_scheduler"]
+		local scheduler = package.loaded["core.events.timer_scheduler"]
 		local ok, err = xpcall(function() scenario(api, servers, clients, state) end, debug.traceback)
 		-- A terminal can release a waiting successor. Drain appended requests too.
 		for _, request in ipairs(state.requests) do request.callback(200, '{"data":[]}', {}) end

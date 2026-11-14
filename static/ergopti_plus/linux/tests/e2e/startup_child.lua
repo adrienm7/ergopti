@@ -297,9 +297,9 @@ end
 -- waits 2 s; the error window 0.25 s), short enough to keep the suite fast.
 local SOAK_SECONDS = 30
 
-package.preload["adapters.event_loop"] = function()
+package.preload["core.events.loop"] = function()
 	-- The real deferred queue: start-up schedules work on it.
-	local adapter = dofile("adapters/event_loop.lua")
+	local adapter = dofile("core/events/loop.lua")
 	local function settle_metrics()
 		local uv, collector = require("luv"), require("modules.keystats.keystats")
 		if not collector.has_flush_debt() then return end

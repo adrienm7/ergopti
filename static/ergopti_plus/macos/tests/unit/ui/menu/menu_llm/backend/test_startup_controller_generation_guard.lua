@@ -120,7 +120,7 @@ local function load_fresh_startup_controller()
 		},
 	}
 	package.loaded["ui.menu.menu_llm.startup_controller"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	-- get_current_model is called unconditionally by prediction_engine.lua's
 	-- module-level code; without it, any later test whose require chain
 	-- reaches prediction_engine while this stub is still cached crashes with

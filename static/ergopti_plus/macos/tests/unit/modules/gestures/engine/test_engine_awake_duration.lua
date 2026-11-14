@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"modules.gestures.engine",
 	"modules.gestures.geometry",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"infra.timings",
 	"adapters.accessibility_permission",
@@ -83,7 +83,7 @@ local function with_engine_scope(callback)
 		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return true end }
 		package.loaded["adapters.mouse_control"] = { any_button_down = function() return false end }
 		local Engine = require("modules.gestures.engine")
-		local Timer = require("adapters.timer_scheduler")
+		local Timer = require("core.events.timer_scheduler")
 		helpers.assert_eq(Engine.init({
 			enabled = true,
 			ga = { tap_2 = "mission_control", swipe_3_right = "word_next", swipe_3_left = "word_prev" },

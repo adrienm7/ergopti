@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 
 local MIXIN_MODULES = {
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.logger",
 	"ui.download_window",
 	"ui.menu.menu_llm.models_manager_mlx_download",

@@ -325,7 +325,7 @@ end
 --- @return function
 local function cpu_load(config, run)
 	return function(done)
-		local Timers = require("adapters.timer_scheduler")
+		local Timers = require("core.events.timer_scheduler")
 		if not Timers.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
@@ -361,7 +361,7 @@ end
 --- @return function
 local function configuration(schema, run, overrides)
 	return function(done)
-		local Timers = require("adapters.timer_scheduler")
+		local Timers = require("core.events.timer_scheduler")
 		if not Timers.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return

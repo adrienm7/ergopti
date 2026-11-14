@@ -1,4 +1,4 @@
---- adapters/event_loop.lua
+--- core/events/loop.lua
 
 --- ==============================================================================
 --- MODULE: EventLoop Adapter (Linux)
@@ -29,7 +29,7 @@ local Logger = require("core.logger.engine.shim")
 local NativeTimer = require("infra.native_timer")
 local NumberPolicy = require("core.text.engine.number_policy")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
-local LOG = "adapters.event_loop"
+local LOG = "core.events.loop"
 
 
 -- =========================================

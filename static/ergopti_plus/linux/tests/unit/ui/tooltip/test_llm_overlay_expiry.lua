@@ -24,10 +24,10 @@ local helpers = require("tests.helpers")
 --- Runs a body with a recording scheduler and a fresh overlay.
 --- @param body function Receives (overlay, timers, expired).
 local function with_overlay(body)
-	local saved = package.loaded["adapters.timer_scheduler"]
+	local saved = package.loaded["core.events.timer_scheduler"]
 	local timers, expired = {}, { count = 0 }
 	local ok, err = pcall(function()
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = { armed = true, delay = delay, callback = callback }
 				timers[#timers + 1] = handle
@@ -45,7 +45,7 @@ local function with_overlay(body)
 		})
 		body(overlay, timers, expired)
 	end)
-	package.loaded["adapters.timer_scheduler"] = saved
+	package.loaded["core.events.timer_scheduler"] = saved
 	if not ok then error(err, 0) end
 end
 

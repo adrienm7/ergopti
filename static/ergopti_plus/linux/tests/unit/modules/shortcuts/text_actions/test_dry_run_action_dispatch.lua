@@ -96,7 +96,7 @@ local function with_action(route, mode, action, body)
 			end })
 			local function lifecycle() world.lifecycle = world.lifecycle + 1 end
 			environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
-			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "adapters.event_loop",
+			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "core.events.loop",
 				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "adapters.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "infra.monotonic",

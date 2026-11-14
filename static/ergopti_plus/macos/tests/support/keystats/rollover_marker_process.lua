@@ -210,7 +210,7 @@ return function()
 			manager = require("modules.keystats.log_manager")
 			writer = require("modules.keystats.sqlite_writer")
 			rotation = require("modules.keystats.rotation")
-			scheduler = require("adapters.timer_scheduler")
+			scheduler = require("core.events.timer_scheduler")
 			-- Begin this physical recovery scenario with an existing user ignore.
 			local ignore = temporary .. "/metrics/.gitignore"
 			if not Lfs.symlinkattributes(ignore) then

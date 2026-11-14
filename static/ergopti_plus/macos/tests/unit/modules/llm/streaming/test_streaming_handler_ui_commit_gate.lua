@@ -86,7 +86,7 @@ local function load_fixture(render_result, reset_result, mark_result, timer_new)
 		new_thinking_filter = SharedParser.new_thinking_filter,
 		process_prediction = function(_buffer, _tail, raw) return prediction(" " .. raw) end,
 	}
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.llm.streaming_handler"] = nil
 	local fixture
 	local hs_overrides = {

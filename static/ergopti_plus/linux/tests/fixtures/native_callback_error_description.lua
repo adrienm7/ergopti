@@ -13,8 +13,8 @@ local root = assert(source:match("^(.*)/tests/fixtures/native_callback_error_des
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
-local Scheduler = require("adapters.timer_scheduler")
-local Loop = require("adapters.event_loop")
+local Scheduler = require("core.events.timer_scheduler")
+local Loop = require("core.events.loop")
 local scenario = assert(arg[1])
 local bad_calls, sibling_calls, watchdog_calls, formatter_calls = 0, 0, 0, 0
 local object = arg[2] == "string" and "owned ordinary callback failure" or setmetatable({}, { __tostring = function() formatter_calls = formatter_calls + 1; error("owned error formatter failure", 0) end })

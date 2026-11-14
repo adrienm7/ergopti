@@ -225,7 +225,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["modules.keymap.registry"] = {},
 			["modules.hotstrings.hotstrings_config"] = {},
 			["modules.keymap.expander"] = {},
-			["adapters.timer_scheduler"] = {},
+			["core.events.timer_scheduler"] = {},
 			["infra.manifest_reader"] = { default_for = function() return "★" end },
 			["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 		}, function(bridge)
@@ -245,7 +245,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 		with_stubbed_module("modules.keymap.terminator_replay", {
 			["infra.logger"] = LOGGER_STUB,
 			["adapters.text_sender"] = {},
-			["adapters.timer_scheduler"] = {},
+			["core.events.timer_scheduler"] = {},
 			["adapters.synthetic_input"] = {},
 		}, function(replay)
 			local state1 = {}
@@ -260,7 +260,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 		with_stubbed_module("modules.llm.warmup_controller", {
 			["infra.logger"] = LOGGER_STUB,
 			["infra.timings"] = { sec = function() return 0.1 end },
-			["adapters.timer_scheduler"] = {},
+			["core.events.timer_scheduler"] = {},
 		}, function(warmup)
 			local core1 = {}
 			local core2 = {}
@@ -345,7 +345,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		["modules.llm.api_common"] = {},
 		["infra.logger"] = LOGGER_STUB,
 		["infra.timings"] = { sec = function() return 0.1 end },
-		["adapters.timer_scheduler"] = PortFakes.timer_scheduler(),
+		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),
 		["infra.i18n"] = {},
 		["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 },
 		["ui.tooltip"] = PortFakes.complete_tooltip({

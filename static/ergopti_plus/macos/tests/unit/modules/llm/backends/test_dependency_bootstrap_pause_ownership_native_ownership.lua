@@ -287,7 +287,7 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 					"duplicate delivery must retry the same native handle")
 
 				fixture.timer_stop_mode = "true"
-				helpers.assert_true(require("adapters.timer_scheduler").retryCleanup())
+				helpers.assert_true(require("core.events.timer_scheduler").retryCleanup())
 				helpers.assert_eq(initial_timer.running_state, false)
 				helpers.assert_eq(#fixture.tasks, 1,
 					"exact settlement releases one authorized bootstrap delivery")
@@ -317,7 +317,7 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 		helpers.assert_eq(#fixture.tasks, 1,
 			"a live resume timer cannot publish replay")
 		fixture.timer_stop_mode = "true"
-		helpers.assert_true(require("adapters.timer_scheduler").retryCleanup())
+		helpers.assert_true(require("core.events.timer_scheduler").retryCleanup())
 		helpers.assert_eq(#fixture.tasks, 2)
 		fixture.tasks[2]:complete(0, "", "")
 	end)

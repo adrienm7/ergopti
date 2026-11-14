@@ -68,7 +68,7 @@ end
 
 local function fresh_engine()
 	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["infra.logger"] = nil
 	package.loaded["infra.timings"] = {
 		sec = function(_, key)

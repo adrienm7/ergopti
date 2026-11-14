@@ -48,7 +48,7 @@ local function load_remote()
 		end,
 		cancel = function() return true end,
 	}
-	package.loaded["adapters.event_loop"] = {
+	package.loaded["core.events.loop"] = {
 		defer = function(fn, delay)
 			deferred[#deferred + 1] = { fn = fn, delay = delay }
 			return true
@@ -61,7 +61,7 @@ end
 
 local function unload()
 	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.event_loop"] = nil
+	package.loaded["core.events.loop"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 	os.remove(REFUSED_FILE)
 end

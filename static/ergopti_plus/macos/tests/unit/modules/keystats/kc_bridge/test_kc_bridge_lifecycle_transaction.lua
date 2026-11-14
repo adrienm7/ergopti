@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @param pathwatcher table Native pathwatcher test double.
 --- @return table module Fresh bridge module.
 local function load_bridge(scheduler, pathwatcher)
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end,
 	metrics_cache_dir = function() return "./metrics_cache" end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()

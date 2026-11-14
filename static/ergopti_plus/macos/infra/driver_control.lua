@@ -78,8 +78,8 @@ local function native_ports()
 			return (bytes:gsub(".", function(c) return string.format("%02x", c:byte()) end))
 		end,
 		watch = function(path, callback) return hs.pathwatcher.new(path, callback) end,
-		defer = function(callback) return require("adapters.timer_scheduler").after(0, callback) end,
-		cancel = function(handle) return require("adapters.timer_scheduler").cancel(handle) end,
+		defer = function(callback) return require("core.events.timer_scheduler").after(0, callback) end,
+		cancel = function(handle) return require("core.events.timer_scheduler").cancel(handle) end,
 	}
 end
 

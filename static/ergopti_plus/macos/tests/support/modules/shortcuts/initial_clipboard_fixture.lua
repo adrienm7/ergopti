@@ -37,7 +37,7 @@ function M.run(kind, options, callback)
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
 			state.text = require("modules.shortcuts.actions.text")
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local native_after = scheduler.after
 			local function external_copy(boundary)
 				if not state.faults_open or options.copy_at ~= boundary or state.copies > 0 then return end

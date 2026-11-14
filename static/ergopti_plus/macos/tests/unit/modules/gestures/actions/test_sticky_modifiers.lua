@@ -93,7 +93,7 @@ local function fresh_sticky()
 		end,
 		is_armed = function() return injector.armed_with ~= nil end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, fn)
 			if timers.next_after_throws then
 				timers.next_after_throws = false

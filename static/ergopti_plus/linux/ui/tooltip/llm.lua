@@ -313,7 +313,7 @@ end
 local function cancel_expiry()
 	local old = _expiry
 	_expiry = nil
-	if old then pcall(require("adapters.timer_scheduler").cancel, old.handle) end
+	if old then pcall(require("core.events.timer_scheduler").cancel, old.handle) end
 end
 
 --- Arms the offer's lifetime once, at its first shown answer (a loading
@@ -321,7 +321,7 @@ end
 local function arm_expiry()
 	if _expiry or not _on_expire or _meta.loading == true then return end
 	local token = {}
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local called, handle = pcall(Scheduler.after, Config.llm_timeout_seconds(), function()
 		if not _expiry or _expiry.token ~= token then return end
 		_expiry = nil

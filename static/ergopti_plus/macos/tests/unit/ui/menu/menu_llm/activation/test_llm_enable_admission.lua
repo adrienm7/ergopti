@@ -131,7 +131,7 @@ helpers.describe("LLM enable requires an owned fresh version receipt", function(
 			local timer = calls.resume_timers[#calls.resume_timers]
 			timer.callback()
 			helpers.assert_eq(#calls.version_requests, 1, "resume cannot acquire while its native staging timer remains live")
-			helpers.assert_eq(require("adapters.timer_scheduler").cancel(timer), true)
+			helpers.assert_eq(require("core.events.timer_scheduler").cancel(timer), true)
 			helpers.assert_eq(#calls.version_requests, 2)
 			assert_off(state, calls)
 			calls.version_callback(GOOD)
@@ -194,7 +194,7 @@ helpers.describe("LLM enable requires an owned fresh version receipt", function(
 			local stage = calls.resume_timers[#calls.resume_timers]
 			stage.callback()
 			helpers.assert_eq(calls.service_repairs, 0)
-			helpers.assert_eq(require("adapters.timer_scheduler").cancel(stage), true)
+			helpers.assert_eq(require("core.events.timer_scheduler").cancel(stage), true)
 			helpers.assert_eq(calls.service_repairs, 1)
 			helpers.assert_eq(#calls.version_requests, 2)
 			helpers.assert_eq(calls.saves, 1)
@@ -218,7 +218,7 @@ helpers.describe("LLM enable requires an owned fresh version receipt", function(
 			calls.set_paused(false)
 			local stage = calls.resume_timers[#calls.resume_timers]
 			stage.callback()
-			helpers.assert_eq(require("adapters.timer_scheduler").cancel(stage), true)
+			helpers.assert_eq(require("core.events.timer_scheduler").cancel(stage), true)
 			assert_off(state, calls)
 			helpers.assert_eq(calls.service_repairs, 1)
 			helpers.assert_eq(#calls.version_requests, 1)

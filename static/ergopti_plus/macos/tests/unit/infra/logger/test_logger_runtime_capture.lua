@@ -253,7 +253,7 @@ helpers.describe("logger — runtime error capture", function()
 			local function owner_callback() clock.now = clock.now + 5000 * 1000000 end
 			-- A closure compiled under the scheduler's chunk name stands for its wrapper.
 			local wrapper = load("local cb = ...; return function() cb() end",
-				"@adapters/timer_scheduler.lua")(owner_callback)
+				"@core/events/timer_scheduler.lua")(owner_callback)
 			hs.timer.doAfter(0, wrapper)
 			helpers.assert_eq(count_lines(captured, "timer_scheduler.lua"), 0,
 				"the scheduler's own wrapper names no owner")

@@ -21,7 +21,7 @@ local PortFakes = require("tests.support.port_fakes")
 local function load_fixture(cancel_result)
 	helpers.load_with_stubs("infra.logger")
 	local hs_stub = _G.hs
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local cancel_calls = 0
 	local core = {
 		DEFAULT_STATE = {

@@ -37,7 +37,7 @@ local dialog     = require("infra.dialog_util")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local CategoryStore = require("metrics.engine.apps.category_store")
 
 local LOG = "metrics_apps"

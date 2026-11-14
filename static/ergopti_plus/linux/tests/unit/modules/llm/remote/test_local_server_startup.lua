@@ -14,7 +14,7 @@ local Json = require("core.text.engine.json")
 --- @param body function Receives servers, entries, HTTP calls and the actual loop.
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "adapters.event_loop", "modules.llm.local_server_ports" }
+		"adapters.http_client", "core.events.loop", "modules.llm.local_server_ports" }
 	local previous, calls = {}, {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	-- Every catalogue server runs at its catalogue address (test_local_server_ports covers the scan)
@@ -50,7 +50,7 @@ local function isolated(body)
 	entries._set_private_create_for_test(function(stage, text)
 		local out = assert(io.open(stage, "wb")); out:write(text); out:close(); return true
 	end)
-	local servers, loop = require("modules.llm.local_servers"), require("adapters.event_loop")
+	local servers, loop = require("modules.llm.local_servers"), require("core.events.loop")
 	local ok, err = pcall(body, servers, entries, calls, loop, path)
 	servers.shutdown()
 	for _, call in ipairs(calls) do if not call.settled then call.finish() end end

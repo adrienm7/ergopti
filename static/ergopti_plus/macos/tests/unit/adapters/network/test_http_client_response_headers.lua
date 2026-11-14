@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Loads a fresh adapter whose native requests answer synchronously.
 local function load_client(response_headers)
 	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	return helpers.load_with_stubs("adapters.http_client", {
 		http = {
 			asyncGet = function(_url, _headers, callback)
@@ -84,7 +84,7 @@ local function load_fixture()
 		}
 	end
 	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local HttpClient = helpers.load_with_stubs("adapters.http_client", { http = http, timer = timer })
 	return HttpClient.new(), callbacks
 end

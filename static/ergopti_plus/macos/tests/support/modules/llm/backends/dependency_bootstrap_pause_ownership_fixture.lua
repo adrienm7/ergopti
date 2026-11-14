@@ -146,7 +146,7 @@ local function load_fixture(options)
 		return task
 	end
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.task_lifecycle"] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.llm.ollama_binary"] = {

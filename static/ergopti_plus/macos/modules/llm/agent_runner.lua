@@ -63,7 +63,7 @@ local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
 local WindowInfo     = require("adapters.window_info")
 local SystemInfo     = require("adapters.system_info")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local TextUtils = require("core.text.engine.utils_core")
 local ConfigKeys = require("settings.engine.keys")
 

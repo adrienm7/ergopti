@@ -162,9 +162,9 @@ helpers.describe("gesture touch watchers are exact lifecycle transactions", func
 						"the exact ON feature snapshot must survive startup rollback")
 					helpers.assert_eq(gestures.is_suspended(), true)
 					for _, handle in ipairs(runtime.primer_handles) do
-						local scheduler_count = #require("adapters.timer_scheduler").handles
+						local scheduler_count = #require("core.events.timer_scheduler").handles
 						handle.callback({ getType = function() return 0 end })
-						helpers.assert_eq(#require("adapters.timer_scheduler").handles,
+						helpers.assert_eq(#require("core.events.timer_scheduler").handles,
 							scheduler_count, "a rolled-back primer callback must stay inert")
 					end
 
@@ -195,9 +195,9 @@ helpers.describe("gesture touch watchers are exact lifecycle transactions", func
 				helpers.assert_true(_G.ERGOPTI_GESTURE_PRIMER == retained,
 					"the exact stop-refused primer must remain owned")
 				helpers.assert_eq(retained.running, true)
-				local scheduler_count = #require("adapters.timer_scheduler").handles
+				local scheduler_count = #require("core.events.timer_scheduler").handles
 				retained.callback({ getType = function() return 0 end })
-				helpers.assert_eq(#require("adapters.timer_scheduler").handles,
+				helpers.assert_eq(#require("core.events.timer_scheduler").handles,
 					scheduler_count, "cleanup-debt callbacks must remain fenced")
 
 				options.primer_stop_mode = "commit"

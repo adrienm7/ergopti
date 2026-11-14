@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
@@ -58,7 +58,7 @@ local function with_profiles_fixture(options, body)
 		local logger = helpers.make_logger_stub()
 		logger.error = function() error_count = error_count + 1 end
 		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback, timer = {} }
 				timers[#timers + 1] = handle

@@ -16,7 +16,7 @@ local function load_real_keep_awake_owner()
 	local arm_mode = "true"
 	local cancel_mode = "true"
 	local handles = {}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return 0 end,
 		after = function(_, callback)
 			if arm_mode == "throw" then error("keep-awake timer arm exploded") end

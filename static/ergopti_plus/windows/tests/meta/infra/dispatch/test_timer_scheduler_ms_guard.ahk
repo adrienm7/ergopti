@@ -4,7 +4,7 @@
 ; MODULE: TimerEvery Invalid-Duration Guard
 ; DESCRIPTION:
 ; Static ordering guard for TimerEvery duration validation in
-; adapters/timer_scheduler.ahk.
+; core/events/timer_scheduler.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; SetTimer with a period of 0 in AHK v2 does not create a one-shot timer —
@@ -39,10 +39,10 @@ _TTSMG_StripLineComments(Src) {
 
 _TTSMG_MsZeroGuard() {
 	Src := _TTSMG_StripLineComments(_TTSMG_ReadSource("timer_scheduler.ahk"))
-	Assert(Src != "", "adapters/timer_scheduler.ahk must be readable")
+	Assert(Src != "", "core/events/timer_scheduler.ahk must be readable")
 
 	Body := _DriverFuncBody("TimerEvery")
-	Assert(Body != "", "TimerEvery must be defined in adapters/timer_scheduler.ahk")
+	Assert(Body != "", "TimerEvery must be defined in core/events/timer_scheduler.ahk")
 
 	ValidatePos := InStr(Body, "_TimerAdapterDurationMs(IntervalSec")
 	AllocatePos := InStr(Body, "_TimerAdapterNextId()")

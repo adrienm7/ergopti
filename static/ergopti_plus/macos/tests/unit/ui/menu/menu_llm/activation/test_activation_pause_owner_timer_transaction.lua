@@ -112,9 +112,9 @@ end
 
 local function load_context(start_modes, stop_modes)
 	local timer_stub, backend = make_timer_backend(start_modes, stop_modes)
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["ui.menu.menu_llm.activation_pause_owner"] = nil
-	local TimerScheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+	local TimerScheduler = helpers.load_with_stubs("core.events.timer_scheduler", {
 		timer = timer_stub,
 	})
 	local ActivationPauseOwner = require("ui.menu.menu_llm.activation_pause_owner")

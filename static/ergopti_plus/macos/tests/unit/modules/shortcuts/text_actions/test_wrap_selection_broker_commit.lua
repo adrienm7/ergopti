@@ -19,7 +19,7 @@ local function with_broker(callback)
 	helpers.with_stub_scope({
 		"modules.keymap.utils",
 		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
+		"core.events.timer_scheduler", "adapters.event_provenance", "adapters.storage",
 		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
 	}, function()
 		local f = Fixture.make({ deliver_trigger = false, absolute_time = 0 })
