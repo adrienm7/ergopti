@@ -296,6 +296,52 @@ for (const mention of cacheMentions)
 		'foreign archive cache path ' + mention
 	);
 
+// The locked Playwright admits only the Ubuntu releases its own host check
+// names. ubuntu-latest moved to 26.04 under it (2026-11) and every browser
+// install refused the host, so each job that installs the browsers names a
+// release, and that release must be one the locked version supports.
+const hostPlatform = fs.readFileSync(
+	path.join(
+		path.dirname(require.resolve('playwright-core/package.json')),
+		'lib/server/utils/hostPlatform.js'
+	),
+	'utf8'
+);
+const supportedUbuntu = new Set(
+	[...hostPlatform.matchAll(/isUbuntu && version === "(\d+\.\d+)"/g)].map((match) => match[1])
+);
+assert.ok(supportedUbuntu.size > 0, 'the locked Playwright host check names no Ubuntu release');
+
+/** Lists the browser-installing jobs whose runner the locked Playwright refuses. */
+function browserRunnerProblems(text, rel) {
+	const found = { jobs: 0, errors: [] };
+	for (const job of pipeline.jobsOfText(text, rel)) {
+		const installs = pipeline
+			.steps(job.body)
+			.some((step) =>
+				(pipeline.runOf(step.body) || []).some((line) => line.includes(browserCommand))
+			);
+		if (!installs) continue;
+		found.jobs++;
+		const runner = pipeline.field(job.body, 'runs-on');
+		const release = /^ubuntu-(\d+\.\d+)$/.exec(runner || '');
+		if (!release || !supportedUbuntu.has(release[1]))
+			found.errors.push(`${rel} ${job.id}: runner ${runner} is not a release Playwright supports`);
+	}
+	return found;
+}
+
+const browserRunners = browserRunnerProblems(coreWorkflow, coreOwner.file);
+assert.equal(
+	browserRunners.jobs,
+	2,
+	'the shared UI E2E and site install jobs install the browsers'
+);
+assert.deepEqual(browserRunners.errors, []);
+const floatingRunner = coreWorkflow.replace(/runs-on: ubuntu-24\.04\b/g, 'runs-on: ubuntu-latest');
+assert.notEqual(floatingRunner, coreWorkflow, 'the runner mutation changes the workflow');
+assert.equal(browserRunnerProblems(floatingRunner, coreOwner.file).errors.length, 2);
+
 const result = spawnSync(
 	process.platform === 'win32' ? 'python' : 'python3',
 	['tools/ci/ubuntu_apt_test.py'],
