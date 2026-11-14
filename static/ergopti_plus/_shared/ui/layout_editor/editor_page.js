@@ -307,7 +307,25 @@ var LayoutEditorPage = (function () {
 			render();
 		}
 
+		/**
+		 * Commits the edit of the focused field, if any: a field commits on blur, and its
+		 * change must apply to the document it was typed in, before that document is
+		 * replaced or its node leaves the page.
+		 */
+		function commitFocused() {
+			const focused = document.activeElement;
+			if (
+				focused &&
+				focused !== root &&
+				root.contains(focused) &&
+				typeof focused.blur === 'function'
+			)
+				focused.blur();
+		}
+
 		function replace(next, lost) {
+			// The edit belongs to the document being replaced: commit it there first.
+			commitFocused();
 			state.history.reset(next);
 			state.layer = (next.layers || []).some((l) => l.id === 'base') ? 'base' : null;
 			state.selected = null;
@@ -379,6 +397,7 @@ var LayoutEditorPage = (function () {
 		}
 
 		function importNav(name, text) {
+			commitFocused();
 			const hold = root.querySelector('#le-nav-hold').value;
 			if (!hold) return notify('error', problemText({ code: 'nav_hold_key_missing', path: '' }));
 			try {
@@ -2523,18 +2542,11 @@ var LayoutEditorPage = (function () {
 			}
 			rendering = true;
 			try {
-				// A field edited but not yet committed commits on blur. Blur it before its node
-				// leaves the page, so its change renders (as the pass below) before the tree is
-				// replaced, instead of being lost or firing inside replaceChildren, where a
-				// nested render once made the outer replacement throw.
-				const focused = document.activeElement;
-				if (
-					focused &&
-					focused !== root &&
-					root.contains(focused) &&
-					typeof focused.blur === 'function'
-				)
-					focused.blur();
+				// Commit a focused field's edit before its node leaves the page, so its change
+				// renders (as the pass below) before the tree is replaced, instead of being lost
+				// or firing inside replaceChildren, where a nested render once made the outer
+				// replacement throw.
+				commitFocused();
 				do {
 					renderAgain = false;
 					renderTree();

@@ -63,12 +63,40 @@ function serve() {
 	});
 }
 
+/**
+ * Gives every browser the removal semantics of the engines that commit a focused
+ * field's change while removing it (Chromium in CI, the drivers' webviews):
+ * replaceChildren removes the old children one by one and, before removing the
+ * one holding focus, fires that field's change while it is still attached. A
+ * handler that re-renders there makes the replacement throw, as it did in CI on
+ * 2026-11-14; other Chromium builds do not fire it, so the page must not depend
+ * on either behaviour. Runs in the page (from worker G's 90b2446702).
+ */
+function commitFocusedFieldOnRemoval() {
+	const replace = Element.prototype.replaceChildren;
+	Element.prototype.replaceChildren = function (...nodes) {
+		for (const child of [...this.childNodes]) {
+			const active = document.activeElement;
+			if (active && active !== document.body && child.contains(active))
+				active.dispatchEvent(new Event('change', { bubbles: true }));
+			if (child.parentNode !== this)
+				throw new DOMException(
+					"Failed to execute 'replaceChildren' on 'Element': The node to be removed is no longer a child of this node.",
+					'NotFoundError'
+				);
+			child.remove();
+		}
+		replace.apply(this, nodes);
+	};
+}
+
 async function open(browser, origin, lang) {
 	const context = await browser.newContext({
 		acceptDownloads: true,
 		viewport: { width: 1280, height: 900 }
 	});
 	await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
+	await context.addInitScript(commitFocusedFieldOnRemoval);
 	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
@@ -549,6 +577,13 @@ async function exerciseManager(browser, origin) {
 			'typed, not yet committed',
 			'the edit is committed, not lost, by that render'
 		);
+		// A file opened while a text field holds an uncommitted edit: the edit belongs to
+		// the document being replaced, so the opened file keeps its own name (worker G's case).
+		await page.fill('#le-name', 'Uncommitted edit');
+		await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
+		await page.waitForFunction(() => document.querySelector('#le-name').value === 'Source Fixture');
+		assert.deepEqual(errors, [], 'opening a file while a field is being edited throws nothing');
+
 		// The preview types through the web emulation: a tap-hold's tap and a shortcut.
 		await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
 		await page.waitForFunction(() => document.querySelector('#le-name').value === 'Source Fixture');
