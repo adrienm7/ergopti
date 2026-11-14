@@ -727,25 +727,19 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 		end)
 	end)
 
-	helpers.it("retains the paused menu posture and refuses stale callbacks before mutation (shared-word-expander-controls)", function()
-		with_settings(stored, function(Settings, path, sandbox, Terminators)
+	helpers.it("keeps the word expander rows live and commits while paused (shared-word-expander-controls)", function()
+		with_settings(stored, function(Settings, _, _, Terminators)
 			helpers.assert_true(Settings.load())
 			local controls, ctx, observed = menu_controls(Settings, false, false)
+			-- A pause stops typing, not configuration (EDD-1): the change applies on resume.
 			ctx.paused = true
-			local receipts = {}
-			for position = 1, 3 do receipts[position] = controls[position].fn() end
-			helpers.assert_eq(observed.writes, 0, "paused callbacks cannot reach the writer")
-			helpers.assert_eq(observed.redraws, 0)
-			helpers.assert_eq(Terminators.is_terminator_enabled("space"), false)
-			helpers.assert_eq(Terminators.is_terminator_enabled("slash"), true)
-			helpers.assert_eq(sandbox.read_bytes(path), stored)
-			for position = 1, 3 do helpers.assert_eq(receipts[position], false) end
-			local grey, _, grey_observed = menu_controls(Settings, true, false)
-			-- The tray keeps the Hotstrings row live while paused (EDD-1); the word
-			-- expander rows themselves still grey until all drivers move together.
-			helpers.assert_true(grey_observed.hotstrings_disabled ~= true, "a paused tray keeps the Hotstrings row")
-			for position = 1, 3 do helpers.assert_eq(grey[position].disabled, true) end
-			helpers.assert_eq(grey_observed.writes, 0)
+			helpers.assert_eq(controls[1].fn(), true)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_true(Terminators.is_terminator_enabled("space") ~= false
+				or Terminators.is_terminator_enabled("slash") ~= true, "the paused click changed a delimiter")
+			local live, _, live_observed = menu_controls(Settings, true, false)
+			helpers.assert_true(live_observed.hotstrings_disabled ~= true, "a paused tray keeps the Hotstrings row")
+			for position = 1, 3 do helpers.assert_true(live[position].disabled ~= true) end
 		end)
 	end)
 end)

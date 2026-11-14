@@ -68,7 +68,7 @@ helpers.describe("custom delimiter deletion consumes the shared command declarat
 		end)
 	end
 
-	helpers.it("a held declared Delete cannot act after pause while the custom toggle remains present", function()
+	helpers.it("a held declared Delete acts while paused and the custom toggle remains present (EDD-1)", function()
 		with_settings(SOURCE, function(Settings, _, _, Terminators)
 			helpers.assert_true(Settings.load())
 			helpers.assert_true(Terminators.add_custom_terminator("custom_probe", "☃", "Independent snowman", false))
@@ -81,11 +81,11 @@ helpers.describe("custom delimiter deletion consumes the shared command declarat
 			end
 			helpers.assert_type(toggle, "table")
 			helpers.assert_type(toggle.fn, "function", "the existing independent custom activation owner remains reachable")
+			-- A pause stops typing, not configuration (EDD-1).
 			ctx.paused = true
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(observed.writes, 0)
-			helpers.assert_eq(observed.redraws, 0)
-			helpers.assert_eq(has_custom(Terminators, "custom_probe"), true)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_eq(has_custom(Terminators, "custom_probe"), false)
 		end)
 	end)
 end)
@@ -134,10 +134,12 @@ end)
 
 
 helpers.describe("custom delimiter Add uses shared declaration and native acknowledgement", function()
-	for _, mode in ipairs({ "ack", "consume_no", "write_false", "write_nil", "write_throw", "write_truthy" }) do
+	-- A pause during the prompts stops typing, not configuration (EDD-1).
+	for _, mode in ipairs({ "ack", "consume_no", "late_pause", "pause_after_prompt", "pause_after_consume",
+		"write_false", "write_nil", "write_throw", "write_truthy" }) do
 		helpers.it("keeps exact owner publication semantics after " .. mode, function()
 			local observed = observe_add_command(mode)
-			local acknowledged = mode == "ack" or mode == "consume_no"
+			local acknowledged = mode == "ack" or mode == "consume_no" or mode:find("pause", 1, true) ~= nil
 			helpers.assert_eq(observed.result, acknowledged)
 			helpers.assert_eq(observed.present, acknowledged)
 			helpers.assert_eq(observed.writes, 1)
@@ -150,7 +152,7 @@ helpers.describe("custom delimiter Add uses shared declaration and native acknow
 			helpers.assert_eq(observed.writer_restored, true)
 		end)
 	end
-	for _, mode in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "input_cancel", "input_empty", "consume_unavailable" }) do
+	for _, mode in ipairs({ "input_cancel", "input_empty", "consume_unavailable" }) do
 		helpers.it("refuses held native Add without publication after " .. mode, function()
 			local observed = observe_add_command(mode)
 			helpers.assert_eq(observed.present, false)
@@ -158,8 +160,6 @@ helpers.describe("custom delimiter Add uses shared declaration and native acknow
 			helpers.assert_eq(observed.source, SOURCE)
 			helpers.assert_eq(observed.writes, 0)
 			helpers.assert_eq(observed.redraws, 0)
-			if mode == "late_pause" then helpers.assert_eq(observed.prompts, 0) end
-			if mode == "pause_after_prompt" then helpers.assert_eq(observed.questions, 0) end
 			helpers.assert_eq(observed.prompt_restored, true)
 			helpers.assert_eq(observed.execute_restored, true)
 			helpers.assert_eq(observed.writer_restored, true)
