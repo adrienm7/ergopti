@@ -4,7 +4,8 @@
  * ==============================================================================
  * MODULE: Linux Pages Post Ready
  * DESCRIPTION:
- * A Linux page bridge (linux/ui/<page>/bridge.lua) that answers the page's
+ * A Linux page bridge (the module webview_manager's BRIDGE_MODULES names for
+ * the page, wherever it lives) that answers the page's
  * "ready" message pushes the page its first state only then: the WebKit host
  * routes no load-finished signal to it, while Windows and macOS also push on
  * navigation. A shared page (_shared/ui/<page>/) that never posts "ready"
@@ -21,7 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const plus = path.resolve(__dirname, '../../static/ergopti_plus');
-const linuxUi = path.join(plus, 'linux/ui');
+const linux = path.join(plus, 'linux');
 const sharedUi = path.join(plus, '_shared/ui');
 
 // A page no Linux caller opens: its bridge is registered, nothing shows it.
@@ -32,14 +33,37 @@ const NOT_OPENED_ON_LINUX = {
 const READY_HANDLED = /==\s*"ready"/;
 const READY_POSTED = /\(\s*(?:\{\s*action:\s*)?['"]ready['"]/;
 
-const pages = fs
-	.readdirSync(linuxUi, { withFileTypes: true })
-	.filter((entry) => entry.isDirectory())
-	.map((entry) => entry.name)
-	.filter((name) => {
-		const bridge = path.join(linuxUi, name, 'bridge.lua');
-		return fs.existsSync(bridge) && READY_HANDLED.test(fs.readFileSync(bridge, 'utf8'));
-	});
+/** Every Lua file of the Linux driver outside its tests. */
+function driverLua(dir, out = []) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (!['tests', '_generated'].includes(entry.name)) driverLua(full, out);
+		} else if (entry.name.endsWith('.lua')) out.push(full);
+	}
+	return out;
+}
+
+// The pages come from the table that loads their bridges, found by its
+// declaration, and each bridge from its module name: a page's bridge may
+// live in any feature folder, under any file name.
+const owners = driverLua(linux).filter((file) =>
+	/^local BRIDGE_MODULES = \{$/m.test(fs.readFileSync(file, 'utf8'))
+);
+assert.equal(owners.length, 1, 'exactly one Linux module declares BRIDGE_MODULES');
+const table = fs
+	.readFileSync(owners[0], 'utf8')
+	.match(/^local BRIDGE_MODULES = \{$([\s\S]*?)^\}$/m)[1];
+const bridges = new Map(
+	[...table.matchAll(/^\s*([\w]+)\s*=\s*"([\w.]+)",/gm)].map((m) => [
+		m[1],
+		path.join(linux, `${m[2].replace(/\./g, '/')}.lua`)
+	])
+);
+assert.ok(bridges.size >= 15, `only ${bridges.size} bridge modules declared: the table moved`);
+const pages = [...bridges]
+	.filter(([, file]) => fs.existsSync(file) && READY_HANDLED.test(fs.readFileSync(file, 'utf8')))
+	.map(([name]) => name);
 
 assert.ok(pages.length >= 15, `only ${pages.length} Linux bridges answer "ready": the scan moved`);
 const missing = [];
