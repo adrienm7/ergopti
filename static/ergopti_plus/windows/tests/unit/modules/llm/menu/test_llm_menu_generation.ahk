@@ -181,7 +181,10 @@ _LMT_SharedTriggerOwner() {
 				; A pause stops typing, not configuration (EDD-1).
 				Suspend(true)
 				AssertTrue(Callback.Call(), "a paused trigger switch commits")
+				AssertTrue(_LLM_Menu[Expected["native"]])
+				AssertTrue(Callback.Call(), "and switches back while still paused")
 				Suspend(false)
+				AssertFalse(_LLM_Menu[Expected["native"]])
 				Writes := _LMT_WriterCalls
 				_LLM_Menu["enabled"] := false
 				Features["llm"]["enabled"] := false
