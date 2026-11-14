@@ -136,6 +136,23 @@ helpers.describe("layout manager bounds native controller ownership", function()
 			end)
 		end)
 	end
+	-- The native pool probe (tools/diagnostics/macos_layout_manager_pool_observer.lua)
+	-- reads the open window's owners as upvalues of the public open function: a
+	-- wrapper around the window factory hides them and turns the probe red.
+	helpers.it("exposes the window owners the native pool probe reads (layout-manager-pool-upvalues)", function()
+		Fixture(function(host)
+			for _, wanted in ipairs({ "_webview", "_usercontent", "_controller", "_controller_lease", "ControllerPool" }) do
+				local found, index = 0, 1
+				while true do
+					local name = debug.getupvalue(host.open, index)
+					if name == nil then break end
+					if name == wanted then found = found + 1 end
+					index = index + 1
+				end
+				assert(found == 1, "open carries " .. wanted .. " " .. found .. " time(s)")
+			end
+		end)
+	end)
 	helpers.it("opens the layout editor in its own window from the manager (layout-editor-own-window)", function()
 		Fixture(function(host, h)
 			local registry = package.loaded["modules.keymap.layout_registry"]
