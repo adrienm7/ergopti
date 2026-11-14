@@ -341,5 +341,5 @@ view is visible, one layout per idle slice. A change of the user's finger model
 (`LAYOUT_ANALYSIS_FINGERING.onChange`) re-scores. Each analyser has two
 columns, official and yours, and an « i » button (`analyser.<id>` of
 `sources.json`); an analyser without a score shows its headline statistics.
-The « Éditer » panel (`analysis_panel.js`) shows the same scores from
-`scoreAll`.
+The « Éditer » panel (`analysis_panel.js`) is to show the same `scoreAll`
+result; that part is not written yet.
