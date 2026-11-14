@@ -1463,6 +1463,15 @@ for (const [key, value] of planOutputs) {
 	}
 }
 const COMMON_MATRIX = '${{ fromJSON(inputs.common_plan).matrix }}';
+// The Common jobs that install the Playwright browsers name an Ubuntu release
+// the locked Playwright supports (test-ubuntu-ci-acquisition.cjs); the others
+// follow ubuntu-latest.
+const COMMON_BROWSER_RUNNERS = new Map([
+	['common-e2e', 'ubuntu-24.04'],
+	['common-testbuild', 'ubuntu-24.04']
+]);
+/** @param {string} id Common job id. @returns {string} Its required runner. */
+const commonRunner = (id) => COMMON_BROWSER_RUNNERS.get(id) || 'ubuntu-latest';
 
 /** Admit the one root plan transport and its complete cross-workflow consumer. */
 function commonPlanProblems(files) {
@@ -2408,7 +2417,11 @@ function commonSiteProblems(source) {
 		]) {
 			same(job.needs, [previous], 'adjacent production stage');
 			same(job.name, name, 'actual API stage name');
-			same(job['runs-on'], 'ubuntu-latest', 'production runner');
+			same(
+				job['runs-on'],
+				commonRunner(job === build ? 'common-build' : 'common-testbuild'),
+				'production runner'
+			);
 			same(job['timeout-minutes'], timeout, 'bounded production stage');
 			same(
 				job.strategy,
@@ -3050,7 +3063,7 @@ function commonProblems(files) {
 					(id === 'common-verdict' && key === 'if' ? 'always()' : null)
 			)
 				problems.push(id + ' must set no ' + key);
-		if (!job || pipeline.field(job.body, 'runs-on') !== 'ubuntu-latest')
+		if (!job || pipeline.field(job.body, 'runs-on') !== commonRunner(id))
 			problems.push(id + ' must retain its Ubuntu runner');
 	}
 	const strategy = '    strategy:\n      fail-fast: false\n      matrix: ' + COMMON_MATRIX;
