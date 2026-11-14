@@ -90,6 +90,15 @@ paused and the engine reads the stored value when typing resumes. A missing or
 non-boolean pause is still refused. On macOS the AI settings groups grey only
 when the AI is off.
 
+Later on 2026-11-14 (worker H): the AI switch turns the AI off while paused on
+the three OS; turning it on waits for resume, because it starts model warmups
+and may offer an install (decided by the agent on 2026-11-14, accepted by the
+coordinator). AI profiles are chosen, created, cloned, edited and deleted while
+paused; the macOS profile shortcut waits for resume because it binds a hotkey
+(`llm_custom_profile_shortcut_ready`). Regressions: `test_llm_menu_toggle_row`
+on macOS and Linux, `test_config_journal_ai_admission.ahk`, the profile
+suites (`edd1-paused-writes`).
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -101,10 +110,10 @@ source proofs reworked first:
   slots' rebinding under `KeyboardShortcuts`' lifecycle pause is not yet
   traced; each shortcut's own row, the wrap rows, the ChatGPT URL editor and
   the tap-key rows run while paused.
-- AI menus, all three drivers: the enable switch (it starts a model warmup,
-  which is not pause-aware on macOS), the model and profile rows, profile
-  creation, model deletion, the API entry rows, the whole-scope restore and
-  clear on Windows, and the Windows tray's greying of the AI submenu.
+- AI menus, all three drivers: turning the AI on (it starts a model warmup,
+  which is not pause-aware on macOS), the model rows, model deletion, the API
+  entry rows, the whole-scope restore and clear on Windows, and the Windows
+  tray's greying of the AI submenu.
 - macOS hotstrings submenus: the personal legacy shortcut row (it binds a
   hotkey).
 - macOS magic key source capture: it listens to a physical key press.
