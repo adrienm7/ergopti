@@ -22,6 +22,8 @@ from support import convert_registry_layout, keylayout_to_xkb, registry_entries
 
 _LINE_RE = re.compile(r'^((?:<[^>]+>\s*)+):\s*"((?:[^"\\]|\\.)*)"\s*$')
 _LOCALE_COMPOSE = Path("/usr/share/X11/locale/en_US.UTF-8/Compose")
+_COMPOSE_NOTHING = 0
+_COMPOSE_COMPOSING = 1
 _COMPOSE_COMPOSED = 2
 
 
@@ -71,6 +73,29 @@ class LocaleShadowingTests(unittest.TestCase):
     def test_unshadowed_dead_keys_keep_their_standard_keysym(self):
         self.assertEqual(self.bepo.dead_triggers["cedille"], "dead_cedilla")
         self.assertEqual(self.bepo.dead_triggers["breve"], "dead_breve")
+
+    def test_every_written_prefix_precedes_its_extensions(self):
+        """libxkbcommon 1.13 lets a shorter line written later replace the longer
+        sequences it starts; a prefix written first is extended on every
+        version (Ubuntu 26.04: 7398 Bépo sequences no longer completed)."""
+        late = []
+        for entry in registry_entries():
+            first_at = {}
+            for index, line in enumerate(
+                convert_registry_layout(entry["id"]).compose_text.splitlines()
+            ):
+                match = _LINE_RE.match(line)
+                if not match:
+                    continue
+                keys = tuple(re.findall(r"<([^>]+)>", match.group(1)))
+                for size in range(1, len(keys)):
+                    first_at.setdefault(keys[:size], (index, keys))
+                if keys in first_at and first_at[keys][0] < index:
+                    late.append(
+                        "%s: %s after %s"
+                        % (entry["id"], " ".join(keys), " ".join(first_at[keys][1]))
+                    )
+        self.assertEqual(late, [])
 
     def test_the_pinned_prefixes_hold_the_cedi_sign_path(self):
         self.assertIn(("dead_currency", "dead_cedilla"), self.extended)
@@ -144,11 +169,28 @@ class NativeComposeTests(unittest.TestCase):
         pair = [bepo.dead_triggers["monnaie"], bepo.dead_triggers["cedille"]]
         self.assertEqual(self.compose(bepo.compose_text, pair), (_COMPOSE_COMPOSED, "₢"))
 
+    def later_shorter_rule_replaces(self) -> bool:
+        """Whether this libxkbcommon lets a shorter rule written later replace the
+        longer ones (1.13, Ubuntu 26.04) or keeps the longer ones (1.6)."""
+        table = '<dead_acute> <a> <b>\t: "y"\n<dead_acute> <a>\t: "x"\n'
+        replaced = self.compose(table, ["dead_acute", "a"])
+        kept = self.compose(table, ["dead_acute", "a", "b"])
+        self.assertIn(
+            (replaced[0], kept[0]),
+            [(_COMPOSE_COMPOSED, _COMPOSE_NOTHING), (_COMPOSE_COMPOSING, _COMPOSE_COMPOSED)],
+        )
+        return replaced[0] == _COMPOSE_COMPOSED
+
     def test_the_standard_trigger_is_what_the_locale_shadowed(self):
-        """Control: the old rule under the locale never completes at the pair."""
+        """Control: under the locale the old rule completes at the pair only on a
+        libxkbcommon whose later shorter rule replaces the locale's longer ones;
+        DKS-001 moves the trigger for the versions that keep them."""
         table = 'include "%L"\n\n<dead_currency> <dead_cedilla>\t: "₢"\n'
         status, _text = self.compose(table, ["dead_currency", "dead_cedilla"])
-        self.assertNotEqual(status, _COMPOSE_COMPOSED)
+        if self.later_shorter_rule_replaces():
+            self.assertEqual(status, _COMPOSE_COMPOSED)
+        else:
+            self.assertNotEqual(status, _COMPOSE_COMPOSED)
         table = '<dead_currency> <dead_cedilla>\t: "₢"\n'
         self.assertEqual(
             self.compose(table, ["dead_currency", "dead_cedilla"]), (_COMPOSE_COMPOSED, "₢")

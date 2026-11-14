@@ -907,7 +907,7 @@ class _Converter:
                         continue
                     emitted[sequence] = terminator + text
                     lines.append("%s\t: %s" % (sequence, compose_string(terminator + text)))
-        return 'include "%L"\n\n' + "\n".join(lines) + "\n"
+        return 'include "%L"\n\n' + "\n".join(prefixes_before_extensions(lines)) + "\n"
 
     def shadowed_states(self, extended: frozenset) -> frozenset:
         """Dead states starting a written sequence the locale extends."""
@@ -950,6 +950,36 @@ class _Converter:
                 if state != "none":
                     explicit.setdefault(state, set()).update(self.state_keysyms(action_id))
         return explicit
+
+
+_COMPOSE_KEYS_RE = re.compile(r"^((?:<[^>]+>\s*)+):")
+
+
+def prefixes_before_extensions(lines: List[str]) -> List[str]:
+    """Move each written sequence before every written sequence it starts.
+
+    A dead state's own line (``<dead_abovedot> : "˙"``) can be written after a
+    chained state whose sequences it starts. libxkbcommon 1.6 (Ubuntu 24.04)
+    keeps the longer sequences whatever the order; 1.13 (Ubuntu 26.04) lets a
+    shorter line written later replace them, so that one line cut every
+    sequence the dead key starts. Written first, the shorter line is extended by
+    the longer ones on both. Lines already in that order keep their place.
+    """
+    keys_of = []
+    for line in lines:
+        match = _COMPOSE_KEYS_RE.match(line)
+        keys_of.append(tuple(re.findall(r"<([^>]+)>", match.group(1))) if match else None)
+    first_extension: Dict[tuple, int] = {}
+    for index, keys in enumerate(keys_of):
+        for size in range(1, len(keys or ())):
+            first_extension.setdefault(keys[:size], index)
+    order = []
+    for index, keys in enumerate(keys_of):
+        target = min(index, first_extension.get(keys, index)) if keys else index
+        # A moved line goes just before the first line it starts, a shorter
+        # prefix before a longer one.
+        order.append((target, 0 if target < index else 1, len(keys or ()), index))
+    return [lines[entry[3]] for entry in sorted(order)]
 
 
 def compose_string(text: str) -> str:
