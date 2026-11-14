@@ -328,6 +328,7 @@ const PROGRAMS = {
 	mkfifo: coreutils,
 	mktemp: coreutils,
 	mv: coreutils,
+	od: coreutils,
 	printf: coreutils,
 	readlink: coreutils,
 	rm: coreutils,
