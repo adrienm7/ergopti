@@ -15,7 +15,7 @@ local OWNED_MODULES = {
 	"core.fs.engine.file_watchers", "ui.menu.menu_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
-	"core.fs.adapters.storage", "infra.timings", "core.fs.adapters.file_system",
+	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",
 	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "ui.hotstring_editor",
 }
 
@@ -76,7 +76,7 @@ local function with_watchers(kind, callback)
 			-- The registry values (constants.toml): the menu watcher's debounce
 			-- doubles as its settle poll, the UI queue polls once a second.
 			local ui_timings = { ui_restore_poll_ms = 1, hs_reload_debounce_ms = 0.5 }
-			package.loaded["infra.timings"] = { sec = function(group, key)
+			package.loaded["core.timing.engine.timings"] = { sec = function(group, key)
 				assert(group == "ui" and ui_timings[key] ~= nil, "unexpected UI timing")
 				return ui_timings[key]
 			end }

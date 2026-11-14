@@ -16,14 +16,14 @@ local MODULES = {
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.text.engine.utils",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 }
 
 local function with_picker(run, options)
 	helpers.with_fresh_modules(MODULES, function()
 		local pending, choosers, native_callbacks = {}, {}, {}
 		local deferred = {}
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			deferred[#deferred + 1] = callback
 			return true
 		end }

@@ -30,7 +30,7 @@ function M.run(options, callback)
 	return helpers.with_stub_scope({
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.keystats.log_manager",
 		"adapters.secure_field_detector", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
-		"core.logger.engine.logger", "infra.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
+		"core.logger.engine.logger", "core.timing.engine.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
 	}, function()
 		local original_date, original_time = os.date, os.time
 		local state = { rows = {}, errors = {}, flushes = 0, rollover_calls = 0, rollover_accepted = false,
@@ -85,7 +85,7 @@ function M.run(options, callback)
 			local function dormant() error("Maintenance must not activate a native timer or task") end
 			package.loaded["core.process.adapters.task_lifecycle"] = { native = dormant, start = dormant }
 			package.loaded["core.events.timer_scheduler"] = { after = dormant, cancel = dormant }
-			package.loaded["infra.timings"] = { ms = function() return 1000 end }
+			package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end }
 			local manager = {
 				append_log = function() end,
 				flush_buffer = function() state.flushes = state.flushes + 1 end,

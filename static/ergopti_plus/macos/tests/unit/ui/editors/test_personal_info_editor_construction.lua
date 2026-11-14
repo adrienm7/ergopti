@@ -35,7 +35,7 @@ local function with_editor(scenario)
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			records.deferred[#records.deferred + 1] = callback
 			return true
 		end }

@@ -376,7 +376,7 @@ helpers.describe("updater bounded pagination", function()
 			local index = tonumber(url:match("&page=(%d+)$"))
 			helpers.assert_true(index ~= nil, "requests carry an explicit page")
 			helpers.assert_contains(url, "per_page=20")
-			helpers.assert_eq(options.max_body_bytes, require("infra.timings").count("limits", "release_list_body_bytes"))
+			helpers.assert_eq(options.max_body_bytes, require("core.timing.engine.timings").count("limits", "release_list_body_bytes"))
 			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
 			etag_response(response, "https://etag-fixture.invalid/releases/page-" .. index, '"PAGE-' .. index .. '"', cached)
 			if cached then helpers.assert_true(options.etag_compare ~= nil, "the controlled 304 sent a cached validator") end

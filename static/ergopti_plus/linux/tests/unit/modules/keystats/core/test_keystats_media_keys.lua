@@ -78,7 +78,7 @@ helpers.describe("Linux media key metrics (linux-media-key-metrics)", function()
 			keystats.flush()
 			helpers.assert_eq(#calls.media, 1, "one media batch")
 			local batch = calls.media[1]
-			helpers.assert_eq(batch.threshold_ms, require("infra.timings").ms("keystats", "hold_threshold_ms"))
+			helpers.assert_eq(batch.threshold_ms, require("core.timing.engine.timings").ms("keystats", "hold_threshold_ms"))
 			local press, release = batch.events[1], batch.events[2]
 			helpers.assert_eq({ press.action, press.media_id, press.capture, press.device, press.app },
 				{ "physical_media_press", "media.play_pause", "linux_evdev", DEVICE, "org.gnome.Rhythmbox" })

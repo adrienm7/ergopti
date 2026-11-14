@@ -42,7 +42,7 @@ local ContactJoin = require("gestures.engine.contact_join")
 -- Minimum centroid displacement (Manhattan distance) thresholds, from the
 -- shared timings registry the Linux tracker reads too ([gestures] *_minimum_mm,
 -- GSD-3); the engine reads them back from this module rather than re-declaring them.
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local MINIMUMS = {
 	swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
 	pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),

@@ -32,7 +32,7 @@
 ---    owner (core/lifecycle/engine/reload/restart.lua) for the restart. The stop of a run whose
 ---    restart was accepted suspends it instead of closing it; the successor's
 ---    start reads the resume file once, records the step with the reload's
----    duration (infra/reload_timing.lua, request to boot complete), takes a
+---    duration (core/timing/engine/reload_timing.lua, request to boot complete), takes a
 ---    fresh config.toml snapshot for the guard and runs the next step. A
 ---    reload refused, or accepted and never started, fails by name; a run with
 ---    no usable resume file is closed as interrupted.
@@ -349,7 +349,7 @@ Session.__index = Session
 
 --- Creates one session; it publishes nothing until start().
 --- @param opts table { spec, folder, pid, ports, reload_ms? }; reload_ms is the duration of the
----   reload this daemon's boot completed (infra/reload_timing.lua), nil when it follows none.
+---   reload this daemon's boot completed (core/timing/engine/reload_timing.lua), nil when it follows none.
 --- @return table session
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.spec) == "table", "field run needs its declaration")

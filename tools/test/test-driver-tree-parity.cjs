@@ -191,7 +191,7 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    ui/field_check/, so the path is shared on all three. The
 //                    measurement had also carried two paths of slack (38 against
 //                    36); tightened to the measurement.
-const BASELINE_SHARED = 50;
+const BASELINE_SHARED = 51;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops

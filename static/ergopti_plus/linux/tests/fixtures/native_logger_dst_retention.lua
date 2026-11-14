@@ -10,7 +10,7 @@ local time, date = os.time, os.date
 local now
 os.time = function(value) if value == nil then return now end; return time(value) end
 os.date = function(format, stamp) return date(format, stamp or now) end
-package.loaded["infra.timings"] = { count = function(group, key)
+package.loaded["core.timing.engine.timings"] = { count = function(group, key)
 	assert(group == "logger" and key == "retention_days"); return 1
 end }
 local Sink = require("core.logger.engine.sink")

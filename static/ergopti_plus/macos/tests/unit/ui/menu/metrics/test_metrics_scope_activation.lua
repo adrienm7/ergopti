@@ -3,9 +3,9 @@
 local helpers = require("tests.helpers")
 
 local function fixture(synchronous, accepted)
-	local saved = package.loaded["infra.deferred_work"]
+	local saved = package.loaded["core.timing.engine.deferred_work"]
 	local callback, starts = nil, 0
-	package.loaded["infra.deferred_work"] = { after = function(_, fn, label)
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn, label)
 		if label == "menu_state.keystats_start" then
 			callback = fn
 			if synchronous then fn() end
@@ -20,7 +20,7 @@ local function fixture(synchronous, accepted)
 			{ core_mods = { keystats = core }, hotstring_editor = {}, save_prefs = function() return true end })
 	end
 	sync(true)
-	package.loaded["infra.deferred_work"] = saved
+	package.loaded["core.timing.engine.deferred_work"] = saved
 	return MenuState, function() callback() end, function() return starts end, sync
 end
 

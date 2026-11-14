@@ -37,7 +37,7 @@ local M = {}
 
 local Logger         = require("core.logger.engine.logger")
 local text_utils = require("core.text.engine.utils")
-local Timings        = require("infra.timings")
+local Timings        = require("core.timing.engine.timings")
 local PerfBudget     = require("core.logger.engine.perf_budget")
 local Paths          = require("core.fs.engine.paths")
 local Profiles       = require("modules.llm.profiles")

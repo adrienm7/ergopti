@@ -32,7 +32,7 @@ helpers.describe("tap-hold delay model on macOS (par-15)", function()
 
 	helpers.it("the global default is the timing registry's, the one Windows and Linux read", function()
 		local Defaults = require("platform.remap.defaults")
-		helpers.assert_eq(Defaults.tap_hold_timeout_ms, require("infra.timings").ms("tap_hold", "default_activation_ms"))
+		helpers.assert_eq(Defaults.tap_hold_timeout_ms, require("core.timing.engine.timings").ms("tap_hold", "default_activation_ms"))
 		helpers.assert_nil(Defaults.tap_hold_key_timeouts_ms, "macOS resolves no shipped per-key delay")
 	end)
 

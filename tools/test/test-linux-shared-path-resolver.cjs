@@ -92,7 +92,7 @@ if (files.length < 40) {
 //      pattern like `s:match("^(.*)/[^/]+/[^/]+/[^/]+$")`, then append the tree.
 //
 // Both encode the checkout's depth as a fact. The second is the one that
-// mattered: infra/timings.lua, infra/wpm_constants.lua,
+// mattered: core/timing/engine/timings.lua, infra/wpm_constants.lua,
 // infra/personal_info_fields.lua and modules/gestures/manager.lua all used it,
 // none was exempt, and none was ever reported — this guard printed "All 99
 // Linux module(s) reach _shared through core/fs/engine/paths.lua" while four did not.

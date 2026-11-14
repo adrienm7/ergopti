@@ -20,7 +20,7 @@
 
 local helpers = require("tests.helpers")
 local Cmd = helpers.load_module("modules.keystats.sqlite_command")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 -- These cases drive the real sqlite3 CLI, which every CI image installs:
 -- its absence is a broken host, never a skipped case.

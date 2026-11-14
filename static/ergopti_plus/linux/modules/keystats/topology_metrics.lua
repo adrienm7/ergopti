@@ -26,7 +26,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Topology = require("metrics.engine.system.window_topology")
 local Capture = require("metrics.engine.capture_presence")
 

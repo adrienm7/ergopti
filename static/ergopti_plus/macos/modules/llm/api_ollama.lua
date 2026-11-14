@@ -741,7 +741,7 @@ end
 local STREAM_TMPFILE_CLEANUP_MARGIN_SEC = 10
 
 --- @return number seconds
-local function stream_max_time_sec() return require("infra.timings").sec("llm", "ollama_request_timeout_ms") end
+local function stream_max_time_sec() return require("core.timing.engine.timings").sec("llm", "ollama_request_timeout_ms") end
 
 -- Ensure Ollama daemon is running — fully async to avoid blocking the Cocoa
 -- run loop. Previous implementation used synchronous hs.execute + usleep which
@@ -1966,7 +1966,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			"-s", "-N", "-X", "POST",
 			"-H", "Content-Type: application/json",
 			-- Abort a TCP handshake that never completes (Ollama dead).
-			"--connect-timeout", tostring(require("infra.timings").sec("llm", "stream_connect_timeout_ms")),
+			"--connect-timeout", tostring(require("core.timing.engine.timings").sec("llm", "stream_connect_timeout_ms")),
 			"--max-time", tostring(stream_max_time_sec()),  -- hard ceiling; also drives cleanup delay
 			"--data-binary", "@" .. tmp_path,
 			M.get_base_url() .. "/api/chat",
@@ -2232,7 +2232,7 @@ local function request_prebuilt(client, label, body, on_text, on_fail, continuat
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
 					require("core.logger.engine.perf_budget").judge(Logger, LOG, "llm.local", ms,
-						function() return require("infra.timings").ms("budgets", "llm_local_request_ms") end)
+						function() return require("core.timing.engine.timings").ms("budgets", "llm_local_request_ms") end)
 					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 					end

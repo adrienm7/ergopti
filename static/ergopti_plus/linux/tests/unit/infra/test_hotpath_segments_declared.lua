@@ -27,7 +27,7 @@ require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 	root = helpers.driver_root(),
 	call_patterns = { 'Perf%.span%(%s*"([^"]+)"', 'Perf%.done%(%s*"([^"]+)"', 'Perf%.record_age%(%s*"([^"]+)"' },
 	timed_only = TIMED_ONLY,
-	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
+	default_slow_ms = require("core.timing.engine.timings").ms("logger", "hotpath_slow_ms"),
 })
 
 helpers.describe("hot-path segment inventory: linux spans", function()

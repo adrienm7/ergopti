@@ -58,7 +58,7 @@ local LOG = "platform.remap.tap_hold_writer"
 M.FILE_NAME = require("tap_hold.engine.shared_file").FILE_NAME
 
 -- The bound of time_activation_seconds: the timing registry's.
-local MAX_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "max_activation_ms") / 1000
+local MAX_THRESHOLD_SECONDS = require("core.timing.engine.timings").ms("tap_hold", "max_activation_ms") / 1000
 
 -- The per-key fields whose runtime meaning belongs to this writer. A delay is
 -- only ever written when the user sets it: no key ships one.

@@ -26,7 +26,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.log_transport_fixture")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 -- The pump runs every 10 ms in production; 50 ms keeps these loops short while
 -- remaining far below every retry interval under test.

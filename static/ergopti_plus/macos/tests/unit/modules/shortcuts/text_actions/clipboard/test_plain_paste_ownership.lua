@@ -24,7 +24,7 @@ local function with_plain(callback)
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
 			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			Destination.install()
 			f.text = require("modules.shortcuts.actions.text")
 			function f.step()

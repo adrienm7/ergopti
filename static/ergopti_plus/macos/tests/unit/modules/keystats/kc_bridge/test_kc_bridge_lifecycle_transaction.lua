@@ -189,7 +189,7 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 			init = function() return false end,
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			ms = function() return 1 end,
 			sec = function() return 1 end,
 		}

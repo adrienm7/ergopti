@@ -18,7 +18,7 @@ local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 local hs = hs
 local Logger        = require("core.logger.engine.logger")
 local PhaseStats    = require("infra.phase_stats")
-local DeferredWork  = require("infra.deferred_work")
+local DeferredWork  = require("core.timing.engine.deferred_work")
 local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
@@ -677,7 +677,7 @@ function M.build(ctx)
 							.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 						return false
 					end
-					return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+					return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 						local mutation = {
 							section = require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 							read = function()

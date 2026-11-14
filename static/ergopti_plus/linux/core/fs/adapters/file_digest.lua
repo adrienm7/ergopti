@@ -11,10 +11,10 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local LibuvExit = require("core.lifecycle.engine.shutdown.libuv_exit")
-local NativeTimer = require("infra.native_timer")
+local NativeTimer = require("core.timing.engine.native_timer")
 local NumberPolicy = require("core.text.engine.number_policy")
 local ProcessGroup = require("core.lifecycle.engine.libuv_process_group")
 local LOG = "core.fs.adapters.file_digest"

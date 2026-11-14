@@ -22,7 +22,7 @@ local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 local MUTATED_PACKAGE_SLOTS = {
 	"core.fs.adapters.file_system", "core.events.timer_scheduler",
 	"hs", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer",
-	"core.logger.engine.logger", "infra.timings", "metrics.engine.metrics",
+	"core.logger.engine.logger", "core.timing.engine.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
@@ -151,7 +151,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 		"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
 		"modules.keystats.export", "metrics.engine.metrics", "core.logger.engine.logger",
-		"infra.timings", "core.events.timer_scheduler",
+		"core.timing.engine.timings", "core.events.timer_scheduler",
 		"modules.keystats.physical_accounting_mode",
 	}) do
 		package.loaded[name] = nil
@@ -255,7 +255,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 	package.loaded["hs.fs"] = hs_stub.fs
 	package.loaded["hs.json"] = hs_stub.json
 	package.loaded["hs.sqlite3"] = hs_stub.sqlite3
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 5 end,
 		ms = function() return 2000 end,
 		count = function() return 65536 end,

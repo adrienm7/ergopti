@@ -26,7 +26,7 @@ end
 helpers.describe("menu_keyboard_layout: async layout selection", function()
 	helpers.it("waits for the business terminal instead of the dispatch result", function()
 		helpers.with_fresh_modules({
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 			"modules.keymap.input_sources",
 			"modules.keymap.layout_install",
 			"ui.menu.menu_keyboard_layout",
@@ -37,7 +37,7 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")
 			local scheduled = {}
-			package.loaded["infra.deferred_work"] = { after = function(delay, callback)
+			package.loaded["core.timing.engine.deferred_work"] = { after = function(delay, callback)
 				scheduled[#scheduled + 1] = { delay = delay, callback = callback }
 				return true
 			end }
@@ -107,7 +107,7 @@ end)
 --- @param business_ok boolean Terminal result delivered by the async owner.
 local function exercise_bundle_action(operation, business_ok, live)
 	helpers.with_fresh_modules({
-		"infra.deferred_work",
+		"core.timing.engine.deferred_work",
 		"modules.keymap.input_sources",
 		"modules.keymap.layout_install",
 		"ui.menu.menu_keyboard_layout",
@@ -121,7 +121,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 		local notices = {}
 		local business_done = nil
 		local dispatches = 0
-		package.loaded["infra.deferred_work"] = { after = function(delay, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(delay, callback)
 			scheduled[#scheduled + 1] = { delay = delay, callback = callback }
 			return true
 		end }
@@ -240,7 +240,7 @@ end)
 helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function()
 	helpers.it("keeps the legacy cleanup action visible when every stable variant is active", function()
 		helpers.with_fresh_modules({
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 			"modules.keymap.input_sources",
 			"modules.keymap.layout_install",
 			"ui.menu.menu_keyboard_layout",

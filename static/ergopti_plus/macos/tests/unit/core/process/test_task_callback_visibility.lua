@@ -44,7 +44,7 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 		local errors = {}
 		local completion
 		package.loaded["core.logger.engine.logger"] = capturing_logger(errors)
-		package.loaded["infra.timings"] = { ms = function() return 1 end }
+		package.loaded["core.timing.engine.timings"] = { ms = function() return 1 end }
 		package.loaded["modules.keystats.log_manager"] = {
 			log_system_event = function() error("system event sink exploded") end,
 		}

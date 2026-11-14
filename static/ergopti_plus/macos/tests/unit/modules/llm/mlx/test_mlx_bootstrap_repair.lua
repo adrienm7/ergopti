@@ -34,7 +34,7 @@ local LAUNCHER_ENV = {
 
 local OWNED = {
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
+	"infra.dialog_util", "infra.notifications", "core.timing.engine.deferred_work",
 	"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
 	"modules.llm.ollama_deps_checker", "modules.llm.backend_detector",
@@ -280,7 +280,7 @@ local function load_world(world)
 			return true
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback, label)
 			world.deferred[#world.deferred + 1] = { callback = callback, label = label }
 			return true

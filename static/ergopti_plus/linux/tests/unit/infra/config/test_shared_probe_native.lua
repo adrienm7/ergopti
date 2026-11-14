@@ -42,7 +42,7 @@ assert(resolved == %q, "a nonregular candidate must not shadow the packaged chil
 				exited, exit_code, exit_signal = true, status, signal
 				native.timer_stop(timer); native.close(timer); native.close(child_process)
 			end))
-			assert(require("infra.native_timer").start(native, timer, 2000, 0, function()
+			assert(require("core.timing.engine.native_timer").start(native, timer, 2000, 0, function()
 				expired = true; child_process:kill("sigkill")
 			end))
 			while not exited do native.run("once") end

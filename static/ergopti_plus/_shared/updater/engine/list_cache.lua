@@ -22,7 +22,7 @@
 
 local M = {}
 
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 -- One response is capped by the Linux transport ([limits] release_list_body_bytes);
 -- a larger body was not stored by it.

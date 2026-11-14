@@ -32,7 +32,7 @@ local function fresh_fixture()
 		"core.events.timer_scheduler",
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",
-		"infra.timings",
+		"core.timing.engine.timings",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -184,7 +184,7 @@ local function fresh_fixture()
 	package.loaded["hs"] = hs_stub
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	local subject = require("modules.shortcuts.actions.text")
 	local synthetic = require("adapters.synthetic_input")
 

@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local DEPENDENCIES = {
 	"core.logger.engine.logger",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
@@ -214,7 +214,7 @@ local function with_fixture(config, body)
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.timings"] = { count = require("tests.support.registry_count"), sec = function()
+	package.loaded["core.timing.engine.timings"] = { count = require("tests.support.registry_count"), sec = function()
 		return config.click_cooldown_sec or 0.25
 	end }
 	package.loaded["adapters.event_provenance"] = {

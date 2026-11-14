@@ -1,4 +1,4 @@
-﻿; infra/timings/timings_config.ahk
+﻿; core/timing/engine/config.ahk
 
 ; ==============================================================================
 ; MODULE: Timings Config

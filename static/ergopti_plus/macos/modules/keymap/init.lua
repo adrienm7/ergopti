@@ -144,13 +144,13 @@ local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS
 -- for them by this factor. Declared once for the three drivers in the shared
 -- timing registry ([hotstrings] complex_key_delay_multiplier, complex_key_carry_ms);
 -- the rule is the shared engine's complex_delay_multiplier.
-local COMPLEX_DELAY_MULT = require("infra.timings").ms("hotstrings", "complex_key_delay_multiplier")
+local COMPLEX_DELAY_MULT = require("core.timing.engine.timings").ms("hotstrings", "complex_key_delay_multiplier")
 
 -- How long after a complex keystroke the bonus multiplier still applies to
 -- the next keystroke — this covers the small lag between releasing Shift
 -- and pressing the next letter. Beyond this window the bonus is dropped so
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
-local COMPLEX_CARRY_MS = require("infra.timings").ms("hotstrings", "complex_key_carry_ms")
+local COMPLEX_CARRY_MS = require("core.timing.engine.timings").ms("hotstrings", "complex_key_carry_ms")
 
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
@@ -2934,7 +2934,7 @@ local function build_tap_copy()
 	local report = CopyCheck.reporter(log, warn_user)
 	local watch
 	local checker = CopyCheck.new({
-		verify_ms = require("infra.timings").ms("tap_hold", "copy_verify_ms"),
+		verify_ms = require("core.timing.engine.timings").ms("tap_hold", "copy_verify_ms"),
 		read_counter = function() return (Clipboard._change_count()) end,
 		send_copy = function() return SyntheticInput.emit_key_stroke({ "cmd" }, "c", 0) == true end,
 		after = function(delay_ms, callback)

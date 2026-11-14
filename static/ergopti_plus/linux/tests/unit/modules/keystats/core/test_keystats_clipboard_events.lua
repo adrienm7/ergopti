@@ -71,7 +71,7 @@ helpers.describe("Linux clipboard copy/paste bursts", function()
 			helpers.assert_eq(rows[2].meta.copy_lag_ms, 1000)
 			helpers.assert_eq(rows[2].meta.source_app, rows[1].app)
 			helpers.assert_eq(rows[7], { kind = "paste_burst", app = rows[1].app,
-				meta = { count = 5, window_ms = require("infra.timings").ms("keystats", "paste_burst_window_ms") } })
+				meta = { count = 5, window_ms = require("core.timing.engine.timings").ms("keystats", "paste_burst_window_ms") } })
 			keystats.flush()
 			helpers.assert_eq(#fake_writer.clipboard_events, 7, "a second flush must not replay the rows")
 		end)

@@ -10,7 +10,7 @@
 
 local M = {}
 local hs = hs
-local PacedJob = require("infra.paced_job")
+local PacedJob = require("core.timing.engine.paced_job")
 
 --- Maximum source bytes scanned or hashed by one verification step.
 M.BYTES_PER_TURN = 64 * 1024
