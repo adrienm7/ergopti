@@ -25,7 +25,7 @@ local function with_focus(mode, scenario)
 			end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			if mode == "schedule throw" then error("private native error") end
 			if mode == "schedule refusal" then return false end
 			records.deferred[#records.deferred + 1] = callback

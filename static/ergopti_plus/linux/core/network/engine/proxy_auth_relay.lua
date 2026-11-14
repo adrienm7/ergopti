@@ -20,7 +20,7 @@ local M = {}
 local Paths = require("core.fs.engine.paths")
 local Reader = require("core.fs.engine.regular_file_reader")
 local Json = require("core.text.engine.json")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local SharedRelay = require("core.network.engine.proxy_auth_relay_core")
 
 -- The contract is about a kilobyte; a larger file is not the shipped one.

@@ -15,5 +15,5 @@ require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 	driver = "macos",
 	root = helpers.driver_root(),
 	call_patterns = { 'HotPath%.log_if_slow%(%s*"([^"]+)"', 'HotPath%.done%(%s*"([^"]+)"' },
-	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
+	default_slow_ms = require("core.timing.engine.timings").ms("logger", "hotpath_slow_ms"),
 })

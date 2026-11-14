@@ -21,7 +21,7 @@ local ok_json, Json = pcall(require, "core.text.engine.json")
 local LOG = "modules.keystats.sqlite_reader"
 
 -- How long a read waits for the writer's COMMIT lock (single source: timings).
-local READ_BUSY_TIMEOUT_MS = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
+local READ_BUSY_TIMEOUT_MS = require("core.timing.engine.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
 
 -- An ambiguous media pipe close is never retried or replaced by another query.
 local _media_read_debt = nil

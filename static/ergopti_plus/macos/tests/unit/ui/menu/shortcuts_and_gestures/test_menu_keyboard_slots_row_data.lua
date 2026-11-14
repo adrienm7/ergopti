@@ -134,7 +134,7 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 		local group = physical_groups(shortcuts)[1]
 		local rows = ui.provide_rows(ctx, nil)
 		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
-		local deferred = require("infra.deferred_work")
+		local deferred = require("core.timing.engine.deferred_work")
 		local previous = deferred.after
 		deferred.after = function() return false end
 		local ok, accepted = pcall(picker.opened[1].confirm, group.prefix .. "j")
@@ -421,7 +421,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 		local rows = ui.provide_rows(ctx, nil)
 		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 		picker.opened[1].confirm(slot)
-		local deferred = require("infra.deferred_work")
+		local deferred = require("core.timing.engine.deferred_work")
 		local previous = deferred.after
 		deferred.after = function() return false end
 		local ok, accepted = pcall(picker.opened[2].confirm, "wrap_selection")

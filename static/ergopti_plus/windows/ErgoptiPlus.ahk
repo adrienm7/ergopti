@@ -456,7 +456,7 @@ if UIASW_IsWorkerInvocation()
 #Include core/text/engine/toml/helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
-#Include infra/timings/timings_config.ahk
+#Include core/timing/engine/config.ahk
 #Include modules/keymap/layout/layout_ergopti.ahk
 #Include modules/keymap/layout/accented_shortcuts.ahk
 

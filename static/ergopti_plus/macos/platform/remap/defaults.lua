@@ -117,17 +117,17 @@ local timeouts = require_section(sections, "hs_timeouts")
 -- Global tap/hold delay (KE basic.to_if_alone_timeout_milliseconds) of every key
 -- that has no delay of its own: the timing registry's tap_hold.default_activation_ms,
 -- the one declaration Windows and Linux read too (PAR-15). No key ships a delay.
-D.tap_hold_timeout_ms        = require("infra.timings").ms("tap_hold", "default_activation_ms")
+D.tap_hold_timeout_ms        = require("core.timing.engine.timings").ms("tap_hold", "default_activation_ms")
 -- The longest delay, the global one or a key's own (SCHEMA.md's 10 s bound).
-D.tap_hold_max_timeout_ms    = require("infra.timings").ms("tap_hold", "max_activation_ms")
+D.tap_hold_max_timeout_ms    = require("core.timing.engine.timings").ms("tap_hold", "max_activation_ms")
 -- One-shot modifier auto-cancel delay: the cross-driver timing registry's value
 -- (tap_hold.one_shot_shift_timeout_ms), the one Windows and Linux read, so the
 -- three drivers cancel a one-shot Shift after the same time (PAR-15).
-D.sticky_timeout_ms          = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
+D.sticky_timeout_ms          = require("core.timing.engine.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
 -- Minimum tap duration: a release sooner than this is a bounce, not a tap. The
 -- timing registry's tap_hold.tap_min_duration_ms, which Windows and Linux read
 -- too; the generator gates every release-judged tap with it.
-D.tap_min_duration_ms        = require("infra.timings").ms("tap_hold", "tap_min_duration_ms")
+D.tap_min_duration_ms        = require("core.timing.engine.timings").ms("tap_hold", "tap_min_duration_ms")
 D.simultaneous_threshold_ms  = timeouts.simultaneous_threshold_ms  -- Combo activation window
 D.combo_symmetric            = timeouts.combo_symmetric            -- A+B == B+A for the chord slot
 

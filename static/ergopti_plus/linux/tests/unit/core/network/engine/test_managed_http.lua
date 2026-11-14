@@ -253,7 +253,7 @@ helpers.describe("managed_http: actual public ownership sequencing", function()
 		local long_coordinator, long_state = fresh()
 		start(long_coordinator, { timeout_ms = 600000 })
 		helpers.assert_eq(long_state.proxy[1].options.pac_check_timeout_ms,
-			require("infra.timings").ms("adapters", "proxy_pac_download_max_ms"))
+			require("core.timing.engine.timings").ms("adapters", "proxy_pac_download_max_ms"))
 	end)
 
 	helpers.it("walks a dead first relay of the evaluated PAC on to DIRECT", function()

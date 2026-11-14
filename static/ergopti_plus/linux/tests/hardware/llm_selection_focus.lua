@@ -29,7 +29,7 @@ local Detector = require("adapters.secure_field_detector")
 local Atspi = require("adapters.atspi_focus")
 local uv = require("luv")
 local Clock = require("core.logger.engine.monotonic")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local ffi = require("ffi")
 ffi.cdef([[typedef struct _XDisplay Display;
 	Display *XOpenDisplay(const char *name); int XCloseDisplay(Display *display);

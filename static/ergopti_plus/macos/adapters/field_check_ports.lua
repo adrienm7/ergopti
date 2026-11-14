@@ -329,7 +329,7 @@ local function relay_probe(upstream, callback)
 	if not policy or not origins then return callback(nil, "relay_unavailable") end
 	local executable = relay_executable()
 	if not executable then return callback({ status = require("core.network.engine.proxy_auth_relay_core").NOT_INSTALLED }) end
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local args = policy.probe_args(upstream, policy.authority(origins[1]), {
 		dial_ms = Timings.ms("adapters", "proxy_relay_dial_timeout_ms"),
 		handshake_ms = Timings.ms("adapters", "proxy_relay_handshake_timeout_ms"),

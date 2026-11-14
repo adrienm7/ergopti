@@ -352,7 +352,7 @@ end
 --- @param confirm function|nil The consent; the owned dialog by default.
 --- @return function python(callback) -> callback(ok, interpreter_or_code, detail)
 local function managed_python(confirm)
-	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
+	local timeout_ms = require("core.timing.engine.timings").ms("adapters", "managed_python_download_timeout_ms")
 	local native = require("luv")
 	local function managed_process(program, args, callback)
 		local delivered, constructing, pending = false, true, nil
@@ -1161,7 +1161,7 @@ function M.apply_rows(id, rows, on_done, deps)
 		if path == "wayland" then
 			local args = { "apply-wayland", "--layout-id", base, "--display-name", entry.name,
 				"--source-dir", deps.local_dir .. base, "--gnome-settle-ms",
-				tostring(require("infra.timings").ms("ui", "gnome_input_source_settle_ms")) }
+				tostring(require("core.timing.engine.timings").ms("ui", "gnome_input_source_settle_ms")) }
 			for _, language in ipairs(type(entry.languages) == "table" and entry.languages or {}) do
 				args[#args + 1] = "--language"
 				args[#args + 1] = language

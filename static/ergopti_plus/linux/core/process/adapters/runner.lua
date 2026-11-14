@@ -12,7 +12,7 @@
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local Logger = require("core.logger.engine.shim")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local OwnedProcess = require("core.process.adapters.owned_process")
 local available, Native = pcall(require, "luv")

@@ -11,7 +11,7 @@
 
 local M = {}
 local ExactIdentity = require("core.network.engine.curl_identity")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 --- Constructs one initialized native coordinator against explicit owners.
 --- @param dependencies table { policy, proxy, curl, clock, deadline, environment, report }

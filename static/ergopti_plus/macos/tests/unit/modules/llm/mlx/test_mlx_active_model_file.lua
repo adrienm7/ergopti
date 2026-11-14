@@ -20,7 +20,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.config_paths",
 	"core.logger.engine.logger",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx_discovery",
 }
@@ -74,7 +74,7 @@ local function with_fixture(run)
 	}
 	package.loaded["core.process.adapters.shell_runner"] = {}
 	package.loaded["core.events.timer_scheduler"] = {}
-	package.loaded["infra.timings"] = { sec = function() return 1 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 	package.loaded["modules.llm.api_common"] = {
 		protected_call = function(callback, _, ...)
 			if type(callback) ~= "function" then return false end

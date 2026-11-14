@@ -333,7 +333,7 @@ function M.plan(listing, id)
 		for _, pair in ipairs(listing.mru) do
 			if M.gnome_id(pair) ~= id then mru[#mru + 1] = pair end
 		end
-		local settle = string.format("%.3f", require("infra.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
+		local settle = string.format("%.3f", require("core.timing.engine.timings").ms("ui", "gnome_input_source_settle_ms") / 1000)
 		return {
 			{ program = "gsettings", args = { "set", GNOME_SCHEMA, "sources", M.format_gnome_sources({ target }) },
 				undo = { program = "gsettings",
@@ -642,7 +642,7 @@ end
 function M.native_port()
 	local DisplayServer = require("infra.display_server")
 	local OwnedProcess = require("core.process.adapters.owned_process")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local timeout_ms = Timings.ms("ui", "input_source_operation_timeout_ms")
 	local sequence = 0
 	return {

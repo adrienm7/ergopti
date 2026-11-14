@@ -21,13 +21,13 @@ end
 
 local function with_download_window(controls, callback)
 	helpers.with_fresh_modules({
-		"ui.download_window", "ui.ui_builder", "core.logger.engine.logger", "infra.deferred_work",
+		"ui.download_window", "ui.ui_builder", "core.logger.engine.logger", "core.timing.engine.deferred_work",
 		"core.fs.engine.paths", "core.i18n.engine.i18n", "core.text.engine.utils", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
 		local state = { errors = 0, successes = 0, show_calls = 0 }
 		package.loaded["core.logger.engine.logger"] = logger_spy(state)
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.text.engine.utils"] = {
@@ -53,7 +53,7 @@ local function with_onboarding(controls, callback)
 	helpers.with_fresh_modules({
 		"ui.onboarding", "ui.ui_builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.text.engine.toml.writer", "core.text.engine.toml.codec", "infra.notifications", "core.fs.engine.paths",
-		"infra.deferred_work", "core.text.engine.utils", "infra.manifest_reader",
+		"core.timing.engine.deferred_work", "core.text.engine.utils", "infra.manifest_reader",
 		"infra.dialog_util", "ui.menu.menu_paths", "core.fs.adapters.file_system",
 		"core.fs.adapters.storage", "hs", "tests.stubs.hs",
 	}, function()
@@ -76,7 +76,7 @@ local function with_onboarding(controls, callback)
 		package.loaded["core.text.engine.toml.codec"] = {}
 		package.loaded["infra.notifications"] = {}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/assets" end }
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["core.text.engine.utils"] = {}
 		package.loaded["infra.manifest_reader"] = {}
 		package.loaded["core.fs.adapters.file_system"] = {}
@@ -132,7 +132,7 @@ local function with_healthcheck(controls, callback)
 	controls = controls or {}
 	helpers.with_fresh_modules({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work",
 		"infra.dialog_util", "core.events.timer_scheduler", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()

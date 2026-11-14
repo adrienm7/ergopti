@@ -30,7 +30,7 @@ local M = {}
 
 local Logger   = require("core.logger.engine.shim")
 local Metrics  = require("metrics.engine.metrics")
-local Timings  = require("infra.timings")
+local Timings  = require("core.timing.engine.timings")
 
 local LOG = "modules.keystats.metrics_collector"
 

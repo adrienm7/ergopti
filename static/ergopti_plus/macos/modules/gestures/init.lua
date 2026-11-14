@@ -19,7 +19,7 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("core.logger.engine.logger")
 local Manifest      = require("infra.manifest_reader")
-local Timings       = require("infra.timings")
+local Timings       = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
 local GestureFrameEvidence = require("infra.gesture_frame_evidence")
 local LOG           = "gestures"
@@ -1182,7 +1182,7 @@ local function schedule_emergency_recycle()
 	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	local emergency_generation = discovery_generation
-	hs.timer.doAfter(require("infra.timings").sec("gestures", "emergency_recycle_delay_ms"), function()
+	hs.timer.doAfter(require("core.timing.engine.timings").sec("gestures", "emergency_recycle_delay_ms"), function()
 		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
 		-- Checking only the first let kickstart_hid warp the cursor and post a
 		-- synthetic scroll while the script was paused, which the invariant

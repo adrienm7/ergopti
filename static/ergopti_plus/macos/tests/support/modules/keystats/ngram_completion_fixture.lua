@@ -27,7 +27,7 @@ M.FAMILIES = {
 }
 
 local OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
 	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 

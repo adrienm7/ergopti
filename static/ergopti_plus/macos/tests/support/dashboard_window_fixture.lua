@@ -13,7 +13,7 @@ local function with_window(module_name, callback)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "ui.ui_builder",
-			"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "infra.deferred_work",
+			"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.timing.engine.deferred_work",
 			"infra.dialog_util", "core.events.timer_scheduler", "modules.keystats.log_manager",
 		}, function()
 			local native = require("tests.stubs.hs")
@@ -34,7 +34,7 @@ local function with_window(module_name, callback)
 				persist_locale = function() return false end,
 			}
 			package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { timer = {} }, true end,

@@ -15,7 +15,7 @@ end }
 -- The shared module reads its catalogue cap from [limits] when it loads, and the
 -- registry logs its own load: bind it under a silent logger before counting starts.
 package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return function() end end })
-require("infra.timings").count("limits", "program_catalogue_bytes")
+require("core.timing.engine.timings").count("limits", "program_catalogue_bytes")
 package.loaded["core.logger.engine.logger"] = logger
 local Adapter = require("core.process.adapters.program_providers")
 local Directories = require("core.fs.engine.dir")

@@ -18,7 +18,7 @@ local function fixture(callback, cleanup_failures)
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
 			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"core.logger.engine.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
+			"core.logger.engine.logger", "core.fs.engine.paths", "infra.config_paths", "core.timing.engine.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
 			"core.process.adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",

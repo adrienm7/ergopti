@@ -11,7 +11,7 @@
 
 local M = {}
 local LauncherHelper = require("platform.remap.lease_helper")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local SELECT_FLAG = "--select-input-source"
 local SELECT_BY_NAME_FLAG = "--select-input-source-by-name"
 local UPGRADE_FLAG = "--upgrade-input-sources"

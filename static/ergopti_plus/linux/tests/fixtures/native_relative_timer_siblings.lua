@@ -73,7 +73,7 @@ local function flush_http_trace()
 		end
 	end)
 end
-local NativeTimer = require("infra.native_timer")
+local NativeTimer = require("core.timing.engine.native_timer")
 local original_native_start, original_spawn = NativeTimer.start, uv.spawn
 local original_write, original_close, original_kill = uv.write, uv.close, uv.kill
 NativeTimer.start = function(...)

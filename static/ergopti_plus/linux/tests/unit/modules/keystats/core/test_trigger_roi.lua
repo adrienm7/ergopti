@@ -385,7 +385,7 @@ Home.it("Linux trigger ROI: the native writer admits only numerical new events u
 				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, roi = events }, upserts = {},
 			}))
 			local uv, now = require("luv"), require("core.logger.engine.monotonic").now_ms
-			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+			local until_ms = now() + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 			while not operation:is_settled() and now() < until_ms do
 				operation:pump()
 				if operation:is_retryable() then operation:cancel() end

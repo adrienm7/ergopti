@@ -64,7 +64,7 @@ local function fixture()
 		f.dispatch(event)
 	end
 	function control.tick()
-		local delay = require("infra.timings").sec("keystats", "maintenance_interval_ms")
+		local delay = require("core.timing.engine.timings").sec("keystats", "maintenance_interval_ms")
 		for _, timer in ipairs(f.hs.timer.__timers) do
 			if timer.running and timer.delay == delay then timer:fire() end
 		end

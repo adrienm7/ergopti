@@ -33,7 +33,7 @@ local M = {}
 local hs      = hs
 local Logger  = require("core.logger.engine.logger")
 local Storage = require("core.fs.adapters.storage")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG          = "ui_restore"

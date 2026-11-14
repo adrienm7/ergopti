@@ -19,7 +19,7 @@ local function with_presentation(mode, is_new, scenario)
 			error = function(_, text) state.errors[#state.errors + 1] = text end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			state.pending[#state.pending + 1] = callback
 			return true
 		end }

@@ -237,7 +237,7 @@
 				"windows/infra/text_case.ahk",
 				"windows/core/text/engine/utils.ahk",
 				"windows/core/logger/engine/tick_count.ahk",
-				"windows/infra/timings/timings_config.ahk",
+				"windows/core/timing/engine/config.ahk",
 				"windows/core/text/engine/toml/config_snapshot.ahk",
 				"windows/core/text/engine/toml/config_loader.ahk",
 				"windows/core/text/engine/toml/document.ahk",

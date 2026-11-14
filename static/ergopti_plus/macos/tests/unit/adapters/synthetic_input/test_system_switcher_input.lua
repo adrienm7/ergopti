@@ -6,7 +6,7 @@ local eq = helpers.assert_eq
 local function with_input(body, setup)
 	local names = { "adapters.system_switcher_input", "adapters.system_switcher_sampler",
 		"core.events.timer_scheduler", "modules.gestures.native_app_switcher", "adapters.synthetic_input",
-		"adapters.window_manager", "core.fs.adapters.storage", "core.logger.engine.logger", "infra.timings",
+		"adapters.window_manager", "core.fs.adapters.storage", "core.logger.engine.logger", "core.timing.engine.timings",
 		"modules.gestures.native_app_switcher_action", "adapters.system_switcher_runtime" }
 	local saved, old_hs = {}, hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -146,7 +146,7 @@ local function with_input(body, setup)
 	function f.action()
 		f.actual_synthetic()
 		package.loaded["adapters.system_switcher_runtime"] = { descriptor = function() return f.descriptor end }
-		package.loaded["infra.timings"] = { sec = function(_, key)
+		package.loaded["core.timing.engine.timings"] = { sec = function(_, key)
 			return key == "native_switcher_deadline_ms" and 8 or 0.02
 		end }
 		package.loaded["adapters.window_manager"] = { frontmost_pid = function() return f.front end }

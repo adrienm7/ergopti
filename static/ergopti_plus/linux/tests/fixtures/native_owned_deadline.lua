@@ -6,7 +6,7 @@ package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driv
 local Errors = require("diagnostics.engine.adapter_errors")
 local uv = require("luv")
 local Owned = require("core.process.adapters.owned_process")
-local Timer = require("infra.native_timer")
+local Timer = require("core.timing.engine.native_timer")
 local mode = assert(arg[1])
 local BUDGET_MS, BLOCKED_MS = 1000, 1250
 local completed, operation

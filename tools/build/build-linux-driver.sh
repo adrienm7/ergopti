@@ -244,7 +244,7 @@ REQUIRED_FILES=(
 	"linux/_generated/shell_messages/en.msg"
 	"linux/modules/updater/ownership_receipt.lua"
 	"linux/core/i18n/engine/i18n.lua"
-	"linux/infra/timings.lua"
+	"linux/core/timing/engine/timings.lua"
 	"linux/ui/webkit_host.lua"
 	"linux/tests/run.lua"
 	"linux/tests/helpers.lua"

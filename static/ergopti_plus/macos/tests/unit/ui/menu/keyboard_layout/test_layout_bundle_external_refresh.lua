@@ -36,8 +36,8 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				"core.i18n.engine.i18n",
 				"infra.notifications",
 				"core.fs.adapters.storage",
-				"infra.deferred_work",
-				"infra.timings",
+				"core.timing.engine.deferred_work",
+				"core.timing.engine.timings",
 				"ui.menu.keymap_lifecycle",
 				"infra.manifest_menu",
 				"core.fs.engine.paths",
@@ -166,8 +166,8 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					get = function() return nil end,
 					set = function() return true end,
 				}
-				package.loaded["infra.deferred_work"] = { after = function() return true end }
-				package.loaded["infra.timings"] = { sec = function() return 0.1 end }
+				package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+				package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
 				package.loaded["ui.menu.keymap_lifecycle"] = { ensure_started = function() return true end }
 				local actual_manifest = LayoutFixture.install(package.loaded["core.i18n.engine.i18n"])
 				package.loaded["infra.manifest_menu"] = {

@@ -353,7 +353,7 @@ local OWNED_CRASH_PROCESSES = {
 --- shared folder through hs.fs, which a port loaded for another probe may lack.
 --- @return number Bytes.
 local function crash_read_bytes()
-	return require("infra.timings").count("limits", "crash_report_head_bytes")
+	return require("core.timing.engine.timings").count("limits", "crash_report_head_bytes")
 end
 
 --- The closed tokens of one crash report: its kind (hang or crash), the

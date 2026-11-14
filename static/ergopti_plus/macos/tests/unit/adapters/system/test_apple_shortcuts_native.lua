@@ -6,7 +6,7 @@ local Json = require("core.text.engine.json")
 local ID = "11111111-1111-1111-1111-111111111111"
 -- The real registry reader, bound before the fixture's stubs: the adapter reads
 -- its reply cap from [limits] when it loads
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local function fixture(body)
 	local saved, old_hs = {}, _G.hs
@@ -14,7 +14,7 @@ local function fixture(body)
 	local f = { tasks = {}, inode = 12, wires = {}, decoded = 0 }
 	local ok, failure = xpcall(function()
 		package.loaded["adapters.apple_shortcuts_native"] = nil
-		package.loaded["infra.timings"] = Timings
+		package.loaded["core.timing.engine.timings"] = Timings
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/owned/ErgoptiPlus" end }
 		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, done, chunks, environment, private, owned, limit)
 			H.assert_eq(executable, "/owned/ErgoptiAutomationQuery"); H.assert_true(private); H.assert_true(owned)

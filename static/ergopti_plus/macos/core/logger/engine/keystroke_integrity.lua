@@ -24,7 +24,7 @@
 local M = {}
 
 local Logger       = require("core.logger.engine.logger")
-local DeferredWork = require("infra.deferred_work")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local Timer        = require("core.events.timer_scheduler")
 
 local LOG = "keystroke_integrity"

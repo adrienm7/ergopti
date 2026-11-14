@@ -89,7 +89,7 @@ local OWNERS = {
 	"hotstrings.engine.languages",
 	"hotstrings.engine.catalogue.personal_files",
 	"infra.capsword_output",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"core.fs.engine.dir",
 	"infra.hotstring_engine",
 	"core.lifecycle.engine.launcher_environment",

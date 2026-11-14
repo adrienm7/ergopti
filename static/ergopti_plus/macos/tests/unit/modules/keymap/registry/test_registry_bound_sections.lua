@@ -20,7 +20,7 @@ local OWNED_MODULES = {
 	"modules.keymap.state",
 	"modules.keymap.utils",
 	"core.text.engine.toml.reader",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"modules.hotstrings.hotstrings_config",
 }
 
@@ -63,7 +63,7 @@ local function with_registry(data_by_path, callback)
 			get_user_override = function() return nil end,
 		}
 		local State = helpers.load_with_stubs("modules.keymap.state")
-		package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 		local Registry = require("modules.keymap.registry")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { group_a = 0.4 })
 		helpers.assert_eq(Registry.init(state), true)

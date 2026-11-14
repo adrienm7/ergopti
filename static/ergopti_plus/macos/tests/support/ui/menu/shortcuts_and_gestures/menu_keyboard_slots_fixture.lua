@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local MODULES = {
 	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "infra.config_paths",
-	"infra.preferences", "infra.deferred_work", "infra.dialog_util", "core.logger.engine.logger",
+	"infra.preferences", "core.timing.engine.deferred_work", "infra.dialog_util", "core.logger.engine.logger",
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
@@ -91,7 +91,7 @@ local function fresh()
 		if path == "keyboard-fixture-config" then return read_config(path, ...) end
 		return read_resource(path, ...)
 	end
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback)
 			callback()
 			return true

@@ -594,8 +594,8 @@ local function with_native_opener(script, controls, body)
 	local uv = require("luv")
 	local old_owned, old_desktop = package.loaded["core.process.adapters.owned_process"], package.loaded["adapters.desktop_opener"]
 	local old_report = package.loaded["ui.healthcheck.report"]
-	local timer, native = require("infra.native_timer"), {}
-	local timeout = require("infra.timings").ms("ui", "desktop_open_timeout_ms")
+	local timer, native = require("core.timing.engine.native_timer"), {}
+	local timeout = require("core.timing.engine.timings").ms("ui", "desktop_open_timeout_ms")
 	for key, value in pairs(uv) do native[key] = value end
 	function native.timer_start(handle, ms, interval, callback)
 		if ms == timeout then

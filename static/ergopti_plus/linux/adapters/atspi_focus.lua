@@ -13,7 +13,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ShellRunner = require("core.process.adapters.shell_runner")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Interpreter = require("core.process.interpreter")
 local NativeIdentity = require("adapters.atspi_native_identity")
 local OwnedProcess = require("core.process.adapters.owned_process")
