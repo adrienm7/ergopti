@@ -750,6 +750,12 @@ Each closes on a named green hosted or native run, recorded here.
       minutes; the job ran at 23:59:26 UTC, a gap crossed midnight and the day read back held only its share. Any
       branch, `dev` included, failed it in the last minutes before local midnight. The wall origin is held at
       23:00 today at the latest; regression `system-capture-before-midnight` starts the fixture at 23:59:26.
+      New 2026-11-14 (worker L), not reproduced, kept listed: in [43538811340](https://github.com/adrienm7/ergopti/actions/runs/43538811340) (a branch touching no LLM code)
+      Linux E2E network-ai failed `OwnedOllamaContainer.test_umask_0002_private_group_parents_install_and_start`
+      (the owned Ollama start expired, `ollama_unreachable`), green on `dev` run 43506243390; macOS E2E Managed
+      Ollama (Intel) failed « The managed Ollama build handoff never arrived » because its build job waited for a
+      runner from 03:24 to 04:10 Paris and finished at 04:18:45, after the consumer's wait ended at 04:17:20 (CI
+      capacity, not code).
 
 ## Maintainer decisions pending
 
