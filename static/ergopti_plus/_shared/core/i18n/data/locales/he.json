@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} נוספה ({format}); לא ניתן היה לקרוא {count} פריטים: {list}",
 	"layout_analysis.layouts.import_failed": "לא ניתן היה לקרוא את הקובץ כפריסה ({reason}).",
 	"layout_analysis.details.by": "מאת {authors}.",
-	"layout_analysis.details.from": "מתוך האוסף {source}."
+	"layout_analysis.details.from": "מתוך האוסף {source}.",
+	"layout_analysis.corpus.my_typing": "ההקלדה שלי",
+	"layout_analysis.status.store_failed": "לא ניתן היה לקרוא את הפריסות השמורות שלך."
 }

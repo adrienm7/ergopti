@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} añadida ({format}); no se pudieron leer {count} elemento(s): {list}",
 	"layout_analysis.layouts.import_failed": "No se pudo leer este archivo como distribución ({reason}).",
 	"layout_analysis.details.by": "Por {authors}.",
-	"layout_analysis.details.from": "De la colección {source}."
+	"layout_analysis.details.from": "De la colección {source}.",
+	"layout_analysis.corpus.my_typing": "Mi escritura",
+	"layout_analysis.status.store_failed": "No se pudieron leer tus distribuciones guardadas."
 }

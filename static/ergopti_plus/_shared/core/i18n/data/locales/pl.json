@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "Dodano {name} ({format}); nie udało się odczytać elementów: {count}: {list}",
 	"layout_analysis.layouts.import_failed": "Nie udało się odczytać tego pliku jako układu ({reason}).",
 	"layout_analysis.details.by": "Autor: {authors}.",
-	"layout_analysis.details.from": "Z kolekcji {source}."
+	"layout_analysis.details.from": "Z kolekcji {source}.",
+	"layout_analysis.corpus.my_typing": "Moje pisanie",
+	"layout_analysis.status.store_failed": "Nie udało się odczytać zapisanych układów."
 }

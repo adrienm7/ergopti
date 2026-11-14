@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} lagt til ({format}); {count} element(er) kunne ikke leses: {list}",
 	"layout_analysis.layouts.import_failed": "Filen kunne ikke leses som et oppsett ({reason}).",
 	"layout_analysis.details.by": "Av {authors}.",
-	"layout_analysis.details.from": "Fra samlingen {source}."
+	"layout_analysis.details.from": "Fra samlingen {source}.",
+	"layout_analysis.corpus.my_typing": "Min skriving",
+	"layout_analysis.status.store_failed": "De lagrede oppsettene dine kunne ikke leses."
 }

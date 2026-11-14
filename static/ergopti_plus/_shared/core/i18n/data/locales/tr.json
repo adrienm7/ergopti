@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} eklendi ({format}); {count} öğe okunamadı: {list}",
 	"layout_analysis.layouts.import_failed": "Bu dosya düzen olarak okunamadı ({reason}).",
 	"layout_analysis.details.by": "Yazan: {authors}.",
-	"layout_analysis.details.from": "{source} koleksiyonundan."
+	"layout_analysis.details.from": "{source} koleksiyonundan.",
+	"layout_analysis.corpus.my_typing": "Benim yazımım",
+	"layout_analysis.status.store_failed": "Kayıtlı düzenleriniz okunamadı."
 }

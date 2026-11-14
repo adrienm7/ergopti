@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "已添加 {name}（{format}）；有 {count} 项无法读取：{list}",
 	"layout_analysis.layouts.import_failed": "无法将此文件读取为布局（{reason}）。",
 	"layout_analysis.details.by": "作者：{authors}。",
-	"layout_analysis.details.from": "来自 {source} 合集。"
+	"layout_analysis.details.from": "来自 {source} 合集。",
+	"layout_analysis.corpus.my_typing": "我的输入",
+	"layout_analysis.status.store_failed": "无法读取你保存的布局。"
 }

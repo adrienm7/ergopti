@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} 추가됨({format}). 읽지 못한 항목 {count}개: {list}",
 	"layout_analysis.layouts.import_failed": "이 파일을 배열로 읽을 수 없습니다({reason}).",
 	"layout_analysis.details.by": "제작: {authors}.",
-	"layout_analysis.details.from": "{source} 모음에서 가져옴."
+	"layout_analysis.details.from": "{source} 모음에서 가져옴.",
+	"layout_analysis.corpus.my_typing": "내 타이핑",
+	"layout_analysis.status.store_failed": "저장된 배열을 읽을 수 없습니다."
 }

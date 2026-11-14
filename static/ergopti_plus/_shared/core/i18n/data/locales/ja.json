@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} を追加しました（{format}）。読み取れなかった項目 {count} 件: {list}",
 	"layout_analysis.layouts.import_failed": "このファイルは配列として読み込めませんでした（{reason}）。",
 	"layout_analysis.details.by": "作者: {authors}。",
-	"layout_analysis.details.from": "{source} コレクションより。"
+	"layout_analysis.details.from": "{source} コレクションより。",
+	"layout_analysis.corpus.my_typing": "自分の入力",
+	"layout_analysis.status.store_failed": "保存した配列を読み込めませんでした。"
 }

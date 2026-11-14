@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} aggiunto ({format}); impossibile leggere {count} elemento/i: {list}",
 	"layout_analysis.layouts.import_failed": "Impossibile leggere questo file come layout ({reason}).",
 	"layout_analysis.details.by": "Di {authors}.",
-	"layout_analysis.details.from": "Dalla raccolta {source}."
+	"layout_analysis.details.from": "Dalla raccolta {source}.",
+	"layout_analysis.corpus.my_typing": "La mia digitazione",
+	"layout_analysis.status.store_failed": "Impossibile leggere i tuoi layout salvati."
 }

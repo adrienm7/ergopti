@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} tillagd ({format}); {count} del(ar) kunde inte läsas: {list}",
 	"layout_analysis.layouts.import_failed": "Filen kunde inte läsas som en layout ({reason}).",
 	"layout_analysis.details.by": "Av {authors}.",
-	"layout_analysis.details.from": "Från samlingen {source}."
+	"layout_analysis.details.from": "Från samlingen {source}.",
+	"layout_analysis.corpus.my_typing": "Mitt skrivande",
+	"layout_analysis.status.store_failed": "Dina sparade layouter kunde inte läsas."
 }

@@ -26,6 +26,11 @@
  *    comparison; what it could not read is listed.
  * 6. Framed by the site, it posts its height to the parent
  *    ({type: 'ergopti-layout-analysis:height', height}) on load and resize.
+ * 7. Late host data: the app's 'studio-ngrams' event (or
+ *    LAYOUT_ANALYSIS_COMPARER.setCorpus) adds « My typing » and selects it;
+ *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts; a host
+ *    `store` ({list, save, remove}, promises) keeps imported layouts instead
+ *    of localStorage.
  * ==============================================================================
  */
 
@@ -61,6 +66,10 @@
 	const TEXT_DEBOUNCE_MS = 400;
 	// The message the framing page listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
+	// The app's keystats n-grams: the event its Studio window dispatches and the
+	// corpus id they take (the default corpus in the app, maintainer 2026-11-14).
+	const NGRAMS_EVENT = 'studio-ngrams';
+	const MY_TYPING_ID = 'my_typing';
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
 	const lang = new URLSearchParams(location.search).get('lang');
@@ -496,7 +505,13 @@
 		const select = $('la-corpus');
 		select.replaceChildren();
 		for (const corpus of corpora) {
-			const option = el('option', '', corpus.id === CUSTOM_ID ? t('corpus.custom') : corpus.title);
+			const label =
+				corpus.id === CUSTOM_ID
+					? t('corpus.custom')
+					: corpus.id === MY_TYPING_ID && !corpus.title
+						? t('corpus.my_typing')
+						: corpus.title;
+			const option = el('option', '', label);
 			option.value = corpus.id;
 			select.append(option);
 		}
@@ -596,7 +611,8 @@
 			layout.id = id;
 			layouts.push(layout);
 			byId.set(id, layout);
-			imported.push(layout);
+			if (HOST.store) await HOST.store.save(layout);
+			else imported.push(layout);
 			state.selected.add(id);
 			report.textContent =
 				result.unmapped.length === 0
@@ -712,6 +728,46 @@
 		if (typeof ResizeObserver === 'function') new ResizeObserver(post).observe(document.body);
 	}
 
+	// ==========================
+	// ======= 7/ Host API ======
+	// ==========================
+
+	/**
+	 * Adds or replaces a corpus after load (the app's keystats tables arrive on
+	 * the user's request): listed first, and selected when it is the default.
+	 * @param {{id: string, title?: string, tables: object, default?: boolean}} corpus
+	 * @throws {Error} On tables the engine cannot read.
+	 */
+	function setCorpus(corpus) {
+		E.prepareNgrams(corpus.tables);
+		const entry = { id: corpus.id, title: corpus.title || '', host: { tables: corpus.tables } };
+		const at = corpora.findIndex((c) => c.id === corpus.id);
+		if (at >= 0) corpora.splice(at, 1, entry);
+		else corpora.unshift(entry);
+		if (corpus.default) state.corpus = corpus.id;
+		fillCorpora();
+		save();
+		analyse();
+	}
+
+	/** Adds the host's layouts (e.g. the user's own from « Éditer ») to the list, ticked. */
+	function addLayouts(list) {
+		for (const value of list) {
+			const layout = E.layoutFromRows(Object.assign({ origin: 'user' }, value));
+			if (!byId.has(layout.id)) layouts.push(layout);
+			else layouts.splice(layouts.indexOf(byId.get(layout.id)), 1, layout);
+			byId.set(layout.id, layout);
+			state.selected.add(layout.id);
+		}
+		fillLayouts();
+		analyse();
+	}
+
+	window.LAYOUT_ANALYSIS_COMPARER = { setCorpus, addLayouts };
+	document.addEventListener(NGRAMS_EVENT, (event) =>
+		setCorpus({ id: MY_TYPING_ID, tables: event.detail, default: true })
+	);
+
 	function start() {
 		fillCorpora();
 		fillLayouts();
@@ -719,6 +775,8 @@
 		bind();
 		analyse();
 		reportHeight();
+		// The host's personal layouts (app data folder, site IndexedDB).
+		if (HOST.store) HOST.store.list().then(addLayouts, () => showStatus(t('status.store_failed')));
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

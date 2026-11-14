@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} जोड़ा गया ({format}); {count} आइटम पढ़े नहीं जा सके: {list}",
 	"layout_analysis.layouts.import_failed": "इस फ़ाइल को लेआउट के रूप में पढ़ा नहीं जा सका ({reason})।",
 	"layout_analysis.details.by": "रचनाकार: {authors}।",
-	"layout_analysis.details.from": "{source} संग्रह से।"
+	"layout_analysis.details.from": "{source} संग्रह से।",
+	"layout_analysis.corpus.my_typing": "मेरी टाइपिंग",
+	"layout_analysis.status.store_failed": "आपके सहेजे गए लेआउट पढ़े नहीं जा सके।"
 }

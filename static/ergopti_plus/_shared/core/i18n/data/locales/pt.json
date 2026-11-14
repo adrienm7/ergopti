@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} adicionado ({format}); não foi possível ler {count} elemento(s): {list}",
 	"layout_analysis.layouts.import_failed": "Não foi possível ler este ficheiro como layout ({reason}).",
 	"layout_analysis.details.by": "Por {authors}.",
-	"layout_analysis.details.from": "Da coleção {source}."
+	"layout_analysis.details.from": "Da coleção {source}.",
+	"layout_analysis.corpus.my_typing": "A minha digitação",
+	"layout_analysis.status.store_failed": "Não foi possível ler os seus layouts guardados."
 }

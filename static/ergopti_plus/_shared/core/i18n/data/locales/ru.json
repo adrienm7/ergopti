@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} добавлена ({format}); не удалось прочитать элементов: {count}: {list}",
 	"layout_analysis.layouts.import_failed": "Не удалось прочитать этот файл как раскладку ({reason}).",
 	"layout_analysis.details.by": "Автор: {authors}.",
-	"layout_analysis.details.from": "Из коллекции {source}."
+	"layout_analysis.details.from": "Из коллекции {source}.",
+	"layout_analysis.corpus.my_typing": "Мой набор",
+	"layout_analysis.status.store_failed": "Не удалось прочитать сохранённые раскладки."
 }

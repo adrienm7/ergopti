@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} hinzugefügt ({format}); {count} Element(e) konnten nicht gelesen werden: {list}",
 	"layout_analysis.layouts.import_failed": "Diese Datei konnte nicht als Layout gelesen werden ({reason}).",
 	"layout_analysis.details.by": "Von {authors}.",
-	"layout_analysis.details.from": "Aus der Sammlung {source}."
+	"layout_analysis.details.from": "Aus der Sammlung {source}.",
+	"layout_analysis.corpus.my_typing": "Mein Tippen",
+	"layout_analysis.status.store_failed": "Ihre gespeicherten Layouts konnten nicht gelesen werden."
 }

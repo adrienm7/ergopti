@@ -247,6 +247,17 @@ window.LAYOUT_ANALYSIS_HOST = {
 };
 ```
 
+Data that arrives after load (the app's keystats tables, fetched on the user's
+request; the user's own layouts) goes through
+`window.LAYOUT_ANALYSIS_COMPARER`: `setCorpus({id, title?, tables, default?})`
+adds or replaces a corpus, listed first and selected when `default` is true, and
+`addLayouts([layout, ...])` adds or replaces layouts, ticked. The page also
+listens for the app's `studio-ngrams` DOM event (`detail` = the keystats tables)
+and turns it into the « My typing » corpus (`my_typing`), the default in the
+app. A host `store` (`{list(), save(layout), remove(id)}`, each returning a
+promise; the app's data folder, the site's IndexedDB) replaces `localStorage`
+for the layouts imported from files.
+
 Framed by the site (`/studio/comparer`, owned by the site routes), the page
 needs no bridge: it uses relative URLs only, honours `?lang=<code>` (French by
 default), makes no request outside the site and posts

@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} ajoutée ({format}) ; {count} élément(s) n’ont pas pu être lus : {list}",
 	"layout_analysis.layouts.import_failed": "Ce fichier n’a pas pu être lu comme une disposition ({reason}).",
 	"layout_analysis.details.by": "Par {authors}.",
-	"layout_analysis.details.from": "Issue de la collection {source}."
+	"layout_analysis.details.from": "Issue de la collection {source}.",
+	"layout_analysis.corpus.my_typing": "Ma frappe",
+	"layout_analysis.status.store_failed": "Vos dispositions enregistrées n’ont pas pu être lues."
 }

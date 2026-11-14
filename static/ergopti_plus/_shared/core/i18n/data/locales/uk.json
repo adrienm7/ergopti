@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} додано ({format}); не вдалося прочитати елементів: {count}: {list}",
 	"layout_analysis.layouts.import_failed": "Не вдалося прочитати цей файл як розкладку ({reason}).",
 	"layout_analysis.details.by": "Автор: {authors}.",
-	"layout_analysis.details.from": "З колекції {source}."
+	"layout_analysis.details.from": "З колекції {source}.",
+	"layout_analysis.corpus.my_typing": "Мій набір",
+	"layout_analysis.status.store_failed": "Не вдалося прочитати збережені розкладки."
 }

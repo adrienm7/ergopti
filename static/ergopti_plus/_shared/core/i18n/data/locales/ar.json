@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "أُضيف {name} ({format})؛ تعذّرت قراءة {count} عنصرًا: {list}",
 	"layout_analysis.layouts.import_failed": "تعذّرت قراءة هذا الملف كتخطيط ({reason}).",
 	"layout_analysis.details.by": "من تصميم {authors}.",
-	"layout_analysis.details.from": "من مجموعة {source}."
+	"layout_analysis.details.from": "من مجموعة {source}.",
+	"layout_analysis.corpus.my_typing": "كتابتي",
+	"layout_analysis.status.store_failed": "تعذّرت قراءة تخطيطاتك المحفوظة."
 }

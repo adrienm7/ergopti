@@ -83,6 +83,12 @@ check(
 	'the page no longer posts its height to the framing site'
 );
 
+// The app delivers « My typing » late, through this event (contract with T's bridge).
+check(
+	page.includes("'studio-ngrams'") && page.includes('LAYOUT_ANALYSIS_COMPARER'),
+	'the page no longer accepts a late corpus from the app'
+);
+
 // 3/ Corpora
 check(DATA.corpora.length > 0, 'no built-in corpus');
 for (const corpus of DATA.corpora)

@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} tilføjet ({format}); {count} element(er) kunne ikke læses: {list}",
 	"layout_analysis.layouts.import_failed": "Filen kunne ikke læses som et layout ({reason}).",
 	"layout_analysis.details.by": "Af {authors}.",
-	"layout_analysis.details.from": "Fra samlingen {source}."
+	"layout_analysis.details.from": "Fra samlingen {source}.",
+	"layout_analysis.corpus.my_typing": "Min indtastning",
+	"layout_analysis.status.store_failed": "Dine gemte layouts kunne ikke læses."
 }

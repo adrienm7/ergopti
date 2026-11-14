@@ -4459,5 +4459,7 @@
 	"layout_analysis.layouts.import_partial": "{name} přidáno ({format}); nepodařilo se přečíst položek: {count}: {list}",
 	"layout_analysis.layouts.import_failed": "Tento soubor nelze přečíst jako rozložení ({reason}).",
 	"layout_analysis.details.by": "Autor: {authors}.",
-	"layout_analysis.details.from": "Ze sbírky {source}."
+	"layout_analysis.details.from": "Ze sbírky {source}.",
+	"layout_analysis.corpus.my_typing": "Moje psaní",
+	"layout_analysis.status.store_failed": "Uložená rozložení nelze přečíst."
 }
