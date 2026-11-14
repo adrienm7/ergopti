@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 00:35)
+## Where things stand (2026-11-14, 02:05)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -63,12 +63,20 @@ same commit as each step or checkpoint. Times are Paris time.
 - Installed-tree paths (`lib/ergopti/<driver-relative>`) are not read by
   the plan; later steps that move `ui/dialog_host.lua` or
   `modules/updater/manager.lua` need listed edits for those sites.
-- **Next: one block S03–S08.** wt-seq is rebuilding S03–S08 from night
-  `812b987b` (scratchpad `s0308-run.log`). Then: both Lua suites and the
-  JS suite against the baselines; rebase the six step commits onto
-  `origin/dev` as `…-proof-22`; dispatch ci.yml once proof 21 has finished
-  (one run at a time); land if only baseline reds:
-  `git push origin HEAD:refs/heads/dev`, then one line to the coordinator.
+- A second S03–S08 build found four more tool paths (a `windows\\x\.ahk`
+  regex, an `#Include` string in a tool naming `'windows/…'`, a bare path
+  one named Lua driver holds, the source-run owner's joined pieces), fixed
+  in `943d30cb`.
+- **Proof 22 (current): S03–S08, branch `…-proof-22` at `51601507`
+  (night `943d30cb` plus six steps, rebased on dev `95764817`), run
+  43538289052, dispatched 02:04.** Locally on the same steps: JS 26 reds =
+  baseline, macOS 18 and Linux 35 Lua failures = baseline by name.
+- Next: when run 43538289052 completes, compare its reds with run
+  43309556011's list. If only those: `git fetch origin dev`, rebase onto it
+  (re-run a step where dev added files its moves meet), check 0 merges and
+  0 trailers, the format and convention gates, then
+  `git push origin HEAD:refs/heads/dev` from wt-proof and one line to the
+  coordinator. Then S09–S12 the same way.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
