@@ -309,7 +309,7 @@
 		},
 		{
 			"id": "js-0519",
-			"ordinal": 662,
+			"ordinal": 663,
 			"name": "a managed phase worker keeps its published closure status under a late owner TERM",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-managed-phase-late-term.cjs"],
