@@ -33,8 +33,8 @@ end
 --- Routes the shipped data through the already loaded path and file doubles.
 --- Call it after the onboarding module is required and before the wizard runs.
 function M.install()
-	local paths = assert(package.loaded["infra.paths"], "infra.paths must be loaded")
-	local files = assert(package.loaded["adapters.file_system"], "adapters.file_system must be loaded")
+	local paths = assert(package.loaded["core.fs.engine.paths"], "core.fs.engine.paths must be loaded")
+	local files = assert(package.loaded["core.fs.adapters.file_system"], "core.fs.adapters.file_system must be loaded")
 	local shared = paths.shared
 	paths.shared = function(relative)
 		if type(relative) == "string" and shipped(relative) then return SHIPPED_ROOT .. relative end

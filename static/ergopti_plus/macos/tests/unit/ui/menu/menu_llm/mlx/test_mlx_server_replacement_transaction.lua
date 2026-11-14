@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULE_NAMES = {
-	"adapters.json_codec",
+	"core.fs.adapters.json_codec",
 	"infra.notifications",
 	"infra.logger",
 	"infra.i18n",
@@ -60,7 +60,7 @@ local function with_server_fixture(options, assertions)
 	local saved_modules = {}
 	for _, name in ipairs(MODULE_NAMES) do saved_modules[name] = package.loaded[name] end
 	local saved_hs = rawget(_G, "hs")
-	package.loaded["adapters.json_codec"] = nil
+	package.loaded["core.fs.adapters.json_codec"] = nil
 	local saved_os_execute = os.execute
 	local ok, err = xpcall(function()
 		local noop = function() end

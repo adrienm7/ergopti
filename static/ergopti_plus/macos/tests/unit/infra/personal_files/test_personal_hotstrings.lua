@@ -32,7 +32,7 @@ end
 --- Real hardlinks and stale bytes are exercised by the separate native-owner suite.
 local function mock_source_observations()
 	mock("infra.personal_file_adoption", nil)
-	mock("adapters.file_system", {
+	mock("core.fs.adapters.file_system", {
 		path_status = function(path)
 			local inode = 0
 			for index = 1, #path do inode = inode + path:byte(index) * index end
@@ -70,7 +70,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		})
 		-- A flat dir: one canonical file (must be skipped at prefix=="") + two
 		-- extension TOMLs returned out of order to prove the loader sorts them.
-		mock("infra.fs_dir", {
+		mock("core.fs.engine.dir", {
 			entries = function(dir)
 				if dir == "/fake/hot" then
 					return { "zebra.toml", "alpha.toml", "personal_hotstrings.toml", "_index.toml" }
@@ -140,7 +140,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 				return nil
 			end,
 		})
-		mock("infra.fs_dir", {
+		mock("core.fs.engine.dir", {
 			-- Every directory in this fixture contains exactly one further "loop"
 			-- entry that resolves back to a directory — a growing-path cycle.
 			entries = function(_dir) return { "loop" } end,
@@ -193,7 +193,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 				return nil
 			end,
 		})
-		mock("infra.fs_dir", {
+		mock("core.fs.engine.dir", {
 			entries = function(dir)
 				if dir == "/fake/hot" then return { "a__b.toml", "a" } end
 				if dir == "/fake/hot/a" then return { "b.toml" } end

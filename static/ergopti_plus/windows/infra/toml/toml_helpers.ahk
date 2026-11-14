@@ -35,7 +35,7 @@
 
 #Include ../number.ahk
 #Include ../source_text_codec.ahk
-#Include ../../adapters/file_system.ahk
+#Include ../../core/fs/adapters/file_system.ahk
 #Include toml_inline_tables.ahk
 #Include toml_document.ahk
 #Include config_snapshot.ahk

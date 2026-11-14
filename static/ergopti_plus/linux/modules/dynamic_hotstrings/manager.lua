@@ -161,7 +161,7 @@ local function _seed_missing_source(path)
 		Logger.error(LOG, "Could not create the configuration folder for personal_info.toml — the editor has no source.")
 		return false
 	end
-	local written, errno = require("adapters.file_system").write_new(path, _first_boot_source())
+	local written, errno = require("core.fs.adapters.file_system").write_new(path, _first_boot_source())
 	if written or errno == "EEXIST" or errno == 17 then return true end
 	Logger.error(LOG, "Could not create the default personal_info.toml (%s) — the editor has no source.",
 		tostring(errno))

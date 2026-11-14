@@ -33,7 +33,7 @@ local function with_menu(callback)
 		real.set_locale_injector(require("infra.locale").set_locale)
 		for key, value in pairs(real) do captured[key] = value end
 		package.loaded["infra.i18n"] = captured
-		callback(menu, real, require("adapters.json_codec"))
+		callback(menu, real, require("core.fs.adapters.json_codec"))
 	end)
 end
 

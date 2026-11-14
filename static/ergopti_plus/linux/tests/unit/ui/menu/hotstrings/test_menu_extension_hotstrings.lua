@@ -129,7 +129,7 @@ local function with_extension_frame(body, paused)
 	local ok, err = pcall(function()
 		local translator = require("infra.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.shim"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
@@ -219,7 +219,7 @@ local function read_standard_empty_json(path)
 	return value
 end
 
-local StandardEmptyCorpus = read_standard_empty_json(require("infra.paths").shared("tests/corpus/menus/linux_standard_category_empty_status.json"))
+local StandardEmptyCorpus = read_standard_empty_json(require("core.fs.engine.paths").shared("tests/corpus/menus/linux_standard_category_empty_status.json"))
 
 --- Observes the real registered provider while forwarding the full public build.
 --- @param callback function Receives native build, captured data and genuine binding.
@@ -260,7 +260,7 @@ local function with_standard_empty(callback, locale)
 		end,
 	}
 	local ok, detail = xpcall(function()
-		local catalogue = read_standard_empty_json(require("infra.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
+		local catalogue = read_standard_empty_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
 		i18n.get = function(key) return catalogue[key] or key end
 		i18n.get_locale = function() return locale or "en" end
 		binding.build = function(key, category, dynamic, builders, ctx, providers)
@@ -412,7 +412,7 @@ end)
 
 
 -- Independent caption oracle comes from the original native marker's 21 locale files.
-local ExtensionEmptyCorpus = read_standard_empty_json(require("infra.paths").shared("tests/corpus/menus/linux_extension_empty_status.json"))
+local ExtensionEmptyCorpus = read_standard_empty_json(require("core.fs.engine.paths").shared("tests/corpus/menus/linux_extension_empty_status.json"))
 
 local function with_extension_empty(callback, locale)
 	local old_builder = package.loaded["ui.menu.builder"]
@@ -429,7 +429,7 @@ local function with_extension_empty(callback, locale)
 	local old_statuses = owner.status_rows
 	local state = { loaded = false, data = nil, delivered = nil, writes = {} }
 	local ok, detail = xpcall(function()
-		local catalogue = read_standard_empty_json(require("infra.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
+		local catalogue = read_standard_empty_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
 		i18n.get = function(key) return catalogue[key] or key end
 		i18n.get_locale = function() return locale or "en" end
 		binding.build = function(key, category, dynamic, builders, ctx, providers)

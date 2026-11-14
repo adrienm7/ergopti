@@ -16,7 +16,7 @@ local OWNED = {
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
 	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "adapters.shell_runner",
 	"infra.preferences",
-	"adapters.application_notifier", "adapters.file_system", "infra.config_paths", "infra.i18n",
+	"adapters.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "infra.i18n",
 	"adapters.secure_field_detector",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
@@ -148,7 +148,7 @@ local function with_native(body)
 		end
 		helpers.assert_true(Keymap.start())
 		drain(hs_stub)
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		FileSystem.read_with_status = function()
 			if fixture.read_hook then fixture.read_hook() end
 			if fixture.unreadable then return nil, "error", "fixture unreadable" end
@@ -463,7 +463,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 			helpers.assert_eq(f.User.set_enabled(true), false); helpers.assert_eq(f.User.is_enabled(), false)
 			helpers.assert_nil(f.notified, "a missing source is a menu state, not a notification")
 			helpers.assert_eq(f.User.problem(), "missing")
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			FileSystem.write_if_unchanged = function(path, content, expected)
 				helpers.assert_eq(path, f.User.source_path()); helpers.assert_eq(expected.status, "absent")
 				f.content, f.absent = content, false; return true
@@ -886,7 +886,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("saves declared preferences to disk then reloads them into actual native gate and timing", function()
 		with_native(function(f)
 			local path = os.tmpname()
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			local original_read, original_write = FileSystem.read_with_status, FileSystem.write_if_unchanged
 			local function read_disk()
 				local handle = assert(io.open(path, "r"))

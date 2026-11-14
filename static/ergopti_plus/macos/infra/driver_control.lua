@@ -52,7 +52,7 @@ local quote = TextUtils.shell_quote
 --- Native operations, replaceable by tests.
 --- @return table ports
 local function native_ports()
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local ShellRunner = require("adapters.shell_runner")
 	return {
 		read = FileSystem.read_with_status,
@@ -329,8 +329,8 @@ function M.start(opts)
 	local ok, session_or_err = pcall(function()
 		Logger.start(LOG, "Starting the local reload control…")
 		local declaration = opts.declaration
-			or require("infra.paths").shared("diagnostics/data/control/driver_control.json")
-		local text = require("adapters.file_system").read(declaration)
+			or require("core.fs.engine.paths").shared("diagnostics/data/control/driver_control.json")
+		local text = require("core.fs.adapters.file_system").read(declaration)
 		if type(text) ~= "string" then error("the declaration could not be read: " .. tostring(declaration), 0) end
 		local spec = Policy.validate(Json.decode(text))
 		local folder, why = Policy.folder(spec, "macos", os.getenv, require("core.fs.engine.app_dirs").macos.folder_name, "/")

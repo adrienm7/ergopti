@@ -15,8 +15,8 @@ local cached
 --- @return table|nil bytes, string|nil error
 local function forbidden_bytes()
 	if cached then return cached end
-	local Paths = require("infra.paths")
-	local FileSystem = require("adapters.file_system")
+	local Paths = require("core.fs.engine.paths")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local path = Paths.shared("core/network/data/http/header_policy.json")
 	if not path then return nil, "HTTP header policy is unavailable" end
 	local content, status = FileSystem.read_bounded(path, 4096)

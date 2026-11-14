@@ -63,7 +63,7 @@ local function scenario(options, body)
 			"modules.hotstrings.injector", "adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end); package.loaded["core.logger.engine.shim"] = logger
 		local preferences = require("tests.support.llm_preferences_fixture").new({ initial = {
 			["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
@@ -676,7 +676,7 @@ do
 			put("infra.config_paths", { config = function(name)
 			  local file = marker .. "." .. name; owned_paths[file] = true; return file
 			end, get_config_dir = function() return marker .. ".config-dir" end })
-			put("adapters.storage", require("tests.fakes").storage())
+			put("core.fs.adapters.storage", require("tests.fakes").storage())
 			local scheduler = require("tests.fakes").timer_scheduler()
 			put("core.events.timer_scheduler", scheduler)
 			put("infra.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })

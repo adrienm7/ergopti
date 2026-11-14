@@ -15,7 +15,7 @@ local FocusGuard = require("modules.keystats.focus_guard")
 local CaptureGate = require("infra.input_capture_gate")
 local Engine = require("modules.hotstrings.engine")
 local Runtime = require("infra.user_hotstring_runtime")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Timer = require("core.events.timer_scheduler")
 local Injector = require("modules.hotstrings.injector")
 local uv = require("luv")
@@ -24,7 +24,7 @@ local NativeConfigPaths = require("infra.config_paths")
 -- Canonical source discovery also loads the installed-layout registry and its
 -- updater/storage readers. They capture paths at require time, so fixture paths
 -- and every such module owner must be scoped together, including false/nil caches.
-local DISCOVERY_OWNERS = { "adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "infra.i18n" }
+local DISCOVERY_OWNERS = { "core.fs.adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "infra.i18n" }
 
 local function drain()
 	for _ = 1, 16 do
@@ -250,16 +250,16 @@ helpers.describe("programmable native Linux runtime", function()
 			with_configuration_scope(f, function(c)
 				local paths = require("infra.config_paths")
 				helpers.assert_eq(paths.config_home(), c.path:match("^(.*)/[^/]+$"))
-				local storage = require("adapters.storage")
+				local storage = require("core.fs.adapters.storage")
 				helpers.assert_eq(type(storage), "table", "real discovery must never poison the LuaJIT require cache")
 				helpers.assert_eq(type(storage.get), "function")
 				helpers.assert_eq(type(require("modules.updater.manager").installed_channel), "function")
 				helpers.assert_eq(type(require("modules.keymap.layout_registry").settings), "function")
-				helpers.assert_eq(require("adapters.storage"), storage, "repeated require retains the actual admitted reader")
+				helpers.assert_eq(require("core.fs.adapters.storage"), storage, "repeated require retains the actual admitted reader")
 			end)
 		end)
 		for _, name in ipairs(DISCOVERY_OWNERS) do helpers.assert_eq(package.loaded[name], original[name], name) end
-		local ok, storage = pcall(require, "adapters.storage")
+		local ok, storage = pcall(require, "core.fs.adapters.storage")
 		helpers.assert_true(ok, "the next production reader must load after fixture teardown")
 		helpers.assert_eq(type(storage.get), "function")
 		for _, name in ipairs(DISCOVERY_OWNERS) do package.loaded[name] = original[name] end
@@ -279,7 +279,7 @@ helpers.describe("programmable native Linux runtime", function()
 					local outer = {}
 					for _, name in ipairs(DISCOVERY_OWNERS) do outer[name] = package.loaded[name] end
 					with_configuration_scope(f, function()
-						helpers.assert_eq(type(require("adapters.storage").get), "function")
+						helpers.assert_eq(type(require("core.fs.adapters.storage").get), "function")
 					end)
 					for _, name in ipairs(DISCOVERY_OWNERS) do helpers.assert_eq(package.loaded[name], outer[name], "nested owner " .. name) end
 				end)
@@ -296,7 +296,7 @@ helpers.describe("programmable native Linux runtime", function()
 		local ok, problem = pcall(function()
 			with_runtime(function(f)
 				with_configuration_scope(f, function()
-					helpers.assert_eq(type(require("adapters.storage").get), "function")
+					helpers.assert_eq(type(require("core.fs.adapters.storage").get), "function")
 					error("independent callback refusal after actual source discovery")
 				end)
 			end)

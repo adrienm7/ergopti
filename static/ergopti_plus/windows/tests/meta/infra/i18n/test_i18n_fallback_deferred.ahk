@@ -35,7 +35,7 @@
 _MetaCheckI18nFallbackDeferred() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 
-	I18n := _DriverDirConcat("infra")
+	I18n := _DriverDirsConcat("infra", "core/fs/engine")
 	Assert(I18n != "", "infra\i18n.ahk must be readable")
 
 	; The boot preload must load the active locale only, with a separate warmer and

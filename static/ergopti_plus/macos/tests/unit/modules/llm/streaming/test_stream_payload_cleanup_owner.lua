@@ -5,9 +5,9 @@ local helpers = require("tests.helpers")
 local Cleanup = require("modules.llm.stream_payload_cleanup")
 
 local function with_owner(callback)
-	helpers.with_fresh_modules({ "adapters.file_system" }, function()
+	helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 		local state = { attempts = 0, errors = {}, debug = {}, present = true, remove_args = {}, inspect_args = {} }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			remove_if_unchanged = function(path, expected, _, admission)
 				state.remove_args[#state.remove_args + 1] = table.pack(path)
 				assert(expected.content == "payload" and admission())
@@ -187,9 +187,9 @@ end)
 helpers.describe("stream payload conditional removal", function()
 	for _, case in ipairs({ "missing identity", "symbolic link" }) do
 		helpers.it("never unlinks with " .. case, function()
-			helpers.with_fresh_modules({ "adapters.file_system" }, function()
+			helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 				local attempts = 0
-				package.loaded["adapters.file_system"] = {
+				package.loaded["core.fs.adapters.file_system"] = {
 					classify_no_follow = function()
 						return { mode = case == "symbolic link" and "link" or "file", dev = 1, ino = 2 }, "ok"
 					end,
@@ -206,9 +206,9 @@ helpers.describe("stream payload conditional removal", function()
 		end)
 	end
 	helpers.it("retries release only after unlink committed and never removes a successor", function()
-		helpers.with_fresh_modules({ "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 			local attempts, release_allowed = 0, false
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				classify_no_follow = function() return { mode = "file", dev = 1, ino = 2 }, "ok" end,
 				remove_if_unchanged = function(_, _, _, admission)
 					attempts = attempts + 1
@@ -230,14 +230,14 @@ end)
 helpers.describe("stream payload cleanup constructor admission", function()
 	for _, missing in ipairs({ "remove_if_unchanged", "classify_no_follow" }) do
 		helpers.it("(stream-payload-owner) refuses missing " .. missing .. " before native work", function()
-			helpers.with_fresh_modules({ "adapters.file_system" }, function()
+			helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 				local calls = 0
 				local files = {
 					remove_if_unchanged = function() calls = calls + 1; return true end,
 					classify_no_follow = function() calls = calls + 1; return nil, "absent" end,
 				}
 				files[missing] = nil
-				package.loaded["adapters.file_system"] = files
+				package.loaded["core.fs.adapters.file_system"] = files
 				local ok, detail = pcall(Cleanup.new, helpers.make_logger_stub(), "fixture")
 				helpers.assert_eq(ok, false)
 				helpers.assert_contains(tostring(detail), "exact file cleanup ports")

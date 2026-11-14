@@ -31,7 +31,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				"ui.menu.menu_shortcuts",
 				"infra.logger",
 				"infra.deferred_work",
-				"infra.fs_dir",
+				"core.fs.engine.dir",
 				"infra.dialog_util",
 				"modules.shortcuts",
 				"modules.shortcuts.actions.text",
@@ -39,7 +39,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				"ui.menu.menu_utils",
 				"infra.manifest_menu",
 				"menu.engine.renderer",
-				"adapters.json_codec",
+				"core.fs.adapters.json_codec",
 				"ui.menu.shortcut_utils",
 				"ui.menu.menu_keyboard_slots",
 				"ui.menu.menu_tap_keys",
@@ -63,7 +63,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				package.loaded["infra.deferred_work"] = {
 					after = function() return true end,
 				}
-				package.loaded["infra.fs_dir"] = {
+				package.loaded["core.fs.engine.dir"] = {
 					entries = function() return { "demo" } end,
 				}
 				package.loaded["infra.dialog_util"] = {}
@@ -84,7 +84,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				local extension_renderer = assert(require("menu.engine.renderer").new({
 					platform = "hs",
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
-					json_decode = require("adapters.json_codec").decode,
+					json_decode = require("core.fs.adapters.json_codec").decode,
 					i18n = package.loaded["infra.i18n"],
 					logger = package.loaded["infra.logger"],
 				}))
@@ -180,10 +180,10 @@ end)
 --- @param callback function Native provider and initialized owner assertions.
 local function with_extension_boundary(callback)
 	local names = {
-		"ui.menu.menu_shortcuts", "infra.logger", "infra.deferred_work", "infra.fs_dir",
+		"ui.menu.menu_shortcuts", "infra.logger", "infra.deferred_work", "core.fs.engine.dir",
 		"infra.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
-		"infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.paths", "adapters.json_codec",
-		"adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
+		"infra.i18n", "infra.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
+		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
 		"infra.manifest_menu", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader", "hs", "tests.stubs.hs",
 	}
@@ -218,7 +218,7 @@ local function with_extension_boundary(callback)
 			native_hs.extension_boundary = { loads = 0, actions = {}, accept = false }
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
-			package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+			package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 			package.loaded["infra.dialog_util"] = {}
 			package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
 			package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
@@ -239,7 +239,7 @@ local function with_extension_boundary(callback)
 			local renderer = require("infra.manifest_menu")
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_extension_boundary.json"), "r"))
 			local raw = file:read("*a"); file:close()
-			local expected = assert(require("adapters.json_codec").decode(raw))
+			local expected = assert(require("core.fs.adapters.json_codec").decode(raw))
 			package.loaded["infra.manifest_menu"] = {
 				group_receiver = renderer.group_receiver,
 				template_rows = renderer.template_rows,
@@ -347,7 +347,7 @@ helpers.describe("Shortcut extension presentation boundary", function()
 			helpers.assert_eq(rows(), expected.empty_rows)
 			helpers.assert_eq(effects.loads, 0)
 			helpers.assert_eq(effects.actions, {})
-			local Renderer, Json = require("menu.engine.renderer"), require("adapters.json_codec")
+			local Renderer, Json = require("menu.engine.renderer"), require("core.fs.adapters.json_codec")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local projected = assert(Renderer.new({ platform = platform,
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,

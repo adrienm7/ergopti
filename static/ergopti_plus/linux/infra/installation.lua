@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Paths   = require("infra.paths")
+local Paths   = require("core.fs.engine.paths")
 local Version = require("infra.version")
 
 -- Where the system packages (.deb, .rpm, PKGBUILD) stage the driver.

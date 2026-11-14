@@ -18,8 +18,8 @@ local FIXTURE_MODULES = {
 	"infra.notifications",
 	"infra.i18n",
 	"infra.keycodes",
-	"infra.paths",
-	"adapters.storage",
+	"core.fs.engine.paths",
+	"core.fs.adapters.storage",
 	"adapters.graphics_renderer",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -117,7 +117,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				RETURN = 36,
 				ESCAPE = 53,
 			}
-			package.loaded["infra.paths"] = {
+			package.loaded["core.fs.engine.paths"] = {
 				shared = function(relative_path) return helpers.shared(relative_path) end,
 			}
 			package.loaded["modules.keystats"] = {

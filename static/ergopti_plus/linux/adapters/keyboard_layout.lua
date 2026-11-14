@@ -223,7 +223,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = require("infra.regular_file_reader").open_source(path)
+	local fh = require("core.fs.engine.regular_file_reader").open_source(path)
 	if not fh then return nil end
 	local text = fh:read("*a")
 	local closed = fh:close()

@@ -63,4 +63,4 @@ end
 local metrics_parent_file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/metrics_parent.json", "rb"))
 local metrics_parent_raw = metrics_parent_file:read("*a");metrics_parent_file:close()
 require("tests.lua.metrics.parent_contract").register(helpers, metrics_parent_fixture,
-	assert(require("adapters.json_codec").decode(metrics_parent_raw)), "hs")
+	assert(require("core.fs.adapters.json_codec").decode(metrics_parent_raw)), "hs")

@@ -11,7 +11,7 @@
 --- Independent actual public-wrapper/coordinator controls. Curl, GIO, clock and
 --- timer retirement are explicit native ports; no native-wire proof is inferred.
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Json = require("core.text.engine.json")
 local Policy = dofile(assert(Paths.shared("core/network/engine/proxy_policy_core.lua")))
 local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))

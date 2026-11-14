@@ -11,21 +11,21 @@ local helpers = require("tests.helpers")
 
 local function with_installer(options, check)
 	options = options or {}
-	helpers.with_stub_scope({ "modules.updater.release_installer", "infra.logger", "infra.paths",
-		"adapters.file_system", "adapters.json_codec", "adapters.shell_runner" }, function()
+	helpers.with_stub_scope({ "modules.updater.release_installer", "infra.logger", "core.fs.engine.paths",
+		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "adapters.shell_runner" }, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = { shared = function(path)
+		package.loaded["core.fs.engine.paths"] = { shared = function(path)
 			helpers.assert_eq(path, "../macos/adapters/release_stage.sh")
 			return helpers.driver_root() .. "adapters/release_stage.sh"
 		end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function()
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function()
 			if options.previous then return { mode = "directory" }, "ok" end
 			return nil, "absent"
 		end, read = function(path)
 			local file = assert(io.open(path, "rb"))
 			local content = assert(file:read("a")); assert(file:close()); return content
 		end }
-		package.loaded["adapters.json_codec"] = require("core.text.engine.json")
+		package.loaded["core.fs.adapters.json_codec"] = require("core.text.engine.json")
 		package.loaded["adapters.shell_runner"] = {}
 		local installer = require("modules.updater.release_installer")
 		installer._getenv = function(name)

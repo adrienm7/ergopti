@@ -297,7 +297,7 @@ end)
 --- @param timer_result boolean|nil Actual scheduler receipt.
 --- @return table observation Recorded native admissions.
 local function editor_observation(vector, deferred_pause, timer_result, label_key)
-	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "core.events.timer_scheduler", "infra.manifest_menu", "infra.paths", "infra.i18n" }, function()
+	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "core.events.timer_scheduler", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n" }, function()
 		local calls, scheduled, callback = 0, 0, nil
 		local current = vector.initial_paused
 		package.loaded["core.events.timer_scheduler"] = {
@@ -346,10 +346,10 @@ local function editor_observation(vector, deferred_pause, timer_result, label_ke
 end
 
 helpers.describe("shared personal editor command", function()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	local vectors = assert(require("adapters.json_codec").decode(text)).vectors
+	local vectors = assert(require("core.fs.adapters.json_codec").decode(text)).vectors
 	for _, vector in ipairs(vectors) do
 		helpers.it("shared-personal-editor: " .. vector.name, function()
 			local observed = editor_observation(vector)

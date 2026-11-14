@@ -29,7 +29,7 @@ helpers.assert_true(SOURCE ~= nil, "modules/llm/mlx_deps_checker.lua source must
 
 helpers.describe("mlx_deps_checker source invariants", function()
 	helpers.it("imports lib.paths for fallback discovery", function()
-		helpers.assert_true(SOURCE:find("local Paths        = require(\"infra.paths\")", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find("local Paths        = require(\"core.fs.engine.paths\")", 1, true) ~= nil)
 	end)
 
 	helpers.it("defines resolve_hs_root from current file location", function()
@@ -100,7 +100,7 @@ end)
 
 helpers.describe("mlx_deps_checker: refused native launch settles immediately", function()
 	helpers.it("treats task:start() false as terminal failure (mlx-deps-false-start)", function()
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function() return nil end,
 		}
 		package.loaded["ui.download_window"] = {
@@ -147,7 +147,7 @@ end)
 helpers.describe("mlx_deps_checker public API", function()
 	local original_logger = package.loaded["infra.logger"]
 	local original_window = package.loaded["ui.download_window"]
-	local original_paths = package.loaded["infra.paths"]
+	local original_paths = package.loaded["core.fs.engine.paths"]
 	local original_checker = package.loaded["modules.llm.mlx_deps_checker"]
 
 	local calls = {
@@ -182,7 +182,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		is_active = function() return false end,
 	}
 
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		find_from_configdir = function() return nil end,
 	}
 
@@ -219,7 +219,7 @@ helpers.describe("mlx_deps_checker public API", function()
 
 	package.loaded["infra.logger"] = original_logger
 	package.loaded["ui.download_window"] = original_window
-	package.loaded["infra.paths"] = original_paths
+	package.loaded["core.fs.engine.paths"] = original_paths
 	package.loaded["modules.llm.mlx_deps_checker"] = original_checker
 end)
 
@@ -260,7 +260,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 			},
 		}
 
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function() return nil end,
 		}
 		package.loaded["ui.download_window"] = {

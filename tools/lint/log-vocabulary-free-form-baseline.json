@@ -1,7 +1,7 @@
 {
 	"_comment": "Free-form reason and phase literals per driver source file: prose or runtime-built values that cannot join a closed enum. Counts may only go down; lower them with node tools/test/test-logger-scalars-single-source.cjs --shrink.",
 	"reason": {
-		"static/ergopti_plus/macos/adapters/file_system.lua": 2,
+		"static/ergopti_plus/macos/core/fs/adapters/file_system.lua": 2,
 		"static/ergopti_plus/macos/adapters/python_interpreter.lua": 3,
 		"static/ergopti_plus/macos/infra/logger.lua": 1,
 		"static/ergopti_plus/macos/infra/paced_job.lua": 1,

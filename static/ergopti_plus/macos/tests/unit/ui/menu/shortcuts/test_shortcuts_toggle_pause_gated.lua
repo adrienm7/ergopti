@@ -40,7 +40,7 @@ local function build_paused()
 	local render_ctx = nil
 	helpers.load_with_stubs("infra.logger")
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["modules.shortcuts"] = {
 		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },

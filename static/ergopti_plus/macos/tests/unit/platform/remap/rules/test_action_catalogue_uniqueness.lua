@@ -19,10 +19,10 @@ local function with_config_fixture(callback)
 			"platform.remap.defaults",
 			"modules.keymap.layout",
 			"modules.gestures.actions",
-			"adapters.file_system",
+			"core.fs.adapters.file_system",
 			"infra.i18n",
 			"infra.logger",
-			"infra.paths",
+			"core.fs.engine.paths",
 			"infra.toml.codec",
 			"hs",
 			"tests.stubs.hs",
@@ -71,7 +71,7 @@ local function with_config_fixture(callback)
 			package.loaded["modules.gestures.actions"] = {
 				karabiner_aliases = function() return {} end,
 			}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 			}
 			package.loaded["infra.i18n"] = {
@@ -79,7 +79,7 @@ local function with_config_fixture(callback)
 				has = function() return false end,
 			}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.paths"] = {
+			package.loaded["core.fs.engine.paths"] = {
 				shared = function() return "/fixture/modifier-chords.json" end,
 			}
 			package.loaded["infra.toml.codec"] = {

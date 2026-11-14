@@ -19,7 +19,7 @@ local USER_APP = "/Applications/Ollama.app/Contents/Resources/ollama"
 --- Reads the shared LLM defaults, the single source of both ports.
 --- @return table defaults
 local function shared_defaults()
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local file = assert(io.open(Paths.shared_llm_path("defaults.json"), "rb"))
 	local text = file:read("*a"); file:close()
 	return require("core.text.engine.json").decode(text)
@@ -33,7 +33,7 @@ local function endpoint_with(stored)
 	local lines = {}
 	package.loaded["modules.llm"] = { DEFAULT_STATE = {
 		llm_ollama_port = defaults.llm_ollama_port, llm_ollama_owned_port = defaults.llm_ollama_owned_port } }
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key) return stored[key] end,
 		set = function(key, value) stored[key] = value; return true end,
 		delete = function(key) stored[key] = nil; return true end,
@@ -47,7 +47,7 @@ end
 
 local function scoped(fn)
 	return function()
-		helpers.with_stub_scope({ "modules.llm", "adapters.storage", "infra.logger",
+		helpers.with_stub_scope({ "modules.llm", "core.fs.adapters.storage", "infra.logger",
 			"modules.llm.ollama_endpoint", "modules.llm.ollama_binary", "adapters.managed_ollama_hint" }, fn)
 	end
 end

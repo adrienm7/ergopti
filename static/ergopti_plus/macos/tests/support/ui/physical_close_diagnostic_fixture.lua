@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 local OWNED = { "ui.physical_shortcuts", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-	"core.events.timer_scheduler", "infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
-	"adapters.file_system", "adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
+	"core.events.timer_scheduler", "infra.logger", "core.fs.engine.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
+	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
 	"shortcuts.engine.physical_availability", "infra.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "hs.webview", "core.text.engine.json" }
 
 --- Executes the actual diagnostic with individual retirement facts held back.
@@ -24,11 +24,11 @@ local function run(blocked, scenario)
 		local logger = helpers.make_logger_stub()
 		logger.initialize_privacy = function() return true end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = function(path) return path end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return path end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.webview.i18n_seed"] = {}
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(key) return key end }
-		package.loaded["adapters.file_system"] = { read = function() return "{}" end }
+		package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
 		package.loaded["shortcuts.engine.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
 		package.loaded["shortcuts.engine.physical_editor_window"] = { new = function() return {
 			retire = function() return true end, receive = function() return true end,

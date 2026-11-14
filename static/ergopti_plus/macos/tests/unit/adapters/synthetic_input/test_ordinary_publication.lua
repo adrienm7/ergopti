@@ -14,7 +14,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 --- @param scenario function Receives native fixture, real adapter and authority.
 local function with_broker(scenario)
 	helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance",
-		"adapters.storage", "core.events.timer_scheduler", "infra.logger" }, function()
+		"core.fs.adapters.storage", "core.events.timer_scheduler", "infra.logger" }, function()
 		local fixture = Fixture.make({ deliver_trigger = false })
 		local synthetic = fixture.load()
 		local state = { full = true, cached = true, full_calls = 0, cached_calls = 0 }

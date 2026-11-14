@@ -34,9 +34,9 @@ local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
 local NumberPolicy      = require("core.text.engine.number_policy")
 local TomlReader        = require("infra.toml.reader")
-local FileSystem        = require("adapters.file_system")
+local FileSystem        = require("core.fs.adapters.file_system")
 local i18n              = require("infra.i18n")
-local Paths            = require("infra.paths")
+local Paths            = require("core.fs.engine.paths")
 local PersonalFiles    = require("hotstrings.engine.catalogue.personal_files")
 
 local LOG = "hotstrings_config_window"
@@ -179,7 +179,7 @@ end
 -- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is shared with init.lua's hotstring discovery; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("infra.fs_dir").entries
+local safe_dir_entries = require("core.fs.engine.dir").entries
 
 --- Lists TOML files in a directory, skipping names that start with `_` and
 --- the backups configuration writers leave beside a source.

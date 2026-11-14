@@ -89,9 +89,9 @@ local function native()
 			return policy.selection(receipt)
 		end,
 		feed_url = function()
-			local Paths = require("infra.paths")
+			local Paths = require("core.fs.engine.paths")
 			local Json = require("core.text.engine.json")
-			local handle = require("infra.regular_file_reader").open_source(Paths.shared("updater/data/defaults.json"))
+			local handle = require("core.fs.engine.regular_file_reader").open_source(Paths.shared("updater/data/defaults.json"))
 			if not handle then return nil end
 			local raw = handle:read("*a")
 			local closed = handle:close()

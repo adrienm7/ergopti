@@ -60,12 +60,12 @@ local function with_owner(body, managed, public_chords)
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
-			local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
+			local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
-			package.loaded["adapters.file_system"]=files
+			package.loaded["core.fs.adapters.file_system"]=files
 			package.loaded["infra.config_paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.native then
@@ -83,7 +83,7 @@ local function with_owner(body, managed, public_chords)
 		else
 		local keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} }
 		if public_chords==true then
-			local file=assert(io.open(require("infra.paths").shared("tap_hold/data/defaults.toml"),"rb"))
+			local file=assert(io.open(require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),"rb"))
 			local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
 			keys=require("tap_hold.engine.key_catalog").for_platform(defaults,"linux")
 		end
@@ -123,7 +123,7 @@ end
 
 local function with_menu(body, public_chords)
 	with_owner(function(s)
-		package.loaded["adapters.file_system"]=s.files
+		package.loaded["core.fs.adapters.file_system"]=s.files
 		package.loaded["infra.config_paths"]={config=function() return path end}
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
@@ -132,7 +132,7 @@ local function with_menu(body, public_chords)
 		local Holds=require("tap_hold.engine.hold_options")
 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}
 		if public_chords==true then
-			local file=assert(io.open(require("infra.paths").shared("tap_hold/data/defaults.toml"),"rb"))
+			local file=assert(io.open(require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),"rb"))
 			local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
 			keys=require("tap_hold.engine.key_catalog").for_platform(defaults,"linux")
 		end

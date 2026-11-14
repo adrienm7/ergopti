@@ -34,7 +34,7 @@ helpers.describe("installation: installed build or source run (Linux)", function
 	end)
 
 	helpers.it("answers for the running daemon by default", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		helpers.assert_eq(Installation.is_source_run(),
 			Installation.is_source_run(Paths.driver_root(), Version.SOURCE))
 	end)

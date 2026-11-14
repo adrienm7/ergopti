@@ -43,14 +43,14 @@ local _scope = require("settings.engine.scope.owner").new({ name = "ui.error_dia
 
 local hs             = hs
 local Logger         = require("infra.logger")
-local Paths          = require("infra.paths")
+local Paths          = require("core.fs.engine.paths")
 local Policy         = require("diagnostics.engine.reports.error_policy")
 local DialogCore     = require("core.ui.engine.error_dialog_core")
 local Redact         = require("diagnostics.engine.reports.redact")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
-local Storage        = require("adapters.storage")
+local Storage        = require("core.fs.adapters.storage")
 local WebviewResult  = require("adapters.webview_result")
 local ConfigKeys = require("settings.engine.keys")
 local TerminationCoordinator = require("infra.termination_coordinator")

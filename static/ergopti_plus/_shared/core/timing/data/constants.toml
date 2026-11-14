@@ -1349,7 +1349,7 @@ number_row_level_text_bytes = 1024
 release_list_body_bytes = 8388608
 
 # What the digest tool may print for one file, beyond the file's own path: the
-# hexadecimal digest and its separators. LX: adapters/file_digest.lua.
+# hexadecimal digest and its separators. LX: core/fs/adapters/file_digest.lua.
 file_digest_output_bytes = 1024
 
 # Head of one crash report the macOS field run reads for its closed tokens (the
@@ -1403,7 +1403,7 @@ shell_captured_output_bytes = 4194304
 
 # Read granularity of the macOS TOML cache when it collects a source's exact
 # bytes. Read through macos/_generated/registry_limits.lua.
-# HS: adapters/toml_cache.lua.
+# HS: core/fs/adapters/toml_cache.lua.
 toml_source_chunk_bytes = 65536
 
 [launcher]

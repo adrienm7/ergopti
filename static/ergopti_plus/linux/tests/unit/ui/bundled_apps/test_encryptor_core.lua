@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 local Core = require("apps.encryptor_core")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local quote = require("core.text.engine.utils_core").shell_quote
 
 local FORMAT = Core.load_format()

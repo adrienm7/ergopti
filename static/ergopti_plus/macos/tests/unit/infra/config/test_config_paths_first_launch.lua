@@ -68,7 +68,7 @@ end
 helpers.describe("ConfigPaths on the first launch of a packaged app", function()
 	helpers.it("refuses initialization when the default configuration directory cannot be created", function()
 		local previous_hs, previous_getenv = _G.hs, os.getenv
-		local previous_file_system = package.loaded["adapters.file_system"]
+		local previous_file_system = package.loaded["core.fs.adapters.file_system"]
 		local ok, err = xpcall(function()
 			local available = false
 			os.getenv = function(name)
@@ -76,7 +76,7 @@ helpers.describe("ConfigPaths on the first launch of a packaged app", function()
 				if name == "ERGOPTI_PATHS_FILE" then return nil end
 				return previous_getenv(name)
 			end
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return "", "ok" end,
 			}
 			local paths = helpers.load_with_stubs("infra.config_paths", {
@@ -97,7 +97,7 @@ helpers.describe("ConfigPaths on the first launch of a packaged app", function()
 			helpers.assert_true(paths.is_initialized())
 		end, debug.traceback)
 		_G.hs, os.getenv = previous_hs, previous_getenv
-		package.loaded["adapters.file_system"] = previous_file_system
+		package.loaded["core.fs.adapters.file_system"] = previous_file_system
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("reads a missing managed folder as an absent bootstrap, without an error", function()

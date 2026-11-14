@@ -109,7 +109,7 @@ local shared_spec = nil
 --- @return table See tap_hold.shared_file.parse_spec.
 local function shared_file_spec()
 	if shared_spec == nil then
-		local path = require("infra.paths").shared("tap_hold/data/shared_file.toml")
+		local path = require("core.fs.engine.paths").shared("tap_hold/data/shared_file.toml")
 		local text, status = Writer.read_classified(path)
 		if status ~= "ok" or type(text) ~= "string" then
 			error("the shared tap-hold file spec is unreadable: " .. tostring(path), 0)

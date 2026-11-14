@@ -363,7 +363,7 @@ InstallHotstringHooks()
 #Include ../adapters/notifier.ahk
 #Include ../infra/quit_admission.ahk
 #Include ../core/events/timer_scheduler.ahk
-#Include ../adapters/file_system.ahk
+#Include ../core/fs/adapters/file_system.ahk
 #Include ../adapters/window_info.ahk
 #Include ../adapters/uia_worker.ahk
 #Include ../adapters/tray_menu.ahk
@@ -372,7 +372,7 @@ InstallHotstringHooks()
 #Include ../adapters/secure_field_detector.ahk
 #Include ../adapters/clipboard.ahk
 #Include ../infra/input_probe.ahk
-#Include ../adapters/storage.ahk
+#Include ../core/fs/adapters/storage.ahk
 #Include ../adapters/process_lifecycle.ahk
 #Include ../adapters/key_state.ahk
 #Include ../adapters/keyboard_layout_switch.ahk
@@ -421,7 +421,7 @@ InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include unit/adapters/test_adapter_compliance.ahk
-#Include unit/adapters/test_file_system_ports.ahk
+#Include unit/core/fs/test_ports.ahk
 #Include unit/infra/config/persistence/test_feature_io_locator.ahk
 #Include meta/infra/config/persistence/test_feature_io_impl_no_global.ahk
 #Include meta/suite/test_isset_no_property_arg.ahk
@@ -1161,7 +1161,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; config-root dependency without executing the full driver boot sequence.
 global _ConfigDir := A_Temp . "\ergopti_test_config\"
 global _AhkSubDir := ""
-#Include ../infra/sqlite3.ahk
+#Include ../core/fs/engine/sqlite3.ahk
 #Include ../modules/keystats/keystats_walker.ahk
 #Include ../modules/keystats/keystats_app_categories.ahk
 #Include ../modules/keystats/keystats_reader.ahk
@@ -1297,9 +1297,9 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/reader/test_klr_ledger_read_refusal.ahk
 #Include unit/modules/keystats/test_keystats_journal_read_progress.ahk
 #Include unit/modules/keystats/reader/test_klr_sql_operational_retry.ahk
-#Include unit/adapters/sqlite/test_sqlite_read_dispatch.ahk
-#Include unit/adapters/sqlite/test_sqlite_exec_progress_cleanup.ahk
-#Include unit/adapters/sqlite/test_sqlite_module_owner.ahk
+#Include unit/core/fs/sqlite/test_read_dispatch.ahk
+#Include unit/core/fs/sqlite/test_exec_progress_cleanup.ahk
+#Include unit/core/fs/sqlite/test_module_owner.ahk
 #Include unit/modules/keystats/reader/test_klr_ledger_chunk_boundary.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_fixture.ahk
 #Include unit/modules/keystats/reader/test_klr_durable_cache.ahk
@@ -1329,8 +1329,8 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/reader/test_klr_projection_late_page_failure.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_publication_order.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_save_cadence.ahk
-#Include unit/adapters/sqlite/test_sqlite_readonly_clone.ahk
-#Include unit/adapters/sqlite/test_sqlite_clone_page_size.ahk
+#Include unit/core/fs/sqlite/test_readonly_clone.ahk
+#Include unit/core/fs/sqlite/test_clone_page_size.ahk
 #Include unit/modules/keystats/reader/test_klr_resident_refresh.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_encryption.ahk
 #Include unit/modules/keystats/reader/test_klr_newest_first_rebuild.ahk
@@ -1368,7 +1368,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/metrics/test_metrics_prefetch_orphans.ahk
 #Include unit/modules/keystats/reader/test_klr_cache_failed_refresh.ahk
 #Include unit/modules/keystats/reader/test_klr_category_order.ahk
-#Include unit/adapters/sqlite/test_sqlite_query_failure.ahk
+#Include unit/core/fs/sqlite/test_query_failure.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_encrypted_rebuild.ahk
 #Include unit/modules/keystats/test_keystats_app_category_projection.ahk
 #Include unit/modules/keystats/test_keystats_password_fail_closed.ahk
@@ -1536,7 +1536,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/llm/profiles/test_profile_delete_path.ahk
 #Include meta/modules/llm/navigation/test_nav_val_modifiers_wired.ahk
 #Include meta/modules/updater/test_updater_sync_winhttp_blocks.ahk
-#Include meta/adapters/sqlite/test_sqlite_progress_yield.ahk
+#Include meta/core/fs/test_sqlite_progress_yield.ahk
 #Include meta/modules/keystats/ergonomics/test_agg_app_day_llm_suggested.ahk
 #Include meta/modules/keystats/reader/test_reader_preserves_walker_aggregates.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstring_check_constraint_widened.ahk
@@ -2094,7 +2094,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/uia/test_disable_password_fields_gate.ahk
 #Include meta/modules/dynamic_hotstrings/test_menu_dynamic_hotstrings_category_gate.ahk
 #Include meta/ui/menu/test_menu_master_category_cache.ahk
-#Include unit/adapters/test_storage_st_delete_contract.ahk
+#Include unit/core/fs/test_storage_st_delete_contract.ahk
 #Include meta/infra/lifecycle/test_boot_dircreate_guarded.ahk
 #Include meta/infra/toml/test_toml_render_bool_sentinel.ahk
 #Include meta/modules/llm/menu/test_llm_menu_loaded_gate.ahk
@@ -2503,7 +2503,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/suite/test_suite_watchdog_manifest.ahk
 #Include meta/suite/test_suite_unique_includes.ahk
 
-#Include unit/adapters/test_file_read_activity.ahk
+#Include unit/core/fs/test_file_read_activity.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

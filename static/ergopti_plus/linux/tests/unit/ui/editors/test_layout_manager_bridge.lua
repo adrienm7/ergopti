@@ -310,7 +310,7 @@ local function read_empty_layout_json(path)
 	return value
 end
 
-local EmptyLayoutCorpus = read_empty_layout_json(require("infra.paths").shared("tests/corpus/menu/layout_empty_status.json"))
+local EmptyLayoutCorpus = read_empty_layout_json(require("core.fs.engine.paths").shared("tests/corpus/menu/layout_empty_status.json"))
 
 local function empty_layout_owner(binding)
 	for _, row in ipairs(binding.get_array(EmptyLayoutCorpus.section)) do
@@ -346,7 +346,7 @@ helpers.describe("the shared empty native-layout status", function()
 	for locale, expected in pairs(EmptyLayoutCorpus.captions) do
 		helpers.it("(layout-empty-status) renders the real empty provider in " .. locale, function()
 			with_empty_layout(function(build, state, binding)
-				local catalogue = read_empty_layout_json(require("infra.paths").shared("core/i18n/data/locales/" .. locale .. ".json"))
+				local catalogue = read_empty_layout_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. locale .. ".json"))
 				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
 				require("infra.i18n").get = function(key) return catalogue[key] or key end
 				local rows = build()

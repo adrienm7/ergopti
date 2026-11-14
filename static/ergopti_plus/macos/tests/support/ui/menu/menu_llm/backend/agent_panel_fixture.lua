@@ -133,7 +133,7 @@ local function mode_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus, err = require("adapters.json_codec").decode(raw)
+	local corpus, err = require("core.fs.adapters.json_codec").decode(raw)
 	helpers.assert_not_nil(corpus, tostring(err))
 	helpers.assert_eq(#corpus.modes, 3)
 	helpers.assert_eq(#corpus.states, 3)
@@ -145,7 +145,7 @@ local function system_model_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_system_model.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 return {

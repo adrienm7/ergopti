@@ -44,7 +44,7 @@ local Watchers    = require("platform.remap.watchers")
 local Registrar   = require("adapters.hotkey_registrar")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings     = require("infra.timings")
-local FileSystem  = require("adapters.file_system")
+local FileSystem  = require("core.fs.adapters.file_system")
 local Manifest    = require("infra.manifest_reader")
 local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
@@ -5716,7 +5716,7 @@ end
 			and M.capture_configured_navigation_inventory == ports.capture
 			and package.loaded["platform.remap.config"] == Config and getmetatable(Config) == nil
 			and Config.load_user_config == ports.config and Config.save_user_config == ports.save
-			and package.loaded["adapters.file_system"] == FileSystem and getmetatable(FileSystem) == nil
+			and package.loaded["core.fs.adapters.file_system"] == FileSystem and getmetatable(FileSystem) == nil
 			and FileSystem.read_with_status == ports.read and FileSystem.write_if_unchanged == ports.write
 			and package.loaded["platform.remap.nav_layer"] == NavLayer and getmetatable(NavLayer) == nil
 			and NavLayer.load == ports.load and NavLayer.capture_configured_inputs == ports.observe
@@ -7051,7 +7051,7 @@ function M._owned.reconcile()
 end
 
 --- Initializes the Karabiner bridge.
---- @param file_system table FileSystem port adapter (adapters/file_system.lua).
+--- @param file_system table FileSystem port adapter (core/fs/adapters/file_system.lua).
 ---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
 ---   module never hard-codes OS path logic outside the port boundary.
 --- @return boolean initialized True only after every required owner commits.

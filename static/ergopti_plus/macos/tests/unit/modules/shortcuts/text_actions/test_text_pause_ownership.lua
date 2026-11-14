@@ -31,7 +31,7 @@ local function fresh_fixture()
 		"adapters.event_provenance",
 		"core.events.timer_scheduler",
 		"infra.logger",
-		"infra.paths",
+		"core.fs.engine.paths",
 		"infra.timings",
 		"tests.stubs.hs",
 		"hs",
@@ -183,7 +183,7 @@ local function fresh_fixture()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.paths"] = { shared = function() return nil end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 	local subject = require("modules.shortcuts.actions.text")
 	local synthetic = require("adapters.synthetic_input")

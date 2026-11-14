@@ -45,8 +45,8 @@ local Parser = require("updater.engine.release_parser")
 local ReleaseInstall = require("updater.engine.release_install")
 local VersionOrder = require("updater.engine.version_core")
 local NetworkFailure = require("core.network.engine.failure")
-local Paths = require("infra.paths")
-local FileSystem = require("adapters.file_system")
+local Paths = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
 
 -- The owner and the repository come from the shared updater defaults, their
 -- single source (tools/test/test-repo-url-single-source.cjs). The loader is
@@ -180,7 +180,7 @@ end
 --- @return string|nil error
 load_sources = function()
 	if _sources then return _sources, nil end
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	local path = ok_paths and Paths.shared("updater/data/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
 	local raw, status = require("core.text.engine.toml_codec.writer").read_classified(path)

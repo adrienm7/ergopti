@@ -36,7 +36,7 @@
 
 local helpers = require("tests.helpers")
 
-local Paths = helpers.load_module("infra.paths")
+local Paths = helpers.load_module("core.fs.engine.paths")
 
 -- Which files of each shared page can carry a postMessage. Listed rather than
 -- discovered, and asserted non-empty below so a rename cannot silently empty

@@ -21,7 +21,7 @@ local Registry = helpers.load_with_stubs("modules.keymap.registry")
 --- registry module each time so module-level _state resets between calls.
 --- @return table state, table Registry The fresh state and module reference.
 local function fresh_registry()
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.keymap.registry"] = nil
 	package.loaded["modules.keymap.registry_groups"] = nil
 	package.loaded["modules.keymap.registry_index"] = nil

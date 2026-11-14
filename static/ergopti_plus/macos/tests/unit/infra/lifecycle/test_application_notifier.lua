@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("application notification captions", function()
 	helpers.it("composes application labels without changing the generic port (application-caption-policy)", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local fixture = assert(loadfile(Paths.shared("tests/fixtures/application_notification_titles.lua")))()
 		fixture.run(helpers.assert_eq, "macos", require("core.ui.engine.window_titles").compose, {
 			default = "ErgoptiPlus", named = "ErgoptiPlus — Bare label", decorated = "ErgoptiPlus — ⚠ Bare label",

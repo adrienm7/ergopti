@@ -109,7 +109,7 @@ end
 -- Direct injections and the timing reader's native path consumer form one fixture.
 local NATIVE_MODULES = {
 	"adapters.shell_runner", "core.events.timer_scheduler", "ui.healthcheck.report",
-	"infra.logger", "infra.timings", "infra.paths",
+	"infra.logger", "infra.timings", "core.fs.engine.paths",
 }
 
 --- Keeps the complete asynchronous fixture body under one restoration boundary.
@@ -483,10 +483,10 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 	end)
 
 	helpers.it("repeated report saves use the exclusive file owner without replacing the first", function()
-		local previous_fs = package.loaded["adapters.file_system"]
+		local previous_fs = package.loaded["core.fs.adapters.file_system"]
 		local previous_attributes = hs.fs.attributes
 		local files = {}
-		package.loaded["adapters.file_system"] = { create_if_absent = function(path, text)
+		package.loaded["core.fs.adapters.file_system"] = { create_if_absent = function(path, text)
 			if files[path] ~= nil then return false, "exists" end
 			files[path] = text
 			return true, "created"
@@ -506,7 +506,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 			local two = completed_action(Report, action, paths(), config, context, overrides, snapshot)
 			return one, two, files[one.path]
 		end)
-		package.loaded["adapters.file_system"] = previous_fs
+		package.loaded["core.fs.adapters.file_system"] = previous_fs
 		hs.fs.attributes = previous_attributes
 		helpers.assert_true(ok)
 		helpers.assert_eq(first.ok, true, tostring(first.error))
@@ -519,7 +519,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.it("skips a report name already occupied by a " .. kind, function()
 			local Report, _, overrides = load_report()
 			overrides.save = nil
-			local previous_fs, previous_attributes, previous_link = package.loaded["adapters.file_system"],
+			local previous_fs, previous_attributes, previous_link = package.loaded["core.fs.adapters.file_system"],
 				hs.fs.attributes, hs.fs.symlinkAttributes
 			local attempted = {}
 			hs.fs.attributes = function() return "directory" end
@@ -527,7 +527,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 				if path == LOGS .. "/diagnostics/" .. NAME then return { mode = kind } end
 				return nil
 			end
-			package.loaded["adapters.file_system"] = { create_if_absent = function(path)
+			package.loaded["core.fs.adapters.file_system"] = { create_if_absent = function(path)
 				attempted[#attempted + 1] = path
 				if path == LOGS .. "/diagnostics/" .. NAME then return false, "error" end
 				return true, "created"
@@ -538,7 +538,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 				return completed_action(Report, { action = "save", text = doc.text, name = doc.name }, paths(),
 					config, Report.redaction_context(overrides), overrides, snapshot)
 			end)
-			package.loaded["adapters.file_system"] = previous_fs
+			package.loaded["core.fs.adapters.file_system"] = previous_fs
 			hs.fs.attributes, hs.fs.symlinkAttributes = previous_attributes, previous_link
 			helpers.assert_true(ok)
 			helpers.assert_eq(result.ok, true)
@@ -746,10 +746,10 @@ helpers.describe("default attachment completion", function()
 			local doc = Share.document(snapshot, config.schema, "ignored")
 			local Report, calls, overrides = load_report()
 			overrides.save = nil
-			local previous_fs, previous_attributes = package.loaded["adapters.file_system"], hs.fs.attributes
+			local previous_fs, previous_attributes = package.loaded["core.fs.adapters.file_system"], hs.fs.attributes
 			local writes = 0
 			hs.fs.attributes = function() return "directory" end
-			package.loaded["adapters.file_system"] = { create_if_absent = function(_, text)
+			package.loaded["core.fs.adapters.file_system"] = { create_if_absent = function(_, text)
 				writes = writes + 1
 				assert(text == doc.text, "the complete approved text reaches the exclusive owner")
 				return admitted, admitted and "created" or "error", "refused"
@@ -762,7 +762,7 @@ helpers.describe("default attachment completion", function()
 				helpers.assert_eq(#calls.reveal, admitted and 1 or 0)
 				helpers.assert_eq(#calls.open_url, admitted and 1 or 0)
 			end, debug.traceback)
-			package.loaded["adapters.file_system"] = previous_fs
+			package.loaded["core.fs.adapters.file_system"] = previous_fs
 			hs.fs.attributes = previous_attributes
 			if not ok then error(err, 0) end
 		end

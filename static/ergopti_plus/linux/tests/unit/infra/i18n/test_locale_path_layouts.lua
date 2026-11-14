@@ -31,7 +31,7 @@ end
 --- The English label the lookups must return, read from the file itself.
 --- @return string
 local function english(key)
-	local Paths = helpers.load_module("infra.paths")
+	local Paths = helpers.load_module("core.fs.engine.paths")
 	local fh = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "r"))
 	local text = fh:read("*a")
 	fh:close()

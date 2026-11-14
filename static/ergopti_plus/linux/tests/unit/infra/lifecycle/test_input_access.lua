@@ -72,7 +72,7 @@ helpers.describe("input_access: telling the user", function()
 		local src = read("ergopti_hotstrings.lua")
 		helpers.assert_true(src:find("body_key = InputAccess.NO_DEVICE_BODY_KEY", 1, true) ~= nil,
 			"the absent-keyboard report must use the no-device body")
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local fh = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "r"))
 		local text = fh:read("*a")
 		fh:close()
@@ -86,7 +86,7 @@ helpers.describe("input_access: telling the user", function()
 		-- new user reads first.
 		local locales = { "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
 			"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		for _, code in ipairs(locales) do
 			local fh = assert(io.open(Paths.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 			local text = fh:read("*a")

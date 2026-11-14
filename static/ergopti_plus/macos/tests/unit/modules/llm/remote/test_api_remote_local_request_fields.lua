@@ -37,7 +37,7 @@ helpers.describe("api_remote.local_request_fields", function()
 
 	helpers.it("merges the request fields into the openai payload as literal JSON", function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
-		local JsonCodec = require("adapters.json_codec")
+		local JsonCodec = require("core.fs.adapters.json_codec")
 		local fields = api.PROVIDERS.omlx.request_fields
 		local payload = api.__build_payload_for_test("openai", "qwen3.5-4b", "s", "u", 0.3, 40, nil, fields)
 		helpers.assert_eq(payload.chat_template_kwargs.enable_thinking, false)

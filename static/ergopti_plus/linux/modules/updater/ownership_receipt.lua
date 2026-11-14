@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Fs = require("adapters.file_system")
+local Fs = require("core.fs.adapters.file_system")
 local Crypto = require("core.crypto.crypto")
 local NativePath = require("core.fs.engine.native_path")
 local MAX_SAFE_INTEGER = 2 ^ 53 - 1 -- Exact numeric range shared by LuaJIT metadata.

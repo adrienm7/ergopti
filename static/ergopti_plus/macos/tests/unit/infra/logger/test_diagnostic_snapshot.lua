@@ -21,7 +21,7 @@ local Logger   = require("infra.logger")
 helpers.admit_logger_privacy(Logger)
 local Snapshot = require("diagnostics.engine.snapshot")
 
-local Paths    = require("infra.paths")
+local Paths    = require("core.fs.engine.paths")
 
 --- The one production file containing `symbol`. Keyed by content, never by
 --- path, so the assertions survive a file move.

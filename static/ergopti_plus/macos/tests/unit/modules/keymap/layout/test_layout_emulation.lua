@@ -180,8 +180,8 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 	-- (ILM-002, cmd-chord-us-key).
 	helpers.it("finds a character's US key code for a source that lacks it (cmd-chord-us-key)", function()
 		local M = fixture({ emulated_layout = "ergopti", ergopti_base = true })
-		local table_of = require("core.text.engine.json").decode(assert(require("adapters.file_system").read(
-			require("infra.paths").shared("layouts/data/mac_keycodes.json"))))
+		local table_of = require("core.text.engine.json").decode(assert(require("core.fs.adapters.file_system").read(
+			require("core.fs.engine.paths").shared("layouts/data/mac_keycodes.json"))))
 		helpers.assert_eq(M.us_keycode("e", table_of), 14, "kVK_ANSI_E")
 		helpers.assert_eq(M.us_keycode("Z", table_of), 6, "kVK_ANSI_Z")
 		helpers.assert_eq(M.us_keycode("1", table_of), 18, "kVK_ANSI_1")

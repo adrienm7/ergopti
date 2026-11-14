@@ -82,7 +82,7 @@ local function with_fixture(scenario, source)
 			local Registry = require("modules.keymap.registry")
 			local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 			local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 
 			local state = State.new({ trigger_char = "\u{2605}", expansion_delay = 0.4 },
 				{ autocorrection = 0.3 })

@@ -5,7 +5,7 @@ local codec = require("core.text.engine.toml_codec")
 
 helpers.describe("sparse preference transactions", function()
 	helpers.it("saves a real neutral module snapshot without adding enabled overrides", function()
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system", "modules.keystats.kc_bridge" }, function()
+		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system", "modules.keystats.kc_bridge" }, function()
 			local source = '[future]\nkeep = 99\n'
 			package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 			local modules = {}
@@ -13,7 +13,7 @@ helpers.describe("sparse preference transactions", function()
 				shortcuts_mod = "shortcuts", gestures = "gestures", keystats = "keystats" }) do
 				modules[key] = helpers.load_with_stubs("modules." .. name)
 			end
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
 				write = function() error("publication must retain its source precondition") end,
 				write_if_unchanged = function(_, content, expected)
@@ -41,8 +41,8 @@ helpers.describe("sparse preference transactions", function()
 
 	helpers.it("does not reinterpret unknown gesture fields as live action assignments", function()
 		-- No action catalogue: this case is about field shape, not retirement.
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system", "modules.gestures.actions" }, function()
-			package.loaded["adapters.file_system"] = {
+		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system", "modules.gestures.actions" }, function()
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function()
 					return '[gestures]\ntap_2 = "copy"\nfuture = 17\n[gestures.expert]\nvalue = "keep"\n', "ok"
 				end,
@@ -56,10 +56,10 @@ helpers.describe("sparse preference transactions", function()
 	end)
 
 	helpers.it("deletes neutral leaves and preserves unknown nested data in one publication", function()
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
 			local source = "[gestures]\nenabled = true\nfuture = 17\n[gestures.expert]\nvalue = 'keep'\n"
 			local writes = 0
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
 				write = function() error("unguarded publication") end,
 				write_if_unchanged = function(_, content, expected)

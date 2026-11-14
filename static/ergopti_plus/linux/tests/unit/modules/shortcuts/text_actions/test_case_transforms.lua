@@ -146,7 +146,7 @@ local function with_caps_word_menu(body, shortcuts_enabled)
 end
 
 helpers.describe("CapsWord selection checkbox ownership", function()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_caps_word.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_caps_word.json")
 	local file = assert(io.open(path, "rb"))
 	local corpus = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
@@ -324,7 +324,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 	for _, vector in ipairs(corpus.platforms) do
 		helpers.it("keeps the existing " .. vector.platform .. " platform boundary (selection-caps-word)", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
-				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"),
 				logger = require("core.logger.engine.shim"),
 			}))
@@ -376,7 +376,7 @@ local function with_case_menu(body)
 end
 
 helpers.describe("shared selection case command ownership", function()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_case.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_selection_case.json")
 	local file = assert(io.open(path, "rb"))
 	local corpus = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
@@ -462,7 +462,7 @@ helpers.describe("shared selection case command ownership", function()
 	for _, vector in ipairs(corpus.platforms) do
 		helpers.it("keeps " .. vector.platform .. " selection command placement (selection-case-command)", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
-				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			local commands, getters = {}, {}
@@ -526,7 +526,7 @@ local function with_helper_menu(body)
 end
 
 helpers.describe("shared selection helper command ownership", function()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_helpers.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_selection_helpers.json")
 	local file = assert(io.open(path, "rb"))
 	local corpus = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
@@ -631,7 +631,7 @@ helpers.describe("shared selection helper command ownership", function()
 	for _, vector in ipairs(corpus.platforms) do
 		helpers.it("preserves " .. vector.platform .. " placement (selection-helper-command)", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
-				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			local commands, getters, calls = {}, {}, 0
@@ -716,7 +716,7 @@ helpers.describe("shared selection helper command ownership", function()
 		end
 		local isolated_ok, isolated_err = pcall(function()
 			with_helper_menu(function(_, item)
-				local paths, json = require("infra.paths"), require("core.text.engine.json")
+				local paths, json = require("core.fs.engine.paths"), require("core.text.engine.json")
 				local order_file = assert(io.open(paths.shared("core/i18n/data/locale_order.json"), "rb"))
 				local order = json.decode(order_file:read("*a")).order
 				order_file:close()
@@ -749,7 +749,7 @@ end)
 --- Reads the independent physical selection order before testing native providers.
 --- @return table Hand-authored boundary, caption and platform expectations.
 local function selection_boundary_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
 	local file = assert(io.open(path, "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
 	return assert(require("core.text.engine.json").decode(bytes))
@@ -853,7 +853,7 @@ helpers.describe("shared selection presentation boundaries", function()
 		local native_platform, count = platform, expected_count
 		helpers.it("keeps the truthful " .. native_platform .. " boundary projection without an action", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = native_platform,
-				manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			for _, section in ipairs(fragments) do

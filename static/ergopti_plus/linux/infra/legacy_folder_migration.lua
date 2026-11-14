@@ -27,7 +27,7 @@ local M = {}
 local AppDirs = require("core.fs.engine.app_dirs")
 local Core = require("settings.engine.migration.legacy_folder_migration_core")
 local NativePath = require("core.fs.engine.native_path")
-local NoReplaceMove = require("infra.no_replace_move")
+local NoReplaceMove = require("core.fs.engine.no_replace_move")
 -- The installer bundles luv; without it a folder is reported as unlistable
 -- (so nothing is merged, and no link can be mistaken for a second folder).
 local uv_loaded, uv = pcall(require, "luv")
@@ -130,7 +130,7 @@ local function follow_locators(report, storage, ports)
 	if #report.moved + #report.backed_up == 0 then return end
 	-- Loaded after the moves: its path is the default folder that now holds
 	-- the moved storage.json.
-	local store = storage or require("adapters.storage")
+	local store = storage or require("core.fs.adapters.storage")
 	for _, key in ipairs(require("infra.config_paths").LOCATOR_STORAGE_KEYS) do
 		local value = store.get(key, nil)
 		local target, entry = nil, nil
@@ -204,7 +204,7 @@ function M.run(options)
 	local ports = options.ports or M.native_ports()
 	local report = Core.apply(M.plan(config_paths), ports)
 	follow_locators(report, options.storage, ports)
-	rename_custom_logs(report, options.storage or require("adapters.storage"), ports)
+	rename_custom_logs(report, options.storage or require("core.fs.adapters.storage"), ports)
 	-- The updater sends a conditional request only when its cache folder exists
 	-- and never creates it from the event loop, so boot creates it here.
 	report.cache_ready = ports.make_dir(config_paths.cache())

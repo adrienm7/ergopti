@@ -15,7 +15,7 @@ local M = {}
 function M.register(helpers)
 	local Json = require("core.text.engine.json")
 	local Errors = require("diagnostics.engine.adapter_errors")
-	local file = assert(io.open(require("infra.paths").shared("core/logger/data/vocabulary.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("core/logger/data/vocabulary.json"), "rb"))
 	local vocabulary = assert(Json.decode(file:read("*a")))
 	file:close()
 	helpers.describe("adapter error taxonomy (adapter-errors)", function()

@@ -291,7 +291,7 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_eq(select(2, prefs.load(path)), "ok")
 		helpers.assert_true(f.keystats.set_options({ encrypt = false }))
 		c.key("fragment")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local read = files.read_with_status
 		files.read_with_status = function(name, ...)
 			if name ~= path then return read(name, ...) end

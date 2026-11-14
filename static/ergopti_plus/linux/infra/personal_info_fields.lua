@@ -28,8 +28,8 @@ local TableUtil = require("core.text.engine.table_util")
 local Logger = require("core.logger.engine.shim")
 local Reader = require("core.text.engine.toml_codec")
 local Mask   = require("hotstrings.engine.personal_info.mask")
-local Paths  = require("infra.paths")
-local FileReader = require("infra.regular_file_reader")
+local Paths  = require("core.fs.engine.paths")
+local FileReader = require("core.fs.engine.regular_file_reader")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "infra.personal_info_fields"

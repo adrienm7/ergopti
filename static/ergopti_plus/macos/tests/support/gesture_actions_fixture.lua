@@ -48,10 +48,10 @@ local OWNERS = {
 	-- infra.notifications names the launcher bundle id through this shared table.
 	"core.text.engine.identifiers",
 	"_generated.gesture_emit_actions",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.clipboard",
 	"adapters.hotkey_registrar",
-	"adapters.json_codec",
+	"core.fs.adapters.json_codec",
 	"adapters.key_state",
 	"adapters.synthetic_input",
 	"core.events.timer_scheduler",
@@ -61,7 +61,7 @@ local OWNERS = {
 	"infra.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
-	"infra.paths",
+	"core.fs.engine.paths",
 	"infra.startup_transaction",
 	"infra.termination_coordinator",
 	"infra.text_utils",
@@ -141,13 +141,13 @@ local function fresh_actions(options)
 		"modules.shortcuts.actions.system_mouse",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system_pixel",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"adapters.clipboard",
 		"adapters.key_state",
 		"adapters.synthetic_input",
 		"infra.termination_coordinator",
 		"infra.logger",
-		"infra.paths",
+		"core.fs.engine.paths",
 		"infra.config_paths",
 		"infra.timings",
 		"infra.i18n",
@@ -596,7 +596,7 @@ local function fresh_actions(options)
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- Only the send-input vocabulary is real: the send_* actions cannot parse
 		-- a value without it, and every other shared file stays missing.
 		read = function(path)
@@ -719,7 +719,7 @@ local function fresh_actions(options)
 		end,
 	}, { __index = function() return function() return true end end })
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
-	package.loaded["infra.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
+	package.loaded["core.fs.engine.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
 	-- The user's files the open_* actions name live in the configuration folder,
 	-- never in hs.configdir (the script folder, the bundle once installed).
 	local config_files = {

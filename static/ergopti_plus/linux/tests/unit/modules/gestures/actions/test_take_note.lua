@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Shell = require("adapters.shell_runner")
 local Paths = require("infra.config_paths")
-local Files = require("adapters.file_system")
+local Files = require("core.fs.adapters.file_system")
 
 --- Isolates only desktop association, notifications and application launch.
 --- @param body function Receives note path, recorded launches and notices.

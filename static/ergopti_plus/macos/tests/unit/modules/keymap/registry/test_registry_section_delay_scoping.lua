@@ -125,7 +125,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 	local function fixture(source, callback, expected_init_admission)
 		local owned = {}
 		for _, name in ipairs(OWNED_MODULES) do owned[#owned + 1] = name end
-		owned[#owned + 1] = "adapters.file_system"
+		owned[#owned + 1] = "core.fs.adapters.file_system"
 		return helpers.with_fresh_modules(owned, function()
 			local State = helpers.load_with_stubs("modules.keymap.state")
 			local reader = require("infra.toml.reader")
@@ -138,7 +138,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 				return reader.parse(path)
 			end }
 			local files, control = { overrides = source }, { writes = 0, refuse = false }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					helpers.assert_eq(path, "overrides")
 					return files[path], files[path] and "ok" or "absent"

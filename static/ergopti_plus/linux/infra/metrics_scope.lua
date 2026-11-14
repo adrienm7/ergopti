@@ -43,7 +43,7 @@ function M.new(options)
 	end
 	local transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"), manifest = Manifest,
+		files = options.files or require("core.fs.adapters.file_system"), manifest = Manifest,
 		capture = capture,
 		apply = function(config, updates)
 			local touched = {}

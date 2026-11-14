@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local Policy = require("ai.engine.local_servers.auth")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Reads the independent shared fixture without deriving its expected verdicts.
 --- @param relative string
@@ -71,9 +71,9 @@ helpers.describe("Actual local catalogue publication acknowledgement", function(
 		{ name = "unsupported optional authentication", source = '{"server_order":["independent"],"servers":{"independent":{"label":"Independent","base_url":"http://localhost:4321/v1","auth":"required"}}}', published = false },
 	}) do
 		helpers.it("(local-provider-publication) " .. vector.name, function()
-			helpers.with_stub_scope({ "modules.llm.local_servers", "infra.paths" }, function()
+			helpers.with_stub_scope({ "modules.llm.local_servers", "core.fs.engine.paths" }, function()
 				helpers.load_with_stubs("modules.llm.local_servers")
-				local owner_paths = require("infra.paths")
+				local owner_paths = require("core.fs.engine.paths")
 				local original = owner_paths.shared_llm_path
 				local path = os.tmpname()
 				local file = assert(io.open(path, "wb")); assert(file:write(vector.source)); assert(file:close())

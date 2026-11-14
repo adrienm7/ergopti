@@ -24,7 +24,7 @@ local function with_focus(mode, scenario)
 				records.errors[#records.errors + 1] = string.format(message, ...)
 			end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "/virtual" end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, callback)
 			if mode == "schedule throw" then error("private native error") end
 			if mode == "schedule refusal" then return false end

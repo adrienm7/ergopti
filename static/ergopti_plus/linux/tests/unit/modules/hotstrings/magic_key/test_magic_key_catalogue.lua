@@ -15,7 +15,7 @@ local function ends_with(value, suffix)
 end
 
 local function pack(name)
-	return require("infra.paths").shared("hotstrings/data/catalogue/" .. name)
+	return require("core.fs.engine.paths").shared("hotstrings/data/catalogue/" .. name)
 end
 
 helpers.describe("magic key: static catalogue ownership", function()

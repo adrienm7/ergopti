@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger",
+local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.logger",
 	"infra.toml.codec", "core.text.engine.toml_codec" }
 
 --- Loads one remap configuration source through the real codec.
@@ -28,7 +28,7 @@ local function load(source)
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		package.loaded["infra.logger"] = logger
 		config = helpers.load_with_stubs("platform.remap.config")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local old_read = files.read_with_status
 		local Text = require("tests.support.tap_hold_file_text")
 		local path = "sparse-remap-config.toml"
@@ -101,7 +101,7 @@ helpers.describe("Remap configuration sparse loading", function()
 		local source = '[_meta]\nschema_version = 1\n[tap_hold.keys]\nretired_key = "legacy"\n'
 			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
 		local config_source = '[mod_combos.config.retired_combo]\nhold = "ctrl"\n'
-		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system",
+		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system",
 			"infra.logger", "core.logger.engine.shim", "infra.toml.codec", "core.text.engine.toml_codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
@@ -110,7 +110,7 @@ helpers.describe("Remap configuration sparse loading", function()
 			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			require("settings.engine.migration.outdated").reset_for_tests()
 			local config = helpers.load_with_stubs("platform.remap.config")
-			local files = require("adapters.file_system")
+			local files = require("core.fs.adapters.file_system")
 			local old_read, old_write = files.read_with_status, files.write_if_unchanged
 			local written
 			local config_path = require("tests.support.tap_hold_file_text").config_path("karabiner.toml")
@@ -184,7 +184,7 @@ helpers.describe("Remap obsolete scalar leaves", function()
 	--- Karabiner model layout (written as its shared tap_hold.toml text,
 	--- `f.original`), or the raw bytes when `raw` is set.
 	local function with_file(original, body, raw)
-		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system",
+		helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system",
 			"infra.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
@@ -205,7 +205,7 @@ helpers.describe("Remap obsolete scalar leaves", function()
 			if not raw then original, original_config = Text.file(original) end
 			write(original)
 			Text.write_config(path, original_config)
-			local files = require("adapters.file_system")
+			local files = require("core.fs.adapters.file_system")
 			local native_read, native_write = files.read_with_status, files.write_if_unchanged
 			local controls = { writes = 0 }
 			files.write_if_unchanged = function(destination, content, expected)

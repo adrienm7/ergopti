@@ -21,12 +21,12 @@ local helpers = require("tests.helpers")
 --- @param body function body(cfg, world)
 local function with_config(body)
 	helpers.with_stub_scope({
-		"infra.logger", "infra.toml.reader", "infra.deferred_work", "adapters.file_system",
+		"infra.logger", "infra.toml.reader", "infra.deferred_work", "core.fs.adapters.file_system",
 		"modules.hotstrings.hotstrings_config",
 	}, function()
 		helpers.load_with_stubs("infra.logger")
 		local world = { parses = {}, scheduled = {} }
-		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		-- The module reads its shared defaults through the real reader at load
 		-- time; only the category files under /bundle/ are counted and faked
 		package.loaded["infra.toml.reader"] = nil

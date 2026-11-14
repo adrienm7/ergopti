@@ -208,7 +208,7 @@ end
 --- @param callback function Receives the real generator and mutable filesystem fixture.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.generator", "infra.logger", "adapters.file_system",
+		"platform.remap.generator", "infra.logger", "core.fs.adapters.file_system",
 		"infra.config_paths", "infra.keycodes",
 	}, function()
 		local fixture = {}
@@ -230,7 +230,7 @@ local function with_fixture(callback)
 		end
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path) return fixture.file_data[path] end,
 			read_with_status = function(path)
 				fixture.file_reads[#fixture.file_reads + 1] = path

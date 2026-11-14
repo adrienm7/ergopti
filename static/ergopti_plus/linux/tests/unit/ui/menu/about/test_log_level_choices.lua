@@ -14,7 +14,7 @@ local Json = require("core.text.engine.json")
 --- Reads expectations that are independent of the generated menu manifest.
 --- @return table corpus
 local function corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/log_level_rows.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/log_level_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(Json.decode(raw))
@@ -52,7 +52,7 @@ end
 --- @param receipt string Storage refusal mode.
 --- @return function setter, table observations
 local function native_owner(receipt)
-	local previous = { storage = package.loaded["adapters.storage"], logger = package.loaded["core.logger.engine.shim"],
+	local previous = { storage = package.loaded["core.fs.adapters.storage"], logger = package.loaded["core.logger.engine.shim"],
 		settings = package.loaded["infra.script_settings"] }
 	local observed = { selected = "INFO", durable = { ["script.log_level"] = "INFO", future = 42 }, rebuilds = 0 }
 	local source = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
@@ -75,14 +75,14 @@ local function native_owner(receipt)
 			return true
 		end,
 	}
-	package.loaded["adapters.storage"] = storage
+	package.loaded["core.fs.adapters.storage"] = storage
 	package.loaded["infra.script_settings"] = nil
 	local settings = require("infra.script_settings")
 	settings.apply("INFO")
 	local factory = assert(load("return function(ScriptSettings, Logger, rebuild_tray_menu) local LOG = 'menu'; return function(lvl)"
 		.. body .. "\nend end", "actual-daemon-log-level"))()
 	local callback = factory(settings, logger, function() observed.rebuilds = observed.rebuilds + 1 end)
-	for key, name in pairs({ storage = "adapters.storage", logger = "core.logger.engine.shim", settings = "infra.script_settings" }) do
+	for key, name in pairs({ storage = "core.fs.adapters.storage", logger = "core.logger.engine.shim", settings = "infra.script_settings" }) do
 		package.loaded[name] = previous[key]
 	end
 	return function(value)
@@ -211,7 +211,7 @@ local function debug_parent_fixture(body)
 	if not completed then error(failure, 0) end
 end
 
-local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
+local debug_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
 local debug_parent_raw = debug_parent_file:read("*a")
 debug_parent_file:close()
 require("tests.lua.debug_parent_contract").register(helpers, debug_parent_fixture,

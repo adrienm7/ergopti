@@ -17,8 +17,8 @@ local helpers = require("tests.helpers")
 --- @param body function fn(Backup, store, failures)
 local function with_store(store, body)
 	local failures = {}
-	helpers.with_fresh_modules({ "modules.updater.config_backup", "adapters.storage", "infra.config_paths" }, function()
-		package.loaded["adapters.storage"] = {
+	helpers.with_fresh_modules({ "modules.updater.config_backup", "core.fs.adapters.storage", "infra.config_paths" }, function()
+		package.loaded["core.fs.adapters.storage"] = {
 			read_exact = function(key)
 				if failures.read then return false, nil end
 				return true, store[key]

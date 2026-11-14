@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function install_temp_file_stub()
 	local next_id = 0
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			next_id = next_id + 1
 			return string.format("/private/tmp/pixel-refusal-%d", next_id)

@@ -145,8 +145,8 @@ local function with_extension_frame(body, paused)
 		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		local Hotstrings = require("ui.menu.menu_hotstrings")
@@ -227,7 +227,7 @@ helpers.describe("complete installed extension shared frames (macOS)", function(
 		end)
 	end)
 	helpers.it("(shared-extension-frame) restores genuine owners after a raised native-provider scenario", function()
-		local names = { "infra.i18n", "infra.manifest_menu", "infra.paths", "ui.menu.builder",
+		local names = { "infra.i18n", "infra.manifest_menu", "core.fs.engine.paths", "ui.menu.builder",
 			"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local previous_hs = rawget(_G, "hs")

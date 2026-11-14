@@ -37,7 +37,7 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 --- @param body function Receives (ConfigPaths, LoggerSink, storage values).
 local function with_paths(env, stored, body)
 	local real_getenv = os.getenv
-	local saved_storage = package.loaded["adapters.storage"]
+	local saved_storage = package.loaded["core.fs.adapters.storage"]
 	local saved_paths = package.loaded["infra.config_paths"]
 	local saved_sink = package.loaded["infra.logger_sink"]
 	local values = stored
@@ -45,7 +45,7 @@ local function with_paths(env, stored, body)
 		if env[name] ~= nil then return env[name] or nil end
 		return real_getenv(name)
 	end
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, fallback)
 			if values[key] == nil then return fallback end
 			return values[key]
@@ -59,7 +59,7 @@ local function with_paths(env, stored, body)
 		body(require("infra.config_paths"), require("infra.logger_sink"), values)
 	end)
 	os.getenv = real_getenv
-	package.loaded["adapters.storage"] = saved_storage
+	package.loaded["core.fs.adapters.storage"] = saved_storage
 	package.loaded["infra.config_paths"] = saved_paths
 	package.loaded["infra.logger_sink"] = saved_sink
 	if not ok then error(err, 0) end

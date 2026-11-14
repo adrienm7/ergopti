@@ -16,8 +16,8 @@
 --- ==============================================================================
 
 local TextUtils = require("core.text.engine.utils_core")
-local Paths     = require("infra.paths")
-local JsonCodec = require("adapters.json_codec")
+local Paths     = require("core.fs.engine.paths")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local M = {}
 
 -- The brand and emoji come from the file the three drivers and the model page

@@ -694,7 +694,7 @@ helpers.describe("llm-control-boundaries: actual live prompt owner", function()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
-					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
 				end

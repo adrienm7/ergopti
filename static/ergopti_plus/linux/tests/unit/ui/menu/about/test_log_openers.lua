@@ -22,8 +22,8 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local function with_openers(state, body)
 	local saved_sink = package.loaded["infra.logger_sink"]
 	local saved_openers = package.loaded["ui.log_openers"]
-	local saved_reader = package.loaded["infra.regular_file_reader"]
-	local reader = require("infra.regular_file_reader")
+	local saved_reader = package.loaded["core.fs.engine.regular_file_reader"]
+	local reader = require("core.fs.engine.regular_file_reader")
 	package.loaded["infra.logger_sink"] = {
 		log_dir = function() return "/fixture/logs/" .. FOLDER end,
 		main_log_path = function() return "/fixture/logs/" .. FOLDER .. "/unified-" .. state.day .. ".log" end,
@@ -31,7 +31,7 @@ local function with_openers(state, body)
 	}
 	package.loaded["ui.log_openers"] = nil
 	if not state.native then
-		package.loaded["infra.regular_file_reader"] = { ENOENT = reader.ENOENT, open = function(path)
+		package.loaded["core.fs.engine.regular_file_reader"] = { ENOENT = reader.ENOENT, open = function(path)
 			if state.existing[path] then
 				return { close = function()
 					if state.close_refuses then return nil, state.close_failure end
@@ -42,7 +42,7 @@ local function with_openers(state, body)
 		end }
 	end
 	local ok, err = pcall(function() body(require("ui.log_openers")) end)
-	package.loaded["infra.regular_file_reader"] = saved_reader
+	package.loaded["core.fs.engine.regular_file_reader"] = saved_reader
 	package.loaded["infra.logger_sink"] = saved_sink
 	package.loaded["ui.log_openers"] = saved_openers
 	if not ok then error(err, 0) end
@@ -177,7 +177,7 @@ helpers.describe("log-openers-read-receipts", function()
 	helpers.it("(log-openers-read-receipts) native ENOENT is the only error-free-day notice", function()
 		local path = os.tmpname()
 		os.remove(path)
-		local reader = require("infra.regular_file_reader")
+		local reader = require("core.fs.engine.regular_file_reader")
 		local stream, _, code = reader.open(path)
 		helpers.assert_eq(stream, nil)
 		helpers.assert_eq(code, reader.ENOENT, "the canonical absence code must match the real native receipt")

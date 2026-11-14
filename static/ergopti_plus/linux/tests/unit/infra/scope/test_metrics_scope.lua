@@ -201,7 +201,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 		local loaded = {}
 		for name, value in pairs(package.loaded) do loaded[name] = value end
 		local ok, err = pcall(function()
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("metrics scope must not write legacy storage") end,
 			}
@@ -235,7 +235,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 			local loaded = {}
 			for name, value in pairs(package.loaded) do loaded[name] = value end
 			local ok, err = pcall(function()
-				package.loaded["adapters.storage"] = {
+				package.loaded["core.fs.adapters.storage"] = {
 					get = function(_, default) return default end,
 					set = function() error("metrics scope must not write legacy storage") end,
 				}
@@ -244,7 +244,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 					local root = renderer.get_root()
 					local old_rows, old_top = root.metrics_menu, root.top_level
 					local execute = os.execute
-					local old_files = package.loaded["adapters.file_system"]
+					local old_files = package.loaded["core.fs.adapters.file_system"]
 					local backups, changed, questions, paused = {}, 0, 0, false
 					local mode = "recommended"
 					local key, id = "common.restore_recommended", "scope_restore"
@@ -260,7 +260,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 							if target ~= path then backups[#backups + 1] = target end
 						end
 						if scenario == "publication refusal" then controls.refuse = path end
-						package.loaded["adapters.file_system"] = controls.files
+						package.loaded["core.fs.adapters.file_system"] = controls.files
 						os.execute = function(command)
 							if command:find("dialog_host.lua", 1, true) then
 								questions = questions + 1
@@ -303,7 +303,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						end
 					end)
 					root.metrics_menu, root.top_level, os.execute = old_rows, old_top, execute
-					package.loaded["adapters.file_system"] = old_files
+					package.loaded["core.fs.adapters.file_system"] = old_files
 					for _, backup in ipairs(backups) do os.remove(backup) end
 					if not passed then error(detail, 0) end
 				end)

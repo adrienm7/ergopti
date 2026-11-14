@@ -74,7 +74,7 @@ end
 --- Loads the one canonical policy through the driver's native file owner.
 local function contract()
 	if not _contract then
-		local path = require("infra.paths").shared("core/network/data/managed_network.json")
+		local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
 		local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 		assert(status == "ok", "managed network policy read or close refused")
 		_contract = require("core.network.engine.failure").new(Json.decode(source))

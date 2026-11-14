@@ -18,13 +18,13 @@ local ApiMlxFetch    = require("modules.llm.api_mlx_fetch")   -- dispatch strate
 local ApiMlxDiscovery = require("modules.llm.api_mlx_discovery")  -- endpoint-route discovery + route/identifier cache
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
 local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
-local JsonCodec      = require("adapters.json_codec")
-local Storage        = require("adapters.storage")
+local JsonCodec      = require("core.fs.adapters.json_codec")
+local Storage        = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
 local StreamRetirement = require("modules.llm.mlx_stream_retirement")
-local Paths          = require("infra.paths")
+local Paths          = require("core.fs.engine.paths")
 local LOG            = "llm.api_mlx"
 
 -- MLX warmup timeout comes from the shared cross-driver registry ([llm]).

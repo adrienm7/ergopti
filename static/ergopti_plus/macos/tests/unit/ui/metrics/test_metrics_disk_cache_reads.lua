@@ -12,9 +12,9 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 helpers.describe("metrics disk cache reads", function()
 	helpers.it("(metrics-cache-read) rearms bounded diagnostics after a successful read", function()
-		helpers.with_fresh_modules({ "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 			local adapter = {}
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			with_window("ui.metrics_apps", function(dashboard)
 				local mode, warnings, pending = "read", 0, {}
 				adapter.read_with_status = function(_, report)
@@ -42,9 +42,9 @@ helpers.describe("metrics disk cache reads", function()
 	for _, mode in ipairs({ "absent", "inspect", "open", "read", "close", "path_changed",
 		"identity_changed", "dependency", "unreported_error", "decode_refused", "decode_throw", "success" }) do
 		helpers.it("(metrics-cache-read) executes fresh data after " .. mode, function()
-			helpers.with_fresh_modules({ "adapters.file_system", "modules.keystats.sqlite_reader" }, function()
+			helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader" }, function()
 				local adapter = {}
-				package.loaded["adapters.file_system"] = adapter
+				package.loaded["core.fs.adapters.file_system"] = adapter
 				package.loaded["modules.keystats.sqlite_reader"] = {}
 				with_window("ui.metrics_apps", function(dashboard)
 					local pending, warnings, reads = {}, {}, 0

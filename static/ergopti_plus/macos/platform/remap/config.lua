@@ -34,12 +34,12 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local Layout = require("modules.keymap.layout")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local i18n   = require("infra.i18n")
 local KeyNames = require("platform.input.keycodes.key_names")
 local StickyLabel = require("shortcuts.engine.actions.sticky_label")
-local FileSystem = require("adapters.file_system")
-local JsonCodec  = require("adapters.json_codec")
+local FileSystem = require("core.fs.adapters.file_system")
+local JsonCodec  = require("core.fs.adapters.json_codec")
 
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")

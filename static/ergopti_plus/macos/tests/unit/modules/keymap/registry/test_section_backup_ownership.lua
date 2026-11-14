@@ -6,10 +6,10 @@ local Fixture = require("tests.support.modules.keymap.registry.registry_mutation
 local function scenario(collision)
 	local _, registry = Fixture.fresh_registry()
 	registry.register_lua_group("owned", "Owned", { { name = "section" } })
-	local storage = require("adapters.storage")
+	local storage = require("core.fs.adapters.storage")
 	local key = registry.section_setting_key("owned", "section")
 	helpers.assert_true(storage.set(key, false))
-	local original_files = package.loaded["adapters.file_system"]
+	local original_files = package.loaded["core.fs.adapters.file_system"]
 	local entries, writes, deletes, backup_path = {}, 0, 0, nil
 	local files = {}
 	function files.read_with_status(path)
@@ -33,7 +33,7 @@ local function scenario(collision)
 		entries[path] = nil
 		return true
 	end
-	package.loaded["adapters.file_system"] = files
+	package.loaded["core.fs.adapters.file_system"] = files
 	local original_release = storage.release_owned
 	storage.release_owned = function(...)
 		if not collision and backup_path and entries[backup_path] then
@@ -52,7 +52,7 @@ local function scenario(collision)
 		helpers.assert_eq(registry.is_section_enabled("owned", "section"), not collision)
 	end, debug.traceback)
 	storage.release_owned = original_release
-	package.loaded["adapters.file_system"] = original_files
+	package.loaded["core.fs.adapters.file_system"] = original_files
 	if not ok then error(err, 0) end
 end
 

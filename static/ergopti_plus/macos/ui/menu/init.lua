@@ -36,7 +36,7 @@ local MenuState     = require("ui.menu.menu_state")
 local WrapMutation  = require("menu.engine.wrap_mutation")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
-local Storage       = require("adapters.storage")
+local Storage       = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
@@ -1249,7 +1249,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if read_only_reason ~= nil or type(gestures) ~= "table" then return nil end
 		if not gesture_scope then
 			gesture_scope = require("ui.menu.gesture_scope").new({
-				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 				state = state, gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
 				demotions = session_demotions,
 				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
@@ -1293,7 +1293,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if not script_scope then
 				local script_backup
 				script_scope = require("infra.script_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
@@ -1317,7 +1317,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return nil end
 			if not shortcuts_scope then
 				shortcuts_scope = require("ui.menu.shortcuts_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, shortcuts = core_mods.shortcuts_mod, gestures = gestures,
 					bindings = require("modules.shortcuts.bindings"),
@@ -1343,7 +1343,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return nil end
 			if not llm_scope then
 				llm_scope = require("ui.menu.llm_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, runtime = llm_handler.scope_runtime, profiles = llm_handler.scope_profiles,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
@@ -1360,7 +1360,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil then return nil end
 			if not metrics_scope then
 				metrics_scope = require("ui.menu.metrics_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, core = core_mods.keystats,
 					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
@@ -1383,7 +1383,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil or type(keymap) ~= "table" then return nil end
 			if not hotstrings_scope then
 				local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
-				local FileSystem = require("adapters.file_system")
+				local FileSystem = require("core.fs.adapters.file_system")
 				local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 				hotstrings_scope = require("ui.menu.hotstrings_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = FileSystem,
@@ -1420,7 +1420,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if read_only_reason ~= nil then return nil end
 		if not layout_scope then
 			layout_scope = require("ui.menu.scoped_preferences").new({
-				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 				runtime = {
 					capture = function(_, source) return menu_mods.keyboard_layout.capture_scope(state, source) end,
@@ -1593,7 +1593,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	})
 	local program_parameter_owner = ProgramParameterTransaction.new({
 		gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
-		path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+		path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 		admission = run_global_exclusive, paused = live_pause, save_prefs = transactional_save_prefs,
 		current_path = function() return MenuPaths.get("ConfigTomlPath") end,
 		capture_checkpoint_candidate = function()

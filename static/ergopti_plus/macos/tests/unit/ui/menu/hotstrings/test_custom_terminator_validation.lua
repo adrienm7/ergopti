@@ -66,8 +66,8 @@ local function run_action(mode, outcome, language)
 
 	-- The actual command affix reader requires real translated prefix data.
 	-- Other old literal fixture captions remain unchanged.
-	local Paths = require("infra.paths")
-	local JsonCodec = require("adapters.json_codec")
+	local Paths = require("core.fs.engine.paths")
+	local JsonCodec = require("core.fs.adapters.json_codec")
 	local Locale = assert(loadfile(Paths.shared("core/i18n/engine/core.lua")))()
 	Locale.init({ json_decode = JsonCodec.decode,
 		resolve_locale_path = function(code) return Paths.shared("core/i18n/data/locales/" .. code .. ".json") end })

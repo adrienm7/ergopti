@@ -15,13 +15,13 @@ local SETTINGS = { "settings", "trigger_settings", "display_settings", "navigati
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.llm_preferences", "adapters.storage" }
+		local names = { "infra.config_paths", "infra.llm_preferences", "core.fs.adapters.storage" }
 		for _, name in ipairs(SETTINGS) do names[#names + 1] = "modules.llm." .. name end
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["llm.generation.temperature"] = 0.2, ["llm.trigger.debounce_ms"] = 300,
 				["llm.display.show_info_bar"] = true,
 			} })
@@ -645,7 +645,7 @@ end)
 
 helpers.describe("Linux actual preference schema drift and runtime reload", function()
 	local Migration = require("settings.engine.migration.migrate")
-	local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
+	local registry = assert(Migration.load_registry(require("core.fs.engine.paths").shared(Migration.REGISTRY_PATH)))
 	local function current(enabled)
 		return '# retain every foreign byte\n[_meta]\nschema_version = ' .. registry.current
 			.. '\n[llm]\nenabled = ' .. tostring(enabled)
@@ -700,7 +700,7 @@ end)
 helpers.describe("Linux AI runtime source admission", function()
 	helpers.it("a genuine newer-schema boot refuses ordinary runtime admission (ai-readonly-admission)", function()
 		local Migration = require("settings.engine.migration.migrate")
-		local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
+		local registry = assert(Migration.load_registry(require("core.fs.engine.paths").shared(Migration.REGISTRY_PATH)))
 		local source = '[_meta]\nschema_version = ' .. (registry.current + 1)
 			.. '\n[llm]\nenabled = false\n[private]\nkeep = "exact"\n'
 		with_config(source, function(path)

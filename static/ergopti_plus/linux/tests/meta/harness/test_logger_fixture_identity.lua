@@ -22,7 +22,7 @@ helpers.describe("instrumentation fixture logger ownership", function()
 	end)
 
 	for _, scenario in ipairs({
-		{ module = "tests.unit.infra.test_perf_counters", owned = { "infra.perf_counters", "infra.paths", "core.text.engine.toml_codec.reader" } },
+		{ module = "tests.unit.infra.test_perf_counters", owned = { "infra.perf_counters", "core.fs.engine.paths", "core.text.engine.toml_codec.reader" } },
 		{ module = "tests.unit.infra.test_phase_stats", owned = {
 			"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
 			"infra.perf_counters", "core.text.engine.toml_codec.reader",

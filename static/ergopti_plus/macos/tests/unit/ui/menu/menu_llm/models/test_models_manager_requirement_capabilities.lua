@@ -7,7 +7,7 @@ local MODULES = {
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"infra.dialog_util",
 	"infra.i18n",
-	"infra.paths",
+	"core.fs.engine.paths",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager_mlx",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -79,7 +79,7 @@ local function with_fixture(callback)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared_llm_path = function() return "/fixture/models.json" end,
 		}
 		package.loaded["modules.llm"] = {
