@@ -428,7 +428,7 @@ end
 		local mb = helpers.load_module("ui.menu.builder")
 		local ctx = { _version = "test", on_quit = function() end, updater = fake }
 		for key, value in pairs(ctx_extra) do ctx[key] = value end
-		local title = require("infra.i18n").get("menu.about.title")
+		local title = require("core.i18n.engine.i18n").get("menu.about.title")
 		local ok, items = pcall(mb.build, ctx)
 		Installation.is_source_run = real_is_source_run
 		if not ok then error(items, 0) end
@@ -485,7 +485,7 @@ end
 		fake.install_update = function(path) installed_from = path; return true end
 		local finished = nil
 		local rows = updates_rows(fake, { on_update_finished = function(...) finished = { ... } end })
-		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", release.tag)
+		local label = require("core.i18n.engine.i18n").get("menu.about.update_now"):gsub("{tag}", release.tag)
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -509,7 +509,7 @@ end
 		end
 		fake.install_update = function() error("nothing to install") end
 		local rows = updates_rows(fake, { on_update_finished = function() end })
-		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", shown.tag)
+		local label = require("core.i18n.engine.i18n").get("menu.about.update_now"):gsub("{tag}", shown.tag)
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -525,7 +525,7 @@ end
 		fake.download_update = function() error("a source run must download nothing") end
 		fake.install_update = function() error("a source run must install nothing") end
 		local rows = updates_rows(fake, { on_update_finished = function() end }, true)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local plain = i18n.get("menu.about.update_now"):gsub("{tag}", release.tag)
 		-- The head of the reason, cut as the renderers cut it: before its first
 		-- colon, ASCII or full-width.
@@ -553,7 +553,7 @@ end
 		fake.install_update = function() error("nothing to install") end
 		local finished = nil
 		local rows = updates_rows(fake, { on_update_finished = function(...) finished = { ... } end })
-		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", "v0.0.0-dev.134")
+		local label = require("core.i18n.engine.i18n").get("menu.about.update_now"):gsub("{tag}", "v0.0.0-dev.134")
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end

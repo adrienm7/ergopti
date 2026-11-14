@@ -197,7 +197,7 @@ end
 
 --- Tells the user that Ergopti closed their Karabiner and when it comes back.
 local function announce_closed()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
 end
 
@@ -215,7 +215,7 @@ function M.block_notice(notify)
 	return function(state, reason)
 		if shown or (state ~= "unavailable" and state ~= "failed") or not blocks[reason] then return end
 		shown = true
-		notify(require("infra.i18n").get("notify.karabiner.owned_blocked"))
+		notify(require("core.i18n.engine.i18n").get("notify.karabiner.owned_blocked"))
 	end
 end
 

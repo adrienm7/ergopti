@@ -119,7 +119,7 @@ World.record("FACT", "pointer_taps=" .. pointer_taps)
 if ACTION == "restore_recommended" then
 	-- The user's click on Configuration › « Restore recommended values », the
 	-- row that restores every category at once.
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local path = { i18n.get("menu.configuration.title"), i18n.get("common.restore_recommended") }
 	local row = World.find_row(World.menu_items(), path)
 	if type(row) ~= "table" or type(row.fn) ~= "function" then
@@ -131,7 +131,7 @@ if ACTION == "restore_recommended" then
 	end
 elseif ACTION == "select_layout_natively" then
 	-- A real menu click must leave ABC even when setLayout declines the name.
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local path = { i18n.get("menu.layout.title"), "French" }
 	local row = World.find_row(World.menu_items(), path)
 	if type(row) ~= "table" or type(row.fn) ~= "function" or row.disabled then

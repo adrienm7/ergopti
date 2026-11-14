@@ -21,7 +21,7 @@ local function fresh_screenshot()
 		"modules.shortcuts.actions.screen_capture_flow",
 		"infra.logger",
 		"infra.notifications",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
 	local fixture = {
@@ -146,7 +146,7 @@ local function fresh_screenshot()
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			return key

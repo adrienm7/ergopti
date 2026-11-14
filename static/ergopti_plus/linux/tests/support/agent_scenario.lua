@@ -307,7 +307,7 @@ end
 --- @param args table|nil
 --- @return string
 function M.text(key, args)
-	local template = require("infra.i18n").get(key)
+	local template = require("core.i18n.engine.i18n").get(key)
 	return (template:gsub("{(%d+)}", function(index) return tostring((args or {})[tonumber(index)]) end))
 end
 

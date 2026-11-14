@@ -140,7 +140,7 @@ local function start_real_keystats()
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
-	package.loaded["infra.i18n"] = { t = function(key) return key end, get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { t = function(key) return key end, get = function(key) return key end }
 	package.loaded["infra.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function(_section, _key) return 1.0 end,

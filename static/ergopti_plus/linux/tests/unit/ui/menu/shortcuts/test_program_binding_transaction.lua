@@ -199,7 +199,7 @@ local function with_configuration_picker(body)
 			local slot = assert(find(rows, function(row)
 				return type(row.title) == "string" and row.title:sub(1, #prefix) == prefix
 			end), "the actual keyboard slot is rendered")
-			local title = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local title = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 			local command = assert(find(slot.menu, function(row) return row.title == title and type(row.fn) == "function" end))
 			command.fn()
 			assert(bridge.is_open() and f.host.is_visible("action_picker"), "the real picker session is open")
@@ -282,7 +282,7 @@ helpers.describe("Linux program picker transaction", function()
 				return true
 			end }
 			local rows = menu_rows(gestures, path)
-			local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 			local function open_current(tree)
 				for _, row in ipairs(tree) do
 					if row.title == picker_label and type(row.fn) == "function" then row.fn() end
@@ -387,7 +387,7 @@ helpers.describe("Linux program picker transaction", function()
 					return true
 				end }
 				local rows = menu_rows(gestures, path)
-				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 				local function open_current(tree)
 					for _, row in ipairs(tree) do
 						if row.title == picker_label and type(row.fn) == "function" then row.fn() end
@@ -647,7 +647,7 @@ local function parameterized_confirmation(gestures, path)
 		return true
 	end }
 	local rows = menu_rows(gestures, path)
-	local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+	local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 	local function visit(tree)
 		for _, row in ipairs(tree) do
 			if row.title == picker_label and type(row.fn) == "function" then row.fn() end
@@ -787,7 +787,7 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 		helpers.it("(tap-key-magic-override) " .. case.why, function()
 			with_case(CASES[3], function(_, gestures, _, controls, path)
 				local Source, file = magic_source('[hotstrings]\nmagic_key_source = "' .. case.source .. '"\n')
-				local reason = " — " .. require("infra.i18n").get(Source.TAP_OVERRIDE_REASON)
+				local reason = " — " .. require("core.i18n.engine.i18n").get(Source.TAP_OVERRIDE_REASON)
 				helpers.assert_true(reason ~= " — " .. Source.TAP_OVERRIDE_REASON, "the reason is translated")
 				local selected
 				package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
@@ -801,7 +801,7 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 					if title:sub(-#reason) == reason then marked[#marked + 1] = title end
 				end
 				helpers.assert_eq(#marked, case.marked, table.concat(marked, " | "))
-				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 				local function open_current(tree)
 					for _, row in ipairs(tree) do
 						if row.title == picker_label and type(row.fn) == "function" then row.fn() end

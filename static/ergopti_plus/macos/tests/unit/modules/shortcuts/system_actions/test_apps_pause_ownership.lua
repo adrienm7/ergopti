@@ -33,7 +33,7 @@ local function fresh_apps()
 		"adapters.clipboard",
 		"infra.logger",
 		"infra.notifications",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.text_utils",
 		"tests.stubs.hs",
 		"hs",
@@ -298,7 +298,7 @@ local function fresh_apps()
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = {
 		applescript_format = function(template, value)
 			return (template:gsub("%%s", value))

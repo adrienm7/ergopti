@@ -415,7 +415,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 			.. '"\n[llm.profiles]\nactive = "' .. (options.active or "basic") .. '"\nauto_profile_for_model = false\n'
 		with_config(initial, function(settings, path)
 			with_idle_live_owner(settings, function(live_owner)
-				local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.builder", "ui.prompt_editor.bridge" }
+				local names = { "infra.manifest_menu", "core.i18n.engine.i18n", "ui.menu.builder", "ui.prompt_editor.bridge" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = xpcall(function()
 					local document = read("menu/data/menu_manifest.json")
@@ -425,11 +425,11 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 							return header_captions[key]
 						end
 						return key
-					end }, { __index = require("infra.i18n") })
+					end }, { __index = require("core.i18n.engine.i18n") })
 					-- The headings are section headers, read through section, which
 					-- frames whatever get currently answers, like the native one.
 					i18n.section = function(key) return i18n.decorate_section(i18n.get(key)) end
-					package.loaded["infra.i18n"] = i18n
+					package.loaded["core.i18n.engine.i18n"] = i18n
 					package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
 						platform = "linux", manifest_path = function() return shared("menu/data/menu_manifest.json") end,
 						json_decode = function() return document end, i18n = i18n, logger = require("core.logger.engine.shim"),

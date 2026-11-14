@@ -20,7 +20,7 @@ local function with_fixture(collision, body)
 		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
 		"infra.personal_hotstrings",
-		"infra.i18n", "infra.manifest_menu", "infra.locale", "core.i18n.engine.core",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "core.i18n.engine.locale", "core.i18n.engine.core",
 	}, function()
 		-- These fixtures own registered sources, not the boot scanner catalogue.
 		-- Keep only its empty diagnostics port scoped; the real registry and
@@ -111,10 +111,10 @@ local function with_fixture(collision, body)
 		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
 		-- Only the two newly declared affixes need a physical translated source.
 		-- Keep every existing identity-caption assertion on its original test port.
-		local NativeLocale = require("infra.locale")
+		local NativeLocale = require("core.i18n.engine.locale")
 		NativeLocale.set_locale("en")
 		assert(NativeLocale.current_locale() == "en")
-		local CaptionPort, PreviousGet = require("infra.i18n")
+		local CaptionPort, PreviousGet = require("core.i18n.engine.i18n")
 		PreviousGet = CaptionPort.get
 		CaptionPort.get = function(key)
 			if key == "menu.hotstrings.default_category_prefix" or key == "menu.hotstrings.shortcut_prefix" then
@@ -367,7 +367,7 @@ end)
 helpers.describe("personal directory hand corpus drives the genuine native separator policy", function()
 	helpers.it("replays every directory vector including explicit separate_files=false", function()
 		local saved_hs = rawget(_G, "hs")
-		local saved_i18n = rawget(package.loaded, "infra.i18n")
+		local saved_i18n = rawget(package.loaded, "core.i18n.engine.i18n")
 		local saved_get = type(saved_i18n) == "table" and rawget(saved_i18n, "get") or nil
 		local saved_renderer = rawget(package.loaded, "infra.manifest_menu")
 		local fixture_root
@@ -413,7 +413,7 @@ helpers.describe("personal directory hand corpus drives the genuine native separ
 		end)
 		end, debug.traceback)
 		helpers.assert_true(rawequal(rawget(_G, "hs"), saved_hs), "the genuine fixture restores the raw native global")
-		helpers.assert_true(rawequal(rawget(package.loaded, "infra.i18n"), saved_i18n), "the genuine caption module identity is restored")
+		helpers.assert_true(rawequal(rawget(package.loaded, "core.i18n.engine.i18n"), saved_i18n), "the genuine caption module identity is restored")
 		if saved_i18n then helpers.assert_true(rawequal(rawget(saved_i18n, "get"), saved_get)) end
 		helpers.assert_true(rawequal(rawget(package.loaded, "infra.manifest_menu"), saved_renderer))
 		if fixture_root then

@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 local names = {
 	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
-	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
+	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
 	"core.fs.engine.paths", "menu.engine.renderer", "infra.phase_stats",
 }

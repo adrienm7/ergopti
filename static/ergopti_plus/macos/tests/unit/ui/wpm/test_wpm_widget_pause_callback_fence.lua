@@ -16,7 +16,7 @@ local FIXTURE_MODULES = {
 	"modules.keystats",
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.keycodes",
 	"core.fs.engine.paths",
 	"core.fs.adapters.storage",
@@ -108,7 +108,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = { notify = function() end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.keycodes"] = {
 				F13_KARABINER_RETURN = 106,
 				F14_KARABINER_BACKSPACE = 107,

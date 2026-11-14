@@ -26,7 +26,7 @@ local OWNED_MODULES = {
 	"platform.remap.onboarding",
 	"platform.remap",
 	"infra.logger",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.notifications",
 	"infra.text_utils",
 	"platform.remap.ke_paths",

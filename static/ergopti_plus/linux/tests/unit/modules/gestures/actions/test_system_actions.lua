@@ -368,7 +368,7 @@ helpers.describe("Linux system actions", function()
 	end)
 
 	helpers.it("file-manager folder refusals say why and run nothing (system-actions)", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local SystemActions = require("modules.gestures.system_actions")
 		for reason, key in pairs(SystemActions.FOLDER_REFUSALS) do
 			for _, action in ipairs({ "open_terminal_here", "new_text_file_here" }) do
@@ -407,7 +407,7 @@ helpers.describe("Linux system actions", function()
 				Gestures.execute_action("new_text_file_here", "tap_3")
 			end)
 		end)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_eq(levels, {
 			{ message = i18n.get("user_actions.terminal_unavailable"), level = "error" },
 			{ message = i18n.get("system_actions.new_text_file_failed"), level = "error" },
@@ -419,7 +419,7 @@ helpers.describe("Linux system actions", function()
 		os.remove(dir)
 		local made = os.execute("mkdir '" .. dir .. "'")
 		helpers.assert_true(made == true or made == 0)
-		local base = require("infra.i18n").get("system_actions.new_text_file_name")
+		local base = require("core.i18n.engine.i18n").get("system_actions.new_text_file_name")
 		local taken = assert(io.open(dir .. "/" .. base .. ".txt", "w"))
 		taken:write("kept")
 		taken:close()

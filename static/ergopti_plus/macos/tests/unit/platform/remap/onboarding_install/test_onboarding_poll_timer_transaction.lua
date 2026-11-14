@@ -33,7 +33,7 @@ local MODULE_NAMES = {
 	"core.events.timer_scheduler",
 	"hs",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"infra.text_utils",
@@ -89,7 +89,7 @@ local function with_fixture(scenario)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "karabiner.onboarding.btn_open_settings" end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.notifications"] = {
 		notify = function(message, _, kind)

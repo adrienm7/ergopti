@@ -582,7 +582,7 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: the Configuration submenu offers and dispatches the row", function()
 			local fired = 0
 			local builder = helpers.load_with_stubs("ui.menu.builder")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			i18n.get = function(key) return key end
 			i18n.build_language_menu_items = function() return {} end
 			local noop = function() end

@@ -87,7 +87,7 @@ helpers.describe("the tray root is a table hs.menubar can draw", function()
 
 	helpers.it("every row it returns carries a title, at every depth", function()
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -106,7 +106,7 @@ helpers.describe("the tray root is a table hs.menubar can draw", function()
 
 	helpers.it("no row is left holding both dialects at once", function()
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -138,15 +138,15 @@ end)
 
 -- Complete Language parent: the actual locale owner, canonical child and selected parent.
 local function language_parent_fixture(language, scenario)
-	return helpers.with_stub_scope({ "ui.menu.builder", "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }, function()
+	return helpers.with_stub_scope({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }, function()
 		helpers.load_with_stubs("ui.menu.builder")
 		-- The generic helper deliberately installs an i18n stub; this cohort owns the real reader.
 		rawset(package.loaded, "ui.menu.builder", nil)
-		rawset(package.loaded, "infra.i18n", nil)
+		rawset(package.loaded, "core.i18n.engine.i18n", nil)
 		rawset(package.loaded, "infra.manifest_menu", nil)
-		local native = require("infra.i18n")
+		local native = require("core.i18n.engine.i18n")
 		native.init()
-		native.set_locale_injector(require("infra.locale").set_locale)
+		native.set_locale_injector(require("core.i18n.engine.locale").set_locale)
 		native.set_locale_no_reload(language)
 		local renderer = require("infra.manifest_menu")
 		local path = require("core.fs.engine.paths").shared("tests/corpus/menus/language_parent.json")

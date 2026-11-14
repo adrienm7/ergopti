@@ -46,8 +46,8 @@ local Catalogue = require("_generated.action_catalogue")
 -- The harness injects an i18n stub that echoes keys, and the actions module
 -- captured that very table when it loaded. The locale test below points the
 -- same table at the real shared locale core for its duration.
-local i18n = package.loaded["infra.i18n"]
-local Locale = require("infra.locale")
+local i18n = package.loaded["core.i18n.engine.i18n"]
+local Locale = require("core.i18n.engine.locale")
 
 --- Builds a set from a list.
 --- @param list table

@@ -136,7 +136,7 @@ local function build_tray(observe_layout, catalogue)
 	package.loaded["infra.logger"] = spy
 
 	helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	CaptionFixture.install(i18n)
 	LayoutFixture.install(i18n)
 	package.loaded["ui.menu.builder"] = nil
@@ -327,14 +327,14 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_eq(found[1].depth, 2, "the config folder row belongs to the Configuration "
 			.. "submenu, not " .. found[1].where)
 		helpers.assert_true(found[1].where:find("menu.configuration.title", 1, true) ~= nil
-			or found[1].where:find(require("infra.i18n").get("menu.configuration.title"), 1, true) ~= nil,
+			or found[1].where:find(require("core.i18n.engine.i18n").get("menu.configuration.title"), 1, true) ~= nil,
 			"the config folder row must sit under Configuration, not " .. found[1].where)
 	end)
 
 	helpers.it("no clickable row is duplicated across two top-level submenus", function()
 		-- Restore and clear read one shared label in every section on purpose:
 		-- each row acts on its own section, and one wording is the decision.
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local shared_labels = {
 			[i18n.get("common.restore_recommended")] = true,
 			[i18n.get("common.clear_to_system")] = true,
@@ -362,7 +362,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	--- @param key string i18n key of the top-level row.
 	--- @return table|nil
 	local function top_submenu(key)
-		local text = require("infra.i18n").get(key)
+		local text = require("core.i18n.engine.i18n").get(key)
 		for _, row in ipairs(MENU or {}) do
 			if type(row.title) == "string" and row.title:sub(1, #text) == text then return row.menu end
 		end
@@ -381,7 +381,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_true(at ~= nil, "the French language pack row must be drawn")
 		helpers.assert_eq(rows[at].title:sub(1, #"🇫🇷 Français"), "🇫🇷 Français",
 			"the language row starts with the locale's flag, from the shared locale table")
-		helpers.assert_eq(rows[at - 1].title, require("infra.i18n").section("menu.hotstrings.header_languages"),
+		helpers.assert_eq(rows[at - 1].title, require("core.i18n.engine.i18n").section("menu.hotstrings.header_languages"),
 			"a « Hotstrings par langue » header must precede the language rows")
 		helpers.assert_eq(rows[at - 2].title, "-", "and a separator must precede that header")
 	end)
@@ -389,7 +389,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	helpers.it("configuration: the rows that rewrite the file come before the windows", function()
 		local rows = top_submenu("menu.configuration.title")
 		helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local drawn = {}
 		for index, row in ipairs(rows) do drawn[index] = row.title end
 		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
@@ -412,7 +412,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	helpers.it("about: Uninstall closes the submenu, after a separator", function()
 		local rows = top_submenu("menu.about.title")
 		helpers.assert_true(type(rows) == "table" and #rows >= 2, "the tray must carry the About submenu")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local source_run = require("modules.updater").is_local_source()
 		local label = i18n.get("menu.global.uninstall")
 		if source_run then

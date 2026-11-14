@@ -384,7 +384,7 @@ end)
 local function with_common_section_frame(body)
 	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu", "ui.menu.menu_hotstrings",
 		"ui.menu.menu_hotstrings_custom", "ui.menu.menu_hotstrings_management" }, function()
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
@@ -489,7 +489,7 @@ local function with_personal_info_leaf(body)
 end
 
 local function personal_info_native(rows)
-	local title = require("infra.i18n").get("menu.shortcuts.edit_personal_info")
+	local title = require("core.i18n.engine.i18n").get("menu.shortcuts.edit_personal_info")
 	for _, row in ipairs(rows or {}) do if row.title == title then return row end end
 end
 

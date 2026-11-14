@@ -41,7 +41,7 @@ _GCHRS_ReadClickSrc() {
 }
 
 _GCHRS_ReadLifecycleSrc() {
-	return _DriverDirsConcat("infra", "core/fs/engine")
+	return _DriverDirsConcat("infra", "core/i18n/engine", "core/fs/engine")
 }
 
 

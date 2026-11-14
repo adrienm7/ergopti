@@ -14,12 +14,12 @@ local h = require("tests.helpers")
 --- @param body function Assertions against the real module and observed effects.
 --- @param strings table|nil Canonical translation input for the owned renderer.
 local function scenario(choice, body, strings)
-	local names = { "ui.gesture_conflicts", "infra.i18n", "core.fs.adapters.storage", "adapters.shell_runner",
+	local names = { "ui.gesture_conflicts", "core.i18n.engine.i18n", "core.fs.adapters.storage", "adapters.shell_runner",
 		"core.logger.engine.shim", "core.events.loop", "ui.modal", "infra.manifest_menu", "menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local saved, store, queued = {}, {}, {}
 	local observed = { shells = 0, modals = 0, dialogs = 0 }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if strings then return strings[key] or key end
 		if key == "gestures.system.slot_unknown_caption" then return "%s — gestures.system.unknown" end
 		return key

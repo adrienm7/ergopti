@@ -312,7 +312,7 @@ local empty_rows = require("ui.menu.local_server_rows").rows({
 	set_backend = function() error("empty model rows cannot acquire the backend setter") end,
 }, { prompt = function() return nil end, error = function() end }, function() end,
 	{ is_paused = function() return false end })
-local no_models_label = require("infra.i18n").get("menu.llm.local_servers.no_models")
+local no_models_label = require("core.i18n.engine.i18n").get("menu.llm.local_servers.no_models")
 local empty_count, empty_disabled = 0, true
 for _, row in ipairs(empty_rows) do
 	for _, child in ipairs(row.items or {}) do

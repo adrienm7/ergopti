@@ -96,7 +96,7 @@ local function run_action(label, outcome, options)
 			end
 			return value
 		end,
-		i18n = require("infra.i18n"),
+		i18n = require("core.i18n.engine.i18n"),
 		logger = require("infra.logger"),
 	}))
 	local command_row = require("infra.manifest_menu").command_row
@@ -176,7 +176,7 @@ local function run_action(label, outcome, options)
 			do_reload = function() end,
 		}
 		local built = Management.build_management(ctx)
-		local parent = find_row(built.menu, require("infra.i18n").get("menu.hotstrings.word_expanders"))
+		local parent = find_row(built.menu, require("core.i18n.engine.i18n").get("menu.hotstrings.word_expanders"))
 		local controls = parent.items or parent.submenu or parent.menu
 		if options.pause_after_build then ctx.paused = true end
 		local row = find_row(built.menu, label)
@@ -201,7 +201,7 @@ end
 
 
 helpers.describe("word-expander terminator mutations are transactional", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local bulk_labels = {
 		i18n.get("menu.hotstrings.check_all"),
 		i18n.get("menu.hotstrings.uncheck_all"),
@@ -304,7 +304,7 @@ end)
 
 
 helpers.describe("shared word-expander fixed commands", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local function corpus()
 		local raw = assert(io.open(helpers.shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
 		local content = raw:read("*a")

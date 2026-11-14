@@ -594,9 +594,9 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/infra/i18n.lua",
+				"static/ergopti_plus/linux/core/i18n/engine/i18n.lua",
 				"static/ergopti_plus/linux/ui/menu/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/i18n/test_i18n_persistence.lua"
+				"static/ergopti_plus/linux/tests/unit/core/i18n/test_persistence.lua"
 			]
 		},
 		"script.log_level": {

@@ -12,7 +12,7 @@ local with_activation = require("tests.support.llm_activation_fixture")
 local OWNED_MODULES = {
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",

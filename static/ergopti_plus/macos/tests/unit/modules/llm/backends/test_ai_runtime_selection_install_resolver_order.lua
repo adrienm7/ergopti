@@ -208,7 +208,7 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 			"[OLLAMA-DEPS] ERROR: Ollama archive SHA-256 checksum mismatch; refusing extraction.\n")
 		helpers.assert_eq(checker.get_state(), "failed")
 		helpers.assert_eq(checker.get_failure_message(),
-			require("infra.i18n").get("ollama.error_checksum"))
+			require("core.i18n.engine.i18n").get("ollama.error_checksum"))
 	end))
 
 	helpers.it("(ollama-install-stream-error) retains a split streamed failure when completion has no bytes", scoped(function()
@@ -229,7 +229,7 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		local checker = load_ollama_checker(state)
 		helpers.assert_true(Fixture.start_verification(state, checker))
 		state.tasks[1].done(1, "", "")
-		helpers.assert_eq(checker.get_failure_message(), require("infra.i18n").get("download_window.error_unknown"))
+		helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("download_window.error_unknown"))
 	end))
 
 	helpers.it("(ollama-install-stream-error) retains the first full cause before trailing progress markers", scoped(function()
@@ -390,7 +390,7 @@ helpers.describe("MLX bootstraps only on its selection (ai-runtime-mlx)", functi
 			"only the sync fingerprint is dropped, so the script rebuilds the whole venv")
 		helpers.assert_eq(checker.runtime_installed(), false)
 		helpers.assert_eq(checker.get_failure_message(),
-			require("infra.i18n").get("mlx.runtime_broken_body"))
+			require("core.i18n.engine.i18n").get("mlx.runtime_broken_body"))
 		helpers.assert_eq(#state.tasks, 0, "invalidation itself never downloads")
 
 		local plain

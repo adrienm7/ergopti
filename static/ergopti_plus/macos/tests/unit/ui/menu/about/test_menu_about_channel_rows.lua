@@ -50,7 +50,7 @@ local function build(owner)
 	Updater.is_local_source = function() return false end
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
-	require("infra.i18n").get = function(key) return catalogue[key] or key end
+	require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 	local ok, item = pcall(About.build, { channel_owner = owner }, {
 		start_at_login = function() error("Building About must not change startup.") end,
 		uninstall = function() error("Building About must not uninstall the application.") end,
@@ -190,7 +190,7 @@ helpers.describe("macOS published About channel choices", function()
 		local renderer = require("infra.manifest_menu")
 		local root = renderer.get_root()
 		local previous = root.about_update_channel_menu
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local previous_get = i18n.get
 		local expected, choices = channel_corpus(), {}
 		for _, value in ipairs(expected.reordered_values) do

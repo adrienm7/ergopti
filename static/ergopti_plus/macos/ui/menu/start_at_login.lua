@@ -28,7 +28,7 @@ function M.request(action, changed, deps)
 	local shell = deps.shell or require("adapters.shell_runner")
 	local logger = deps.logger or require("infra.logger")
 	local function alert(text_key, style)
-		local i18n = deps.i18n or require("infra.i18n")
+		local i18n = deps.i18n or require("core.i18n.engine.i18n")
 		local dialog = deps.dialog or require("infra.dialog_util")
 		local shown, err = pcall(function()
 			dialog.block_alert(i18n.get("menu.global.start_at_login"),

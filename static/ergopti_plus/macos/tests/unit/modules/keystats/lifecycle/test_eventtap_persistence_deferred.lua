@@ -38,7 +38,7 @@ local RESET_MODULES = {
 	"adapters.input_source_broker", "adapters.keyboard_hook",
 	"adapters.process_lifecycle", "adapters.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
-	"hs.timer", "infra.config_paths", "infra.dialog_util", "infra.i18n",
+	"hs.timer", "infra.config_paths", "infra.dialog_util", "core.i18n.engine.i18n",
 	"infra.logger", "infra.manifest_reader", "infra.timings",
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
@@ -245,7 +245,7 @@ local function load_fixture(options)
 		metrics_dir = function() return "/tmp/ergopti_eventtap_deferred/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_eventtap_deferred/cache" end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { alert = function() end }
 	package.loaded["infra.timings"] = {
 		ms = function(_section, key)

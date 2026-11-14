@@ -35,7 +35,7 @@ end
 
 --- The submenu of the top-level row whose title is the translation of `key`.
 local function submenu_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if item.title == label then return item.menu end
 	end
@@ -90,7 +90,7 @@ helpers.describe("tray (linux): Uninstall closes the Version / Updates submenu",
 		local quits = { count = 0 }
 		local items, runs, restore = build(quits)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = submenu_of(items, "menu.about.title")
 			helpers.assert_true(type(rows) == "table" and #rows >= 3, "the tray must carry the About submenu")
 			local last = rows[#rows]
@@ -115,7 +115,7 @@ helpers.describe("tray (linux): Uninstall closes the Version / Updates submenu",
 	helpers.it("is greyed on a source run, naming why, at the same place", function()
 		local items, _, restore = build({ count = 0 }, true)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = submenu_of(items, "menu.about.title")
 			helpers.assert_true(type(rows) == "table" and #rows >= 3, "the tray must carry the About submenu")
 			local last = rows[#rows]
@@ -152,7 +152,7 @@ helpers.describe("tray (linux): Uninstall closes the Version / Updates submenu",
 	helpers.it("is drawn once in the whole tray, never in Configuration", function()
 		local items, _, restore = build({ count = 0 })
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local label = i18n.get("menu.global.uninstall")
 			local rows = submenu_of(items, "menu.configuration.title")
 			helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
@@ -182,7 +182,7 @@ helpers.describe("tray (linux): startup keeps its native owner", function()
 				local state = { enabled = enabled, toggles = 0, changes = 0 }
 				local items, _, restore, rebuild = build({ count = 0 }, false, state, paused)
 				local ok, err = pcall(function()
-					local i18n = require("infra.i18n")
+					local i18n = require("core.i18n.engine.i18n")
 					local rows = submenu_of(items, "menu.about.title")
 					helpers.assert_true(type(rows) == "table" and #rows >= 3, "the About submenu must be drawn")
 					local startup = rows[#rows - 1]
@@ -217,7 +217,7 @@ end
 --- Native version, startup and transaction boundaries record effects only.
 local function with_about_parent(code, options, body)
 	options = options or {}
-	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.i18n", "infra.version",
+	local names = { "ui.menu.builder", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.version",
 		"infra.installation", "ui.menu.start_at_login", "ui.menu.uninstall" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -225,14 +225,14 @@ local function with_about_parent(code, options, body)
 		local file = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "rb"))
 		local labels = assert(require("core.text.engine.json").decode(assert(file:read("*a"))))
 		assert(file:close())
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end,
 		}
 		-- Install the actual observer before the production renderer captures its translator.
 		if type(options.caption_get) == "function" then
-			local get = package.loaded["infra.i18n"].get
-			package.loaded["infra.i18n"].get = function(key) return options.caption_get(key, get) end
+			local get = package.loaded["core.i18n.engine.i18n"].get
+			package.loaded["core.i18n.engine.i18n"].get = function(key) return options.caption_get(key, get) end
 		end
 		local renderer = require("infra.manifest_menu")
 		local root, parent, quit, boundary = renderer.get_root()
@@ -533,7 +533,7 @@ helpers.describe("Linux uninstall receives its actual late shared command captio
 	helpers.it("refuses a replaced translation owner without observing it (uninstall-declared-caption)", function()
 		with_about_parent("en", nil, function(items, state)
 			local parent = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
-			local translator = package.loaded["infra.i18n"]
+			local translator = package.loaded["core.i18n.engine.i18n"]
 			local get = translator.get
 			local hits = 0
 			with_uninstall_caption_field(translator, "get", function(key)
@@ -706,7 +706,7 @@ helpers.describe("Linux uninstall caption current source and native delivery bou
 				if name == "receiver API" then owner, key, replacement = renderer, "command_caption_receiver", foreign
 				elseif name == "renderer facade" then
 					owner, key, replacement = package.loaded, "infra.manifest_menu", { command_caption_receiver = foreign }
-				else owner, key, replacement = package.loaded, "infra.i18n", { get = foreign } end
+				else owner, key, replacement = package.loaded, "core.i18n.engine.i18n", { get = foreign } end
 				with_uninstall_caption_field(owner, key, replacement, function()
 					helpers.assert_eq(action(), false)
 					helpers.assert_eq(hits, 0)
@@ -737,9 +737,9 @@ helpers.describe("Linux uninstall does not observe a retired option translator",
 					return "foreign option translator"
 				end
 				if name == "getter" then
-					control.owner, control.key, control.replacement = package.loaded["infra.i18n"], "get", foreign
+					control.owner, control.key, control.replacement = package.loaded["core.i18n.engine.i18n"], "get", foreign
 				else
-					control.owner, control.key, control.replacement = package.loaded, "infra.i18n", { get = foreign }
+					control.owner, control.key, control.replacement = package.loaded, "core.i18n.engine.i18n", { get = foreign }
 				end
 				control.armed = true
 				with_uninstall_caption_field(control.owner, control.key, rawget(control.owner, control.key), function()

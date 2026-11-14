@@ -680,7 +680,7 @@ end)
 helpers.describe("API menu metadata path", function()
 	helpers.it("builds before token resolution without starting any shell work", function()
 		local names = {
-			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+			"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 			"menu.engine.renderer", "core.fs.adapters.json_codec",
 		}
@@ -712,7 +712,7 @@ helpers.describe("API menu metadata path", function()
 					resolve_active_entry = function() resolver_calls = resolver_calls + 1 end,
 				},
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.logger"] = { error = function() end }
 			package.loaded["infra.dialog_util"] = {}
 			package.loaded["infra.notifications"] = {}

@@ -82,7 +82,7 @@ end
 --- @param key string Locale key.
 --- @return string text
 local function text(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 

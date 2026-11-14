@@ -15,7 +15,7 @@ local OWNED_MODULES = {
 	"infra.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
@@ -202,7 +202,7 @@ local function build_fixture(backend, save_results, options)
 		return key
 	end
 	-- format keeps its arguments visible: "key|arg1|arg2"
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = fixture_caption,
 		format = function(key, ...)
 			local parts = { key }
@@ -434,7 +434,7 @@ local function build_fixture(backend, save_results, options)
 		platform = "hs",
 		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = require("core.fs.adapters.json_codec").decode,
-		i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
+		i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
 		logger = package.loaded["infra.logger"],
 	}))
 	package.loaded["infra.manifest_menu"] = {

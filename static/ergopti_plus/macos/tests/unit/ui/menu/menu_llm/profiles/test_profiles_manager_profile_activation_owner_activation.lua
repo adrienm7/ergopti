@@ -311,7 +311,7 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 		options.user_profiles = {{ id = "user_custom", label = "Custom" }}
 		with_profiles_fixture(options, function(fixture)
 			local document = read_json("menu/data/menu_manifest.json")
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			local renderer = assert(Renderer.new({
 				platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 				json_decode = function() return document end, i18n = i18n, logger = package.loaded["infra.logger"],
@@ -454,7 +454,7 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 	local function with_headings(custom, body)
 		with_profiles_fixture({user_profiles = custom and {{id="user_canonical",label="Canonical"}} or {}}, function(fixture)
 			local document = read_json("menu/data/menu_manifest.json")
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			i18n.section = function(key) return require("menu.engine.labels").decorate_section(i18n.get(key)) end
 			local renderer = assert(require("menu.engine.renderer").new({platform="hs",
 				manifest_path=function() return helpers.shared("menu/data/menu_manifest.json") end,

@@ -21,7 +21,7 @@ local LISTING = "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice
 --- @return table Onboarding module.
 local function load_onboarding(world)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["infra.dialog_util"] = { block_alert = function() return "later" end }
 	package.loaded["platform.remap.onboarding"] = nil

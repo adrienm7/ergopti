@@ -48,7 +48,7 @@ end
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
+		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_state", "ui.menu.menu_hotstrings_management",
 		"ui.menu.preferences_transaction",
@@ -57,7 +57,7 @@ local function with_fixture(callback)
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { writes = 0, updates = 0 }
-		package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(_, _, _, accept_label) return accept_label, "☂" end,
 			block_alert = function(_, body)

@@ -22,7 +22,7 @@ local with_api_add_locale = Fixture.with_api_add_locale
 
 
 helpers.describe("API Add: retained native admission", function()
-	local owned = { "modules.keymap.llm_bridge", "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.keymap.llm_bridge", "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	local function install_add(provider_id)
 		local entry = { id = "old", provider = "openai", model = "old-model", token = "inert-old-secret" }
@@ -294,7 +294,7 @@ end
 --- Retains the native collaborators while injecting the genuine English translator.
 local function install_api_add_doubles(args, native)
 	install_doubles(args)
-	package.loaded["infra.i18n"] = native
+	package.loaded["core.i18n.engine.i18n"] = native
 	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
@@ -309,7 +309,7 @@ local function install_api_add_doubles(args, native)
 end
 
 helpers.describe("Shared API Add frame (api-add-controls)", function()
-	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
 		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	helpers.it("uses the shared Add label and retains the genuine provider action (api-add-controls)", function()
 		helpers.with_fresh_modules(owned, function()
@@ -375,7 +375,7 @@ end)
 
 helpers.describe("API Add locale scope failure inverse (api-add-controls)", function()
 	helpers.it("restores the actual prior locale cohort after a raised case (api-add-controls)", function()
-		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local raised = {}

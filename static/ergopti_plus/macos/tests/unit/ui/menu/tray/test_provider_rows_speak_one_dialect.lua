@@ -24,7 +24,7 @@ local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 --- Builds the actual packaged About provider over controlled native effect ports.
 --- Shared declarations, decoding, row rendering and update consent remain real.
 local function with_declared_about_provider(offer, body)
-	helpers.with_stub_scope({"infra.manifest_menu", "infra.i18n", "core.fs.engine.paths", "infra.logger",
+	helpers.with_stub_scope({"infra.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.logger",
 		"ui.menu.menu_about", "modules.updater", "adapters.update_launcher", "ui.update_check",
 		"ui.menu.start_at_login", "ui.changelog"}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -49,7 +49,7 @@ local function with_declared_about_provider(offer, body)
 			set_interval = function() return false end}
 		session.refresh = function() end
 		session.manifest = manifest
-		session.translate = require("infra.i18n").get
+		session.translate = require("core.i18n.engine.i18n").get
 		local About = require("ui.menu.menu_about")
 		session.build = function()
 			return About.build({channel_owner = session.owner, update_checks = session.checks,
@@ -211,7 +211,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		helpers.assert_eq(rendered[1].menu[5].title, "Two (3)")
 		helpers.assert_eq(type(rendered[1].menu[1].fn), "function")
 		helpers.assert_eq(type(rendered[1].menu[2].fn), "function")
-		local translate = require("infra.i18n").get
+		local translate = require("core.i18n.engine.i18n").get
 		local order = rendered[1].menu[6]
 		helpers.assert_eq(order.title, translate("menu.hotstrings.section_order"))
 		helpers.assert_eq(#order.menu, 4, "both section controls, a separator and reset survive native rendering")
@@ -344,10 +344,10 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("the shared native admission policy preserves admitted scope and neighbor callbacks exactly", function()
-		helpers.with_stub_scope({ "infra.manifest_menu", "infra.i18n" }, function()
+		helpers.with_stub_scope({ "infra.manifest_menu", "core.i18n.engine.i18n" }, function()
 			local Manifest = helpers.load_with_stubs("infra.manifest_menu")
 			local Policy = require("menu.engine.personal_files")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local enabled, disabled, neighbor = function() return true end, function() return true end, function() return true end
 			local rows = Manifest.build("hotstring_category_menu", "Hotstrings", nil, nil, { commands = {
 				["hotstring_category_enable_all"] = enabled, ["hotstring_category_disable_all"] = disabled,
@@ -365,10 +365,10 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("the shared native admission policy closes only declared scope controls on strict owner refusal", function()
-		helpers.with_stub_scope({ "infra.manifest_menu", "infra.i18n" }, function()
+		helpers.with_stub_scope({ "infra.manifest_menu", "core.i18n.engine.i18n" }, function()
 			local Manifest = helpers.load_with_stubs("infra.manifest_menu")
 			local Policy = require("menu.engine.personal_files")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			for _, refusal in ipairs({ { value = false }, { value = nil }, { value = 1 }, { value = true, readonly = true } }) do
 				local calls = 0
 				local neighbor = function() calls = calls + 1; return true end

@@ -164,7 +164,7 @@ package.loaded["infra.preferences"] = nil
 helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 	helpers.it("dispatches the common commands through the exact scope owner", function()
 		local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-		local renderer = LayoutFixture.install(require("infra.i18n"))
+		local renderer = LayoutFixture.install(require("core.i18n.engine.i18n"))
 		local original, captured = renderer.build
 		renderer.build = function(...)
 			captured = select(5, ...)

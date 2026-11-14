@@ -60,7 +60,7 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 	--- @param ui_locale string
 	--- @param scenario function
 	local function with_interface(ui_locale, scenario)
-		local i18n = package.loaded["infra.i18n"]
+		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get, saved_format, saved_locale = i18n.get, i18n.format, i18n.get_locale
 		i18n.get_locale = function() return ui_locale end
 		i18n.get = function(key)
@@ -104,6 +104,6 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 
 	helpers.it("refuses with the llm_language error text", function()
 		helpers.assert_eq(Actions.parameter_error(ACTION),
-			package.loaded["infra.i18n"].get("dialog.gestures.param_err_llm_language"))
+			package.loaded["core.i18n.engine.i18n"].get("dialog.gestures.param_err_llm_language"))
 	end)
 end)

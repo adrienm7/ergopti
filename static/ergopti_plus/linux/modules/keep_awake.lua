@@ -11,7 +11,7 @@
 
 local M = {}
 local Logger = require("core.logger.engine.shim")
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 local LOG = "modules.keep_awake"
 local READY = "ERGOPTI_INHIBITED\n"
 local POLL_SECONDS = 1
