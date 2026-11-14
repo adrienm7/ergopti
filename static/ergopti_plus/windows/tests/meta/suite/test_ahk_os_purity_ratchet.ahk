@@ -109,8 +109,26 @@ _AOPR_IsUiSource(Path) {
 	return InStr("\" . Relative, "\ui\") > 0
 }
 
+; The structure plan's platform domains (tools/audit/structure/rules.cjs
+; PLATFORM_DOMAINS, held equal by tools/test/test-ahk-os-purity-platform.cjs):
+; platform\<domain>\ is the home of a driver's OS bindings and has no adapters\
+; role folder, so its files are the isolation layer as adapters\ is (decided by
+; the coordinator on 2026-11-14, to review by the maintainer). Today's
+; platform\remap\ and platform\tray\ are layer folders, not platform domains.
+_AOPR_PLATFORM_DOMAINS := ["desktop_focus", "focus", "input", "native", "system"]
+
+_AOPR_IsPlatformAdapter(Path) {
+	global _AOPR_PLATFORM_DOMAINS
+	Relative := SubStr(Path, StrLen(_AOPR_DriverRoot()) + 2)
+	for Domain in _AOPR_PLATFORM_DOMAINS
+		if SubStr(Relative, 1, StrLen(Domain) + 10) = "platform\" . Domain . "\"
+			return true
+	return false
+}
+
 ; Every .ahk file under the given driver subdirectories, recursively, with
-; adapters/ excluded — OS calls there are the legitimate isolation layer. The
+; adapters/ and the platform domains excluded — OS calls there are the
+; legitimate isolation layer. The
 ; crypto adapter (S02), the boot clock and timer scheduler (S03) and the
 ; driver control adapter (S06), the one adapter of core/lifecycle, live in
 ; core/ outside any adapters/ folder: they stay the same isolation layer.
@@ -124,6 +142,7 @@ _AOPR_FilesIn(SubDirs) {
 			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
 			if InStr(A_LoopFilePath, "\adapters\") || _AOPR_IsUiSource(A_LoopFilePath)
+				|| _AOPR_IsPlatformAdapter(A_LoopFilePath)
 				|| RegExMatch(A_LoopFilePath, "\\core\\(?:crypto\\crypto|events\\(?:boot_clock|timer_scheduler)|lifecycle\\driver_control)\.ahk$")
 				continue
 			Files.Push(A_LoopFilePath)
