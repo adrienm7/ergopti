@@ -57,6 +57,12 @@ wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the sk
 3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
    or a release stay for the maintainer; say so on the item and move on.
 
+State of the parity queue (worker H, 2026-11-14 10:16 Paris): the pause fourth pass is on `dev` (personal
+editor, word expanders, terminators, extension scope and the AI settings rows commit while paused on the three
+OS; CI run 43574300302). Next: the rest of « Parity audit pause and resumption » (the AI enable switch, model,
+profile and API rows, the macOS legacy shortcut and slot rows, the magic key capture, the typing-inertness
+audit), then « Sequential WPM, wrap and personal-info parity follow-up », whose rows are mostly CI and hardware.
+
 ### Reds `dev` already has (2026-11-12 evening), the baseline a change is compared with
 
 Linux E2E desktop-webview, updater, platform-metrics, input-display; Common Shared ui (App Cloner generated literals); Common
