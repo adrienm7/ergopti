@@ -1,0 +1,160 @@
+{
+	"_description": "Where each value of the layout analysis comes from: the « i » popovers of Ergopti Studio (_shared/ui/layout_analysis) list these references next to every metric and sourced value. « references » are the works cited: an external page (url) or a document of this repository (path, optional anchor; the link is repository_base + path). « items » maps every engine metric and every sourced value (ideal_finger_load, shortcut_letters, weights, fingering) to its references; its explanation is the locale key layout_analysis.info.<item>. « checked » is the date the page was last read, null when it could not be fetched (to verify). codegen-layout-analysis-data-js.cjs checks that every metric has an item, every reference exists and every repository path and anchor is real.",
+	"schema_version": 1,
+	"repository_base": "https://github.com/adrienm7/ergopti/blob/dev/",
+	"references": {
+		"engine_doc": {
+			"title": "Ergopti — layout analysis engine",
+			"path": "docs/design/layout-analysis.md",
+			"anchor": "metrics"
+		},
+		"study": {
+			"title": "Ergopti — study of the layout analysers",
+			"path": "docs/audits/layout-analysers/report.md"
+		},
+		"study_weights": {
+			"title": "Ergopti — study, default weights",
+			"path": "docs/audits/layout-analysers/report.md",
+			"anchor": "11-default-weights"
+		},
+		"study_finger_load": {
+			"title": "Ergopti — study, ideal finger load",
+			"path": "docs/audits/layout-analysers/report.md",
+			"anchor": "16-ideal-finger-load"
+		},
+		"study_shortcuts": {
+			"title": "Ergopti — study, shortcut letters",
+			"path": "docs/audits/layout-analysers/report.md",
+			"anchor": "17-shortcut-letters"
+		},
+		"kld": {
+			"title": "Keyboard Layouts Doc (Markdown port)",
+			"url": "https://github.com/aoi-buh/Keyboard-Layouts-Doc",
+			"checked": "2026-11-14"
+		},
+		"ergol_stats": {
+			"title": "Ergo-L analyser (ergol.org/stats)",
+			"url": "https://ergol.org/stats/",
+			"checked": "2026-11-14"
+		},
+		"kla": {
+			"title": "Keyboard Layout Analyzer (patorjk)",
+			"url": "https://github.com/patorjk/keyboard-layout-analyzer",
+			"checked": "2026-11-14"
+		},
+		"kalamine": {
+			"title": "Kalamine",
+			"url": "https://github.com/OneDeadKey/kalamine",
+			"checked": "2026-11-14"
+		},
+		"genkey": {
+			"title": "genkey (semilin)",
+			"url": "https://github.com/semilin/genkey",
+			"checked": "2026-11-14"
+		},
+		"oxeylyzer": {
+			"title": "Oxeylyzer",
+			"url": "https://github.com/O-X-E-Y/oxeylyzer",
+			"checked": "2026-11-14"
+		},
+		"cmini": {
+			"title": "cmini",
+			"url": "https://github.com/Apsu/cmini",
+			"checked": "2026-11-14"
+		},
+		"trialyzer": {
+			"title": "trialyzer",
+			"url": "https://github.com/samuelxyz/trialyzer",
+			"checked": "2026-11-14"
+		},
+		"km_metrics": {
+			"title": "keymeow metrics (semilin)",
+			"url": "https://github.com/semilin/km_metrics",
+			"checked": "2026-11-14"
+		},
+		"dariogoetz": {
+			"title": "keyboard_layout_optimizer (Dario Götz)",
+			"url": "https://github.com/dariogoetz/keyboard_layout_optimizer",
+			"checked": "2026-11-14"
+		},
+		"keygen": {
+			"title": "keygen (xsznix)",
+			"url": "https://github.com/xsznix/keygen",
+			"checked": "2026-11-14"
+		},
+		"windows_shortcuts": {
+			"title": "Microsoft — Keyboard shortcuts in Windows",
+			"url": "https://support.microsoft.com/en-us/windows/keyboard-shortcuts-in-windows-dcc61a57-8ff0-cffe-9796-cb9706c75eec",
+			"checked": null
+		},
+		"mac_shortcuts": {
+			"title": "Apple — Mac keyboard shortcuts",
+			"url": "https://support.apple.com/en-us/102650",
+			"checked": null
+		},
+		"word_shortcuts": {
+			"title": "Microsoft — Keyboard shortcuts in Word",
+			"url": "https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-word-95ef89dd-7142-4b50-afb2-f762f663ceb2",
+			"checked": null
+		},
+		"docs_shortcuts": {
+			"title": "Google — Keyboard shortcuts for Google Docs",
+			"url": "https://support.google.com/docs/answer/179738",
+			"checked": null
+		},
+		"chrome_shortcuts": {
+			"title": "Google — Chrome keyboard shortcuts",
+			"url": "https://support.google.com/chrome/answer/157179",
+			"checked": null
+		},
+		"vscode_shortcuts": {
+			"title": "Visual Studio Code — Key bindings",
+			"url": "https://code.visualstudio.com/docs/getstarted/keybindings",
+			"checked": null
+		}
+	},
+	"items": {
+		"sfb": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "genkey"],
+		"repeat": ["engine_doc", "ergol_stats"],
+		"sfs": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "trialyzer"],
+		"lsb": ["engine_doc", "kld", "ergol_stats", "genkey", "km_metrics"],
+		"scissors": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "keygen"],
+		"half_scissors": ["engine_doc", "kld"],
+		"roll_in": ["engine_doc", "kld", "oxeylyzer", "dariogoetz"],
+		"roll_out": ["engine_doc", "kld", "oxeylyzer", "dariogoetz"],
+		"hand_change": ["engine_doc", "ergol_stats"],
+		"roll3_in": ["engine_doc", "cmini", "oxeylyzer"],
+		"roll3_out": ["engine_doc", "cmini", "oxeylyzer"],
+		"alternation": ["engine_doc", "cmini", "oxeylyzer", "trialyzer"],
+		"redirect": ["engine_doc", "kld", "ergol_stats", "oxeylyzer"],
+		"redirect_bad": ["engine_doc", "kld", "ergol_stats", "oxeylyzer"],
+		"home_row": ["engine_doc", "kla", "ergol_stats"],
+		"top_row": ["engine_doc", "kla"],
+		"bottom_row": ["engine_doc", "kla"],
+		"number_row": ["engine_doc", "kla"],
+		"distance": ["engine_doc", "kla", "genkey"],
+		"finger_imbalance": ["engine_doc", "study_finger_load", "dariogoetz", "genkey"],
+		"hand_imbalance": ["engine_doc", "dariogoetz"],
+		"pinky_load": ["engine_doc", "ergol_stats", "genkey", "oxeylyzer"],
+		"modifier_usage": ["engine_doc", "dariogoetz", "kla"],
+		"dead_key_usage": ["engine_doc", "ergol_stats", "kalamine"],
+		"outer_column": ["engine_doc", "study"],
+		"unsupported": ["engine_doc", "ergol_stats"],
+		"compact_fit": ["engine_doc", "study"],
+		"char_coverage": ["engine_doc", "study"],
+		"direct_digits": ["engine_doc", "study"],
+		"shortcut_left": ["engine_doc", "study_shortcuts"],
+		"ideal_finger_load": ["study_finger_load", "dariogoetz", "genkey", "oxeylyzer", "ergol_stats"],
+		"shortcut_letters": [
+			"study_shortcuts",
+			"windows_shortcuts",
+			"mac_shortcuts",
+			"word_shortcuts",
+			"docs_shortcuts",
+			"chrome_shortcuts",
+			"vscode_shortcuts"
+		],
+		"weights": ["study_weights"],
+		"fingering": ["engine_doc", "study", "kld"]
+	}
+}

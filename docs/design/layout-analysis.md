@@ -18,6 +18,7 @@ definition and of the default weights, is
 | `static/ergopti_plus/_shared/layouts/data/analysis/analysis_model.json`        | Fingers, home keys, lateral and outer keys, keyboards, ideal finger load, form factors, shortcut letters… |
 | `static/ergopti_plus/_shared/layouts/data/analysis/score_weights.json`         | The default weights of the global score (one source).                                                     |
 | `static/ergopti_plus/_shared/layouts/data/analysis/layout_library.json`        | The alphabetic blocks of the imported layouts, with their source.                                         |
+| `static/ergopti_plus/_shared/layouts/data/analysis/sources.json`               | The references behind every metric and sourced value, shown by the « i » popovers.                        |
 | `static/ergopti_plus/_shared/tests/corpus/layout_analysis/metric_vectors.json` | Hand-computed reference vectors; `npm run test:layout-analysis-engine`.                                   |
 
 Key geometry comes from `_shared/layouts/data/keycodes/physical_keys.json`; the
@@ -55,7 +56,11 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   composer source (`LayoutComposer.parseSource` of a `.keylayout`, or
   `referenceSource`): the way the Studio analyses the layout being edited (its
   compiled `.keylayout`).
-- `analyse(layout, ngrams, {keyboard?, weights?})` → one result:
+- `defaultIdealLoad()` → a copy of `ideal_finger_load`; `idealLoad(load)` →
+  `load` checked (the eight fingers, finite shares ≥ 0, summing to 100 within
+  0.05).
+- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?})` → one result
+  (`idealLoad` replaces the default target of `finger_imbalance`):
 
   ```js
   {
@@ -124,9 +129,10 @@ distance and `modifier_usage`, not in bigrams or trigrams.
 **Keyboards.** `iso`, `ansi` and `ortho` (ISO geometry with the row stagger
 removed), `iso_angle` (the angle-mod fingering: Z by the ring finger, X by the
 middle, C by the index). An angle-mod library layout analysed on `iso` uses
-`iso_angle`. Fingers: `lp lr lm li lt rt ri rm rr rp`. Shift is pressed by the
-pinky of the other hand (ShiftRight for a left-hand key), AltGr by the right
-thumb. The **order** of a finger runs from the pinky (0) to the index (3);
+`iso_angle`. Fingers: `lp lr lm li lt rt ri rm rr rp`. The space bar is
+pressed by the left thumb and Digit6 by the right index (maintainer,
+2026-11-14). Shift is pressed by the pinky of the other hand (ShiftRight for a
+left-hand key), AltGr by the right thumb. The **order** of a finger runs from the pinky (0) to the index (3);
 moving to a higher order is **inward**.
 
 **Shares.** A bigram or trigram metric is a share of the key bigrams or
@@ -264,7 +270,21 @@ default), makes no request outside the site and posts
 `{type: 'ergopti-layout-analysis:height', height}` to its parent on load and on
 every resize so the frame fits its content.
 
-Weights, selection, corpus and keyboard are remembered in `localStorage` when
+Every metric, every weight, the fingering, the ideal finger load and the
+shortcut table have an « i » button. Its popover gives a localized explanation
+(`layout_analysis.info.<item>`) and links the references of `sources.json`; a
+reference not yet re-read is marked « link to verify ». The codegen refuses a
+metric without references, an unknown or unused reference, and a repository
+document or heading that does not exist. A host that opens links itself (the
+app's browser) defines `LAYOUT_ANALYSIS_HOST.openLink(url)`; otherwise links
+open in a new tab.
+
+The ideal finger load is editable under the weights: eight targets, their
+total shown, analysed again once they sum to 100 %, « restore the defaults ».
+The codegen refuses a default that breaks the maintainer's rule (each hand at
+50 %, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %).
+
+Weights, ideal finger load, selection, corpus and keyboard are remembered in `localStorage` when
 the browser allows it; nothing is sent anywhere.
 
 ## Performance
@@ -276,7 +296,8 @@ the text; built-in corpora can ship their tables pre-computed.
 
 ## Decided by the agent, to review by the maintainer
 
-The fingering, the ideal finger load, the shortcut tables, the reference
-character set, the scissor rule (the Keyboard Layouts Doc's « the finger that
+The maintainer settled the space bar thumb, Digit6, the weights, the ideal
+finger load and the shortcut letters on 2026-11-14. Still to review: the ISO
+key left of Z, the shortcut key ease, the reference character set, the scissor rule (the Keyboard Layouts Doc's « the finger that
 prefers being higher is not ») and the default weights; see the study's last
 section.

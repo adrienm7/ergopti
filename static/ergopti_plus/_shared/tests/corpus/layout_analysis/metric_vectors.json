@@ -189,7 +189,7 @@
 			"expect": {
 				"distance": 0,
 				"home_row": 100,
-				"finger_imbalance": 84,
+				"finger_imbalance": 83.5,
 				"hand_imbalance": 100
 			}
 		},
@@ -265,7 +265,7 @@
 			"keyboard": "iso",
 			"text": "a",
 			"expect": {
-				"shortcut_left": 79.012346,
+				"shortcut_left": 61.203008,
 				"char_coverage": 62.091503
 			}
 		}

@@ -17,7 +17,9 @@
  *    equal those counted on the expanded key stream of the text itself.
  * 3. Score: each contribution is sign × weight × value, the total their sum,
  *    weights override the defaults without changing them, rescoring re-ranks
- *    without re-analysis, and an unknown or invalid weight throws.
+ *    without re-analysis, and an unknown or invalid weight throws. The ideal
+ *    finger load keeps index ≥ middle ≥ ring ≥ pinky with pinkies under 8 %,
+ *    an edited one is the one measured, and an invalid one throws.
  * 4. Library: about a hundred layouts with unique ids, every registry layout
  *    with its dead keys, and the reference QWERTY as its source says.
  * 5. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
@@ -208,6 +210,37 @@ for (const bad of [{ nonsense: 1 }, { repeat: 1 }, { sfb: -1 }, { sfb: Infinity 
 	}
 	check(threw, `score: ${JSON.stringify(bad)} must throw`);
 }
+// The ideal finger load: the maintainer's order (index ≥ middle ≥ ring ≥
+// pinky, pinkies under 8 %), editable per analysis, checked when edited.
+const ideal = E.defaultIdealLoad();
+for (const hand of ['l', 'r']) {
+	const [p, r, m, i] = ['p', 'r', 'm', 'i'].map((f) => ideal[hand + f]);
+	check(
+		i >= m && m >= r && r >= p,
+		`ideal load: ${hand} hand breaks index ≥ middle ≥ ring ≥ pinky`
+	);
+	check(p < 8, `ideal load: ${hand} pinky at ${p} %, not under 8 %`);
+	check(near(p + r + m + i, 50), `ideal load: ${hand} hand sums to ${p + r + m + i}, not 50`);
+}
+const allIndex = Object.fromEntries(Object.keys(ideal).map((f) => [f, 0]));
+allIndex.li = 100;
+const onF = E.analyse(byId.get('qwerty'), E.ngramsFromText('f'), { idealLoad: allIndex });
+check(onF.metrics.finger_imbalance === 0, 'ideal load: an edited target is the one measured');
+check(E.defaultIdealLoad().li === ideal.li, 'ideal load: an edited target leaves the default');
+for (const bad of [
+	{ li: 100 },
+	Object.assign({}, ideal, { li: -1 }),
+	Object.assign({}, ideal, { li: 40 })
+]) {
+	let threw = false;
+	try {
+		E.analyse(byId.get('qwerty'), E.ngramsFromText('f'), { idealLoad: bad });
+	} catch {
+		threw = true;
+	}
+	check(threw, `ideal load: ${JSON.stringify(bad)} must throw`);
+}
+
 const ranked = E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, {});
 check(ranked[0].layout.id === 'ergopti' && ranked[0].rank === 1, 'compare: Ergopti beats QWERTY');
 const flipped = E.rescore(ranked, Object.fromEntries(Object.keys(defaults).map((m) => [m, 0])));

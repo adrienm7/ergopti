@@ -9,6 +9,7 @@
  *   - _shared/layouts/data/analysis/analysis_model.json (fingers, keyboards…);
  *   - _shared/layouts/data/analysis/score_weights.json (default weights);
  *   - _shared/layouts/data/analysis/layout_library.json (alphabetic blocks);
+ *   - _shared/layouts/data/analysis/sources.json (the « i » references);
  *   - _shared/layouts/data/keycodes/physical_keys.json (key geometry);
  *   - the registry layouts and the reference QWERTY and AZERTY, read through
  *     the layout composer model (tools/lib/layout-composer.cjs).
@@ -38,6 +39,16 @@ const WEIGHTS_PATH = shared('layouts', 'data', 'analysis', 'score_weights.json')
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
 const CORPORA_PATH = shared('layouts', 'data', 'analysis', 'corpora.json');
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
+const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
+// The values the « i » popovers explain besides the metrics.
+const INFO_VALUES = ['ideal_finger_load', 'shortcut_letters', 'weights', 'fingering'];
+// The ideal finger load per hand, pinky to index (maintainer 2026-11-14).
+const HAND_FINGERS = [
+	['lp', 'lr', 'lm', 'li'],
+	['rp', 'rr', 'rm', 'ri']
+];
+const HAND_SHARE = 50;
+const MAX_PINKY_SHARE = 8;
 // The text patterns the Windows antivirus-surface gate refuses in the shipped
 // bundle (tools/ci/windows-exe-av-surface.cjs reads the same file).
 const AV_POLICY_PATH = path.join(REPO_ROOT, 'tools', 'ci', 'windows-exe-av-surface.json');
@@ -64,6 +75,7 @@ const SOURCES = [
 	'layouts/data/analysis/layout_library.json',
 	'layouts/data/analysis/corpora.json',
 	'layouts/data/analysis/layout_credits.json',
+	'layouts/data/analysis/sources.json',
 	'layouts/data/keycodes/physical_keys.json',
 	'../../layouts/registry (through layout_composer)'
 ];
@@ -426,6 +438,89 @@ function corpusSource(id, table) {
 	].join('\n');
 }
 
+/**
+ * GitHub's anchor of a Markdown heading: lower case, punctuation dropped,
+ * spaces to hyphens.
+ * @param {string} heading - Heading text without the leading #.
+ * @returns {string} The anchor.
+ */
+function headingAnchor(heading) {
+	return heading
+		.trim()
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}\s_-]/gu, '')
+		.replace(/\s/g, '-');
+}
+
+/**
+ * The references of the « i » popovers, each with its link resolved.
+ * @param {object} engine - The engine (its METRICS list every metric).
+ * @returns {{references: object, items: object}} References and items.
+ * @throws {Error} On a metric or value without an item, an unknown or unused
+ *   reference, a missing repository file or anchor, or a non-https URL.
+ */
+function buildInfoSources(engine) {
+	const raw = JSON.parse(fs.readFileSync(INFO_SOURCES_PATH, 'utf8'));
+	const expected = Object.keys(engine.METRICS).concat(INFO_VALUES);
+	const items = raw.items;
+	for (const id of expected)
+		if (!Array.isArray(items[id]) || items[id].length === 0)
+			throw new Error(`sources.json: no references for ${id}`);
+	for (const id of Object.keys(items))
+		if (!expected.includes(id)) throw new Error(`sources.json: unknown item ${id}`);
+	const references = {};
+	for (const [id, ref] of Object.entries(raw.references)) {
+		let url = ref.url;
+		if (ref.path !== undefined) {
+			const file = path.join(REPO_ROOT, ref.path);
+			if (!fs.existsSync(file)) throw new Error(`sources.json: ${id}: no ${ref.path}`);
+			if (ref.anchor !== undefined) {
+				const anchors = Array.from(fs.readFileSync(file, 'utf8').matchAll(/^#+ (.+)$/gm), (m) =>
+					headingAnchor(m[1])
+				);
+				if (!anchors.includes(ref.anchor))
+					throw new Error(`sources.json: ${id}: no heading #${ref.anchor} in ${ref.path}`);
+			}
+			url = raw.repository_base + ref.path + (ref.anchor ? `#${ref.anchor}` : '');
+		}
+		if (typeof url !== 'string' || !url.startsWith('https://'))
+			throw new Error(`sources.json: ${id}: needs an https url or a repository path`);
+		references[id] = {
+			title: ref.title,
+			url,
+			checked: ref.checked === undefined ? true : ref.checked !== null
+		};
+	}
+	const used = new Set(Object.values(items).flat());
+	for (const id of used)
+		if (!references[id]) throw new Error(`sources.json: unknown reference ${id}`);
+	for (const id of Object.keys(references))
+		if (!used.has(id)) throw new Error(`sources.json: unused reference ${id}`);
+	return { references, items };
+}
+
+/**
+ * Rejects an ideal finger load that breaks the maintainer's rule: each hand
+ * sums to half, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %.
+ * @param {object} load - finger → %.
+ * @throws {Error} On a broken rule.
+ */
+function checkIdealLoad(load) {
+	for (const hand of HAND_FINGERS) {
+		const shares = hand.map((f) => load[f]);
+		if (!shares.every(Number.isFinite))
+			throw new Error(`ideal_finger_load: ${hand.join(', ')} needed`);
+		const sum = shares.reduce((a, b) => a + b, 0);
+		if (Math.abs(sum - HAND_SHARE) > 1e-9)
+			throw new Error(`ideal_finger_load: ${hand.join(', ')} sum to ${sum}, not ${HAND_SHARE}`);
+		for (let i = 1; i < shares.length; i++)
+			if (shares[i] < shares[i - 1])
+				throw new Error(`ideal_finger_load: ${hand[i]} is below ${hand[i - 1]}`);
+		if (shares[0] >= MAX_PINKY_SHARE)
+			throw new Error(`ideal_finger_load: ${hand[0]} is not under ${MAX_PINKY_SHARE} %`);
+	}
+}
+
 // ==========================
 // ======= 4/ JS source =====
 // ==========================
@@ -438,7 +533,9 @@ function buildData() {
 	const model = JSON.parse(fs.readFileSync(MODEL_PATH, 'utf8'));
 	const weights = JSON.parse(fs.readFileSync(WEIGHTS_PATH, 'utf8'));
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
-	const corpora = buildCorpora(loadEngine());
+	const engine = loadEngine();
+	const corpora = buildCorpora(engine);
+	checkIdealLoad(model.ideal_finger_load);
 	delete model._description;
 	return {
 		schema_version: 1,
@@ -449,6 +546,7 @@ function buildData() {
 		library_sources: library.sources,
 		layouts: buildLibrary(model),
 		corpora: corpora.catalogue,
+		sources: buildInfoSources(engine),
 		corpusTables: corpora.tables
 	};
 }
@@ -480,6 +578,7 @@ function buildSource(data) {
 		`\t"weights": ${JSON.stringify(data.weights)},`,
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,
 		`\t"corpora": ${JSON.stringify(data.corpora)},`,
+		`\t"sources": ${JSON.stringify(data.sources)},`,
 		'\t"layouts": [',
 		layoutLines,
 		'\t]',

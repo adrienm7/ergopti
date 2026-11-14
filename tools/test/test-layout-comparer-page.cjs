@@ -13,7 +13,10 @@
  * 2. Strings: every layout_analysis.* key the page uses (data-i18n attributes,
  *    option prefixes and t() calls, metric and finger keys built from the
  *    engine's own lists) exists in all 21 locales.
- * 3. Corpora: every built-in corpus of the generated data has its tables file.
+ * 3. Sources: every metric and sourced value has an « i » explanation in all
+ *    21 locales, the page draws an « i » button for each, and the placeholders
+ *    of each explanation match English.
+ * 4. Corpora: every built-in corpus of the generated data has its tables file.
  * ==============================================================================
  */
 
@@ -69,6 +72,7 @@ for (const m of html.matchAll(/data-i18n-option-prefix="([^"]+)"[^>]*>([\s\S]*?)
 for (const m of page.matchAll(/\bt\('([a-z_.]+)'/g)) keys.add(m[1]);
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
+for (const id of Object.keys(DATA.sources.items)) keys.add(`${PREFIX}info.${id}`);
 check(keys.size >= MIN_KEYS, `only ${keys.size} keys found`);
 const locales = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'));
 check(locales.length === 21, `${locales.length} locales`);
@@ -90,7 +94,33 @@ check(
 	'the page no longer accepts a late corpus from the app'
 );
 
-// 3/ Corpora
+// 3/ Sources: each metric gets its button from the details table, the
+// values from the static page or the shortcut row.
+for (const id of Object.keys(E.METRICS))
+	check(DATA.sources.items[id], `sources: no references for metric ${id}`);
+check(
+	page.includes("th.append(' ', infoButton(id))"),
+	'sources: the metrics table lost its « i » buttons'
+);
+for (const id of ['fingering', 'weights', 'ideal_finger_load'])
+	check(html.includes(`data-info="${id}"`), `sources: no « i » button for ${id}`);
+check(
+	page.includes("infoButton('shortcut_letters')"),
+	'sources: no « i » button for shortcut_letters'
+);
+const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+const placeholders = (text) => (text.match(/\{\w+\}/g) || []).sort().join(',');
+for (const file of locales) {
+	const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
+	for (const key of keys)
+		if (typeof strings[key] === 'string')
+			check(
+				placeholders(strings[key]) === placeholders(english[key]),
+				`${file}: ${key} placeholders`
+			);
+}
+
+// 4/ Corpora
 check(DATA.corpora.length > 0, 'no built-in corpus');
 for (const corpus of DATA.corpora)
 	check(

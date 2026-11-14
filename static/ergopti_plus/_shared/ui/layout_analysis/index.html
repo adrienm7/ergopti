@@ -49,7 +49,17 @@
 					<p id="la-file-error" class="la-error" hidden></p>
 				</div>
 				<div class="la-field">
-					<label for="la-keyboard" data-i18n="layout_analysis.keyboard.label"></label>
+					<div class="la-heading">
+						<label for="la-keyboard" data-i18n="layout_analysis.keyboard.label"></label>
+						<button
+							class="la-info"
+							type="button"
+							data-info="fingering"
+							data-i18n-title="layout_analysis.info.button"
+						>
+							i
+						</button>
+					</div>
 					<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard">
 						<option value="iso"></option>
 						<option value="iso_angle"></option>
@@ -118,11 +128,50 @@
 			</section>
 
 			<section class="la-weights" aria-labelledby="la-weights-label">
-				<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
+				<div class="la-heading">
+					<h2 id="la-weights-label" data-i18n="layout_analysis.weights.title"></h2>
+					<button
+						class="la-info"
+						type="button"
+						data-info="weights"
+						data-i18n-title="layout_analysis.info.button"
+					>
+						i
+					</button>
+				</div>
 				<p class="la-muted" data-i18n="layout_analysis.weights.help"></p>
 				<button id="la-restore" type="button" data-i18n="layout_analysis.weights.restore"></button>
 				<div id="la-weight-list" class="la-weight-list"></div>
 			</section>
+
+			<section class="la-weights" aria-labelledby="la-ideal-label">
+				<div class="la-heading">
+					<h2 id="la-ideal-label" data-i18n="layout_analysis.ideal.title"></h2>
+					<button
+						class="la-info"
+						type="button"
+						data-info="ideal_finger_load"
+						data-i18n-title="layout_analysis.info.button"
+					>
+						i
+					</button>
+				</div>
+				<p class="la-muted" data-i18n="layout_analysis.ideal.help"></p>
+				<button
+					id="la-ideal-restore"
+					type="button"
+					data-i18n="layout_analysis.ideal.restore"
+				></button>
+				<div id="la-ideal-list" class="la-weight-list"></div>
+				<p id="la-ideal-sum" class="la-muted" role="status"></p>
+			</section>
+
+			<div id="la-popover" class="la-popover" role="dialog" aria-modal="false" hidden>
+				<p id="la-popover-text"></p>
+				<p class="la-popover-title" data-i18n="layout_analysis.info.sources"></p>
+				<ul id="la-popover-links"></ul>
+				<button id="la-popover-close" type="button" data-i18n="layout_analysis.info.close"></button>
+			</div>
 		</main>
 	</body>
 </html>

@@ -53,6 +53,8 @@ var LAYOUT_ANALYSIS = (function () {
 	// How far each finger reaches, by order (pinky, ring, middle, index), for half scissors.
 	const FINGER_LENGTH = [0, 2, 3, 1];
 	const DEFAULT_KEYBOARD = 'iso';
+	// An edited ideal finger load may miss 100 % by this much (rounding of inputs).
+	const LOAD_SUM_TOLERANCE = 0.05;
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
 
@@ -461,7 +463,9 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Measures one layout.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, weights?: object}} [options] - Board and weights.
+	 * @param {{keyboard?: string, weights?: object, idealLoad?: object}} [options]
+	 *   - Board, weights and the ideal finger load of finger_imbalance (finger →
+	 *   % of the non-thumb presses; the model's ideal_finger_load when absent).
 	 * @returns {object} {layout, keyboard, metrics, fingers, rows, coverage,
 	 *   trigramClasses, score}.
 	 */
@@ -663,7 +667,7 @@ var LAYOUT_ANALYSIS = (function () {
 		fingerIds.forEach((id, f) => {
 			fingers[id] = pct(fingerLoad[f], allPresses);
 		});
-		const ideal = data().model.ideal_finger_load;
+		const ideal = idealLoad(opts.idealLoad);
 		let imbalance = 0;
 		for (const [id, target] of Object.entries(ideal))
 			imbalance += Math.abs(pct(fingerLoad[fingerIds.indexOf(id)], pressed) - target);
@@ -818,6 +822,35 @@ var LAYOUT_ANALYSIS = (function () {
 		return digits.size * 10;
 	}
 
+	/** A copy of the default ideal finger load (analysis_model.json). */
+	function defaultIdealLoad() {
+		return Object.assign({}, data().model.ideal_finger_load);
+	}
+
+	/**
+	 * The ideal finger load an analysis measures finger_imbalance against.
+	 * @param {object} [load] - finger → %; the default when absent.
+	 * @returns {object} The load, checked.
+	 * @throws {Error} On a finger the default lacks or misses, a negative or
+	 *   non-finite share, or shares that do not sum to 100.
+	 */
+	function idealLoad(load) {
+		if (load === undefined) return data().model.ideal_finger_load;
+		const fingers = Object.keys(data().model.ideal_finger_load);
+		const given = Object.keys(load);
+		if (given.length !== fingers.length || !fingers.every((f) => given.includes(f)))
+			throw new Error(`layout_analysis: idealLoad needs exactly ${fingers.join(', ')}`);
+		let sum = 0;
+		for (const f of fingers) {
+			if (!Number.isFinite(load[f]) || load[f] < 0)
+				throw new Error(`layout_analysis: idealLoad.${f} must be a finite number >= 0`);
+			sum += load[f];
+		}
+		if (Math.abs(sum - 100) > LOAD_SUM_TOLERANCE)
+			throw new Error(`layout_analysis: idealLoad sums to ${sum}, not 100`);
+		return load;
+	}
+
 	/**
 	 * Usefulness-weighted share of the shortcut letters on easy left-hand keys:
 	 * a letter counts its weight times the ease of its key (0 on the right hand).
@@ -923,6 +956,8 @@ var LAYOUT_ANALYSIS = (function () {
 		analyse,
 		score,
 		defaultWeights,
+		defaultIdealLoad,
+		idealLoad,
 		compare,
 		rescore
 	};

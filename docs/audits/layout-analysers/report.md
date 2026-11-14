@@ -407,7 +407,7 @@ bad layouts on the reference corpora weighs as the tools above weigh it.
 | compact_fit      |    0.1 | Maintainer requirement; 1 point per 10 % of characters lost on a compact board.                                                                       |
 | char_coverage    |    0.1 | Maintainer requirement (Bépo and Optimot gain); 1 point per 10 % of the reference set.                                                                |
 | direct_digits    |   0.03 | Maintainer: « a small bonus »: 3 points for ten direct digits.                                                                                        |
-| shortcut_left    |   0.15 | Maintainer: about 5–10 % of the score; measured 5.6 % of Ergopti's absolute contributions on the French reference corpus, 6.4 % on English.           |
+| shortcut_left    |   0.15 | Maintainer: about 5–10 % of the score; with the A–Z table (section 17), 5.6–5.7 % of Ergopti's absolute contributions in French, 5.1 % in English.    |
 
 These weights are **decided by the agent, to review by the maintainer**. The
 Studio lets every user change each weight and restore the defaults; the score
@@ -421,22 +421,26 @@ about 0.3 s per corpus. French: `static/corpus/original/fr/corpus_nemolivier.txt
 (2.9 MB). A layout of the imported library has only its alphabetic block (no
 accents): its `unsupported` share shows what it cannot type.
 
-French corpus (best eight and the reference layouts):
+French corpus (best eight and the reference layouts), with the model of
+2026-11-14 (space bar on the left thumb, sections 16 and 17):
 
 | Rank | Layout        | Score |  SFB |  SFS |  LSB | Scissors | Bad redirects | Inward rolls | Alternation | Home row | mm/char | Unsupported |
 | ---: | ------------- | ----: | ---: | ---: | ---: | -------: | ------------: | -----------: | ----------: | -------: | ------: | ----------: |
-|    1 | Ergopti+ ANSI |  20.4 | 0.97 | 6.23 | 1.31 |     0.31 |          0.45 |        14.89 |       39.84 |    66.62 |     8.9 |        0.00 |
-|    2 | beo           |  19.2 | 0.77 | 5.48 | 1.57 |     0.90 |          0.68 |        13.26 |       39.69 |    63.95 |     7.4 |        0.73 |
-|    3 | Ergopti+      |  18.7 | 1.02 | 6.21 | 1.43 |     0.24 |          0.46 |        14.81 |       39.84 |    65.36 |     9.1 |        0.00 |
-|    4 | Ergopti       |  16.8 | 1.36 | 6.44 | 1.29 |     0.25 |          0.42 |        14.89 |       39.64 |    65.43 |     8.4 |        0.00 |
-|    6 | Ergo-L        |  11.7 | 1.79 | 6.09 | 1.46 |     0.19 |          1.89 |        19.65 |       28.97 |    70.21 |     8.2 |        0.01 |
-|   11 | bépo          | −10.1 | 2.88 | 7.72 | 0.85 |     0.08 |          0.68 |        15.65 |       38.91 |    71.18 |     8.9 |        0.00 |
-|  109 | QWERTY (US)   | −85.3 | 7.40 | 8.70 | 5.33 |     0.54 |          1.06 |        17.14 |       29.18 |    29.80 |    13.6 |        2.21 |
-|  110 | AZERTY (FR)   | −87.8 | 7.60 | 7.97 | 4.40 |     1.47 |          1.03 |        18.07 |       28.00 |    23.77 |    15.3 |        0.04 |
+|    1 | Ergopti+ ANSI |  20.7 | 0.94 | 6.24 | 1.17 |     0.31 |          0.41 |        14.78 |       40.13 |    66.55 |     8.8 |        0.00 |
+|    2 | Ergopti+      |  19.0 | 0.98 | 6.21 | 1.29 |     0.24 |          0.42 |        14.70 |       40.13 |    65.51 |     8.9 |        0.00 |
+|    3 | beo           |  17.2 | 0.77 | 5.48 | 1.57 |     0.90 |          0.68 |        13.26 |       39.69 |    63.95 |     7.4 |        0.73 |
+|    4 | Ergopti       |  17.0 | 1.33 | 6.45 | 1.15 |     0.24 |          0.38 |        14.78 |       39.92 |    65.58 |     8.3 |        0.00 |
+|    5 | Ergopti ANSI  |  16.5 | 1.33 | 6.45 | 1.15 |     0.32 |          0.38 |        14.78 |       39.92 |    66.20 |     8.4 |        0.00 |
+|    6 | Optimot       |   8.2 | 1.01 | 6.69 | 1.82 |     0.19 |          0.37 |        15.23 |       41.20 |    66.58 |     7.2 |        1.43 |
+|    7 | Ergo-L        |   8.0 | 1.79 | 6.09 | 1.46 |     0.18 |          1.89 |        19.63 |       28.97 |    70.15 |     8.1 |        0.01 |
+|    8 | Hands Down    |   4.5 | 1.17 | 4.93 | 1.42 |     0.96 |          0.52 |        14.88 |       36.42 |    64.54 |     7.3 |        2.44 |
+|   11 | bépo          |  −9.7 | 2.88 | 7.72 | 0.85 |     0.08 |          0.68 |        15.65 |       38.91 |    71.18 |     8.9 |        0.00 |
+|  108 | AZERTY (FR)   | −90.5 | 7.60 | 7.97 | 4.40 |     1.47 |          1.03 |        18.07 |       28.00 |    23.77 |    15.3 |        0.04 |
+|  110 | QWERTY (US)   | −94.4 | 7.40 | 8.70 | 5.33 |     0.54 |          1.06 |        17.14 |       29.18 |    29.80 |    13.6 |        2.21 |
 
-English corpus: Graphite (9.5), Gallium (9.4), Gallium Colstag (9.4), Maya,
-Nerbs, Hands Down Neu, Heart and AdNW lead; Colemak-DH −6.1, Ergopti+ −7.8,
-Ergo-L −10.6, Dvorak −13.8, Bépo −29.9, QWERTY −89.6, AZERTY −102.8. The SFB
+English corpus: Graphite (7.2), Gallium (7.1), Gallium Colstag (6.9), Nerbs,
+Maya, AdNW, Hands Down Neu and S-Roll lead; Ergopti+ −7.6, Colemak-DH −11.2,
+Dvorak −13.7, Ergo-L −14.4, Bépo −29.4, QWERTY −92.1, AZERTY −105.4. The SFB
 of QWERTY (7.0 %), Colemak-DH (1.9 %) and Dvorak (3.2 %) on this synthetic
 corpus are of the order the Keyboard Layouts Doc gives (QWERTY ~6 %, Dvorak
 2.5 %, Colemak 1.5 %), the difference coming from its chained bigrams (« e, »
@@ -507,16 +511,76 @@ dead keys per physical key).
 
 ## 15. Decided by the agent, to review by the maintainer
 
-- The default fingering: Digit6 is typed by the right index; the ISO key left of
-  Z and Z by the left pinky; the space bar by the right thumb (thumbs are left
-  out of every bigram and trigram metric, so this only moves load between the
-  two thumbs). An angle-mod layout of the library uses the angle fingering on an
-  ISO board.
-- The ideal finger load of `finger_imbalance` (pinky 8, ring 11, middle 15,
-  index 16 % per hand), from dariogoetz's intended loads with the pinkies
-  lowered (Ergo-L criterion 2).
-- The usefulness table of the shortcut letters and the ease of each left-hand
-  key, both in `analysis_model.json`.
+Settled by the maintainer on 2026-11-14:
+
+- Digit6 is typed by the right index.
+- The space bar is typed by the **left** thumb (AltGr stays on the right
+  thumb). Thumbs are left out of every bigram and trigram metric, so this only
+  moves load between the two thumbs.
+- The default weights stay as in section 11.
+- The cmini layouts stay in the library, credited to their submitters.
+- The credits recorded from knowledge (`basis: knowledge`) are shown, to be
+  verified later.
+- The ideal finger load and the shortcut table were changed as sections 16
+  and 17 describe.
+
+Still decided by the agent:
+
+- The ISO key left of Z and Z are typed by the left pinky. An angle-mod layout
+  of the library uses the angle fingering on an ISO board.
 - The reference character set of `char_coverage` (ASCII, French letters and
   typography, a few European letters).
-- The weights above.
+- The ease of each left-hand key for `shortcut_left` (`shortcut_key_ease`).
+
+## 16. Ideal finger load
+
+`finger_imbalance` compares each finger's share of the non-thumb presses with a
+target, `ideal_finger_load` in `analysis_model.json`. The maintainer asked for
+pinkies under 8 % (ideally 6–7 %) and the order index ≥ middle ≥ ring ≥ pinky
+on each hand. Two of the studied tools publish a per-finger target or
+strength; each is scaled to one hand's 50 %:
+
+| Basis                                                               | Pinky | Ring | Middle | Index |
+| ------------------------------------------------------------------- | ----: | ---: | -----: | ----: |
+| dariogoetz `finger_balance` intended loads 1.0 / 1.6 / 2.0 / 2.0    |   7.6 | 12.1 |   15.2 |  15.2 |
+| genkey finger speeds (KPS) 1.5 / 3.6 / 4.8 / 5.5                    |   4.9 | 11.7 |   15.6 |  17.9 |
+| Mean of the two                                                     |   6.2 | 11.9 |   15.4 |  16.5 |
+| **Ergopti default**: the mean rounded to 0.5, the hand kept at 50 % |   6.5 | 11.5 |   15.5 |  16.5 |
+
+Oxeylyzer's finger weights (1.4 / 3.6 / 4.8 / 5.5, pinky to index) give almost
+the same split as genkey's. Ergo-L's criterion 2 (spare the pinkies) gives no
+number. The default pinky, 6.5 %, is inside the maintainer's range. The index
+is the strongest finger in both sources but also covers two columns, so it
+gets only 1 % more than the middle finger.
+
+The codegen refuses a model that breaks the rule (a hand not at 50 %, a finger
+above a stronger one, a pinky at 8 % or more). In the Studio, everyone can edit
+the eight targets and restore the defaults. The engine takes them through
+`analyse(…, {idealLoad})` and refuses targets that do not sum to 100 %.
+
+## 17. Shortcut letters
+
+`shortcut_left` rewards layouts that put the most used Ctrl/Cmd shortcuts on
+easy left-hand keys, so the right hand can stay on the mouse. Every letter A–Z
+has a usefulness from 1 to 10, `shortcut_letters` in `analysis_model.json`.
+The scores are an editorial estimate: no published study counts shortcut use.
+They are ordered by how universal each shortcut is across the vendor shortcut
+lists cited in the Studio (Windows, macOS, Word, Google Docs, Chrome, VS Code).
+Those pages could not be fetched from this session, so the citations are
+marked « to verify ».
+
+| Score | Letters       | Shortcuts                                                                                           |
+| ----: | ------------- | --------------------------------------------------------------------------------------------------- |
+|    10 | C, V, X, Z    | Copy, paste, cut, undo: the same in every application and system.                                   |
+|     8 | A, S          | Select all, save.                                                                                   |
+|     6 | F, Y, T, W    | Find; redo (Windows; Shift+Cmd+Z on macOS); new tab; close tab or window.                           |
+|     5 | B, I, U       | Bold, italic, underline in every rich-text editor (the maintainer wants them on the left).          |
+|     4 | K, N, O, P, R | Insert link / VS Code chord and command palette; new; open; print or quick open; reload.            |
+|     3 | L, Q, H, D    | Address bar or select line; quit (macOS); replace (Windows) or hide (macOS); bookmark or duplicate. |
+|     2 | E, G          | Search bar or centre; find next or go to line.                                                      |
+|     1 | J, M          | Downloads or join lines; minimise.                                                                  |
+
+With this table, Ergopti scores 53.8 %. It already has B, I and U on the left,
+but S (save) and F (find) are on the right. The weight stays at 0.15: on the
+French reference corpora `shortcut_left` is 5.6–5.7 % of Ergopti's absolute
+contributions, and 5.1 % on English. Both are inside the maintainer's 5–10 %.

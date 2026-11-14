@@ -1158,6 +1158,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "it", "pt", "sv"]
 		},
+		"layout_analysis.ideal.sum": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "pt"]
+		},
 		"layout_analysis.table.score": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "fr", "nl"]

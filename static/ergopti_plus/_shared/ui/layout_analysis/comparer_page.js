@@ -31,6 +31,12 @@
  *    LAYOUT_ANALYSIS_COMPARER.addLayouts adds personal layouts; a host
  *    `store` ({list, save, remove}, promises) keeps imported layouts instead
  *    of localStorage.
+ * 8. Every metric and sourced value has an « i » button: its popover says
+ *    where the value comes from and links the sources (DATA.sources, from
+ *    sources.json). A host may define LAYOUT_ANALYSIS_HOST.openLink(url) to
+ *    open links itself (the app's browser); otherwise they open a new tab.
+ * 9. The ideal finger load of finger_imbalance is editable (eight targets
+ *    summing to 100 %), kept with the other conveniences.
  * ==============================================================================
  */
 
@@ -63,6 +69,9 @@
 	// Size of one key unit of the heatmap, in pixels.
 	const HEAT_UNIT_PX = 44;
 	const TEXT_DEBOUNCE_MS = 400;
+	// The « i » popover: its widest size and its gap to the window's edges.
+	const POPOVER_WIDTH_PX = 360;
+	const POPOVER_GUTTER_PX = 12;
 	// The message the framing page listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
 	// The app's keystats n-grams: the event its Studio window dispatches and the
@@ -123,6 +132,7 @@
 					keyboard: state.keyboard,
 					selected: Array.from(state.selected),
 					weights: state.weights,
+					idealLoad: state.idealLoad,
 					custom: state.custom,
 					imported
 				})
@@ -158,6 +168,7 @@
 						.map((l) => l.id)
 		),
 		weights: Object.assign(E.defaultWeights(), validWeights(saved.weights)),
+		idealLoad: validIdealLoad(saved.idealLoad),
 		custom: saved.custom && saved.custom.tables ? saved.custom : null,
 		tables: null,
 		results: [],
@@ -185,6 +196,16 @@
 		for (const [id, value] of Object.entries(weights || {}))
 			if (id in defaults && Number.isFinite(value) && value >= 0) out[id] = value;
 		return out;
+	}
+
+	/** The saved ideal finger load when the engine still accepts it, else the default. */
+	function validIdealLoad(load) {
+		if (!load) return E.defaultIdealLoad();
+		try {
+			return Object.assign({}, E.idealLoad(load));
+		} catch {
+			return E.defaultIdealLoad();
+		}
 	}
 
 	// ==========================
@@ -260,7 +281,11 @@
 			return;
 		}
 		const start = performance.now();
-		state.results = E.compare(chosen, tables, { keyboard: state.keyboard, weights: state.weights });
+		state.results = E.compare(chosen, tables, {
+			keyboard: state.keyboard,
+			weights: state.weights,
+			idealLoad: state.idealLoad
+		});
 		const ms = Math.round(performance.now() - start);
 		showStatus(
 			t('layout_analysis.status.ready', {
@@ -345,6 +370,7 @@
 		for (const column of columns) {
 			const th = el('th', 'la-sortable', column.label);
 			th.scope = 'col';
+			if (DATA.sources.items[column.key]) th.append(' ', infoButton(column.key));
 			if (state.sort.key === column.key)
 				th.setAttribute('aria-sort', state.sort.descending ? 'descending' : 'ascending');
 			th.addEventListener('click', () => {
@@ -467,6 +493,7 @@
 		link.hidden = !layout.url;
 		link.href = layout.url || '#';
 		link.textContent = layout.url;
+		routeLink(link);
 		renderHeatmap(result);
 		const contributions = Object.entries(result.score.contributions)
 			.filter(([, v]) => v !== 0)
@@ -484,6 +511,8 @@
 			const tr = el('tr');
 			const th = el('th', '', t(`layout_analysis.metric.${id}`));
 			th.scope = 'row';
+			th.append(' ', infoButton(id));
+			if (id === 'shortcut_left') th.append(' ', infoButton('shortcut_letters'));
 			const unit = E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
 			tr.append(th, el('td', '', `${format(result.metrics[id], metricDigits(id))} ${unit}`));
 			table.append(tr);
@@ -565,7 +594,9 @@
 		list.replaceChildren();
 		for (const id of Object.keys(E.defaultWeights())) {
 			const label = el('label', 'la-weight');
-			label.append(el('span', '', t(`layout_analysis.metric.${id}`)));
+			const name = el('span', '', t(`layout_analysis.metric.${id}`));
+			name.append(' ', infoButton(id));
+			label.append(name);
 			const input = el('input');
 			input.type = 'number';
 			input.min = '0';
@@ -584,6 +615,176 @@
 			label.append(input);
 			list.append(label);
 		}
+	}
+
+	function fillIdealLoad() {
+		const list = $('la-ideal-list');
+		list.replaceChildren();
+		const inputs = {};
+		const showSum = () => {
+			const sum = Object.keys(inputs).reduce((total, id) => total + Number(inputs[id].value), 0);
+			const box = $('la-ideal-sum');
+			box.textContent = t('layout_analysis.ideal.sum', { sum: format(sum, 1) });
+			let load;
+			try {
+				load = E.idealLoad(
+					Object.fromEntries(
+						Object.keys(inputs).map((id) => [
+							id,
+							inputs[id].value === '' ? NaN : Number(inputs[id].value)
+						])
+					)
+				);
+			} catch {
+				box.className = 'la-error';
+				for (const input of Object.values(inputs)) input.setAttribute('aria-invalid', 'true');
+				return;
+			}
+			box.className = 'la-muted';
+			for (const input of Object.values(inputs)) input.removeAttribute('aria-invalid');
+			state.idealLoad = Object.assign({}, load);
+			save();
+			analyse();
+		};
+		for (const id of Object.keys(E.defaultIdealLoad())) {
+			const label = el('label', 'la-weight');
+			label.append(el('span', '', t(`layout_analysis.finger.${id}`)));
+			const input = el('input');
+			input.type = 'number';
+			input.min = '0';
+			input.max = '100';
+			input.step = 'any';
+			input.value = String(state.idealLoad[id]);
+			input.addEventListener('input', showSum);
+			inputs[id] = input;
+			label.append(input);
+			list.append(label);
+		}
+		$('la-ideal-sum').textContent = t('layout_analysis.ideal.sum', {
+			sum: format(
+				Object.values(state.idealLoad).reduce((a, b) => a + b, 0),
+				1
+			)
+		});
+	}
+
+	// ==========================
+	// ======= Info popovers ====
+	// ==========================
+
+	let popoverOwner = null;
+
+	/** An « i » button that opens the sources of one metric or value. */
+	function infoButton(item) {
+		const button = el('button', 'la-info', 'i');
+		button.type = 'button';
+		button.dataset.info = item;
+		labelInfoButton(button);
+		return button;
+	}
+
+	function labelInfoButton(button) {
+		const label = t('layout_analysis.info.button');
+		button.setAttribute('aria-label', label);
+		button.title = label;
+		button.setAttribute('aria-expanded', String(button === popoverOwner));
+		button.setAttribute('aria-controls', 'la-popover');
+	}
+
+	/** Opens links through the host when it has a browser of its own. */
+	function routeLink(link) {
+		link.target = '_blank';
+		link.rel = 'noopener';
+		if (typeof HOST.openLink !== 'function') return;
+		link.onclick = (event) => {
+			event.preventDefault();
+			HOST.openLink(link.href);
+		};
+	}
+
+	/** The default values an explanation quotes, from the data (one source of truth). */
+	function infoValues(item) {
+		if (item !== 'ideal_finger_load') return {};
+		const load = E.defaultIdealLoad();
+		return {
+			pinky: format(load.lp, 1),
+			ring: format(load.lr, 1),
+			middle: format(load.lm, 1),
+			index: format(load.li, 1)
+		};
+	}
+
+	function openInfo(button) {
+		const item = button.dataset.info;
+		const refs = DATA.sources.items[item];
+		if (!refs) throw new Error(`layout_analysis: no sources for ${item}`);
+		const popover = $('la-popover');
+		$('la-popover-text').textContent = t(`layout_analysis.info.${item}`, infoValues(item));
+		const list = $('la-popover-links');
+		list.replaceChildren();
+		for (const id of refs) {
+			const ref = DATA.sources.references[id];
+			const li = el('li');
+			const a = el('a', '', ref.title);
+			a.href = ref.url;
+			routeLink(a);
+			li.append(a);
+			if (!ref.checked) li.append(` (${t('layout_analysis.info.unchecked')})`);
+			list.append(li);
+		}
+		closeInfo();
+		popoverOwner = button;
+		button.setAttribute('aria-expanded', 'true');
+		popover.hidden = false;
+		const box = button.getBoundingClientRect();
+		const width = Math.min(
+			POPOVER_WIDTH_PX,
+			document.documentElement.clientWidth - 2 * POPOVER_GUTTER_PX
+		);
+		popover.style.width = `${width}px`;
+		const left = Math.min(
+			Math.max(POPOVER_GUTTER_PX, box.left),
+			document.documentElement.clientWidth - width - POPOVER_GUTTER_PX
+		);
+		popover.style.left = `${left + window.scrollX}px`;
+		popover.style.top = `${box.bottom + window.scrollY + POPOVER_GUTTER_PX / 2}px`;
+		$('la-popover-close').focus();
+	}
+
+	function closeInfo() {
+		const popover = $('la-popover');
+		if (popover.hidden) return;
+		popover.hidden = true;
+		const owner = popoverOwner;
+		popoverOwner = null;
+		if (owner && owner.isConnected) {
+			owner.setAttribute('aria-expanded', 'false');
+			owner.focus();
+		}
+	}
+
+	function bindInfo() {
+		// One listener for every « i » button, static or redrawn.
+		document.addEventListener(
+			'click',
+			(event) => {
+				const button = event.target.closest('.la-info');
+				if (button) {
+					// Inside a sortable header or a weight label: open only.
+					event.preventDefault();
+					event.stopPropagation();
+					if (button === popoverOwner) closeInfo();
+					else openInfo(button);
+					return;
+				}
+				if (!event.target.closest('#la-popover')) closeInfo();
+			},
+			true
+		);
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') closeInfo();
+		});
+		$('la-popover-close').addEventListener('click', closeInfo);
 	}
 
 	/** Decodes a picked layout file: UTF-16 with its byte-order mark (KLC) or UTF-8. */
@@ -705,6 +906,12 @@
 			fillLayouts();
 			analyse();
 		});
+		$('la-ideal-restore').addEventListener('click', () => {
+			state.idealLoad = E.defaultIdealLoad();
+			fillIdealLoad();
+			save();
+			analyse();
+		});
 		$('la-restore').addEventListener('click', () => {
 			state.weights = E.defaultWeights();
 			fillWeights();
@@ -714,6 +921,8 @@
 		document.addEventListener('i18n:applied', () => {
 			fillCorpora();
 			fillWeights();
+			fillIdealLoad();
+			document.querySelectorAll('.la-info').forEach(labelInfoButton);
 			render();
 			analyse();
 		});
@@ -779,7 +988,10 @@
 		fillCorpora();
 		fillLayouts();
 		fillWeights();
+		fillIdealLoad();
+		document.querySelectorAll('.la-info').forEach(labelInfoButton);
 		bind();
+		bindInfo();
 		analyse();
 		reportHeight();
 		// The host's personal layouts (app data folder, site IndexedDB).
