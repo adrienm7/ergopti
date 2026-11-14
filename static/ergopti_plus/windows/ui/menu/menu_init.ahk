@@ -138,7 +138,7 @@ initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false, PrebuiltLlm := unset) {
 _MI_TopLevelBuilders() {
 	return Map(
 		"keyboard_layout", _MI_StageLayout,
-		"ergopti_studio",  _MI_StageErgoptiStudio,
+		MenuCommand.ERGOPTI_STUDIO, _MI_StageErgoptiStudio,
 		"hotstrings",      _MI_StageHotstrings,
 		"llm",             _MI_StageLlm,
 		"agent",           _MI_StageAgent,
@@ -246,7 +246,7 @@ _MI_StageLayout() {
 ; the startup admission like the other command rows, and a pause greys it with
 ; the feature rows (greyed_when_paused).
 _MI_StageErgoptiStudio() {
-	Row := MenuRenderer_CommandRow("top_level", "ergopti_studio",
+	Row := MenuRenderer_CommandRow("top_level", MenuCommand.ERGOPTI_STUDIO,
 		Map(MenuCommand.ERGOPTI_STUDIO, LayoutManager_OpenEditor))
 	if !(Row is Map) || !Row.Has("action")
 		throw Error("The declared Ergopti Studio row was refused before native construction.")

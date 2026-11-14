@@ -26,7 +26,7 @@ local function _build_ergopti_studio(ctx)
 		return nil
 	end
 	local command = require("settings.engine.keys").COMMAND.ERGOPTI_STUDIO
-	return ManifestMenu.command_row("top_level", "ergopti_studio", {
+	return ManifestMenu.command_row("top_level", command, {
 		[command] = function()
 			-- Loudly, not silently: a row that cannot open its window must say so.
 			if type(ctx) ~= "table" or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
