@@ -156,6 +156,42 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	Tracker.Close(Label, StartTicks, now, SlowMs, Detail)
 }
 
+; Opens a paired span line for a path a person waits on (an expansion typed, a
+; tray branch filled, a layout switched): at DEBUG it writes "[TRACE] [Span]
+; <name>…", the tag and names of the Linux and macOS drivers, so one search finds
+; the line on every OS. It opens no nesting frame: the segment that times the
+; same work (HSE.Dispatch, Menu.deferred_build) keeps its own attribution.
+; @param Name {String} Span name shared with the other drivers (e.g. "hotstring.expand").
+; @returns {Integer} QPC stamp to pass to HotPath_SpanDone.
+HotPath_SpanTrace(Name) {
+	global _LOGGER_DEBUG_ENABLED
+	; The logger's flag is assigned at its include position; a span closed by an
+	; early boot pump before it has no line to write, only its stamp.
+	if IsSet(_LOGGER_DEBUG_ENABLED) && _LOGGER_DEBUG_ENABLED
+		LoggerTrace("Span", "{1}…", Name)
+	return PerfClockTicks()
+}
+
+; Closes a span opened with HotPath_SpanTrace, or measured from an existing
+; HotPath_Now stamp, with its "[DONE] [Span] <name> done in N ms" line at DEBUG.
+; Below DEBUG it costs one flag read and formats nothing.
+; @param Name {String} The span HotPath_SpanTrace opened.
+; @param StartTicks {Integer} QPC stamp taken when the work started.
+; @param Detail {String} A short outcome: names and counts only, never typed text.
+; @returns {Number} Elapsed milliseconds at DEBUG, 0 below it (nothing was read).
+HotPath_SpanDone(Name, StartTicks, Detail := "") {
+	global _LOGGER_DEBUG_ENABLED, _HOTPATH_QPC_FREQ
+	ElapsedMs := 0.0
+	if !(IsSet(_LOGGER_DEBUG_ENABLED) && _LOGGER_DEBUG_ENABLED)
+		return ElapsedMs
+	if !IsSet(_HOTPATH_QPC_FREQ) || _HOTPATH_QPC_FREQ == 0
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	ElapsedMs := (PerfClockTicks() - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
+	LoggerDone("Span", "{1} done in {2} ms{3}.", Name, Format("{:.2f}", ElapsedMs),
+		(Detail is String && Detail != "") ? " (" . Detail . ")" : "")
+	return ElapsedMs
+}
+
 /**
  * The open segments of the one AutoHotkey thread stack; the port of
  * _shared/metrics/engine/perf/hotpath_segments.lua new_nesting. Threads interrupt one another
