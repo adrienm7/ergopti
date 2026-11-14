@@ -82,7 +82,14 @@ the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_
 list: Windows Unit meta, Linux E2E platform-metrics and input-display, Linux unit rows on every distribution, Common
 App Cloner literals, the Linux uninstall and Arch desktop entry fixtures, the macOS release Darwin receiver and the
 macOS Intel Managed Ollama Go race (`TestCancellationAndConcurrentClosePhysicallyRetirePeer`, fixed with its
-`slow-start` case).
+`slow-start` case). Run [43585486177](https://github.com/adrienm7/ergopti/actions/runs/43585486177) (worker G,
+11:20 Paris) adds Windows Integration Driver startup and Unit core to the green list; its reds are the updater,
+desktop-webview and Packaging and boot rows above, with their verdicts and Release Verify. The « Linux layout
+installer » workflow, red since the structure move, is green again in run
+[43585483614](https://github.com/adrienm7/ergopti/actions/runs/43585483614): its BOM gate admits the Windows-written
+tap-hold corpus file, which pins the BOM on purpose (91c214ca94); each Compose prefix is written before the sequences
+it starts, because libxkbcommon 1.13 lets a later shorter rule replace them (d19829499b); and the Python 3.8 floor
+runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3bad).
 
 ### Maintainer decisions of 2026-11-13, to implement
 
