@@ -117,7 +117,7 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
         (Right Ctrl already ships one-shot Shift + Shift); the AltGr pair is pinned by tests per OS. The shipped
         AltGr key keeps its Tab tap (decided by the agent on 2026-11-13, to review by the maintainer).
   - Hardware checks are in TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md.
-- [ ] **One validation contract for every user-entered value (maintainer request 2026-11-13).** Every input box,
+- [x] **One validation contract for every user-entered value (maintainer request 2026-11-13).** Every input box,
       editor field and `config.toml`/TOML key on Windows, macOS and Linux declares its type (integer, decimal,
       boolean, enum, string, path), minimum, maximum, whether decimals are allowed and any special value (such as
       the one-shot `0` = no limit), in one shared schema per setting (single source, read by the three drivers and
@@ -145,7 +145,14 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
       editor repeat count, the layout editor's tap-hold threshold and virtual key, the prompt binding's prediction
       count, the Linux stored proxy override, the Windows magic-key source and log level, and the macOS hotstring
       editor shortcut, each at entry, load and boundary with tests per OS (« Migration status » rows of the
-      inventory, each with its agent decision). Left: the one-shot timeout, once worker A lands « 0 = no time limit ».
+      inventory, each with its agent decision). The one-shot timeout followed on 2026-11-14 after CI run
+      [43587610549](https://github.com/adrienm7/ergopti/actions/runs/43587610549) (its failed jobs rerun: the
+      Windows core input-burst case passed, the macOS Intel managed Ollama cell failed on a refused model pull,
+      then on the rerun's missing build handoff): `tap_holds.sticky_timeout_ms` is declared from 0 (no time
+      limit, worker A's rule) to 2147483647 ms, the Windows timer ceiling (decided by the agent on 2026-11-14,
+      to review by the maintainer), and the shared Lua rule and its AHK port read it at entry, load and
+      boundary. The same landing keeps the schema's provenance (default_from, max_from) out of the generated
+      runtime projections, the Windows bundle manifest red of dev run 43579693369.
 - [x] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
