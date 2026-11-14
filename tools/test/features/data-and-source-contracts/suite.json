@@ -890,6 +890,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-published-records.cjs"],
 			"repro": "npm run test:structure-published-records"
+		},
+		{
+			"id": "js-0537",
+			"ordinal": 660,
+			"name": "structure plan follows a shell path joined onto an unbraced variable",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-shell-paths.cjs"],
+			"repro": "npm run test:structure-shell-paths"
 		}
 	]
 }

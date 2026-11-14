@@ -2305,6 +2305,25 @@ function scanFile(file, text, ctx) {
 				}
 			);
 		}
+	// "$SCRIPT_DIR/ui/dialog_host.lua" in a driver's shell script: the path
+	// joined onto an unbraced variable. ${SCRIPT_DIR}/x is a path token as
+	// written; $SCRIPT_DIR/x is not (the variable's last letter touches it),
+	// so S12 left uninstall.sh running a dialog host that had moved.
+	if (/\.(sh|bash)$/.test(file) && inTree && Census.DRIVERS.includes(inTree))
+		for (const m of text.matchAll(
+			/\$([A-Za-z_]\w*)(\/(?:[\w.-]+\/)*[\w.-]+\.[A-Za-z0-9]+)(?![\w/.-])/g
+		)) {
+			// The variable is the script's folder or the driver root: the path
+			// resolves from the script's own folder, as its bare spelling would.
+			const hit = resolvePathToken(m[2].slice(1), file, inTree, byRepoPath, false, byRepoDir, null);
+			if (!hit || !['file', 'root'].includes(hit.form)) continue;
+			if (!hit.newRepo || hit.newRepo === PREFIX || hit.newRepo === SPLIT) continue;
+			const from = hit.form === 'file' ? path.posix.dirname(file) : `${PREFIX}${inTree}`;
+			const fresh = `/${path.posix.relative(from, hit.newRepo)}`;
+			if (fresh !== m[2] && !fresh.startsWith('/..'))
+				add('lua-module-quoted', m[0], `$${m[1]}${fresh}`, hit);
+		}
+
 	// SplitPath(A_LineFile, , &TestDir) then TestDir . "/../../..": a climb
 	// from the file's own folder to a folder above it. When the file moves, the
 	// climb is recounted to name the same folder (S06 moved the reload
