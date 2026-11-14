@@ -439,7 +439,8 @@ function resolvePathToken(
 	byRepoPath,
 	sharedArgument = false,
 	folders = null,
-	toolDriver = null
+	toolDriver = null,
+	entryScript = false
 ) {
 	// //go:build or a // comment: a comment marker, never a path the plan
 	// moves (file:///A.app/… is a path, after its empty authority).
@@ -472,8 +473,11 @@ function resolvePathToken(
 		// #Include %A_ScriptDir%\..\x.ahk is written only by entry scripts (the
 		// driver, the bundled app entry, the UIA worker, the layout registrar):
 		// launched on their own, their script folder is their own folder. In a
-		// test it is windows/tests, which the A_ScriptDir climb rule reads.
-		const ownScriptDir = file.endsWith('.ahk') && !file.includes('/tests/');
+		// test it is windows/tests, which the A_ScriptDir climb rule reads,
+		// unless the test is itself launched (#SingleInstance): the magic
+		// editor's native helper kept ..\..\adapters\hotkey_registrar.ahk
+		// after S15 moved the registrar.
+		const ownScriptDir = file.endsWith('.ahk') && (!file.includes('/tests/') || entryScript);
 		if (lead !== '%A_ScriptDir%/' || ownScriptDir)
 			candidates.push({ form: 'file', lead, abs: path.posix.normalize(`${dir}/${rest}`) });
 		// "./lua" and "../x" are relative to the file and nothing else.
@@ -1836,6 +1840,8 @@ function scanFile(file, text, ctx) {
 			? resolveOwnRelative(token, file, selfTarget)
 			: hit;
 	const sharedFolders = new Set();
+	// Only a launched AutoHotkey script declares #SingleInstance.
+	const entryScript = /\.ahk$/.test(file) && /^#SingleInstance\b/m.test(text);
 	for (const m of text.matchAll(pathToken)) {
 		const hit = stays(
 			m[0],
@@ -1846,7 +1852,8 @@ function scanFile(file, text, ctx) {
 				byRepoPath,
 				isSharedArgument(text, m.index),
 				byRepoDir,
-				toolDriverOf(m[0], m.index)
+				toolDriverOf(m[0], m.index),
+				entryScript
 			)
 		);
 		if (hit) add('path', m[0], hit.newRepo === PREFIX ? '(retired)' : hit.newRepo, hit);

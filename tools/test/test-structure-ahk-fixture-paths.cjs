@@ -74,6 +74,22 @@ function run() {
 			includeOut
 		);
 	}
+	// A test helper launched on its own (#SingleInstance) climbs from its own
+	// folder, not from windows/tests: the magic editor's native helper kept
+	// ..\..\adapters\hotkey_registrar.ahk after S15 moved the registrar.
+	const NATIVE = 'static/ergopti_plus/windows/tests/support/zz_probe_native.ahk';
+	const nativeMap = new Map([
+		['windows/adapters/hotkey_registrar.ahk', 'windows/platform/input/hotkey_registrar.ahk']
+	]);
+	const native =
+		'#Requires AutoHotkey v2.0\n#SingleInstance Off\n' +
+		'#Include %A_ScriptDir%\\..\\..\\adapters\\hotkey_registrar.ahk\n';
+	const nativeRows = Plan.scanFile(NATIVE, native, Plan.referenceContext(nativeMap));
+	const nativeOut = Apply.rewriteText(native, nativeRows, new Map(), NATIVE);
+	assert.ok(
+		nativeOut.includes('#Include %A_ScriptDir%\\..\\..\\platform\\input\\hotkey_registrar.ahk'),
+		nativeOut
+	);
 	console.log('[OK] AutoHotkey fixtures keep their created folders and their climbs.');
 }
 
