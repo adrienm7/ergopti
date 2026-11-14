@@ -8,8 +8,10 @@
  * from a loopback server: edit a key and see its legend, type through a dead
  * key in the live preview, save the TOML and read it back, import a registry
  * .keylayout, export it unchanged, convert it, import the navigation layer,
- * and check that no raw locale key is shown in any of the 21 locales. Page
- * errors and requests outside the loopback origin fail the gate.
+ * show and add the Base, Shift, AltGr and Shift+AltGr layers from the layer
+ * selector, lay out at phone width in light and dark without a sideways page
+ * scroll, and check that no raw locale key is shown in any tool tab of the 21
+ * locales. Page errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
  */
 
@@ -110,6 +112,25 @@ async function open(browser, origin, lang) {
 	return { page, errors };
 }
 
+/** Shows one of the editor's secondary tools (the tab strip under the board). */
+function tool(page, id) {
+	return page.click(`#le-tools [data-tool="${id}"]`);
+}
+
+/** The raw locale keys the page shows (texts, placeholders and titles). */
+function rawKeys(page) {
+	return page.evaluate(() => {
+		const texts = [document.title];
+		for (const node of document.querySelectorAll('body *')) {
+			if (node.children.length === 0) texts.push(node.textContent);
+			if (node.placeholder) texts.push(node.placeholder);
+			if (node.title) texts.push(node.title);
+			if (node.getAttribute('aria-label')) texts.push(node.getAttribute('aria-label'));
+		}
+		return texts.filter((text) => /layout_editor\.|sg_actions\.|layer_editor\./.test(text));
+	});
+}
+
 async function downloaded(page, click) {
 	const [download] = await Promise.all([page.waitForEvent('download'), click()]);
 	return {
@@ -178,7 +199,7 @@ async function exerciseManager(browser, origin) {
 	assert.match(await page.textContent('#le-message'), /ErgoptiPlus/);
 
 	// Fill sources come from the composer host's own list.
-	await page.click('#le-fill summary');
+	await tool(page, 'fill');
 	await page.click('#le-fill-load');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_open'));
 	const keylayoutText = fs.readFileSync(KEYLAYOUT, 'utf8');
@@ -198,9 +219,11 @@ async function exerciseManager(browser, origin) {
 	assert.match(await page.textContent('#le-message'), /mine\.toml/);
 
 	// The source's navigation layer applies through the host's navigation layer save.
+	await tool(page, 'navigation');
 	await page.selectOption('#le-nav-hold', 'CapsLock');
 	await page.setInputFiles('#le-nav-file', NAV);
 	await page.waitForSelector('[data-layer="nav"].active');
+	await tool(page, 'export');
 	await page.click('#le-apply-nav');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'nav_save'));
 	const nav = await page.evaluate(() => window.__posted.find((p) => p.action === 'nav_save'));
@@ -274,6 +297,7 @@ async function exerciseManager(browser, origin) {
 	await page.click('#le-start [data-start="ergopti"]');
 	if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
 	await page.waitForSelector('#le-start', { state: 'detached' });
+	await tool(page, 'details');
 	assert.equal(await page.inputValue('#le-name'), 'My Ergopti');
 	await page.click('#le-new');
 	await page.click('#le-start [data-start="blank"]');
@@ -284,6 +308,133 @@ async function exerciseManager(browser, origin) {
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'close'));
 	assert.deepEqual(errors, []);
 	await page.close();
+}
+
+/**
+ * The layer selector shows the four character levels of any layout, adds a missing
+ * one in one click, finds a level by its modifiers whatever the layer is called,
+ * and lists the layout's other layers.
+ */
+async function exerciseLayerSelector(browser, origin) {
+	const { page, errors } = await open(browser, origin, 'en');
+	const levels = () =>
+		page.$$eval('#le-layerbar [data-level]', (buttons) =>
+			buttons.map((b) => [
+				b.dataset.level,
+				b.dataset.layer || null,
+				b.classList.contains('missing')
+			])
+		);
+	assert.deepEqual(await levels(), [
+		['base', 'base', false],
+		['shift', null, true],
+		['altgr', null, true],
+		['shift_altgr', null, true]
+	]);
+	assert.equal(await page.getAttribute('[data-layer="base"]', 'aria-selected'), 'true');
+	// A missing level is added with its modifiers and shown at once.
+	await page.click('#le-layerbar [data-level="altgr"]');
+	await page.waitForSelector('[data-layer="altgr"].active');
+	await page.click('#le-board [data-code="KeyQ"]');
+	await page.selectOption('#le-kind', 'text');
+	await page.fill('#le-text', '@');
+	await page.click('#le-apply');
+	const legendOf = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	assert.equal(await legendOf('KeyQ'), '@');
+	await page.click('[data-layer="base"]');
+	assert.equal(await legendOf('KeyQ'), '', 'the base layer keeps its own key');
+	await page.click('[data-layer="altgr"]');
+	assert.equal(await legendOf('KeyQ'), '@');
+	const saved = await downloaded(page, () => page.click('#le-save'));
+	assert.match(saved.text, /id = "altgr"\s+required = \[ ?"alt" ?\]/);
+	// « Manage layers… » opens the layer tool; Undo removes the added level again.
+	await page.click('#le-manage-layers');
+	await page.waitForSelector('#le-layers #le-layer-add');
+	await page.click('#le-undo');
+	await page.click('#le-undo');
+	await page.waitForSelector('#le-layerbar [data-level="altgr"].missing');
+	// A source names its levels freely: AltGr is the layer held with Right Alt.
+	await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
+	await page.waitForSelector('[data-layer="option"][data-level="altgr"]');
+	assert.deepEqual(await levels(), [
+		['base', 'base', false],
+		['shift', 'shift', false],
+		['altgr', 'option', false],
+		['shift_altgr', null, true]
+	]);
+	assert.deepEqual(
+		await page.$$eval('#le-layerbar .le-other-layers [data-layer]', (buttons) =>
+			buttons.map((b) => b.dataset.layer)
+		),
+		['kana', 'command']
+	);
+	await page.click('[data-layer="option"]');
+	assert.equal(await page.getAttribute('[data-layer="option"]', 'aria-selected'), 'true');
+	// Every section reaches the page as an element: a hidden one is not printed as « null ».
+	assert.deepEqual(
+		await page.$$eval('#layout-editor', ([root]) =>
+			[...root.childNodes].filter((node) => node.nodeType !== 1).map((node) => node.textContent)
+		),
+		[]
+	);
+	assert.deepEqual(errors, []);
+	await page.context().close();
+}
+
+/** At phone width, in light and dark, the page never scrolls sideways and stacks its columns. */
+async function exercisePhoneWidth(browser, origin) {
+	const backgrounds = [];
+	for (const colorScheme of ['light', 'dark']) {
+		const context = await browser.newContext({
+			viewport: { width: 375, height: 812 },
+			colorScheme
+		});
+		const page = await context.newPage();
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.goto(`${origin}/ui/layout_editor/index.html?lang=fr`);
+		await page.waitForSelector('#le-board');
+		await page.click('#le-board [data-code="KeyA"]');
+		const layout = await page.evaluate(() => {
+			const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+			const inside = (selector) =>
+				[...document.querySelectorAll(selector)].every((node) => {
+					const rect = node.getBoundingClientRect();
+					return rect.left >= 0 && rect.right <= window.innerWidth;
+				});
+			return {
+				pageWidth: document.documentElement.scrollWidth,
+				viewport: window.innerWidth,
+				toolbarInside: inside('.le-toolbar button'),
+				levelsInside: inside('#le-layerbar [data-level]'),
+				inspectorBelowBoard: box('#le-inspector').top >= box('#le-board').bottom,
+				toolsBelowInspector: box('#le-tools').top >= box('#le-inspector').bottom,
+				toolTabsScroll: getComputedStyle(document.querySelector('.le-tool-tabs')).overflowX,
+				background: getComputedStyle(document.querySelector('#layout-editor')).backgroundColor
+			};
+		});
+		assert.equal(layout.pageWidth, layout.viewport, `${colorScheme}: no sideways page scroll`);
+		assert.ok(layout.toolbarInside, `${colorScheme}: the primary toolbar fits the screen`);
+		assert.ok(layout.levelsInside, `${colorScheme}: the four levels fit the screen`);
+		assert.ok(layout.inspectorBelowBoard, `${colorScheme}: the inspector stacks under the board`);
+		assert.ok(layout.toolsBelowInspector, `${colorScheme}: the tools come last`);
+		assert.equal(layout.toolTabsScroll, 'auto', 'the tool tabs scroll inside their strip');
+		// Every tool opens without widening the page.
+		for (const id of await page.$$eval('#le-tools [data-tool]', (tabs) =>
+			tabs.map((tab) => tab.dataset.tool)
+		)) {
+			await tool(page, id);
+			assert.equal(
+				await page.evaluate(() => document.documentElement.scrollWidth),
+				layout.viewport,
+				`${colorScheme}: the ${id} tool fits the screen`
+			);
+		}
+		backgrounds.push(layout.background);
+		assert.deepEqual(errors, []);
+		await context.close();
+	}
+	assert.notEqual(backgrounds[0], backgrounds[1], 'the dark theme changes the page background');
 }
 
 (async () => {
@@ -312,6 +463,8 @@ async function exerciseManager(browser, origin) {
 			.replace('{1}', '1')
 			.replace('{2}', '10000')
 			.replace('{3}', strings['value_check.unit.ms']);
+		await page.click('#le-group-tap_hold summary');
+		await page.click('#le-group-key summary');
 		for (const typed of ['0', '10001', '2.5', '']) {
 			await page.fill('#le-threshold', typed);
 			await page.click('#le-tap-hold-apply');
@@ -371,7 +524,7 @@ async function exerciseManager(browser, origin) {
 		await page.click('#le-undo');
 
 		// A dead key with a rule types its composition in the preview.
-		await page.click('#le-dead-keys summary');
+		await tool(page, 'dead_keys');
 		await page.fill('#le-dead-id', 'circ');
 		await page.fill('#le-dead-terminator', '^');
 		await page.click('#le-dead-add');
@@ -399,9 +552,11 @@ async function exerciseManager(browser, origin) {
 		assert.equal(await page.textContent('#le-board [data-code="BracketLeft"] .le-legend'), '');
 
 		// A .keylayout imports verbatim, exports unchanged, then converts to editable layers.
+		await tool(page, 'details');
 		await page.selectOption('#le-import-convention', 'iso');
 		await page.setInputFiles('#le-open-file', KEYLAYOUT);
 		await page.waitForSelector('#le-preserved');
+		await tool(page, 'export');
 		assert.equal(await page.locator('#le-macos-format').count(), 0, 'an import keeps its variant');
 		assert.equal(await page.getAttribute('#le-export-macos', 'data-format'), 'iso');
 		const exported = await downloaded(page, () => page.click('#le-export-macos'));
@@ -443,11 +598,12 @@ async function exerciseManager(browser, origin) {
 		// The KLC needs its Windows metadata first: the refusal says so.
 		await page.click('#le-export-klc');
 		await page.waitForSelector('.le-message.error');
-		await page.click('#le-windows summary');
+		await tool(page, 'windows');
 		await page.fill('#le-win-locale', 'fr-FR');
 		await page.fill('#le-win-layout-id', '0000040c');
 		await page.fill('#le-win-dll-name', 'kbdergo');
 		await page.click('#le-win-klc-apply');
+		await tool(page, 'export');
 		const [klc] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-klc')]);
 		assert.equal(klc.suggestedFilename(), 'kbdergo.klc');
 		// The site says where the Windows DLL and installer come from, and offers no
@@ -485,10 +641,11 @@ async function exerciseManager(browser, origin) {
 		await page.selectOption('#le-board-form', 'ansi');
 		assert.equal(await page.locator('#le-board [data-code="IntlBackslash"]').count(), 0);
 		await page.selectOption('#le-board-form', 'iso');
-		await page.click('#le-windows summary');
+		await tool(page, 'windows');
 		await page.fill('#le-win-flags', 'kllf_altgr');
 		await page.click('#le-win-flags-apply');
 		assert.equal(await page.inputValue('#le-win-flags'), 'kllf_altgr');
+		await tool(page, 'stickers');
 		await page.fill('#le-sticker-mm', '18');
 		await page.dispatchEvent('#le-sticker-mm', 'change');
 		assert.match(await page.getAttribute('#le-stickers', 'style'), /--le-sticker-size:18mm/);
@@ -513,14 +670,13 @@ async function exerciseManager(browser, origin) {
 				level
 			);
 		assert.ok((await sticker('shift')).includes('Ŵ'));
-		await page.click('#le-sticker-levels summary');
+		await tool(page, 'stickers');
 		await page.check('#le-sticker-hide-case');
 		assert.ok(!(await sticker('shift')).includes('Ŵ'), 'the capital of the base is hidden');
-		await page.click('#le-sticker-levels summary');
 		await page.uncheck('#le-sticker-layer-shift');
 		assert.equal((await sticker('shift')).length, 0, 'an unchosen level is not printed');
 		// « Move every key »: the Shift layer's mappings go to the base layer at once.
-		await page.click('#le-move-all summary');
+		await tool(page, 'layers');
 		await page.selectOption('#le-move-target', 'base');
 		await page.click('#le-move-layer');
 		assert.equal(await legendOf('KeyD'), '', 'the moved layer is empty');
@@ -532,7 +688,7 @@ async function exerciseManager(browser, origin) {
 		// The composer's job: fill the base layer from AZERTY. This loopback server
 		// has no registry folder, so the panel says the catalogue list failed.
 		await page.click('[data-layer="base"]');
-		await page.click('#le-fill summary');
+		await tool(page, 'fill');
 		await page.click('#le-fill-load');
 		await page.waitForSelector('#le-fill-source');
 		assert.equal(await page.locator('#le-fill .le-message.error').count(), 1);
@@ -543,9 +699,11 @@ async function exerciseManager(browser, origin) {
 		assert.equal(await legendOf('KeyQ'), 'a');
 
 		// The navigation layer imports as a layer and exports as layers.toml again.
+		await tool(page, 'navigation');
 		await page.selectOption('#le-nav-hold', 'CapsLock');
 		await page.setInputFiles('#le-nav-file', NAV);
 		await page.waitForSelector('[data-layer="nav"].active');
+		await tool(page, 'export');
 		const nav = await downloaded(page, () => page.click('#le-export-nav'));
 		assert.equal(nav.name, 'layers.toml');
 		assert.match(nav.text, /\[layers\.nav\.all\]/);
@@ -553,6 +711,7 @@ async function exerciseManager(browser, origin) {
 		// Reopening the saved source restores it.
 		const reopened = path.join(require('node:os').tmpdir(), `layout-editor-${process.pid}.toml`);
 		fs.writeFileSync(reopened, saved.text);
+		await tool(page, 'details');
 		try {
 			await page.setInputFiles('#le-open-file', reopened);
 			await page.waitForFunction(() => document.querySelector('#le-name').value === 'My layout');
@@ -597,27 +756,30 @@ async function exerciseManager(browser, origin) {
 
 		// Inside the layout manager window, the same editor saves through the host.
 		await exerciseManager(browser, origin);
+		await exerciseLayerSelector(browser, origin);
+		await exercisePhoneWidth(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {
 			const opened = await open(browser, origin, lang);
-			for (const selector of ['#le-dead-keys summary', '#le-modifiers summary'])
-				await opened.page.click(selector);
 			await opened.page.click('#le-board [data-code="KeyQ"]');
-			const raw = await opened.page.evaluate(() => {
-				const texts = [document.title];
-				for (const node of document.querySelectorAll('body *')) {
-					if (node.children.length === 0) texts.push(node.textContent);
-					if (node.placeholder) texts.push(node.placeholder);
-					if (node.title) texts.push(node.title);
-				}
-				return texts.filter((text) => /layout_editor\.|sg_actions\.|layer_editor\./.test(text));
-			});
+			for (const summary of await opened.page.$$('#le-inspector details > summary'))
+				await summary.click();
+			const raw = await rawKeys(opened.page);
+			const tools = await opened.page.$$eval('#le-tools [data-tool]', (tabs) =>
+				tabs.map((tab) => tab.dataset.tool)
+			);
+			for (const id of tools) {
+				await tool(opened.page, id);
+				raw.push(...(await rawKeys(opened.page)));
+			}
 			assert.deepEqual(raw, [], `${lang}: raw locale keys are shown`);
 			assert.deepEqual(opened.errors, [], `${lang}: page errors`);
 			await opened.page.close();
 		}
-		console.log(`ok - layout editor page: editing, preview, files and ${LOCALES.length} locales`);
+		console.log(
+			`ok - layout editor page: editing, layer selector, phone width, preview, files and ${LOCALES.length} locales`
+		);
 	} finally {
 		await browser.close();
 		server.close();

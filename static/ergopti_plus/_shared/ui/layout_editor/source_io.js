@@ -42,6 +42,13 @@ var LayoutSourceIO = (function () {
 		{ id: 'shift_altgr', composer: 'shift_altgr', required: ['shift', 'alt'] },
 		{ id: 'command', composer: 'command', required: ['meta'] }
 	];
+	// The four character levels the editor's layer selector always shows, with the
+	// modifiers a missing one is added with.
+	const LEVEL_LAYERS = Object.freeze(
+		PROJECTED_LAYERS.filter((level) => level.id !== 'command').map((level) =>
+			Object.freeze({ id: level.id, required: Object.freeze(level.required.slice()) })
+		)
+	);
 	// layers.toml modifier tokens and the source's built-in names.
 	const NAV_MODIFIERS = { ctrl: 'control', alt: 'alt', shift: 'shift', meta: 'meta', fn: 'fn' };
 	const NAV_LAYER = 'nav';
@@ -798,6 +805,7 @@ var LayoutSourceIO = (function () {
 	return {
 		SourceIOError,
 		NAV_LAYER,
+		LEVEL_LAYERS,
 		parse,
 		serialize,
 		check,

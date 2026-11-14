@@ -22,6 +22,12 @@
  * 4. Live analysis: a page that loads the layout analysis scripts
  *    (layout_analysis/analysis_panel.js and its dependencies) gets the
  *    analysis panel beside the board, updated after every render.
+ * 5. One clear hierarchy: the primary toolbar (New, Open, Save, Undo, Redo),
+ *    the layer selector (the four character levels always shown, a missing one
+ *    added in one click), the board with its preview and the key inspector,
+ *    then the secondary tools in tabs. A host's side panel (the Studio's
+ *    analysis) goes in the persistent slot the mount returns as sideSlot; the
+ *    root fires layout-editor:rendered after each render.
  * ==============================================================================
  */
 
@@ -34,7 +40,6 @@ var LayoutEditorPage = (function () {
 	// ============================
 
 	const PREFIX = 'layout_editor.';
-	const KEY_UNIT_PX = 46;
 	const MAPPING_CHOICES = ['none', 'text', 'dead_key', 'action', 'key', 'disabled'];
 	const BUILTIN_MODIFIERS = ['shift', 'control', 'alt', 'meta', 'caps_lock', 'kana'];
 	// Ranges of the Unicode palette; the block name is a locale key.
@@ -71,6 +76,18 @@ var LayoutEditorPage = (function () {
 	// The levels of another layout a layer can be filled from (the composer's levels).
 	const FILL_LEVELS = ['base', 'shift', 'altgr', 'shift_altgr', 'command'];
 	const STICKER_MAX_MM = 30;
+	// The secondary tools under the board, in tab order; the first one opens by default.
+	const TOOLS = [
+		'details',
+		'layers',
+		'modifiers',
+		'dead_keys',
+		'fill',
+		'navigation',
+		'windows',
+		'export',
+		'stickers'
+	];
 	// The drag data type of a character from the palette or the name search.
 	const CHAR_DRAG_TYPE = 'application/x-ergopti-character';
 
@@ -289,6 +306,14 @@ var LayoutEditorPage = (function () {
 			starting: false,
 			// Physical modifier keys held in the preview, as sided modifier ids.
 			heldSides: new Set(),
+			// The secondary tool shown under the board (one of TOOLS).
+			tool: TOOLS[0],
+			// The key inspector's groups unfolded by the user (see inspectorGroup).
+			openGroups: new Set(),
+			// The keyboard an imported .keylayout is described on, and the key
+			// held for an imported navigation layer ('' until chosen).
+			importConvention: 'iso',
+			navHold: '',
 			lost: null,
 			dirty: false
 		};
@@ -350,7 +375,7 @@ var LayoutEditorPage = (function () {
 
 		function openText(name, text) {
 			if (/\.keylayout$/i.test(name)) {
-				const convention = root.querySelector('#le-import-convention').value;
+				const convention = state.importConvention;
 				try {
 					const id = LayoutSourceIO.identifierFrom(name.replace(/\.keylayout$/i, ''), 'layout');
 					replace(LayoutSourceIO.importKeylayout(text, id, convention));
@@ -406,7 +431,7 @@ var LayoutEditorPage = (function () {
 
 		function importNav(name, text) {
 			commitFocused();
-			const hold = root.querySelector('#le-nav-hold').value;
+			const hold = state.navHold;
 			if (!hold) return notify('error', problemText({ code: 'nav_hold_key_missing', path: '' }));
 			try {
 				state.history.push(LayoutSourceIO.withNavLayer(doc(), text, [hold], data));
@@ -454,6 +479,7 @@ var LayoutEditorPage = (function () {
 		// ======= 5/ Toolbar =========
 		// ============================
 
+		/** The primary actions: the file, the history and, in a window, Close. */
 		function toolbar() {
 			const fileInput = el('input', {
 				type: 'file',
@@ -462,6 +488,7 @@ var LayoutEditorPage = (function () {
 				hidden: true,
 				onchange: (event) => readFile(event.target, openText)
 			});
+			// Always in the page, so a navigation layer file can be read from any tool.
 			const navInput = el('input', {
 				type: 'file',
 				id: 'le-nav-file',
@@ -469,129 +496,60 @@ var LayoutEditorPage = (function () {
 				hidden: true,
 				onchange: (event) => readFile(event.target, importNav)
 			});
-			const keyOptions = [['', tl('nav_hold_placeholder')]].concat(
-				data.keys.filter((k) => k.kind === 'key').map((k) => [k.code, keyName(k.code)])
+			const button = (id, label, onclick, extra) =>
+				el('button', Object.assign({ type: 'button', id, text: label, onclick }, extra || {}));
+			return el(
+				'div',
+				{ class: 'le-toolbar', role: 'toolbar', 'aria-label': tl('toolbar.label') },
+				[
+					el('div', { class: 'le-toolbar-group' }, [
+						button(
+							'le-new',
+							tl('btn.new'),
+							() => {
+								state.starting = !state.starting;
+								if (state.starting && state.fillSources === null) loadFillSources();
+								else render();
+							},
+							{ 'aria-expanded': String(state.starting) }
+						),
+						button('le-open', tl('btn.open'), () =>
+							host.pickFile ? pickWithHost() : fileInput.click()
+						),
+						button('le-save', tl('btn.save'), saveSource, { class: 'primary' }),
+						fileInput,
+						navInput
+					]),
+					el('div', { class: 'le-toolbar-group' }, [
+						button(
+							'le-undo',
+							tl('btn.undo'),
+							() => {
+								state.history.undo();
+								render();
+							},
+							{ disabled: !state.history.canUndo() }
+						),
+						button(
+							'le-redo',
+							tl('btn.redo'),
+							() => {
+								state.history.redo();
+								render();
+							},
+							{ disabled: !state.history.canRedo() }
+						)
+					]),
+					el('span', { class: 'le-toolbar-spacer' }),
+					el('span', {
+						class: `le-doc-state${state.dirty ? ' dirty' : ''}`,
+						id: 'le-doc-state',
+						text: `${doc().layout.name}${state.dirty ? ' •' : ''}`,
+						title: tl(state.dirty ? 'toolbar.unsaved' : 'toolbar.saved')
+					}),
+					host.onClose ? button('le-close', tl('btn.close'), host.onClose) : null
+				]
 			);
-			return el('div', { class: 'le-toolbar' }, [
-				el('button', {
-					type: 'button',
-					id: 'le-new',
-					text: tl('btn.new'),
-					onclick: () => {
-						state.starting = !state.starting;
-						if (state.starting && state.fillSources === null) loadFillSources();
-						else render();
-					}
-				}),
-				el('button', {
-					type: 'button',
-					id: 'le-open',
-					text: tl('btn.open'),
-					onclick: () => (host.pickFile ? pickWithHost() : fileInput.click())
-				}),
-				el('label', { class: 'le-inline' }, [
-					tl('import_convention'),
-					select(
-						[
-							['iso', tl('physical.iso')],
-							['ansi', tl('physical.ansi')]
-						],
-						'iso',
-						() => {},
-						{ id: 'le-import-convention' }
-					)
-				]),
-				fileInput,
-				el('button', {
-					type: 'button',
-					id: 'le-save',
-					class: 'primary',
-					text: tl('btn.save'),
-					onclick: saveSource
-				}),
-				el('button', {
-					type: 'button',
-					id: 'le-undo',
-					text: tl('btn.undo'),
-					disabled: !state.history.canUndo(),
-					onclick: () => {
-						state.history.undo();
-						render();
-					}
-				}),
-				el('button', {
-					type: 'button',
-					id: 'le-redo',
-					text: tl('btn.redo'),
-					disabled: !state.history.canRedo(),
-					onclick: () => {
-						state.history.redo();
-						render();
-					}
-				}),
-				el('button', {
-					type: 'button',
-					id: 'le-print',
-					text: tl('btn.print'),
-					onclick: () => window.print()
-				}),
-				el('label', { class: 'le-inline' }, [
-					tl('sticker.size'),
-					el('input', {
-						type: 'number',
-						id: 'le-sticker-mm',
-						min: STICKER_MIN_MM,
-						max: STICKER_MAX_MM,
-						placeholder: tl('sticker.fit'),
-						value: state.stickerMm === null ? '' : state.stickerMm,
-						onchange: (event) => {
-							const mm = Number(event.target.value);
-							state.stickerMm =
-								event.target.value === '' || !(mm >= STICKER_MIN_MM && mm <= STICKER_MAX_MM)
-									? null
-									: mm;
-							render();
-						}
-					})
-				]),
-				LayoutSourceIO.isPreserved(doc()) ? null : stickerOptions(),
-				el('label', { class: 'le-inline' }, [
-					tl('board.label'),
-					select(
-						[
-							['iso', tl('physical.iso')],
-							['ansi', tl('physical.ansi')]
-						],
-						state.board,
-						(value) => {
-							state.board = value;
-							render();
-						},
-						{ id: 'le-board-form' }
-					)
-				]),
-				el('span', { class: 'le-sep' }),
-				el('label', { class: 'le-inline' }, [
-					tl('nav_hold'),
-					select(keyOptions, '', () => {}, { id: 'le-nav-hold' })
-				]),
-				el('button', {
-					type: 'button',
-					id: 'le-nav-import',
-					text: tl('btn.nav_import'),
-					disabled: LayoutSourceIO.isPreserved(doc()),
-					onclick: () => navInput.click()
-				}),
-				navInput,
-				host.onClose
-					? el('button', {
-							type: 'button',
-							id: 'le-close',
-							text: tl('btn.close'),
-							onclick: host.onClose
-						})
-					: null
-			]);
 		}
 
 		function messageBar() {
@@ -666,6 +624,7 @@ var LayoutEditorPage = (function () {
 		// ======= 6/ Metadata ========
 		// ============================
 
+		/** The layout's name, description, author and how a .keylayout is read. */
 		function metadata() {
 			const layout = doc().layout;
 			const field = (name, id) =>
@@ -679,10 +638,36 @@ var LayoutEditorPage = (function () {
 							apply((d) => LayoutEditorModel.setLayout(d, { [name]: event.target.value }))
 					})
 				]);
-			return el('section', { class: 'le-meta' }, [
-				field('name', 'le-name'),
-				field('description', 'le-description'),
-				field('author', 'le-author'),
+			return el('section', { class: 'le-panel le-meta', id: 'le-meta' }, [
+				el('h2', { text: tl('tools.details') }),
+				el('div', { class: 'le-form-grid' }, [
+					field('name', 'le-name'),
+					field('author', 'le-author'),
+					el('label', { class: 'le-field le-wide' }, [
+						tl('meta.description'),
+						el('input', {
+							type: 'text',
+							id: 'le-description',
+							value: layout.description || '',
+							onchange: (event) =>
+								apply((d) => LayoutEditorModel.setLayout(d, { description: event.target.value }))
+						})
+					]),
+					el('label', { class: 'le-field' }, [
+						tl('import_convention'),
+						select(
+							[
+								['iso', tl('physical.iso')],
+								['ansi', tl('physical.ansi')]
+							],
+							state.importConvention,
+							(value) => {
+								state.importConvention = value;
+							},
+							{ id: 'le-import-convention' }
+						)
+					])
+				]),
 				el('p', { class: 'le-note', text: tl('meta.id', { id: layout.id }) })
 			]);
 		}
@@ -695,20 +680,141 @@ var LayoutEditorPage = (function () {
 			return BUILTIN_MODIFIERS.concat((doc().modifiers || []).map((m) => m.id));
 		}
 
-		function layerTabs() {
-			const tabs = LayoutEditorModel.layers(doc()).map((layer) =>
-				el('button', {
+		/**
+		 * The layer of the document that holds one of the four character levels: the
+		 * layer of that id, else the one reached by the same modifiers (AltGr is
+		 * Alt or Right Alt), else null.
+		 */
+		function levelLayer(level) {
+			const layers = LayoutEditorModel.layers(doc());
+			const byId = layers.find((layer) => layer.id === level.id);
+			if (byId) return byId;
+			const altgr = (id) => (id === 'alt_right' ? 'alt' : id);
+			const wanted = level.required.slice().sort().join('+');
+			return layers.find((layer) => layer.required.map(altgr).sort().join('+') === wanted) || null;
+		}
+
+		/** Selects a layer and redraws. */
+		function showLayer(id) {
+			state.layer = id;
+			render();
+		}
+
+		/**
+		 * The layer selector: the four character levels always shown (a missing one
+		 * is added by choosing it), then every other layer of the layout.
+		 */
+		function layerBar() {
+			const preserved = LayoutSourceIO.isPreserved(doc());
+			const levelIds = new Set();
+			const levels = LayoutSourceIO.LEVEL_LAYERS.map((level) => {
+				const layer = levelLayer(level);
+				const label = tl(`fill.level.${level.id}`);
+				if (layer) {
+					levelIds.add(layer.id);
+					return el('button', {
+						type: 'button',
+						role: 'tab',
+						class: `le-tab${layer.id === state.layer ? ' active' : ''}`,
+						'aria-selected': String(layer.id === state.layer),
+						'data-layer': layer.id,
+						'data-level': level.id,
+						title: layer.required.join('+') || tl('layer.no_modifier'),
+						text: label,
+						onclick: () => showLayer(layer.id)
+					});
+				}
+				return el('button', {
 					type: 'button',
-					class: `le-tab${layer.id === state.layer ? ' active' : ''}`,
-					'data-layer': layer.id,
-					title: layer.required.join('+') || tl('layer.no_modifier'),
-					text: layer.id,
+					class: 'le-tab missing',
+					'data-level': level.id,
+					disabled: preserved,
+					title: tl('layer.level_missing', { layer: label }),
+					'aria-label': tl('layer.level_missing', { layer: label }),
+					text: `+ ${label}`,
 					onclick: () => {
-						state.layer = layer.id;
-						render();
+						apply((d) => LayoutEditorModel.addLayer(d, level.id, level.required, []));
+						if (doc().layers.some((l) => l.id === level.id)) showLayer(level.id);
 					}
-				})
+				});
+			});
+			const others = LayoutEditorModel.layers(doc())
+				.filter((layer) => !levelIds.has(layer.id))
+				.map((layer) =>
+					el('button', {
+						type: 'button',
+						role: 'tab',
+						class: `le-tab${layer.id === state.layer ? ' active' : ''}`,
+						'aria-selected': String(layer.id === state.layer),
+						'data-layer': layer.id,
+						title: layer.required.join('+') || tl('layer.no_modifier'),
+						text: layer.id,
+						onclick: () => showLayer(layer.id)
+					})
+				);
+			const scope = select(
+				[['', tl('scope.all')]].concat(
+					LayoutEditorModel.PLATFORMS.map((p) => [p, tl(`scope.${p}`)])
+				),
+				state.platform,
+				(value) => {
+					state.platform = value;
+					render();
+				},
+				{ id: 'le-scope' }
 			);
+			return el('section', { class: 'le-layerbar', id: 'le-layerbar' }, [
+				el('div', { class: 'le-layer-pick' }, [
+					el('span', { class: 'le-label', id: 'le-layers-label', text: tl('layer.selector') }),
+					el(
+						'div',
+						{
+							class: 'le-tabs le-segmented',
+							role: 'tablist',
+							'aria-labelledby': 'le-layers-label'
+						},
+						levels
+					),
+					others.length
+						? el('div', { class: 'le-tabs le-other-layers', role: 'tablist' }, others)
+						: null,
+					preserved
+						? null
+						: el('button', {
+								type: 'button',
+								class: 'le-link',
+								id: 'le-manage-layers',
+								text: tl('layer.manage'),
+								onclick: () => showTool('layers')
+							})
+				]),
+				el('div', { class: 'le-view' }, [
+					el('label', { class: 'le-inline' }, [tl('scope.label'), scope]),
+					el('label', { class: 'le-inline' }, [
+						tl('board.label'),
+						select(
+							[
+								['iso', tl('physical.iso')],
+								['ansi', tl('physical.ansi')]
+							],
+							state.board,
+							(value) => {
+								state.board = value;
+								render();
+							},
+							{ id: 'le-board-form' }
+						)
+					]),
+					checkbox('le-numpad', tl('numpad'), state.numpad, (on) => {
+						state.numpad = on;
+						render();
+					})
+				])
+			]);
+		}
+
+		/** Adds, removes and empties layers. */
+		function layersTool() {
 			const idInput = el('input', {
 				type: 'text',
 				id: 'le-layer-id',
@@ -717,8 +823,8 @@ var LayoutEditorPage = (function () {
 			const checks = modifierOptions().map((id) =>
 				el('label', { class: 'le-check' }, [el('input', { type: 'checkbox', value: id }), id])
 			);
-			const addForm = el('details', { class: 'le-add' }, [
-				el('summary', { text: tl('layer.add') }),
+			const addForm = el('div', { class: 'le-subpanel le-add', id: 'le-layer-add-form' }, [
+				el('h3', { text: tl('layer.add') }),
 				idInput,
 				el('div', { class: 'le-checks', id: 'le-layer-required' }, checks),
 				el('button', {
@@ -732,28 +838,9 @@ var LayoutEditorPage = (function () {
 							.map((c) => c.value);
 						const id = idInput.value.trim();
 						apply((d) => LayoutEditorModel.addLayer(d, id, required, []));
-						if (doc().layers.some((l) => l.id === id)) {
-							state.layer = id;
-							render();
-						}
+						if (doc().layers.some((l) => l.id === id)) showLayer(id);
 					}
-				}),
-				state.layer && state.layer !== 'base'
-					? el('button', {
-							type: 'button',
-							id: 'le-layer-remove',
-							class: 'danger',
-							text: tl('layer.remove', { id: state.layer }),
-							onclick: () => {
-								const removed = state.layer;
-								apply((d) => LayoutEditorModel.removeLayer(d, removed));
-								if (!doc().layers.some((l) => l.id === removed)) {
-									state.layer = 'base';
-									render();
-								}
-							}
-						})
-					: null
+				})
 			]);
 			const others = LayoutEditorModel.layers(doc()).filter((layer) => layer.id !== state.layer);
 			const moveTarget = select(
@@ -766,53 +853,167 @@ var LayoutEditorPage = (function () {
 				const from = state.layer;
 				apply((d) => LayoutEditorModel.transferLayer(d, from, moveTarget.value, keep));
 			};
-			const moveForm =
+			const current =
 				state.layer && others.length
-					? el('details', { class: 'le-add', id: 'le-move-all' }, [
-							el('summary', { text: tl('layer.move_all') }),
+					? el('div', { class: 'le-subpanel le-add', id: 'le-move-all' }, [
+							el('h3', { text: tl('layer.move_all') }),
 							el('label', { class: 'le-inline' }, [tl('layer.move_target'), moveTarget]),
-							el('button', {
-								type: 'button',
-								id: 'le-move-layer',
-								text: tl('btn.move'),
-								onclick: moveAll(false)
-							}),
-							el('button', {
-								type: 'button',
-								id: 'le-copy-layer',
-								text: tl('btn.copy'),
-								onclick: moveAll(true)
-							})
+							el('div', { class: 'le-buttons' }, [
+								el('button', {
+									type: 'button',
+									id: 'le-move-layer',
+									text: tl('btn.move'),
+									onclick: moveAll(false)
+								}),
+								el('button', {
+									type: 'button',
+									id: 'le-copy-layer',
+									text: tl('btn.copy'),
+									onclick: moveAll(true)
+								})
+							]),
+							state.layer !== 'base'
+								? el('button', {
+										type: 'button',
+										id: 'le-layer-remove',
+										class: 'danger',
+										text: tl('layer.remove', { id: state.layer }),
+										onclick: () => {
+											const removed = state.layer;
+											apply((d) => LayoutEditorModel.removeLayer(d, removed));
+											if (!doc().layers.some((l) => l.id === removed)) showLayer('base');
+										}
+									})
+								: null
 						])
 					: null;
-			const scope = select(
-				[['', tl('scope.all')]].concat(
-					LayoutEditorModel.PLATFORMS.map((p) => [p, tl(`scope.${p}`)])
-				),
-				state.platform,
-				(value) => {
-					state.platform = value;
-					render();
-				},
-				{ id: 'le-scope' }
+			return el('section', { class: 'le-panel', id: 'le-layers' }, [
+				el('h2', { text: tl('tools.layers') }),
+				el('div', { class: 'le-subpanels' }, [addForm, current])
+			]);
+		}
+
+		/** Imports a navigation layer (layers.toml) as a layer held by one key. */
+		function navigationTool() {
+			const keyOptions = [['', tl('nav_hold_placeholder')]].concat(
+				data.keys.filter((k) => k.kind === 'key').map((k) => [k.code, keyName(k.code)])
 			);
-			return el('section', { class: 'le-layers' }, [
-				el('div', { class: 'le-tabs', role: 'tablist' }, tabs),
-				el('label', { class: 'le-inline' }, [tl('scope.label'), scope]),
-				el('label', { class: 'le-inline' }, [
-					el('input', {
-						type: 'checkbox',
-						id: 'le-numpad',
-						checked: state.numpad,
-						onchange: (event) => {
-							state.numpad = event.target.checked;
-							render();
-						}
-					}),
-					tl('numpad')
+			return el('section', { class: 'le-panel', id: 'le-navigation' }, [
+				el('h2', { text: tl('tools.navigation') }),
+				el('p', { class: 'le-note', text: tl('nav.note') }),
+				el('div', { class: 'le-buttons' }, [
+					el('label', { class: 'le-inline' }, [
+						tl('nav_hold'),
+						select(
+							keyOptions,
+							state.navHold,
+							(value) => {
+								state.navHold = value;
+							},
+							{ id: 'le-nav-hold' }
+						)
+					]),
+					el('button', {
+						type: 'button',
+						id: 'le-nav-import',
+						text: tl('btn.nav_import'),
+						disabled: LayoutSourceIO.isPreserved(doc()),
+						onclick: () => root.querySelector('#le-nav-file').click()
+					})
+				])
+			]);
+		}
+
+		/** Sticker printing: size, levels and the print button. */
+		function stickersTool() {
+			return el('section', { class: 'le-panel', id: 'le-sticker-tool' }, [
+				el('h2', { text: tl('tools.stickers') }),
+				el('p', { class: 'le-note', text: tl('sticker.note') }),
+				el('div', { class: 'le-buttons' }, [
+					el('label', { class: 'le-inline' }, [
+						tl('sticker.size'),
+						el('input', {
+							type: 'number',
+							id: 'le-sticker-mm',
+							min: STICKER_MIN_MM,
+							max: STICKER_MAX_MM,
+							placeholder: tl('sticker.fit'),
+							value: state.stickerMm === null ? '' : state.stickerMm,
+							onchange: (event) => {
+								const mm = Number(event.target.value);
+								state.stickerMm =
+									event.target.value === '' || !(mm >= STICKER_MIN_MM && mm <= STICKER_MAX_MM)
+										? null
+										: mm;
+								render();
+							}
+						})
+					]),
+					el('button', {
+						type: 'button',
+						id: 'le-print',
+						class: 'primary',
+						text: tl('btn.print'),
+						onclick: () => window.print()
+					})
 				]),
-				LayoutSourceIO.isPreserved(doc()) ? null : addForm,
-				LayoutSourceIO.isPreserved(doc()) ? null : moveForm
+				LayoutSourceIO.isPreserved(doc()) ? null : stickerOptions()
+			]);
+		}
+
+		/** Shows one secondary tool. */
+		function showTool(id) {
+			state.tool = id;
+			render();
+			const tab = root.querySelector(`#le-tool-tab-${id}`);
+			if (tab) tab.scrollIntoView({ block: 'nearest' });
+		}
+
+		/** The secondary tools: one tab strip, one panel shown at a time. */
+		function tools() {
+			const preserved = LayoutSourceIO.isPreserved(doc());
+			const builders = {
+				details: metadata,
+				layers: preserved ? null : layersTool,
+				modifiers: preserved ? null : modifiersPanel,
+				dead_keys: preserved ? null : deadKeysPanel,
+				fill: preserved ? null : fillPanel,
+				navigation: navigationTool,
+				windows: preserved ? null : windowsPanel,
+				export: exportPanel,
+				stickers: stickersTool
+			};
+			const shown = TOOLS.filter((id) => builders[id]);
+			const active = shown.includes(state.tool) ? state.tool : shown[0];
+			const tabs = shown.map((id) =>
+				el('button', {
+					type: 'button',
+					role: 'tab',
+					id: `le-tool-tab-${id}`,
+					class: `le-tool-tab${id === active ? ' active' : ''}`,
+					'data-tool': id,
+					'aria-selected': String(id === active),
+					'aria-controls': 'le-tool-panel',
+					text: tl(`tools.${id}`),
+					onclick: () => showTool(id)
+				})
+			);
+			return el('section', { class: 'le-tools', id: 'le-tools' }, [
+				el(
+					'div',
+					{ class: 'le-tool-tabs', role: 'tablist', 'aria-label': tl('tools.label') },
+					tabs
+				),
+				el(
+					'div',
+					{
+						class: 'le-tool-panel',
+						id: 'le-tool-panel',
+						role: 'tabpanel',
+						'aria-labelledby': `le-tool-tab-${active}`
+					},
+					builders[active]()
+				)
 			]);
 		}
 
@@ -867,7 +1068,8 @@ var LayoutEditorPage = (function () {
 			const container = el('div', {
 				class: 'le-board',
 				id: 'le-board',
-				style: `width:${width * KEY_UNIT_PX}px;height:${height * KEY_UNIT_PX}px`
+				// The stylesheet sizes one key unit to the width available (style.css, Board).
+				style: `--le-cols:${width};--le-rows:${height}`
 			});
 			const remap = doc().remap || {};
 			for (const key of keys) {
@@ -885,9 +1087,7 @@ var LayoutEditorPage = (function () {
 							class: classes.join(' '),
 							'data-code': key.code,
 							title: keyName(key.code),
-							style:
-								`left:${g.col * KEY_UNIT_PX}px;top:${g.row * KEY_UNIT_PX}px;` +
-								`width:${g.width * KEY_UNIT_PX - 4}px;height:${(g.height || 1) * KEY_UNIT_PX - 4}px`,
+							style: `--x:${g.col};--y:${g.row};--w:${g.width};--h:${g.height || 1}`,
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
 								state.selected = key.code;
@@ -1412,8 +1612,7 @@ var LayoutEditorPage = (function () {
 				id: 'le-caps-altgr',
 				checked: entry.caps_altgr === true
 			});
-			return el('div', { class: 'le-group' }, [
-				el('h3', { text: tl('inspector.key') }),
+			return inspectorGroup('key', [
 				el('label', { class: 'le-field' }, [tl('caps.label'), capsSelect]),
 				el('label', { class: 'le-field' }, [tl('caps.layer'), capsLayer]),
 				el('label', { class: 'le-field' }, [tl('caps.shift_layer'), capsShift]),
@@ -1465,8 +1664,7 @@ var LayoutEditorPage = (function () {
 					.filter((k) => k.kind === 'key' && k.code !== code)
 					.map((k) => [k.code, keyName(k.code)])
 			);
-			return el('div', { class: 'le-group' }, [
-				el('h3', { text: tl('inspector.remap') }),
+			return inspectorGroup('remap', [
 				select(
 					options,
 					current === null ? '__none' : current,
@@ -1499,8 +1697,7 @@ var LayoutEditorPage = (function () {
 					.map((c) => c.firstChild)
 					.filter((c) => c.checked)
 					.map((c) => c.value);
-			return el('div', { class: 'le-group' }, [
-				el('h3', { text: tl('inspector.shortcuts') }),
+			return inspectorGroup('shortcuts', [
 				el(
 					'ul',
 					{ class: 'le-list', id: 'le-shortcuts' },
@@ -1569,8 +1766,7 @@ var LayoutEditorPage = (function () {
 				step: TAP_HOLD_THRESHOLD_STEP,
 				value: entry ? entry.threshold_ms : ''
 			});
-			return el('div', { class: 'le-group' }, [
-				el('h3', { text: tl('inspector.tap_hold') }),
+			return inspectorGroup('tap_hold', [
 				el('label', { class: 'le-field' }, [tl('tap_hold.tap_text'), tapText]),
 				el('label', { class: 'le-field' }, [tl('tap_hold.hold'), hold]),
 				el('label', { class: 'le-field' }, [tl('tap_hold.threshold'), threshold]),
@@ -1605,6 +1801,26 @@ var LayoutEditorPage = (function () {
 						})
 					: null
 			]);
+		}
+
+		/**
+		 * A folded group of the key inspector; it stays open across renders once
+		 * opened, so editing a key does not fold it again.
+		 */
+		function inspectorGroup(id, children) {
+			return el(
+				'details',
+				{
+					class: 'le-group',
+					id: `le-group-${id}`,
+					open: state.openGroups.has(id),
+					ontoggle: (event) => {
+						if (event.target.open) state.openGroups.add(id);
+						else state.openGroups.delete(id);
+					}
+				},
+				[el('summary', { text: tl(`inspector.${id}`) })].concat(children)
+			);
 		}
 
 		function inspector() {
@@ -1717,7 +1933,7 @@ var LayoutEditorPage = (function () {
 		/** The composer's job: fill the current layer from one level of another layout. */
 		function fillPanel() {
 			const parts = [
-				el('summary', { text: tl('fill.title') }),
+				el('h2', { text: tl('fill.title') }),
 				el('p', { class: 'le-note', text: tl('fill.note') })
 			];
 			if (state.fillSources === null) {
@@ -1729,7 +1945,7 @@ var LayoutEditorPage = (function () {
 						onclick: loadFillSources
 					})
 				);
-				return el('details', { class: 'le-panel', id: 'le-fill' }, parts);
+				return el('section', { class: 'le-panel', id: 'le-fill' }, parts);
 			}
 			const source = select(
 				state.fillSources.map((entry) => [entry.id, entry.name]),
@@ -1762,7 +1978,7 @@ var LayoutEditorPage = (function () {
 					}
 				})
 			);
-			return el('details', { class: 'le-panel', id: 'le-fill', open: true }, parts);
+			return el('section', { class: 'le-panel', id: 'le-fill' }, parts);
 		}
 
 		/** Windows-only records: the .klc metadata, layout flags and NLS special functions. */
@@ -1807,8 +2023,8 @@ var LayoutEditorPage = (function () {
 					placeholder
 				})
 			]);
-			return el('details', { class: 'le-panel', id: 'le-windows' }, [
-				el('summary', { text: tl('windows.title') }),
+			return el('section', { class: 'le-panel', id: 'le-windows' }, [
+				el('h2', { text: tl('windows.title') }),
 				el('p', { class: 'le-note', text: tl('windows.klc_note') }),
 				...klcFields.map(([field, input]) =>
 					el('label', { class: 'le-field' }, [tl(`windows.${field}`), input])
@@ -1892,8 +2108,8 @@ var LayoutEditorPage = (function () {
 				{ id: 'le-mod-mode' }
 			);
 			const keys = el('input', { type: 'text', id: 'le-mod-keys', placeholder: 'ScrollLock' });
-			return el('details', { class: 'le-panel', id: 'le-modifiers' }, [
-				el('summary', { text: tl('modifier.title') }),
+			return el('section', { class: 'le-panel', id: 'le-modifiers' }, [
+				el('h2', { text: tl('modifier.title') }),
 				el('p', { class: 'le-note', text: tl('modifier.note') }),
 				el(
 					'ul',
@@ -1945,7 +2161,7 @@ var LayoutEditorPage = (function () {
 				size: 4
 			});
 			const parts = [
-				el('summary', { text: tl('dead.title') }),
+				el('h2', { text: tl('dead.title') }),
 				el('p', { class: 'le-note', text: tl('dead.note') }),
 				el(
 					'div',
@@ -2042,11 +2258,7 @@ var LayoutEditorPage = (function () {
 					})
 				);
 			}
-			return el(
-				'details',
-				{ class: 'le-panel', id: 'le-dead-keys', open: Boolean(current) },
-				parts
-			);
+			return el('section', { class: 'le-panel', id: 'le-dead-keys' }, parts);
 		}
 
 		// ============================
@@ -2482,8 +2694,8 @@ var LayoutEditorPage = (function () {
 		/** Which layers the stickers print, and whether capitals are hidden. */
 		function stickerOptions() {
 			const chosen = stickerLevels();
-			return el('details', { class: 'le-add', id: 'le-sticker-levels' }, [
-				el('summary', { text: tl('sticker.levels') }),
+			return el('div', { class: 'le-subpanel', id: 'le-sticker-levels' }, [
+				el('h3', { text: tl('sticker.levels') }),
 				el(
 					'div',
 					{ class: 'le-checks' },
@@ -2566,7 +2778,11 @@ var LayoutEditorPage = (function () {
 
 		function renderTree() {
 			keyView = makeKeyView(doc(), state.platform || host.platform || null);
-			root.replaceChildren(
+			// Undo or redo can remove the layer shown: show the base layer then.
+			const ids = (doc().layers || []).map((layer) => layer.id);
+			if (state.layer && !ids.includes(state.layer))
+				state.layer = ids.includes('base') ? 'base' : null;
+			const parts = [
 				el('header', { class: 'le-header' }, [
 					el('h1', { text: tl('title') }),
 					el('p', { class: 'le-subtitle', text: tl('subtitle') })
@@ -2574,26 +2790,26 @@ var LayoutEditorPage = (function () {
 				toolbar(),
 				startPanel(),
 				messageBar(),
-				metadata(),
-				layerTabs(),
-				el('div', { class: 'le-main' }, [
-					board(),
-					inspector(),
-					magnifier(),
-					analysisPanel ? analysisPanel.node : null
+				layerBar(),
+				el('div', { class: 'le-workspace' }, [
+					el('div', { class: 'le-board-col' }, [board(), preview()]),
+					el('aside', { class: 'le-inspector-col' }, [inspector(), magnifier()]),
+					sideSlot
 				]),
-				el('div', { class: 'le-panels' }, [
-					LayoutSourceIO.isPreserved(doc()) ? null : modifiersPanel(),
-					LayoutSourceIO.isPreserved(doc()) ? null : windowsPanel(),
-					LayoutSourceIO.isPreserved(doc()) ? null : fillPanel(),
-					LayoutSourceIO.isPreserved(doc()) ? null : deadKeysPanel()
-				]),
-				preview(),
-				exportPanel(),
+				tools(),
 				stickers()
-			);
+			];
+			// A section a state hides is null: it must not reach the page as text.
+			root.replaceChildren(...parts.filter(Boolean));
+			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
 			if (analysisPanel) analysisPanel.update(doc());
 		}
+
+		// One persistent element for a host's side panel (the analysis of the Studio):
+		// re-inserted by every render, so what the host appends there survives.
+		const sideSlot = el('div', { class: 'le-side-slot', id: 'le-side-slot' });
+		// The live analysis (layout_analysis/analysis_panel.js), when the page loads it.
+		if (analysisPanel) sideSlot.append(analysisPanel.node);
 
 		if (typeof host.initial === 'string') {
 			const parsed = LayoutSourceIO.parse(host.initial);
@@ -2612,6 +2828,7 @@ var LayoutEditorPage = (function () {
 		return {
 			open: (name, text) => openText(name, text),
 			current: () => doc(),
+			sideSlot,
 			render
 		};
 	}
