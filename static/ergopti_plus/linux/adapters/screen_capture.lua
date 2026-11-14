@@ -113,8 +113,12 @@ M.SCRIPT = table.concat({
 	'[ "$s" -eq 0 ] || exit "$s"',
 	'[ -s "$out" ] || exit ' .. M.EXIT_NO_FILE,
 	'scaled="${out}.scaled.png"',
-	'if has magick; then magick "$out" -resize "${edge}x${edge}>" "$scaled" && [ -s "$scaled" ] && mv -f -- "$scaled" "$out" && exit 0',
-	'elif has convert; then convert "$out" -resize "${edge}x${edge}>" "$scaled" && [ -s "$scaled" ] && mv -f -- "$scaled" "$out" && exit 0',
+	-- A complete PNG ends with its IEND chunk and that chunk's fixed CRC.
+	-- ImageMagick 7 (Ubuntu 26.04) exits 0 after a refused write (EFBIG), so
+	-- its status alone would let a truncated resize replace the original.
+	'whole_png() { [ "$(tail -c 8 -- "$1" | od -An -tx1 | tr -d \' \\n\')" = 49454e44ae426082 ]; }',
+	'if has magick; then magick "$out" -resize "${edge}x${edge}>" "$scaled" && whole_png "$scaled" && mv -f -- "$scaled" "$out" && exit 0',
+	'elif has convert; then convert "$out" -resize "${edge}x${edge}>" "$scaled" && whole_png "$scaled" && mv -f -- "$scaled" "$out" && exit 0',
 	'fi',
 	'rm -f -- "$scaled" || exit 1',
 	'echo ' .. M.UNSCALED_MARKER,
