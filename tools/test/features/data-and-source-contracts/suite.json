@@ -849,6 +849,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-ahk-dir-scans.cjs"],
 			"repro": "npm run test:structure-ahk-dir-scans"
+		},
+		{
+			"id": "js-0533",
+			"ordinal": 652,
+			"name": "structure plan keeps AutoHotkey fixtures' created folders and climbs",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-ahk-fixture-paths.cjs"],
+			"repro": "npm run test:structure-ahk-fixture-paths"
 		}
 	]
 }
