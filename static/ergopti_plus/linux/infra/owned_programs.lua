@@ -53,7 +53,7 @@ end
 
 --- The program to run for one owned program, without logging.
 --- For a helper process that has only the driver tree on package.path
---- (adapters/sqlite_process_worker.lua, core/network/adapters/system_proxy_probe.lua):
+--- (core/process/adapters/sqlite_process_worker.lua, core/network/adapters/system_proxy_probe.lua):
 --- the daemon already logged the mode, and a helper's stdout may be its protocol.
 --- @param name string One of M.PROGRAMS.
 --- @param getenv function|nil os.getenv by default; a test seam.
@@ -86,7 +86,7 @@ end
 --- @return boolean
 function M.available(name, getenv)
 	local program = M.path(name, getenv)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	if program:sub(1, 1) == "/" then
 		local ok = os.execute("test -x " .. Shell.quote(program))
 		return ok == true or ok == 0

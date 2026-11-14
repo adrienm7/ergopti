@@ -555,7 +555,7 @@ try {
 					'local Loader = require("modules.hotstrings.loader")',
 					...(process.platform === 'win32'
 						? [
-								'local Shell = require("adapters.shell_runner")',
+								'local Shell = require("core.process.adapters.shell_runner")',
 								`assert(Shell.run(${JSON.stringify('test -e ' + shellQuote(path.join(lib, 'linux', settings.folder, settings.index_file).replaceAll('\\', '/')) + ' 2>/dev/null')}), "the actual installed registry exists through the real Bash status port")`,
 								`assert(not Shell.run(${JSON.stringify('test -e ' + shellQuote(path.join(lib, '__absent_shell_control__').replaceAll('\\', '/')) + ' 2>/dev/null')}), "the real Bash status port preserves a missing-path failure")`
 							]

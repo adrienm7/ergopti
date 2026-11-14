@@ -460,7 +460,7 @@ end)
 helpers.describe("installer-backup-ownership native receipts", function()
 	local NativeFixture = require("tests.support.modules.updater.installer_native_fixture")
 	local uv = require("luv")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local function receipt(fixture)
 		assert(uv.fs_rename(fixture.installed .. "/old.marker", fixture.installed .. "/linux/old.marker"))
 		NativeFixture.write(fixture.installed .. "/linux/binary.marker", "\0owned binary\255\n")
@@ -792,7 +792,7 @@ helpers.describe("installer rollback capture admission", function()
 					else
 						-- A copied valid receipt cannot authorize deleting a different
 						-- native generation, even when every payload hash still matches.
-						local Shell = require("adapters.shell_runner")
+						local Shell = require("core.process.adapters.shell_runner")
 						assert(Shell.run("cp -a -- " .. Shell.quote(fixture.root .. "/displaced-candidate") .. " " .. Shell.quote(source)))
 						marker = "/linux/new.marker"; foreign_bytes = assert(Fixture.read(source .. marker))
 					end

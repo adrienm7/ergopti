@@ -117,7 +117,7 @@ _CRSB_CurlAdapterRejectsOversizeHeaders() {
 
 _CRSB_EveryCurlTransportDeclaresTheCap() {
 	Http := FileRead(A_ScriptDir . "\..\core\network\adapters\http_client.ahk", "UTF-8")
-	Shell := FileRead(A_ScriptDir . "\..\adapters\shell_runner.ahk", "UTF-8")
+	Shell := FileRead(A_ScriptDir . "\..\core\process\adapters\shell_runner.ahk", "UTF-8")
 	Remote := FileRead(A_ScriptDir . "\..\modules\llm\api_remote.ahk", "UTF-8")
 	OllamaHttp := FileRead(A_ScriptDir
 		. "\..\modules\llm\api_ollama\ollama_http.ahk", "UTF-8")

@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 for _, program in ipairs({ "gio", "xdotool", "gsettings", "luajit" }) do
 	assert(Shell.exec_checked("command -v " .. program), program .. " is required")

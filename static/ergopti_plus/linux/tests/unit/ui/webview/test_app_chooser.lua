@@ -156,7 +156,7 @@ end)
 --- @param output string Actual child stdout.
 --- @return string receipt
 local function native_dialog_receipt(status, output)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local made, directory = Shell.exec_checked("mktemp -d")
 	assert(made)
 	directory = directory:gsub("[\r\n]+$", "")
@@ -171,7 +171,7 @@ local function native_dialog_receipt(status, output)
 		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
 			.. "package.loaded['core.logger.engine.shim']={error=function()end,warn=function()end,debug=function()end}\n"
 			.. "local calls=0;package.loaded['ui.modal']={run=function(fn)calls=calls+1;return fn()end}\n"
-			.. "local S=require('adapters.shell_runner')\n"
+			.. "local S=require('core.process.adapters.shell_runner')\n"
 			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked}\n"
 			-- The private executable stands in for the owned dialog host.
 			.. "package.loaded['ui.native_dialog']={command=function()return S.quote(" .. string.format("%q", executable) .. ")end}\n"
@@ -194,7 +194,7 @@ end
 helpers.describe("application chooser follows the actual XDG resolution owner", function()
 	helpers.it("keeps the higher-priority file and refuses the shadowed selection", function()
 		if not rawget(_G, "jit") then print("SKIP: native Gio worker requires LuaJIT FFI"); return end
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local ok, root = Shell.exec_checked("mktemp -d")
 		assert(ok); root = root:gsub("[\r\n]+$", "")
 		local user, system, worker = root .. "/user", root .. "/system", root .. "/worker.lua"
@@ -242,11 +242,11 @@ end)
 
 helpers.describe("application lookup owns its bounded native worker", function()
 	helpers.it("refuses failed or malformed bounded lookup receipts", function()
-		local names = { "ui.desktop_application_resolution", "adapters.shell_runner", "ui.modal" }
+		local names = { "ui.desktop_application_resolution", "core.process.adapters.shell_runner", "ui.modal" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local command, modal_calls, answer, output = nil, 0, false, ""
-		local real_shell = require("adapters.shell_runner")
-		package.loaded["adapters.shell_runner"] = { quote = real_shell.quote, exec_checked = function(value)
+		local real_shell = require("core.process.adapters.shell_runner")
+		package.loaded["core.process.adapters.shell_runner"] = { quote = real_shell.quote, exec_checked = function(value)
 			command = value
 			return answer, output
 		end }
@@ -271,7 +271,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 
 	helpers.it("resolves through a literal driver root containing semicolon and question mark", function()
 		if not rawget(_G, "jit") then print("SKIP: native Gio worker requires LuaJIT FFI"); return end
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
 		local driver, user = root .. "/driver;?literal", root .. "/user"
 		assert(Shell.run("mkdir -p " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
@@ -305,7 +305,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 	end)
 
 	helpers.it("waits for a worker that ignores TERM and needs KILL", function()
-		local Shell, uv = require("adapters.shell_runner"), require("luv")
+		local Shell, uv = require("core.process.adapters.shell_runner"), require("luv")
 		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
 		local interpreter, marker, parent = root .. "/interpreter", root .. "/pid", root .. "/parent.lua"
 		local function write(path, text)
@@ -316,7 +316,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 			.. "\nwhile :; do :; done\n")
 		assert(Shell.run("chmod u+x " .. Shell.quote(interpreter)))
 		write(parent, "package.path=" .. string.format("%q", package.path) .. "\n"
-			.. "require('adapters.shell_runner')\n"
+			.. "require('core.process.adapters.shell_runner')\n"
 			.. "package.loaded['ui.modal']={run=function(fn)return fn()end}\n"
 			.. "package.loaded.luv={exepath=function()return " .. string.format("%q", interpreter) .. " end}\n"
 			.. "local path,status=require('ui.desktop_application_resolution').resolve('witness'); io.write(tostring(path),'|',status)\n")
@@ -336,7 +336,7 @@ helpers.describe("application lookup owns its bounded native worker", function()
 
 	helpers.it("retires a Gio worker blocked on a higher-priority FIFO", function()
 		if not rawget(_G, "jit") then print("SKIP: native Gio worker requires LuaJIT FFI"); return end
-		local Shell, uv = require("adapters.shell_runner"), require("luv")
+		local Shell, uv = require("core.process.adapters.shell_runner"), require("luv")
 		local made, root = Shell.exec_checked("mktemp -d"); assert(made); root = root:gsub("[\r\n]+$", "")
 		local user, system = root .. "/user", root .. "/system"
 		assert(Shell.run("mkdir -p " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(system .. "/applications")))

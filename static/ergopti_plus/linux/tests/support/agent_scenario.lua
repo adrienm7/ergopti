@@ -34,7 +34,7 @@ local RELOADED = {
 -- The boundaries a scenario scripts
 local FAKED = {
 	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
-	"modules.llm.profiles", "modules.llm.api_ollama", "adapters.shell_runner",
+	"modules.llm.profiles", "modules.llm.api_ollama", "core.process.adapters.shell_runner",
 }
 
 -- The preferences every scenario starts from: the menu's predictions go to the
@@ -134,7 +134,7 @@ function M.run(opts, body)
 		})
 
 		if opts.native_model_dialog then
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(command) return command == "zenity" end,
 				quote = function(value) return "'" .. value:gsub("'", "'\"'\"'") .. "'" end,
 				exec_checked = function(command)

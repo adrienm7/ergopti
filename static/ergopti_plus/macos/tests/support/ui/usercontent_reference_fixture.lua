@@ -15,7 +15,7 @@ local function with_picker(scenario)
 	return helpers.with_stub_scope({
 		"ui.action_picker", "ui.webview_controller_pool", "ui.ui_builder", "core.logger.engine.logger",
 		"core.i18n.engine.i18n", "core.fs.engine.paths", "infra.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
-		"adapters.program_providers", "adapters.apple_shortcuts_native",
+		"core.process.adapters.program_providers", "adapters.apple_shortcuts_native",
 	}, function()
 		local h = { controllers = {}, userdata_refs = {}, callback_refs = {}, views = {}, errors = {}, nil_calls = 0 }
 		local Json = require("core.text.engine.json")
@@ -26,7 +26,7 @@ local function with_picker(scenario)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 		helpers.provide_timings()
-		package.loaded["adapters.program_providers"] = {}
+		package.loaded["core.process.adapters.program_providers"] = {}
 		package.loaded["adapters.apple_shortcuts_native"] = {}
 		local function new_controller(name)
 			local controller = { name = name }

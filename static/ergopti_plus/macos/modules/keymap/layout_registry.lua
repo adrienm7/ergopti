@@ -179,7 +179,7 @@ local function default_deps(settings)
 		-- An asynchronous task (ShellRunner.run), never a blocking shell call: the refresh
 		-- runs on the main thread that also delivers the keys.
 		registry_changes = function(dir, callback)
-			require("adapters.shell_runner").run(GIT, Catalogue.registry_changes_args(dir), function(ok, out, stderr)
+			require("core.process.adapters.shell_runner").run(GIT, Catalogue.registry_changes_args(dir), function(ok, out, stderr)
 				if ok then
 					callback(out or "", nil)
 				else

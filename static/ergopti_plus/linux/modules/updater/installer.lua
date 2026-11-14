@@ -12,7 +12,7 @@
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local TextUtils = require("core.text.engine.utils_core")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 local Fs = require("core.fs.adapters.file_system")
 local Paths = require("core.fs.engine.paths")
@@ -21,7 +21,7 @@ local Snapshot = require("diagnostics.engine.snapshot")
 local NativePath = require("core.fs.engine.native_path")
 local NoReplaceMove = require("core.fs.engine.no_replace_move")
 local Ownership = require("modules.updater.ownership_receipt")
-local ProgramRunner = require("adapters.program_runner")
+local ProgramRunner = require("core.process.adapters.program_runner")
 local uv_loaded, uv = pcall(require, "luv")
 
 local WORK_PREFIX = ".ergopti-update."

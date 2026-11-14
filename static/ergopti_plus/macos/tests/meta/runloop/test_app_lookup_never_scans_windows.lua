@@ -47,7 +47,7 @@ local WINDOW_LOOKUP_OWNER = "adapters.own_window"
 -- WindowManager and WindowInfo ports, the unused focus filter of the process
 -- lifecycle); none runs when a window opens.
 local WINDOW_SCAN_BASELINE = {
-	["adapters.process_lifecycle"] = 2,
+	["core.process.adapters.lifecycle"] = 2,
 	["adapters.window_info"] = 1,
 	["adapters.window_manager"] = 5,
 	["platform.remap.watchers"] = 1,

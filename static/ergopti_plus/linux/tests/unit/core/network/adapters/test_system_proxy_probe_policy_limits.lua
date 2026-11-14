@@ -98,7 +98,7 @@ helpers.describe("system proxy probe: selection limits come from the shared poli
 		local root = root_with("{}")
 		local path = root .. "/" .. POLICY
 		os.remove(path)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local quote = Shell.quote
 		assert(os.execute("mkfifo " .. quote(path)))
 		local executable = assert(require("luv").exepath())

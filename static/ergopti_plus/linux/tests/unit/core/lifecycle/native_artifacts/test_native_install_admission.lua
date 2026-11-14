@@ -13,7 +13,7 @@ local function fixture(options)
   stages = 0, commits = 0, cleanups = 0, disposes = 0, hashes = 0, writes = {}, bytes = "",
   timer_settled = false, timer_listeners = {}, hash_settled = false, hash_listeners = {}, callbacks = {} }
  local saved = {}
- local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256", "adapters.owned_process" }
+ local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256", "core.process.adapters.owned_process" }
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local function restore()
   for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -129,7 +129,7 @@ local function fixture(options)
  for _, name in ipairs({ "new_pipe", "fs_read", "fs_close", "write", "shutdown" }) do
   package.loaded.luv[name] = function() error("admission controls must not acquire reader I/O") end
  end
- package.loaded["adapters.owned_process"] = { start = function() error("no tar launch in admission controls") end }
+ package.loaded["core.process.adapters.owned_process"] = { start = function() error("no tar launch in admission controls") end }
  h.factory, h.unavailable = Output.native_artifact("ergopti-linux.tar.gz")
  function h:reserve()
   self.transaction = {}
@@ -178,7 +178,7 @@ local function fixture(options)
 end
 local function controlled(options, body)
  local saved = {}
- local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256", "adapters.owned_process" }
+ local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "core.network.engine.managed_http_deadline", "core.network.engine.fd_sha256", "core.process.adapters.owned_process" }
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local ok, err = xpcall(function() body(fixture(options)) end, debug.traceback)
  for _, name in ipairs(names) do package.loaded[name] = saved[name] end

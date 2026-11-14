@@ -73,7 +73,7 @@ helpers.describe("file_watchers Personal topology", function()
 		local directories, files, records = { root }, {}, {}
 		local state = { root = root, now = 0, reloads = 0, scans = 0, callbacks = {},
 			fail_callback = false, denied = nil, start_refused = nil, stop_refused = nil, close_refused = nil }
-		local actual_shell = require("adapters.shell_runner")
+		local actual_shell = require("core.process.adapters.shell_runner")
 		local backend, scan_port, shell_port = {}, {}, {}
 		for key, value in pairs(native_luv) do backend[key] = value end
 		for key, value in pairs(fixture_filesystem) do scan_port[key] = value end
@@ -186,7 +186,7 @@ helpers.describe("file_watchers Personal topology", function()
 		end
 		local previous_watch = package.loaded["core.fs.engine.file_watchers"]
 		local previous_posix, previous_posix_preload = package.loaded["posix"], package.preload["posix"]
-		local previous_shell = package.loaded["adapters.shell_runner"]
+		local previous_shell = package.loaded["core.process.adapters.shell_runner"]
 		local watcher
 		function state.start(reuse_owner)
 			if not reuse_owner then
@@ -196,10 +196,10 @@ helpers.describe("file_watchers Personal topology", function()
 					package.loaded["posix"] = nil
 					package.preload["posix"] = function() error("explicit supported no-posix watcher backend") end
 				end
-				package.loaded["adapters.shell_runner"] = shell_port
+				package.loaded["core.process.adapters.shell_runner"] = shell_port
 				watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", backend_name == "native" and backend or false)
 				package.loaded["posix"], package.preload["posix"] = previous_posix, previous_posix_preload
-				package.loaded["adapters.shell_runner"] = previous_shell
+				package.loaded["core.process.adapters.shell_runner"] = previous_shell
 			end
 			watcher.start({ personal_dir = state.personal, hotstrings_dir = state.overlap and state.personal or nil,
 				base_dir = state.base, now_ms = function() return state.now end,
@@ -260,7 +260,7 @@ helpers.describe("file_watchers Personal topology", function()
 		end
 		native_luv.run("nowait")
 		package.loaded["core.fs.engine.file_watchers"], package.loaded["posix"] = previous_watch, previous_posix
-		package.preload["posix"], package.loaded["adapters.shell_runner"] = previous_posix_preload, previous_shell
+		package.preload["posix"], package.loaded["core.process.adapters.shell_runner"] = previous_posix_preload, previous_shell
 		for path in pairs(files) do local deleted, detail = native_luv.fs_unlink(path); if not deleted then failures[#failures + 1] = tostring(detail) end end
 		for index = #directories, 1, -1 do local deleted, detail = native_luv.fs_rmdir(directories[index]); if not deleted then failures[#failures + 1] = tostring(detail) end end
 		for _, record in pairs(records) do if not record.retired then failures[#failures + 1] = "owned native handle did not acknowledge retirement" end end

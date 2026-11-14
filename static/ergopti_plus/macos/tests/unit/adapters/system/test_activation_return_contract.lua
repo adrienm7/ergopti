@@ -110,7 +110,7 @@ end)
 helpers.describe("file-manager shortcut: a refused running app falls through", function()
 	helpers.it("tries the next activation path after app:activate() false", function()
 		local shell_opens = 0
-		local saved_shell_runner = package.loaded["adapters.shell_runner"]
+		local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 		local slots = {
 			"adapters.window_manager",
 			"adapters.app_launcher",
@@ -124,7 +124,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 		for _, slot in ipairs(slots) do saved[slot] = package.loaded[slot] end
 
 		local ok, err = xpcall(function()
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				open = function() shell_opens = shell_opens + 1; return true end,
 			}
 			package.loaded["adapters.window_manager"] = {
@@ -158,7 +158,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			})
 			actions.open_finder()
 		end, debug.traceback)
-		package.loaded["adapters.shell_runner"] = saved_shell_runner
+		package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 		for _, slot in ipairs(slots) do package.loaded[slot] = saved[slot] end
 		if not ok then error(err, 0) end
 

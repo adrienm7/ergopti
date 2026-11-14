@@ -20,11 +20,11 @@ local function with_window(module_name, scenario)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
 			"ui.layer_editor", "ui.action_picker", "ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
-			"infra.config_paths", "adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
+			"infra.config_paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
 			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "infra.keycodes", "core.fs.adapters.file_system",
 			"infra.text_utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
-			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "adapters.shell_runner", "adapters.task_environment",
+			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",
 			"diagnostics.engine.runtime_log", "platform.remap.lease_helper", "settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
 			"shortcuts.engine.brightness_actions", "shortcuts.engine.brightness_actions_data", "settings.engine.migration.migrate", "diagnostics.engine.operation_reporter",
 			"core.fs.engine.dir", "platform.input.keycodes.core", "lfs", "core.fs.engine.module_source_directory", "core.fs.engine.module_source_identity", "modules.keymap.layout",
@@ -50,7 +50,7 @@ local function with_window(module_name, scenario)
 				end
 				return view
 			end
-			package.loaded["adapters.program_providers"] = {}
+			package.loaded["core.process.adapters.program_providers"] = {}
 			package.loaded["modules.keymap.layout_registry"] = { snapshot = function() return { platform = "macos", installed = {} } end }
 			package.loaded["infra.config_paths"] = {
 				is_initialized = function() return true end,

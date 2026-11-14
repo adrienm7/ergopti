@@ -424,8 +424,8 @@ local OLLAMA_MODULES = {
 	"adapters.managed_ollama_pull",
 	"modules.llm.opaque_network_admission",
 	"modules.llm.ollama_endpoint",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"ui.download_window",
@@ -463,11 +463,11 @@ local function with_ollama_manager(enabled, body)
 		package.loaded["modules.llm.ollama_endpoint"] = {
 			get_base_url = function() return "http://127.0.0.1:11435" end,
 		}
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["core.network.adapters.http_client"] = {}
 		package.loaded["ui.download_window"] = {}
 		package.loaded["core.events.timer_scheduler"] = scheduler
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, on_done, args)
 				local task = { label = label, executable = executable, args = args, on_done = on_done }
 				function task:isRunning() return false end

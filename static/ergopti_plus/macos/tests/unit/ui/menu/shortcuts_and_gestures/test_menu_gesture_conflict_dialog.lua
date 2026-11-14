@@ -31,7 +31,7 @@ local function choose(parameter, clicked, refusal, picked)
 		"menu.engine.renderer", "core.text.engine.json",
 	}
 	local saved, observed = {}, { queue = {}, opened = {}, dialogs = 0, refreshed = 0, settings = 0, prompts = 0 }
-	local saved_shell = package.loaded["adapters.shell_runner"]
+	local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local gestures = {
 		DEFAULT_STATE = { gestures = true }, get_action = function() return assigned end,
@@ -103,7 +103,7 @@ local function choose(parameter, clicked, refusal, picked)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.adapters.storage"] = { get = function() return false end }
 	package.loaded["infra.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
-	package.loaded["adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
+	package.loaded["core.process.adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
 	local ok, err = xpcall(function()
 		-- Keep the prompt and retained writer owner genuine; dialog/native ports
 		-- remain controlled by this UI-boundary fixture.
@@ -121,7 +121,7 @@ local function choose(parameter, clicked, refusal, picked)
 		while #observed.queue > 0 do table.remove(observed.queue, 1)() end
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved_shell
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell
 	for name in pairs(package.loaded) do
 		if original_modules[name] == nil then package.loaded[name] = nil end
 	end

@@ -396,7 +396,7 @@ helpers.describe("ui.bridge_handlers", function()
         "the obsolete Linux-only schema must not survive beside the canonical one")
     end)
     helpers.it("opens only repository URLs and reports the launcher outcome (lnx-056)", function()
-      local Shell = require("adapters.shell_runner")
+      local Shell = require("core.process.adapters.shell_runner")
       local commands = {}
       Shell._set_runner(function(command)
         commands[#commands + 1] = command
@@ -422,7 +422,7 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("refuses a repository that only shares the name's prefix (repo-url-single-source)", function()
       -- The allow-pattern was a typed copy of the repository, and it accepted
       -- any name that merely started with it
-      local Shell = require("adapters.shell_runner")
+      local Shell = require("core.process.adapters.shell_runner")
       local commands = {}
       Shell._set_runner(function(command) commands[#commands + 1] = command; return true end)
       local refused = handler.on_message({

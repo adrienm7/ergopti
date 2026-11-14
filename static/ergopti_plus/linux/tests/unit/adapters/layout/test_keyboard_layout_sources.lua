@@ -58,7 +58,7 @@ local function load_with(kind, answers, env, group, native_dump)
 	package.loaded["adapters.xkb_capture"] = require("tests.support.layout_cohort_fixture").capture(function(text)
 		return package.loaded["adapters.keyboard_layout"].build(text, group)
 	end, group)
-	local Shell = helpers.load_module("adapters.shell_runner")
+	local Shell = helpers.load_module("core.process.adapters.shell_runner")
 	Shell._set_runner(function(cmd)
 		commands[#commands + 1] = cmd
 		if cmd:match("^command %-v") then
@@ -99,7 +99,7 @@ end
 helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 
 	helpers.it("xkb-data-prerequisite: requires actual include files and Compose tables", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native XKB data admission requires Python and the actual LuaJIT FFI runtime")
 		local quote = require("core.text.engine.utils_core").shell_quote
@@ -110,7 +110,7 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 	end)
 
 	helpers.it("keymap-session-exit: failed native metadata cannot select the compiled keymap", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native session keymap receipts require Python and the actual LuaJIT FFI runtime")
 		local quote = require("core.text.engine.utils_core").shell_quote
@@ -121,7 +121,7 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 	end)
 
 	helpers.it("keymap-source-exit: refuses failed real source commands before native publication", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native keymap source receipts require Python and the actual LuaJIT FFI runtime")
 		local quote = require("core.text.engine.utils_core").shell_quote

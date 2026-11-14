@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Regression — every shell_runner stub install must be restored
 --- DESCRIPTION:
---- Scans every test file for `package.loaded["adapters.shell_runner"] = {...}`
+--- Scans every test file for `package.loaded["core.process.adapters.shell_runner"] = {...}`
 --- installs and requires a later restore (`= nil` or `= <saved real module>`)
 --- in the same file.
 ---
@@ -22,7 +22,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 --- Assignment head that installs or restores the shared shell_runner slot.
-local ASSIGN_PATTERN = 'package%.loaded%[%"adapters%.shell_runner%"%]%s*=%s*'
+local ASSIGN_PATTERN = 'package%.loaded%[%"core%.process%.adapters%.shell_runner%"%]%s*=%s*'
 
 --- Directories whose test files are scanned, relative to the driver root.
 local SCAN_DIRS = { "tests/unit", "tests/meta", "tests/integration" }
@@ -99,7 +99,7 @@ local function has_dangling_install(content)
 	-- with_stub_scope additionally restores native API doubles on exceptions.
 	if (content:find("helpers.with_fresh_modules", 1, true)
 			or content:find("helpers.with_stub_scope", 1, true))
-			and content:find('[{,]%s*"adapters%.shell_runner"%s*[,}]') then
+			and content:find('[{,]%s*"core%.process%.adapters%.shell_runner"%s*[,}]') then
 		return false
 	end
 	local last_install = nil
@@ -129,7 +129,7 @@ end
 -- ============================
 
 helpers.describe("shell_runner stub hygiene across the whole suite", function()
-	helpers.it("every test file restores adapters.shell_runner after its last stub install", function()
+	helpers.it("every test file restores core.process.adapters.shell_runner after its last stub install", function()
 		local files = {}
 		for _, dir in ipairs(SCAN_DIRS) do
 			collect_test_files(helpers.driver_root() .. "/" .. dir, files)
@@ -145,26 +145,26 @@ helpers.describe("shell_runner stub hygiene across the whole suite", function()
 		end
 
 		helpers.assert_eq(table.concat(offenders, ", "), "",
-			"these test files install a package.loaded[\"adapters.shell_runner\"] stub and never "
+			"these test files install a package.loaded[\"core.process.adapters.shell_runner\"] stub and never "
 			.. "restore it — the next test file the runner loads captures the stub at require "
 			.. "time and crashes order-dependently (green locally, red in CI)")
 	end)
 
 	helpers.it("the scanner itself recognises a dangling install", function()
-		local dangling = 'package.loaded["adapters.shell_runner"] = { spawn = function() end }'
-		local restored = dangling .. '\npackage.loaded["adapters.shell_runner"] = nil'
+		local dangling = 'package.loaded["core.process.adapters.shell_runner"] = { spawn = function() end }'
+		local restored = dangling .. '\npackage.loaded["core.process.adapters.shell_runner"] = nil'
 		helpers.assert_true(has_dangling_install(dangling) == true,
 			"an install with no later restore must be flagged")
 		helpers.assert_true(has_dangling_install(restored) == false,
 			"an install followed by a restore must pass")
-		local scoped = 'local OWNED = { "adapters.shell_runner" }\n' .. dangling
+		local scoped = 'local OWNED = { "core.process.adapters.shell_runner" }\n' .. dangling
 			.. '\nhelpers.with_fresh_modules(OWNED, body)'
 		helpers.assert_true(has_dangling_install(scoped) == false,
 			"an install inside a with_fresh_modules scope that owns the module must pass")
 		local native_scoped = scoped:gsub("helpers.with_fresh_modules", "helpers.with_stub_scope")
 		helpers.assert_true(has_dangling_install(native_scoped) == false,
 			"the native stub scope restores its explicit shell-runner ownership")
-		local unowned_scope = native_scoped:gsub('"adapters.shell_runner"', '"core.logger.engine.logger"', 1)
+		local unowned_scope = native_scoped:gsub('"core.process.adapters.shell_runner"', '"core.logger.engine.logger"', 1)
 		helpers.assert_true(has_dangling_install(unowned_scope),
 			"a scope that does not own shell_runner cannot excuse its dangling install")
 	end)

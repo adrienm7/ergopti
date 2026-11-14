@@ -316,7 +316,7 @@ try:
                         + "logger.error=function() errors=errors+1 end;package.loaded['core.logger.engine.shim']=logger\n"
                         + "local releases, restores = 0, 0\n"
                         + "package.loaded['adapters.keyboard_hook'] = {while_released=function(fn) releases=releases+1; local result={fn()}; restores=restores+1; return unpack(result) end}\n"
-                        + "local shell=require('adapters.shell_runner')\n"
+                        + "local shell=require('core.process.adapters.shell_runner')\n"
                         + (
                             "local value=require('ui.text_prompt').ask('Native entry','Preserved native body',' Exact café ')\n"
                             if mode == "prompt"

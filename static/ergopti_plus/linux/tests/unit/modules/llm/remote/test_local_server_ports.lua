@@ -361,7 +361,7 @@ helpers.it("(local-port-owned) a real process acknowledges exit and closure befo
 	scanner._list_proc = function() return { "1" } end
 	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
 	scanner._owned_process = function(_, _, options, callback)
-		return require("adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
+		return require("core.process.adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
 	end
 	local ok, err = pcall(function()
 		local descriptor = read("ai/data/local_servers.json").servers.omlx.discovery

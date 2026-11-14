@@ -64,7 +64,7 @@ helpers.describe("shortcut case transforms", function()
 
 	helpers.it("retains the real text owner while a command runs asynchronously", function()
 		with_manager("unused", function(_, state, _, focus, watch)
-			local names = { "modules.gestures.user_actions", "adapters.shell_runner" }
+			local names = { "modules.gestures.user_actions", "core.process.adapters.shell_runner" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local callback

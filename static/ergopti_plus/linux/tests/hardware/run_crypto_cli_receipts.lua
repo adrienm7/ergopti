@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 assert(uv.getuid() ~= 0, "native CLI tests require an ordinary user")
 assert(not require("core.network.engine.openssl_digest").available, "run this actual fallback fixture with lua5.4, without FFI")
 local Crypto = require("core.crypto.crypto")

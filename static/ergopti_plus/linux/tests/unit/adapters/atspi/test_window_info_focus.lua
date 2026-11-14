@@ -59,7 +59,7 @@ local NIRI_WINDOW = [[
 --- @param routes table Array of { pattern, reply } — reply is a string or boolean.
 --- @return table log Commands in the order they were run.
 local function stub_shell(routes)
-	local Shell = helpers.load_module("adapters.shell_runner")
+	local Shell = helpers.load_module("core.process.adapters.shell_runner")
 	local log = {}
 	Shell._set_runner(function(cmd)
 		log[#log + 1] = cmd
@@ -91,7 +91,7 @@ end
 
 --- Drops the shell seam so a later module never inherits it.
 local function restore()
-	local Shell = helpers.load_module("adapters.shell_runner")
+	local Shell = helpers.load_module("core.process.adapters.shell_runner")
 	Shell._reset_runner()
 end
 
@@ -108,7 +108,7 @@ end
 helpers.describe("window_info: X11", function()
 
 	helpers.it("(linux-focus-coherent-poll) retains one window's metadata and identity while focus changes", function()
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		local display = helpers.load_module("infra.display_server")
 		display._set_for_test(display.X11, "coherent focus fixture")
 		local queries, id = 0, "1"
@@ -141,7 +141,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("(linux-focus-window-identity) distinguishes identically titled windows of one process", function()
 		local id = "0x1"
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 		local ds = helpers.load_module("infra.display_server")
 		ds._set_for_test("x11", "xfce")
 		package.loaded["infra.display_server"] = ds
@@ -166,7 +166,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("(linux-focus-window-identity) distinguishes applications with the same window title", function()
 		local id, comm = "0x1", "firefox"
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 		local ds = helpers.load_module("infra.display_server")
 		ds._set_for_test("x11", "xfce")
 		package.loaded["infra.display_server"] = ds
@@ -189,7 +189,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("(linux-focus-window-identity) retries an unavailable process identity", function()
 		local comm = ""
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 		local ds = helpers.load_module("infra.display_server")
 		ds._set_for_test("x11", "xfce")
 		package.loaded["infra.display_server"] = ds
@@ -244,7 +244,7 @@ helpers.describe("window_info: X11", function()
 	end)
 
 	helpers.it("(linux-focus-reused-xid) detects a new owner in the xdotool fallback", function()
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 		local ds = helpers.load_module("infra.display_server")
 		ds._set_for_test("x11", "xfce")
 		package.loaded["infra.display_server"] = ds
@@ -273,7 +273,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("re-resolves the identity when the title changes", function()
 		local title = "First Window"
-		local Shell = helpers.load_module("adapters.shell_runner")
+		local Shell = helpers.load_module("core.process.adapters.shell_runner")
 		local ds = helpers.load_module("infra.display_server")
 		ds._set_for_test("x11", "xfce")
 		package.loaded["infra.display_server"] = ds
@@ -375,7 +375,7 @@ helpers.describe("window_info: Wayland", function()
 		}
 		local ok, failure = pcall(function()
 			local window = under("wayland", "sway", {})
-			require("adapters.shell_runner")._set_runner(function() error("controlled unexpected compositor query error") end)
+			require("core.process.adapters.shell_runner")._set_runner(function() error("controlled unexpected compositor query error") end)
 			helpers.assert_nil(window.focused_identity(), "an unexpected native query failure cannot authorize output through a different lookup")
 			helpers.assert_eq(captures, 0)
 			local metadata, identity = window.focused_snapshot()
@@ -391,7 +391,7 @@ helpers.describe("window_info: Wayland", function()
 	helpers.it("(linux-focus-coherent-poll) reserves accessible focus lookup for fresh native targeting", function()
 		local name = "adapters.user_hotstring_destination"
 		local saved, captures = package.loaded[name], 0
-		local saved_lifecycle = package.loaded["adapters.process_lifecycle"]
+		local saved_lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		package.loaded[name] = {
 			capture_current = function()
 				captures = captures + 1
@@ -405,7 +405,7 @@ helpers.describe("window_info: Wayland", function()
 			local metadata, identity = window.focused_snapshot()
 			helpers.assert_eq(metadata.appId, "")
 			helpers.assert_nil(identity, "unsupported compositors retain unknown native identity during metadata polling")
-			local lifecycle = helpers.load_module("adapters.process_lifecycle")
+			local lifecycle = helpers.load_module("core.process.adapters.lifecycle")
 			lifecycle.start()
 			for tick = 1, 5 do lifecycle.tick(tick) end
 			lifecycle.stop()
@@ -415,7 +415,7 @@ helpers.describe("window_info: Wayland", function()
 			helpers.assert_eq(captures, 2)
 		end)
 		package.loaded[name] = saved
-		package.loaded["adapters.process_lifecycle"] = saved_lifecycle
+		package.loaded["core.process.adapters.lifecycle"] = saved_lifecycle
 		restore()
 		helpers.assert_true(ok, tostring(failure))
 	end)

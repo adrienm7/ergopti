@@ -572,7 +572,7 @@ local function finish(state, answers)
 end
 
 local function pick_config_dir(state, current, page_current)
-	local shell = dependency(state, "shell", "adapters.shell_runner")
+	local shell = dependency(state, "shell", "core.process.adapters.shell_runner")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	if not shell or not config_paths then return { picked = false } end
 	local normalized = ConfigDirPicker.pick(shell, config_paths, wizard_translator(state), current)

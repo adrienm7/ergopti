@@ -587,7 +587,7 @@ Test("KS_ScanScancodeForChar: callable, returns a Map with scan + vk", _KS_ScanS
 
 ; Regression guard: ShellRunner is an
 ; OS-infrastructure adapter (not a formal port) that mirrors
-; macos/adapters/shell_runner.lua so domain modules share the same surface
+; macos/core/process/adapters/shell_runner.lua so domain modules share the same surface
 ; on both drivers. Tests assert the contract without exercising real OS side-effects.
 
 _SR_Exec_EmptyStringReturnsEmpty() {

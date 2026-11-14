@@ -19,10 +19,10 @@ local with_remap = fixture.with_remap
 --- @param open function Double for shell_runner.open(target, on_done).
 --- @param body function Receives nothing.
 local function with_runner(open, body)
-	local saved = package.loaded["adapters.shell_runner"]
-	package.loaded["adapters.shell_runner"] = { open = open }
+	local saved = package.loaded["core.process.adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = { open = open }
 	local ok, err = pcall(body)
-	package.loaded["adapters.shell_runner"] = saved
+	package.loaded["core.process.adapters.shell_runner"] = saved
 	if not ok then error(err, 0) end
 end
 

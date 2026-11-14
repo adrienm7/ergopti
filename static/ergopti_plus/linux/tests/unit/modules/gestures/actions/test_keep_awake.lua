@@ -131,7 +131,7 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 
 	helpers.it("linux-keep-awake: real child holds until its daemon-owned pipe closes", function()
 		local uv = require("luv")
-		local Process = require("adapters.owned_process")
+		local Process = require("core.process.adapters.owned_process")
 		local operation, input, active, sessions = nil, nil, false, {}
 		local owner = KeepAwake.new({
 			-- Its own sink: the metrics sampler is process-wide, and a session

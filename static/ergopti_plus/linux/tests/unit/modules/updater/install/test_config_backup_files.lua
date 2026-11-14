@@ -620,7 +620,7 @@ helpers.describe("config-backup-rule-source", function()
 			local source, target = dir .. "/rules\\source\n", dir .. "/target\\source\n"
 			assert(uv.fs_mkdir(dir .. "/config", 448))
 			if kind == "fifo" or kind == "fifo-link" then
-				assert(require("adapters.shell_runner").run("mkfifo -- " .. quote(kind == "fifo" and source or target)))
+				assert(require("core.process.adapters.shell_runner").run("mkfifo -- " .. quote(kind == "fifo" and source or target)))
 			else write(kind == "file-link" and target or source, rules) end
 			if kind == "fifo-link" or kind == "file-link" then assert(uv.fs_symlink(target, source)) end
 			if kind == "denied" then assert(uv.fs_chmod(source, 0)) end
@@ -648,7 +648,7 @@ assert((owner ~= nil) == %s, "backup rules admission disagrees with actual sourc
 			while not exited do uv.run("once") end
 			uv.run("nowait")
 			uv.fs_chmod(source, 384)
-			assert(require("adapters.shell_runner").run("rm -r -- " .. quote(dir)))
+			assert(require("core.process.adapters.shell_runner").run("rm -r -- " .. quote(dir)))
 			helpers.assert_eq(expired, false, "configuration backup must not wait for a FIFO writer")
 			helpers.assert_eq(status, 0, "only complete regular rule sources can construct a backup owner")
 			helpers.assert_eq(signal, 0, "a killed backup constructor never counts as admission")
@@ -692,7 +692,7 @@ end)
 helpers.describe("installer-native-exit-receipt", function()
 	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
 	local uv = require("luv")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 
 	local function with_listing_child(exit_code, callback)
 		local root = Fixture.scratch()

@@ -47,8 +47,8 @@ local OWNED_MODULES = {
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
 	"adapters.key_state",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.network.adapters.http_client",
 	"modules.gestures.engine",
@@ -79,7 +79,7 @@ end
 
 local function with_fixture(callback)
 	local saved_hs = _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
 			package.loaded["tests.stubs.hs"] = nil
@@ -122,7 +122,7 @@ local function with_fixture(callback)
 				build = function() return "exec /fixture/ollama serve" end,
 			}
 
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(executable, args, on_done)
 					local record = {
 						executable = executable,
@@ -165,7 +165,7 @@ local function with_fixture(callback)
 				end,
 			}
 
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, executable, on_done, on_chunk_or_args, args)
 					local task = {
 						label = label,
@@ -527,7 +527,7 @@ local function with_fixture(callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 

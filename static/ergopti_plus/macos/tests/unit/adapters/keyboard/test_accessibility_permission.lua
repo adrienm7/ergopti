@@ -66,11 +66,11 @@ helpers.describe("accessibility permission adapter (accessibility-before-eventta
 	end)
 
 	helpers.it("resets only this app's entry through tccutil (accessibility-wait-resumes)", function()
-		local saved = package.loaded["adapters.shell_runner"]
+		local saved = package.loaded["core.process.adapters.shell_runner"]
 		local saved_info = _G.hs.processInfo
 		_G.hs.processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon" }
 		local spawned = nil
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				spawned = { executable = executable, args = args, on_done = on_done }
 				return { start = function() return true end }
@@ -91,7 +91,7 @@ helpers.describe("accessibility permission adapter (accessibility-before-eventta
 				helpers.assert_contains(tostring(refusal), "bundle_id must be a non-empty string")
 			end)
 		end)
-		package.loaded["adapters.shell_runner"] = saved
+		package.loaded["core.process.adapters.shell_runner"] = saved
 		_G.hs.processInfo = saved_info
 		if not ok then error(err, 0) end
 	end)

@@ -32,7 +32,7 @@ helpers.describe("Ollama manager nonblocking boundaries", function()
 			"Ollama manager shell work must never use blocking hs.execute"
 		)
 		helpers.assert_true(
-			src:find('require("adapters.shell_runner")', 1, true) ~= nil
+			src:find('require("core.process.adapters.shell_runner")', 1, true) ~= nil
 				and src:find("ShellRunner.spawn", 1, true) ~= nil
 				and src:find("OLLAMA_READINESS_PROBE_TIMEOUT_SEC", 1, true) ~= nil
 				and src:find('"--max-time", tostring(OLLAMA_READINESS_PROBE_TIMEOUT_SEC)', 1, true) ~= nil,

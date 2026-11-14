@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local native = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 
 helpers.describe("shared-probe-native", function()
 	for _, kind in ipairs({ "fifo", "directory", "file", "symlink" }) do

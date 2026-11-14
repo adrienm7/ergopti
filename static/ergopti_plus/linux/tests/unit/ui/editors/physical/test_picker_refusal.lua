@@ -3,13 +3,13 @@
 --- Exercises genuine editor/window/picker callbacks over an exact file receipt.
 local helpers = require("tests.helpers")
 local Writer = require("core.text.engine.toml_codec.writer")
-require("adapters.shell_runner")
+require("core.process.adapters.shell_runner")
 require("ui.physical_shortcuts.bridge")
 require("ui.action_picker.bridge")
 
 local function with_editor(body)
 	local names = { "ui.physical_shortcuts.bridge", "ui.action_picker.bridge", "ui.webview_manager",
-		"modules.gestures.manager", "adapters.keyboard_hook", "adapters.program_providers", "core.i18n.engine.i18n",
+		"modules.gestures.manager", "adapters.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
 		"ui.text_prompt", "ui.app_chooser", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -73,7 +73,7 @@ local function with_editor(body)
 	local called, detail = xpcall(function()
 		package.loaded["ui.webview_manager"], package.loaded["modules.gestures.manager"] = manager, catalogue
 		package.loaded["adapters.keyboard_hook"] = { position_capture_available = function() return false end }
-		package.loaded["adapters.program_providers"] = {}
+		package.loaded["core.process.adapters.program_providers"] = {}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function() state.errors = state.errors + 1 end

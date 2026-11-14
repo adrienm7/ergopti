@@ -1418,7 +1418,7 @@ function shellFunctionNames(text, context) {
 const LUA_LAUNCHERS = {
 	io: { popen: 'shell' },
 	os: { execute: 'shell' },
-	'adapters.shell_runner': {
+	'core.process.adapters.shell_runner': {
 		run: 'shell',
 		exec: 'shell',
 		exec_checked: 'shell',
@@ -1430,9 +1430,9 @@ const LUA_LAUNCHERS = {
 		has_command: 'probe',
 		run_async: 'program'
 	},
-	'adapters.process_runner': { run: 'program' },
-	'adapters.program_runner': { spawn: 'program', available: 'probe' },
-	'adapters.owned_process': { start: 'program' },
+	'core.process.adapters.runner': { run: 'program' },
+	'core.process.adapters.program_runner': { spawn: 'program', available: 'probe' },
+	'core.process.adapters.owned_process': { start: 'program' },
 	luv: { spawn: 'program' }
 };
 
@@ -2307,12 +2307,12 @@ function selfTest() {
 	expectFound(
 		'Lua ShellRunner.exec_line',
 		'fixture.lua',
-		'local Shell = require("adapters.shell_runner")\nShell.exec_line("hostname")\n'
+		'local Shell = require("core.process.adapters.shell_runner")\nShell.exec_line("hostname")\n'
 	);
 	expectFound(
 		'Lua loop over a literal table, the form of the first regression',
 		'fixture.lua',
-		'local Shell = require("adapters.shell_runner")\nfor _, program in ipairs({ "mkdir", "hostname" }) do\n\tShell.exec_checked("command -v " .. program)\nend\n'
+		'local Shell = require("core.process.adapters.shell_runner")\nfor _, program in ipairs({ "mkdir", "hostname" }) do\n\tShell.exec_checked("command -v " .. program)\nend\n'
 	);
 	expectFound(
 		'Python loop over a literal list',

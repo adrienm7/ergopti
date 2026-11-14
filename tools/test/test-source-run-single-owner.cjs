@@ -108,7 +108,7 @@ const WINDOWS_MECHANICS = {
 	'ui/layout_manager/kbd_register_core.ahk': 'how the elevated layout installer relaunches itself',
 	'modules/dynamic_hotstrings/user_code.ahk':
 		'launch an owned personal-code worker with the bundled interpreter /script mode',
-	'adapters/program_providers.ahk':
+	'core/process/adapters/program_providers.ahk':
 		'admit A_AhkPath as an interpreter only when the current runtime is interpreted',
 	'modules/updater/core.ahk': 'the owner, Updater_IsLocalSource'
 };
@@ -123,7 +123,7 @@ for (const file of sources('windows', '.ahk')) {
 	);
 }
 const readinessPublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishReady');
-const programInventory = code('windows', 'adapters/program_providers.ahk', ahkComment);
+const programInventory = code('windows', 'core/process/adapters/program_providers.ahk', ahkComment);
 expect(
 	programInventory.split('A_IsCompiled').length === 2 &&
 		programInventory.split('A_AhkPath').length === 3 &&

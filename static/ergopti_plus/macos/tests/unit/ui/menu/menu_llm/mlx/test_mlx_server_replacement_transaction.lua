@@ -31,8 +31,8 @@ local MODULE_NAMES = {
 	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
-	"adapters.task_lifecycle",
-	"adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -130,7 +130,7 @@ local function with_server_fixture(options, assertions)
 
 		-- Quit/reload ("shutdown") dispatches the listener kill as an async task
 		-- instead of the synchronous os.execute proof (hs-quit-never-blocks).
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, arguments)
 				cleanup_commands[#cleanup_commands + 1] = executable .. " " .. table.concat(arguments, " ")
 				events[#events + 1] = "cleanup"
@@ -180,7 +180,7 @@ local function with_server_fixture(options, assertions)
 			set_active_server_pgid = noop,
 			mark_load_failed = noop,
 		}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, _, on_done, on_chunk, arguments)
 				local task = {
 					label = label,
@@ -291,7 +291,7 @@ local function with_server_fixture(options, assertions)
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved_modules[name] end
 	-- Explicit for the suite-wide shell_runner stub-restore ratchet
-	package.loaded["adapters.shell_runner"] = saved_modules["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved_modules["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

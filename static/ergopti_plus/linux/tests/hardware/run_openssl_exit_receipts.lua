@@ -22,7 +22,7 @@ local function typed_at(offset_ms)
 end
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Codec = require("metrics.engine.privacy.text_crypto")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local OpenSSL = require("core.network.engine.openssl_command")

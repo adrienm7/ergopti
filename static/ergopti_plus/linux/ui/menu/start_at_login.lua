@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Paths = require("core.fs.engine.paths")
 local Logger = require("core.logger.engine.shim")
 

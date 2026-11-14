@@ -57,9 +57,9 @@ end
 
 helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)", function()
 	helpers.it("(hs-quit-never-blocks) LLM helper and orphan MLX sweeps are async tasks", function()
-		helpers.with_stub_scope({ "adapters.shell_runner", "ui.menu.menu_llm" }, function()
+		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ui.menu.menu_llm" }, function()
 			local spawns = {}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				_active_tasks = {},
 				spawn = function(executable, arguments, on_done)
 					local record = { executable = executable, arguments = arguments,
@@ -98,14 +98,14 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 			helpers.assert_true(listener.arguments[2]:find("/usr/sbin/lsof -nP -tiTCP:3460", 1, true) ~= nil,
 				"the listener sweep must skip DNS/port-name resolution")
 			-- with_stub_scope restores the cache too; explicit for the suite ratchet
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 		end)
 	end)
 
 	helpers.it("(ollama-owned-retirement) Quit reports retained daemon debt without a global kill", function()
-		helpers.with_stub_scope({ "adapters.shell_runner", "ui.menu.menu_llm", "modules.llm.api_ollama" }, function()
+		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ui.menu.menu_llm", "modules.llm.api_ollama" }, function()
 			local spawns, retirements = {}, 0
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				_active_tasks = {},
 				spawn = function(executable, arguments)
 					spawns[#spawns + 1] = { executable = executable, arguments = arguments }
@@ -127,8 +127,8 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 	end)
 
 	helpers.it("(hs-quit-never-blocks) a refused sweep is reported, never waited on", function()
-		helpers.with_stub_scope({ "adapters.shell_runner", "ui.menu.menu_llm" }, function()
-			package.loaded["adapters.shell_runner"] = {
+		helpers.with_stub_scope({ "core.process.adapters.shell_runner", "ui.menu.menu_llm" }, function()
+			package.loaded["core.process.adapters.shell_runner"] = {
 				_active_tasks = {},
 				spawn = function()
 					return { start = function() return false end }
@@ -141,7 +141,7 @@ helpers.describe("quit teardown helper sweeps never block (hs-quit-never-blocks)
 			end)
 			helpers.assert_eq(blocked, {})
 			helpers.assert_eq(result, false, "a refused dispatch must be an explicit failure")
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 		end)
 	end)
 end)
