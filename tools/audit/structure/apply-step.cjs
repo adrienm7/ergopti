@@ -36,7 +36,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const Plan = require('./plan.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -456,6 +456,55 @@ function repairCoupled(before, after) {
  * stays.
  * @param {string[]} oldRepoPaths Repository paths of the files that left.
  */
+/**
+ * The needles a payload guard quotes from its reader follow the reader's
+ * rewrite. tools/test/test-macos-bundle-payload.cjs pairs each reader with
+ * the exact source text it must still contain; S08 recounted the reader's
+ * `Path(__file__).resolve().parents[3]` climb and the guard reported the
+ * reader no longer contained the quoted one. The reader's old line is split
+ * as prefix + needle + suffix; the needle becomes what its rewritten line
+ * holds between the same prefix and suffix. A needle that cannot be found so
+ * is refused rather than guessed.
+ * @param {string} guardText The guard's text, its reader paths already rewritten.
+ * @param {(reader: string) => {before: string, after: string}|null} readerTexts
+ *   The reader's text before and after the step, by its rewritten guard path;
+ *   null when the step did not rewrite it.
+ * @returns {string} The guard's text with its needles following their readers.
+ */
+function followGuardNeedles(guardText, readerTexts) {
+	const quote = (x) => `'${x.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+	const unquote = (x) => x.replace(/\\(.)/g, '$1');
+	return guardText.replace(
+		// The list is a run of quoted strings: a needle may hold brackets.
+		/(reader:\s*'([^']+)',\s*needles:\s*\[)((?:\s*'(?:[^'\\]|\\.)*'\s*,?)*\s*)\]/g,
+		(whole, head, reader, list) => {
+			const texts = readerTexts(reader);
+			if (!texts) return whole;
+			const oldLines = texts.before.split('\n');
+			const newLines = texts.after.split('\n');
+			const next = list.replace(/'((?:[^'\\]|\\.)*)'/g, (lit, body) => {
+				const needle = unquote(body);
+				if (texts.after.includes(needle) || !texts.before.includes(needle)) return lit;
+				const at = oldLines.findIndex((l) => l.includes(needle));
+				const line = oldLines[at];
+				const cut = line.indexOf(needle);
+				const prefix = line.slice(0, cut);
+				const suffix = line.slice(cut + needle.length);
+				const candidates = (oldLines.length === newLines.length ? [newLines[at]] : newLines).filter(
+					(l) =>
+						l.startsWith(prefix) && l.endsWith(suffix) && l.length >= prefix.length + suffix.length
+				);
+				if (candidates.length !== 1)
+					throw new Error(
+						`refusing --apply: the needle ${needle} quoted from ${reader} has no single rewritten line`
+					);
+				return quote(candidates[0].slice(prefix.length, candidates[0].length - suffix.length));
+			});
+			return `${head}${next}]`;
+		}
+	);
+}
+
 function pruneEmptyFolders(oldRepoPaths) {
 	const folders = new Set();
 	for (const f of oldRepoPaths) {
@@ -663,10 +712,30 @@ function main() {
 		);
 
 	// References first, in the files' current locations; then the moves.
+	const rewritten = new Map();
 	for (const [file, rows] of edits) {
 		const abs = path.join(ROOT, file);
-		const text = rewriteText(fs.readFileSync(abs, 'utf8'), rows, movedRepo, file);
+		const original = fs.readFileSync(abs, 'utf8');
+		const text = rewriteText(original, rows, movedRepo, file);
 		fs.writeFileSync(abs, text, 'utf8');
+		rewritten.set(movedRepo.get(file) || file, { file, before: original, after: text });
+	}
+	// The guards that quote their readers' text follow the rewrites.
+	// git grep exits 1 when no file matches: no guard quotes a reader then.
+	const found = spawnSync('git', ['grep', '-l', '-e', 'needles:', '--', 'tools/test'], {
+		cwd: ROOT,
+		encoding: 'utf8'
+	});
+	if (found.status !== 0 && found.status !== 1)
+		throw new Error(`git grep for payload guards failed: ${found.stderr}`);
+	const guards = found.stdout.split('\n').filter(Boolean);
+	for (const guard of guards) {
+		const abs = path.join(ROOT, guard);
+		const text = fs.readFileSync(abs, 'utf8');
+		const next = followGuardNeedles(text, (reader) => rewritten.get(`static/${reader}`) || null);
+		if (next === text) continue;
+		fs.writeFileSync(abs, next, 'utf8');
+		if (!edits.has(guard)) edits.set(guard, []);
 	}
 	const finalRepo = new Map(
 		[...map].filter(([, t]) => t).map(([o, t]) => [PREFIX + o, PREFIX + (stepMap.get(o) || o)])
@@ -704,6 +773,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	followGuardNeedles,
 	newPathToken,
 	rewriteOwnIncludes,
 	rewriteText,
