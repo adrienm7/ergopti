@@ -29,6 +29,7 @@ const MAP = new Map([
 	['windows/infra/lifecycle.ahk', 'windows/core/lifecycle/engine/lifecycle.ahk'],
 	['windows/infra/uninstall.ahk', 'windows/core/lifecycle/engine/shutdown/uninstall.ahk'],
 	['windows/infra/bundle.ahk', 'windows/core/lifecycle/engine/bundle.ahk'],
+	['windows/infra/json.ahk', 'windows/core/text/engine/json.ahk'],
 	['linux/infra/installation.lua', 'linux/core/lifecycle/engine/installation.lua'],
 	['macos/infra/paths.lua', 'macos/infra/paths.lua']
 ]);
@@ -72,6 +73,11 @@ function run() {
 		);
 		assert.ok(out.includes("'#Include core/lifecycle/engine/lifecycle.ahk'"), out);
 		assert.ok(out.includes('/windows\\\\core\\\\lifecycle\\\\engine\\\\bundle\\.ahk/'), out);
+	}
+	// An #Include of the Windows suite's entry climbs from windows/tests.
+	{
+		const out = rewrite(`${head}principal.indexOf('#Include ../infra/json.ahk');\n`);
+		assert.ok(out.includes("'#Include ../core/text/engine/json.ahk'"), out);
 	}
 	// A tool naming both Lua drivers: a bare path only one of them holds.
 	{

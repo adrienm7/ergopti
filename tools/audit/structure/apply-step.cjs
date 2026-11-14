@@ -76,6 +76,8 @@ function newPathToken(row, movedRepo) {
 			`${PREFIX}${r.newRepo.slice(PREFIX.length).split('/')[0]}`,
 			r.newRepo
 		);
+	// An #Include climb from the Windows suite's folder: from there again.
+	else if (r.form === 'tests-relative') out = path.posix.relative(r.keep, r.newRepo);
 	else if (r.form === 'root') {
 		// Relative to the root of the referencing file's tree, which may not be
 		// the target's: driver_root .. "/../_shared/data/x" keeps its "../_shared".
