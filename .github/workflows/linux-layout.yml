@@ -52,7 +52,9 @@ jobs:
       # symbol") on POSIX runners while staying invisible on Windows.
       #
       # Exclusions: historical corpus texts are data, not code; .gitkeep
-      # placeholders inside committed bundle fixtures must stay byte-stable.
+      # placeholders inside committed bundle fixtures must stay byte-stable;
+      # the tap-hold shared-file corpus pins the bytes the Windows writers
+      # produce (their UTF-8 BOM included) and the Linux readers read them.
       - name: Reject UTF-8 BOM in tracked non-AHK text files
         run: |
           bad=""
@@ -61,6 +63,7 @@ jobs:
               *.ahk) continue ;;
               static/corpus/original/*) continue ;;
               *.gitkeep) continue ;;
+              static/ergopti_plus/_shared/tests/corpus/tap_hold_shared_file/windows_written.toml) continue ;;
             esac
             if [ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
               bad="$bad$f\n"
